@@ -1,7 +1,11 @@
 #!/bin/bash
 #source /opt/bash-utils/logger.sh
 export PYTHONPATH="${PYTHONPATH}:/app/src/"
-export CUDA_HOME=/usr/local/cuda/
+if [ -z "${MARQO_CUDA_PATH}" ]; then
+    export CUDA_HOME=/usr/local/cuda
+else
+    export CUDA_HOME=${MARQO_CUDA_PATH}
+fi
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
@@ -35,23 +39,28 @@ VESPA_IS_INTERNAL=False
 # Vespa local run
 if ([ -n "$VESPA_QUERY_URL" ] || [ -n "$VESPA_DOCUMENT_URL" ] || [ -n "$VESPA_CONFIG_URL" ]) && \
    ([ -z "$VESPA_QUERY_URL" ] || [ -z "$VESPA_DOCUMENT_URL" ] || [ -z "$VESPA_CONFIG_URL" ]); then
-  echo "Error: Partial VESPA environment variables set. Please provide all or none of the VESPA_QUERY_URL, VESPA_DOCUMENT_URL, VESPA_CONFIG_URL."
+  echo "Error: Partial external vector store configuration detected. \
+Please provide all or none of the VESPA_QUERY_URL, VESPA_DOCUMENT_URL, VESPA_CONFIG_URL. \
+See https://docs.marqo.ai/2.0.0/Guides/Advanced-Usage/configuration/ for more information"
   exit 1
 
 elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_CONFIG_URL" ]; then
   # Start local vespa
-  echo "Running Vespa Locally"
+  echo "External vector store not configured. Using local vector store"
   tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
 
-  echo "Waiting for Vespa to start"
+  echo "Waiting for vector store to start"
   for i in {1..5}; do
-      echo -ne "Waiting... $i seconds\r"
-      sleep 1
+    if [ $i -eq 1 ]; then
+      suffix="second"
+    else
+      suffix="seconds"
+    fi
+    echo -ne "Waiting... $i $suffix\r"
+    sleep 1
   done
-  echo -e "\nDone waiting."
 
   # Try to deploy the application and branch on the output
-  echo "Setting up Marqo local vector search application..."
   END_POINT="http://localhost:19071/application/v2/tenant/default/application/default"
   MAX_RETRIES=10
   RETRY_COUNT=0
@@ -60,29 +69,28 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
     # Make the curl request and capture the output
     RESPONSE=$(curl -s -X GET "$END_POINT")
 
-    # Check for the specific "not found" error response
+    # Check for the specific "not found" error response which indicates there is no application package deployed
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
-      echo "Marqo does not find an existing index"
-      echo "Marqo is deploying the application and waiting for the response from document API to start..."
+      echo "Marqo did not find an existing vector store. Setting up vector store..."
       # Deploy a dummy application package
       vespa deploy /app/scripts/vespa_dummy_app --wait 300 >/dev/null 2>&1
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
-        echo "  Waiting for Vespa document API to be available..."
+        echo "  Waiting for vector store to be available..."
         sleep 10
       done
-      echo "  Vespa document API is available. Local Vespa setup complete."
+      echo "  Vector store is available. Vector store setup complete"
       break
 
-    # Check for the "generation" success response
+    # Check for the "generation" success response which indicates there is an existing application package deployed
     elif echo "$RESPONSE" | grep -q '"generation":'; then
-      echo "Marqo found an existing index. Waiting for the response from document API to start Marqo..."
+      echo "Marqo found an existing vector store. Waiting for vector store to be available..."
 
       until curl -f -X GET http://localhost:8080 >/dev/null 2>&1; do
-        echo "  Waiting for Vespa document API to be available..."
+        echo "  Waiting for vector store to be available..."
         sleep 10
       done
-      echo "  Vespa document API is available. Local Vespa setup complete."
+      echo "  Vector store is available. Vector store setup complete"
       break
     fi
     ((RETRY_COUNT++))
@@ -90,7 +98,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
   done
 
   if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-    echo "Warning: Marqo didn't configure local vector . Marqo is still starting but unexpected error may happen."
+    echo "Warning: Failed to configure local vector store. Marqo may not function correctly"
   fi
 
   export VESPA_QUERY_URL="http://localhost:8080"
@@ -99,7 +107,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
   export VESPA_IS_INTERNAL=True
 
 else
-  echo "All VESPA environment variables provided. Skipping local Vespa setup."
+  echo "External vector store configured. Using external vector store"
 fi
 
 # Start up redis
@@ -119,7 +127,7 @@ if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
         elapsed_time=$(expr $current_time - $start_time)
         if [ $elapsed_time -ge 2000 ]; then
             # Expected start time should be < 30ms in reality.
-            echo "redis-server failed to start within 2s. skipping."
+            echo "Marqo throttling server failed to start within 2s. skipping"
             break
         fi
         sleep 0.1
@@ -128,7 +136,7 @@ if [ "$MARQO_ENABLE_THROTTLING" != "FALSE" ]; then
     echo "Marqo throttling is now running"
 
 else
-    echo "Throttling has been disabled. Skipping Marqo throttling start."
+    echo "Throttling has been disabled. Skipping Marqo throttling start"
 fi
 
 # set the default value to info and convert to lower case
@@ -138,7 +146,7 @@ MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
 uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level $MARQO_LOG_LEVEL &
-api_pid=$!
+export api_pid=$!
 wait "$api_pid"
 
 

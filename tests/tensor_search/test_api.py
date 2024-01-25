@@ -1,3 +1,4 @@
+import uuid
 from unittest import mock
 
 from fastapi.testclient import TestClient
@@ -145,23 +146,98 @@ class TestApiErrors(MarqoTestCase):
         assert "Could not find model properties for" in response.json()["message"]
 
     def test_create_index_snake_case_fails(self):
-        # Verify snake case rejected for fields that have camel case as alias
-        response = self.client.post(
-            "/indexes/my_index",
-            json={
-                "type": "structured",
-                "allFields": [{"name": "field1", "type": "text"}],
-                "tensorFields": [],
-                'annParameters': {
-                    'spaceType': 'dotproduct',
-                    'parameters': {
-                        'ef_construction': 128,
-                        'm': 16
-                    }
-                }
-            }
-        )
+        """
+        Verify snake case rejected for fields that have camel case as alias
+        """
+        test_cases_fail = [
+            ({
+                 "type": "structured",
+                 "allFields": [
+                     {
+                         "name": "field1",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field2",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field3",
+                         "type": "multimodal_combination",
+                         "dependent_fields": {"field1": 0.5, "field2": 0.5}
+                     }
+                 ],
+                 "tensorFields": [],
+             }, 'dependent_fields', 'Snake case within a list'),
+            ({
+                 "type": "structured",
+                 "allFields": [],
+                 "tensorFields": [],
+                 'annParameters': {
+                     'spaceType': 'dotproduct',
+                     'parameters': {
+                         'ef_construction': 128,
+                         'm': 16
+                     }
+                 }
+             }, 'ef_construction', 'Snake case within a dict is invalid'),
+            ({
+                 "type": "unstructured",
+                 'annParameters': {
+                     'spaceType': 'dotproduct',
+                     'parameters': {
+                         'ef_construction': 128,
+                         'm': 16
+                     }
+                 }
+             }, 'ef_construction', 'Snake case within a dict is invalid, unstructured index')
+        ]
+        test_cases_pass = [
+            ({
+                 "type": "structured",
+                 "allFields": [
+                     {
+                         "name": "field_1",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field_2",
+                         "type": "text"
+                     },
+                     {
+                         "name": "field_3",
+                         "type": "multimodal_combination",
+                         "dependentFields": {"field_1": 0.5, "field_2": 0.5}
+                     }
+                 ],
+                 "tensorFields": ['field_3'],
+                 "model": "ViT-L/14",
+                 "modelProperties": {
+                     "name": "ViT-L/14",
+                     "dimensions": 768,
+                     "url": "https://7b4d1a66-507d-43f1-b99f-7368b655de46.s3.amazonaws.com/e5a7d9c7-0736-4301-a037-b1307f43a314/23fa0cb1-68d5-40f6-8039-e9e1265b6103.pt",
+                     "type": "open_clip",
+                     "field_1": "sth"
+                 }
+             }, 'Snake case in field name is valid'),
+        ]
 
-        self.assertEqual(response.status_code, 422)
-        self.assertTrue("Invalid field name 'ef_construction'" in response.text)
+        for test_case, field, test_name in test_cases_fail:
+            with self.subTest(test_name):
+                response = self.client.post(
+                    "/indexes/my_index",
+                    json=test_case
+                )
 
+                self.assertEqual(response.status_code, 422)
+                self.assertTrue(f"Invalid field name '{field}'" in response.text)
+
+        for test_case, test_name in test_cases_pass:
+            with self.subTest(test_name):
+                index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+                response = self.client.post(
+                    f"/indexes/{index_name}",
+                    json=test_case
+                )
+
+                self.assertEqual(response.status_code, 200)

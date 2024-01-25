@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 
 from pydantic import root_validator
 
@@ -45,15 +45,20 @@ class IndexSettings(StrictBaseModel):
     @root_validator(pre=True)
     def validate_field_names(cls, values):
         # Verify no snake case field names (pydantic won't catch these due to allow_population_by_field_name = True)
-        def validate_dict_keys(d: dict):
-            for key in d.keys():
-                if '_' in key:
-                    raise ValueError(f"Invalid field name '{key}'. "
-                                     f"See Create Index API reference here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/")
-                if isinstance(d[key], dict):
-                    validate_dict_keys(d[key])
+        def validate_keys(d: Union[dict, list]):
+            if isinstance(d, dict):
+                for key in d.keys():
+                    if '_' in key:
+                        raise ValueError(f"Invalid field name '{key}'. "
+                                         f"See Create Index API reference here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/")
 
-        validate_dict_keys(values)
+                    if key not in ['dependentFields', 'modelProperties']:
+                        validate_keys(d[key])
+            elif isinstance(d, list):
+                for item in d:
+                    validate_keys(item)
+
+        validate_keys(values)
 
         return values
 

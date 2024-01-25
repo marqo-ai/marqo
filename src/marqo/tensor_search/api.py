@@ -13,6 +13,7 @@ from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.models.health_response import HealthResponse
+from marqo.api.models.rollback_request import RollbackRequest
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.logging import get_logger
@@ -25,6 +26,7 @@ from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
+from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
@@ -353,6 +355,22 @@ def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(
     document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
 
     return {"documentCount": document_count}
+
+
+@app.post("/upgrade")
+@utils.enable_upgrade_api()
+def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    upgrade_runner = UpgradeRunner(marqo_config.vespa_client, marqo_config.index_management)
+    upgrade_runner.upgrade()
+
+
+@app.post("/rollback")
+@utils.enable_upgrade_api()
+def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    rollback_runner = RollbackRunner(marqo_config.vespa_client, marqo_config.index_management)
+    rollback_runner.rollback(from_version=req.from_version, to_version=req.to_version)
 
 
 if __name__ == "__main__":

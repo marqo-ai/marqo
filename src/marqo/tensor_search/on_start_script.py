@@ -4,7 +4,7 @@ import time
 
 import torch
 
-from marqo import config
+from marqo import config, documentation, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
@@ -12,25 +12,50 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.vespa.exceptions import VespaError
 
 logger = get_logger(__name__)
 
 
 def on_start(config: config.Config):
     to_run_on_start = (
+        CreateSettingsSchema(config),
         PopulateCache(config),
         DownloadStartText(),
         CUDAAvailable(),
         SetBestAvailableDevice(),
         ModelsForCacheing(),
-        InitializeRedis("localhost", 6379),  # TODO, have these variable
+        InitializeRedis("localhost", 6379),
         DownloadFinishText(),
+        PrintVersion(),
         MarqoWelcome(),
         MarqoPhrase(),
     )
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()
+
+
+class CreateSettingsSchema:
+    """Create the Marqo settings schema on Vespa"""
+
+    def __init__(self, config: config.Config):
+        self.config = config
+
+    def run(self):
+        try:
+            logger.debug('Creating Marqo settings schema')
+            created = self.config.index_management.bootstrap_vespa()
+            if created:
+                logger.debug('Marqo settings schema created')
+            else:
+                logger.debug('Marqo settings schema already exists. Skipping')
+        except VespaError as e:
+            logger.warn(
+                f"Could not create Marqo settings schema. If you are using an external vector store, "
+                "ensure that Marqo is configured properly for this. See "
+                f"{documentation.configuring_marqo()} for more details. Error: {e}"
+            )
 
 
 class PopulateCache:
@@ -40,6 +65,7 @@ class PopulateCache:
         self.config = config
 
     def run(self):
+        logger.debug('Starting index cache refresh thread')
         index_meta_cache.start_refresh_thread(self.config)
 
 
@@ -64,7 +90,7 @@ class CUDAAvailable:
         for device_id in device_ids:
             device_names.append({'id': device_id, 'name': id_to_device(device_id)})
 
-        self.logger.info(f"found devices {device_names}")
+        self.logger.info(f"Found devices {device_names}")
 
 
 class SetBestAvailableDevice:
@@ -181,6 +207,7 @@ class InitializeRedis:
         self.port = port
 
     def run(self):
+        logger.debug('Initializing Redis')
         # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
         if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) == "TRUE":
             redis_driver.init_from_app(self.host, self.port)
@@ -195,7 +222,7 @@ class DownloadStartText:
         print("###### STARTING DOWNLOAD OF MARQO ARTEFACTS################")
         print("###########################################################")
         print("###########################################################")
-        print('\n')
+        print('\n', flush=True)
 
 
 class DownloadFinishText:
@@ -207,7 +234,12 @@ class DownloadFinishText:
         print("###### !!COMPLETED SUCCESSFULLY!!!         ################")
         print("###########################################################")
         print("###########################################################")
-        print('\n')
+        print('\n', flush=True)
+
+
+class PrintVersion:
+    def run(self):
+        print(f"Version: {version.__version__}")
 
 
 class MarqoPhrase:
@@ -222,7 +254,7 @@ class MarqoPhrase:
                                                                                                                                                                                                                                                      
         """
 
-        print(message)
+        print(message, flush=True)
 
 
 class MarqoWelcome:
@@ -238,4 +270,4 @@ class MarqoWelcome:
       \_/\_/  |_____||_____|\____| \___/ |___|___||_____|      |__|   \___/     |___|___||__|__||__|\_|\__,_| \___/ |__|
                                                                                                                         
         """
-        print(message)
+        print(message, flush=True)
