@@ -78,9 +78,9 @@ After creating a digital copy of the product manual, the next step is to index t
 We first install Marqo and the Marqo python client,
 
 ```bash
-docker pull marqoai/marqo:0.0.12;
+docker pull marqoai/marqo:2.0.0;
 docker rm -f marqo;
-docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.12
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:2.0.0
 pip install marqo
 ```
 
