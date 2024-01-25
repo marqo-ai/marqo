@@ -62,7 +62,7 @@ Now we can start indexing:
 
 ```python
 settings = {
-           "model":'ViT-L/14',
+           "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
            "treat_urls_and_pointers_as_images": True,
            }
 client.create_index("hot-dogs-100k", **settings)
@@ -133,7 +133,7 @@ label_strings = [list(a.values())[0] for a in labels]
 
 # we create a new index
 settings = {
-        "model":'ViT-L/14',
+        "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
         "treat_urls_and_pointers_as_images": True,
         }
 client.create_index(index_name, **settings)

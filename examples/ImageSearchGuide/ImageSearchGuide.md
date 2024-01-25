@@ -26,8 +26,8 @@ please check [here](https://github.com/marqo-ai/marqo#m-series-mac-users).
 
 ```
 docker rm -f marqo
-docker pull marqoai/marqo:0.0.10
-docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.10
+docker pull marqoai/marqo:2.0.0
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:2.0.0
 ```
 
 Now, we can create a new environment and install the Marqo client by:
@@ -46,9 +46,9 @@ mq.get_marqo()
 ```
 and you should have the output as:
 ```python
-{'message': 'Welcome to Marqo', 'version': '0.0.10'}
+{'message': 'Welcome to Marqo', 'version': '2.0.0'}
 ```
-At the time this article is written, we are using marqo with version 0.0.10.
+At the time this article is written, we are using marqo with version 2.0.0.
 
 ### Download images
 
@@ -72,14 +72,14 @@ In this case, we just use a very basic setting by specifying the model ,enabling
 index_name = 'image-search-guide'
 
 settings = {
-        "model": "ViT-L/14",
+        "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
         "treat_urls_and_pointers_as_images": True,
         }
 
 mq.create_index(index_name, **settings)
 ```
 __Note__: To accomplish this multi-modal search task, we __MUST__ set `"treat_urls_and_pointers_as_imges": True` to enable the multi-modal search feature. As for the `model`, we need to 
-select a model from [__CLIP families__](https://docs.marqo.ai/0.0.10/Models-Reference/dense_retrieval/) (`"ViT-L/14"` in this case).
+select a model from [__CLIP families__](https://docs.marqo.ai/2.0.0/Models-Reference/dense_retrieval/) (`"open_clip/ViT-B-32/laion2b_s34b_b79k"` in this case).
 
 ### Access local images
 Now, we need to add the images to the created index, which is a little tricky. Marqo is running in the docker, so it will not be able to access
@@ -158,7 +158,7 @@ outputs:
 2022-12-30 04:27:51,573 logger:'marqo' INFO completed batch ingestion.
 2022-12-30 04:27:51,575 logger:'marqo' INFO add_documents completed. total time taken: 5.729s.
 ```
-Yes, it is just this simple one line of code. And you can check the outputs for the indexing time. If you have CUDA GPU available, and want to speed up indexing, follow [this guide](https://docs.marqo.ai/0.0.10/using_marqo_with_a_gpu/) to enable CUDA on Marqo, and set `device="cuda"` in the `add_documents` call.  
+Yes, it is just this simple one line of code. And you can check the outputs for the indexing time. If you have CUDA GPU available, and want to speed up indexing, follow [this guide](https://docs.marqo.ai/2.0.0/using_marqo_with_a_gpu/) to enable CUDA on Marqo, and set `device="cuda"` in the `add_documents` call.  
 
 Done, all the images are in Marqo and now we can search.
 
