@@ -169,7 +169,7 @@ print(response['hits'][0])
 We can see in the highlights field the coordinates of the bounding box that best matched the query.
 
 ```python
-bbox = response['hits']['_highlights']['image_location']
+bbox = response['hits']['_highlights'][0]['image_location']
 print(bbox)
 ```
 
@@ -200,7 +200,7 @@ The localisation provided by the reranker does not require any index time locali
 We can see in the highlights field the coordinates of the bounding box that best matched the query after reranking,
 
 ```python
-bbox = response['hits']['_highlights']['image_location']
+bbox = response['hits']['_highlights'][0]['image_location']
 print(bbox)
 ```
 

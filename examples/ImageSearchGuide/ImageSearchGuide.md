@@ -124,7 +124,7 @@ All the local image are on a docker server for marqo to access now.
 Marqo requires the input (which we call `documents`) as a `list` of `dictionary`, we can convert the images into the required format
 
 ```python
-documents = [{"image_docker" : image, "_id" : idx} for idx, image in enumerate(image_docker)]
+documents = [{"image_docker" : image, "_id" : str(idx)} for idx, image in enumerate(image_docker)]
 
 print(documents)
 ```
@@ -184,7 +184,7 @@ print(search_results)
 output:
 {'hits': [{'image_docker': 'http://host.docker.internal:8222/image1.jpg',
    '_id': '1',
-   '_highlights': {'image_docker': 'http://host.docker.internal:8222/image1.jpg'},
+   '_highlights': [{'image_docker': 'http://host.docker.internal:8222/image1.jpg'}],
    '_score': 0.6133688}],
  'processingTimeMs': 358,
  'query': 'A rider on a horse jumping over the barrier',

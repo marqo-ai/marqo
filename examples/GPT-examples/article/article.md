@@ -151,7 +151,7 @@ In order to connect GPT to Marqo, we need to format the results so they can be e
 ```python
 from langchain.docstore.document import Document
 results = client.index(index_name).search(question)
-text = [res['_highlights']['text'] for res in results['hits']]
+text = [res['_highlights'][0]['text'] for res in results['hits']]
 docs = [Document(page_content=f"Source [{ind}]:"+t) for ind,t in enumerate(texts)]
 ```
 To start with, we take just the highlights from Marqo. This is convenient because they are small pieces of text. They fit within the prompt and do not occupy too many tokens. Token limits matter because GPT (and LLM’s in general) will have a context length and often charge by token. This is the maximum number of tokens that can be used for the input. The more context, the larger the text (and background) that GPT can use. The drawback here is that the highlights might be too short to accurately answer the question.

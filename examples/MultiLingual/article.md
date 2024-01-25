@@ -70,7 +70,7 @@ At the end of each loop, we call the `add_documents()` function to insert the do
 mq.index(index_name='my-multilingual-index').add_documents(
     device='cuda', auto_refresh=False,
     documents=[{
-                    "_id": doc_id,
+                    "_id": str(doc_id),
                     "language": lang,
                     'text': sub_doc,
                     'celex_id': doc['celex_id'],
