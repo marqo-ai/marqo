@@ -3,12 +3,12 @@
 #####################################################
 
 from marqo import Client
-from marqo.api.exceptions import MarqoApiError
-import numpy as np
 import json
-import pprint
-import copy
 import math
+import numpy as np
+import copy
+import pprint
+
 
 def read_json(filename: str) -> dict:
     # reads a json file
@@ -16,23 +16,27 @@ def read_json(filename: str) -> dict:
         data = json.load(f)
     return data
 
-def replace_title(data: dict) -> dict:
+
+def clean_data(data: dict) -> dict:
     # removes the wikipedia from the title for better matching
     data['title'] = data['title'].replace('- Wikipedia', '')
+    # Convert docDate to string
+    data["docDate"] = str(data["docDate"])
     return data
+
 
 def split_big_docs(data, field='content', char_len=5e4):
     # there are some large documents which can cause issues for some users
     new_data = []
     for dat in data:
-        
+
         content = dat[field]
         N = len(content)
-        
+
         if N >= char_len:
             n_chunks = math.ceil(N / char_len)
             new_content = np.array_split(list(content), n_chunks)
-            
+
             for _content in new_content:
                 new_dat = copy.deepcopy(dat)
                 new_dat[field] = ''.join(_content)
@@ -41,21 +45,22 @@ def split_big_docs(data, field='content', char_len=5e4):
             new_data.append(dat)
     return new_data
 
+
 #####################################################
 ### STEP 1. load the data
 #####################################################
 
-# download the json formatted simplewiki from here - 
+# download the json formatted simplewiki from here -
 # https://www.kaggle.com/datasets/louisgeisler/simple-wiki?resource=download
-# or from 
+# or from
 # https://drive.google.com/file/d/1OEqXeIdqaZb6BwzKIgw8G_sDi91fBawt/view?usp=sharing
 dataset_file = "simplewiki.json"
 
 # get the data
 data = read_json(dataset_file)
 # clean up the title
-data = [replace_title(d) for d in data]
-# split big ones to make it easier for users on all hardware
+data = [clean_data(d) for d in data]
+
 data = split_big_docs(data)
 print(f"loaded data with {len(data)} entries")
 
@@ -75,24 +80,25 @@ index_name = 'marqo-simplewiki-demo-all'
 # setup the client
 client = Client()
 
-# we create the index. Note if it already exists an error will occur 
+# we create the index. Note if it already exists an error will occur
 # as you cannot overwrite an existing index
-# try:
-#     client.delete_index(index_name)
-# except:
-#     pass
+try:
+    client.delete_index(index_name)
+except:
+    pass
 
 # we create the index and can set the model we want to use
 # the onnx models are typically faster on both CPU and GPU
 # to use non-onnx just use the name 'all_datasets_v4_MiniLM-L6'
 client.create_index(index_name, model='onnx/all_datasets_v4_MiniLM-L6')
 
-device = 'cpu'
-
-responses = client.index(index_name).add_documents(data, device=device, client_batch_size=20, tensor_fields=['title', 'content'])
+responses = client.index(index_name).add_documents(
+    data, client_batch_size=50,
+    tensor_fields=["title", "content"]
+)
 
 # optionally take a look at the responses
-#pprint.print(responses)
+# pprint.pprint(responses)
 
 #######################################
 ### STEP 4. Searching with marqo ######
@@ -113,8 +119,8 @@ pprint.pprint(results['hits'][0])
 # we also get highlighting which tells us why this article was returned
 pprint.pprint(results['hits'][0]['_highlights'])
 
-# we can restrict the search to specific fields as well 
-results = client.index(index_name).search(query, searchable_attributes=['content'])
+# we can restrict the search to specific fields as well
+results = client.index(index_name).search(query)
 
 # we can check the results - lets look at the top hit
 pprint.pprint(results['hits'][0])
@@ -123,23 +129,21 @@ pprint.pprint(results['hits'][0])
 pprint.pprint(results['hits'][0])
 
 # we use lexical search instead of tensor search
-results = client.index(index_name).search(query, searchable_attributes=['content'], search_method='LEXICAL')
+results = client.index(index_name).search(query, search_method='LEXICAL')
 
 # we can check the results - lets look at the top hit
 pprint.pprint(results['hits'][0])
 
 # we can check the results - lets look at the top hit
 pprint.pprint(results['hits'][0])
-
 
 # lets create another query
 query = 'what is a cube?'
 
-results = client.index(index_name).search(query, searchable_attributes=['content'])
+results = client.index(index_name).search(query)
 
 # we can check the results - lets look at the top hit
 pprint.pprint(results['hits'][0])
 
 # we also get highlighting which tells us why this article was returned
 pprint.pprint(results['hits'][0]['_highlights'])
-
