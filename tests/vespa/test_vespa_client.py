@@ -227,7 +227,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                 yql="select * from sources * where title contains 'Title 1';"
             )
 
-    @unittest.skip
     @patch.object(httpx, "get", wraps=httpx.get)
     @patch.object(httpx, "post", wraps=httpx.post)
     def test_download_application_successful(self, mock_post, mock_get):
