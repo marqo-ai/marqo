@@ -203,7 +203,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(titles, {"Title 1"})
         self.assertEqual(contents, {"Content 1", "Content 1.1"})
 
-    @unittest.skip
     def test_query_notFound_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
