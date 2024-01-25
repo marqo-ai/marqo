@@ -181,7 +181,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.assertEqual(status, [{"docx": 404}, {"doc1": 200}])
 
-    @unittest.skip
     def test_query_found_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
