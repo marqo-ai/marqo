@@ -239,7 +239,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertTrue(os.path.isfile(os.path.join(app, "schemas", "test_vespa_client.sd")),
                         "test_vespa_client.sd does not exist or is not a file")
 
-    @unittest.skip
     def test_download_application_createSessionError_fails(self):
         """
         Test that download_application fails when session creation fails
