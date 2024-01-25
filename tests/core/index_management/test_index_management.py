@@ -1,6 +1,9 @@
+import os
+import shutil
 import uuid
 from unittest import mock
 
+from marqo import version
 from marqo.core.exceptions import IndexExistsError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
@@ -16,7 +19,7 @@ class TestIndexManagement(MarqoTestCase):
     def setUp(self):
         self.index_management = IndexManagement(self.vespa_client)
 
-    def test_create_settings_schema_doesNotExist_successful(self):
+    def test_bootstrap_vespa_doesNotExist_successful(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
             self.assertTrue(self.index_management.bootstrap_vespa())
@@ -36,7 +39,14 @@ class TestIndexManagement(MarqoTestCase):
                 else:
                     raise e
 
-    def test_create_settings_schema_exists_skips(self):
+            # Verify default query profile exists
+            app = self.vespa_client.download_application()
+            query_profile_exists = os.path.exists(
+                os.path.join(app, 'search/query-profiles', 'default.xml')
+            )
+            self.assertTrue(query_profile_exists, 'Default query profile does not exist')
+
+    def test_bootstrap_vespa_exists_skips(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
             self.assertTrue(self.index_management.bootstrap_vespa())
@@ -54,6 +64,45 @@ class TestIndexManagement(MarqoTestCase):
                 self.assertFalse(self.index_management.bootstrap_vespa())
                 # Sanity check that we're patching the right method
                 self.assertTrue(mock_post.called)
+
+    def test_boostrap_vespa_v2Exists_skips(self):
+        """
+        bootstrap_vespa skips when Vespa has been configured with Marqo 2.0.x
+        """
+        # Marqo 2.0.x configuration is detected by presence of settings schema, but absence default query profile
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            app = self.vespa_client.download_application()
+
+            # Clean any query profiles that may exist
+            shutil.rmtree(os.path.join(app, 'search'), ignore_errors=True)
+
+            self.index_management._add_marqo_settings_schema(app)
+            self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
+
+            self.assertFalse(
+                self.index_management.bootstrap_vespa(),
+                'bootstrap_vespa should skip when Marqo 2.0.x configuration is detected'
+            )
+
+    def test_bootstrap_vespa_partialConfig_successful(self):
+        """
+        bootstrap_vespa succeeds when Vespa has been partially configured and recovers to a consistent state
+        """
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            self.assertTrue(self.index_management.bootstrap_vespa())
+
+            # Delete marqo config to simulate partial configuration for 2.1+
+            self.vespa_client.delete_document(
+                schema=settings_schema_name,
+                id=IndexManagement._MARQO_CONFIG_DOC_ID
+            )
+
+            self.assertTrue(self.index_management.bootstrap_vespa(), 'bootstrap_vespa should not skip')
+            # Verify config has been saved
+            self.assertEqual(version.get_version(), self.index_management.get_marqo_version())
 
     def test_create_index_settingsSchemaDoesNotExist_successful(self):
         """
@@ -167,3 +216,29 @@ class TestIndexManagement(MarqoTestCase):
 
         with self.assertRaises(IndexExistsError):
             self.index_management.create_index(marqo_index_request)
+
+    def test_get_marqo_version_successful(self):
+        """
+        get_marqo_version returns current version
+        """
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            self.index_management.bootstrap_vespa()
+
+            self.assertEqual(version.get_version(), self.index_management.get_marqo_version())
+
+    def test_get_marqo_version_v20_successful(self):
+        """
+        get_marqo_version returns 2.0 when Vespa has been configured with Marqo 2.0.x
+        """
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            self.index_management.bootstrap_vespa()
+
+            # Delete Marqo config to simulate 2.0
+            self.vespa_client.delete_document(
+                schema=settings_schema_name,
+                id=IndexManagement._MARQO_CONFIG_DOC_ID
+            )
+
+            self.assertEqual(self.index_management.get_marqo_version(), '2.0')

@@ -297,7 +297,7 @@ class IndexManagement:
 
         if settings_schema_exists and query_profile_exists:
             try:
-                _ = self.get_marqo_version()
+                self.vespa_client.get_document(self._MARQO_CONFIG_DOC_ID, self._MARQO_SETTINGS_SCHEMA_NAME)
                 return True
             except VespaStatusError as e:
                 if e.status_code == 404:
