@@ -293,7 +293,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             mock_post.assert_called_once()
             self.assertTrue('prepareandactivate' in mock_post.call_args[0][0])
 
-    @unittest.skip
     def test_deploy_application_invalidAppPath_fails(self):
         with self.assertRaises(VespaError):
             self.client.deploy_application("/invalid/path")
