@@ -121,7 +121,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
 
-    @unittest.skip
     def test_feed_batch_sync_emptyBatch_successful(self):
         documents = []
 
