@@ -6,6 +6,7 @@ from unittest import mock
 
 import requests
 
+from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import (
     IllegalRequestedDocCount
 )
@@ -165,17 +166,39 @@ class TestPagination(MarqoTestCase):
 
                     self.assertTrue(max_offset in offsets_covered, "Max offset not covered. Check test parameters")
 
-    def test_pagination_limt_exceeded_error(self):
+    def test_pagination_limit_exceeded_error(self):
         """
         Verify InvalidArgs error is raised when limit is exceeded
         """
-        self.fail()
+        for index in [self.index_structured, self.index_unstructured]:
+            for search_method in [SearchMethod.TENSOR, SearchMethod.LEXICAL]:
+                for limit in [1001, 2000, 10000]:
+                    with self.subTest(f'Index: {index.type}, Search method: {search_method}, Limit: {limit}'):
+                        with self.assertRaises(api_exceptions.IllegalRequestedDocCount):
+                            tensor_search.search(
+                                search_method=search_method,
+                                config=self.config,
+                                index_name=index.name,
+                                text='my title',
+                                result_count=limit, offset=0,
+                            )
 
     def test_pagination_offset_exceeded_error(self):
         """
         Verify InvalidArgs error is raised when offset is exceeded
         """
-        self.fail()
+        for index in [self.index_structured, self.index_unstructured]:
+            for search_method in [SearchMethod.TENSOR, SearchMethod.LEXICAL]:
+                for offset in [10001, 12000, 50000]:
+                    with self.subTest(f'Index: {index.type}, Search method: {search_method}, Offset: {offset}'):
+                        with self.assertRaises(api_exceptions.IllegalRequestedDocCount):
+                            tensor_search.search(
+                                search_method=search_method,
+                                config=self.config,
+                                index_name=index.name,
+                                text='my title',
+                                result_count=100, offset=offset,
+                            )
 
     @unittest.skip
     def test_pagination_multi_field(self):
