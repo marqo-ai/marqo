@@ -22,7 +22,7 @@ if __name__ == "__main__":
     # run the following docker commands from the terminal to start marqo
     # docker rm -f marqo
     # docker pull marqoai/marqo:latest
-    # docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+    # docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 
     #############################################################
     #       1. Create some data

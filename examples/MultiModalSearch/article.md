@@ -283,7 +283,7 @@ The first thing to do is start [Marqo](https://github.com/marqo-ai/marqo). To st
 ```bash
 docker pull marqoai/marqo:latest
 docker rm -f marqo
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 
 The next step is to install the python client (a REST API is also [available](https://docs.marqo.ai/0.0.21/)).

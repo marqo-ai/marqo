@@ -80,7 +80,7 @@ We first install Marqo and the Marqo python client,
 ```bash
 docker pull marqoai/marqo:0.0.12;
 docker rm -f marqo;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.12
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.12
 pip install marqo
 ```
 

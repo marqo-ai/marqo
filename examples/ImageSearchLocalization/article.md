@@ -100,7 +100,7 @@ We are going to index this dataset using a couple of different methods and then 
 We will be using Marqo to do the image search with localization that was explained previously (full code is also here). To start Marqo run the following from your terminal (assuming a cuda compatible GPU):
 
 ```
-docker run --name marqo -it --privileged -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway -e MARQO_MODELS_TO_PRELOAD='[]' marqoai/marqo:0.0.10
+docker run --name marqo -it -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway -e MARQO_MODELS_TO_PRELOAD='[]' marqoai/marqo:0.0.10
 ```
 
 If no GPU is available remove the --gpus all flag from the above command.

@@ -54,7 +54,7 @@ To solve this, we need to start our Marqo docker container, which creates a Pyth
 ```
 docker pull marqoai/marqo:latest;
 docker rm -f marqo;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 
 Next, let's look at our example news documents corpus, which contains BBC and Reuters news content from 8th and 9th of November. We use "_id" as Marqo document identifier, the "date" the article was written, "website" indicating the web domain, "Title" for the headline, and "Description" for the article body:

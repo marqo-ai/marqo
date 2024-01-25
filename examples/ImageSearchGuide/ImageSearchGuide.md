@@ -27,7 +27,7 @@ please check [here](https://github.com/marqo-ai/marqo#m-series-mac-users).
 ```
 docker rm -f marqo
 docker pull marqoai/marqo:0.0.10
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.10
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.10
 ```
 
 Now, we can create a new environment and install the Marqo client by:

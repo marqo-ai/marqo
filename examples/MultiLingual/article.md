@@ -41,7 +41,7 @@ First, we set up a Marqo instance on the machine, which has docker installed. No
 This allows Marqo to use GPUs it finds on the machine. If the machine you are using doesn't have GPUs, then remove this option from the command. 
 ```sh
 docker rm -f marqo; 
-docker run --name marqo -it --privileged -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 We use pip to install the Marqo client (`pip install marqo`) and the datasets python package (`pip install datasets`). 
 We will use the `datasets` package from [Hugging Face](https://huggingface.co/docs/datasets/index)

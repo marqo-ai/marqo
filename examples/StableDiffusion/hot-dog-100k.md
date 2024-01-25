@@ -24,7 +24,7 @@ To dig a bit deeper into hot dog-100k dataset, we can index the data using [Marq
 ```
 pip install marqo
 docker pull marqoai/marqo:latest;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 
 Once Marqo is up and running we can get the files ready for indexing:
