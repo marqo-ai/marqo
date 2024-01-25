@@ -31,7 +31,7 @@ def load_index(number_data):
             "model":"ViT-B/16"
         }
          
-        mq.create_index("demo-search-index", **settings)
+        mq.create_index("demo-search-index", settings_dict=settings)
 
         with st.spinner("Creating Index..."):
             mq.index("demo-search-index").add_documents(shirt_data, tensor_fields=['image', 'label', 'kids'])

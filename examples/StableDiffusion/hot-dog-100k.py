@@ -51,7 +51,7 @@ settings = {
         "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
         "treatUrlsAndPointersAsImages": True,
         }
-client.create_index(index_name, **settings)
+client.create_index(index_name, settings_dict=settings)
 
 # Here we index. A gpu is recommended (device='cuda')
 responses = client.index(index_name).add_documents(documents, device='cpu', client_batch_size=50, tensor_fields=["image_docker"])
@@ -78,7 +78,7 @@ settings = {
         "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
         "treatUrlsAndPointersAsImages": True,
         }
-client.create_index(index_name, **settings)
+client.create_index(index_name, settings_dict=settings)
 
 # add our labels to the index
 responses = client.index(index_name).add_documents(labels, tensor_fields=["label"])

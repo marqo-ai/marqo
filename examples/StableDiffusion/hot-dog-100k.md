@@ -65,7 +65,7 @@ settings = {
            "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
            "treatUrlsAndPointersAsImages": True,
            }
-client.create_index("hot-dogs-100k", **settings)
+client.create_index("hot-dogs-100k", settings_dict=settings)
 responses = client.index("hot-dogs-100k").add_documents(documents, device="cuda", client_batch_size=50, tensor_fields=["image_docker"])
 
 ```
@@ -136,7 +136,7 @@ settings = {
         "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
         "treatUrlsAndPointersAsImages": True,
         }
-client.create_index(index_name, **settings)
+client.create_index(index_name, settings_dict=settings)
 
 # add our labels to the index
 responses = client.index(index_name).add_documents(labels, tensor_fields=["label"])

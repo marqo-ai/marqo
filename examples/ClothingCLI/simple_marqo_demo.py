@@ -28,7 +28,7 @@ def load_index(index_name: str, number_data: int) -> None:
             "model":"ViT-B/16"
         }
             
-        mq.create_index(index_name, **settings)
+        mq.create_index(index_name, settings_dict=settings)
 
         mq.index(index_name).add_documents(shirt_data, tensor_fields=['image','label','kids'])
 

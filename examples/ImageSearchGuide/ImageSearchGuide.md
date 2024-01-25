@@ -41,12 +41,6 @@ Open Python and check the installation is successful by:
 ```python
 import marqo
 mq = marqo.Client("http://localhost:8882")
-
-mq.get_marqo()
-```
-and you should have the output as:
-```python
-{'message': 'Welcome to Marqo', 'version': '2.0.0'}
 ```
 At the time this article is written, we are using marqo with version 2.0.0.
 
@@ -76,7 +70,7 @@ settings = {
         "treatUrlsAndPointersAsImages": True,
         }
 
-mq.create_index(index_name, **settings)
+mq.create_index(index_name, settings_dict=settings)
 ```
 __Note__: To accomplish this multi-modal search task, we __MUST__ set `"treat_urls_and_pointers_as_imges": True` to enable the multi-modal search feature. As for the `model`, we need to 
 select a model from [__CLIP families__](https://docs.marqo.ai/2.0.0/Models-Reference/dense_retrieval/) (`"open_clip/ViT-B-32/laion2b_s34b_b79k"` in this case).
@@ -90,7 +84,7 @@ are you really going to upload and download 1 million images with a larger datas
 We can put the local images in a docker server for easier access from marqo in dock by
 ```python
 import subprocess
-local_dir = "./data"
+local_dir = "./data/"
 pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', local_dir], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 ```
 
@@ -168,9 +162,8 @@ Finally, let us search and see the returned the results.
 
 Let's say we want to get the image "*A rider on a horse jumping over the barrier*". Here is the code.
 ```python
-search_results =  mq.index(index_name).search("A rider on a horse jumping over the barrier", 
-                        searchable_attributes=['image_docker'], limit = 1,
-                        device='cpu')
+search_results = mq.index(index_name).search("A rider on a horse jumping over the barrier", limit=1,
+                                             device='cpu')
 ```
 ```python
 output:
