@@ -320,7 +320,7 @@ n_background = 2
 # we keep track of the human and superhero responses
 history.append(f"\nHUMAN:{question}")
 # search for background related to the question
-results = mq.index(index_name).search(question, filter_string=f"name:({persona})", searchable_attributes=['text'], limit=20) 
+results = mq.index(index_name).search(question, filter_string=f"name:({persona})", limit=20) 
 # optionally crop the text to the highlighted region to fit within the context window
 highlights, texts = extract_text_from_highlights(results, token_limit=150)
 # add the truncated/cropped text to the data structure for langchain

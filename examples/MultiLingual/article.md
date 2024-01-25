@@ -97,11 +97,11 @@ We'll define the following search function that sets some parameters for the cal
 import pprint 
 
 def search(query: str):
-    result = mq.index(index_name='my-multilingual-index').search(q=query, searchable_attributes=["text"])
+    result = mq.index(index_name='my-multilingual-index').search(q=query)
     for res in result["hits"]:
         pprint.pprint(res["_highlights"])
 ```
-The first thing to notice is the call to the Marqo `search()` function. We set `searchable_attributes` to the `"text"` field. 
+The first thing to notice is the call to the Marqo `search()` function. 
 This is because this is the field that holds the content relevant for searching.
 
 We could print out the result straight away, but it contains the full original documents. These can be huge. Instead, 
@@ -137,7 +137,6 @@ Because we added the language code as a property of each document, we can filter
 ```python
 mq.index(index_name='my-multilingual-index').search(
     q=query, 
-    searchable_attributes=['text'],
     filter_string='language:en'
 )
 ```

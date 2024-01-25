@@ -77,7 +77,7 @@ pprint.pprint(results['hits'][0]['_highlights'])
 
 # let's create another query and perform lexical search on a particular field
 query = 'water crisis'
-results = mq.index(index_name).search(query, searchable_attributes=['name'], search_method='LEXICAL')
+results = mq.index(index_name).search(query, search_method='LEXICAL')
 
 print("Result 4 -", end=" ")
 pprint.pprint(results['hits'][0]['name'])

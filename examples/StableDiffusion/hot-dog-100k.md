@@ -178,7 +178,7 @@ To animate the images based on their sorted vectors we can take an image as a st
 ```python
 # pick one to start
 results = client.index("hot-dogs-100k").search('a photo of a smiling face', 
-                      searchable_attributes=['image_docker'], filter_string="a_face:[0.58 TO 0.99]")
+                      filter_string="a_face:[0.58 TO 0.99]")
 # find the document that matches closest with the query
 index = [ind for ind,doc in enumerate(documents) if doc['_id'] == results['hits'][0]['_id'] ][0]
 current_document = documents[index]

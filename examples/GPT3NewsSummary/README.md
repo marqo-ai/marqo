@@ -92,7 +92,6 @@ question = 'What is happening in business today?'
 date = '2022-11-09'
 results = mq.index(DOC_INDEX_NAME).search(
 					q=question,
-                    searchable_attributes=['Title', 'Description'],
 					filter_string=f"date:{date}"
                     limit=5)
 ```  

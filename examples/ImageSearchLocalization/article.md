@@ -192,7 +192,7 @@ As described earlier, the alternative way to get localization is to have an obje
 
 ```python
 response = client.index(index_name).search("brocolli", device="cuda", 
-        searchable_attributes=['image_location'], reranker="owl/ViT-B/32")
+        reranker="owl/ViT-B/32")
 print(response['hits'][0])
 ```
 
