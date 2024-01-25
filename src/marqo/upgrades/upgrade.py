@@ -65,8 +65,8 @@ class RollbackRunner:
         self.index_management = index_management
 
     def rollback(self, from_version: str, to_version: str):
-        parsed_from_version = semver.VersionInfo.parse(from_version)
-        parsed_to_version = semver.VersionInfo.parse(to_version)
+        parsed_from_version = semver.VersionInfo.parse(from_version, optional_minor_and_patch=True)
+        parsed_to_version = semver.VersionInfo.parse(to_version, optional_minor_and_patch=True)
 
         rollback = self._for_versions(
             f'{parsed_from_version.major}.{parsed_from_version.minor}',
