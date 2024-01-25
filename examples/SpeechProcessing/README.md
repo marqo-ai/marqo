@@ -55,7 +55,7 @@ A: GANs have seen a lot of applications in recent years that are beneficial to t
 
 3. Install FFmpeg for your platform.
 4. [Log in to Hugging Face to get an API key for pyannot speaker-diarization](https://huggingface.co/pyannote/speaker-diarization)
-5. [Get an OpenAI API Key](https://platform.openai.com/account/api-keys). This repo uses the `text-davinci-003` model by default which will cost money to use if you are outside of your free trial period.
+5. [Get an OpenAI API Key](https://platform.openai.com/account/api-keys).
 6. Copy `.env_local` and rename it as `.env`, place the API keys in the `.env` file
 
 ## Troubleshooting
