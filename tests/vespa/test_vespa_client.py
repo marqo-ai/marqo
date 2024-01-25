@@ -254,7 +254,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             with self.assertRaises(VespaError):
                 self.client.download_application()
 
-    @unittest.skip
     def test_download_application_downloadError_fails(self):
         original_get = httpx.Client.get
 
