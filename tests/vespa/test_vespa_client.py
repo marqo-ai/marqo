@@ -139,7 +139,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
 
-    @unittest.skip
     def test_delete_document_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
