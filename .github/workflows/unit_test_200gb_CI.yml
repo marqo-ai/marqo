@@ -5,8 +5,6 @@ on:
   workflow_call:
   workflow_dispatch:
   push:
-    branches:
-      - mainline
     paths-ignore:
       - '**.md'
   pull_request:
