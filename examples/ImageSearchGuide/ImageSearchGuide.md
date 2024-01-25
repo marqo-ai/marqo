@@ -73,7 +73,7 @@ index_name = 'image-search-guide'
 
 settings = {
         "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
-        "treat_urls_and_pointers_as_images": True,
+        "treatUrlsAndPointersAsImages": True,
         }
 
 mq.create_index(index_name, **settings)

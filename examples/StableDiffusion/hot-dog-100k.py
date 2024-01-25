@@ -49,7 +49,7 @@ index_name = 'hot-dogs-100k'
 
 settings = {
         "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
-        "treat_urls_and_pointers_as_images": True,
+        "treatUrlsAndPointersAsImages": True,
         }
 client.create_index(index_name, **settings)
 
@@ -76,7 +76,7 @@ label_strings = [list(a.values())[0] for a in labels]
 # we create a new index
 settings = {
         "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
-        "treat_urls_and_pointers_as_images": True,
+        "treatUrlsAndPointersAsImages": True,
         }
 client.create_index(index_name, **settings)
 

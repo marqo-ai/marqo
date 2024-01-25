@@ -27,7 +27,7 @@ def load_index(number_data):
             data['image'] = path
             
         settings = {
-            "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it
+            "treatUrlsAndPointersAsImages":True,   # allows us to find an image file and index it
             "model":"ViT-B/16"
         }
          

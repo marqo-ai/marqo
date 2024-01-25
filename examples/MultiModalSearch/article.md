@@ -317,12 +317,10 @@ client = Client()
     
 index_name = 'multimodal'
 settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
+	"treatUrlsAndPointersAsImages": True,
+	"model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+	"normalizeEmbeddings": True,
+}
     
 response = client.create_index(index_name, settings_dict=settings)
 ```
@@ -435,12 +433,10 @@ The first step is to create a new index to calculate the context vectors.
 # we create another index to create a context vector
 index_name_context = 'multimodal-context'
 settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
+	"treatUrlsAndPointersAsImages": True,
+	"model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+	"normalizeEmbeddings": True,
+}
     
 res = client.create_index(index_name_context, settings_dict=settings)
 ```
@@ -541,12 +537,10 @@ We will create a new index in the same way as before but with a new name.
 # we will create a new index for the multimodal objects
 index_name_mm_objects = 'multimodal-objects'
 settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
+	"treatUrlsAndPointersAsImages": True,
+	"model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+	"normalizeEmbeddings": True,
+}
     
 res = client.create_index(index_name_mm_objects, settings_dict=settings) 
 ```

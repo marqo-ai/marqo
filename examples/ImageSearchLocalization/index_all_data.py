@@ -50,14 +50,12 @@ batch_size = 24
 delete_index = True
 
 settings = {
-    "index_defaults": {
-        "treat_urls_and_pointers_as_images": True,
-        "image_preprocessing": {
-            "patch_method": None
-        },
-        "model":None,
-        "normalize_embeddings":True,
+    "treatUrlsAndPointersAsImages": True,
+    "imagePreprocessing": {
+        "patchMethod": None
     },
+    "model": None,
+    "normalizeEmbeddings": True,
 }
 
 for patch_method in patch_methods:
@@ -66,8 +64,8 @@ for patch_method in patch_methods:
     index_name = index_name_prefix + suffix
     
     # update the settings we want to use
-    settings['index_defaults']['model'] = model_name
-    settings['index_defaults']['image_preprocessing']['patch_method'] = patch_method
+    settings['model'] = model_name
+    settings['imagePreprocessing']['patchMethod'] = patch_method
 
     # optionally delete the index if it exists
     if delete_index:

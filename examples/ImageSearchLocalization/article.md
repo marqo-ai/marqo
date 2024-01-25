@@ -128,14 +128,12 @@ client = Client()
 patch_methods = [None, "dino-v2", "yolox"]
 
 settings = {
-    "index_defaults": {
-        "treat_urls_and_pointers_as_images": True,
-        "image_preprocessing": {
-            "patch_method": None
-        },
-        "model":"ViT-B/32",
-        "normalize_embeddings":True,
+    "treatUrlsAndPointersAsImages": True,
+    "imagePreprocessing": {
+        "patchMethod": None
     },
+    "model": "ViT-B/32",
+    "normalizeEmbeddings": True,
 }
 ```
 
@@ -146,7 +144,7 @@ for patch_method in patch_methods:
 
     index_name = f"visual_search-{str(patch_method).lower()}"     
     
-    settings['index_defaults']['image_preprocessing']['patch_method'] = patch_method
+    settings['imagePreprocessing']['patchMethod'] = patch_method
    
     response = client.create_index(index_name, settings_dict=settings)
     

@@ -63,7 +63,7 @@ Now we can start indexing:
 ```python
 settings = {
            "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
-           "treat_urls_and_pointers_as_images": True,
+           "treatUrlsAndPointersAsImages": True,
            }
 client.create_index("hot-dogs-100k", **settings)
 responses = client.index("hot-dogs-100k").add_documents(documents, device="cuda", client_batch_size=50, tensor_fields=["image_docker"])
@@ -134,7 +134,7 @@ label_strings = [list(a.values())[0] for a in labels]
 # we create a new index
 settings = {
         "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
-        "treat_urls_and_pointers_as_images": True,
+        "treatUrlsAndPointersAsImages": True,
         }
 client.create_index(index_name, **settings)
 
