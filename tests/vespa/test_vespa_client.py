@@ -160,7 +160,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         self.assertEqual(status, [{"doc1": 404}, {"doc2": 200}])
 
-    @unittest.skip
     def test_delete_document_notFound_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
