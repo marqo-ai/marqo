@@ -1187,9 +1187,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         # validate query
     validation.validate_query(q=text, search_method=search_method)
 
-    # Validate result_count + offset <= int(max_docs_limit)
+    # Validate max limits
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
+    max_search_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_LIMIT)
+    max_search_offset = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_OFFSET)
+
     check_upper = True if max_docs_limit is None else result_count + offset <= int(max_docs_limit)
+    check_limit = True if max_search_limit is None else result_count <= int(max_search_limit)
+    check_offset = True if max_search_offset is None else offset <= int(max_search_offset)
     if not check_upper:
         upper_bound_explanation = ("The search result limit + offset must be less than or equal to the "
                                    f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
@@ -1197,6 +1202,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         raise api_exceptions.IllegalRequestedDocCount(
             f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
             f"and offset of `{offset}`.")
+    if not check_limit:
+        raise api_exceptions.IllegalRequestedDocCount(
+            f"The search result limit must be less than or equal to the MARQO_MAX_SEARCH_LIMIT limit of "
+            f"[{max_search_limit}]. Marqo received search result limit of `{result_count}`.")
+    if not check_offset:
+        raise api_exceptions.IllegalRequestedDocCount(
+            f"The search result offset must be less than or equal to the MARQO_MAX_SEARCH_OFFSET limit of "
+            f"[{max_search_offset}]. Marqo received search result offset of `{offset}`.")
 
     t0 = timer()
     validation.validate_context(context=context, query=text, search_method=search_method)

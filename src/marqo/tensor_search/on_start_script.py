@@ -4,7 +4,7 @@ import time
 
 import torch
 
-from marqo import config, documentation
+from marqo import config, documentation, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
@@ -27,6 +27,7 @@ def on_start(config: config.Config):
         ModelsForCacheing(),
         InitializeRedis("localhost", 6379),
         DownloadFinishText(),
+        PrintVersion(),
         MarqoWelcome(),
         MarqoPhrase(),
     )
@@ -44,7 +45,7 @@ class CreateSettingsSchema:
     def run(self):
         try:
             logger.debug('Creating Marqo settings schema')
-            created = self.config.index_management.create_settings_schema()
+            created = self.config.index_management.bootstrap_vespa()
             if created:
                 logger.debug('Marqo settings schema created')
             else:
@@ -234,6 +235,11 @@ class DownloadFinishText:
         print("###########################################################")
         print("###########################################################")
         print('\n', flush=True)
+
+
+class PrintVersion:
+    def run(self):
+        print(f"Version: {version.__version__}")
 
 
 class MarqoPhrase:

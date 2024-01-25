@@ -374,7 +374,24 @@ def enable_batch_apis():
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_BATCH_APIS).lower() != 'true':
-                raise HTTPException(status_code=403, detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_API to true to enable it.")
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_BATCH_API to true to enable it.")
             return func(*args, **kwargs)
+
         return wrapper
+
+    return decorator_function
+
+
+def enable_upgrade_api():
+    def decorator_function(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_UPGRADE_API).lower() != 'true':
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_UPGRADE_API to true to enable it.")
+            return func(*args, **kwargs)
+
+        return wrapper
+
     return decorator_function

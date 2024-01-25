@@ -11,7 +11,7 @@ from marqo.api.exceptions import (
 )
 from marqo.core.models.marqo_index import FieldType, FieldFeature, IndexType
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.tensor_search import tensor_search
+from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
@@ -56,21 +56,22 @@ class TestPagination(MarqoTestCase):
         self.device_patcher.stop()
 
     def test_pagination_single_field(self):
-        num_docs = 400  # TODO - Increase this to 1000 once max doc limit issue has been addressed
+        num_docs = 400
         batch_size = 100
 
         for index in [self.index_structured, self.index_unstructured]:
-            for _ in range(0, num_docs, 100):
-                tensor_search.add_documents(
+            for _ in range(0, num_docs, batch_size):
+                r = tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
-                                                  docs=[{"title": 'my title'} for i in
+                                                  docs=[{"title": 'my title', 'desc': 'my title'} for i in
                                                         range(batch_size)],
                                                   device="cpu",
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
                                                   )
                 )
+                self.assertFalse(r['errors'], "Errors in add documents call")
 
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
                 full_search_results = tensor_search.search(
@@ -98,6 +99,83 @@ class TestPagination(MarqoTestCase):
 
                         # Compare paginated to full results (length only for now)
                         self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
+
+    def test_pagination_high_limit_offset(self):
+        """
+        Test pagination with max device limit and offset (1000 and 10,000)
+        """
+        num_docs = 12000
+        batch_size = 100
+
+        max_limit = 1000
+        max_offset = 10000
+
+        self.assertTrue(num_docs >= max_limit, "Test requires num_docs >= max_limit")
+
+        original_read_var = utils.read_env_vars_and_defaults
+
+        def read_var(var):
+            if var == EnvVars.MARQO_MAX_RETRIEVABLE_DOCS:
+                return num_docs
+            return original_read_var(var)
+
+        # Patch EnvVars.MARQO_MAX_RETRIEVABLE_DOCS so we can test max offset
+        with mock.patch.object(utils, 'read_env_vars_and_defaults', new=read_var):
+            for index in [self.index_structured, self.index_unstructured]:
+                for _ in range(0, num_docs, batch_size):
+                    r = tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(index_name=index.name,
+                                                      docs=[{"title": 'my title', 'desc': 'my title'} for i in
+                                                            range(batch_size)],
+                                                      device="cpu",
+                                                      tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                      else None,
+                                                      )
+                    )
+                    self.assertFalse(r['errors'], "Errors in add documents call")
+
+                for search_method in [SearchMethod.TENSOR, SearchMethod.LEXICAL]:
+                    offsets_covered = set()
+                    for page_size in [max_limit]:
+                        with self.subTest(
+                                f'Index: {index.type}, Search method: {search_method}, Page size: {page_size}'):
+                            paginated_search_results = {"hits": []}
+
+                            pages = math.ceil((max_offset + max_limit) / page_size)
+                            for page_num in range(pages):
+                                lim = page_size
+                                off = page_num * page_size
+                                offsets_covered.add(off)
+                                page_res = tensor_search.search(
+                                    search_method=search_method,
+                                    config=self.config,
+                                    index_name=index.name,
+                                    text='my title',
+                                    result_count=lim, offset=off,
+                                    # Approximate search retrieved ~8400 docs, under investigation
+                                    approximate=False if search_method == SearchMethod.TENSOR else None
+                                )
+
+                                paginated_search_results["hits"].extend(page_res["hits"])
+
+                            # Compare paginated to full results (length only for now)
+                            expected_count = (pages - 1) * page_size + page_size
+                            self.assertEqual(expected_count, len(paginated_search_results["hits"]))
+
+                    self.assertTrue(max_offset in offsets_covered, "Max offset not covered. Check test parameters")
+
+    def test_pagination_limt_exceeded_error(self):
+        """
+        Verify InvalidArgs error is raised when limit is exceeded
+        """
+        self.fail()
+
+    def test_pagination_offset_exceeded_error(self):
+        """
+        Verify InvalidArgs error is raised when offset is exceeded
+        """
+        self.fail()
 
     @unittest.skip
     def test_pagination_multi_field(self):
