@@ -85,7 +85,6 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         with self.assertRaises(VespaError):
             feed_client.feed_batch(documents, self.TEST_SCHEMA)
 
-    @unittest.skip
     @patch.object(concurrency, "_run_coroutine_in_thread", wraps=concurrency._run_coroutine_in_thread)
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
         """Test that feed_batch works when an event loop is already running and runs in a new thread"""
