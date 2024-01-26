@@ -1,5 +1,5 @@
 name: cpu_local_marqo_API_tests
-# runs Integration Tests on LOCAL OS on AMD64 machine
+# runs API Tests on CPU-only instance with Vespa and Marqo running in two separate docker containers
 
 on:
   workflow_call:
@@ -28,7 +28,7 @@ on:
           Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
-      mainline
+      - mainline
     paths-ignore:
       - '**.md'
 
