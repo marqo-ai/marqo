@@ -40,7 +40,7 @@ class UnstructuredVespaIndex(VespaIndex):
         #                                  'You can create a structured index '
         #                                  'by `mq.create_index("your_index_name", type="structured")`')
 
-        if len(marqo_query.searchable_attributes) != 1:
+        if not marqo_query.searchable_attributes or len(marqo_query.searchable_attributes) != 1:
             raise errors.InvalidArgError('In this POC, searchable_attributes must have exactly one attribute for'
                                          ' an unstructured index')
 
