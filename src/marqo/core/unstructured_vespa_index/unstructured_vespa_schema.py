@@ -65,7 +65,7 @@ class UnstructuredVespaSchema(VespaSchema):
     @classmethod
     def _generate_unstructured_schema(cls, marqo_index: UnstructuredMarqoIndex) -> str:
         """This function generates the Vespa schema for an unstructured Marqo index."""
-        dimension = str(marqo_index.model.get_dimension())
+        dimension = str(marqo_index.model.get_dimension() + 20)
 
         return textwrap.dedent(
             f"""

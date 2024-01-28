@@ -240,6 +240,7 @@ class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
     filter_string_max_length: int
+    tensor_field_id_map: Dict[str, int] = dict()
 
     @classmethod
     def _valid_type(cls) -> IndexType:

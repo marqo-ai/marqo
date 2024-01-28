@@ -1,5 +1,7 @@
 from typing import Dict, Any, Optional
 
+import numpy as np
+
 import marqo.core.constants as index_constants
 import marqo.core.search.search_filter as search_filter
 from marqo.api import exceptions as errors
@@ -32,11 +34,15 @@ class UnstructuredVespaIndex(VespaIndex):
         return unstructured_document.to_marqo_document(return_highlights=return_highlights)
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
-        if marqo_query.searchable_attributes is not None:
-            # TODO Add a marqo doc link here on how to create a structured index
-            raise errors.InvalidArgError('searchable_attributes is not supported for an unstructured index. '
-                                         'You can create a structured index '
-                                         'by `mq.create_index("your_index_name", type="structured")`')
+        # if marqo_query.searchable_attributes is not None:
+        #     # TODO Add a marqo doc link here on how to create a structured index
+        #     raise errors.InvalidArgError('searchable_attributes is not supported for an unstructured index. '
+        #                                  'You can create a structured index '
+        #                                  'by `mq.create_index("your_index_name", type="structured")`')
+
+        if len(marqo_query.searchable_attributes) != 1:
+            raise errors.InvalidArgError('In this POC, searchable_attributes must have exactly one attribute for'
+                                         ' an unstructured index')
 
         if isinstance(marqo_query, MarqoTensorQuery):
             return self._to_vespa_tensor_query(marqo_query)
@@ -65,8 +71,21 @@ class UnstructuredVespaIndex(VespaIndex):
         ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
             else unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
+        tensor_field_id = self._marqo_index.tensor_field_id_map.get(marqo_query.searchable_attributes[0])
+        if tensor_field_id is None:
+            raise errors.InvalidArgError(f'Vespa index does not have a tensor field for attribute '
+                                         f'{marqo_query.searchable_attributes[0]}')
+
+        def normalize(vector):
+            norm = np.linalg.norm(vector)
+            return [x / norm for x in vector]
+
+        encoding = [0] * 20
+        encoding[tensor_field_id] = 1
+        vector_query = normalize(encoding + marqo_query.vector_query)
+
         query_inputs = {
-            unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+            unstructured_common.QUERY_INPUT_EMBEDDING: vector_query
         }
 
         if score_modifiers:

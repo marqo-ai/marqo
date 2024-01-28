@@ -314,6 +314,18 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             # ADD DOCS TIMER-LOGGER (4)
                             start_time = timer()
                             with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                                tensor_field_id = marqo_index.tensor_field_id_map.get(field)
+                                if tensor_field_id is None:
+                                    tensor_field_id = len(marqo_index.tensor_field_id_map)
+                                    if tensor_field_id >= 20:
+                                        raise errors.InvalidArgError(
+                                            f"Cannot add more than 20 tensor fields to an index. "
+                                            f"Current tensor fields: {marqo_index.tensor_field_id_map.keys()}"
+                                        )
+                                    
+                                    marqo_index.tensor_field_id_map[field] = tensor_field_id
+                                    config.index_management._save_index_settings(marqo_index)
+
                                 vector_chunks = s2_inference.vectorise(
                                     model_name=marqo_index.model.name,
                                     model_properties=marqo_index.model.get_properties(), content=content_chunks,
@@ -321,6 +333,18 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                     infer=marqo_index.treat_urls_and_pointers_as_images,
                                     model_auth=add_docs_params.model_auth
                                 )
+
+                                field_encoding = [0] * 20
+                                field_encoding[tensor_field_id] = 1
+                                vector_chunks = [field_encoding + vector_chunk for vector_chunk in vector_chunks]
+
+                                # Normalize
+                                if normalize_embeddings:
+                                    def normalize(vector):
+                                        norm = np.linalg.norm(vector)
+                                        return [x / norm for x in vector]
+
+                                    vector_chunks = [normalize(vector) for vector in vector_chunks]
 
                             end_time = timer()
                             total_vectorise_time += (end_time - start_time)
