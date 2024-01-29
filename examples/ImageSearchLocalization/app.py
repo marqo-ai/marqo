@@ -80,7 +80,7 @@ def draw_box(img, box):
 def main():
 
     #########################################
-    # SETUP SOME PARAMTERS
+    # SETUP SOME PARAMETERS
     # this is for temporary storage of an image
     temp_image_dir = os.getcwd() + '/'
     # the field name for the image

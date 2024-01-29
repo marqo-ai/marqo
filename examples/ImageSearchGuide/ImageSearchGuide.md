@@ -72,7 +72,7 @@ settings = {
 
 mq.create_index(index_name, settings_dict=settings)
 ```
-__Note__: To accomplish this multi-modal search task, we __MUST__ set `"treat_urls_and_pointers_as_imges": True` to enable the multi-modal search feature. As for the `model`, we need to 
+__Note__: To accomplish this multi-modal search task, we __MUST__ set `"treat_urls_and_pointers_as_images": True` to enable the multi-modal search feature. As for the `model`, we need to 
 select a model from [__CLIP families__](https://docs.marqo.ai/2.0.0/Models-Reference/dense_retrieval/) (`"open_clip/ViT-B-32/laion2b_s34b_b79k"` in this case).
 
 ### Access local images
