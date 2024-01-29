@@ -18,7 +18,6 @@ Python 3.8
     python3 -m http.server 8222
     ```
     This is for the marqo docker container to read files from local os.
-    For more info on this please visit [this link](https://github.com/marqo-ai/marqo/issues/35).
 
 3. Make sure to run the Marqo docker container via the following command:
     ```
@@ -35,7 +34,7 @@ Python 3.8
     python3 simple_marqo_demo.py
     ```
 
-For more information on Marqo's functions and features, please visit the [Marqo Documentation Page](https://marqo.pages.dev/).
+For more information on Marqo's functions and features, please visit the [Marqo Documentation Page](https://docs.marqo.ai/).
 
 ## Usage
 Feel free to checkout the code in order to have a better understanding on how Marqo functions are used :).

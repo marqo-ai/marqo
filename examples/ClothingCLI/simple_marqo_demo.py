@@ -62,7 +62,7 @@ def search_index_text(index_name: str, query_text: str, search_method: str):
     )
 
     # Marqo also has other features such as searhcing based on a specific attribute field and query fitlering
-    # refer to the documentation on how these features work (https://marqo.pages.dev/)
+    # refer to the documentation on how these features work (https://docs.marqo.ai/)
     return results
 
 

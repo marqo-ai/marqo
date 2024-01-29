@@ -39,7 +39,7 @@ Python 3.8
     ```
 
 For more information on: 
-- Marqo's functions and features, please visit the [Marqo Documentation Page](https://marqo.pages.dev/).
+- Marqo's functions and features, please visit the [Marqo Documentation Page](https://docs.marqo.ai/).
 
 - Streamlit's functions and features, please visit the [Streamlit Documentation Page](https://docs.streamlit.io/).
 
