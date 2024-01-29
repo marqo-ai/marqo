@@ -18,7 +18,7 @@ from tests.utils.transition import add_docs_caller, add_docs_batched
 import os
 from marqo.vespa.models.delete_document_response import DeleteBatchDocumentResponse, DeleteBatchResponse
 
-class TestDeleteDocuments(MarqoTestCase):
+class TestDeleteDocumentsUnstructured(MarqoTestCase):
     """module that has tests at the tensor_search level"""
 
     @classmethod
@@ -270,7 +270,6 @@ class TestDeleteDocuments(MarqoTestCase):
         self.assertEqual(remaining_document["_id"], "doc_id_2")
 
 
-@unittest.skip
 class TestDeleteDocumentsEndpoint(MarqoTestCase):
     """Module that has tests at the tensor_search level"""
 
@@ -278,13 +277,13 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        text_index_with_random_model = cls.unstructured_marqo_index_request(model=Model(name='random'))
+        text_index_with_random_model_request = cls.unstructured_marqo_index_request(model=Model(name='random'))
 
         cls.create_indexes([
-            text_index_with_random_model
+            text_index_with_random_model_request
         ])
 
-        cls.text_index_with_random_model = text_index_with_random_model.name
+        cls.text_index_with_random_model = text_index_with_random_model_request.name
 
     def setUp(self) -> None:
         self.generic_header = {"Content-type": "application/json"}
@@ -348,7 +347,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         config_copy = copy(self.config)
         config_copy.backend = enums.SearchDb.vespa
         request = MqDeleteDocsRequest(
-            index_name=self.text_index_with_random_model, document_ids=["1", "2", "3"]
+            index_name=self.text_index_with_random_model, schema_name=self.text_index_with_random_model, document_ids=["1", "2", "3"]
         )
 
         with patch("marqo.tensor_search.delete_docs.delete_documents_vespa") as mock_delete_documents_vespa:
@@ -370,7 +369,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         config_copy = copy(self.config)
         config_copy.backend = enums.SearchDb.vespa
         request = MqDeleteDocsRequest(
-            index_name=self.text_index_with_random_model, document_ids=[]
+            index_name=self.text_index_with_random_model, schema_name=self.text_index_with_random_model, document_ids=[]
         )
 
         with self.assertRaises(api_exceptions.InvalidDocumentIdError):
@@ -380,7 +379,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         config_copy = copy(self.config)
         config_copy.backend = "unknown_backend"
         request = MqDeleteDocsRequest(
-            index_name=self.text_index_with_random_model, document_ids=["1", "2", "3"]
+            index_name=self.text_index_with_random_model, schema_name=self.text_index_with_random_model, document_ids=["1", "2", "3"]
         )
 
         with self.assertRaises(RuntimeError):
@@ -390,7 +389,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         config_copy = copy(self.config)
         config_copy.backend = enums.SearchDb.vespa
         request = MqDeleteDocsRequest(
-            index_name=self.text_index_with_random_model, document_ids=["1", "2", "3"]
+            index_name=self.text_index_with_random_model, schema_name=self.text_index_with_random_model, document_ids=["1", "2", "3"]
         )
 
         with patch("marqo.vespa.vespa_client.VespaClient.delete_batch") as mock_delete_batch:
@@ -446,7 +445,7 @@ class TestDeleteDocumentsEndpoint(MarqoTestCase):
         config_copy = copy(self.config)
         config_copy.backend = enums.SearchDb.vespa
         request = MqDeleteDocsRequest(
-            index_name=self.text_index_with_random_model, document_ids=['hello', None, 123]
+            index_name=self.text_index_with_random_model, schema_name=self.text_index_with_random_model, document_ids=['hello', None, 123]
         )
 
         with self.assertRaises(api_exceptions.InvalidDocumentIdError):
