@@ -6,8 +6,6 @@ import subprocess
 mq = marqo.Client(url='http://localhost:8882')  # Connection to Marqo Docker Container
 
 local_dir = "./"
-pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', local_dir], stdout=subprocess.DEVNULL,
-                       stderr=subprocess.STDOUT)
 
 
 def load_index(index_name: str, number_data: int) -> None:
