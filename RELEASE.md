@@ -5,8 +5,8 @@
 
 ## Bug fixes and minor changes
 - Improved the Marqo bootstrapping process to address unexpected API behaviour when no index has been created yet (https://github.com/marqo-ai/marqo/pull/730).
-- Addressed a bug where create_index accepted both dependent_fields and dependentFields (https://github.com/marqo-ai/marqo/pull/717, https://github.com/marqo-ai/marqo/pull/734). Using dependent_fields will now raise a 400 validation error.
-- Fixed parsing issue for documents in unstructured indexes (https://github.com/marqo-ai/marqo/pull/732). 
+- Improved validation for `create_index` settings (https://github.com/marqo-ai/marqo/pull/717, https://github.com/marqo-ai/marqo/pull/734). Using `dependent_fields` as a request body parameter will now raise a 400 validation error.
+- Improved data parsing for documents in unstructured indexes (https://github.com/marqo-ai/marqo/pull/732). 
 - Made vector store layer config upgrades and rollbacks easier ([#735](https://github.com/marqo-ai/marqo/pull/735)​​, [#736](https://github.com/marqo-ai/marqo/pull/736)​​). 
 - Readme improvements (https://github.com/marqo-ai/marqo/pull/729). 
 
