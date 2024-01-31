@@ -67,7 +67,7 @@ class IndexSettings(StrictBaseModel):
         if self.type == core.IndexType.Structured:
             if self.treatUrlsAndPointersAsImages is not None:
                 raise api_exceptions.InvalidArgError(
-                    "treatUrlsAndPointsAsImages is not a valid parameter for structured indexes"
+                    "treatUrlsAndPointersAsImages is not a valid parameter for structured indexes"
                 )
             if self.filterStringMaxLength is not None:
                 raise api_exceptions.InvalidArgError(
