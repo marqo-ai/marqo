@@ -100,7 +100,7 @@ We are going to index this dataset using a couple of different methods and then 
 We will be using Marqo to do the image search with localization that was explained previously (full code is also here). To start Marqo run the following from your terminal (assuming a cuda compatible GPU):
 
 ```
-docker run --name marqo -it --privileged -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway -e MARQO_MODELS_TO_PRELOAD='[]' marqoai/marqo:0.0.10
+docker run --name marqo -it -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway -e MARQO_MODELS_TO_PRELOAD='[]' marqoai/marqo:2.0.0
 ```
 
 If no GPU is available remove the --gpus all flag from the above command.
@@ -128,14 +128,12 @@ client = Client()
 patch_methods = [None, "dino-v2", "yolox"]
 
 settings = {
-    "index_defaults": {
-        "treat_urls_and_pointers_as_images": True,
-        "image_preprocessing": {
-            "patch_method": None
-        },
-        "model":"ViT-B/32",
-        "normalize_embeddings":True,
+    "treatUrlsAndPointersAsImages": True,
+    "imagePreprocessing": {
+        "patchMethod": None
     },
+    "model": "ViT-B/32",
+    "normalizeEmbeddings": True,
 }
 ```
 
@@ -146,7 +144,7 @@ for patch_method in patch_methods:
 
     index_name = f"visual_search-{str(patch_method).lower()}"     
     
-    settings['index_defaults']['image_preprocessing']['patch_method'] = patch_method
+    settings['imagePreprocessing']['patchMethod'] = patch_method
    
     response = client.create_index(index_name, settings_dict=settings)
     
@@ -171,7 +169,7 @@ print(response['hits'][0])
 We can see in the highlights field the coordinates of the bounding box that best matched the query.
 
 ```python
-bbox = response['hits']['_highlights']['image_location']
+bbox = response['hits']['_highlights'][0]['image_location']
 print(bbox)
 ```
 
@@ -194,7 +192,7 @@ As described earlier, the alternative way to get localization is to have an obje
 
 ```python
 response = client.index(index_name).search("brocolli", device="cuda", 
-        searchable_attributes=['image_location'], reranker="owl/ViT-B/32")
+        reranker="owl/ViT-B/32")
 print(response['hits'][0])
 ```
 
@@ -202,7 +200,7 @@ The localisation provided by the reranker does not require any index time locali
 We can see in the highlights field the coordinates of the bounding box that best matched the query after reranking,
 
 ```python
-bbox = response['hits']['_highlights']['image_location']
+bbox = response['hits']['_highlights'][0]['image_location']
 print(bbox)
 ```
 

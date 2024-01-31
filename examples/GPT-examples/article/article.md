@@ -78,9 +78,9 @@ After creating a digital copy of the product manual, the next step is to index t
 We first install Marqo and the Marqo python client,
 
 ```bash
-docker pull marqoai/marqo:0.0.12;
+docker pull marqoai/marqo:2.0.0;
 docker rm -f marqo;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.12
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:2.0.0
 pip install marqo
 ```
 
@@ -151,7 +151,7 @@ In order to connect GPT to Marqo, we need to format the results so they can be e
 ```python
 from langchain.docstore.document import Document
 results = client.index(index_name).search(question)
-text = [res['_highlights']['text'] for res in results['hits']]
+text = [res['_highlights'][0]['text'] for res in results['hits']]
 docs = [Document(page_content=f"Source [{ind}]:"+t) for ind,t in enumerate(texts)]
 ```
 To start with, we take just the highlights from Marqo. This is convenient because they are small pieces of text. They fit within the prompt and do not occupy too many tokens. Token limits matter because GPT (and LLM’s in general) will have a context length and often charge by token. This is the maximum number of tokens that can be used for the input. The more context, the larger the text (and background) that GPT can use. The drawback here is that the highlights might be too short to accurately answer the question.
@@ -174,7 +174,7 @@ Now we have the prepared documents and prompt, we can call GPT using Langchain. 
 
 ```python
 from langchain.chains import LLMChain
-llm = OpenAI(temperature=0.9,  model_name = "text-davinci-003")
+llm = OpenAI(temperature=0.9)
 chain_qa = LLMChain(llm=llm, prompt=prompt)
 llm_results = chain_qa({"summaries": docs, "question": results['query']}, return_only_outputs=True)
 ```
@@ -292,7 +292,7 @@ Now we have the prepared documents and prompt, we can call GPT using Langchain. 
 
 ```python
 from langchain.chains import LLMChain
-lm = OpenAI(temperature=0.9,  model_name = "text-davinci-003")
+lm = OpenAI(temperature=0.9)
 chain_qa = LLMChain(llm=llm, prompt=prompt)
 llm_results = chain_qa({"summaries": docs, "conversation": "wow, what are some of your favorite things to do?", return_only_outputs=True)
 ```
@@ -320,7 +320,7 @@ n_background = 2
 # we keep track of the human and superhero responses
 history.append(f"\nHUMAN:{question}")
 # search for background related to the question
-results = mq.index(index_name).search(question, filter_string=f"name:({persona})", searchable_attributes=['text'], limit=20) 
+results = mq.index(index_name).search(question, filter_string=f"name:({persona})", limit=20) 
 # optionally crop the text to the highlighted region to fit within the context window
 highlights, texts = extract_text_from_highlights(results, token_limit=150)
 # add the truncated/cropped text to the data structure for langchain

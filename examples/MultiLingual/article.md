@@ -41,7 +41,7 @@ First, we set up a Marqo instance on the machine, which has docker installed. No
 This allows Marqo to use GPUs it finds on the machine. If the machine you are using doesn't have GPUs, then remove this option from the command. 
 ```sh
 docker rm -f marqo; 
-docker run --name marqo -it --privileged -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 --gpus all --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 We use pip to install the Marqo client (`pip install marqo`) and the datasets python package (`pip install datasets`). 
 We will use the `datasets` package from [Hugging Face](https://huggingface.co/docs/datasets/index)
@@ -68,9 +68,9 @@ One small adjustment we'll make is to split up text of very long documents (of o
 At the end of each loop, we call the `add_documents()` function to insert the document:
 ```python
 mq.index(index_name='my-multilingual-index').add_documents(
-    device='cuda', auto_refresh=False,
+    device='cuda',
     documents=[{
-                    "_id": doc_id,
+                    "_id": str(doc_id),
                     "language": lang,
                     'text': sub_doc,
                     'celex_id': doc['celex_id'],
@@ -81,9 +81,7 @@ mq.index(index_name='my-multilingual-index').add_documents(
 ```
 Here we set the device argument as `"cuda"`. This tells Marqo to use the GPU it finds on the machine to index the document. 
 If you don't have a GPU, remove this argument or set it to `"cpu"`. We encourage using a GPU as it will make the `add_documents` 
-process significantly faster (our testing showed a 6–12x speed up). 
-
-We also set the `auto_refresh` argument to `False`. When indexing large volumes of data we encourage you to set this to False, as it optimises the `add_documents` process. 
+process significantly faster (our testing showed a 6–12x speed up).
 
 And that's the indexing process! Run the script to fill up the Marqo index with documents. It took us around 45 minutes 
 with an AWS _ml.g4dn.2xlarge_ machine. 
@@ -97,11 +95,11 @@ We'll define the following search function that sets some parameters for the cal
 import pprint 
 
 def search(query: str):
-    result = mq.index(index_name='my-multilingual-index').search(q=query, searchable_attributes=["text"])
+    result = mq.index(index_name='my-multilingual-index').search(q=query)
     for res in result["hits"]:
         pprint.pprint(res["_highlights"])
 ```
-The first thing to notice is the call to the Marqo `search()` function. We set `searchable_attributes` to the `"text"` field. 
+The first thing to notice is the call to the Marqo `search()` function. 
 This is because this is the field that holds the content relevant for searching.
 
 We could print out the result straight away, but it contains the full original documents. These can be huge. Instead, 
@@ -137,7 +135,6 @@ Because we added the language code as a property of each document, we can filter
 ```python
 mq.index(index_name='my-multilingual-index').search(
     q=query, 
-    searchable_attributes=['text'],
     filter_string='language:en'
 )
 ```

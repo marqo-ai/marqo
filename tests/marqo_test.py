@@ -166,7 +166,7 @@ class MarqoTestCase(unittest.TestCase):
     def unstructured_marqo_index_request(
             cls,
             name: Optional[str] = None,
-            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model: Model = Model(name='random/small'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,

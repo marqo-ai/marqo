@@ -37,7 +37,7 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, pool_size: int = 10,):
+                 content_cluster_name: str, pool_size: int = 10):
         """
         Create a VespaClient object.
         Args:
@@ -60,11 +60,12 @@ class VespaClient:
         """
         self.http_client.close()
 
-    def deploy_application(self, application: str):
+    def deploy_application(self, application: str, timeout: int = 60) -> None:
         """
         Deploy a Vespa application.
         Args:
             application: Path to the Vespa application root directory
+            timeout: Timeout in seconds
         """
         endpoint = f'{self.config_url}/application/v2/tenant/default/prepareandactivate'
 
@@ -73,7 +74,8 @@ class VespaClient:
         response = self.http_client.post(
             endpoint,
             headers={'Content-Type': 'application/x-gzip'},
-            data=gzip_stream.read()
+            data=gzip_stream.read(),
+            timeout=timeout
         )
 
         self._raise_for_status(response)

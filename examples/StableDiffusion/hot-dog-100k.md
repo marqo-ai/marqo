@@ -24,7 +24,7 @@ To dig a bit deeper into hot dog-100k dataset, we can index the data using [Marq
 ```
 pip install marqo
 docker pull marqoai/marqo:latest;
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 
 Once Marqo is up and running we can get the files ready for indexing:
@@ -62,10 +62,10 @@ Now we can start indexing:
 
 ```python
 settings = {
-           "model":'ViT-L/14',
-           "treat_urls_and_pointers_as_images": True,
+           "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
+           "treatUrlsAndPointersAsImages": True,
            }
-client.create_index("hot-dogs-100k", **settings)
+client.create_index("hot-dogs-100k", settings_dict=settings)
 responses = client.index("hot-dogs-100k").add_documents(documents, device="cuda", client_batch_size=50, tensor_fields=["image_docker"])
 
 ```
@@ -133,10 +133,10 @@ label_strings = [list(a.values())[0] for a in labels]
 
 # we create a new index
 settings = {
-        "model":'ViT-L/14',
-        "treat_urls_and_pointers_as_images": True,
+        "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
+        "treatUrlsAndPointersAsImages": True,
         }
-client.create_index(index_name, **settings)
+client.create_index(index_name, settings_dict=settings)
 
 # add our labels to the index
 responses = client.index(index_name).add_documents(labels, tensor_fields=["label"])
@@ -178,7 +178,7 @@ To animate the images based on their sorted vectors we can take an image as a st
 ```python
 # pick one to start
 results = client.index("hot-dogs-100k").search('a photo of a smiling face', 
-                      searchable_attributes=['image_docker'], filter_string="a_face:[0.58 TO 0.99]")
+                      filter_string="a_face:[0.58 TO 0.99]")
 # find the document that matches closest with the query
 index = [ind for ind,doc in enumerate(documents) if doc['_id'] == results['hits'][0]['_id'] ][0]
 current_document = documents[index]

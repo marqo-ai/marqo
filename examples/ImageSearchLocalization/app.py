@@ -80,7 +80,7 @@ def draw_box(img, box):
 def main():
 
     #########################################
-    # SETUP SOME PARAMTERS
+    # SETUP SOME PARAMETERS
     # this is for temporary storage of an image
     temp_image_dir = os.getcwd() + '/'
     # the field name for the image
@@ -134,7 +134,7 @@ def main():
 
     if submit1:
         st.text("searching using '{}'...".format(sentence))
-        res = client.index(index_name).search("{}".format(sentence), searchable_attributes=[image_location], reranker=reranker, device=device)
+        res = client.index(index_name).search("{}".format(sentence), reranker=reranker, device=device)
 
         if len(res[hits]) == 0:
             st.text(f"No results found for {sentence}")
@@ -144,7 +144,7 @@ def main():
  
     if submit2:       
         st.text("searching using '{}'...".format(sentence))        
-        res = client.index(index_name).search("{}".format(sentence), searchable_attributes=[image_location], reranker=reranker, device=device)
+        res = client.index(index_name).search("{}".format(sentence), reranker=reranker, device=device)
         # get the image 
         if len(res[hits]) == 0:
             st.text(f"No results found for {sentence}")
@@ -171,7 +171,7 @@ def main():
         # To View Uploaded Image
         st.image(image, width=250)
 
-        res = client.index(index_name).search("{}".format(query), searchable_attributes=[image_location], 
+        res = client.index(index_name).search("{}".format(query),
                                          limit=9, device=device)
 
         # get the image 

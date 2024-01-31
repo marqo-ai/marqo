@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-<b><a href="https://www.marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://community.marqo.ai">Discourse</a>  | <a href="https://bit.ly/marqo-slack">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
+<b><a href="https://www.marqo.ai">Website</a> | <a href="https://docs.marqo.ai">Documentation</a> | <a href="https://demo.marqo.ai">Demos</a> | <a href="https://community.marqo.ai">Discourse</a>  | <a href="https://bit.ly/marqo-community-slack">Slack Community</a> | <a href="https://www.marqo.ai/cloud">Marqo Cloud</a>
 </b>
 </p>
 
@@ -11,7 +11,7 @@
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg"></a>
 <a href="https://pypi.org/project/marqo/"><img src="https://img.shields.io/pypi/v/marqo?label=PyPI"></a>
 <a href="https://github.com/marqo-ai/marqo/actions/workflows/unit_test_200gb_CI.yml"><img src="https://img.shields.io/github/actions/workflow/status/marqo-ai/marqo/unit_test_200gb_CI.yml?branch=mainline"></a>
-<a align="center" href="https://bit.ly/marqo-slack"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
+<a align="center" href="https://bit.ly/marqo-community-slack"><img src="https://img.shields.io/badge/Slack-blueviolet?logo=slack&amp;logoColor=white"></a>
 
 ## Marqo
 
@@ -21,7 +21,7 @@ Marqo is more than a vector database, it's an end-to-end vector search engine fo
 
 Vector similarity alone is not enough for vector search. Vector search requires more than a vector database - it also requires machine learning (ML) deployment and management, preprocessing and transformations of inputs as well as the ability to modify search behavior without retraining a model. Marqo contains all these pieces, enabling developers to build vector search into their application with minimal effort. A full list of features can be found [below](#-core-features).
 
-**Why not X, Y, Z vector database?** 
+**Why bundle embedding generation with vector search?** 
 
 Vector databases are specialized components for vector similarity and only service one component of a vector search system. They are “vectors in - vectors out”. They still require the production of vectors, management of the ML models, associated orchestration and processing of the inputs. Marqo makes this easy by being “documents in, documents out”. Preprocessing of text and images, embedding the content, storing meta-data and deployment of inference and storage is all taken care of by Marqo. 
 
@@ -209,21 +209,21 @@ pprint.pprint(results)
 
 {
     'hits': [
-        {   
+        {
             'Title': 'Extravehicular Mobility Unit (EMU)',
-            'Description': 'The EMU is a spacesuit that provides environmental protection, mobility, life support, and' 
+            'Description': 'The EMU is a spacesuit that provides environmental protection, mobility, life support, and'
                            'communications for astronauts',
-            '_highlights': {
+            '_highlights': [{
                 'Description': 'The EMU is a spacesuit that provides environmental protection, '
                                'mobility, life support, and communications for astronauts'
-            },
+            }],
             '_id': 'article_591',
             '_score': 0.61938936
-        }, 
-        {   
+        },
+        {
             'Title': 'The Travels of Marco Polo',
             'Description': "A 13th-century travelogue describing Polo's travels",
-            '_highlights': {'Title': 'The Travels of Marco Polo'},
+            '_highlights': [{'Title': 'The Travels of Marco Polo'}],
             '_id': 'e00d1a8d-894c-41a1-8e3b-d8b2a8fce12a',
             '_score': 0.60237324
         }
@@ -292,10 +292,10 @@ Images can then be added within documents as follows. You can use urls from the 
 ```python
 
 response = mq.index("my-multimodal-index").add_documents([{
-    "My Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+    "My_Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
-}], tensor_fields=["My Image"])
+}], tensor_fields=["My_Image"])
 
 ```
 
@@ -497,11 +497,9 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 3. Install requirements from the requirements file: ```pip install -r requirements.txt```.
 
-4. Ensure you have marqo-os running with `docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.3`
+4. Run tests by running the tox file. CD into this dir and then run "tox".
 
-5. Run tests by running the tox file. CD into this dir and then run "tox".
-
-6. If you update dependencies, make sure to delete the .tox dir and rerun.
+5. If you update dependencies, make sure to delete the .tox dir and rerun.
 
 ## Merge instructions:
 
@@ -512,6 +510,6 @@ Marqo is a community project with the goal of making tensor search accessible to
 ## Support
 
 - Ask questions and share your creations with the community on our [Discourse forum](https://community.marqo.ai).
-- Join our [Slack community](https://bit.ly/marqo-slack) and chat with other community members about ideas.
+- Join our [Slack community](https://bit.ly/marqo-community-slack) and chat with other community members about ideas.
 
 

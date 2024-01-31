@@ -164,15 +164,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
             existing_docs_dict: Dict[str, dict] = {}
             if len(ids) > 0:
-                existing_docs = get_documents_by_ids(config, marqo_index.name, ids, show_vectors=True,
-                                                     ignore_invalid_ids=True)['results']
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, ids, ignore_invalid_ids=True)
                 for doc in existing_docs:
                     id = doc["_id"]
                     if id in existing_docs_dict:
                         raise errors.InternalError(f"Received duplicate documents for ID {id} from Vespa")
-                    if doc[TensorField.found]:
-                        del doc[TensorField.found]
-                        existing_docs_dict[id] = doc
+                    existing_docs_dict[id] = doc
 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
@@ -379,14 +376,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     ):
                         existing_doc = existing_docs_dict[doc_id]
                         current_field_contents = utils.extract_multimodal_content(existing_doc, multimodal_params)
-                        current_multimodal_params = existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][
-                            field_name]
                         if (
                                 field_content == current_field_contents and
-                                current_multimodal_params == multimodal_params and
+                                unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS in existing_doc and
+                                field_name in existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS] and
+                                existing_doc[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS][
+                                    field_name] == multimodal_params and
                                 field_name in existing_doc[constants.MARQO_DOC_TENSORS]
                         ):
-                            combo_chunk = f"{field_name}::{existing_doc[constants.MARQO_DOC_TENSORS][field_name][constants.MARQO_DOC_CHUNKS]}"
+                            combo_chunk = f"{field_name}::{existing_doc[constants.MARQO_DOC_TENSORS][field_name][constants.MARQO_DOC_CHUNKS][0]}"
                             combo_embeddings = existing_doc[constants.MARQO_DOC_TENSORS][field_name][
                                 constants.MARQO_DOC_EMBEDDINGS]
 
@@ -573,11 +571,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         if add_docs_params.use_existing_tensors:
             existing_docs_dict: Dict[str, dict] = {}
             if len(doc_ids) > 0:
-                existing_docs = get_documents_by_ids(config,
-                                                     marqo_index.name,
-                                                     doc_ids,
-                                                     show_vectors=True,
-                                                     ignore_invalid_ids=True)['results']
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, doc_ids, ignore_invalid_ids=True)
                 for doc in existing_docs:
                     if not isinstance(doc, dict):
                         continue
@@ -585,9 +579,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     id = doc["_id"]
                     if id in existing_docs_dict:
                         raise api_exceptions.InternalError(f"Received duplicate documents for ID {id} from Vespa")
-                    if doc[TensorField.found]:
-                        del doc[TensorField.found]
-                        existing_docs_dict[id] = doc
+                    existing_docs_dict[id] = doc
 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
@@ -951,11 +943,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
         return translate_add_doc_response(index_responses, time_diff=t1 - t0)
 
 
-def get_document_by_id(
-        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
-    """returns document by its ID"""
-    validation.validate_id(document_id)
-
+def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     try:
@@ -969,6 +957,16 @@ def get_document_by_id(
 
     vespa_index = vespa_index_factory(marqo_index)
     marqo_document = vespa_index.to_marqo_document(res.document.dict())
+
+    return marqo_document
+
+
+def get_document_by_id(
+        config: Config, index_name: str, document_id: str, show_vectors: bool = False):
+    """returns document by its ID"""
+    validation.validate_id(document_id)
+
+    marqo_document = _get_marqo_document_by_id(config, index_name, document_id)
 
     if show_vectors:
         if constants.MARQO_DOC_TENSORS in marqo_document:
@@ -984,6 +982,29 @@ def get_document_by_id(
         del marqo_document[constants.MARQO_DOC_TENSORS]
 
     return marqo_document
+
+
+def _get_marqo_documents_by_ids(
+        config: Config, index_name: str, document_ids, ignore_invalid_ids: bool = False
+):
+    validated_ids = []
+    for doc_id in document_ids:
+        try:
+            validated_ids.append(validation.validate_id(doc_id))
+        except api_exceptions.InvalidDocumentIdError as e:
+            if not ignore_invalid_ids:
+                raise e
+            logger.debug(f'Invalid document ID {doc_id} ignored')
+
+    if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
+        return []
+
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
+    vespa_index = vespa_index_factory(marqo_index)
+
+    return [vespa_index.to_marqo_document(response.document.dict()) for response in batch_get.responses
+            if response.status == 200]
 
 
 def get_documents_by_ids(
@@ -1033,9 +1054,18 @@ def get_documents_by_ids(
             marqo_document = vespa_index.to_marqo_document(response.document.dict())
 
             if show_vectors:
-                marqo_document[TensorField.tensor_facets] = _get_tensor_facets(
-                    marqo_document[constants.MARQO_DOC_TENSORS])
-            del marqo_document[constants.MARQO_DOC_TENSORS]
+                if constants.MARQO_DOC_TENSORS in marqo_document:
+                    marqo_document[TensorField.tensor_facets] = _get_tensor_facets(
+                        marqo_document[constants.MARQO_DOC_TENSORS])
+                else:
+                    marqo_document[TensorField.tensor_facets] = []
+
+            if not show_vectors:
+                if unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS in marqo_document:
+                    del marqo_document[unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS]
+
+            if constants.MARQO_DOC_TENSORS in marqo_document:
+                del marqo_document[constants.MARQO_DOC_TENSORS]
 
             to_return['results'].append(
                 {
@@ -1157,9 +1187,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         # validate query
     validation.validate_query(q=text, search_method=search_method)
 
-    # Validate result_count + offset <= int(max_docs_limit)
+    # Validate max limits
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
+    max_search_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_LIMIT)
+    max_search_offset = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_SEARCH_OFFSET)
+
     check_upper = True if max_docs_limit is None else result_count + offset <= int(max_docs_limit)
+    check_limit = True if max_search_limit is None else result_count <= int(max_search_limit)
+    check_offset = True if max_search_offset is None else offset <= int(max_search_offset)
     if not check_upper:
         upper_bound_explanation = ("The search result limit + offset must be less than or equal to the "
                                    f"MARQO_MAX_RETRIEVABLE_DOCS limit of [{max_docs_limit}]. ")
@@ -1167,6 +1202,14 @@ def search(config: Config, index_name: str, text: Union[str, dict],
         raise api_exceptions.IllegalRequestedDocCount(
             f"{upper_bound_explanation} Marqo received search result limit of `{result_count}` "
             f"and offset of `{offset}`.")
+    if not check_limit:
+        raise api_exceptions.IllegalRequestedDocCount(
+            f"The search result limit must be less than or equal to the MARQO_MAX_SEARCH_LIMIT limit of "
+            f"[{max_search_limit}]. Marqo received search result limit of `{result_count}`.")
+    if not check_offset:
+        raise api_exceptions.IllegalRequestedDocCount(
+            f"The search result offset must be less than or equal to the MARQO_MAX_SEARCH_OFFSET limit of "
+            f"[{max_search_offset}]. Marqo received search result offset of `{offset}`.")
 
     t0 = timer()
     validation.validate_context(context=context, query=text, search_method=search_method)

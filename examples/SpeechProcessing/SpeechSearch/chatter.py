@@ -38,7 +38,7 @@ def answer_question(
     context = ". ".join([r["transcription"] for r in results["hits"]])
 
     prompt = PromptTemplate(template=TEMPLATE, input_variables=["context", "question"])
-    llm = OpenAI(temperature=0.9, model_name="text-davinci-003")
+    llm = OpenAI(temperature=0.9)
     chain_qa = LLMChain(llm=llm, prompt=prompt)
     llm_results = chain_qa(
         {"context": context, "question": query}, return_only_outputs=True
