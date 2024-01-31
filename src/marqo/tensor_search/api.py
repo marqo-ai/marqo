@@ -51,6 +51,7 @@ if __name__ in ["__main__", "api"]:
 
 app = FastAPI(
     title="Marqo",
+    version=version.get_version()
 )
 app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
