@@ -241,3 +241,60 @@ class TestApiErrors(MarqoTestCase):
                 )
 
                 self.assertEqual(response.status_code, 200)
+
+    def test_invalid_structured_index_field_type(self):
+        """Verify invalid field types are rejected with proper error"""
+
+        base_index_settings = {
+            "type": "structured",
+            "allFields": [{"name": "field1", "type": None}],
+            "tensorFields": []
+        }
+
+        test_cases = [
+            ("bulabua", "Invalid field type 'bulabua'"),
+            ([], "Invalid field type '[]'"),
+            (None, "Invalid field type 'NoneType'"),
+            ("", "Invalid field type ''"),
+        ]
+
+        for test_case, test_name in test_cases:
+            test_settings = base_index_settings.copy()
+            test_settings["allFields"][0]["type"] = test_case
+            with self.subTest(test_name):
+                index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+                response = self.client.post(
+                    f"/indexes/{index_name}",
+                    json=test_settings
+                )
+                self.assertEqual(response.status_code, 422)
+                self.assertIn("allFields", response.text)
+                self.assertIn("type", response.text)
+
+    def test_invalid_structured_index_field_features(self):
+        """Verify invalid field features are rejected with proper error"""
+
+        base_index_settings = {
+            "type": "structured",
+            "allFields": [{"name": "field1", "type": "text", "features": None}],
+            "tensorFields": []
+        }
+
+        test_cases = [
+            ("bulabua", "Invalid field feature 'bulabua'"),
+            (None, "Invalid field feature 'NoneType'"),
+            ("", "Invalid field feature ''"),
+        ]
+
+        for test_case, test_name in test_cases:
+            test_settings = base_index_settings.copy()
+            test_settings["allFields"][0]["features"] = test_case
+            with self.subTest(test_name):
+                index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+                response = self.client.post(
+                    f"/indexes/{index_name}",
+                    json=test_settings
+                )
+                self.assertEqual(response.status_code, 422)
+                self.assertIn("allFields", response.text)
+                self.assertIn("features", response.text)
