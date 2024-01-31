@@ -98,7 +98,7 @@ jobs:
       - name: Set py_marqo_branch variable
         id: set_var
         run: |
-          if [[ "${{ env.PY_MQ_API_TEST_BRANCH }}" == "marqo" ]]; then
+          if [[ "${{ env.PY_MQ_API_TEST_BRANCH }}" == "marqo" ]] || [[ "${{ env.PY_MQ_API_TEST_BRANCH }}" == "" ]]; then
             echo "::set-output name=py_marqo_branch::marqo"
           else
             echo "::set-output name=py_marqo_branch::git+https://github.com/marqo-ai/py-marqo.git@${{ env.PY_MQ_API_TEST_BRANCH }}"
