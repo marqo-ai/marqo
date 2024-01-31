@@ -51,7 +51,6 @@ if __name__ in ["__main__", "api"]:
 
 app = FastAPI(
     title="Marqo",
-    version=version.get_version(),
 )
 app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
@@ -101,7 +100,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
     return marqo_api_exception_handler(request, converted_error)
 
 
-@app.exception_handler(api_exceptions.InvalidArgError)
+@app.exception_handler(api_exceptions.MarqoWebError)
 def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebError) -> JSONResponse:
     """ Catch a MarqoWebError and return an appropriate HTTP response.
 
