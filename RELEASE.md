@@ -1,3 +1,24 @@
+# Release 2.1.0
+
+## New features
+- Search result maximum limit and offset greatly increased. Maximum `limit` parameter increased from 400 to 1,000, `offset` increased from 1,000 to 10,000. Maximum value for `MARQO_MAX_RETRIEVABLE_DOCS` configuration is now 10,000 ([#735](https://github.com/marqo-ai/marqo/pull/735)​​, [#737](https://github.com/marqo-ai/marqo/pull/737)​​). See search `limit` and `offset` usage [here](https://docs.marqo.ai/2.1.0/API-Reference/Search/search/#limit)
+
+## Bug fixes and minor changes
+- Improved the Marqo bootstrapping process to address unexpected API behaviour when no index has been created yet (https://github.com/marqo-ai/marqo/pull/730).
+- Improved validation for `create_index` settings (https://github.com/marqo-ai/marqo/pull/717, https://github.com/marqo-ai/marqo/pull/734). Using `dependent_fields` as a request body parameter will now raise a 400 validation error.
+- Improved data parsing for documents in unstructured indexes (https://github.com/marqo-ai/marqo/pull/732). 
+- Made vector store layer config upgrades and rollbacks easier ([#735](https://github.com/marqo-ai/marqo/pull/735)​​, [#736](https://github.com/marqo-ai/marqo/pull/736)​​). 
+- Readme improvements (https://github.com/marqo-ai/marqo/pull/729). 
+
+
+# Release 2.0.1
+
+## Bug fixes and minor changes
+- Improved stability of `use_existing_tensors` feature in `add_documents` (https://github.com/marqo-ai/marqo/pull/725).
+- Improved readability of Marqo start-up logs (https://github.com/marqo-ai/marqo/pull/719).
+- Removed obsolete examples ([#721](https://github.com/marqo-ai/marqo/pull/721), [#723](https://github.com/marqo-ai/marqo/pull/723)).
+
+
 # Release 2.0.0
 ## New features
 * Significant queries-per-second (QPS) and latency improvements in addition to reduced memory and storage requirements. 

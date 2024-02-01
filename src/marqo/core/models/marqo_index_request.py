@@ -46,7 +46,7 @@ class FieldRequest(StrictBaseModel):
     features: List[marqo_index.FieldFeature] = []
     dependent_fields: Optional[Dict[str, float]] = pydantic.Field(alias='dependentFields')
 
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def check_all_fields(cls, values):
         marqo_index.validate_structured_field(values, marqo_index=False)
 
