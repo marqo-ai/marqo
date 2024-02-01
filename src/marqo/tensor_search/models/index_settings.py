@@ -67,7 +67,7 @@ class IndexSettings(StrictBaseModel):
         if self.type == core.IndexType.Structured:
             if self.treatUrlsAndPointersAsImages is not None:
                 raise api_exceptions.InvalidArgError(
-                    "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
+                    "treatUrlsAndPointersAsImages is not a valid parameter for structured indexes"
                 )
             if self.filterStringMaxLength is not None:
                 raise api_exceptions.InvalidArgError(
@@ -106,11 +106,11 @@ class IndexSettings(StrictBaseModel):
         elif self.type == core.IndexType.Unstructured:
             if self.allFields is not None:
                 raise api_exceptions.InvalidArgError(
-                    "all_fields is not a valid parameter for unstructured indexes"
+                    "allFields is not a valid parameter for unstructured indexes"
                 )
             if self.tensorFields is not None:
                 raise api_exceptions.InvalidArgError(
-                    "tensor_fields is not a valid parameter for unstructured indexes"
+                    "tensorFields is not a valid parameter for unstructured indexes"
                 )
 
             if self.treatUrlsAndPointersAsImages is None:
