@@ -7,6 +7,11 @@ logger = get_logger(__name__)
 
 
 class MarqoCustomRoute(APIRoute):
+    """This is a custom route that logs the error and raises it.
+
+    The log will include the stack trace of the error for debugging purposes.
+    The raised error will be handled by the exception handlers. We DO NOT handle the error here.
+    """
     def get_route_handler(self):
         original_route_handler = super().get_route_handler()
 
@@ -14,21 +19,7 @@ class MarqoCustomRoute(APIRoute):
             try:
                 return await original_route_handler(request)
             except Exception as exc:
-                await self._log_the_error(request, exc)
+                logger.error(str(exc), exc_info=True)
                 raise exc
 
         return marqo_custom_route_handler
-
-    async def _log_the_error(self, request: Request, exc: Exception):
-        if self._is_log_stack_trace(exc):
-            logger.error(str(exc), exc_info=True)
-        if self._is_log_request_body(exc):
-            body_bytes = await request.body()
-            logger.error(f"Request body: {body_bytes.decode('utf-8')}")
-
-    def _is_log_stack_trace(self, exc) -> bool:
-        return True
-
-    def _is_log_request_body(self, exc) -> bool:
-        return True
-
