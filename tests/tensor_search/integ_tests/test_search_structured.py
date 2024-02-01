@@ -639,7 +639,7 @@ class TestSearchStructured(MarqoTestCase):
             ("_id:1", 1, ["1"]),
             ("_id:doc1", 1, ["doc1"]),
             ("_id:51", 0, None),
-            ("_id:1 OR _id:doc1", 1, ["1", "doc1"]),  # or condition
+            ("_id:1 OR _id:doc1", 2, ["1", "doc1"]),  # or condition
             ("_id:1 OR _id:doc1 OR _id:50", 3, ["1", "doc1", "50"]),  # or condition, longer
             ("_id:1 OR _id:doc1 OR _id:50 OR _id:51", 3, ["1", "doc1", "50"]),  # or condition with non-existent id
             ("_id:1 AND _id:doc1", 0, None),  # and condition

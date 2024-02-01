@@ -315,6 +315,8 @@ class StructuredMarqoIndex(MarqoIndex):
             if self.parsed_marqo_version().match('>=2.2.0'):
                 the_set.add(constants.MARQO_DOC_ID)
 
+            return the_set
+
         return self._cache_or_get('filterable_fields_names', generate)
 
     @property

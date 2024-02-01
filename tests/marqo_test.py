@@ -5,7 +5,7 @@ from unittest.mock import patch, Mock
 
 import vespa.application as pyvespa
 
-from marqo import config
+from marqo import config, version
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.models.marqo_index import *
@@ -92,7 +92,7 @@ class MarqoTestCase(unittest.TestCase):
                 ef_construction=128,
                 m=16
             ),
-            marqo_version='1.0.0',
+            marqo_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time()
     ) -> StructuredMarqoIndex:
@@ -138,7 +138,7 @@ class MarqoTestCase(unittest.TestCase):
                 ef_construction=128,
                 m=16
             ),
-            marqo_version='1.0.0',
+            marqo_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time()
     ) -> StructuredMarqoIndexRequest:
