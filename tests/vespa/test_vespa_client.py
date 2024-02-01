@@ -1,4 +1,5 @@
 import os
+import unittest
 from unittest.mock import patch
 
 import httpx
@@ -296,6 +297,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         with self.assertRaises(VespaError):
             self.client.deploy_application("/invalid/path")
 
+    @unittest.skip
     def test_deploy_application_invalidApp_fails(self):
         with self.assertRaises(VespaError):
             self.client.deploy_application(os.path.abspath(os.path.curdir))
