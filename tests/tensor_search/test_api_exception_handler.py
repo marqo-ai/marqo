@@ -271,10 +271,10 @@ class TestBaseExceptionHandler(MarqoTestCase):
 
     @mock.patch("marqo.tensor_search.api.marqo_api_exception_handler")
     def test_base_exception_handler_unhandled_error(self, mock_api_exception_handler):
-        # Ensure that an unhandled error is converted to a MarqoWebError and the original message is not propogated
-        marqo_base_exception_handler(self.normal_request, base_exceptions.MarqoError("This should not be propogated."))
+        # Ensure that an unhandled error is converted to a MarqoWebError and the original message is not propagated
+        marqo_base_exception_handler(self.normal_request, base_exceptions.MarqoError("This should not be propagated."))
         converted_error = mock_api_exception_handler.call_args_list[-1][0][1]
         
         self.assertIsInstance(converted_error, api_exceptions.MarqoWebError)
-        self.assertNotIn("This should not be propogated.", converted_error.message)
+        self.assertNotIn("This should not be propagated.", converted_error.message)
         self.assertIn("unexpected internal Marqo error", converted_error.message)
