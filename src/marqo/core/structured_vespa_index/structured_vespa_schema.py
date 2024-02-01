@@ -59,7 +59,7 @@ class StructuredVespaSchema(VespaSchema):
 
         # ID field
         document.append(f'field {common.FIELD_ID} type string {{')
-        document.append(f'indexing: attribute | summary')
+        document.append('indexing: attribute | summary')
         document.append('attribute: fast-search')
         document.append('rank: filter')
         document.append('}')

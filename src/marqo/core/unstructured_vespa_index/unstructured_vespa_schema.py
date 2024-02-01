@@ -73,6 +73,8 @@ class UnstructuredVespaSchema(VespaSchema):
                 document {{
                     field {cls._FIELD_ID} type string {{
                         indexing: attribute | summary
+                        attribute: fast-search
+                        rank: filter
                     }}
 
                     field {cls._STRINGS} type array<string>{{
