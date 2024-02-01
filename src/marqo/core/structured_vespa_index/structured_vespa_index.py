@@ -381,24 +381,33 @@ class StructuredVespaIndex(VespaIndex):
             elif isinstance(node, search_filter.Term):
                 if node.field not in self._marqo_index.filterable_fields_names:
                     raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no filterable field {node.field}. '
-                        f'Available filterable fields are: {", ".join(self._marqo_index.filterable_fields_names)}'
+                        f"Index '{self._marqo_index.name}' has no filterable field '{node.field}'. "
+                        f'Available filterable fields are: \'{", ".join(self._marqo_index.filterable_fields_names)}\''
                     )
 
-                marqo_field = self._marqo_index.all_field_map[node.field]
+                if node.field == constants.MARQO_DOC_ID:
+                    marqo_field_name = common.FIELD_ID
+                    marqo_field_type = FieldType.Text
+                else:
+                    marqo_field = self._marqo_index.all_field_map[node.field]
+                    marqo_field_name = marqo_field.filter_field_name
+                    marqo_field_type = marqo_field.type
 
                 if isinstance(node, search_filter.EqualityTerm):
                     node_value = node.value
-                    if marqo_field.type == FieldType.Bool:
+                    if marqo_field_type == FieldType.Bool:
                         if node_value.lower() == 'true':
                             node_value = '1'
                         elif node_value.lower() == 'false':
                             node_value = '0'
+                        else:
+                            raise InvalidDataTypeError(f"Invalid value '{node_value}' for field '{node.field}'. "
+                                                       f'Expected boolean value')
 
-                    return f'{marqo_field.filter_field_name} contains "{escape(node_value)}"'
+                    return f'{marqo_field_name} contains "{escape(node_value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
-                    lower = f'{marqo_field.filter_field_name} >= {node.lower}' if node.lower is not None else None
-                    upper = f'{marqo_field.filter_field_name} <= {node.upper}' if node.upper is not None else None
+                    lower = f'{marqo_field_name} >= {node.lower}' if node.lower is not None else None
+                    upper = f'{marqo_field_name} <= {node.upper}' if node.upper is not None else None
                     if lower and upper:
                         return f'({lower} AND {upper})'
                     elif lower:
