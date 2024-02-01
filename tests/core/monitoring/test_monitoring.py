@@ -124,6 +124,11 @@ class TestMonitoring(MarqoTestCase):
             cls.unstructured_index
         ]
 
+        # WARMUP monitoring calls to avoid NoneType return for first test run
+        for i in range(2):
+            for marqo_index in cls.indexes_to_test:
+                cls.monitoring.get_index_stats(marqo_index)
+
     def test_get_index_stats_emptyIndex_successful(self):
         """
         get_index_stats returns the correct stats for an empty index
