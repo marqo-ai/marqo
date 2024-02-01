@@ -7,7 +7,7 @@ import threading
 import time
 from typing import Dict
 
-from marqo import documentation
+from marqo import marqo_docs
 from marqo.api import exceptions
 from marqo.config import Config
 from marqo.core.exceptions import IndexNotFoundError
@@ -114,7 +114,7 @@ def _check_refresh_thread(config: Config):
                             logger.warn(
                                 "Failed to connect to vector store. If you are using an external vector store, "
                                 "ensure that Marqo is configured properly for this. See "
-                                f"{documentation.configuring_marqo()} for more details. Error: {e}"
+                                f"{marqo_docs.configuring_marqo()} for more details. Error: {e}"
                             )
                     except Exception as e:
                         logger.error(f'Unexpected error in index cache refresh thread: {e}')

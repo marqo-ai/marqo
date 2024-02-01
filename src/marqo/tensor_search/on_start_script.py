@@ -4,7 +4,7 @@ import time
 
 import torch
 
-from marqo import config, documentation, version
+from marqo import config, marqo_docs, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
@@ -54,7 +54,7 @@ class CreateSettingsSchema:
             logger.warn(
                 f"Could not create Marqo settings schema. If you are using an external vector store, "
                 "ensure that Marqo is configured properly for this. See "
-                f"{documentation.configuring_marqo()} for more details. Error: {e}"
+                f"{marqo_docs.configuring_marqo()} for more details. Error: {e}"
             )
 
 
