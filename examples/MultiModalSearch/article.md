@@ -278,15 +278,15 @@ The dataset consists of ~220,000 e-commerce products with images, text and some 
 
 ### 3.2 Installing Marqo
 
-The first thing to do is start [Marqo](https://github.com/marqo-ai/marqo). To start, we can run the following [docker command](https://marqo.pages.dev/0.0.21/) from a terminal (for M-series Mac users see [here](https://marqo.pages.dev/0.0.21/m1_mac_users/)).
+The first thing to do is start [Marqo](https://github.com/marqo-ai/marqo). To start, we can run the following [docker command](https://docs.marqo.ai/) from a terminal (for M-series Mac users see [here](https://docs.marqo.ai/2.0.0/m1_mac_users/)).
 
 ```bash
 docker pull marqoai/marqo:latest
 docker rm -f marqo
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
 ```
 
-The next step is to install the python client (a REST API is also [available](https://docs.marqo.ai/0.0.21/)).
+The next step is to install the python client (a REST API is also [available](https://docs.marqo.ai/2.0.0/)).
 
 ```bash
 pip install marqo
@@ -308,7 +308,7 @@ documents = data[['s3_http', '_id', 'price', 'blip_large_caption', 'aesthetic_sc
 
 ###  3.4 Create the Index
 
-Now we have the data prepared, we can [set up the index](https://marqo.pages.dev/0.0.21/API-Reference/indexes/). We will use a [ViT-L-14 from open clip](https://github.com/mlfoundations/open_clip) as the model. This model is very good to start with. It is recommended to [use a GPU](https://marqo.pages.dev/0.0.21/using_marqo_with_a_gpu/) (at least 4GB VRAM) otherwise a [smaller model](https://marqo.pages.dev/0.0.21/Models-Reference/dense_retrieval/#open-clip) can be used (although results may be worse).  
+Now we have the data prepared, we can [set up the index](https://docs.marqo.ai/2.0.0/API-Reference/indexes/). We will use a [ViT-L-14 from open clip](https://github.com/mlfoundations/open_clip) as the model. This model is very good to start with. It is recommended to [use a GPU](https://docs.marqo.ai/2.0.0/using_marqo_with_a_gpu/) (at least 4GB VRAM) otherwise a [smaller model](https://docs.marqo.ai/2.0.0/Models-Reference/dense_retrieval/#open-clip) can be used (although results may be worse).  
 
 ```python
 from marqo import Client
@@ -317,19 +317,17 @@ client = Client()
     
 index_name = 'multimodal'
 settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
+	"treatUrlsAndPointersAsImages": True,
+	"model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+	"normalizeEmbeddings": True,
+}
     
 response = client.create_index(index_name, settings_dict=settings)
 ```
 
 ###  3.5 Add Images to the Index
 
-Now we can [add images](https://marqo.pages.dev/0.0.21/API-Reference/documents/) to the index which can then be searched over. We can also select the device we want to use and also which fields in the data to embed. To use a GPU, change the device to `cuda` (see [here](https://marqo.pages.dev/0.0.21/using_marqo_with_a_gpu/) for how to use Marqo with a GPU).
+Now we can [add images](https://docs.marqo.ai/2.0.0/API-Reference/documents/) to the index which can then be searched over. We can also select the device we want to use and also which fields in the data to embed. To use a GPU, change the device to `cuda` (see [here](https://docs.marqo.ai/2.0.0/using_marqo_with_a_gpu/) for how to use Marqo with a GPU).
 
 ```python
 device = 'cpu' # use 'cuda' if a GPU is available
@@ -339,11 +337,11 @@ res = client.index(index_name).add_documents(documents, client_batch_size=64, te
 
 ###  3.6 Searching
 
-Now the images are indexed, we can start [searching](https://marqo.pages.dev/0.0.21/API-Reference/search/).
+Now the images are indexed, we can start [searching](https://docs.marqo.ai/2.0.0/API-Reference/search/).
 
 ```python
 query = "green shirt"
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.7 Searching as Prompting
@@ -352,7 +350,7 @@ Like in the examples above, it is easy to do more specific searches by adopting 
 
 ```python
 query = "cozy sweater, xmas, festive, holidays"    
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.8 Searching with Semantic Filters
@@ -361,7 +359,7 @@ Now we can extend the searching to use multi-part queries. These can act as "sem
 
 ```python
 query = {"green shirt":1.0, "short sleeves":1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.9 Searching with Negation
@@ -370,7 +368,7 @@ In addition to additive terms, negation can be used. Here we remove buttons from
 
 ```python
 query = {"green shirt":1.0, "short sleeves":1.0, "buttons":-1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.10 Searching with Images
@@ -380,7 +378,7 @@ In addition to text, searching can be done with images alone.
 ```python
 image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
 query = {image_context_url:1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.11 Searching with Multimodal Queries
@@ -392,18 +390,18 @@ The multi-part queries can span both text and images.
 image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/71iPk9lfhML._SL1500_.jpg"
 
 query = {"backpack":1.0, image_context_url:1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 
 # trees/hiking
 image_context_url = "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/trees.jpg"
 
 query = {"backpack":1.0, image_context_url:1.0}
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 ```
 
 ###  3.12 Searching with Ranking
 
-We can now extend the search to also include document specific values to boost the [ranking of documents](https://marqo.pages.dev/0.0.21/API-Reference/search/#score-modifiers) in addition to the vector similarity. In this example, each document has a field called `aesthetic_score` which can also be used to bias the score of each document.
+We can now extend the search to also include document specific values to boost the [ranking of documents](https://docs.marqo.ai/2.0.0/API-Reference/search/#score-modifiers) in addition to the vector similarity. In this example, each document has a field called `aesthetic_score` which can also be used to bias the score of each document.
 
 ```python
 query = {"yellow handbag":1.0}
@@ -416,63 +414,56 @@ score_modifiers = {
             {"field_name": "aesthetic_score", "weight": 0.02}]
         }
     
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, score_modifiers=score_modifiers)
+res = client.index(index_name).search(query, device=device, limit=10, score_modifiers=score_modifiers)
 
 # now get the aggregate aesthetic score
 print(sum(r['aesthetic_score'] for r in res['hits']))
     
 # and compare to the non ranking version
-res = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10)
+res = client.index(index_name).search(query, device=device, limit=10)
 
 print(sum(r['aesthetic_score'] for r in res['hits']))
 ```
 
 ###  3.13 Searching with Popular or Liked Products
 
-Results at a per-query level can be personalized using sets of items. These items could be previously liked or popular items. To perform this we do it in two stages. The first is to calculate the "context vector" which is a condensed representation of the items. This is pre-computed and then stored to remove any additional overhead at query time. The context is generated by [creating documents](https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object) of the item sets and retrieving the corresponding vectors. 
+Results at a per-query level can be personalized using sets of items. These items could be previously liked or popular items. To perform this we do it in two stages. The first is to calculate the "context vector" which is a condensed representation of the items. This is pre-computed and then stored to remove any additional overhead at query time. The context is generated by [creating documents](https://docs.marqo.ai/2.0.0/Advanced-Usage/document_fields/#multimodal-combination-object) of the item sets and retrieving the corresponding vectors. 
 The first step is to create a new index to calculate the context vectors.
 ```python
 # we create another index to create a context vector
 index_name_context = 'multimodal-context'
 settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
+	"treatUrlsAndPointersAsImages": True,
+	"model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+	"normalizeEmbeddings": True,
+}
     
 res = client.create_index(index_name_context, settings_dict=settings)
 ```
 
-Then we [construct the objects](https://marqo.pages.dev/0.0.21/Advanced-Usage/document_fields/#multimodal-combination-object) from the sets of items we want to use for the context.
+Then we [construct the objects](https://docs.marqo.ai/2.0.0/Advanced-Usage/document_fields/#multimodal-combination-object) from the sets of items we want to use for the context.
 
 ```python
 # create the document that will be created from multiple images
-document1 = {"_id":"1",
-                "multimodal": 
-                    {
-                        "top_1":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/blue_backpack.jpg", 
-                        "top_2":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/dark_backpack.jpeg", 
-                        "top_3":'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/green+_backpack.jpg',
-                        "top_4":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
-                    }
-               }
+document1 = {"_id": "1",
+			 "top_1": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/blue_backpack.jpg",
+			 "top_2": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/dark_backpack.jpeg",
+			 "top_3": 'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/green+_backpack.jpg',
+			 "top_4": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/red_backpack.jpg"
+
+			 }
 
 # create the document that will be created from multiple images
-document2 = {"_id":"2",
-                "multimodal": 
-                    {
-                        "top_1":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_1.jpg", 
-                        "top_2":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office2.webp", 
-                        "top_3":'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_3.jpeg',
-                        "top_4":"https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_4.jpg"
-                    }
-               }
+document2 = {"_id": "2",
+			 "top_1": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_1.jpg",
+			 "top_2": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office2.webp",
+			 "top_3": 'https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_3.jpeg',
+			 "top_4": "https://marqo-overall-demo-assets.s3.us-west-2.amazonaws.com/ecommerce/office_4.jpg"
+			 }
 
 ```
 
-We can now [define mappings](https://marqo.pages.dev/0.0.21/API-Reference/mappings/) objects to determine how we want to combine the different fields. We can then index the documents.
+We can now [define mappings](https://docs.marqo.ai/2.0.0/API-Reference/mappings/) objects to determine how we want to combine the different fields. We can then index the documents.
 
 ```python
 # define how we want to combined
@@ -500,7 +491,7 @@ res = client.index(index_name_context).add_documents([document1], tensor_fields=
 res = client.index(index_name_context).add_documents([document2], tensor_fields=["multimodal"], device=device, mappings=mappings2)
 ```
 
-To get the vectors to use as context vectors at search time - we need to [retrieve the calculated vectors](https://marqo.pages.dev/0.0.21/API-Reference/documents/). We can then [create a context object](https://marqo.pages.dev/0.0.21/API-Reference/search/#context) that is used at search time.
+To get the vectors to use as context vectors at search time - we need to [retrieve the calculated vectors](https://docs.marqo.ai/2.0.0/API-Reference/documents/). We can then [create a context object](https://docs.marqo.ai/2.0.0/API-Reference/search/#context) that is used at search time.
 
 ```python
 
@@ -527,9 +518,9 @@ context2 = {"tensor":
 
 # now search
 query = {"backpack":1.0}
-res1 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context1)
+res1 = client.index(index_name).search(query, device=device, limit=10, context=context1)
     
-res2 = client.index(index_name).search(query, searchable_attributes=['s3_http'], device=device, limit=10, context=context2)
+res2 = client.index(index_name).search(query, device=device, limit=10, context=context2)
 ```
 
 ###  3.14 Indexing as Multimodal Objects
@@ -541,26 +532,14 @@ We will create a new index in the same way as before but with a new name.
 # we will create a new index for the multimodal objects
 index_name_mm_objects = 'multimodal-objects'
 settings = {
-            "index_defaults": {
-                "treat_urls_and_pointers_as_images": True,
-                "model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
-                "normalize_embeddings": True,
-            },
-        }
+	"treatUrlsAndPointersAsImages": True,
+	"model": "open_clip/ViT-L-14/laion2b_s32b_b82k",
+	"normalizeEmbeddings": True,
+}
     
 res = client.create_index(index_name_mm_objects, settings_dict=settings) 
 ```
  
- To index the documents as multimodal objects, we need to create a new field and add in what we want to use. 
-    
- ```python
- # now create the multimodal field in the documents
- for doc in documents:
-     doc['multimodal'] = {
-                            'blip_large_caption':doc['blip_large_caption'],
-                            's3_http':doc['s3_http'],
-                            }
-```
 
 The next step is to index. The only change is an additional mappings object which details how we want to combine the different fields for each document.
 
@@ -586,7 +565,7 @@ Finally we can search in the same way as before.
 
 ```python
 query = "red shawl"
-res = client.index(index_name_mm_objects).search(query, searchable_attributes=['multimodal'], device=device, limit=10)
+res = client.index(index_name_mm_objects).search(query, device=device, limit=10)
 ```
 
 ### 4. Conclusion

@@ -15,6 +15,8 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
+        EnvVars.MARQO_MAX_SEARCH_LIMIT: 1000,
+        EnvVars.MARQO_MAX_SEARCH_OFFSET: 10000,
         EnvVars.MARQO_MODELS_TO_PRELOAD: ["hf/e5-base-v2", "open_clip/ViT-B-32/laion2b_s34b_b79k"],
         EnvVars.MARQO_MAX_CONCURRENT_INDEX: 8,
         EnvVars.MARQO_MAX_CONCURRENT_SEARCH: 8,
@@ -31,4 +33,5 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_NUMBER_OF_REPLICAS: 1,
         EnvVars.MARQO_DEFAULT_EF_SEARCH: 2000,
         EnvVars.MARQO_ENABLE_BATCH_APIS: "FALSE",
+        EnvVars.MARQO_ENABLE_UPGRADE_API: "FALSE",
     }

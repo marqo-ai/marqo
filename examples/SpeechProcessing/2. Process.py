@@ -27,12 +27,10 @@ def main():
 
     mq.delete_index(index_name)
     settings = {
-        "index_defaults": {
-            "text_preprocessing": {
-                "split_length": 2,
-                "split_overlap": 0,
-                "split_method": "sentence",
-            },
+        "textPreprocessing": {
+            "splitLength": 2,
+            "splitOverlap": 0,
+            "splitMethod": "sentence",
         },
     }
 

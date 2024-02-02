@@ -26,8 +26,8 @@ please check [here](https://github.com/marqo-ai/marqo#m-series-mac-users).
 
 ```
 docker rm -f marqo
-docker pull marqoai/marqo:0.0.10
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:0.0.10
+docker pull marqoai/marqo:2.0.0
+docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:2.0.0
 ```
 
 Now, we can create a new environment and install the Marqo client by:
@@ -41,14 +41,8 @@ Open Python and check the installation is successful by:
 ```python
 import marqo
 mq = marqo.Client("http://localhost:8882")
-
-mq.get_marqo()
 ```
-and you should have the output as:
-```python
-{'message': 'Welcome to Marqo', 'version': '0.0.10'}
-```
-At the time this article is written, we are using marqo with version 0.0.10.
+At the time this article is written, we are using marqo with version 2.0.0.
 
 ### Download images
 
@@ -72,14 +66,14 @@ In this case, we just use a very basic setting by specifying the model ,enabling
 index_name = 'image-search-guide'
 
 settings = {
-        "model": "ViT-L/14",
-        "treat_urls_and_pointers_as_images": True,
+        "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
+        "treatUrlsAndPointersAsImages": True,
         }
 
-mq.create_index(index_name, **settings)
+mq.create_index(index_name, settings_dict=settings)
 ```
-__Note__: To accomplish this multi-modal search task, we __MUST__ set `"treat_urls_and_pointers_as_imges": True` to enable the multi-modal search feature. As for the `model`, we need to 
-select a model from [__CLIP families__](https://docs.marqo.ai/0.0.10/Models-Reference/dense_retrieval/) (`"ViT-L/14"` in this case).
+__Note__: To accomplish this multi-modal search task, we __MUST__ set `"treat_urls_and_pointers_as_images": True` to enable the multi-modal search feature. As for the `model`, we need to 
+select a model from [__CLIP families__](https://docs.marqo.ai/2.0.0/Models-Reference/dense_retrieval/) (`"open_clip/ViT-B-32/laion2b_s34b_b79k"` in this case).
 
 ### Access local images
 Now, we need to add the images to the created index, which is a little tricky. Marqo is running in the docker, so it will not be able to access
@@ -90,7 +84,7 @@ are you really going to upload and download 1 million images with a larger datas
 We can put the local images in a docker server for easier access from marqo in dock by
 ```python
 import subprocess
-local_dir = "./data"
+local_dir = "./data/"
 pid = subprocess.Popen(['python3', '-m', 'http.server', '8222', '--directory', local_dir], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 ```
 
@@ -124,7 +118,7 @@ All the local image are on a docker server for marqo to access now.
 Marqo requires the input (which we call `documents`) as a `list` of `dictionary`, we can convert the images into the required format
 
 ```python
-documents = [{"image_docker" : image, "_id" : idx} for idx, image in enumerate(image_docker)]
+documents = [{"image_docker" : image, "_id" : str(idx)} for idx, image in enumerate(image_docker)]
 
 print(documents)
 ```
@@ -158,7 +152,7 @@ outputs:
 2022-12-30 04:27:51,573 logger:'marqo' INFO completed batch ingestion.
 2022-12-30 04:27:51,575 logger:'marqo' INFO add_documents completed. total time taken: 5.729s.
 ```
-Yes, it is just this simple one line of code. And you can check the outputs for the indexing time. If you have CUDA GPU available, and want to speed up indexing, follow [this guide](https://docs.marqo.ai/0.0.10/using_marqo_with_a_gpu/) to enable CUDA on Marqo, and set `device="cuda"` in the `add_documents` call.  
+Yes, it is just this simple one line of code. And you can check the outputs for the indexing time. If you have CUDA GPU available, and want to speed up indexing, follow [this guide](https://docs.marqo.ai/2.0.0/using_marqo_with_a_gpu/) to enable CUDA on Marqo, and set `device="cuda"` in the `add_documents` call.  
 
 Done, all the images are in Marqo and now we can search.
 
@@ -168,9 +162,8 @@ Finally, let us search and see the returned the results.
 
 Let's say we want to get the image "*A rider on a horse jumping over the barrier*". Here is the code.
 ```python
-search_results =  mq.index(index_name).search("A rider on a horse jumping over the barrier", 
-                        searchable_attributes=['image_docker'], limit = 1,
-                        device='cpu')
+search_results = mq.index(index_name).search("A rider on a horse jumping over the barrier", limit=1,
+                                             device='cpu')
 ```
 ```python
 output:
@@ -184,7 +177,7 @@ print(search_results)
 output:
 {'hits': [{'image_docker': 'http://host.docker.internal:8222/image1.jpg',
    '_id': '1',
-   '_highlights': {'image_docker': 'http://host.docker.internal:8222/image1.jpg'},
+   '_highlights': [{'image_docker': 'http://host.docker.internal:8222/image1.jpg'}],
    '_score': 0.6133688}],
  'processingTimeMs': 358,
  'query': 'A rider on a horse jumping over the barrier',

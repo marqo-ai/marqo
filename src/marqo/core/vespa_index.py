@@ -71,12 +71,13 @@ class VespaIndex(ABC):
         pass
 
 
-def for_marqo_index(marqo_index: MarqoIndex):
+def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
     """
     Get the VespaIndex implementation for the given MarqoIndex.
 
     Args:
         marqo_index: The MarqoIndex to get the implementation for
+        marqo_version: The version of Marqo that the index was created with
 
     Returns:
         The VespaIndex implementation for the given MarqoIndex

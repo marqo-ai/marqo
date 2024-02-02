@@ -3,13 +3,8 @@
 #####################################################
 
 from marqo import Client
-from marqo.api.exceptions import MarqoApiError
-import torch
-import json
-import pprint
 import glob
 import os
-import pandas as pd
 import subprocess
 
 #####################################################
@@ -53,10 +48,10 @@ client = Client()
 index_name = 'hot-dogs-100k'
 
 settings = {
-        "model":'ViT-L/14',
-        "treat_urls_and_pointers_as_images": True,
+        "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
+        "treatUrlsAndPointersAsImages": True,
         }
-client.create_index(index_name, **settings)
+client.create_index(index_name, settings_dict=settings)
 
 # Here we index. A gpu is recommended (device='cuda')
 responses = client.index(index_name).add_documents(documents, device='cpu', client_batch_size=50, tensor_fields=["image_docker"])
@@ -80,10 +75,10 @@ label_strings = [list(a.values())[0] for a in labels]
 
 # we create a new index
 settings = {
-        "model":'ViT-L/14',
-        "treat_urls_and_pointers_as_images": True,
+        "model":'open_clip/ViT-B-32/laion2b_s34b_b79k',
+        "treatUrlsAndPointersAsImages": True,
         }
-client.create_index(index_name, **settings)
+client.create_index(index_name, settings_dict=settings)
 
 # add our labels to the index
 responses = client.index(index_name).add_documents(labels, tensor_fields=["label"])
@@ -124,8 +119,7 @@ client.index(index_name).delete_documents(documents_delete)
 #####################################################
 
 # pick one to start
-results = client.index("hot-dogs-100k").search('a photo of a smiling face', 
-                        searchable_attributes=['image_docker'], 
+results = client.index("hot-dogs-100k").search('a photo of a smiling face',
                         filter_string="a_face:[0.58 TO 0.99] AND a_hamburger:[0.60 TO 0.99]", device='cuda')
 
 # find the document that matches closest with the query
@@ -141,7 +135,6 @@ for i in range(len(documents)):
 
     # now search with it to get next best
     results = client.index(index_name).search(current_document['image_docker'],
-                            searchabel_attributes=['image_docker'], 
                             filter_string="a_face:[0.58 TO 0.99] AND a_hamburger:[0.60 TO 0.99]",
                             device='cuda')
 

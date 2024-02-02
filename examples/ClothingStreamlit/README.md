@@ -22,7 +22,7 @@ Python 3.8
 
 3. Make sure to run the Marqo docker container via the following command:
     ```
-    docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
+    docker run --name marqo -it -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
     ```
 
 4. Install Streamlit. This can be done by via the following [link](https://docs.streamlit.io/library/get-started/installation).
@@ -39,7 +39,7 @@ Python 3.8
     ```
 
 For more information on: 
-- Marqo's functions and features, please visit the [Marqo Documentation Page](https://marqo.pages.dev/).
+- Marqo's functions and features, please visit the [Marqo Documentation Page](https://docs.marqo.ai/).
 
 - Streamlit's functions and features, please visit the [Streamlit Documentation Page](https://docs.streamlit.io/).
 

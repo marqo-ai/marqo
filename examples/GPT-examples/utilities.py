@@ -174,9 +174,9 @@ def extract_text_from_highlights(res, token_limit=256, truncate=True):
     highlights = []
     texts = []
     for ind,hit in enumerate(res[ResultsFields.hits]):
-        highlight_dict = hit[ResultsFields.highlights]
-        highlight_key = list(highlight_dict.keys())[0]
-        highlight_text = list(highlight_dict.values())[0]
+        highlight_list = hit[ResultsFields.highlights]
+        highlight_key = list(highlight_list[0].keys())[0]
+        highlight_text = list(highlight_list[0].values())[0]
         text = hit[highlight_key]
     
         if truncate:
@@ -400,17 +400,17 @@ def test_check_highlights_field():
                 'Title': 'Extravehicular Mobility Unit (EMU)',
                 'Description': 'The EMU is a spacesuit that provides environmental protection, mobility, life support, and' 
                             'communications for astronauts',
-                '_highlights': {
+                '_highlights': [{
                     'Description': 'The EMU is a spacesuit that provides environmental protection, '
                                 'mobility, life support, and communications for astronauts'
-                },
+                }],
                 '_id': 'article_591',
                 '_score': 0.61938936
             }, 
             {   
                 'Title': 'The Travels of Marco Polo',
                 'Description': "A 13th-century travelogue describing Polo's travels",
-                '_highlights': {'Title': 'The Travels of Marco Polo'},
+                '_highlights': [{'Title': 'The Travels of Marco Polo'}],
                 '_id': 'e00d1a8d-894c-41a1-8e3b-d8b2a8fce12a',
                 '_score': 0.60237324
             }

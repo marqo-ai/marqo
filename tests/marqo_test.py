@@ -73,6 +73,7 @@ class MarqoTestCase(unittest.TestCase):
     def structured_marqo_index(
             cls,
             name: str,
+            schema_name: str,
             fields: List[Field] = None,
             tensor_fields: List[TensorField] = None,
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
@@ -100,6 +101,7 @@ class MarqoTestCase(unittest.TestCase):
         """
         return StructuredMarqoIndex(
             name=name,
+            schema_name=schema_name,
             model=model,
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
@@ -166,7 +168,7 @@ class MarqoTestCase(unittest.TestCase):
     def unstructured_marqo_index_request(
             cls,
             name: Optional[str] = None,
-            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            model: Model = Model(name='random/small'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,

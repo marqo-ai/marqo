@@ -1,2 +1,0 @@
-pandas
-marqo==0.9.6

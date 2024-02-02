@@ -351,7 +351,7 @@ QUESTION:
 """
 ```
 
-This context is used in the answer_question function which searches Marqo, uses the transcriptions to make a context and then sends it to the text-davinci-003 model as part of the prompt.
+This context is used in the answer_question function which searches Marqo, uses the transcriptions to make a context
 
 ```python
 def answer_question(
@@ -370,7 +370,7 @@ def answer_question(
     context = ". ".join([r["transcription"] for r in results["hits"]])
 
     prompt = PromptTemplate(template=TEMPLATE, input_variables=["context", "question"])
-    llm = OpenAI(temperature=0.9, model_name="text-davinci-003")
+    llm = OpenAI(temperature=0.9)
     chain_qa = LLMChain(llm=llm, prompt=prompt)
     llm_results = chain_qa(
         {"context": context, "question": query}, return_only_outputs=True

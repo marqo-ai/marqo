@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 
 from pydantic import root_validator
 
@@ -45,15 +45,20 @@ class IndexSettings(StrictBaseModel):
     @root_validator(pre=True)
     def validate_field_names(cls, values):
         # Verify no snake case field names (pydantic won't catch these due to allow_population_by_field_name = True)
-        def validate_dict_keys(d: dict):
-            for key in d.keys():
-                if '_' in key:
-                    raise ValueError(f"Invalid field name '{key}'. "
-                                     f"See Create Index API reference here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/")
-                if isinstance(d[key], dict):
-                    validate_dict_keys(d[key])
+        def validate_keys(d: Union[dict, list]):
+            if isinstance(d, dict):
+                for key in d.keys():
+                    if '_' in key:
+                        raise ValueError(f"Invalid field name '{key}'. "
+                                         f"See Create Index API reference here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/")
 
-        validate_dict_keys(values)
+                    if key not in ['dependentFields', 'modelProperties']:
+                        validate_keys(d[key])
+            elif isinstance(d, list):
+                for item in d:
+                    validate_keys(item)
+
+        validate_keys(values)
 
         return values
 
@@ -62,7 +67,7 @@ class IndexSettings(StrictBaseModel):
         if self.type == core.IndexType.Structured:
             if self.treatUrlsAndPointersAsImages is not None:
                 raise api_exceptions.InvalidArgError(
-                    "treat_urls_and_pointers_as_images is not a valid parameter for structured indexes"
+                    "treatUrlsAndPointersAsImages is not a valid parameter for structured indexes"
                 )
             if self.filterStringMaxLength is not None:
                 raise api_exceptions.InvalidArgError(
@@ -101,11 +106,11 @@ class IndexSettings(StrictBaseModel):
         elif self.type == core.IndexType.Unstructured:
             if self.allFields is not None:
                 raise api_exceptions.InvalidArgError(
-                    "all_fields is not a valid parameter for unstructured indexes"
+                    "allFields is not a valid parameter for unstructured indexes"
                 )
             if self.tensorFields is not None:
                 raise api_exceptions.InvalidArgError(
-                    "tensor_fields is not a valid parameter for unstructured indexes"
+                    "tensorFields is not a valid parameter for unstructured indexes"
                 )
 
             if self.treatUrlsAndPointersAsImages is None:

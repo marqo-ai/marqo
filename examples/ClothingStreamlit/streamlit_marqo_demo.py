@@ -27,18 +27,18 @@ def load_index(number_data):
             data['image'] = path
             
         settings = {
-            "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it
+            "treatUrlsAndPointersAsImages":True,   # allows us to find an image file and index it
             "model":"ViT-B/16"
         }
          
-        mq.create_index("demo-search-index", **settings)
+        mq.create_index("demo-search-index", settings_dict=settings)
 
         with st.spinner("Creating Index..."):
-            mq.index("demo-search-index").add_documents(shirt_data, tensor_fields=['image', 'label', 'kids'])
+            mq.index("demo-search-index").add_documents(shirt_data, tensor_fields=['image', 'label'])
 
         st.success("Index successfully created.")
-    except:
-        st.error("Index already exists.")
+    except Exception as e:
+        st.error("Index creation failed {e}")
 
 def delete_index():
     try:
@@ -143,16 +143,14 @@ def main():
             results = mq.index("demo-search-index").search(
                 search_text,
                 filter_string=create_filter_str(filtering), 
-                search_method=search_text_mode.upper(), 
-                searchable_attributes=[i.lower() for i in searchable_attr],
+                search_method=search_text_mode.upper(),
                 limit=30
                 )
         
         elif search_image_url != "" and search_image_url != None:
             results = mq.index("demo-search-index").search(
                 search_image_url,
-                filter_string=create_filter_str(filtering), 
-                searchable_attributes=[i.lower() for i in searchable_attr],
+                filter_string=create_filter_str(filtering),
                 limit=30
                 )
         
@@ -164,8 +162,7 @@ def main():
 
             results = mq.index("demo-search-index").search(
                 uploaded_img_path,
-                filter_string=create_filter_str(filtering), 
-                searchable_attributes=[i.lower() for i in searchable_attr],
+                filter_string=create_filter_str(filtering),
                 limit=30
                 )
 
