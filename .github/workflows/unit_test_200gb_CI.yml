@@ -5,8 +5,6 @@ on:
   workflow_call:
   workflow_dispatch:
   push:
-    branches:
-      mainline
     paths-ignore:
       - '**.md'
   pull_request:
@@ -73,19 +71,50 @@ jobs:
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.txt
           pip install pytest==7.4.0
-      
-      - name: start Marqo-os
+
+      - name: Start Vespa
         run: |
-          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
-          docker run --name marqo-os -d -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" marqoai/marqo-os:0.0.3 || exit
+          # Define these for checking if Vespa is ready
+          export VESPA_CONFIG_URL=http://localhost:19071
+          export VESPA_DOCUMENT_URL=http://localhost:8080
+          export VESPA_QUERY_URL=http://localhost:8080
           
-          # wait for marqo-os to start:
-          timeout 10m bash -c 'until [[ $(curl -v --silent --insecure $LOCAL_OPENSEARCH_URL 2>&1 | grep Unauthorized) ]]; do sleep 0.1; done;' || \
-            (echo "Marqo-os did not start in time" && exit 1)
+          cd marqo/scripts/vespa_local
+          set -x
+          python vespa_local.py start
+          set +x
+
+          echo "Waiting for Vespa to start"
+          for i in {1..20}; do
+              echo -ne "Waiting... $i seconds\r"
+              sleep 1
+          done
+          echo -e "\nDone waiting."
+          
+          # Zip up schemas and services
+          apt-get install zip -y
+          zip -r vespa_tester_app.zip services.xml schemas
+
+          # Deploy dummy application with test schema
+          curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
+
+          # wait for vespa to start (document url):
+          timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
+            (echo "Vespa (Document URL) did not start in time" && exit 1)
+          
+          echo "Vespa document API is available. Local Vespa setup complete."
+
+          # Delete the zip file
+          rm vespa_tester_app.zip
+          echo "Deleted vespa_tester_app.zip"
           
       - name: Run Unit Tests
         run: |
-          export LOCAL_OPENSEARCH_URL="https://localhost:9200"
+          # Define these for use by marqo
+          export VESPA_CONFIG_URL=http://localhost:19071
+          export VESPA_DOCUMENT_URL=http://localhost:8080
+          export VESPA_QUERY_URL=http://localhost:8080
+
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
           pytest marqo/tests
   
