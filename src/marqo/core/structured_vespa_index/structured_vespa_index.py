@@ -400,9 +400,6 @@ class StructuredVespaIndex(VespaIndex):
                             node_value = '1'
                         elif node_value.lower() == 'false':
                             node_value = '0'
-                        else:
-                            raise InvalidDataTypeError(f"Invalid value '{node_value}' for field '{node.field}'. "
-                                                       f'Expected boolean value')
 
                     return f'{marqo_field_name} contains "{escape(node_value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
