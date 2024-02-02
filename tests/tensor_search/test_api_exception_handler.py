@@ -1,11 +1,9 @@
 from unittest import mock
 
 import pydantic
-import pytest
 
 from marqo import exceptions as base_exceptions
 from marqo.api import exceptions as api_exceptions
-from marqo.api.exceptions import InvalidArgError
 from marqo.core import exceptions as core_exceptions
 from marqo.tensor_search.api import marqo_base_exception_handler
 from marqo.vespa import exceptions as vespa_exceptions
