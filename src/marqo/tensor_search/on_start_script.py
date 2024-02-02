@@ -43,12 +43,12 @@ class BootstrapVespa:
 
     def run(self):
         try:
-            logger.debug('Creating Marqo settings schema')
+            logger.debug('Bootstrapping Vespa')
             created = self.config.index_management.bootstrap_vespa()
             if created:
-                logger.debug('Marqo settings schema created')
+                logger.debug('Vespa configured successfully')
             else:
-                logger.debug('Marqo settings schema already exists. Skipping')
+                logger.debug('Vespa configuration already exists. Skipping bootstrap')
         except Exception as e:
             logger.error(
                 f"Failed to bootstrap vector store. If you are using an external vector store, "
