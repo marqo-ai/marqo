@@ -824,19 +824,16 @@ class TestSearchUnstructured(MarqoTestCase):
             for max_doc in [2, 5, 10, 100]:
                 with self.subTest(f"search_method={search_method}, max_doc={max_doc}"):
                     mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
-
-                    @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
-                    def run():
-                        res = half_search = tensor_search.search(
+                    with mock.patch.dict(os.environ, {**os.environ, **mock_environ}):
+                        half_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
                             index_name=self.image_index_with_random_model,
                             text=search_text,
                             result_count=max_doc // 2
                         )
-
-                        assert half_search['limit'] == max_doc // 2
-                        assert len(half_search['hits']) == max_doc // 2
+                        self.assertEqual(max_doc // 2, half_search['limit'])
+                        self.assertEqual(max_doc // 2, len(half_search['hits']))
 
                         limit_search = tensor_search.search(
                             search_method=search_method,
@@ -845,10 +842,10 @@ class TestSearchUnstructured(MarqoTestCase):
                             text=search_text,
                             result_count=max_doc
                         )
-
                         self.assertEqual(max_doc, limit_search['limit'])
                         self.assertEqual(max_doc, len(limit_search['hits']))
-                        try:
+
+                        with self.assertRaises(errors.IllegalRequestedDocCount):
                             oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
@@ -856,9 +853,8 @@ class TestSearchUnstructured(MarqoTestCase):
                                 text=search_text,
                                 result_count=max_doc + 1
                             )
-                        except errors.IllegalRequestedDocCount:
-                            pass
-                        try:
+
+                        with self.assertRaises(errors.IllegalRequestedDocCount):
                             very_oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
@@ -866,11 +862,6 @@ class TestSearchUnstructured(MarqoTestCase):
                                 text=search_text,
                                 result_count=(max_doc + 1) * 2
                             )
-                        except errors.IllegalRequestedDocCount:
-                            pass
-                        return True
-
-                    assert run()
 
     def test_invalid_limit_results(self):
         """Ensure that proper errors are raised when the limit is bad"""
