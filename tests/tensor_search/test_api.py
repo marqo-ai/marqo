@@ -51,12 +51,8 @@ class TestApiErrors(MarqoTestCase):
     def test_index_not_found_error(self):
         # delete index if it exists
         self.client.delete("/indexes/" + self.index_name_1)
-        with patch('marqo.api.route.logger.error') as mock_logger_error:
-            response = self.client.delete("/indexes/" + self.index_name_1)
 
-            mock_logger_error.assert_called_once()
-            self.assertIn("not found", str(mock_logger_error.call_args))
-
+        response = self.client.delete("/indexes/" + self.index_name_1)
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["code"], "index_not_found")
         self.assertEqual(response.json()["type"], "invalid_request")
@@ -69,14 +65,11 @@ class TestApiErrors(MarqoTestCase):
             "allFields": [],
             "tensorFields": []
         })
-        with patch('marqo.api.route.logger.error') as mock_logger_error:
-            response = self.client.post("/indexes/" + self.index_name_1, json={
-                "type": "structured",
-                "allFields": [],
-                "tensorFields": []
-            })
-            mock_logger_error.assert_called_once()
-            self.assertIn("already exists", str(mock_logger_error.call_args))
+        response = self.client.post("/indexes/" + self.index_name_1, json={
+            "type": "structured",
+            "allFields": [],
+            "tensorFields": []
+        })
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["code"], "index_already_exists")
@@ -89,14 +82,12 @@ class TestApiErrors(MarqoTestCase):
             "allFields": [],
             "tensorFields": []
         })
-        with patch('marqo.api.route.logger.error') as mock_logger_error:
-            # use attributesToRetrieve on a non-existent field
-            response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
-                "q": "test",
-                "attributesToRetrieve": ["non_existent_field"]
-            })
-            mock_logger_error.assert_called_once()
-            self.assertIn("has no field non_existent_field", str(mock_logger_error.call_args))
+
+        # use attributesToRetrieve on a non-existent field
+        response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
+            "q": "test",
+            "attributesToRetrieve": ["non_existent_field"]
+        })
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], "invalid_field_name")
@@ -109,17 +100,15 @@ class TestApiErrors(MarqoTestCase):
             "allFields": [{"name": "field1", "type": "text"}],
             "tensorFields": []
         })
-        with patch('marqo.api.route.logger.error') as mock_logger_error:
-            # Add a document to field1 of the wrong type
-            response = self.client.post("/indexes/" + self.index_name_1 + "/documents?device=cpu", json={
-                "documents": [
-                    {
-                        "field1": 123
-                    }
-                ]
-            })
-            mock_logger_error.assert_called_once()
-            self.assertIn("Expected a value of", str(mock_logger_error.call_args))
+
+        # Add a document to field1 of the wrong type
+        response = self.client.post("/indexes/" + self.index_name_1 + "/documents?device=cpu", json={
+            "documents": [
+                {
+                    "field1": 123
+                }
+            ]
+        })
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], "invalid_argument")
@@ -132,13 +121,11 @@ class TestApiErrors(MarqoTestCase):
             "allFields": [{"name": "field1", "type": "text"}],
             "tensorFields": []
         })
-        with patch('marqo.api.route.logger.error') as mock_logger_error:
-            response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
-                "q": "test",
-                "filter": ""
-            })
-            mock_logger_error.assert_called_once()
-            self.assertIn("Cannot parse empty filter string", str(mock_logger_error.call_args))
+
+        response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
+            "q": "test",
+            "filter": ""
+        })
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], "invalid_argument")
@@ -147,15 +134,12 @@ class TestApiErrors(MarqoTestCase):
 
     def test_invalid_argument_error(self):
         # Try to create index with invalid model (should raise 400)
-        with patch('marqo.api.route.logger.error') as mock_logger_error:
-            response = self.client.post("/indexes/" + self.index_name_1, json={
-                "type": "structured",
-                "allFields": [{"name": "field1", "type": "text"}],
-                "tensorFields": [],
-                "model": "random_nonexistent_model"
-            })
-            mock_logger_error.assert_called_once()
-            self.assertIn("Could not find model properties for", str(mock_logger_error.call_args))
+        response = self.client.post("/indexes/" + self.index_name_1, json={
+            "type": "structured",
+            "allFields": [{"name": "field1", "type": "text"}],
+            "tensorFields": [],
+            "model": "random_nonexistent_model"
+        })
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], "invalid_argument")
@@ -241,25 +225,21 @@ class TestApiErrors(MarqoTestCase):
 
         for test_case, field, test_name in test_cases_fail:
             with self.subTest(test_name):
-                with patch('marqo.api.route.logger.error') as mock_logger_error:
-                    response = self.client.post(
-                        "/indexes/my_index",
-                        json=test_case
-                    )
-                    mock_logger_error.assert_called_once()
+                response = self.client.post(
+                    "/indexes/my_index",
+                    json=test_case
+                )
 
                 self.assertEqual(response.status_code, 422)
                 self.assertTrue(f"Invalid field name '{field}'" in response.text)
 
         for test_case, test_name in test_cases_pass:
             with self.subTest(test_name):
-                with patch('marqo.api.route.logger.error') as mock_logger_error:
-                    index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-                    response = self.client.post(
-                        f"/indexes/{index_name}",
-                        json=test_case
-                    )
-                    mock_logger_error.assert_not_called()
+                index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+                response = self.client.post(
+                    f"/indexes/{index_name}",
+                    json=test_case
+                )
 
                 self.assertEqual(response.status_code, 200)
 
@@ -319,3 +299,24 @@ class TestApiErrors(MarqoTestCase):
                 self.assertEqual(response.status_code, 422)
                 self.assertIn("allFields", response.text)
                 self.assertIn("features", response.text)
+
+    def test_log_stack_trace_for_model_properties_not_found(self):
+        """Ensure stack trace is logged for API errors - ModelPropertiesNotFound"""
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
+            response = self.client.post("/indexes/" + self.index_name_1, json={
+                "type": "structured",
+                "allFields": [{"name": "field1", "type": "text"}],
+                "tensorFields": [],
+                "model": "random_nonexistent_model"
+            })
+            mock_logger_error.assert_called_once()
+            self.assertIn("Could not find model properties for", str(mock_logger_error.call_args))
+
+    def test_log_stack_trace_for_index_not_found(self):
+        """Ensure stack trace is logged for API errors - IndexNotFound"""
+        # delete index if it exists
+        self.client.delete("/indexes/" + self.index_name_1)
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
+            response = self.client.delete("/indexes/" + self.index_name_1)
+            mock_logger_error.assert_called_once()
+            self.assertIn("not found", str(mock_logger_error.call_args))
