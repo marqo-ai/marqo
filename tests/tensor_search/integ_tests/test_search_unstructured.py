@@ -814,13 +814,13 @@ class TestSearchUnstructured(MarqoTestCase):
             res = tensor_search.add_documents(
                 config=self.config,
                 add_docs_params=AddDocsParams(
-                    index_name=self.unstructured_marqo_index_request,
+                    index_name=self.default_text_index,
                     docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
                           for _ in range(batch_size)],
                     tensor_fields=["Title"]
                 )
             )
-        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.unstructured_marqo_index_request).
+        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.default_text_index).
                          number_of_documents)
         search_text = "a test of"
 
@@ -832,7 +832,7 @@ class TestSearchUnstructured(MarqoTestCase):
                         half_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.unstructured_marqo_index_request,
+                            index_name=self.default_text_index,
                             text=search_text,
                             result_count=max_doc // 2
                         )
@@ -842,7 +842,7 @@ class TestSearchUnstructured(MarqoTestCase):
                         limit_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.unstructured_marqo_index_request,
+                            index_name=self.default_text_index,
                             text=search_text,
                             result_count=max_doc
                         )
@@ -853,7 +853,7 @@ class TestSearchUnstructured(MarqoTestCase):
                             oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.unstructured_marqo_index_request,
+                                index_name=self.default_text_index,
                                 text=search_text,
                                 result_count=max_doc + 1
                             )
@@ -862,7 +862,7 @@ class TestSearchUnstructured(MarqoTestCase):
                             very_oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.unstructured_marqo_index_request,
+                                index_name=self.default_text_index,
                                 text=search_text,
                                 result_count=(max_doc + 1) * 2
                             )
