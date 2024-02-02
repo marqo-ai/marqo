@@ -111,7 +111,7 @@ def _check_refresh_thread(config: Config):
                                 f'if Marqo settings schema does not exist. Error: {e}'
                             )
                         else:
-                            logger.warn(
+                            logger.error(
                                 "Failed to connect to vector store. If you are using an external vector store, "
                                 "ensure that Marqo is configured properly for this. See "
                                 f"{documentation.configuring_marqo()} for more details. Error: {e}"
