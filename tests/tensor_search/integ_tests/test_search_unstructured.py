@@ -42,7 +42,7 @@ class TestSearchUnstructured(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
-        image_index_with_random_model = cls.unstructured_marqo_index_request(
+        unstructured_marqo_index_request = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
             treat_urls_and_pointers_as_images=True
         )
@@ -52,14 +52,14 @@ class TestSearchUnstructured(MarqoTestCase):
             default_text_index_encoded_name,
             default_image_index,
             image_index_with_chunking,
-            image_index_with_random_model
+            unstructured_marqo_index_request
         ])
 
         cls.default_text_index = default_text_index.name
         cls.default_text_index_encoded_name = default_text_index_encoded_name.name
         cls.default_image_index = default_image_index.name
         cls.image_index_with_chunking = image_index_with_chunking.name
-        cls.image_index_with_random_model = image_index_with_random_model.name
+        cls.unstructured_marqo_index_request = unstructured_marqo_index_request.name
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -814,13 +814,13 @@ class TestSearchUnstructured(MarqoTestCase):
             res = tensor_search.add_documents(
                 config=self.config,
                 add_docs_params=AddDocsParams(
-                    index_name=self.image_index_with_random_model,
-                    docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=10)))}
+                    index_name=self.unstructured_marqo_index_request,
+                    docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
                           for _ in range(batch_size)],
                     tensor_fields=["Title"]
                 )
             )
-        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.image_index_with_random_model).
+        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.unstructured_marqo_index_request).
                          number_of_documents)
         search_text = "a test of"
 
@@ -832,7 +832,7 @@ class TestSearchUnstructured(MarqoTestCase):
                         half_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.image_index_with_random_model,
+                            index_name=self.unstructured_marqo_index_request,
                             text=search_text,
                             result_count=max_doc // 2
                         )
@@ -842,7 +842,7 @@ class TestSearchUnstructured(MarqoTestCase):
                         limit_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.image_index_with_random_model,
+                            index_name=self.unstructured_marqo_index_request,
                             text=search_text,
                             result_count=max_doc
                         )
@@ -853,7 +853,7 @@ class TestSearchUnstructured(MarqoTestCase):
                             oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.image_index_with_random_model,
+                                index_name=self.unstructured_marqo_index_request,
                                 text=search_text,
                                 result_count=max_doc + 1
                             )
@@ -862,7 +862,7 @@ class TestSearchUnstructured(MarqoTestCase):
                             very_oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.image_index_with_random_model,
+                                index_name=self.unstructured_marqo_index_request,
                                 text=search_text,
                                 result_count=(max_doc + 1) * 2
                             )
