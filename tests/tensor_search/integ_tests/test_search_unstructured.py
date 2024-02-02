@@ -808,16 +808,20 @@ class TestSearchUnstructured(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        res = tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.image_index_with_random_model,
-                docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=10)))}
-                      for _ in range(128)],
-                tensor_fields=["Title"]
+        batch_size_list = [50, 50, 28]
+        # We add 128 documents to the index wth batch_size 50, 50, 28 to avoid timeout
+        for batch_size in batch_size_list:
+            res = tensor_search.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.image_index_with_random_model,
+                    docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=10)))}
+                          for _ in range(batch_size)],
+                    tensor_fields=["Title"]
+                )
             )
-        )
-
+        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.image_index_with_random_model).
+                         number_of_documents)
         search_text = "a test of"
 
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
