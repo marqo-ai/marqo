@@ -3,12 +3,16 @@ import unittest
 from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index import common
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core import exceptions as core_exceptions
 from tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredVespaIndex(MarqoTestCase):
-    def test_to_vespa_document_standardMarqoDoc_successful(self):
-        marqo_index = self.structured_marqo_index(
+    def setUp(self) -> None:
+        """
+        Create a structured Marqo index and a StructuredVespaIndex object for testing.
+        """
+        self.marqo_index = self.structured_marqo_index(
             name='my_index',
             schema_name='my_index',
             model=Model(name='ViT-B/32'),
@@ -75,6 +79,9 @@ class TestStructuredVespaIndex(MarqoTestCase):
             ]
         )
 
+        self.vespa_index = StructuredVespaIndex(self.marqo_index)
+
+    def test_to_vespa_document_standardMarqoDoc_successful(self):
         marqo_doc = {
             '_id': 'my_id',
             'title': 'my title',
@@ -95,42 +102,124 @@ class TestStructuredVespaIndex(MarqoTestCase):
             }
         }
 
-        actual_vespa_doc = StructuredVespaIndex(marqo_index).to_vespa_document(marqo_doc)
+        actual_vespa_doc = self.vespa_index.to_vespa_document(marqo_doc)
         expected_vespa_doc = {
             'id': 'my_id',
             'fields': {
                 common.FIELD_ID: 'my_id',
                 common.FIELD_SCORE_MODIFIERS: {'price': 100.0, 'rank': 1},
                 common.FIELD_VECTOR_COUNT: 2,
-                marqo_index.field_map['title'].lexical_field_name: 'my title',
+                self.marqo_index.field_map['title'].lexical_field_name: 'my title',
                 'description': 'my description',
-                marqo_index.field_map['category'].lexical_field_name: 'my category',
-                marqo_index.field_map['category'].filter_field_name: 'my category',
-                marqo_index.field_map['tags'].filter_field_name: ['tag1', 'tag2'],
+                self.marqo_index.field_map['category'].lexical_field_name: 'my category',
+                self.marqo_index.field_map['category'].filter_field_name: 'my category',
+                self.marqo_index.field_map['tags'].filter_field_name: ['tag1', 'tag2'],
                 'image': 'https://my-image.com',
-                marqo_index.field_map['is_active'].filter_field_name: True,
+                self.marqo_index.field_map['is_active'].filter_field_name: True,
                 'price': 100.0,
                 'rank': 1,
-                marqo_index.field_map['click_per_day'].filter_field_name: [1, 2, 3],
-                marqo_index.field_map['last_updated'].filter_field_name: [1.0, 2.0, 3.0],
-                marqo_index.tensor_field_map['title'].chunk_field_name: ['my', 'title'],
-                marqo_index.tensor_field_map['title'].embeddings_field_name: {'0': [1.0, 2.0, 3.0],
+                self.marqo_index.field_map['click_per_day'].filter_field_name: [1, 2, 3],
+                self.marqo_index.field_map['last_updated'].filter_field_name: [1.0, 2.0, 3.0],
+                self.marqo_index.tensor_field_map['title'].chunk_field_name: ['my', 'title'],
+                self.marqo_index.tensor_field_map['title'].embeddings_field_name: {'0': [1.0, 2.0, 3.0],
                                                                               '1': [4.0, 5.0, 6.0]}
             }
         }
 
         self.assertEqual(expected_vespa_doc, actual_vespa_doc)
 
-    @unittest.skip
     def test_to_vespa_document_invalidDataType_fails(self):
         """
         Test that an error is raised when a field has an invalid data type e.g., a string for a float field.
         """
-        pass
-
-    @unittest.skip
+        invalid_data_type_docs = [
+            ("int when it should be text", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': 12345,   
+            }),
+            ("array of text when it should be text", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': ['my description', 'hello'],   
+            }),
+            ("float when it should be int", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': 123.45,   
+            }),
+            ("array of int when it should be int", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': [123, 456],   
+            }),
+            ("bool when it should be int", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': True,   
+            }),
+            ("array of bool when it should be int", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': [True, False],   
+            }),
+            ("float when it should be bool", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': 123.45,   
+            }),
+            ("array of float when it should be bool", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': [123.45, 678.90],   
+            }),
+            ("text when it should be array of text", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'tags': 'fail',   
+            }),
+            ("int when it should be array of int", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': 123,   
+            }),
+            ("bool when it should be array of bool", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': True,   
+            }),
+            ("float when it should be array of float", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': 123.45,   
+            }),
+            ("array of float when it should be array of int", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': [123.45, 678.90],   
+            }),
+            ("array of bool when it should be array of int", {
+                '_id': 'my_id',
+                'title': 'my title',
+                'description': [True, False],   
+            }),
+        ]
+            
+        for case_desc, marqo_doc in invalid_data_type_docs:
+            with self.subTest(case_desc):
+                with self.assertRaises(core_exceptions.InvalidDataTypeError):
+                    self.vespa_index.to_vespa_document(marqo_doc)
+    
     def test_to_vespa_document_fieldNotInIndex_fails(self):
         """
         Test that an error is raised when a field is not in the index.
         """
-        pass
+        with self.assertRaises(core_exceptions.InvalidFieldNameError):
+            self.vespa_index.to_vespa_document(
+                {
+                    '_id': 'my_id',
+                    'title': 'my title',
+                    'nonexistent field': 'fail'
+                }
+            )
+        
