@@ -42,7 +42,7 @@ class TestSearchUnstructured(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
-        unstructured_marqo_index_request = cls.unstructured_marqo_index_request(
+        image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
             treat_urls_and_pointers_as_images=True
         )
@@ -52,14 +52,14 @@ class TestSearchUnstructured(MarqoTestCase):
             default_text_index_encoded_name,
             default_image_index,
             image_index_with_chunking,
-            unstructured_marqo_index_request
+            image_index_with_random_model
         ])
 
         cls.default_text_index = default_text_index.name
         cls.default_text_index_encoded_name = default_text_index_encoded_name.name
         cls.default_image_index = default_image_index.name
         cls.image_index_with_chunking = image_index_with_chunking.name
-        cls.unstructured_marqo_index_request = unstructured_marqo_index_request.name
+        cls.image_index_with_random_model = image_index_with_random_model.name
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
