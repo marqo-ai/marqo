@@ -870,69 +870,64 @@ class TestSearchUnstructured(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        res = tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.image_index_with_random_model,
-                docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=10)))}
-                      for _ in range(128)],
-                tensor_fields=["Title"]
+        batch_size_list = [50, 50, 28]
+        # We add 128 documents to the index wth batch_size 50, 50, 28 to avoid timeout
+        for batch_size in batch_size_list:
+            res = tensor_search.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.default_text_index,
+                    docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
+                          for _ in range(batch_size)],
+                    tensor_fields=["Title"]
+                )
             )
-        )
-
+        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.default_text_index).
+                         number_of_documents)
         search_text = "a test of"
 
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             for max_doc in [2, 5, 10, 100]:
                 with self.subTest(f"search_method={search_method}, max_doc={max_doc}"):
                     mock_environ = {EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(max_doc)}
-
-                    @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
-                    def run():
-                        res = half_search = tensor_search.search(
+                    with mock.patch.dict(os.environ, {**os.environ, **mock_environ}):
+                        half_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.image_index_with_random_model,
+                            index_name=self.default_text_index,
                             text=search_text,
                             result_count=max_doc // 2
                         )
-
-                        assert half_search['limit'] == max_doc // 2
-                        assert len(half_search['hits']) == max_doc // 2
+                        self.assertEqual(max_doc // 2, half_search['limit'])
+                        self.assertEqual(max_doc // 2, len(half_search['hits']))
 
                         limit_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.image_index_with_random_model,
+                            index_name=self.default_text_index,
                             text=search_text,
                             result_count=max_doc
                         )
-
                         self.assertEqual(max_doc, limit_search['limit'])
                         self.assertEqual(max_doc, len(limit_search['hits']))
-                        try:
+
+                        with self.assertRaises(errors.IllegalRequestedDocCount):
                             oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.image_index_with_random_model,
+                                index_name=self.default_text_index,
                                 text=search_text,
                                 result_count=max_doc + 1
                             )
-                        except errors.IllegalRequestedDocCount:
-                            pass
-                        try:
+
+                        with self.assertRaises(errors.IllegalRequestedDocCount):
                             very_oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.image_index_with_random_model,
+                                index_name=self.default_text_index,
                                 text=search_text,
                                 result_count=(max_doc + 1) * 2
                             )
-                        except errors.IllegalRequestedDocCount:
-                            pass
-                        return True
-
-                    assert run()
 
     def test_invalid_limit_results(self):
         """Ensure that proper errors are raised when the limit is bad"""
