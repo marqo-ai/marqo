@@ -1,7 +1,11 @@
     schema marqo__my_00index {
         document {
-        field marqo__id type string { indexing: summary}
-            field title type string {
+        field marqo__id type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field title type string {
             indexing: summary
         }
             field description type string {
