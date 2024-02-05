@@ -48,7 +48,6 @@ _config = generate_config()
 if __name__ in ["__main__", "api"]:
     on_start(_config)
 
-
 app = FastAPI(
     title="Marqo",
     version=version.get_version()
@@ -59,44 +58,6 @@ app.router.route_class = MarqoCustomRoute
 
 def get_config():
     return _config
-
-
-@app.exception_handler(base_exceptions.MarqoError)
-def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoError) -> JSONResponse:
-    """
-    Catch a base/core Marqo Error and convert to its corresponding API Marqo Error.
-    The API Error will be passed to the `marqo_api_exception_handler` below.
-    This ensures that raw base errors are never returned by the API.
-    
-    Mappings are in an ordered list to allow for hierarchical resolution of errors.
-    Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
-    """
-    api_exception_mappings = [
-        # More specific errors should take precedence
-
-        # Core exceptions
-        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),
-        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError),
-        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError),
-        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError),
-
-        # Base exceptions
-        (base_exceptions.InternalError, api_exceptions.InternalError),
-        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError),
-    ]
-
-    converted_error = None
-    for base_exception, api_exception in api_exception_mappings:
-        if isinstance(exc, base_exception):
-            converted_error = api_exception(exc.message)
-            break
-
-    # Completely unhandled exception (500)
-    # This should abstract away internal error.
-    if not converted_error:
-        converted_error = api_exceptions.MarqoWebError("Marqo encountered an unexpected internal error.")
-
-    return marqo_api_exception_handler(request, converted_error)
 
 
 @app.exception_handler(api_exceptions.MarqoWebError)
@@ -136,6 +97,44 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
         return JSONResponse(content=body, status_code=500, headers=headers)
     else:
         return JSONResponse(content=body, status_code=500)
+
+
+@app.exception_handler(Exception)
+def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoError) -> JSONResponse:
+    """
+    Catch a base/core Marqo Error and convert to its corresponding API Marqo Error.
+    The API Error will be passed to the `marqo_api_exception_handler` below.
+    This ensures that raw base errors are never returned by the API.
+
+    Mappings are in an ordered list to allow for hierarchical resolution of errors.
+    Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
+    """
+    api_exception_mappings = [
+        # More specific errors should take precedence
+
+        # Core exceptions
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),
+        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError),
+        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError),
+        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError),
+
+        # Base exceptions
+        (base_exceptions.InternalError, api_exceptions.InternalError),
+        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError),
+    ]
+
+    converted_error = None
+    for base_exception, api_exception in api_exception_mappings:
+        if isinstance(exc, base_exception):
+            converted_error = api_exception(exc.message)
+            break
+
+    # Completely unhandled exception (500)
+    # This should abstract away internal error.
+    if not converted_error:
+        converted_error = api_exceptions.MarqoWebError("Marqo encountered an unexpected internal error")
+
+    return marqo_api_exception_handler(request, converted_error)
 
 
 @app.get("/")
