@@ -101,6 +101,7 @@ class TestApiErrors(MarqoTestCase):
         assert "has no field non_existent_field" in response.json()["message"]
 
     def test_invalid_data_type(self):
+        """Test that invalid data types only reject the document with the invalid data type, not the whole request"""
         self.client.post("/indexes/" + self.index_name_1, json={
             "type": "structured",
             "allFields": [{"name": "field1", "type": "text"}],
@@ -115,11 +116,8 @@ class TestApiErrors(MarqoTestCase):
                 }
             ]
         })
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["code"], "invalid_argument")
-        self.assertEqual(response.json()["type"], "invalid_request")
-        assert "Expected a value of" in response.json()["message"] and "but found" in response.json()["message"]
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["errors"], True)
 
     def test_filter_string_parsing_error(self):
         self.client.post("/indexes/" + self.index_name_1, json={
