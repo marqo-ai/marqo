@@ -1,6 +1,9 @@
 import uuid
 from unittest import mock
 from unittest.mock import patch
+from marqo import exceptions as base_exceptions
+from marqo.core import exceptions as core_exceptions
+from marqo.api import exceptions as api_exceptions
 
 from fastapi.testclient import TestClient
 
@@ -46,7 +49,11 @@ class TestApiErrors(MarqoTestCase):
 
     def tearDown(self) -> None:
         # Make sure no indexes are left over from tests
-        self.client.delete("/indexes/" + self.index_name_1)
+        # try:
+        #     self.client.delete("/indexes/" + self.index_name_1)
+        # except core_exceptions.IndexNotFoundError:
+        #     pass
+        pass
 
     def test_index_not_found_error(self):
         # delete index if it exists
@@ -300,23 +307,46 @@ class TestApiErrors(MarqoTestCase):
                 self.assertIn("allFields", response.text)
                 self.assertIn("features", response.text)
 
-    def test_log_stack_trace_for_model_properties_not_found(self):
-        """Ensure stack trace is logged for API errors - ModelPropertiesNotFound"""
+    def test_log_stack_trace_for_core_exceptions(self):
+        """Ensure stack trace is logged for core exceptions, e.g.,IndexExistsError"""
+        raised_error = core_exceptions.IndexExistsError("index1")
         with patch('marqo.api.route.logger.error') as mock_logger_error:
-            response = self.client.post("/indexes/" + self.index_name_1, json={
-                "type": "structured",
-                "allFields": [{"name": "field1", "type": "text"}],
-                "tensorFields": [],
-                "model": "random_nonexistent_model"
-            })
+            with patch("marqo.core.index_management.index_management.IndexManagement.create_index",
+                       side_effect=raised_error):
+                response = self.client.post("/indexes/" + self.index_name_1, json={
+                    "type": "structured",
+                    "allFields": [{"name": "field1", "type": "text"}],
+                    "tensorFields": [],
+                })
             mock_logger_error.assert_called_once()
-            self.assertIn("Could not find model properties for", str(mock_logger_error.call_args))
+            self.assertIn("index1", str(mock_logger_error.call_args))
 
-    def test_log_stack_trace_for_index_not_found(self):
-        """Ensure stack trace is logged for API errors - IndexNotFound"""
-        # delete index if it exists
-        self.client.delete("/indexes/" + self.index_name_1)
+    def test_log_stack_trace_for_base_exceptions_invalid_arg(self):
+        """Ensure stack trace is logged for base exceptions, e.g.,InvalidArg"""
+        raised_error = base_exceptions.InvalidArgumentError("invalid_arg_msg")
         with patch('marqo.api.route.logger.error') as mock_logger_error:
-            response = self.client.delete("/indexes/" + self.index_name_1)
+            with patch("marqo.tensor_search.tensor_search.search", side_effect=raised_error):
+                response = self.client.post(f"/indexes/test_index/search", json={
+                    "q": "test"
+                })
             mock_logger_error.assert_called_once()
-            self.assertIn("not found", str(mock_logger_error.call_args))
+            self.assertIn("invalid_arg_msg", str(mock_logger_error.call_args))
+
+    def test_log_stack_trace_for_base_exceptions_internal(self):
+        """Ensure stack trace is logged for base exceptions, e.g.,InternalError"""
+        raised_error = base_exceptions.InternalError("internal_error_msg")
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
+            with patch("marqo.tensor_search.tensor_search.get_document_by_id", side_effect=raised_error):
+                response = self.client.get(f"/indexes/test_index/documents/1")
+            mock_logger_error.assert_called_once()
+            self.assertIn("internal_error_msg", str(mock_logger_error.call_args))
+
+    def test_log_stack_trace_for_base_generic_exception(self):
+        """Ensure stack trace is logged for generic Exception"""
+        raised_error = Exception("generic exception")
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
+            with patch("marqo.tensor_search.tensor_search.delete_index", side_effect=raised_error):
+                response = self.client.delete("/indexes/test_index")
+            mock_logger_error.assert_called_once()
+            self.assertIn("generic_exception", str(mock_logger_error.call_args))
+
