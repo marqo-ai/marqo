@@ -4,7 +4,7 @@ import pprint
 from unittest import mock
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.api.exceptions import (
-    MarqoApiError, MarqoError, IndexNotFoundError, InvalidArgError,
+    IndexNotFoundError, InvalidArgError,
     InvalidFieldNameError, IllegalRequestedDocCount
 )
 from marqo.tensor_search import tensor_search, constants, index_meta_cache

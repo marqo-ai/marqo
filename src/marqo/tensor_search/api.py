@@ -144,24 +144,6 @@ async def validation_exception_handler(request: Request, exc: pydantic.Validatio
     return JSONResponse(content=body, status_code=api_exceptions.InvalidArgError.status_code)
 
 
-@app.exception_handler(api_exceptions.MarqoError)
-def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
-    """MarqoErrors are treated as internal errors"""
-    logger.error(str(exc), exc_info=True)
-
-    headers = getattr(exc, "headers", None)
-    body = {
-        "message": exc.message,
-        "code": 500,
-        "type": "internal_error",
-        "link": ""
-    }
-    if headers:
-        return JSONResponse(content=body, status_code=500, headers=headers)
-    else:
-        return JSONResponse(content=body, status_code=500)
-
-
 @app.get("/")
 def root():
     return {"message": "Welcome to Marqo",

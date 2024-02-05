@@ -2,64 +2,6 @@ import json
 from http import HTTPStatus
 
 from requests import Response
-
-
-# TODO: DELETE
-class MarqoError(Exception):
-    """Generic class for Marqo error handling
-    Can be used for value errors etc.
-    These will be caught and returned to the user as 5xx internal errors
-
-    """
-    code = None
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-        super().__init__(self.message)
-
-    def __str__(self) -> str:
-        return f'MarqoError {self.__class__.__name__} Message: {self.message}'
-
-
-class EnvVarError(MarqoError):
-    code = "env_var_error"
-
-    def __init__(self, message: str):
-        self.message = message
-
-
-# TODO: DELETE
-class MarqoApiError(MarqoError):
-    """Error sent by Marqo API"""
-
-    def __init__(self, error: str, request: Response) -> None:
-        self.status_code = request.status_code
-        self.code = None
-        self.link = None
-        self.type = None
-
-        if request.text:
-            json_data = json.loads(request.text)
-            self.message = json_data
-            self.code = json_data.get('status')
-            self.link = ''
-            self.type = ''
-            if 'error' in json_data and 'root_cause' in json_data["error"] \
-                    and len(json_data.get('error').get('root_cause')) > 0:
-                self.type = json_data.get('error').get('root_cause')[0].get('type')
-        else:
-            self.message = error
-        super().__init__(self.message)
-
-    def __str__(self) -> str:
-        if self.code and self.link:
-            return f'MarqoApiError. Error code: {self.code}. Error message: {self.message} Error documentation: {self.link} Error type: {self.type}'
-
-        return f'MarqoApiError. {self.message}'
-
-
-# MARQO WEB ERROR
-
 class MarqoWebError(Exception):
     status_code: int = 500
     error_type: str = None

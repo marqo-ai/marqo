@@ -16,6 +16,7 @@ from marqo.api import exceptions
 from marqo.marqo_logging import logger
 from marqo.tensor_search import enums, configs
 from marqo.tensor_search.enums import EnvVars
+from marqo import exceptions as base_exceptions
 
 
 def dicts_to_jsonl(dicts: List[dict]) -> str:
@@ -67,26 +68,6 @@ def format_timestamp(timestamp: datetime.datetime):
     return f"{timestamp.isoformat()}Z"
 
 
-def construct_authorized_url(url_base: str, username: str, password: str) -> str:
-    """
-    Args:
-        url_base:
-        username:
-        password:
-
-    Returns:
-
-    """
-    http_sep = "://"
-    if http_sep not in url_base:
-        raise exceptions.MarqoError(f"Could not parse url: {url_base}")
-    url_split = url_base.split(http_sep)
-    if len(url_split) != 2:
-        raise exceptions.MarqoError(f"Could not parse url: {url_base}")
-    http_part, domain_part = url_split
-    return f"{http_part}{http_sep}{username}:{password}@{domain_part}"
-
-
 def check_device_is_available(device: str) -> bool:
     """Checks if a device is available on the machine
 
@@ -98,7 +79,7 @@ def check_device_is_available(device: str) -> bool:
         True, IFF it is available
 
     Raises:
-        MarqoError if device is determined to be invalid
+        InvalidArgumentError if device is determined to be invalid
     """
     lowered = device.lower()
     if lowered == "cpu":
@@ -106,7 +87,7 @@ def check_device_is_available(device: str) -> bool:
 
     split = lowered.split(":")
     if split[0] != "cuda":
-        raise exceptions.MarqoError(f"Invalid device prefix! {device}. Valid prefixes: 'cpu' and 'cuda'")
+        raise base_exceptions.InvalidArgumentError(f"Invalid device prefix! {device}. Valid prefixes: 'cpu' and 'cuda'")
 
     if not torch.cuda.is_available():
         return False
@@ -115,7 +96,7 @@ def check_device_is_available(device: str) -> bool:
         return True
 
     if int(split[1]) < 0:
-        raise exceptions.MarqoError(f"Invalid cuda device number! {device}. It must not be negative")
+        raise base_exceptions.InvalidArgumentError(f"Invalid device prefix! {device}. Valid prefixes: 'cpu' and 'cuda'")
 
     if int(split[1]) < torch.cuda.device_count():
         return True

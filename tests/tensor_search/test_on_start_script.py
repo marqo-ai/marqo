@@ -44,7 +44,7 @@ class TestOnStartScript(MarqoTestCase):
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
                 raise AssertionError
-            except exceptions.EnvVarError as e:
+            except exceptions.ConfigurationError as e:
                 print(str(e))
                 return True
         assert run()
@@ -127,10 +127,10 @@ class TestOnStartScript(MarqoTestCase):
         def run():
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
-                # There should be a KeyError -> EnvVarError when attempting to call vectorise
+                # There should be a KeyError -> ConfigurationError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
-            except exceptions.EnvVarError as e:
+            except exceptions.ConfigurationError as e:
                 return True
         assert run()
     
@@ -144,10 +144,10 @@ class TestOnStartScript(MarqoTestCase):
         def run():
             try:
                 model_caching_script = on_start_script.ModelsForCacheing()
-                # There should be a KeyError -> EnvVarError when attempting to call vectorise
+                # There should be a KeyError -> ConfigurationError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
-            except exceptions.EnvVarError as e:
+            except exceptions.ConfigurationError as e:
                 return True
         assert run()
     
