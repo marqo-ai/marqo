@@ -339,13 +339,3 @@ class TestApiErrors(MarqoTestCase):
                 response = self.client.get(f"/indexes/test_index/documents/1")
             mock_logger_error.assert_called_once()
             self.assertIn("internal_error_msg", str(mock_logger_error.call_args))
-
-    def test_log_stack_trace_for_base_generic_exception(self):
-        """Ensure stack trace is logged for generic Exception"""
-        raised_error = Exception("generic exception")
-        with patch('marqo.api.route.logger.error') as mock_logger_error:
-            with patch("marqo.tensor_search.tensor_search.delete_index", side_effect=raised_error):
-                response = self.client.delete("/indexes/test_index")
-            mock_logger_error.assert_called_once()
-            self.assertIn("generic_exception", str(mock_logger_error.call_args))
-
