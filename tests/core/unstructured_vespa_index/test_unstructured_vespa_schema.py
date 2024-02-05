@@ -18,7 +18,8 @@ class TestUnstructuredVespaSchema(TestStructuredVespaSchema):
 
         return schema
 
-    def test_unstructured_index_schema(self):
+    def test_unstructured_index_schema_random_model(self):
+        """A test for the unstructured Vespa schema generation with a random model."""
         index_name = "test_unstructured_schema"
 
         test_marqo_index_request: MarqoIndexRequest = IndexSettings(
