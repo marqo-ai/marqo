@@ -63,7 +63,7 @@ class StructuredVespaIndex(VespaIndex):
 
             index_field = self._marqo_index.field_map[marqo_field]
 
-            if isinstance(marqo_value, (int, float)):
+            if isinstance(marqo_value, (int, float)) and not index_field.type == FieldType.Bool:
                 self._verify_numerical_field_value(marqo_value, index_field)
 
             if isinstance(marqo_value, list) and isinstance(marqo_value[0], (int, float)):
@@ -530,10 +530,10 @@ class StructuredVespaIndex(VespaIndex):
         if (value > MAX_FLOAT) or (0 < value < SMALLEST_POS_FLOAT) or (value < MIN_FLOAT) or \
                 (0 > value > LARGEST_NEG_FLOAT):
             raise InvalidDataRangeError(f'Invalid value {value} for float field. Expected a value in the range '
-                                       f'[{MIN_FLOAT}, {MAX_FLOAT}] or [{LARGEST_NEG_FLOAT}, {SMALLEST_POS_FLOAT}], but '
-                                       f'found {value} '
-                                       f'If you wish to store a value outside of this range, creating a field with type '
-                                       f"'{FieldType.Double}'. ")
+                                        f'[{MIN_FLOAT}, {MAX_FLOAT}] or [{LARGEST_NEG_FLOAT}, {SMALLEST_POS_FLOAT}], but '
+                                        f'found {value} '
+                                        f'If you wish to store a value outside of this range, creating a field with type '
+                                        f"'{FieldType.Double}'. ")
 
     def _verify_int_field_range(self, value: int):
         MAX_INT = 2147483647
@@ -541,18 +541,18 @@ class StructuredVespaIndex(VespaIndex):
         MIN_INT = -2147483647
         if value > MAX_INT or value < MIN_INT:
             raise InvalidDataRangeError(f"Invalid value {value} for int field. Expected a value in the range "
-                                       f"[{MIN_INT}, {MAX_INT}], but found {value}. "
-                                       f"If you wish to store a value outside of this range, creating a field with type "
-                                       f"'{FieldType.Long} or '{FieldType.Double}'. ")
+                                        f"[{MIN_INT}, {MAX_INT}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, creating a field with type "
+                                        f"'{FieldType.Long} or '{FieldType.Double}'. ")
 
     def _verify_long_field_range(self, value: int):
         MAX_LONG = 9223372036854775807
         MIN_LONG = -9223372036854775808
         if value > MAX_LONG or value < MIN_LONG:
             raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
-                                       f"[{MIN_LONG}, {MAX_LONG}], but found {value}. "
-                                       f"If you wish to store a value outside of this range, creating a field with type "
-                                       f"'{FieldType.Double}'. ")
+                                        f"[{MIN_LONG}, {MAX_LONG}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, creating a field with type "
+                                        f"'{FieldType.Double}'. ")
 
     def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
         # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features
