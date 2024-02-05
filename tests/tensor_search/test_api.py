@@ -49,11 +49,10 @@ class TestApiErrors(MarqoTestCase):
 
     def tearDown(self) -> None:
         # Make sure no indexes are left over from tests
-        # try:
-        #     self.client.delete("/indexes/" + self.index_name_1)
-        # except core_exceptions.IndexNotFoundError:
-        #     pass
-        pass
+        try:
+            self.client.delete("/indexes/" + self.index_name_1)
+        except core_exceptions.IndexNotFoundError:
+            pass
 
     def test_index_not_found_error(self):
         # delete index if it exists
