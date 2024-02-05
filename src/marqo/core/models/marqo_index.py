@@ -4,6 +4,7 @@ from enum import Enum
 from typing import List, Optional, Dict, Any, Set, Union
 
 import pydantic
+import semver
 from pydantic import PrivateAttr, root_validator
 from pydantic import ValidationError, validator
 from pydantic.error_wrappers import ErrorWrapper
@@ -194,9 +195,15 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
             if isinstance(value, property):
                 getattr(self, name)
 
+    def parsed_marqo_version(self) -> semver.VersionInfo:
+        return semver.VersionInfo.parse(self.marqo_version)
+
     @classmethod
     @abstractmethod
     def _valid_type(cls) -> IndexType:
+        """
+        The index type that is valid for this MarqoIndex implementation.
+        """
         pass
 
     @validator('type')
@@ -302,10 +309,15 @@ class StructuredMarqoIndex(MarqoIndex):
 
     @property
     def filterable_fields_names(self) -> Set[str]:
-        return self._cache_or_get('filterable_fields_names',
-                                  lambda: {field.name for field in self.fields if
-                                           FieldFeature.Filter in field.features}
-                                  )
+        def generate():
+            the_set = {field.name for field in self.fields if
+                       FieldFeature.Filter in field.features}
+            if self.parsed_marqo_version().match('>=2.2.0'):
+                the_set.add(constants.MARQO_DOC_ID)
+
+            return the_set
+
+        return self._cache_or_get('filterable_fields_names', generate)
 
     @property
     def score_modifier_fields_names(self) -> Set[str]:
