@@ -277,4 +277,4 @@ class TestBaseExceptionHandler(MarqoTestCase):
         
         self.assertIsInstance(converted_error, api_exceptions.MarqoWebError)
         self.assertNotIn("This should not be propagated.", converted_error.message)
-        self.assertIn("unexpected internal Marqo error", converted_error.message)
+        self.assertIn("unexpected internal error", converted_error.message)

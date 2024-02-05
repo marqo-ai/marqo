@@ -93,7 +93,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
     # Completely unhandled exception (500)
     # This should abstract away internal error.
     if not converted_error:
-        converted_error = api_exceptions.MarqoWebError("Encountered an unexpected internal Marqo error.")
+        converted_error = api_exceptions.MarqoWebError("Marqo encountered an unexpected internal error.")
 
     return marqo_api_exception_handler(request, converted_error)
 
