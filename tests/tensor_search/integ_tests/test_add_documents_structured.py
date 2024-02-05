@@ -49,6 +49,16 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     features=[FieldFeature.Filter]
                 ),
                 FieldRequest(
+                    name="int_field_1",
+                    type=FieldType.Int,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="float_field_1",
+                    type=FieldType.Float,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
                     name="long_field_1",
                     type=FieldType.Long,
                     features=[FieldFeature.Filter]
@@ -64,7 +74,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     features=[FieldFeature.Filter]
                 ),
                 FieldRequest(
-                    name="double_double_field_1",
+                    name="array_double_field_1",
                     type=FieldType.ArrayDouble,
                     features=[FieldFeature.Filter]
                 ),
@@ -1019,6 +1029,21 @@ class TestAddDocumentsStructured(MarqoTestCase):
     def test_add_long_double_numeric_values(self):
         """Test to ensure large integer and float numbers are handled correctly for long and double fields"""
         test_case = [
+            ({"int_field_1": 2147483647}, False),  # maximum positive integer that can be handled by int
+            ({"int_field_1": -2147483648}, False),  # maximum negative integer that can be handled by int
+            ({"int_field_1": 2147483648}, True),  # integer slightly larger than boundary so can't be handled by int
+            ({"long_field_1": 2147483648}, False),  # integer slightly larger than boundary can be handled by long
+            ({"int_field_1": -2147483649}, True),  # integer slightly smaller than boundary so can't be handled by int
+            ({"long_field_1": -2147483649}, False),  # integer slightly larger than boundary can be handled by long
+
+            ({"float_field_1": 3.4028235e38}, False),  # maximum positive float that can be handled by float
+            ({"float_field_1": -3.4028235e38}, False),  # maximum negative float that can be handled by float
+            # The boundary for float and double is not causing add_documents to raise an error
+            ({"float_field_1": 3.4028235e40}, False),  # float slightly larger than boundary can be handled by float
+            ({"double_field_1": 3.4028235e40}, False),  # float slightly larger than boundary can be handled by double
+            ({"float_field_1": 1.40239846e-40}, False),  # float slightly smaller than boundary so can't be handled by float
+            ({"double_field_1": 1.40239846e-40}, False),  # float slightly smaller than boundary can be handled by double
+
             ({"long_field_1": 1}, False),  # small positive integer
             ({"long_field_1": -1}, False),  # small negative integer
             ({"long_field_1": 100232142864}, False),  # large positive integer that can't be handled by int
@@ -1037,7 +1062,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         ]
 
         for doc, error in test_case:
-            with self.subTest():
+            with self.subTest(doc):
                 res = tensor_search.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[doc], device="cpu",
