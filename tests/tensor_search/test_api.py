@@ -339,3 +339,5 @@ class TestApiErrors(MarqoTestCase):
                 response = self.client.get(f"/indexes/test_index/documents/1")
             mock_logger_error.assert_called_once()
             self.assertIn("internal_error_msg", str(mock_logger_error.call_args))
+
+    # TODO: Test how marqo handles generic exceptions, including Exception, RunTimeError, ValueError, etc.
