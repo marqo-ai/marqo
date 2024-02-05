@@ -536,7 +536,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 if expected_id:
                     self.assertEqual(expected_id, res["hits"][0]["_id"])
 
-    def test_filtering_fake_and_real_boolean_fields(self):
+    def test_filtering_string_boolean_and_real_boolean_fields(self):
         documents = [
             {"_id": "1", "text_field_1": "true", "text_field_2": "false",
              "bool_field_1": True, "bool_field_2": False, "text_field_3": "search me"},
