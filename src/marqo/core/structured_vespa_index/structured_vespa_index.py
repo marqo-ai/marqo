@@ -1,5 +1,3 @@
-from typing import List, Dict, Any
-
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
 from marqo.core.models import MarqoQuery
@@ -36,6 +34,9 @@ class StructuredVespaIndex(VespaIndex):
     _VESPA_DOC_RELEVANCE = 'relevance'
     _VESPA_DOC_MATCH_FEATURES = 'matchfeatures'
     _VESPA_DOC_FIELDS_TO_IGNORE = {'sddocname'}
+
+    _DEFAULT_MAX_LIMIT = 1000
+    _DEFAULT_MAX_OFFSET = 10000
 
     def __init__(self, marqo_index: StructuredMarqoIndex):
         self._marqo_index = marqo_index
@@ -270,7 +271,7 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking
+            'ranking': ranking,
         }
         query = {k: v for k, v in query.items() if v is not None}
 

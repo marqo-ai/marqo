@@ -1,8 +1,6 @@
 """The API entrypoint for Tensor Search"""
-import json
 from typing import List
 
-import pydantic
 import uvicorn
 from fastapi import FastAPI
 from fastapi import Request, Depends
@@ -13,6 +11,8 @@ from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.models.health_response import HealthResponse
+from marqo.api.models.rollback_request import RollbackRequest
+from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.logging import get_logger
@@ -25,6 +25,7 @@ from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
+from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
@@ -47,11 +48,13 @@ _config = generate_config()
 if __name__ in ["__main__", "api"]:
     on_start(_config)
 
+
 app = FastAPI(
     title="Marqo",
     version=version.get_version()
 )
 app.add_middleware(TelemetryMiddleware)
+app.router.route_class = MarqoCustomRoute
 
 
 def get_config():
@@ -104,7 +107,6 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
 
     We can potentially catch any type of Marqo exception. We can do isinstance() calls
     to handle WebErrors vs Regular errors"""
-    logger.error(str(exc), exc_info=True)
 
     headers = getattr(exc, "headers", None)
     body = {
@@ -121,31 +123,9 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
         return JSONResponse(content=body, status_code=exc.status_code)
 
 
-@app.exception_handler(pydantic.ValidationError)
-async def validation_exception_handler(request: Request, exc: pydantic.ValidationError) -> JSONResponse:
-    """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
-    logger.error(str(exc), exc_info=True)
-
-    error_messages = [{
-        'loc': error.get('loc', ''),
-        'msg': error.get('msg', ''),
-        'type': error.get('type', '')
-    } for error in exc.errors()]
-
-    body = {
-        "message": json.dumps(error_messages),
-        "code": api_exceptions.InvalidArgError.code,
-        "type": api_exceptions.InvalidArgError.error_type,
-        "link": api_exceptions.InvalidArgError.link
-    }
-
-    return JSONResponse(content=body, status_code=api_exceptions.InvalidArgError.status_code)
-
-
 @app.exception_handler(api_exceptions.MarqoError)
 def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
     """MarqoErrors are treated as internal errors"""
-    logger.error(str(exc), exc_info=True)
 
     headers = getattr(exc, "headers", None)
     body = {
@@ -353,6 +333,22 @@ def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(
     document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
 
     return {"documentCount": document_count}
+
+
+@app.post("/upgrade")
+@utils.enable_upgrade_api()
+def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    upgrade_runner = UpgradeRunner(marqo_config.vespa_client, marqo_config.index_management)
+    upgrade_runner.upgrade()
+
+
+@app.post("/rollback")
+@utils.enable_upgrade_api()
+def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(get_config)):
+    """An internal API used for testing processes. Not to be used by users."""
+    rollback_runner = RollbackRunner(marqo_config.vespa_client, marqo_config.index_management)
+    rollback_runner.rollback(from_version=req.from_version, to_version=req.to_version)
 
 
 if __name__ == "__main__":

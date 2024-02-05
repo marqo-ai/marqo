@@ -4,7 +4,7 @@ import time
 
 import torch
 
-from marqo import config, documentation
+from marqo import config, documentation, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
@@ -12,14 +12,13 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.vespa.exceptions import VespaError
 
 logger = get_logger(__name__)
 
 
 def on_start(config: config.Config):
     to_run_on_start = (
-        CreateSettingsSchema(config),
+        BootstrapVespa(config),
         PopulateCache(config),
         DownloadStartText(),
         CUDAAvailable(),
@@ -27,6 +26,7 @@ def on_start(config: config.Config):
         ModelsForCacheing(),
         InitializeRedis("localhost", 6379),
         DownloadFinishText(),
+        PrintVersion(),
         MarqoWelcome(),
         MarqoPhrase(),
     )
@@ -35,7 +35,7 @@ def on_start(config: config.Config):
         thing_to_start.run()
 
 
-class CreateSettingsSchema:
+class BootstrapVespa:
     """Create the Marqo settings schema on Vespa"""
 
     def __init__(self, config: config.Config):
@@ -43,15 +43,15 @@ class CreateSettingsSchema:
 
     def run(self):
         try:
-            logger.debug('Creating Marqo settings schema')
-            created = self.config.index_management.create_settings_schema()
+            logger.debug('Bootstrapping Vespa')
+            created = self.config.index_management.bootstrap_vespa()
             if created:
-                logger.debug('Marqo settings schema created')
+                logger.debug('Vespa configured successfully')
             else:
-                logger.debug('Marqo settings schema already exists. Skipping')
-        except VespaError as e:
-            logger.warn(
-                f"Could not create Marqo settings schema. If you are using an external vector store, "
+                logger.debug('Vespa configuration already exists. Skipping bootstrap')
+        except Exception as e:
+            logger.error(
+                f"Failed to bootstrap vector store. If you are using an external vector store, "
                 "ensure that Marqo is configured properly for this. See "
                 f"{documentation.configuring_marqo()} for more details. Error: {e}"
             )
@@ -234,6 +234,11 @@ class DownloadFinishText:
         print("###########################################################")
         print("###########################################################")
         print('\n', flush=True)
+
+
+class PrintVersion:
+    def run(self):
+        print(f"Version: {version.__version__}")
 
 
 class MarqoPhrase:

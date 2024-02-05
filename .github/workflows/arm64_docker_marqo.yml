@@ -95,17 +95,14 @@ jobs:
           repository: marqo-ai/marqo-api-tests
           ref: ${{ github.event.inputs.api_tests_branch }}
 
-      - name: Set py_marqo_branch variable
-        id: set_var
+      - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
-          if [[ "${{ env.PY_MQ_API_TEST_BRANCH }}" == "marqo" ]]; then
-            echo "::set-output name=py_marqo_branch::marqo"
+          if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]] || [[ "${{ inputs.py_marqo_branch }}" == "" ]]; then
+            echo "MQ_PY_MARQO_BRANCH=marqo" >> $GITHUB_ENV
           else
-            echo "::set-output name=py_marqo_branch::git+https://github.com/marqo-ai/py-marqo.git@${{ env.PY_MQ_API_TEST_BRANCH }}"
+            echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
           fi
-        env:
-          PY_MQ_API_TEST_BRANCH: ${{ inputs.py_marqo_branch }}
-          
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
           
@@ -113,13 +110,12 @@ jobs:
         run: |
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-
+          
       - name: Run Integration Tests - ARM64 Docker Marqo
         run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          export MQ_PY_MARQO_BRANCH=${{ steps.set_var.outputs.py_marqo_branch }}
           tox -e py3-docker_marqo
   
   Stop-Runner:

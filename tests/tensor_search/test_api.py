@@ -1,5 +1,9 @@
 import uuid
 from unittest import mock
+from unittest.mock import patch
+from marqo import exceptions as base_exceptions
+from marqo.core import exceptions as core_exceptions
+from marqo.api import exceptions as api_exceptions
 
 from fastapi.testclient import TestClient
 
@@ -45,7 +49,10 @@ class TestApiErrors(MarqoTestCase):
 
     def tearDown(self) -> None:
         # Make sure no indexes are left over from tests
-        self.client.delete("/indexes/" + self.index_name_1)
+        try:
+            self.client.delete("/indexes/" + self.index_name_1)
+        except core_exceptions.IndexNotFoundError:
+            pass
 
     def test_index_not_found_error(self):
         # delete index if it exists
@@ -241,3 +248,96 @@ class TestApiErrors(MarqoTestCase):
                 )
 
                 self.assertEqual(response.status_code, 200)
+
+    def test_invalid_structured_index_field_type(self):
+        """Verify invalid field types are rejected with proper error"""
+
+        base_index_settings = {
+            "type": "structured",
+            "allFields": [{"name": "field1", "type": None}],
+            "tensorFields": []
+        }
+
+        test_cases = [
+            ("bulabua", "Invalid field type 'bulabua'"),
+            ([], "Invalid field type '[]'"),
+            (None, "Invalid field type 'NoneType'"),
+            ("", "Invalid field type ''"),
+        ]
+
+        for test_case, test_name in test_cases:
+            test_settings = base_index_settings.copy()
+            test_settings["allFields"][0]["type"] = test_case
+            with self.subTest(test_name):
+                index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+                response = self.client.post(
+                    f"/indexes/{index_name}",
+                    json=test_settings
+                )
+                self.assertEqual(response.status_code, 422)
+                self.assertIn("allFields", response.text)
+                self.assertIn("type", response.text)
+
+    def test_invalid_structured_index_field_features(self):
+        """Verify invalid field features are rejected with proper error"""
+
+        base_index_settings = {
+            "type": "structured",
+            "allFields": [{"name": "field1", "type": "text", "features": None}],
+            "tensorFields": []
+        }
+
+        test_cases = [
+            ("bulabua", "Invalid field feature 'bulabua'"),
+            (None, "Invalid field feature 'NoneType'"),
+            ("", "Invalid field feature ''"),
+        ]
+
+        for test_case, test_name in test_cases:
+            test_settings = base_index_settings.copy()
+            test_settings["allFields"][0]["features"] = test_case
+            with self.subTest(test_name):
+                index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+                response = self.client.post(
+                    f"/indexes/{index_name}",
+                    json=test_settings
+                )
+                self.assertEqual(response.status_code, 422)
+                self.assertIn("allFields", response.text)
+                self.assertIn("features", response.text)
+
+    def test_log_stack_trace_for_core_exceptions(self):
+        """Ensure stack trace is logged for core exceptions, e.g.,IndexExistsError"""
+        raised_error = core_exceptions.IndexExistsError("index1")
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
+            with patch("marqo.core.index_management.index_management.IndexManagement.create_index",
+                       side_effect=raised_error):
+                response = self.client.post("/indexes/" + self.index_name_1, json={
+                    "type": "structured",
+                    "allFields": [{"name": "field1", "type": "text"}],
+                    "tensorFields": [],
+                })
+            mock_logger_error.assert_called_once()
+            self.assertIn("index1", str(mock_logger_error.call_args))
+
+    def test_log_stack_trace_for_base_exceptions_invalid_arg(self):
+        """Ensure stack trace is logged for base exceptions, e.g.,InvalidArg"""
+        raised_error = base_exceptions.InvalidArgumentError("invalid_arg_msg")
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
+            with patch("marqo.tensor_search.tensor_search.search", side_effect=raised_error):
+                response = self.client.post(f"/indexes/test_index/search", json={
+                    "q": "test"
+                })
+            mock_logger_error.assert_called_once()
+            self.assertIn("invalid_arg_msg", str(mock_logger_error.call_args))
+
+    def test_log_stack_trace_for_base_exceptions_internal(self):
+        """Ensure stack trace is logged for base exceptions, e.g.,InternalError"""
+        raised_error = base_exceptions.InternalError("internal_error_msg")
+        with patch('marqo.api.route.logger.error') as mock_logger_error:
+            with patch("marqo.tensor_search.tensor_search.get_document_by_id", side_effect=raised_error):
+                response = self.client.get(f"/indexes/test_index/documents/1")
+            mock_logger_error.assert_called_once()
+            self.assertIn("internal_error_msg", str(mock_logger_error.call_args))
+
+    # TODO: Test how marqo handles generic exceptions, including Exception, RunTimeError, ValueError, etc.
