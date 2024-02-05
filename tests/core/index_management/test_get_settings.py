@@ -90,13 +90,14 @@ class TestGetSettings(MarqoTestCase):
                     },
                     'filterStringMaxLength': 20,
                     'imagePreprocessing': {},
-                    'model': 'hf/all_datasets_v4_MiniLM-L6',
+                    'model': 'hf/e5-base-v2',
                     'modelProperties': {
-                        'dimensions': 384,
-                        'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6',
-                        'notes': '',
-                        'tokens': 128,
-                        'type': 'hf'
+                        "name": 'intfloat/e5-base-v2',
+                        "dimensions": 768,
+                        "tokens": 512,
+                        "type": "hf",
+                        "model_size": 0.438,
+                        "notes": ""
                     },
                     'normalizeEmbeddings': True,
                     'textPreprocessing': {'splitLength': 2,
@@ -130,13 +131,14 @@ class TestGetSettings(MarqoTestCase):
                         'spaceType': DistanceMetric.PrenormalizedAnguar
                     },
                     'imagePreprocessing': {},
-                    'model': 'hf/all_datasets_v4_MiniLM-L6',
+                    'model': 'hf/e5-base-v2',
                     'modelProperties': {
-                        'dimensions': 384,
-                        'name': 'flax-sentence-embeddings/all_datasets_v4_MiniLM-L6',
-                        'notes': '',
-                        'tokens': 128,
-                        'type': 'hf'
+                        "name": 'intfloat/e5-base-v2',
+                        "dimensions": 768,
+                        "tokens": 512,
+                        "type": "hf",
+                        "model_size": 0.438,
+                        "notes": ""
                     },
                     'normalizeEmbeddings': True,
                     'tensorFields': [],
