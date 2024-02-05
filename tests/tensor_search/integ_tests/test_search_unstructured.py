@@ -1253,3 +1253,53 @@ class TestSearchUnstructured(MarqoTestCase):
         )
         self.assertEqual(1, len(tensor_search_result['hits']))
         self.assertEqual("1", tensor_search_result['hits'][0]['_id'])
+
+    def test_search_returned_documents(self):
+        """A test to ensure that the returned are not missing/adding any unexpected fields"""
+        full_fields_document = ({
+            "_id": "full_fields",
+            "text_field": "some text",
+            "int_field": 1,
+            "float_field": 2.0,
+            "bool_field": True,
+            "list_field": ["a", "b","c"],
+            "string_bool_field": "True",
+            "string_int_field": "1",
+            "string_float_field": "1.2",
+            "string_list_field": "['a', 'b', 'c']"
+        }, "full-fields document")
+
+        partial_fields_document = ({
+            "_id": "partial_field",
+            "text_field": "some text",
+            "float_field": 1.0,
+            "bool_field": True,
+            "list_field": ["a", "b", "c"],
+        }, "partial-fields document")
+
+        no_field_documents = ({
+            "_id": "no_field",
+            "text_field": "some text"
+        }, "no-field document")
+
+        for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
+            with self.subTest(msg):
+                self.clear_index_by_name(self.default_text_index)
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=self.default_text_index,
+                        docs=[document],
+                        tensor_fields=["text_field"]
+                    )
+                )
+
+                search_result = tensor_search.search(
+                    text="some text",
+                    index_name=self.default_text_index,
+                    config=self.config,
+                    search_method=SearchMethod.TENSOR,
+                )
+
+                self.assertEqual(1, len(search_result['hits']))
+                self.assertEqual(document, self.strip_marqo_fields(search_result['hits'][0], strip_id=False))
