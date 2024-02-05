@@ -1,5 +1,6 @@
 import marqo.core.search.search_filter as search_filter
-from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
+from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
+                                   InvalidDataRangeError)
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
@@ -61,6 +62,13 @@ class StructuredVespaIndex(VespaIndex):
             self._verify_marqo_field_type(marqo_field, marqo_value)
 
             index_field = self._marqo_index.field_map[marqo_field]
+
+            if isinstance(marqo_value, (int, float)):
+                self._verify_numerical_field_value(marqo_value, index_field)
+
+            if isinstance(marqo_value, list) and isinstance(marqo_value[0], (int, float)):
+                for v in marqo_value:
+                    self._verify_numerical_field_value(v, index_field)
 
             if index_field.type == FieldType.Bool:
                 # Booleans are stored as bytes in Vespa
@@ -499,6 +507,52 @@ class StructuredVespaIndex(VespaIndex):
             raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
                                        f'{marqo_type.value}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
+
+    def _verify_numerical_field_value(self, value: Union[float, int], index_field: Field):
+        if index_field.type in (FieldType.Float, FieldType.ArrayFloat):
+            self._verify_float_field_range(value)
+        elif index_field.type in (FieldType.Int, FieldType.ArrayInt):
+            self._verify_int_field_range(value)
+        elif index_field.type in (FieldType.Long, FieldType.ArrayLong):
+            self._verify_long_field_range(value)
+        elif index_field.type in (FieldType.Double, FieldType.ArrayDouble):
+            pass
+        else:
+            raise InternalError(f'Invalid field type {index_field.type} for field {index_field.name} called by'
+                                f'_verify_numerical_field_value. Expected one of {FieldType.Float}, {FieldType.Int}, '
+                                f'{FieldType.Long}, {FieldType.Double}.')
+
+    def _verify_float_field_range(self, value: float):
+        MAX_FLOAT = 3.4028235e38
+        MIN_FLOAT = -3.4028235e38
+        SMALLEST_POS_FLOAT = 1.4e-45
+        LARGEST_NEG_FLOAT = -1.4e-45
+        if (value > MAX_FLOAT) or (0 < value < SMALLEST_POS_FLOAT) or (value < MIN_FLOAT) or \
+                (0 > value > LARGEST_NEG_FLOAT):
+            raise InvalidDataRangeError(f'Invalid value {value} for float field. Expected a value in the range '
+                                       f'[{MIN_FLOAT}, {MAX_FLOAT}] or [{LARGEST_NEG_FLOAT}, {SMALLEST_POS_FLOAT}], but '
+                                       f'found {value} '
+                                       f'If you wish to store a value outside of this range, creating a field with type '
+                                       f"'{FieldType.Double}'. ")
+
+    def _verify_int_field_range(self, value: int):
+        MAX_INT = 2147483647
+        # The actual minimum value is -2147483648, but we use -2147483647 as this is the minimum to support filtering
+        MIN_INT = -2147483647
+        if value > MAX_INT or value < MIN_INT:
+            raise InvalidDataRangeError(f"Invalid value {value} for int field. Expected a value in the range "
+                                       f"[{MIN_INT}, {MAX_INT}], but found {value}. "
+                                       f"If you wish to store a value outside of this range, creating a field with type "
+                                       f"'{FieldType.Long} or '{FieldType.Double}'. ")
+
+    def _verify_long_field_range(self, value: int):
+        MAX_LONG = 9223372036854775807
+        MIN_LONG = -9223372036854775808
+        if value > MAX_LONG or value < MIN_LONG:
+            raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
+                                       f"[{MIN_LONG}, {MAX_LONG}], but found {value}. "
+                                       f"If you wish to store a value outside of this range, creating a field with type "
+                                       f"'{FieldType.Double}'. ")
 
     def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
         # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features

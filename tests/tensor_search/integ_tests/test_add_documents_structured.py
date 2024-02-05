@@ -1028,44 +1028,58 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
     def test_add_long_double_numeric_values(self):
         """Test to ensure large integer and float numbers are handled correctly for long and double fields"""
+
         test_case = [
-            ({"int_field_1": 2147483647}, False),  # maximum positive integer that can be handled by int
-            ({"int_field_1": -2147483648}, False),  # maximum negative integer that can be handled by int
-            ({"int_field_1": 2147483648}, True),  # integer slightly larger than boundary so can't be handled by int
-            ({"long_field_1": 2147483648}, False),  # integer slightly larger than boundary can be handled by long
-            ({"int_field_1": -2147483649}, True),  # integer slightly smaller than boundary so can't be handled by int
-            ({"long_field_1": -2147483649}, False),  # integer slightly larger than boundary can be handled by long
-
-            ({"float_field_1": 3.4028235e38}, False),  # maximum positive float that can be handled by float
-            ({"float_field_1": -3.4028235e38}, False),  # maximum negative float that can be handled by float
-            # The boundary for float and double is not causing add_documents to raise an error
-            ({"float_field_1": 3.4028235e40}, False),  # float slightly larger than boundary can be handled by float
-            ({"double_field_1": 3.4028235e40}, False),  # float slightly larger than boundary can be handled by double
-            ({"float_field_1": 1.40239846e-40}, False),  # float slightly smaller than boundary so can't be handled by float
-            ({"double_field_1": 1.40239846e-40}, False),  # float slightly smaller than boundary can be handled by double
-
-            ({"long_field_1": 1}, False),  # small positive integer
-            ({"long_field_1": -1}, False),  # small negative integer
-            ({"long_field_1": 100232142864}, False),  # large positive integer that can't be handled by int
-            ({"long_field_1": -923217213}, False),  # large negative integer that can't be handled by int
-            ({'long_field_1': int("1" * 50)}, True),  # overlarge positive integer, should raise error in long field
-            # overlarge negative integer, should raise error in long field
-            ({'long_field_1': -1 * int("1" * 50)}, True),
-            ({"double_field_1": 1e10}, False),  # large positive integer mathematical expression
-            ({"double_field_1": -1e12}, False),  # large negative integer mathematical expression
-            ({"double_field_1": 1e10 + 0.123249357987123}, False),  # large positive float
-            ({"double_field_1": - 1e10 + 0.123249357987123}, False),  # large negative float
-            ({"array_double_field_1": [1e10, 1e10 + 0.123249357987123]}, False),  # large float array
-            ({"array_long_field_1": [1002321428643, -4923217213, 12390809]}, False),  # large integer array
-            # large integer array with one overlarge integer, should raise error
-            ({"array_long_field_1": [1002321428643, -4923217213, 12390809, int("9" * 50)]}, True)
+            ({"_id": "1", "int_field_1": 2147483647}, False, "maximum positive integer that can be handled by int"),
+            ({"_id": "2", "int_field_1": -2147483647}, False, "maximum negative integer that can be handled by int"),
+            ({"_id": "3", "int_field_1": 2147483648}, True,
+             "integer slightly larger than boundary so can't be handled by int"),
+            ({"_id": "4", "long_field_1": 2147483648}, False,
+             "integer slightly larger than boundary can be handled by long"),
+            ({"_id": "5", "int_field_1": -2147483648}, True,
+             "integer slightly smaller than boundary so can't be handled by int"),
+            ({"_id": "6", "long_field_1": -2147483648}, False,
+             "integer slightly larger than boundary can be handled by long"),
+            ({"_id": "7", "float_field_1": 3.4028235e38}, False, "maximum positive float that can be handled by float"),
+            (
+            {"_id": "8", "float_field_1": -3.4028235e38}, False, "maximum negative float that can be handled by float"),
+            ({"_id": "9", "float_field_1": 3.4028235e40}, True,
+             "float slightly larger than boundary can't be handled by float"),
+            ({"_id": "10", "double_field_1": 3.4028235e40}, False,
+             "float slightly larger than boundary can be handled by double"),
+            ({"_id": "11", "float_field_1": 1.40239846e-46}, True,
+             "float slightly smaller than boundary so can't be handled by float"),
+            ({"_id": "12", "double_field_1": 1.40239846e-46}, False,
+             "float slightly smaller than boundary can be handled by double"),
+            ({"_id": "13", "long_field_1": 1}, False, "small positive integer"),
+            ({"_id": "14", "long_field_1": -1}, False, "small negative integer"),
+            ({"_id": "15", "long_field_1": 100232142864}, False, "large positive integer that can't be handled by int"),
+            ({"_id": "16", "long_field_1": -923217213}, False, "large negative integer that can't be handled by int"),
+            ({"_id": "17", 'long_field_1': int("1" * 50)}, True,
+             "overlarge positive integer, should raise error in long field"),
+            ({"_id": "18", 'long_field_1': -1 * int("1" * 50)}, True,
+             "overlarge negative integer, should raise error in long field"),
+            ({"_id": "19", "double_field_1": 1e10}, False, "large positive integer mathematical expression"),
+            ({"_id": "20", "double_field_1": -1e12}, False, "large negative integer mathematical expression"),
+            ({"_id": "21", "double_field_1": 1e10 + 0.123249357987123}, False, "large positive float"),
+            ({"_id": "22", "double_field_1": -1e10 + 0.123249357987123}, False, "large negative float"),
+            ({"_id": "23", "array_double_field_1": [1e10, 1e10 + 0.123249357987123]}, False, "large float array"),
         ]
 
-        for doc, error in test_case:
-            with self.subTest(doc):
+        for doc, error, msg in test_case:
+            with self.subTest(msg):
                 res = tensor_search.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[doc], device="cpu",
                     )
                 )
                 self.assertEqual(res['errors'], error)
+                if error:
+                    self.assertIn("Invalid value", res['items'][0]['error'])
+                else:
+                    document_id = doc["_id"]
+                    returned_doc = tensor_search.get_document_by_id(
+                        config=self.config, index_name=self.index_name_1, document_id=document_id, show_vectors=False
+                    )
+                    # Ensure we get the same document back for those that are valid
+                    self.assertEqual(doc, returned_doc)
