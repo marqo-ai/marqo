@@ -1,7 +1,11 @@
-    schema marqo__my_00index {
-        document {
-        field marqo__id type string { indexing: summary}
-            field marqo__lexical_title type string {
+schema marqo__my_00index {
+    document {
+        field marqo__id type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+        field marqo__lexical_title type string {
             indexing: index | summary
             index: enable-bm25
         }

@@ -620,6 +620,43 @@ class TestSearchStructured(MarqoTestCase):
                 if expected_id:
                     self.assertEqual(expected_id, res["hits"][0]["_id"])
 
+    def test_filter_id(self):
+        """
+        Test filtering by _id
+        """
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=[
+                    {"_id": "1", "text_field_1": "some text"},
+                    {"_id": "doc1", "text_field_1": "some text"},
+                    {"_id": "doc5", "text_field_1": "some text"},
+                    {"_id": "50", "text_field_1": "some text"},
+                ]
+            )
+        )
+
+        test_parameters = [
+            ("_id:1", 1, ["1"]),
+            ("_id:doc1", 1, ["doc1"]),
+            ("_id:51", 0, None),
+            ("_id:1 OR _id:doc1", 2, ["1", "doc1"]),  # or condition
+            ("_id:1 OR _id:doc1 OR _id:50", 3, ["1", "doc1", "50"]),  # or condition, longer
+            ("_id:1 OR _id:doc1 OR _id:50 OR _id:51", 3, ["1", "doc1", "50"]),  # or condition with non-existent id
+            ("_id:1 AND _id:doc1", 0, None),  # and condition
+        ]
+
+        for filter_string, expected_hits, expected_ids in test_parameters:
+            with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
+                res = tensor_search.search(
+                    config=self.config, index_name=self.default_text_index, text="some text", filter=filter_string,
+                )
+
+                self.assertEqual(expected_hits, len(res["hits"]))
+                if expected_ids:
+                    self.assertEqual(set(expected_ids), {hit["_id"] for hit in res["hits"]})
+
     def test_filter_spaced_fields(self):
         # Add documents
         tensor_search.add_documents(
