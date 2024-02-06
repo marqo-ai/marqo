@@ -4,7 +4,7 @@ from unittest.mock import patch
 from marqo import exceptions as base_exceptions
 from marqo.core import exceptions as core_exceptions
 from marqo.api import exceptions as api_exceptions
-
+from marqo.core.models.marqo_index import *
 from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
@@ -43,16 +43,17 @@ class TestApiErrors(MarqoTestCase):
 
     index_name_1 = "index1"
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        index_request = cls.unstructured_marqo_index_request(model=Model(name='random'))
+        cls.indexes = cls.create_indexes([
+            index_request
+        ])
+        cls.index_name_1 = index_request.name
+
     def setUp(self):
         self.client = TestClient(api.app)
-        self.index_name_1 = "index1"
-
-    def tearDown(self) -> None:
-        # Make sure no indexes are left over from tests
-        try:
-            self.client.delete("/indexes/" + self.index_name_1)
-        except core_exceptions.IndexNotFoundError:
-            pass
 
     def test_index_not_found_error(self):
         # delete index if it exists
@@ -62,7 +63,7 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["code"], "index_not_found")
         self.assertEqual(response.json()["type"], "invalid_request")
-        assert "not found" in response.json()["message"] and "index1" in response.json()["message"]
+        assert "not found" in response.json()["message"] and self.index_name_1 in response.json()["message"]
 
     def test_index_already_exists(self):
         # create index if it does not already exist
@@ -80,7 +81,7 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["code"], "index_already_exists")
         self.assertEqual(response.json()["type"], "invalid_request")
-        assert "already exists" in response.json()["message"] and "index1" in response.json()["message"]
+        assert "already exists" in response.json()["message"] and self.index_name_1 in response.json()["message"]
 
     def test_invalid_field_name(self):
         self.client.post("/indexes/" + self.index_name_1, json={
