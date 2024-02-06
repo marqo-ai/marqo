@@ -2,6 +2,8 @@ schema marqo__test_00unstructured_00schema {
     document {
         field marqo__id type string {
             indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
         }
 
         field marqo__strings type array<string>{
@@ -33,7 +35,7 @@ schema marqo__test_00unstructured_00schema {
             indexing: summary
         }
 
-        field marqo__int_fields type map<string, int> {
+        field marqo__int_fields type map<string, long> {
             indexing: summary
             struct-field key { indexing : attribute
                                attribute: fast-search
@@ -53,7 +55,7 @@ schema marqo__test_00unstructured_00schema {
                                   rank: filter }
             }
 
-        field marqo__float_fields type map<string, float> {
+        field marqo__float_fields type map<string, double> {
             indexing: summary
             struct-field key { indexing : attribute
                                attribute: fast-search
@@ -149,8 +151,8 @@ schema marqo__test_00unstructured_00schema {
         summary marqo__short_string_fields type map<string, string> {}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
-        summary marqo__int_fields type map<string, int> {}
-        summary marqo__float_fields type map<string, float> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
         summary marqo__chunks type array<string> {}
     }
 
@@ -161,8 +163,8 @@ schema marqo__test_00unstructured_00schema {
         summary marqo__short_string_fields type map<string, string> {}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
-        summary marqo__int_fields type map<string, int> {}
-        summary marqo__float_fields type map<string, float> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
         summary marqo__chunks type array<string> {}
         summary marqo__embeddings type tensor<float>(p{}, x[32]) {}
     }

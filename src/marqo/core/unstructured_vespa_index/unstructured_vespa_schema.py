@@ -222,8 +222,8 @@ class UnstructuredVespaSchema(VespaSchema):
                     summary {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
                     summary {cls._STRING_ARRAY} type array<string> {{}}
                     summary {cls._BOOL_FIELDS} type map<string, byte> {{}}
-                    summary {cls._INT_FIELDS} type map<string, int> {{}}
-                    summary {cls._FLOAT_FIELDS} type map<string, float> {{}}
+                    summary {cls._INT_FIELDS} type map<string, long> {{}}
+                    summary {cls._FLOAT_FIELDS} type map<string, double> {{}}
                     summary {cls._CHUNKS} type array<string> {{}}
                 }}
 
