@@ -83,9 +83,6 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         # Base exceptions
         (base_exceptions.InternalError, api_exceptions.InternalError),
         (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError),
-
-        # If no mapping is found, raise a generic API error (500)
-        (base_exceptions.MarqoError, api_exceptions.MarqoWebError),
     ]
 
     converted_error = None
@@ -95,8 +92,9 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
             break
 
     # Completely unhandled exception (500)
+    # This should abstract away internal error.
     if not converted_error:
-        converted_error = api_exceptions.MarqoWebError(exc.message)
+        converted_error = api_exceptions.MarqoWebError("Marqo encountered an unexpected internal error.")
 
     return marqo_api_exception_handler(request, converted_error)
 
