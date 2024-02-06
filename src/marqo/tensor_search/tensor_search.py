@@ -505,6 +505,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
+    vespa_index = StructuredVespaIndex(marqo_index)
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
@@ -517,7 +518,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             marqo_index
         )
     t0 = timer()
-    bulk_parent_dicts: List[Dict[str, Any]] = []
+    bulk_parent_dicts: List[VespaDocument] = []
 
     if len(add_docs_params.docs) == 0:
         raise api_exceptions.BadRequestError(message="Received empty add documents request")
@@ -878,7 +879,17 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 if processed_tensor_fields:
                     copied[constants.MARQO_DOC_TENSORS] = processed_tensor_fields
                 copied[constants.MARQO_DOC_ID] = doc_id
-                bulk_parent_dicts.append(copied)
+
+                try:
+                    converted_doc = VespaDocument(**vespa_index.to_vespa_document(copied))
+                    bulk_parent_dicts.append(converted_doc)
+                except core_exceptions.MarqoDocumentParsingError as e:
+                    document_is_valid = False
+                    unsuccessful_docs.append(
+                        (i, {'_id': doc_id, 'error': e.message,
+                             'status': int(api_exceptions.InvalidArgError.status_code),
+                             'code': api_exceptions.InvalidArgError.code})
+                    )
 
     total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
         "add_documents.processing_before_vespa")
@@ -890,15 +901,10 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                  f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
     if bulk_parent_dicts:
-        vespa_index = StructuredVespaIndex(marqo_index)
-        vespa_docs = [
-            VespaDocument(**vespa_index.to_vespa_document(doc))
-            for doc in bulk_parent_dicts
-        ]
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
         with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.schema_name)
+            index_responses = vespa_client.feed_batch(bulk_parent_dicts, marqo_index.schema_name)
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5

@@ -47,7 +47,37 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     name='in_stock',
                     type=FieldType.Bool,
                     features=[FieldFeature.Filter]
-                )
+                ),
+                FieldRequest(
+                    name="int_field_1",
+                    type=FieldType.Int,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="float_field_1",
+                    type=FieldType.Float,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="long_field_1",
+                    type=FieldType.Long,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="double_field_1",
+                    type=FieldType.Double,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="array_long_field_1",
+                    type=FieldType.ArrayLong,
+                    features=[FieldFeature.Filter]
+                ),
+                FieldRequest(
+                    name="array_double_field_1",
+                    type=FieldType.ArrayDouble,
+                    features=[FieldFeature.Filter]
+                ),
             ],
             tensor_fields=['title']
         )
@@ -995,3 +1025,81 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 )
 
                 self.assertEqual(thread_count, mock_download_images.call_count)
+
+    def test_add_long_double_numeric_values(self):
+        """Test to ensure large integer and float numbers are handled correctly for long and double fields"""
+        test_case = [
+            ({"_id": "1", "int_field_1": 2147483647}, False, "maximum positive integer that can be handled by int"),
+            ({"_id": "2", "int_field_1": -2147483647}, False, "maximum negative integer that can be handled by int"),
+            ({"_id": "3", "int_field_1": 2147483648}, True,
+             "integer slightly larger than boundary so can't be handled by int"),
+            ({"_id": "4", "long_field_1": 2147483648}, False,
+             "integer slightly larger than boundary can be handled by long"),
+            ({"_id": "5", "int_field_1": -2147483648}, True,
+             "integer slightly smaller than boundary so can't be handled by int"),
+            ({"_id": "6", "long_field_1": -2147483648}, False,
+             "integer slightly larger than boundary can be handled by long"),
+            ({"_id": "7", "float_field_1": 3.4028235e38}, False, "maximum positive float that can be handled by float"),
+            (
+            {"_id": "8", "float_field_1": -3.4028235e38}, False, "maximum negative float that can be handled by float"),
+            ({"_id": "9", "float_field_1": 3.4028235e40}, True,
+             "float slightly larger than boundary can't be handled by float"),
+            ({"_id": "10", "double_field_1": 3.4028235e40}, False,
+             "float slightly larger than boundary can be handled by double"),
+            ({"_id": "13", "long_field_1": 1}, False, "small positive integer"),
+            ({"_id": "14", "long_field_1": -1}, False, "small negative integer"),
+            ({"_id": "15", "long_field_1": 100232142864}, False, "large positive integer that can't be handled by int"),
+            ({"_id": "16", "long_field_1": -923217213}, False, "large negative integer that can't be handled by int"),
+            ({"_id": "17", 'long_field_1': int("1" * 50)}, True,
+             "overlarge positive integer, should raise error in long field"),
+            ({"_id": "18", 'long_field_1': -1 * int("1" * 50)}, True,
+             "overlarge negative integer, should raise error in long field"),
+            ({"_id": "19", "double_field_1": 1e10}, False, "large positive integer mathematical expression"),
+            ({"_id": "20", "double_field_1": -1e12}, False, "large negative integer mathematical expression"),
+            ({"_id": "21", "double_field_1": 1e10 + 0.123249357987123}, False, "large positive float"),
+            ({"_id": "22", "double_field_1": -1e10 + 0.123249357987123}, False, "large negative float"),
+            ({"_id": "23", "array_double_field_1": [1e10, 1e10 + 0.123249357987123]}, False, "large float array"),
+        ]
+
+        for doc, error, msg in test_case:
+            with self.subTest(msg):
+                res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=[doc], device="cpu",
+                    )
+                )
+                self.assertEqual(res['errors'], error)
+                if error:
+                    self.assertIn("Invalid value", res['items'][0]['error'])
+                else:
+                    document_id = doc["_id"]
+                    returned_doc = tensor_search.get_document_by_id(
+                        config=self.config, index_name=self.index_name_1, document_id=document_id, show_vectors=False
+                    )
+                    # Ensure we get the same document back for those that are valid
+                    self.assertEqual(doc, returned_doc)
+
+    def test_long_double_numeric_values_edge_case(self):
+        """We test some edge cases here for clarity"""
+        test_case = [
+            ({"_id": "1", "float_field_1": 1e-50},
+             {"_id": "1", "float_field_1": 0},
+             "small positive float will be rounded to 0"),
+            ({"_id": "2", "float_field_1": -1e-50},
+             {"_id": "2", "float_field_1": 0},
+             "small negative float will be rounded to 0"),
+        ]
+
+        for doc, expected_doc, msg in test_case:
+            with self.subTest(msg):
+                res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=self.index_name_1, docs=[doc], device="cpu",
+                    )
+                )
+                self.assertFalse(res['errors'])
+                document_id = doc["_id"]
+                returned_doc = tensor_search.get_document_by_id(
+                    config=self.config, index_name=self.index_name_1, document_id=document_id, show_vectors=False
+                )
+                self.assertEqual(expected_doc, returned_doc)
