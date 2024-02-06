@@ -28,6 +28,10 @@ class InvalidDataTypeError(MarqoDocumentParsingError):
     pass
 
 
+class InvalidDataRangeError(MarqoDocumentParsingError):
+    pass
+
+
 class InvalidFieldNameError(MarqoDocumentParsingError):
     pass
 
