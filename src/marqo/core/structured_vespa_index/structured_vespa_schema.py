@@ -12,10 +12,14 @@ class StructuredVespaSchema(VespaSchema):
         FieldType.Text: 'string',
         FieldType.Bool: 'byte',
         FieldType.Int: 'int',
+        FieldType.Long: 'long',
         FieldType.Float: 'float',
+        FieldType.Double: 'double',
         FieldType.ArrayText: 'array<string>',
         FieldType.ArrayInt: 'array<int>',
+        FieldType.ArrayLong: 'array<long>',
         FieldType.ArrayFloat: 'array<float>',
+        FieldType.ArrayDouble: 'array<double>',
         FieldType.ImagePointer: 'string',
         FieldType.MultimodalCombination: 'map<string, float>'
     }
@@ -58,8 +62,12 @@ class StructuredVespaSchema(VespaSchema):
         document.append(f'document {{')
 
         # ID field
-        document.append(f'field {common.FIELD_ID} type string {{ indexing: summary }}')
-
+        document.append(f'field {common.FIELD_ID} type string {{')
+        document.append('indexing: attribute | summary')
+        document.append('attribute: fast-search')
+        document.append('rank: filter')
+        document.append('}')
+        
         for tensor_field_request in self._index_request.fields:
             field_type = self._get_vespa_type(tensor_field_request.type)
             lexical_field_name = None

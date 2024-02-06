@@ -1,5 +1,6 @@
 import marqo.core.search.search_filter as search_filter
-from marqo.core.exceptions import InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError
+from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
+                                   InvalidDataRangeError)
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
@@ -17,10 +18,14 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.Text: str,
         FieldType.Bool: bool,
         FieldType.Int: int,
+        FieldType.Long: int,
         FieldType.Float: [float, int],
+        FieldType.Double: [float, int],
         FieldType.ArrayText: list,
         FieldType.ArrayInt: list,
         FieldType.ArrayFloat: list,
+        FieldType.ArrayLong: list,
+        FieldType.ArrayDouble: list,
         FieldType.ImagePointer: str,
         FieldType.MultimodalCombination: dict
     }
@@ -33,6 +38,16 @@ class StructuredVespaIndex(VespaIndex):
 
     _DEFAULT_MAX_LIMIT = 1000
     _DEFAULT_MAX_OFFSET = 10000
+
+    _MAX_FLOAT = 3.4028235e38
+    _MIN_FLOAT = -3.4028235e38
+
+    _MAX_INT = 2147483647
+    # The actual minimum value is -2147483648, but we use -2147483647 as this is the minimum to support filtering
+    _MIN_INT = -2147483647
+
+    _MAX_LONG = 9223372036854775807
+    _MIN_LONG = -9223372036854775808
 
     def __init__(self, marqo_index: StructuredMarqoIndex):
         self._marqo_index = marqo_index
@@ -57,6 +72,13 @@ class StructuredVespaIndex(VespaIndex):
             self._verify_marqo_field_type(marqo_field, marqo_value)
 
             index_field = self._marqo_index.field_map[marqo_field]
+
+            if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
+                self._verify_numerical_field_value(marqo_value, index_field)
+
+            if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
+                for v in marqo_value:
+                    self._verify_numerical_field_value(v, index_field)
 
             if index_field.type == FieldType.Bool:
                 # Booleans are stored as bytes in Vespa
@@ -381,24 +403,30 @@ class StructuredVespaIndex(VespaIndex):
             elif isinstance(node, search_filter.Term):
                 if node.field not in self._marqo_index.filterable_fields_names:
                     raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no filterable field {node.field}. '
-                        f'Available filterable fields are: {", ".join(self._marqo_index.filterable_fields_names)}'
+                        f"Index '{self._marqo_index.name}' has no filterable field '{node.field}'. "
+                        f'Available filterable fields are: \'{", ".join(self._marqo_index.filterable_fields_names)}\''
                     )
 
-                marqo_field = self._marqo_index.all_field_map[node.field]
+                if node.field == constants.MARQO_DOC_ID:
+                    marqo_field_name = common.FIELD_ID
+                    marqo_field_type = FieldType.Text
+                else:
+                    marqo_field = self._marqo_index.all_field_map[node.field]
+                    marqo_field_name = marqo_field.filter_field_name
+                    marqo_field_type = marqo_field.type
 
                 if isinstance(node, search_filter.EqualityTerm):
                     node_value = node.value
-                    if marqo_field.type == FieldType.Bool:
+                    if marqo_field_type == FieldType.Bool:
                         if node_value.lower() == 'true':
                             node_value = '1'
                         elif node_value.lower() == 'false':
                             node_value = '0'
 
-                    return f'{marqo_field.filter_field_name} contains "{escape(node_value)}"'
+                    return f'{marqo_field_name} contains "{escape(node_value)}"'
                 elif isinstance(node, search_filter.RangeTerm):
-                    lower = f'{marqo_field.filter_field_name} >= {node.lower}' if node.lower is not None else None
-                    upper = f'{marqo_field.filter_field_name} <= {node.upper}' if node.upper is not None else None
+                    lower = f'{marqo_field_name} >= {node.lower}' if node.lower is not None else None
+                    upper = f'{marqo_field_name} <= {node.upper}' if node.upper is not None else None
                     if lower and upper:
                         return f'({lower} AND {upper})'
                     elif lower:
@@ -495,6 +523,41 @@ class StructuredVespaIndex(VespaIndex):
             raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
                                        f'{marqo_type.value}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
+
+    def _verify_numerical_field_value(self, value: Union[float, int], index_field: Field):
+        if index_field.type in (FieldType.Float, FieldType.ArrayFloat):
+            self._verify_float_field_range(value)
+        elif index_field.type in (FieldType.Int, FieldType.ArrayInt):
+            self._verify_int_field_range(value)
+        elif index_field.type in (FieldType.Long, FieldType.ArrayLong):
+            self._verify_long_field_range(value)
+        elif index_field.type in (FieldType.Double, FieldType.ArrayDouble):
+            pass
+        else:
+            raise InternalError(f'Invalid field type {index_field.type} for field {index_field.name} called by'
+                                f'_verify_numerical_field_value. Expected one of {FieldType.Float}, {FieldType.Int}, '
+                                f'{FieldType.Long}, {FieldType.Double}.')
+
+    def _verify_float_field_range(self, value: float):
+        if not (self._MIN_FLOAT <= value <= self._MAX_FLOAT):
+            raise InvalidDataRangeError(f'Invalid value {value} for float field. Expected a value in the range '
+                                        f'[{self._MIN_FLOAT}, {self._MAX_FLOAT}], but found {value}. '
+                                        f'If you wish to store a value outside of this range, create a field with type '
+                                        f"'{FieldType.Double}'. ")
+
+    def _verify_int_field_range(self, value: int):
+        if not (self._MIN_INT <= value <= self._MAX_INT):
+            raise InvalidDataRangeError(f"Invalid value {value} for int field. Expected a value in the range "
+                                        f"[{self._MIN_INT}, {self._MAX_INT}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, create a field with type "
+                                        f"'{FieldType.Long} or '{FieldType.Double}'. ")
+
+    def _verify_long_field_range(self, value: int):
+        if not (self._MIN_LONG <= value <= self._MAX_LONG):
+            raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
+                                        f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, create a field with type "
+                                        f"'{FieldType.Double}'. ")
 
     def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
         # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features

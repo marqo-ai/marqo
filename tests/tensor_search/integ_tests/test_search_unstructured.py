@@ -1233,6 +1233,51 @@ class TestSearchUnstructured(MarqoTestCase):
             self.assertEqual(1, len(hit["_highlights"]))  # We only have 1 highlight now
             self.assertTrue(isinstance(hit["_highlights"][0], dict))
 
+    def test_filter_on_large_integer_and_float(self):
+        valid_documents = [
+            {'long_field_1': 1, '_id': '0', "search_field": "some text"},  # small positive integer
+            {'long_field_1': -1, '_id': '1', "search_field": "some text"},  # small negative integer
+            # large positive integer that can't be handled by int
+            {'long_field_1': 100232142864, '_id': '2', "search_field": "some text"},
+            # large negative integer that can't be handled by int
+            {'long_field_1': -923217213, '_id': '3', "search_field": "some text"},
+            # large positive integer mathematical expression
+            {'double_field_1': 10000000000.0, '_id': '4', "search_field": "some text"},
+            # large negative integer mathematical expression
+            {'double_field_1': -1000000000000.0, '_id': '5', "search_field": "some text"},
+            # large positive float
+            {'double_field_1': 10000000000.12325, '_id': '6', "search_field": "some text"},
+            # large negative float
+            {'double_field_1': -9999999999.87675, '_id': '7', "search_field": "some text"}
+        ]
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=valid_documents,
+                tensor_fields=["search_field"]
+            )
+        )
+
+        self.assertEqual(len(valid_documents),
+                         self.monitoring.get_index_stats_by_name(self.default_text_index).number_of_documents)
+
+        for document in valid_documents:
+            for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
+                numeric_field = list(document.keys())[0]
+                numeric_value = document[numeric_field]
+                filter_string = f"{numeric_field}:{numeric_value}"
+                expected_document_ids = document["_id"]
+                with self.subTest(f"filter_string = {filter_string}, "
+                                  f"expected_document_ids = {expected_document_ids}, "
+                                  f"search_method = {search_method}"):
+                    res = tensor_search.search(
+                        config=self.config, index_name=self.default_text_index, text="some text",
+                        filter=filter_string, search_method=SearchMethod.LEXICAL
+                    )
+                    self.assertEqual(1, len(res["hits"]))
+                    self.assertEqual(expected_document_ids, res["hits"][0]["_id"])
+
     def test_search_with_content_double_colon(self):
         docs = [
             {"_id": "1", "text_field": "::my_text"} # This should work properly
