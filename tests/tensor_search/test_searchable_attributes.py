@@ -8,7 +8,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 
 
-class TestSearchStructured(MarqoTestCase):
+class TestSearchableAttributes(MarqoTestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
