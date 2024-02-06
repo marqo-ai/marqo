@@ -539,21 +539,21 @@ class StructuredVespaIndex(VespaIndex):
                                 f'{FieldType.Long}, {FieldType.Double}.')
 
     def _verify_float_field_range(self, value: float):
-        if not (self._MIN_FLOAT < value < self._MAX_FLOAT):
+        if not (self._MIN_FLOAT <= value <= self._MAX_FLOAT):
             raise InvalidDataRangeError(f'Invalid value {value} for float field. Expected a value in the range '
                                         f'[{self._MIN_FLOAT}, {self._MAX_FLOAT}], but found {value}. '
                                         f'If you wish to store a value outside of this range, create a field with type '
                                         f"'{FieldType.Double}'. ")
 
     def _verify_int_field_range(self, value: int):
-        if value > self._MAX_INT or value < self._MIN_INT:
+        if not (self._MIN_INT <= value <= self._MAX_INT):
             raise InvalidDataRangeError(f"Invalid value {value} for int field. Expected a value in the range "
                                         f"[{self._MIN_INT}, {self._MAX_INT}], but found {value}. "
                                         f"If you wish to store a value outside of this range, create a field with type "
                                         f"'{FieldType.Long} or '{FieldType.Double}'. ")
 
     def _verify_long_field_range(self, value: int):
-        if value > self._MAX_LONG or value < self._MIN_LONG:
+        if not (self._MIN_LONG <= value <= self._MAX_LONG):
             raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
                                         f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
                                         f"If you wish to store a value outside of this range, create a field with type "
