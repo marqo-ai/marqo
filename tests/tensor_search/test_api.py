@@ -118,6 +118,7 @@ class TestApiErrors(MarqoTestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["errors"], True)
+        self.assertIn("Expected a value of type", response.json()["items"][0]["error"])
 
     def test_filter_string_parsing_error(self):
         self.client.post("/indexes/" + self.index_name_1, json={

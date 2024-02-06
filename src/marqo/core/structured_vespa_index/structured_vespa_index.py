@@ -39,6 +39,16 @@ class StructuredVespaIndex(VespaIndex):
     _DEFAULT_MAX_LIMIT = 1000
     _DEFAULT_MAX_OFFSET = 10000
 
+    _MAX_FLOAT = 3.4028235e38
+    _MIN_FLOAT = -3.4028235e38
+
+    _MAX_INT = 2147483647
+    # The actual minimum value is -2147483648, but we use -2147483647 as this is the minimum to support filtering
+    _MIN_INT = -2147483647
+
+    _MAX_LONG = 9223372036854775807
+    _MIN_LONG = -9223372036854775808
+
     def __init__(self, marqo_index: StructuredMarqoIndex):
         self._marqo_index = marqo_index
 
@@ -63,10 +73,10 @@ class StructuredVespaIndex(VespaIndex):
 
             index_field = self._marqo_index.field_map[marqo_field]
 
-            if isinstance(marqo_value, (int, float)) and not index_field.type == FieldType.Bool:
+            if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
 
-            if isinstance(marqo_value, list) and isinstance(marqo_value[0], (int, float)):
+            if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
                 for v in marqo_value:
                     self._verify_numerical_field_value(v, index_field)
 
@@ -523,35 +533,24 @@ class StructuredVespaIndex(VespaIndex):
                                 f'{FieldType.Long}, {FieldType.Double}.')
 
     def _verify_float_field_range(self, value: float):
-        MAX_FLOAT = 3.4028235e38
-        MIN_FLOAT = -3.4028235e38
-        SMALLEST_POS_FLOAT = 1.4e-45
-        LARGEST_NEG_FLOAT = -1.4e-45
-        if (value > MAX_FLOAT) or (0 < value < SMALLEST_POS_FLOAT) or (value < MIN_FLOAT) or \
-                (0 > value > LARGEST_NEG_FLOAT):
+        if not (self._MIN_FLOAT < value < self._MAX_FLOAT):
             raise InvalidDataRangeError(f'Invalid value {value} for float field. Expected a value in the range '
-                                        f'[{MIN_FLOAT}, {MAX_FLOAT}] or [{LARGEST_NEG_FLOAT}, {SMALLEST_POS_FLOAT}], but '
-                                        f'found {value} '
-                                        f'If you wish to store a value outside of this range, creating a field with type '
+                                        f'[{self._MIN_FLOAT}, {self._MAX_FLOAT}], but found {value}. '
+                                        f'If you wish to store a value outside of this range, create a field with type '
                                         f"'{FieldType.Double}'. ")
 
     def _verify_int_field_range(self, value: int):
-        MAX_INT = 2147483647
-        # The actual minimum value is -2147483648, but we use -2147483647 as this is the minimum to support filtering
-        MIN_INT = -2147483647
-        if value > MAX_INT or value < MIN_INT:
+        if value > self._MAX_INT or value < self._MIN_INT:
             raise InvalidDataRangeError(f"Invalid value {value} for int field. Expected a value in the range "
-                                        f"[{MIN_INT}, {MAX_INT}], but found {value}. "
-                                        f"If you wish to store a value outside of this range, creating a field with type "
+                                        f"[{self._MIN_INT}, {self._MAX_INT}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, create a field with type "
                                         f"'{FieldType.Long} or '{FieldType.Double}'. ")
 
     def _verify_long_field_range(self, value: int):
-        MAX_LONG = 9223372036854775807
-        MIN_LONG = -9223372036854775808
-        if value > MAX_LONG or value < MIN_LONG:
+        if value > self._MAX_LONG or value < self._MIN_LONG:
             raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
-                                        f"[{MIN_LONG}, {MAX_LONG}], but found {value}. "
-                                        f"If you wish to store a value outside of this range, creating a field with type "
+                                        f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
+                                        f"If you wish to store a value outside of this range, create a field with type "
                                         f"'{FieldType.Double}'. ")
 
     def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
