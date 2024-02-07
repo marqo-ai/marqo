@@ -70,7 +70,7 @@ class MarqoTestCase(unittest.TestCase):
         self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)
 
     def random_index_name(self) -> str:
-        return 'a' + str(uuid.uuid4())
+        return 'a' + str(uuid.uuid4()).replace('-', '')
 
     @classmethod
     def structured_marqo_index(
@@ -149,7 +149,7 @@ class MarqoTestCase(unittest.TestCase):
         Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
         """
         if not name:
-            name = 'a' + str(uuid.uuid4())
+            name = 'a' + str(uuid.uuid4()).replace('-', '')
 
         return StructuredMarqoIndexRequest(
             name=name,
@@ -196,7 +196,7 @@ class MarqoTestCase(unittest.TestCase):
         Helper method that provides reasonable defaults for UnstructuredMarqoIndexRequest.
         """
         if not name:
-            name = 'a' + str(uuid.uuid4())
+            name = 'a' + str(uuid.uuid4()).replace('-', '')
 
         return UnstructuredMarqoIndexRequest(
             name=name,
