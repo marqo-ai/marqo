@@ -710,7 +710,7 @@ class VespaClient:
                                 0].message == "Search request soft doomed during query setup and initialization."
                     ):
                         # The soft doom error is a bug in certain Vespa versions. Newer versions should always return
-                        # a code 8 for timeouts
+                        # a code 12 for timeouts
                         logger.warn('Detected soft doomed query')
                         raise VespaTimeoutError(message=resp.text, cause=e) from e
 
