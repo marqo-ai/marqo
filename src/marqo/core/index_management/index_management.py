@@ -75,11 +75,10 @@ class IndexManagement:
             if not configured:
                 self._add_marqo_config(app)
                 self.vespa_client.deploy_application(app)
-
+                self.vespa_client.wait_for_application_convergence()
                 if lock:
                     lock.release()
 
-                self.vespa_client.wait_for_application_convergence()
                 self._save_marqo_version(version.get_version())
                 return True
 
@@ -125,10 +124,10 @@ class IndexManagement:
             self._add_schema(app, marqo_index.schema_name, schema)
             self._add_schema_to_services(app, marqo_index.schema_name)
             self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
             if lock:
                 lock.release()
 
-            self.vespa_client.wait_for_application_convergence()
             self._save_index_settings(marqo_index)
 
             if not configured:
@@ -183,10 +182,9 @@ class IndexManagement:
                 self._add_schema_to_services(app, marqo_index.schema_name)
 
             self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
             if lock:
                 lock.release()
-
-            self.vespa_client.wait_for_application_convergence()
 
             for _, marqo_index in schema_responses:
                 self._save_index_settings(marqo_index)
@@ -220,10 +218,10 @@ class IndexManagement:
             self._remove_schema_from_services(app, marqo_index.schema_name)
             self._add_schema_removal_override(app)
             self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
             if lock:
                 lock.release()
 
-            self.vespa_client.wait_for_application_convergence()
             self._delete_index_settings_by_name(marqo_index.name)
         finally:
             if lock and lock.is_acquired():
@@ -269,10 +267,10 @@ class IndexManagement:
                 self._remove_schema_from_services(app, marqo_index.schema_name)
             self._add_schema_removal_override(app)
             self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
             if lock:
                 lock.release()
 
-            self.vespa_client.wait_for_application_convergence()
             for marqo_index in marqo_indexes:
                 self._delete_index_settings_by_name(marqo_index.name)
         finally:

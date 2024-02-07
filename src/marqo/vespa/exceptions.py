@@ -21,7 +21,7 @@ class VespaStatusError(VespaError):
             return super().__str__()
 
 
-class InvalidVespaApplicationError(VespaError):
+class InvalidVespaApplicationError(VespaStatusError):
     pass
 
 
