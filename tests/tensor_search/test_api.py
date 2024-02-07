@@ -1,13 +1,15 @@
 import uuid
 from unittest import mock
 from unittest.mock import patch
-from marqo import exceptions as base_exceptions
-from marqo.core import exceptions as core_exceptions
-from marqo.api import exceptions as api_exceptions
 
 from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
+from marqo import exceptions as base_exceptions
+from marqo.core import exceptions as core_exceptions
+from marqo.core.models.marqo_index import FieldType
+from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
 
 
@@ -41,37 +43,36 @@ class TestApiErrors(MarqoTestCase):
     Testing on errors that should be 4xxs.
     """
 
-    index_name_1 = "index1"
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        structured_index_request = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name='field1', type=FieldType.Text),
+                FieldRequest(name='field2', type=FieldType.Text)
+            ],
+            tensor_fields=['field1']
+        )
+
+        cls.indexes = cls.create_indexes([structured_index_request])
+
+        cls.structured_index = cls.indexes[0]
 
     def setUp(self):
         self.client = TestClient(api.app)
-        self.index_name_1 = "index1"
-
-    def tearDown(self) -> None:
-        # Make sure no indexes are left over from tests
-        try:
-            self.client.delete("/indexes/" + self.index_name_1)
-        except core_exceptions.IndexNotFoundError:
-            pass
 
     def test_index_not_found_error(self):
-        # delete index if it exists
-        self.client.delete("/indexes/" + self.index_name_1)
+        index_name = self.random_index_name()
 
-        response = self.client.delete("/indexes/" + self.index_name_1)
+        response = self.client.delete("/indexes/" + index_name)
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["code"], "index_not_found")
         self.assertEqual(response.json()["type"], "invalid_request")
-        assert "not found" in response.json()["message"] and "index1" in response.json()["message"]
+        assert "not found" in response.json()["message"] and index_name in response.json()["message"]
 
     def test_index_already_exists(self):
-        # create index if it does not already exist
-        self.client.post("/indexes/" + self.index_name_1, json={
-            "type": "structured",
-            "allFields": [],
-            "tensorFields": []
-        })
-        response = self.client.post("/indexes/" + self.index_name_1, json={
+        response = self.client.post("/indexes/" + self.structured_index.name, json={
             "type": "structured",
             "allFields": [],
             "tensorFields": []
@@ -80,17 +81,12 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json()["code"], "index_already_exists")
         self.assertEqual(response.json()["type"], "invalid_request")
-        assert "already exists" in response.json()["message"] and "index1" in response.json()["message"]
+        assert "already exists" in response.json()["message"] and self.structured_index.name in response.json()[
+            "message"]
 
     def test_invalid_field_name(self):
-        self.client.post("/indexes/" + self.index_name_1, json={
-            "type": "structured",
-            "allFields": [],
-            "tensorFields": []
-        })
-
         # use attributesToRetrieve on a non-existent field
-        response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
             "q": "test",
             "attributesToRetrieve": ["non_existent_field"]
         })
@@ -102,17 +98,11 @@ class TestApiErrors(MarqoTestCase):
 
     def test_invalid_data_type(self):
         """Test that invalid data types only reject the document with the invalid data type, not the whole request"""
-        self.client.post("/indexes/" + self.index_name_1, json={
-            "type": "structured",
-            "allFields": [{"name": "field1", "type": "text"}],
-            "tensorFields": []
-        })
-
         # Add a document to field1 of the wrong type
-        response = self.client.post("/indexes/" + self.index_name_1 + "/documents?device=cpu", json={
+        response = self.client.post("/indexes/" + self.structured_index.name + "/documents?device=cpu", json={
             "documents": [
                 {
-                    "field1": 123
+                    "field2": 123
                 }
             ]
         })
@@ -121,13 +111,7 @@ class TestApiErrors(MarqoTestCase):
         self.assertIn("Expected a value of type", response.json()["items"][0]["error"])
 
     def test_filter_string_parsing_error(self):
-        self.client.post("/indexes/" + self.index_name_1, json={
-            "type": "structured",
-            "allFields": [{"name": "field1", "type": "text"}],
-            "tensorFields": []
-        })
-
-        response = self.client.post("/indexes/" + self.index_name_1 + "/search?device=cpu", json={
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
             "q": "test",
             "filter": ""
         })
@@ -137,9 +121,22 @@ class TestApiErrors(MarqoTestCase):
         self.assertEqual(response.json()["type"], "invalid_request")
         assert "Cannot parse empty filter string" in response.json()["message"]
 
+    def test_vespa_timeout_error(self):
+        error = vespa_exceptions.VespaTimeoutError('timeout_msg')
+        with patch("marqo.tensor_search.tensor_search.search", side_effect=error):
+            response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+                "q": "test",
+                "filter": ""
+            })
+
+            self.assertEqual(response.status_code, 429)
+            self.assertEqual(response.json()["code"], "too_many_requests")
+            self.assertEqual(response.json()["type"], "invalid_request")
+            assert "Throttled by vector store" in response.json()["message"]
+
     def test_invalid_argument_error(self):
         # Try to create index with invalid model (should raise 400)
-        response = self.client.post("/indexes/" + self.index_name_1, json={
+        response = self.client.post("/indexes/" + self.random_index_name(), json={
             "type": "structured",
             "allFields": [{"name": "field1", "type": "text"}],
             "tensorFields": [],
@@ -311,7 +308,7 @@ class TestApiErrors(MarqoTestCase):
         with patch('marqo.api.route.logger.error') as mock_logger_error:
             with patch("marqo.core.index_management.index_management.IndexManagement.create_index",
                        side_effect=raised_error):
-                response = self.client.post("/indexes/" + self.index_name_1, json={
+                response = self.client.post("/indexes/" + self.structured_index.name, json={
                     "type": "structured",
                     "allFields": [{"name": "field1", "type": "text"}],
                     "tensorFields": [],

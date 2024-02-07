@@ -7,10 +7,10 @@ import vespa.application as pyvespa
 
 from marqo import config, version
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
+from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
@@ -68,6 +68,9 @@ class MarqoTestCase(unittest.TestCase):
 
     def clear_index_by_name(self, index_name: str):
         self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)
+
+    def random_index_name(self) -> str:
+        return 'a' + str(uuid.uuid4()).replace('-', '')
 
     @classmethod
     def structured_marqo_index(
@@ -210,6 +213,31 @@ class MarqoTestCase(unittest.TestCase):
             created_at=created_at,
             updated_at=updated_at
         )
+
+    class _AssertRaisesContext:
+        def __init__(self, expected_exception):
+            self.expected_exception = expected_exception
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, tb):
+            if exc_type is None:
+                raise AssertionError(f"No exception raised, expected: '{self.expected_exception.__name__}'")
+            if issubclass(exc_type, self.expected_exception) and exc_type is not self.expected_exception:
+                raise AssertionError(
+                    f"Subclass of '{self.expected_exception.__name__}' "
+                    f"raised: '{exc_type.__name__}', expected exact exception.")
+            if exc_type is not self.expected_exception:
+                raise AssertionError(
+                    f"Wrong exception raised: '{exc_type.__name__}', expected: '{self.expected_exception.__name__}'")
+            return True
+
+    def assertRaisesStrict(self, expected_exception):
+        """
+        Assert that a specific exception is raised. Will not pass for subclasses of the expected exception.
+        """
+        return self._AssertRaisesContext(expected_exception)
 
 
 class AsyncMarqoTestCase(unittest.IsolatedAsyncioTestCase, MarqoTestCase):
