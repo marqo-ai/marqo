@@ -14,3 +14,7 @@ def configuring_marqo():
 
 def create_index():
     return _build_url('API-Reference/Indexes/create_index/')
+
+
+def multimodal_combination_object():
+    return _build_url('Advanced-Usage/document_fields/#multimodal-combination-object')

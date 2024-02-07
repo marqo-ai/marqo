@@ -4,13 +4,17 @@ import math
 import random
 import threading
 from contextlib import contextmanager
-from typing import List, Optional, ContextManager
+from typing import List, Optional, Tuple, ContextManager, Union
 
 import PIL
 from PIL.ImageFile import ImageFile
 
 from marqo.s2_inference import clip_utils
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+from marqo.tensor_search import enums
+from marqo.tensor_search import constants
+import marqo.core.exceptions as core_exceptions
+import marqo.exceptions as base_exceptions
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
@@ -162,3 +166,44 @@ def reduce_thread_metrics(data):
             else:
                 result[new_key] = value
     return result
+
+
+def create_chunk_metadata(raw_document: dict) -> dict:
+    """
+    Creates a chunk metadata dictionary for a given document.
+    This metadata will be put in each OpenSearch child document (chunk) to be used for filtering.
+    We will only add values which are string, boolean, int, float, list or dictionary.
+    """
+
+    metadata = {}
+    metadata_field_types = {str, bool, int, float, list, dict}
+    for key, value in raw_document.items():
+        for cls in metadata_field_types:
+            if isinstance(value, cls):
+                metadata[key] = value
+                break
+    return metadata
+
+
+def determine_document_field_type(field_name: str, field_content, mappings: dict) -> enums.DocumentFieldType:
+    """
+    Determines the type of a document field
+    using its name, content, and the add docs mappings object.
+    3 Options:
+    1. standard (str, int, float, bool, list)
+    2. multimodal_combination (dict)
+    3. custom_vector (dict)
+    """
+
+    if isinstance(field_content, dict):
+        if field_name not in mappings:
+            raise base_exceptions.InternalError(f"Invalid dict field {field_name}. Could not find field in mappings object.")
+
+        if mappings[field_name]["type"] == enums.MappingsObjectType.multimodal_combination:
+            return enums.DocumentFieldType.multimodal_combination
+        elif mappings[field_name]["type"] == enums.MappingsObjectType.custom_vector:
+            return enums.DocumentFieldType.custom_vector
+        else:
+            raise base_exceptions.InternalError(f"Invalid dict field type {field_name} in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
+    else:
+        return enums.DocumentFieldType.standard
