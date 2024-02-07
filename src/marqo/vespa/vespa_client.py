@@ -21,7 +21,6 @@ from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, 
     DeleteBatchResponse, DeleteAllDocumentsResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
     GetBatchDocumentResponse
-from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -38,17 +37,14 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, pool_size: int = 10, zookeeper_client: Optional[ZookeeperClient] = None):
+                 content_cluster_name: str, pool_size: int = 10):
         """
         Create a VespaClient object.
         Args:
             config_url: Vespa Deploy API base URL
             document_url: Vespa Document API base URL
             query_url: Vespa Query API base URL
-            content_cluster_name: Vespa content cluster name
             pool_size: Number of connections to keep in the connection pool
-            zookeeper_client: Zookeeper client. If not provided, concurrent application changes can cause
-            a race condition
         """
         self.config_url = config_url.strip('/')
         self.document_url = document_url.strip('/')
@@ -58,17 +54,11 @@ class VespaClient:
         )
         self.content_cluster_name = content_cluster_name
 
-        self.zk: Optional[ZookeeperClient] = None
-        if zookeeper_client is not None:
-            self.zk: ZookeeperClient = zookeeper_client
-
     def close(self):
         """
         Close the VespaClient object.
         """
         self.http_client.close()
-        if self.zk:
-            self.zk.close()
 
     def deploy_application(self, application: str, timeout: int = 60) -> None:
         """
