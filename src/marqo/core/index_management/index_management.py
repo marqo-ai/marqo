@@ -2,7 +2,7 @@ import os
 import textwrap
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 import marqo.logging
 import marqo.vespa.vespa_client
@@ -17,6 +17,7 @@ from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -51,8 +52,9 @@ class IndexManagement:
         '''
     )
 
-    def __init__(self, vespa_client: VespaClient):
+    def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[ZookeeperClient] = None):
         self.vespa_client = vespa_client
+        self.zookeeper_client = zookeeper_client
 
     def bootstrap_vespa(self) -> bool:
         """
@@ -61,17 +63,28 @@ class IndexManagement:
         Returns:
             True if Vespa was configured, False if it was already configured
         """
-        app = self.vespa_client.download_application()
-        configured = self._marqo_config_exists(app)
+        lock = None
+        if self.zookeeper_client:
+            lock = self.zookeeper_client.lock_vespa_deployment()
+        try:
+            app = self.vespa_client.download_application()
+            configured = self._marqo_config_exists(app)
 
-        if not configured:
-            self._add_marqo_config(app)
-            self.vespa_client.deploy_application(app)
-            self.vespa_client.wait_for_application_convergence()
-            self._save_marqo_version(version.get_version())
-            return True
+            if not configured:
+                self._add_marqo_config(app)
+                self.vespa_client.deploy_application(app)
 
-        return False
+                if lock:
+                    lock.release()
+
+                self.vespa_client.wait_for_application_convergence()
+                self._save_marqo_version(version.get_version())
+                return True
+
+            return False
+        finally:
+            if lock and lock.is_acquired():
+                lock.release()
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
@@ -87,30 +100,40 @@ class IndexManagement:
             IndexExistsError: If index already exists
             InvalidVespaApplicationError: If Vespa application is invalid after applying the index
         """
-        app = self.vespa_client.download_application()
-        configured = self._marqo_config_exists(app)
+        lock = None
+        if self.zookeeper_client:
+            lock = self.zookeeper_client.lock_vespa_deployment()
+        try:
+            app = self.vespa_client.download_application()
+            configured = self._marqo_config_exists(app)
 
-        if configured and self.index_exists(marqo_index_request.name):
-            raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
-        else:
-            logger.debug('Marqo config does not exist. Configuring Vespa as part of index creation')
-            self._add_marqo_config(app)
+            if configured and self.index_exists(marqo_index_request.name):
+                raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
+            else:
+                logger.debug('Marqo config does not exist. Configuring Vespa as part of index creation')
+                self._add_marqo_config(app)
 
-        vespa_schema = vespa_schema_factory(marqo_index_request)
-        schema, marqo_index = vespa_schema.generate_schema()
+            vespa_schema = vespa_schema_factory(marqo_index_request)
+            schema, marqo_index = vespa_schema.generate_schema()
 
-        logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
+            logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
 
-        self._add_schema(app, marqo_index.schema_name, schema)
-        self._add_schema_to_services(app, marqo_index.schema_name)
-        self.vespa_client.deploy_application(app)
-        self.vespa_client.wait_for_application_convergence()
-        self._save_index_settings(marqo_index)
+            self._add_schema(app, marqo_index.schema_name, schema)
+            self._add_schema_to_services(app, marqo_index.schema_name)
+            self.vespa_client.deploy_application(app)
+            if lock:
+                lock.release()
 
-        if not configured:
-            self._save_marqo_version(version.get_version())
+            self.vespa_client.wait_for_application_convergence()
+            self._save_index_settings(marqo_index)
 
-        return marqo_index
+            if not configured:
+                self._save_marqo_version(version.get_version())
+
+            return marqo_index
+        finally:
+            if lock and lock.is_acquired():
+                lock.release()
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
