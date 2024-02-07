@@ -13,7 +13,7 @@ import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
-from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError
+from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError, VespaTimeoutError
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
@@ -175,7 +175,7 @@ class VespaClient:
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
-        self._raise_for_status(resp)
+        self._query_raise_for_status(resp)
 
         return QueryResult(**resp.json())
 
@@ -688,7 +688,37 @@ class VespaClient:
 
             self._raise_for_status(resp)
 
-    def _raise_for_status(self, resp) -> None:
+    def _query_raise_for_status(self, resp: httpx.Response) -> None:
+        """
+        Query API specific raise for status method.
+        """
+        # See error codes here https://github.com/vespa-engine/vespa/blob/master/container-core/src/main/java/com/yahoo/container/protect/Error.java
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            try:
+                result = QueryResult(**resp.json())
+                if (
+                        result.root.errors is not None
+                        and len(result.root.errors) > 0
+                ):
+                    if resp.status_code == 504 and result.root.errors[0].code == 12:
+                        raise VespaTimeoutError(message=resp.text, cause=e) from e
+                    elif (
+                            result.root.errors[0].code == 8
+                            and result.root.errors[
+                                0].message == "Search request soft doomed during query setup and initialization."
+                    ):
+                        logger.warn('Detected soft doomed query')
+                        raise VespaTimeoutError(message=resp.text, cause=e) from e
+
+                raise e
+            except VespaStatusError:
+                raise
+            except Exception:
+                raise VespaStatusError(message=resp.text, cause=e) from e
+
+    def _raise_for_status(self, resp: httpx.Response) -> None:
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as e:

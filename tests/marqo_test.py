@@ -7,10 +7,10 @@ import vespa.application as pyvespa
 
 from marqo import config, version
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
+from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
@@ -68,6 +68,9 @@ class MarqoTestCase(unittest.TestCase):
 
     def clear_index_by_name(self, index_name: str):
         self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)
+
+    def random_index_name(self) -> str:
+        return 'a' + str(uuid.uuid4())
 
     @classmethod
     def structured_marqo_index(
@@ -146,7 +149,7 @@ class MarqoTestCase(unittest.TestCase):
         Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
         """
         if not name:
-            name = 'a' + str(uuid.uuid4()).replace('-', '')
+            name = 'a' + str(uuid.uuid4())
 
         return StructuredMarqoIndexRequest(
             name=name,
@@ -193,7 +196,7 @@ class MarqoTestCase(unittest.TestCase):
         Helper method that provides reasonable defaults for UnstructuredMarqoIndexRequest.
         """
         if not name:
-            name = 'a' + str(uuid.uuid4()).replace('-', '')
+            name = 'a' + str(uuid.uuid4())
 
         return UnstructuredMarqoIndexRequest(
             name=name,
