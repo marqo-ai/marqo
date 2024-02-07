@@ -27,6 +27,7 @@ from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = get_logger(__name__)
 
@@ -39,7 +40,10 @@ def generate_config() -> config.Config:
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
         content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
     )
-    index_management = IndexManagement(vespa_client)
+    zookeeper_client = ZookeeperClient(
+        hosts='localhost:2181'
+    )
+    index_management = IndexManagement(vespa_client, zookeeper_client)
     return config.Config(vespa_client, index_management)
 
 
@@ -47,7 +51,6 @@ _config = generate_config()
 
 if __name__ in ["__main__", "api"]:
     on_start(_config)
-
 
 app = FastAPI(
     title="Marqo",
