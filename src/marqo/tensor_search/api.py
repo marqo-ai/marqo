@@ -196,6 +196,18 @@ def add_or_replace_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
 
+@app.post("/indexes/{index_name}/documents/update")
+@throttle(RequestType.INDEX)
+def update_documents(
+        documents: List,
+        index_name: str,
+        marqo_config: config.Config = Depends(get_config)):
+    """update_documents endpoint"""
+    marqo_config.document.update_docs(index_name=index_name, documents=documents)
+
+    return JSONResponse(content={"acknowledged": True}, status_code=200)
+
+
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
 def get_document_by_id(index_name: str, document_id: str,

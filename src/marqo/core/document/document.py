@@ -22,3 +22,18 @@ class Document:
         res: DeleteAllDocumentsResponse = self.vespa_client.delete_all_docs(marqo_index.schema_name)
 
         return res.document_count
+
+    def update_documents_by_index_name(self, documents, index_name):
+        if not self.index_management.index_exists(index_name):
+            raise IndexNotFoundError(f"Index {index_name} does not exist")
+
+        marqo_index = self.index_management.get_index(index_name)
+        return self.update_documents_by_index(documents, marqo_index.schema_name)
+
+    def update_documents_by_index(self, documents, index):
+        pass
+
+
+
+
+
