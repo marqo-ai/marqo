@@ -116,7 +116,7 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
 
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests
+          pytest -n 10 marqo/tests
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
