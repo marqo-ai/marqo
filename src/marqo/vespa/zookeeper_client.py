@@ -34,7 +34,7 @@ class ZookeeperClient:
         self.client.stop()
         self.client.close()
 
-    def lock_vespa_deployment(self, timeout: int = 10) -> DistributedLock:
+    def lock_vespa_deployment(self, timeout: int = 60) -> DistributedLock:
         lock = Lock(self.client, self._LOCK_VESPA_DEPLOYMENT)
 
         logger.debug(f"Acquiring lock {self._LOCK_VESPA_DEPLOYMENT} with timeout {timeout}")
