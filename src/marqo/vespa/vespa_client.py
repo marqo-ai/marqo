@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
 import httpx
+from kazoo.client import KazooClient
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -37,14 +38,17 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, pool_size: int = 10):
+                 content_cluster_name: str, pool_size: int = 10, zookeeper_url: Optional[str] = None):
         """
         Create a VespaClient object.
         Args:
             config_url: Vespa Deploy API base URL
             document_url: Vespa Document API base URL
             query_url: Vespa Query API base URL
+            content_cluster_name: Vespa content cluster name
             pool_size: Number of connections to keep in the connection pool
+            zookeeper_url: Zookeeper URL. If not provided, concurrent application changes can cause
+            a race condition
         """
         self.config_url = config_url.strip('/')
         self.document_url = document_url.strip('/')
@@ -53,6 +57,12 @@ class VespaClient:
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
         self.content_cluster_name = content_cluster_name
+
+        if zookeeper_url:
+            self.zk = KazooClient(hosts=zookeeper_url)
+            self.zk.start()
+        else:
+            self.zk = None
 
     def close(self):
         """
