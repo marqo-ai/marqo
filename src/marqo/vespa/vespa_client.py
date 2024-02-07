@@ -717,7 +717,7 @@ class VespaClient:
                 raise e
             except VespaStatusError:
                 raise
-            except Exception as e2:
+            except Exception:
                 raise VespaStatusError(message=resp.text, cause=e) from e
 
     def _raise_for_status(self, resp: httpx.Response) -> None:
