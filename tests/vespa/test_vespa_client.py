@@ -230,6 +230,9 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             )
 
     def test_query_timeout_fails(self):
+        """
+        VespaTimeoutError error is raised when Vespa responds with a timeout error.
+        """
         query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")
 
@@ -247,6 +250,9 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                 )
 
     def test_query_softDoom_fails(self):
+        """
+        VespaTimeoutError error is raised when Vespa responds with a soft doom error.
+        """
         query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")
 
@@ -277,6 +283,9 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                 )
 
     def test_query_nonHandled_fails(self):
+        """
+        VespaStatusError error is raised when Vespa responds with a non-handled error status code.
+        """
         query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")
 
