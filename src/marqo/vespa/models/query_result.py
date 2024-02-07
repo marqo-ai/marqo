@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 # See https://docs.vespa.ai/en/reference/default-result-format.html
-class ChildFields(BaseModel):
+class RootFields(BaseModel):
     total_count: Optional[int] = Field(alias='totalCount')
 
 
@@ -34,21 +34,28 @@ class Error(BaseModel):
     transient: Optional[bool]
 
 
-class Child(BaseModel):
+class AbstractChild(BaseModel):
     # label, value, and recursive children occur in aggregation results
     id: Optional[str]
     relevance: float
     source: Optional[str]
     label: Optional[str]
     value: Optional[str]
-    fields: Optional[ChildFields]
     coverage: Optional[Coverage]
     errors: Optional[List[Error]]
     children: Optional[List['Child']]
 
 
+class Child(AbstractChild):
+    fields: Optional[Dict[str, Any]]
+
+
+class Root(AbstractChild):
+    fields: Optional[RootFields]
+
+
 class QueryResult(BaseModel):
-    root: Child
+    root: Root
     timing: Optional[Dict[str, Any]]
     trace: Optional[Dict[str, Any]]
 

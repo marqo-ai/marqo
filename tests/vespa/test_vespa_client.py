@@ -1,3 +1,4 @@
+import functools
 import os
 import unittest
 from unittest.mock import patch
@@ -6,8 +7,9 @@ import httpx
 import vespa.application as pyvespa
 
 from marqo.vespa import concurrency
-from marqo.vespa.exceptions import VespaError
-from marqo.vespa.models import VespaDocument
+from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutError
+from marqo.vespa.models import VespaDocument, QueryResult
+from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
 from tests.marqo_test import AsyncMarqoTestCase
 
@@ -216,7 +218,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             model_restrict=self.TEST_SCHEMA
         )
 
-        self.assertEqual(len(result.root.children), 0)
+        self.assertIsNone(result.root.children)
 
     def test_query_invalidQueryUrl_fails(self):
         query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
@@ -227,9 +229,78 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                 yql="select * from sources * where title contains 'Title 1';"
             )
 
-    @patch.object(httpx, "get", wraps=httpx.get)
-    @patch.object(httpx, "post", wraps=httpx.post)
-    def test_download_application_successful(self, mock_post, mock_get):
+    def test_query_timeout_fails(self):
+        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default")
+
+        def modified_post(*args, **kwargs):
+            kwargs['json']['timeout'] = '1ms'
+            return httpx.post(*args, **kwargs)
+
+        with patch.object(
+                httpx.Client, "post",
+                wraps=modified_post
+        ):
+            with self.assertRaisesStrict(VespaTimeoutError):
+                query_client.query(
+                    yql="select * from sources * where title contains 'Title 1';"
+                )
+
+    def test_query_softDoom_fails(self):
+        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default")
+
+        def modified_post(*args, **kwargs):
+            resp = httpx.post(*args, **kwargs)
+            result = QueryResult(**resp.json())
+            result.root.errors = []
+            result.root.errors.append(
+                Error(
+                    code=8,
+                    summary='Error in search reply.',
+                    message='Search request soft doomed during query setup and initialization.'
+                )
+            )
+            return httpx.Response(
+                status_code=504,
+                content=result.json(by_alias=True).encode("utf-8"),
+                request=resp.request
+            )
+
+        with patch.object(
+                httpx.Client, "post",
+                wraps=modified_post
+        ):
+            with self.assertRaisesStrict(VespaTimeoutError):
+                query_client.query(
+                    yql="select * from sources * where title contains 'Title 1';"
+                )
+
+    def test_query_nonHandled_fails(self):
+        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default")
+
+        statuses = [400, 500, 504]
+
+        def modified_post(*args, **kwargs):
+            status = kwargs.get("status", 200)
+            del kwargs["status"]
+            resp = httpx.post(*args, **kwargs)
+            resp.status_code = status
+            return resp
+
+        for status in statuses:
+            with self.subTest(status):
+                with patch.object(
+                        httpx.Client, "post",
+                        wraps=functools.partial(modified_post, status=status)
+                ):
+                    with self.assertRaisesStrict(VespaStatusError):
+                        query_client.query(
+                            yql="select * from sources * where title contains 'Title 1';"
+                        )
+
+    def test_download_application_successful(self):
         app = self.client.download_application()
 
         self.assertTrue(os.path.exists(app), "Application root does not exist")

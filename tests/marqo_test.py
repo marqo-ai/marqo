@@ -214,6 +214,31 @@ class MarqoTestCase(unittest.TestCase):
             updated_at=updated_at
         )
 
+    class _AssertRaisesContext:
+        def __init__(self, expected_exception):
+            self.expected_exception = expected_exception
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, tb):
+            if exc_type is None:
+                raise AssertionError(f"No exception raised, expected: '{self.expected_exception.__name__}'")
+            if issubclass(exc_type, self.expected_exception) and exc_type is not self.expected_exception:
+                raise AssertionError(
+                    f"Subclass of '{self.expected_exception.__name__}' "
+                    f"raised: '{exc_type.__name__}', expected exact exception.")
+            if exc_type is not self.expected_exception:
+                raise AssertionError(
+                    f"Wrong exception raised: '{exc_type.__name__}', expected: '{self.expected_exception.__name__}'")
+            return True
+
+    def assertRaisesStrict(self, expected_exception):
+        """
+        Assert that a specific exception is raised. Will not pass for subclasses of the expected exception.
+        """
+        return self._AssertRaisesContext(expected_exception)
+
 
 class AsyncMarqoTestCase(unittest.IsolatedAsyncioTestCase, MarqoTestCase):
     pass
