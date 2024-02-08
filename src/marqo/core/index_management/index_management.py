@@ -162,12 +162,15 @@ class IndexManagement:
             logger.warn('Zookeeper client not found. Vespa deployment may not be locked')
         try:
             app = self.vespa_client.download_application()
-            configured = self._add_marqo_config(app)
+            configured = self._marqo_config_exists(app)
 
-            if not configured:
+            if configured:
                 for index in marqo_index_requests:
                     if self.index_exists(index.name):
                         raise IndexExistsError(f"Index {index.name} already exists")
+            else:
+                logger.debug('Marqo config does not exist. Configuring Vespa as part of index creation')
+                self._add_marqo_config(app)
 
             schema_responses = [
                 vespa_schema_factory(index).generate_schema()  # Tuple (schema, MarqoIndex)
@@ -187,6 +190,9 @@ class IndexManagement:
 
             for _, marqo_index in schema_responses:
                 self._save_index_settings(marqo_index)
+
+            if not configured:
+                self._save_marqo_version(version.get_version())
 
             return [schema_resp[1] for schema_resp in schema_responses]
         finally:
