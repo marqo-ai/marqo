@@ -37,7 +37,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           ec2-image-id:  ${{ secrets.AMD_200GB_EC2_IMAGE_ID }}
-          ec2-instance-type: t3.xlarge
+          ec2-instance-type: t3.2xlarge
           subnet-id: ${{ secrets.AMD_SUBNET_ID }}
           security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
 
