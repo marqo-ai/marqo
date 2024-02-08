@@ -37,7 +37,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           ec2-image-id:  ${{ secrets.AMD_200GB_EC2_IMAGE_ID }}
-          ec2-instance-type: t3.xlarge
+          ec2-instance-type: t3.2xlarge
           subnet-id: ${{ secrets.AMD_SUBNET_ID }}
           security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
 
@@ -71,6 +71,7 @@ jobs:
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.txt
           pip install pytest==7.4.0
+          pip install pytest-xdist==3.5.0
 
       - name: Start Vespa
         run: |
@@ -116,7 +117,7 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
 
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests
+          pytest -n 4 marqo/tests
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner

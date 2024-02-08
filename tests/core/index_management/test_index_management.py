@@ -17,7 +17,7 @@ from tests.marqo_test import MarqoTestCase
 class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
-        self.index_management = IndexManagement(self.vespa_client)
+        self.index_management = IndexManagement(self.vespa_client, self.zookeeper_client)
 
     def test_bootstrap_vespa_doesNotExist_successful(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')

@@ -2,7 +2,7 @@ import os
 import textwrap
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 import marqo.logging
 import marqo.vespa.vespa_client
@@ -17,6 +17,7 @@ from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -51,8 +52,9 @@ class IndexManagement:
         '''
     )
 
-    def __init__(self, vespa_client: VespaClient):
+    def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[ZookeeperClient] = None):
         self.vespa_client = vespa_client
+        self.zookeeper_client = zookeeper_client
 
     def bootstrap_vespa(self) -> bool:
         """
@@ -61,17 +63,30 @@ class IndexManagement:
         Returns:
             True if Vespa was configured, False if it was already configured
         """
-        app = self.vespa_client.download_application()
-        configured = self._marqo_config_exists(app)
+        lock = None
+        if self.zookeeper_client:
+            lock = self.zookeeper_client.lock_vespa_deployment()
+        else:
+            logger.warn('Zookeeper client not found. Vespa deployment may not be locked')
+        try:
+            app = self.vespa_client.download_application()
+            configured = self._marqo_config_exists(app)
 
-        if not configured:
-            self._add_marqo_config(app)
-            self.vespa_client.deploy_application(app)
-            self.vespa_client.wait_for_application_convergence()
-            self._save_marqo_version(version.get_version())
-            return True
+            if not configured:
+                self._add_marqo_config(app)
+                self.vespa_client.deploy_application(app)
 
-        return False
+                if lock:
+                    lock.release()
+
+                self.vespa_client.wait_for_application_convergence()
+                self._save_marqo_version(version.get_version())
+                return True
+
+            return False
+        finally:
+            if lock and lock.is_acquired():
+                lock.release()
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
@@ -87,30 +102,42 @@ class IndexManagement:
             IndexExistsError: If index already exists
             InvalidVespaApplicationError: If Vespa application is invalid after applying the index
         """
-        app = self.vespa_client.download_application()
-        configured = self._marqo_config_exists(app)
-
-        if configured and self.index_exists(marqo_index_request.name):
-            raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
+        lock = None
+        if self.zookeeper_client:
+            lock = self.zookeeper_client.lock_vespa_deployment()
         else:
-            logger.debug('Marqo config does not exist. Configuring Vespa as part of index creation')
-            self._add_marqo_config(app)
+            logger.warn('Zookeeper client not found. Vespa deployment may not be locked')
+        try:
+            app = self.vespa_client.download_application()
+            configured = self._marqo_config_exists(app)
 
-        vespa_schema = vespa_schema_factory(marqo_index_request)
-        schema, marqo_index = vespa_schema.generate_schema()
+            if configured and self.index_exists(marqo_index_request.name):
+                raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
+            else:
+                logger.debug('Marqo config does not exist. Configuring Vespa as part of index creation')
+                self._add_marqo_config(app)
 
-        logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
+            vespa_schema = vespa_schema_factory(marqo_index_request)
+            schema, marqo_index = vespa_schema.generate_schema()
 
-        self._add_schema(app, marqo_index.schema_name, schema)
-        self._add_schema_to_services(app, marqo_index.schema_name)
-        self.vespa_client.deploy_application(app)
-        self.vespa_client.wait_for_application_convergence()
-        self._save_index_settings(marqo_index)
+            logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
 
-        if not configured:
-            self._save_marqo_version(version.get_version())
+            self._add_schema(app, marqo_index.schema_name, schema)
+            self._add_schema_to_services(app, marqo_index.schema_name)
+            self.vespa_client.deploy_application(app)
+            if lock:
+                lock.release()
 
-        return marqo_index
+            self.vespa_client.wait_for_application_convergence()
+            self._save_index_settings(marqo_index)
+
+            if not configured:
+                self._save_marqo_version(version.get_version())
+
+            return marqo_index
+        finally:
+            if lock and lock.is_acquired():
+                lock.release()
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
@@ -128,32 +155,43 @@ class IndexManagement:
             IndexExistsError: If an index already exists
             InvalidVespaApplicationError: If Vespa application is invalid after applying the indexes
         """
-        app = self.vespa_client.download_application()
-        configured = self._add_marqo_config(app)
+        lock = None
+        if self.zookeeper_client:
+            lock = self.zookeeper_client.lock_vespa_deployment()
+        else:
+            logger.warn('Zookeeper client not found. Vespa deployment may not be locked')
+        try:
+            app = self.vespa_client.download_application()
+            configured = self._add_marqo_config(app)
 
-        if not configured:
-            for index in marqo_index_requests:
-                if self.index_exists(index.name):
-                    raise IndexExistsError(f"Index {index.name} already exists")
+            if not configured:
+                for index in marqo_index_requests:
+                    if self.index_exists(index.name):
+                        raise IndexExistsError(f"Index {index.name} already exists")
 
-        schema_responses = [
-            vespa_schema_factory(index).generate_schema()  # Tuple (schema, MarqoIndex)
-            for index in marqo_index_requests
-        ]
+            schema_responses = [
+                vespa_schema_factory(index).generate_schema()  # Tuple (schema, MarqoIndex)
+                for index in marqo_index_requests
+            ]
 
-        for schema, marqo_index in schema_responses:
-            logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
-            self._add_schema(app, marqo_index.schema_name, schema)
-            self._add_schema_to_services(app, marqo_index.schema_name)
+            for schema, marqo_index in schema_responses:
+                logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
+                self._add_schema(app, marqo_index.schema_name, schema)
+                self._add_schema_to_services(app, marqo_index.schema_name)
 
-        self.vespa_client.deploy_application(app)
+            self.vespa_client.deploy_application(app)
+            if lock:
+                lock.release()
 
-        self.vespa_client.wait_for_application_convergence()
+            self.vespa_client.wait_for_application_convergence()
 
-        for _, marqo_index in schema_responses:
-            self._save_index_settings(marqo_index)
+            for _, marqo_index in schema_responses:
+                self._save_index_settings(marqo_index)
 
-        return [schema_resp[1] for schema_resp in schema_responses]
+            return [schema_resp[1] for schema_resp in schema_responses]
+        finally:
+            if lock and lock.is_acquired():
+                lock.release()
 
     def delete_index(self, marqo_index: MarqoIndex) -> None:
         """
@@ -164,14 +202,26 @@ class IndexManagement:
         Args:
             marqo_index: Marqo index to delete
         """
-        app = self.vespa_client.download_application()
+        lock = None
+        if self.zookeeper_client:
+            lock = self.zookeeper_client.lock_vespa_deployment()
+        else:
+            logger.warn('Zookeeper client not found. Vespa deployment may not be locked')
+        try:
+            app = self.vespa_client.download_application()
 
-        self._remove_schema(app, marqo_index.schema_name)
-        self._remove_schema_from_services(app, marqo_index.schema_name)
-        self._add_schema_removal_override(app)
-        self.vespa_client.deploy_application(app)
-        self.vespa_client.wait_for_application_convergence()
-        self._delete_index_settings_by_name(marqo_index.name)
+            self._remove_schema(app, marqo_index.schema_name)
+            self._remove_schema_from_services(app, marqo_index.schema_name)
+            self._add_schema_removal_override(app)
+            self.vespa_client.deploy_application(app)
+            if lock:
+                lock.release()
+
+            self.vespa_client.wait_for_application_convergence()
+            self._delete_index_settings_by_name(marqo_index.name)
+        finally:
+            if lock and lock.is_acquired():
+                lock.release()
 
     def delete_index_by_name(self, index_name: str) -> None:
         """
@@ -200,15 +250,28 @@ class IndexManagement:
         Args:
             marqo_indexes: List of Marqo indexes to delete
         """
-        app = self.vespa_client.download_application()
+        lock = None
+        if self.zookeeper_client:
+            lock = self.zookeeper_client.lock_vespa_deployment()
+        else:
+            logger.warn('Zookeeper client not found. Vespa deployment may not be locked')
+        try:
+            app = self.vespa_client.download_application()
 
-        for marqo_index in marqo_indexes:
-            self._remove_schema(app, marqo_index.schema_name)
-            self._remove_schema_from_services(app, marqo_index.schema_name)
-        self._add_schema_removal_override(app)
-        self.vespa_client.deploy_application(app)
-        for marqo_index in marqo_indexes:
-            self._delete_index_settings_by_name(marqo_index.name)
+            for marqo_index in marqo_indexes:
+                self._remove_schema(app, marqo_index.schema_name)
+                self._remove_schema_from_services(app, marqo_index.schema_name)
+            self._add_schema_removal_override(app)
+            self.vespa_client.deploy_application(app)
+            if lock:
+                lock.release()
+
+            self.vespa_client.wait_for_application_convergence()
+            for marqo_index in marqo_indexes:
+                self._delete_index_settings_by_name(marqo_index.name)
+        finally:
+            if lock and lock.is_acquired():
+                lock.release()
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         """

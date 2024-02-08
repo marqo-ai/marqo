@@ -13,6 +13,7 @@ from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, 
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 
 class MarqoTestCase(unittest.TestCase):
@@ -43,9 +44,13 @@ class MarqoTestCase(unittest.TestCase):
             content_cluster_name="content_default",
 
         )
+        zookeeper_client = ZookeeperClient(
+            hosts='localhost:2181'
+        )
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
-        cls.index_management = IndexManagement(cls.vespa_client)
+        cls.zookeeper_client = zookeeper_client
+        cls.index_management = IndexManagement(vespa_client, zookeeper_client)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client, index_management=cls.index_management)
 

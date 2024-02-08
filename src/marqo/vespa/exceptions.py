@@ -30,3 +30,11 @@ class VespaTimeoutError(VespaStatusError):
 
 class InvalidVespaApplicationError(VespaError):
     pass
+
+
+class ZookeeperError(MarqoError):
+    pass
+
+
+class ZookeeperTimeoutError(ZookeeperError):
+    pass
