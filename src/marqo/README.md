@@ -31,13 +31,12 @@ docker run --detach --name vespa --hostname vespa-tutorial \
   vespaengine/vespa:latest
 ```
 
-4. Deploy a dummy application for Vespa docker image by using the provided `scripts/vespa_dummy_app.zip` file and `curl`
+4. Configure Vespa by deploying to the provided application package `scripts/vespa_local`
 ```bash
-curl --header "Content-Type:application/zip" --data-binary @scripts/vespa_dummy_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
+zip -r - scripts/vespa_local | curl --header "Content-Type:application/zip" --data-binary @- http://localhost:19071/application/v2/tenant/default/prepareandactivate
 ```
 
-Up to now. you should have a running Vespa docker image and a dummy application deployed to it. 
-You can check this by visiting `http://localhost:8080` in your browser.
+You can verify that Vespa has been set up correctly by visiting `http://localhost:8080` in your browser.
 
 ### Option A. Run the Marqo application locally (outside of docker) through IDE
 Now you can run Marqo locally through your IDE (e.g. PyCharm) by following the steps below.
