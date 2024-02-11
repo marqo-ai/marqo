@@ -21,5 +21,12 @@ class VespaStatusError(VespaError):
             return super().__str__()
 
 
+class VespaTimeoutError(VespaStatusError):
+    """
+    Raised when Vespa responds with a timeout error.
+    """
+    pass
+
+
 class InvalidVespaApplicationError(VespaError):
     pass
