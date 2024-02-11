@@ -65,7 +65,7 @@ export MARQO_ENABLE_BATCH_APIS=true
 export MARQO_LOG_LEVEL=debug
 export VESPA_CONFIG_URL=http://localhost:19071
 export VESPA_DOCUMENT_URL=http://localhost:8080
-export ESPA_QUERY_URL=http://localhost:8080
+export VESPA_QUERY_URL=http://localhost:8080
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 cd src/marqo/tensor_search
 uvicorn api:app --host 0.0.0.0 --port 8882 --reload
