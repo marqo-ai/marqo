@@ -33,7 +33,7 @@ docker run --detach --name vespa --hostname vespa-tutorial \
 
 4. Configure Vespa by deploying to the provided application package `scripts/vespa_local`
 ```bash
-zip -r - scripts/vespa_local | curl --header "Content-Type:application/zip" --data-binary @- http://localhost:19071/application/v2/tenant/default/prepareandactivate
+(cd scripts/vespa_local && zip -r - * | curl --header "Content-Type:application/zip" --data-binary @- http://localhost:19071/application/v2/tenant/default/prepareandactivate)
 ```
 
 You can verify that Vespa has been set up correctly by visiting `http://localhost:8080` in your browser.
