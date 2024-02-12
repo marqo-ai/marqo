@@ -95,7 +95,7 @@ jobs:
           apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
 
-          # Deploy dummy application with test schema
+          # Deploy application with test schema
           curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 
           # wait for vespa to start (document url):
