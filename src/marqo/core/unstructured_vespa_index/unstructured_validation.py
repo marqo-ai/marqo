@@ -4,7 +4,7 @@ import jsonschema
 
 from marqo.api import exceptions as errors
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
+from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_mappings_schema, custom_vector_mappings_schema
 from marqo.core.models.marqo_index import validate_field_name as common_validate_field_name
 
 _FILTER_STRING_BOOL_VALUES = ["true", "false"]
@@ -23,6 +23,10 @@ def validate_mappings_object_format(mappings: Dict) -> None:
             if configuration["type"] == enums.MappingsObjectType.multimodal_combination:
                 _validate_multimodal_combination_field_name(field_name)
                 _validate_multimodal_combination_configuration_format(configuration)
+            elif configuration["type"] == enums.MappingsObjectType.custom_vector:
+                # Add any other custom_vector field name validations if needed.
+                _validate_custom_vector_configuration_format(configuration)
+
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating mappings object. Reason: {str(e)}. "
@@ -40,10 +44,20 @@ def _validate_multimodal_combination_field_name(multimodal_field_name: str):
 
 def _validate_multimodal_combination_configuration_format(configuration: Dict):
     try:
-        jsonschema.validate(instance=configuration, schema=multimodal_combination_schema)
+        jsonschema.validate(instance=configuration, schema=multimodal_combination_mappings_schema)
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating multimodal combination mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
+        )
+
+
+def _validate_custom_vector_configuration_format(configuration: Dict):
+    try:
+        jsonschema.validate(instance=configuration, schema=custom_vector_mappings_schema)
+    except jsonschema.ValidationError as e:
+        raise errors.InvalidArgError(
+            f"Error validating custom vector mappings object. Reason: \n{str(e)}"
             f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
         )
 
@@ -71,10 +85,14 @@ def validate_coupling_of_mappings_and_doc(doc: Dict, mappings: Dict, multimodal_
 
     multimodal_fields = [field_name for field_name, configuration in mappings.items()
                          if configuration["type"] == enums.MappingsObjectType.multimodal_combination]
+    custom_vector_fields = [field_name for field_name, configuration in mappings.items()
+                            if configuration["type"] == enums.MappingsObjectType.custom_vector]
 
     if multimodal_fields:
         _validate_conflicts_fields(multimodal_fields, doc)
         _validate_multimodal_sub_fields_content(doc, multimodal_sub_fields)
+        # Remove this validation once we support custom vector fields as multimodal subfields
+        _validate_custom_vector_field_not_a_sub_field_of_multimodal(multimodal_sub_fields, custom_vector_fields)
 
 
 def _validate_multimodal_sub_fields_content(doc: Dict, multimodal_sub_fields: List):
@@ -93,6 +111,13 @@ def _validate_conflicts_fields(multimodal_fields: List[str], doc: Dict):
     if mappings_fields.intersection(doc_fields):
         raise errors.InvalidArgError(
             f"Document and mappings object have conflicting fields: {mappings_fields.intersection(doc_fields)}")
+
+
+def _validate_custom_vector_field_not_a_sub_field_of_multimodal(multimodal_sub_fields: List[str], custom_vector_fields: List[str]):
+    for custom_vector_field in custom_vector_fields:
+        if custom_vector_field in multimodal_sub_fields:
+            raise errors.InvalidArgError(
+                f"Custom vector field {custom_vector_field} can not be a multimodal subfield.")
 
 
 def validate_tensor_fields(tensor_fields: Optional[List[str]]) -> None:
