@@ -47,3 +47,5 @@ class TestVespaSchema(unittest.TestCase):
         index_name = "test_schema-name"
         expected = f"{constants.MARQO_RESERVED_PREFIX}test_00schema_01name"
         self.assertEqual(self.vespa_schema._get_vespa_schema_name(index_name), expected)
+
+
