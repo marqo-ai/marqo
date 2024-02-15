@@ -84,7 +84,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (
             vespa_exceptions.VespaTimeoutError,
             api_exceptions.VectorStoreTimeoutError,
-            "Vector store request timed out"
+            "Vector store request timed out. Try your request again later."
         ),
 
         # Base exceptions
