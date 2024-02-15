@@ -146,16 +146,14 @@ This integration lets you leverage open source or custom fine tuned models throu
 ## Getting started
 
 
-1. Marqo requires docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
+1. Marqo requires Docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
 
 2. Use docker to run Marqo:
 
 ```bash
-
 docker rm -f marqo
 docker pull marqoai/marqo:latest
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
-
+docker run --name marqo -p 8882:8882 marqoai/marqo:latest
 ```
 
 Note: If your `marqo` container keeps getting killed, this is most likely due to a lack of memory being allocated to Docker. Increasing the memory limit for Docker to at least 6GB (8GB recommended) in your Docker settings may fix the problem.
@@ -192,7 +190,6 @@ mq.index("my-first-index").add_documents([
 results = mq.index("my-first-index").search(
     q="What is the best outfit to wear on the moon?"
 )
-
 ```
 
 - `mq` is the client that wraps the `marqo` API.
@@ -239,6 +236,8 @@ pprint.pprint(results)
 - `limit` is the maximum number of hits to be returned. This can be set as a parameter during search.
 - Each hit has a `_highlights` field. This was the part of the document that matched the query the best.
 
+## Running Marqo with external vector store
+
 ## Other basic operations
 
 ### Get document
@@ -246,9 +245,7 @@ pprint.pprint(results)
 Retrieve a document by ID.
 
 ```python
-
 result = mq.index("my-first-index").get_document(document_id="article_591")
-
 ```
 
 Note that by adding the document using ```add_documents``` again using the same ```_id``` will cause a document to be updated.
@@ -258,9 +255,7 @@ Note that by adding the document using ```add_documents``` again using the same 
 Get information about an index.
 
 ```python
-
 results = mq.index("my-first-index").get_stats()
-
 ```
 
 ### Lexical search
@@ -268,9 +263,7 @@ results = mq.index("my-first-index").get_stats()
 Perform a keyword search.
 
 ```python
-
 result = mq.index("my-first-index").search('marco polo', search_method=marqo.SearchMethods.LEXICAL)
-
 ```
 
 ### Multi modal and cross modal search
@@ -278,42 +271,34 @@ result = mq.index("my-first-index").search('marco polo', search_method=marqo.Sea
 To power image and text search, Marqo allows users to plug and play with CLIP models from HuggingFace. **Note that if you do not configure multi modal search, image urls will be treated as strings.** To start indexing and searching with images, first create an index with a CLIP configuration, as below:
 
 ```python
-
 settings = {
     "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
     "model":"ViT-L/14"
 }
 response = mq.create_index("my-multimodal-index", **settings)
-
 ```
 
 Images can then be added within documents as follows. You can use urls from the internet (for example S3) or from the disk of the machine:
 
 ```python
-
 response = mq.index("my-multimodal-index").add_documents([{
     "My_Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
 }], tensor_fields=["My_Image"])
-
 ```
 
 You can then search the image field using text.
 
 ```python
-
 results = mq.index("my-multimodal-index").search('animal')
-
 ```
 
 ### Searching using an image
 Searching using an image can be achieved by providing the image link.
 
 ```python
-
 results = mq.index("my-multimodal-index").search('https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png')
-
 ```
 
 ### Searching using weights in queries
@@ -322,7 +307,6 @@ Queries can also be provided as dictionaries where each key is a query and their
 The example below shows the application of this to a scenario where a user may want to ask a question but also negate results that match a certain semantic criterion. 
 
 ```python
-
 import marqo
 import pprint
 
@@ -377,7 +361,6 @@ results = mq.index("my-weighted-query-index").search(q=query)
 
 print("\nQuery 2:")
 pprint.pprint(results)
-
 ```
 
 ### Creating and searching indexes with multimodal combination fields
@@ -386,7 +369,6 @@ Marqo lets you have indexes with multimodal combination fields. Multimodal combi
 The example below demonstrates this with retrieval of caption and image pairs using multiple types of queries.
 
 ```python
-
 import marqo
 import pprint
 
@@ -454,7 +436,6 @@ results = mq.index("my-first-multimodal-index").search(
 )
 print("\nQuery 3:")
 pprint.pprint(results)
-
 ```
 
 ### Delete documents
@@ -472,10 +453,10 @@ results = mq.index("my-first-index").delete_documents(ids=["article_591", "artic
 Delete an index.
 
 ```python
-
 results = mq.index("my-first-index").delete()
-
 ```
+
+## 
 
 ## Documentation
 
@@ -489,7 +470,7 @@ Note that you should not run other applications on Marqo's Opensearch cluster as
 
 Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started.
 
-## Dev set up
+## Dev setup
 
 1. Create a virtual env ```python -m venv ./venv```.
 
