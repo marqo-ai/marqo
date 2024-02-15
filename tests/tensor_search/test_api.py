@@ -129,10 +129,10 @@ class TestApiErrors(MarqoTestCase):
                 "filter": ""
             })
 
-            self.assertEqual(response.status_code, 429)
-            self.assertEqual(response.json()["code"], "too_many_requests")
+            self.assertEqual(response.status_code, 504)
+            self.assertEqual(response.json()["code"], "vector_store_timeout")
             self.assertEqual(response.json()["type"], "invalid_request")
-            assert "Throttled by vector store" in response.json()["message"]
+            assert "Vector store request timed out" in response.json()["message"]
 
     def test_invalid_argument_error(self):
         # Try to create index with invalid model (should raise 400)
