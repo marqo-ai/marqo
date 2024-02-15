@@ -110,6 +110,11 @@ class TooManyRequestsError(__InvalidRequestError):
     status_code = HTTPStatus.TOO_MANY_REQUESTS
 
 
+class VectorStoreTimeoutError(__InvalidRequestError):
+    code = "vector_store_timeout"
+    status_code = HTTPStatus.GATEWAY_TIMEOUT
+
+
 class IndexAlreadyExistsError(__InvalidRequestError):
     code = "index_already_exists"
     status_code = HTTPStatus.CONFLICT
