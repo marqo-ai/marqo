@@ -126,8 +126,9 @@ class UnstructuredVespaIndex(VespaIndex):
             # Bool Filter
             if node.value.lower() in cls._FILTER_STRING_BOOL_VALUES:
                 filter_value = int(True if node.value.lower() == "true" else False)
-                return (f'({unstructured_common.BOOL_FIELDS} contains sameElement(key contains "{node.field}", '
-                        f'value = {filter_value}))')
+                bool_filter_string = (f'({unstructured_common.BOOL_FIELDS} contains '
+                                      f'sameElement(key contains "{node.field}", value = {filter_value}))')
+                filter_parts.append(bool_filter_string)
 
             # Short String Filter
             short_string_filter_string = (f'({unstructured_common.SHORT_STRINGS_FIELDS} '

@@ -1,3 +1,4 @@
+import copy
 import math
 import os
 import random
@@ -127,6 +128,22 @@ class TestSearchUnstructured(MarqoTestCase):
     #             config=self.config, index_name=self.default_text_index, text="Exact match hehehe"
     #         )
     #
+
+    @staticmethod
+    def strip_marqo_fields(doc, strip_id=False):
+        """Strips Marqo fields from a returned doc to get the original doc"""
+        copied = copy.deepcopy(doc)
+
+        strip_fields = ["_highlights", "_score"]
+        if strip_id:
+            strip_fields += ["_id"]
+
+        for to_strip in strip_fields:
+            try:
+                del copied[to_strip]
+            except KeyError:
+                pass
+        return copied
 
     def test_vector_text_search_no_device(self):
         try:
@@ -518,6 +535,51 @@ class TestSearchUnstructured(MarqoTestCase):
                 self.assertEqual(expected_hits, len(res["hits"]))
                 if expected_id:
                     self.assertEqual(expected_id, res["hits"][0]["_id"])
+
+    def test_filtering_string_boolean_and_real_boolean_fields(self):
+        documents = [
+            {"_id": "1", "text_field_1": "true", "text_field_2": "false",
+             "bool_field_1": True, "bool_field_2": False, "text_field_3": "search me"},
+            {"_id": "2", "text_field_1": "false", "text_field_2": "True",
+             "bool_field_1": False, "bool_field_2": True, "text_field_3": "search me"},
+        ]
+
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=documents,
+                tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+            )
+        )
+
+        test_cases = [
+            ("text_field_1:true", 1, "1"),
+            ("text_field_1:false", 1, "2"),
+            ("bool_field_1:true", 1, "1"),
+            ("bool_field_1:false", 1, "2"),
+            ("text_field_2:true", 1, "2"),
+            ("text_field_2:false", 1, "1"),
+            ("bool_field_2:true", 1, "2"),
+            ("bool_field_2:false", 1, "1"),
+            ("bool_field_2:false AND bool_field_1:false", 0, None),
+            ("bool_field_2:false AND text_field_1:true", 1, "1"),
+        ]
+        for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
+            for filter_string, expected_hits, expected_id in test_cases:
+                with (self.subTest(
+                        f"search_method = {search_method}, filter_string={filter_string}, "
+                        f"expected_hits={expected_hits}, expected_id={expected_id}")):
+                    res = tensor_search.search(
+                        index_name=self.default_text_index, config=self.config, text="search me",
+                        search_method=search_method, filter=filter_string
+                    )
+                    self.assertEqual(expected_hits, len(res["hits"]))
+                    if expected_id:
+                        self.assertEqual(expected_id, res["hits"][0]["_id"])
+                        expected_document = documents[0] if expected_id == "1" else \
+                            documents[1] if expected_id == "2" else None
+                        self.assertEqual(self.strip_marqo_fields(res["hits"][0], strip_id=False), expected_document)
 
     def test_filter_spaced_fields(self):
         # Add documents
@@ -1237,3 +1299,52 @@ class TestSearchUnstructured(MarqoTestCase):
         self.assertEqual(1, len(tensor_search_result['hits']))
         self.assertEqual("1", tensor_search_result['hits'][0]['_id'])
 
+    def test_search_returned_documents(self):
+        """A test to ensure that the returned are not missing/adding any unexpected fields"""
+        full_fields_document = ({
+            "_id": "full_fields",
+            "text_field": "some text",
+            "int_field": 1,
+            "float_field": 2.0,
+            "bool_field": True,
+            "list_field": ["a", "b","c"],
+            "string_bool_field": "True",
+            "string_int_field": "1",
+            "string_float_field": "1.2",
+            "string_list_field": "['a', 'b', 'c']"
+        }, "full-fields document")
+
+        partial_fields_document = ({
+            "_id": "partial_field",
+            "text_field": "some text",
+            "float_field": 1.0,
+            "bool_field": True,
+            "list_field": ["a", "b", "c"],
+        }, "partial-fields document")
+
+        no_field_documents = ({
+            "_id": "no_field",
+            "text_field": "some text"
+        }, "no-field document")
+
+        for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
+            with self.subTest(msg):
+                self.clear_index_by_name(self.default_text_index)
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=self.default_text_index,
+                        docs=[document],
+                        tensor_fields=["text_field"]
+                    )
+                )
+
+                search_result = tensor_search.search(
+                    text="some text",
+                    index_name=self.default_text_index,
+                    config=self.config,
+                    search_method=SearchMethod.TENSOR,
+                )
+
+                self.assertEqual(1, len(search_result['hits']))
+                self.assertEqual(document, self.strip_marqo_fields(search_result['hits'][0], strip_id=False))
