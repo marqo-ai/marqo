@@ -83,8 +83,8 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         # Vespa client exceptions
         (
             vespa_exceptions.VespaTimeoutError,
-            api_exceptions.TooManyRequestsError,
-            "Throttled by vector store. Try your request again later."
+            api_exceptions.VectorStoreTimeoutError,
+            "Vector store request timed out. Try your request again later."
         ),
 
         # Base exceptions
