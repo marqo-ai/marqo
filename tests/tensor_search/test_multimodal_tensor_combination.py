@@ -11,7 +11,7 @@ from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.tensor_search import vectorise_multimodal_combination_field_unstructured
+from marqo.tensor_search.tensor_search import vectorise_multimodal_combination_field_unstructured, vectorise_multimodal_combination_field_structured
 from tests.marqo_test import MarqoTestCase
 
 
@@ -174,6 +174,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 self.assertIn("combo_text_image", added_doc["_tensor_facets"][0])
 
     def test_add_documents_with_multiple_multimodal_fields(self):
+        # TODO - add structured
         doc = {
             "Title": "Horse rider",
             "text_field": "A rider is riding a horse jumping over the barrier.",
@@ -225,44 +226,51 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             self.assertIn(f"my_multimodal_field_{i}", added_doc["_tensor_facets"][i])
 
     def test_get_document_by_id_return_multimodal_params_logic(self):
-        doc = {
-            "Title": "Horse rider",
-            "text_field": "A rider is riding a horse jumping over the barrier.",
-            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-            "_id": "1"
-        }
-
-        mappings = {
-            "combo_text_image":
-                {
-                    "type": "multimodal_combination",
-                    "weights": {
-                        "text_field": 0.5, "image_field": 0.8
-                    }
+        for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
+            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
+                doc = {
+                    "Title": "Horse rider",
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "_id": "1"
                 }
-        }
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.unstructured_random_multimodal_index_name, docs=[doc, ],
-            mappings=mappings,
-            device="cpu",
-            tensor_fields=["combo_text_image"]),
-                                    )
+                mappings = {
+                    "combo_text_image":
+                        {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "text_field": 0.5, "image_field": 0.8
+                            }
+                        }
+                }
 
-        test_cases = [
-            (True, True, "show_vectors = True, should return multimodal_params"),
-            (False, False, "show_vectors = False, should not return multimodal_params"),
-        ]
+                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[doc, ],
+                    mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                    device="cpu",
+                    tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                ))
 
-        for show_vectors, is_return_multimodal_params, msg in test_cases:
-            with self.subTest(msg):
-                returned_doc = tensor_search.get_document_by_id(config=self.config,
-                                                                index_name=self.unstructured_random_multimodal_index_name,
-                                                                document_id="1", show_vectors=show_vectors)
-                self.assertEqual(is_return_multimodal_params, "_tensor_facets" in returned_doc)
-                self.assertEqual(is_return_multimodal_params, "multimodal_params" in returned_doc)
+                test_cases = [
+                    (True, True, "show_vectors = True, should return multimodal_params"),
+                    (False, False, "show_vectors = False, should not return multimodal_params"),
+                ]
+
+                for show_vectors, is_return_multimodal_params, msg in test_cases:
+                    with self.subTest(msg):
+                        returned_doc = tensor_search.get_document_by_id(config=self.config,
+                                                                        index_name=index.name,
+                                                                        document_id="1", show_vectors=show_vectors)
+                        self.assertEqual(show_vectors, "_tensor_facets" in returned_doc)
+                        if isinstance(index, UnstructuredMarqoIndex):
+                            self.assertEqual(is_return_multimodal_params, "multimodal_params" in returned_doc)
+                        elif isinstance(index, StructuredMarqoIndex):
+                            # If index is structured, multimodal_params should never be returned.
+                            self.assertNotIn("multimodal_params", returned_doc)
 
     def test_multimodal_fields_correct_number_of_vectors(self):
+        # TODO: make new structured index for this
         doc = [
             {
                 "Title": "Horse rider",
@@ -312,7 +320,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     mappings=mappings,
                     device="cpu",
                     tensor_fields=tensor_fields),
-                                            )
+                )
 
                 res = self.monitoring.get_index_stats_by_name(index_name=self.unstructured_random_multimodal_index_name)
                 self.assertEqual(number_of_documents, res.number_of_documents)
@@ -320,77 +328,87 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 self.clear_indexes(self.indexes)
 
+
     def test_multimodal_field_bad_field_content(self):
-        test_cases = [
-            ({"text_field": "test", "bad_field": 2.4}, "received bad_field:2.4"),
-            ({"text_field": "test", "bad_field": 1}, "received bad_field:1"),
-            ({"text_field": "test", "bad_field": True}, "received bad_field:True"),
-            ({"text_field": "test", "bad_field": ["123", "23"]}, f'received bad_field:{["123", "23"]}'),
-            ({"text_field": "test", "bad_field": "https://a-void-image.jpg"}, "Could not find image"),
-            ({"my_multimodal_field": "test"}, "Document and mappings object have conflicting fields")
-        ]
+        # TODO: Add structured index for this
+        for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
+            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
+                test_cases = [
+                    ({"text_field": "test", "bad_field": 2.4}, "received bad_field:2.4"),
+                    ({"text_field": "test", "bad_field": 1}, "received bad_field:1"),
+                    ({"text_field": "test", "bad_field": True}, "received bad_field:True"),
+                    ({"text_field": "test", "bad_field": ["123", "23"]}, f'received bad_field:{["123", "23"]}'),
+                    ({"text_field": "test", "bad_field": "https://a-void-image.jpg"}, "Could not find image"),
+                    ({"my_multimodal_field": "test"}, "Document and mappings object have conflicting fields")
+                ]
 
-        mappings = {
-            "my_multimodal_field":
-                {
-                    "type": "multimodal_combination",
-                    "weights": {
-                        "text_field": 0.5, "bad_field": 0.8
-                    }
+                mappings = {
+                    "my_multimodal_field":
+                        {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "text_field": 0.5, "bad_field": 0.8
+                            }
+                        }
                 }
-        }
 
-        for document, error_msg in test_cases:
-            with self.subTest(error_msg):
-                with mock.patch("marqo.s2_inference.s2_inference.vectorise") as mock_vectorise:
-                    res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                        index_name=self.unstructured_random_multimodal_index_name, docs=[document, ],
-                        mappings=mappings,
-                        device="cpu",
-                        tensor_fields=["my_multimodal_field"]),
-                                                      )
-                    self.assertIn(error_msg, str(res))
-                    self.assertEqual(0, self.monitoring.get_index_stats_by_name(
-                        self.unstructured_random_multimodal_index_name).number_of_documents)
-                    self.assertEqual(0, self.monitoring.get_index_stats_by_name(
-                        self.unstructured_random_multimodal_index_name).number_of_vectors)
-                    mock_vectorise.assert_not_called()
+                for document, error_msg in test_cases:
+                    with self.subTest(error_msg):
+                        with mock.patch("marqo.s2_inference.s2_inference.vectorise") as mock_vectorise:
+                            res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                                index_name=index.name, docs=[document, ],
+                                mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                                device="cpu",
+                                tensor_fields=["my_multimodal_field"] if isinstance(index, UnstructuredMarqoIndex) else None
+                            ))
+                            self.assertIn(error_msg, str(res))
+                            self.assertEqual(0, self.monitoring.get_index_stats_by_name(
+                                index.name).number_of_documents)
+                            self.assertEqual(0, self.monitoring.get_index_stats_by_name(
+                                index.name).number_of_vectors)
+                            mock_vectorise.assert_not_called()
+
 
     def test_multimodal_tensor_combination_score(self):
-        def get_score(document):
-            self.clear_indexes(self.indexes)
-            res = tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.unstructured_multimodal_index_name, docs=[document],
-                    mappings={"combo_text_image": {"type": "multimodal_combination",
-                                                   "weights": {"image_field": 0.5, "text_field": 0.5}}},
-                    device="cpu",
-                    tensor_fields=["combo_text_image"]
-                )
-            )
-            self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.unstructured_multimodal_index_name).number_of_documents)
-            res = tensor_search.search(config=self.config, index_name=self.unstructured_multimodal_index_name, text="",
-                                       result_count=1)
-            return res["hits"][0]["_score"]
+        for index in [self.unstructured_multimodal_index, self.structured_multimodal_index]:
+            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
+                def get_score(document):
+                    self.clear_indexes(self.indexes)
+                    res = tensor_search.add_documents(
+                        config=self.config, add_docs_params=AddDocsParams(
+                            index_name=index.name, docs=[document],
+                            mappings={"combo_text_image": {"type": "multimodal_combination",
+                                                           "weights": {"image_field": 0.5, "text_field": 0.5}}}
+                            if isinstance(index, UnstructuredMarqoIndex) else None,
+                            device="cpu",
+                            tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None
+                        )
+                    )
+                    self.assertEqual(1, self.monitoring.get_index_stats_by_name(index.name).number_of_documents)
+                    res = tensor_search.search(config=self.config, index_name=index.name, text="",
+                                               result_count=1)
+                    return res["hits"][0]["_score"]
 
-        score_1 = get_score({
-            "text_field": "A rider is riding a horse jumping over the barrier.",
-            # "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-        })
+                score_1 = get_score({
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    # "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                })
 
-        score_2 = get_score({
-            # "text_field": "A rider is riding a horse jumping over the barrier.",
-            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-        })
+                score_2 = get_score({
+                    # "text_field": "A rider is riding a horse jumping over the barrier.",
+                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                })
 
-        score_3 = get_score({
-            "text_field": "A rider is riding a horse jumping over the barrier.",
-            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-        })
+                score_3 = get_score({
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                })
 
-        assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1, score_2))
+                assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1, score_2))
+
 
     def test_multimodal_tensor_combination_tensor_value(self):
+        # TODO
         res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.unstructured_unnormalized_multimodal_index_name, docs=[
                 {
@@ -504,34 +522,37 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert np.allclose(combo_tensor_4, expected_tensor, atol=1e-5)
 
     def test_multimodal_tensor_combination_zero_weight(self):
-        def get_score(document):
-            self.clear_indexes(self.indexes)
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.unstructured_multimodal_index_name, docs=[document], device="cpu", mappings={
-                    "combo_text_image": {
-                        "type": "multimodal_combination",
-                        "weights": {"image_field": 0, "text_field": 1}}},
-                tensor_fields=["combo_text_image"]
-            ))
-            res = tensor_search.search(config=self.config, index_name=self.unstructured_multimodal_index_name,
-                                       text="test", result_count=1)
+        # TODO: Make structured index, zero weight
+        for index in [self.unstructured_multimodal_index, self.structured_multimodal_index_zero_weight]:
+            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
+                def get_score(document):
+                    self.clear_indexes(self.indexes)
+                    tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name, docs=[document], device="cpu", mappings={
+                            "combo_text_image": {
+                                "type": "multimodal_combination",
+                                "weights": {"image_field": 0, "text_field": 1}}} if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    ))
+                    res = tensor_search.search(config=self.config, index_name=index.name,
+                                               text="test", result_count=1)
 
-            return res["hits"][0]["_score"]
+                    return res["hits"][0]["_score"]
 
-        score_1 = get_score({
-            "text_field": "A rider is riding a horse jumping over the barrier.",
-            "_id": "1"
-        })
+                score_1 = get_score({
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    "_id": "1"
+                })
 
-        score_2 = get_score({
-            "text_field": "A rider is riding a horse jumping over the barrier.",
-            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-            "_id": "1"
-        })
+                score_2 = get_score({
+                    "text_field": "A rider is riding a horse jumping over the barrier.",
+                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "_id": "1"
+                })
 
-        self.assertEqual(score_1, score_2)
+                self.assertEqual(score_1, score_2)
 
-    def test_multimodal_tensor_combination_vectorise_call(self):
+    def test_multimodal_tensor_combination_vectorise_call_unstructured(self):
         """check if the chunks are properly created in the add_documents"""
 
         def pass_through_multimodal(*args, **kwargs):
@@ -545,7 +566,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     mock_multimodal_combination)
         def run():
             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.unstructured_random_multimodal_index_name, docs=[
+                index_name=self.unstructured_random_multimodal_index.name, docs=[
                     {
                         "text_field": "A rider is riding a horse jumping over the barrier.",
                         "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
@@ -591,7 +612,67 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         assert run()
 
+
+    def test_multimodal_tensor_combination_vectorise_call_structured(self):
+        """
+        check if the chunks are properly created in the add_documents
+        Completely separate from the unstructured test, as to not make the mocking logic too complex
+        """
+
+        def pass_through_multimodal(*args, **kwargs):
+            """Vectorise will behave as usual, but we will be able to see the args and kwargs"""
+            return vectorise_multimodal_combination_field_structured(*args, **kwargs)
+
+        mock_multimodal_combination = mock.MagicMock()
+        mock_multimodal_combination.side_effect = pass_through_multimodal
+
+        @mock.patch("marqo.tensor_search.tensor_search.vectorise_multimodal_combination_field_structured",
+                    mock_multimodal_combination)
+        def run():
+            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.structured_random_multimodal_index.name, docs=[
+                    {
+                        "text_field": "A rider is riding a horse jumping over the barrier.",
+                        "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                        "_id": "123",
+                    },
+                    {
+                        "text_field": "test-text-two.",
+                        "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                        "_id": "234",
+                    },
+                    {  # a normal doc
+                        "combo_text_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                        "_id": "534",
+                    }],
+            )
+                                        )
+
+            # first multimodal-doc
+            real_field_0, field_content_0 = [call_args for call_args, call_kwargs
+                                             in mock_multimodal_combination.call_args_list][0][0:2]
+            assert real_field_0 == "combo_text_image"
+            assert field_content_0 == {
+                "text_field": "A rider is riding a horse jumping over the barrier.",
+                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+            }
+
+            # second multimodal=doc
+            real_field_1, field_content_1 = [call_args for call_args, call_kwargs
+                                             in mock_multimodal_combination.call_args_list][1][0:2]
+            assert real_field_1 == "combo_text_image"
+            assert field_content_1 == {
+                "text_field": "test-text-two.",
+                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+            }
+            # ensure we only call multimodal-combination twice
+            assert len(mock_multimodal_combination.call_args_list) == 2
+            return True
+
+        assert run()
+
     def test_batched_vectorise_call(self):
+        # TODO: Make structured index
         def pass_through_vectorise(*arg, **kwargs):
             """Vectorise will behave as usual, but we will be able to see the call list
             via mock
@@ -642,6 +723,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert run()
 
     def test_batched_vectorise_call_infer_image_is_false(self):
+        # TODO: Make structured index
         def pass_through_vectorise(*arg, **kwargs):
             """Vectorise will behave as usual, but we will be able to see the call list
             via mock
@@ -696,6 +778,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert run()
 
     def test_concurrent_image_downloading(self):
+        # TODO: Make structured index
         def pass_through_load_image_from_path(*arg, **kwargs):
             return load_image_from_path(*arg, **kwargs)
 
@@ -733,6 +816,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert run()
 
     def test_lexical_search_on_multimodal_combination(self):
+        # TODO: Make structured index
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.unstructured_multimodal_index_name, docs=[
                 {
@@ -789,6 +873,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert res["hits"][0]["_id"] == "article_592"
 
     def test_search_with_filtering_and_infer_image_false(self):
+        # TODO: Make structured index
         tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.unstructured_random_multimodal_index_name, docs=[
@@ -840,33 +925,35 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         assert res_nonexist_1["hits"] == []
 
     def test_multimodal_combination_chunks(self):
-        test_doc = {
+        for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
+            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
+                test_doc = {
+                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                    "text_field": "marqo is good",
+                    "_id": "123",
+                }
 
-            "image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
-            "text": "marqo is good",
-            "_id": "123",
-        }
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=[test_doc], index_name=index.name, device="cpu",
+                        mappings={"combo_text_image": {"type": "multimodal_combination", "weights": {
+                            "text_field": 0.5, "image_field": 0.5
+                        }}} if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
 
-        res = tensor_search.add_documents(
-            self.config,
-            add_docs_params=AddDocsParams(
-                docs=[test_doc], index_name=self.unstructured_random_multimodal_index_name, device="cpu",
-                mappings={"my_combination_field": {"type": "multimodal_combination", "weights": {
-                    "text": 0.5, "image": 0.5
-                }}}, tensor_fields=["my_combination_field"]
-            )
-        )
+                doc_w_facets = tensor_search.get_document_by_id(
+                    self.config, index_name=index.name, document_id='123', show_vectors=True)
+                # check tensor facets:
+                self.assertEqual(1, len(doc_w_facets[TensorField.tensor_facets]))
+                self.assertIn('combo_text_image', doc_w_facets[TensorField.tensor_facets][0])
 
-        doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.unstructured_random_multimodal_index_name, document_id='123', show_vectors=True)
-        # check tensor facets:
-        self.assertEqual(1, len(doc_w_facets[TensorField.tensor_facets]))
-        self.assertIn('my_combination_field', doc_w_facets[TensorField.tensor_facets][0])
+                self.assertEqual(doc_w_facets[TensorField.tensor_facets][0]['combo_text_image'],
+                                 json.dumps({"text_field": "marqo is good",
+                                             "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg"}
+                                            )
+                                 )
 
-        self.assertEqual(doc_w_facets[TensorField.tensor_facets][0]['my_combination_field'],
-                         json.dumps({"text": "marqo is good",
-                                     "image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg"}
-                                    )
-                         )
-
-        self.assertNotIn("my_combination_field", doc_w_facets)
+                self.assertNotIn("combo_text_image", doc_w_facets)
