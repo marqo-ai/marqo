@@ -464,7 +464,7 @@ The full documentation for Marqo can be found here [https://docs.marqo.ai/](http
 
 ## Warning
 
-Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
+Note that you should not run other applications on Marqo's Vespa cluster as Marqo automatically changes and adapts the settings on the cluster.
 
 ## Contributors
 
