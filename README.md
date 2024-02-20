@@ -481,10 +481,6 @@ results = mq.index("my-first-index").delete()
 
 The full documentation for Marqo can be found here [https://docs.marqo.ai/](https://docs.marqo.ai/).
 
-## Warning
-
-Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
-
 ## Contributors
 
 Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started.
