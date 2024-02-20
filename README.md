@@ -236,8 +236,6 @@ pprint.pprint(results)
 - `limit` is the maximum number of hits to be returned. This can be set as a parameter during search.
 - Each hit has a `_highlights` field. This was the part of the document that matched the query the best.
 
-## Running Marqo with external vector store
-
 ## Other basic operations
 
 ### Get document
