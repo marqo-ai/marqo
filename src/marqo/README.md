@@ -13,7 +13,7 @@ Before running Marqo locally, you will need to do some preparations to set up Ve
 
 ### Preparations
 
-1. Clone the Marqo Github repo and cd into it
+1. Clone the Marqo GitHub repo and cd into it
 ```bash
 git clone https://github.com/marqo-ai/marqo.git
 cd marqo
