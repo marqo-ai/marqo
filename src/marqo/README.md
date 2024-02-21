@@ -13,7 +13,7 @@ Before running Marqo locally, you will need to do some preparations to set up Ve
 
 ### Preparations
 
-1. Clone the Marqo Github repo and cd into it
+1. Clone the Marqo GitHub repo and cd into it
 ```bash
 git clone https://github.com/marqo-ai/marqo.git
 cd marqo
@@ -27,17 +27,16 @@ pip install -r requirements.dev.txt
 3. Pull and run the Vespa docker image
 ```bash
 docker run --detach --name vespa --hostname vespa-tutorial \
-  --publish 8080:8080 --publish 19071:19071 --publish 19092:19092 \
+  --publish 8080:8080 --publish 19071:19071 \
   vespaengine/vespa:latest
 ```
 
-4. Deploy a dummy application for Vespa docker image by using the provided `scripts/vespa_dummy_app.zip` file and `curl`
+4. Configure Vespa by deploying to the provided application package `scripts/vespa_local`
 ```bash
-curl --header "Content-Type:application/zip" --data-binary @scripts/vespa_dummy_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
+(cd scripts/vespa_local && zip -r - * | curl --header "Content-Type:application/zip" --data-binary @- http://localhost:19071/application/v2/tenant/default/prepareandactivate)
 ```
 
-Up to now. you should have a running Vespa docker image and a dummy application deployed to it. 
-You can check this by visiting `http://localhost:8080` in your browser.
+You can verify that Vespa has been set up correctly by visiting `http://localhost:8080` in your browser.
 
 ### Option A. Run the Marqo application locally (outside of docker) through IDE
 Now you can run Marqo locally through your IDE (e.g. PyCharm) by following the steps below.
@@ -66,7 +65,7 @@ export MARQO_ENABLE_BATCH_APIS=true
 export MARQO_LOG_LEVEL=debug
 export VESPA_CONFIG_URL=http://localhost:19071
 export VESPA_DOCUMENT_URL=http://localhost:8080
-export ESPA_QUERY_URL=http://localhost:8080
+export VESPA_QUERY_URL=http://localhost:8080
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
 cd src/marqo/tensor_search
 uvicorn api:app --host 0.0.0.0 --port 8882 --reload
