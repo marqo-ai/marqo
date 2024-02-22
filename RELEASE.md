@@ -7,7 +7,7 @@
 
 ## New features
 * Support filtering on document ID with structured indexes. This was already supported with unstructured indexes ([#749](https://github.com/marqo-ai/marqo/pull/749))
-* New structured index data types: `long`, `double`, `array<long>` and `array<double>` for a higher precision and range of values Available for indexes created with Marqo 2.2+ ([#722](https://github.com/marqo-ai/marqo/pull/722))
+* New structured index data types: `long`, `double`, `array<long>` and `array<double>` for a higher precision and range of values. Available for indexes created with Marqo 2.2+ ([#722](https://github.com/marqo-ai/marqo/pull/722))
 * Higher precision numeric fields for unstructured indexes. Unstructured indexes created with Marqo 2.2+ will use double precision floats and longs for a higher precision and wider range of values ([#722](https://github.com/marqo-ai/marqo/pull/722))
 * Numeric value range validation. Values that are out of range for the field type will now receive a 400 validation error when adding documents. ([#722](https://github.com/marqo-ai/marqo/pull/722))
 
