@@ -91,14 +91,6 @@ class TestGetSettings(MarqoTestCase):
                     'filterStringMaxLength': 20,
                     'imagePreprocessing': {},
                     'model': 'hf/e5-base-v2',
-                    'modelProperties': {
-                        "name": 'intfloat/e5-base-v2',
-                        "dimensions": 768,
-                        "tokens": 512,
-                        "type": "hf",
-                        "model_size": 0.438,
-                        "notes": ""
-                    },
                     'normalizeEmbeddings': True,
                     'textPreprocessing': {'splitLength': 2,
                                         'splitMethod': TextSplitMethod.Sentence,
@@ -108,7 +100,9 @@ class TestGetSettings(MarqoTestCase):
                     'vectorNumericType': VectorNumericType.Float
                 }
             # Get unstructured default settings
-            retrieved_settings = IndexSettings.from_marqo_index(self.unstructured_default_index).dict(exclude_none=True, by_alias=True)
+            self.maxDiff = None
+            retrieved_index = self.config.index_management.get_index(self.unstructured_default_index.name)
+            retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_unstructured_default_settings)
         
         with self.subTest("Structured index default settings"):
@@ -132,14 +126,6 @@ class TestGetSettings(MarqoTestCase):
                     },
                     'imagePreprocessing': {},
                     'model': 'hf/e5-base-v2',
-                    'modelProperties': {
-                        "name": 'intfloat/e5-base-v2',
-                        "dimensions": 768,
-                        "tokens": 512,
-                        "type": "hf",
-                        "model_size": 0.438,
-                        "notes": ""
-                    },
                     'normalizeEmbeddings': True,
                     'tensorFields': [],
                     'textPreprocessing': {
@@ -151,7 +137,8 @@ class TestGetSettings(MarqoTestCase):
                     'vectorNumericType': VectorNumericType.Float
                 }
             # Get unstructured default settings
-            retrieved_settings = IndexSettings.from_marqo_index(self.structured_default_index).dict(exclude_none=True, by_alias=True)
+            retrieved_index = self.config.index_management.get_index(self.structured_default_index.name)
+            retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_structured_default_settings)
         
 
@@ -169,12 +156,6 @@ class TestGetSettings(MarqoTestCase):
                     'filterStringMaxLength': 20,
                     'imagePreprocessing': {},
                     'model': 'ViT-B/32',
-                    'modelProperties': {
-                        "name": "ViT-B/32",
-                        "dimensions": 512,
-                        "notes": "CLIP ViT-B/32",
-                        "type": "clip",
-                    },
                     'normalizeEmbeddings': False,
                     'textPreprocessing': {'splitLength': 3,
                                         'splitMethod': TextSplitMethod.Word,
@@ -184,7 +165,8 @@ class TestGetSettings(MarqoTestCase):
                     'vectorNumericType': VectorNumericType.Float
                 }
             # Get unstructured custom settings
-            retrieved_settings = IndexSettings.from_marqo_index(self.unstructured_custom_index).dict(exclude_none=True, by_alias=True)
+            retrieved_index = self.config.index_management.get_index(self.unstructured_custom_index.name)
+            retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_unstructured_custom_settings)
         
         with self.subTest("Structured index custom settings"):
@@ -208,12 +190,6 @@ class TestGetSettings(MarqoTestCase):
                     },
                     'imagePreprocessing': {},
                     'model': 'ViT-B/32',
-                    'modelProperties': {
-                        "name": "ViT-B/32",
-                        "dimensions": 512,
-                        "notes": "CLIP ViT-B/32",
-                        "type": "clip",
-                    },
                     'normalizeEmbeddings': False,
                     'tensorFields': [],
                     'textPreprocessing': {
@@ -225,6 +201,7 @@ class TestGetSettings(MarqoTestCase):
                     'vectorNumericType': VectorNumericType.Float
                 }
             # Get unstructured default settings
-            retrieved_settings = IndexSettings.from_marqo_index(self.structured_custom_index).dict(exclude_none=True, by_alias=True)
+            retrieved_index = self.config.index_management.get_index(self.structured_custom_index.name)
+            retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_structured_custom_settings)
             
