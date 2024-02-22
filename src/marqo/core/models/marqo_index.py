@@ -39,6 +39,7 @@ class FieldType(Enum):
     ArrayDouble = 'array<double>'
     ImagePointer = 'image_pointer'
     MultimodalCombination = 'multimodal_combination'
+    CustomVector = "custom_vector"
 
 
 class VectorNumericType(Enum):

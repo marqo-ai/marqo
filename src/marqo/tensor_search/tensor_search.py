@@ -72,7 +72,7 @@ from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
     Device, TensorField, SearchMethod, EnvVars,
-    MappingsObjectType, DocumentFieldType
+    MappingsObjectType
 )
 from marqo.tensor_search.index_meta_cache import get_cache, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -217,6 +217,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         field_content=copied[field],
                         is_tensor_field=is_tensor_field
                     )
+                    # Used to validate custom_vector field or any other new dict field type
+                    if isinstance(field_content, dict):
+                        field_content = validation.validate_dict(
+                            field=field, field_content=field_content,
+                            is_non_tensor_field=not is_tensor_field,
+                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions)
                 except (errors.InvalidArgError, core_exceptions.MarqoDocumentParsingError) as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -238,10 +244,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 # B) use_existing_tensors=True and field content hasn't changed -> no chunking or vectorisation
                 # C) field type is standard -> chunking and vectorisation
                 # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
+                # Do step D regardless. It will generate separate chunks for multimodal.
 
                 # A) Calculate custom vector field logic here. It should ignore use_existing_tensors, as this step has no vectorisation.
-                if add_docs.determine_document_field_type(field) == DocumentFieldType.custom_vector:
-                    validate_custom_vector_field(copied[field])     # TODO implement this validation
+                document_dict_field_type = add_docs.determine_document_dict_field_type(field, field_content,
+                                                                                       add_docs_params.mappings)
+                if document_dict_field_type == FieldType.CustomVector:
                     # Generate exactly 1 chunk with the custom vector.
                     chunks = [f"{field}::{copied[field]['content']}"]
                     embeddings = [copied[field]["vector"]]
@@ -527,6 +535,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
     vespa_index = StructuredVespaIndex(marqo_index)
+    index_model_dimensions = marqo_index.model.get_dimension()
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
@@ -656,11 +665,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         field_content=copied[field],
                         is_non_tensor_field=not is_tensor_field
                     )
+                    # Used to validate custom_vector field or any other new dict field type
                     if isinstance(field_content, dict):
                         field_content = validation.validate_dict(
                             field=field, field_content=field_content,
                             is_non_tensor_field=not is_tensor_field,
-                            mappings=add_docs_params.mappings)
+                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions)
                 except api_exceptions.InvalidArgError as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -684,8 +694,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
 
                 # A) Calculate custom vector field logic here. It should ignore use_existing_tensors, as this step has no vectorisation.
-                if add_docs.determine_document_field_type(field) == DocumentFieldType.custom_vector:
-                    validate_custom_vector_field(copied[field])  # TODO implement this validation
+                document_dict_field_type = add_docs.determine_document_dict_field_type(field, field_content,
+                                                                                       add_docs_params.mappings)
+                if document_dict_field_type == FieldType.CustomVector:
                     # Generate exactly 1 chunk with the custom vector.
                     chunks = [f"{field}::{copied[field]['content']}"]
                     embeddings = [copied[field]["vector"]]
@@ -811,7 +822,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         if len(vector_chunks) != len(text_chunks):
                             raise RuntimeError(
                                 f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                                f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                                f"received text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
                                 f"check the preprocessing functions and try again. ")
 
                         chunks = text_chunks
