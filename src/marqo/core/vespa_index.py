@@ -70,6 +70,22 @@ class VespaIndex(ABC):
         """
         pass
 
+    @abstractmethod
+    def to_vespa_update_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Construct a MarqoDocument to a Vespa update document in the update format
+
+        This method converts a MarqoDocument to a VespaDocument in the update format. It should only contain
+        the fields that require to be updated following the Vespa format.
+
+        Args:
+            marqo_document: the MarqoDocument to be converted to the update format
+
+        Returns:
+            VespaDocument in dictionary format with keys 'fields' and 'id'
+        """
+        pass
+
 
 def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
     """

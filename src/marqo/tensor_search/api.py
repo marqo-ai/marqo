@@ -203,9 +203,10 @@ def update_documents(
         index_name: str,
         marqo_config: config.Config = Depends(get_config)):
     """update_documents endpoint"""
-    marqo_config.document.update_docs(index_name=index_name, documents=documents)
+    return marqo_config.document.update_documents_by_index_name(
+        index_name=index_name, documents=documents)
 
-    return JSONResponse(content={"acknowledged": True}, status_code=200)
+
 
 
 

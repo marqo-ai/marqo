@@ -52,6 +52,55 @@ class StructuredVespaIndex(VespaIndex):
     def __init__(self, marqo_index: StructuredMarqoIndex):
         self._marqo_index = marqo_index
 
+    def to_vespa_update_document(self, marqo_document: Dict[str,Any]) -> Dict[str, Any]:
+        vespa_fields: Dict[str, Any] = dict()
+        score_modifiers: Dict[str, float] = {}
+
+        # ID
+        if constants.MARQO_DOC_ID in marqo_document:
+            vespa_id = marqo_document[constants.MARQO_DOC_ID]
+        else:
+            raise VespaDocumentParsingError(f'Vespa update document is missing {constants.MARQO_DOC_ID} field')
+
+        # Fields
+        for marqo_field in marqo_document:
+            if marqo_field == constants.MARQO_DOC_TENSORS or marqo_field == constants.MARQO_DOC_ID:
+                continue  # process tensor fields later
+
+            marqo_value = marqo_document[marqo_field]
+            self._verify_marqo_field_name(marqo_field)
+            self._verify_marqo_field_type(marqo_field, marqo_value)
+
+            index_field = self._marqo_index.field_map[marqo_field]
+
+            if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
+                self._verify_numerical_field_value(marqo_value, index_field)
+
+            if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
+                for v in marqo_value:
+                    self._verify_numerical_field_value(v, index_field)
+
+            if index_field.type == FieldType.Bool:
+                # Booleans are stored as bytes in Vespa
+                marqo_value = int(marqo_value)
+
+            if index_field.lexical_field_name:
+                vespa_fields[index_field.lexical_field_name] = {}
+                vespa_fields[index_field.lexical_field_name]["assign"] = marqo_value
+            if index_field.filter_field_name:
+                vespa_fields[index_field.filter_field_name] = {}
+                vespa_fields[index_field.filter_field_name]["assign"] = marqo_value
+            if not index_field.lexical_field_name and not index_field.filter_field_name:
+                vespa_fields[index_field.name] = {}
+                vespa_fields[index_field.name]["assign"] = marqo_value
+
+            if FieldFeature.ScoreModifier in index_field.features:
+                score_modifiers[index_field.name] = {}
+                score_modifiers[index_field.name]["assign"] = marqo_value
+
+        return {"id": vespa_id, "fields": vespa_fields}
+
+
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
