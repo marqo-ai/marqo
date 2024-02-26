@@ -17,4 +17,12 @@ def create_index():
 
 
 def multimodal_combination_object():
-    return _build_url('Advanced-Usage/document_fields/#multimodal-combination-object')
+    return _build_url('Advanced-Usage/document_fields/#multimodal-combination-object/')
+
+
+def custom_vector_object():
+    return _build_url('Advanced-Usage/document_fields/#custom-vectors/')
+
+
+def mappings():
+    return _build_url('API-Reference/Documents/mappings/')

@@ -670,7 +670,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         field_content = validation.validate_dict(
                             field=field, field_content=field_content,
                             is_non_tensor_field=not is_tensor_field,
-                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions)
+                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions,
+                            structured_field_type=marqo_field.type)
                 except api_exceptions.InvalidArgError as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -694,11 +695,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
 
                 # A) Calculate custom vector field logic here. It should ignore use_existing_tensors, as this step has no vectorisation.
-                document_dict_field_type = add_docs.determine_document_dict_field_type(field, field_content,
-                                                                                       add_docs_params.mappings)
-                if document_dict_field_type == FieldType.CustomVector:
+                if marqo_field.type == FieldType.CustomVector:
                     # Generate exactly 1 chunk with the custom vector.
-                    chunks = [f"{field}::{copied[field]['content']}"]
+                    chunks = [copied[field]['content']]
                     embeddings = [copied[field]["vector"]]
 
                     # Update parent document (copied) to fit new format. Use content (text) to replace input dict
@@ -861,7 +860,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         if (
                                 add_docs_params.mappings is not None and
                                 field_name in add_docs_params.mappings and
-                                add_docs_params.mappings[field_name]["type"] == "multimodal_combination"
+                                add_docs_params.mappings[field_name]["type"] == FieldType.MultimodalCombination
                         ):
                             mappings = add_docs_params.mappings[field_name]
                             # Record custom weights in the document
@@ -1640,7 +1639,7 @@ def get_query_vectors_from_jobs(
                  content
                 ) for content, weight in ordered_queries
             ]
-            # TODO how doe we ensure order?
+            # TODO how do we ensure order?
             weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
 
             context_tensors = q.get_context_tensor()

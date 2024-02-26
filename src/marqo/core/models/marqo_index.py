@@ -25,7 +25,7 @@ class IndexType(Enum):
     Unstructured = 'unstructured'
 
 
-class FieldType(Enum):
+class FieldType(str, Enum):
     Text = 'text'
     Bool = 'bool'
     Int = 'int'
