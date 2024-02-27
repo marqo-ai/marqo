@@ -192,7 +192,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         )
 
     def test_generate_schema_all_distance_metrics(self):
-        """A test for the unstructured Vespa schema generation with each of the distance metrics."""
+        """A test for the structured Vespa schema generation with each of the distance metrics."""
         index_name = "test_structured_schema_distance_metric"
 
         for distance_metric in DistanceMetric:
