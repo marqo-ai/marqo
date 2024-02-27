@@ -26,3 +26,11 @@ def custom_vector_object():
 
 def mappings():
     return _build_url('API-Reference/Documents/mappings/')
+
+
+def dense_retrieval():
+    return _build_url('Guides/Models-Reference/dense_retrieval/')
+
+
+def search_context():
+    return _build_url('API-Reference/search/#context/')

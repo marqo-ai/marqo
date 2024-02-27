@@ -172,7 +172,7 @@ def validate_context(context: Optional[SearchContext], search_method: SearchMeth
             f"and a parameter `context`.\n"  # do not return true {context} here as it might be huge.
             f"This is not supported as the context only works when the query is a dictionary."
             f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
-            f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information."
+            f"Please check `{marqo_docs.search_context()}` for more information."
         )
 
 

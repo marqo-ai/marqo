@@ -7,6 +7,7 @@ from unittest.mock import patch
 from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidDocumentIdError, InvalidArgError, DocTooLargeError
 )
+from marqo import exceptions as base_exceptions
 from marqo.tensor_search import enums
 from marqo.tensor_search import validation
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
@@ -362,6 +363,29 @@ class TestValidateIndexSettings(unittest.TestCase):
                     }
                 }
             },
+
+            # Mappings with custom vector
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector"
+                }
+            },
+            # Mappings with both custom vector and multimodal combination
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector"
+                },
+                "abcd ": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -4.6,
+                        "other_text": 22
+                    }
+                },
+                "my_custom_vector_2": {
+                    "type": "custom_vector"
+                }
+            },
         ]
         for d in mappings:
             assert d == validation.validate_mappings_object(d)
@@ -376,6 +400,19 @@ class TestValidateIndexSettings(unittest.TestCase):
 
                     }
                 }
+            },
+            # Field with no type
+            {
+                "my_combination_field": {
+                    "weights": {
+                        "some_text": 0.5
+
+                    }
+                }
+            },
+            # Empty mapping
+            {
+                "empty field": {}
             },
             {
                 "my_combination_field": {
@@ -444,6 +481,27 @@ class TestValidateIndexSettings(unittest.TestCase):
                     }
                 },
             },
+            # Custom vector with extra field
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector",
+                    "extra_field": "blah"
+                }
+            },
+            # Custom vector with extra field and multimodal
+            {
+                "my_custom_vector": {
+                    "type": "custom_vector",
+                    "extra_field_2": "blah"
+                },
+                "abcd": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "some_text": -4.6,
+                        "other_text": 22
+                    }
+                }
+            },
         ]
         for mapping in mappings:
             try:
@@ -452,7 +510,7 @@ class TestValidateIndexSettings(unittest.TestCase):
             except InvalidArgError as e:
                 pass
 
-    def test_validate_multimodal_combination_object(self):
+    def test_validate_multimodal_combination_mappings_object(self):
         mappings = [
             {
                 "type": "multimodal_combination",
@@ -485,66 +543,101 @@ class TestValidateIndexSettings(unittest.TestCase):
             },
         ]
         for d in mappings:
-            assert d == validation.validate_multimodal_combination_object(d)
+            assert d == validation.validate_multimodal_combination_mappings_object(d)
 
-    def test_validate_multimodal_combination_object_invalid(self):
+    def test_invalid_multimodal_combination_mappings_object(self):
         mappings = [
-            {
-                "my_combination_field": {  # valid mappings dir, but not valid multimodal
+            ({
+                "my_combination_field": { # valid mappings dir, but not valid multimodal
                     "type": "multimodal_combination",
                     "weights": {
                         "some_text": 0.5
                     }
                 }
-            },
-            {
+            }, "'type' is a required property"),
+            ({
                 "type": "othertype",  # bad type
                 "weights": {
                     "some_text": 0.5
 
                 }
-            },
-            {
+            }, "'othertype' is not one of"),
+            ({
                 "type": "multimodal_combination",
                 "non_weights": {  # unknown fieldname 'non_weights' config in multimodal_combination
                     "some_text": 0.5
                 }
-            },
-            {
+            }, "'weights' is a required property"),
+            ({
                 "type": "multimodal_combination",
                 # missing weights for multimodal_combination
-            },
-            {
+            }, "'weights' is a required property"),
+            ({
                 "type": "multimodal_combination",
                 "weights": {"blah": "woo"}  # non-number weights
-            },
-            {
+            }, "is not of type 'number'"),
+            ({
                 "type": "multimodal_combination",
                 "weights": {"blah": "1.3"}  # non-number weights
-            },
-            {
+            }, "is not of type 'number'"),
+            ({
                 "type": "multimodal_combination",
                 "weights": {
                     "some_text": -4.6,
                     "other_text": 22
                 },
                 "extra_field": {"blah"}  # unknown field
-            },
-            {
+            }, "Additional properties are not allowed"),
+            ({
                 "type": "multimodal_combination",
                 "weights": {
                     "some_text": -4.6,
                     "other_text": 22,
                     "nontext": True  # non-number
                 },
-            }
+            }, "is not of type 'number'")
         ]
-        for mapping in mappings:
+        for mapping, error_message in mappings:
             try:
-                validation.validate_multimodal_combination_object(mapping)
+                validation.validate_multimodal_combination_mappings_object(mapping)
                 raise AssertionError
             except InvalidArgError as e:
-                pass
+                assert error_message in e.message
+
+    def test_valid_custom_vector_mappings_object(self):
+        # There is only 1 valid format for custom vector mapping.
+        mappings = [
+            {
+                "type": "custom_vector"
+            }
+        ]
+        for d in mappings:
+            assert d == validation.validate_custom_vector_mappings_object(d)
+
+    def test_invalid_custom_vector_mappings_object(self):
+        mappings = [
+            # Extra field
+            ({
+                 "type": "custom_vector",
+                 "extra_field": "blah"
+             }, "Additional properties are not allowed ('extra_field' was unexpected)"),
+            # Misspelled type field
+            ({
+                 "typeblahblah": "custom_vector",
+             }, "'type' is a required property"),
+            # Type not custom_vector
+            ({
+                 "type": "the wrong field type",
+             }, "'the wrong field type' is not one of"),
+            # Empty
+            ({}, "'type' is a required property")
+        ]
+        for mapping, error_message in mappings:
+            try:
+                validation.validate_custom_vector_mappings_object(mapping)
+                raise AssertionError
+            except InvalidArgError as e:
+                assert error_message in e.message
 
     def test_validate_valid_context_object(self):
         valid_context_list = [
@@ -821,6 +914,95 @@ class TestValidateIndexSettings(unittest.TestCase):
 
         for valid_custom_score_fields in valid_custom_score_fields_list:
             ScoreModifier(**valid_custom_score_fields)
+
+    def test_validate_dict(self):
+        """
+        Only dict content type accepted is `custom_vector`. Other dict types may be added in the future.
+        """
+        test_mappings = {
+            "my_custom_vector": {
+                "type": "custom_vector"
+            }
+        }
+
+        # ============== custom vector validate_dict tests ==============
+        index_model_dimensions = 384
+        # custom vector, valid
+        obj = {"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions)]}
+        assert validation.validate_dict(field="my_custom_vector",
+                                        field_content=obj,
+                                        is_non_tensor_field=False,
+                                        mappings=test_mappings,
+                                        index_model_dimensions=index_model_dimensions) == obj
+
+        # custom vector, valid (no content). must be filled with empty string
+        obj = {"vector": [1.0 for _ in range(index_model_dimensions)]}
+        assert validation.validate_dict(field="my_custom_vector",
+                                        field_content=obj,
+                                        is_non_tensor_field=False,
+                                        mappings=test_mappings,
+                                        index_model_dimensions=index_model_dimensions) \
+               == {"content": "", "vector": [1.0 for _ in range(index_model_dimensions)]}
+
+        invalid_custom_vector_objects = [
+            # Wrong vector length
+            ({"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]}, "is too short"),
+            ({"content": "custom content is here!!", "vector": [1.0] * 1000}, "is too long"),
+            # Wrong content type
+            ({"content": 12345, "vector": [1.0 for _ in range(index_model_dimensions)]},
+             "12345 is not of type 'string'"),
+            # Wrong vector type inside list (even if correct length)
+            ({"content": "custom content is here!!",
+              "vector": [1.0 for _ in range(index_model_dimensions - 1)] + ["NOT A FLOAT"]},
+             "'NOT A FLOAT' is not of type 'number'"),
+            # Field that shouldn't be there
+            ({"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions)],
+              "extra_field": "blah"}, "Additional properties are not allowed ('extra_field' was unexpected)"),
+            # No vector
+            ({"content": "custom content is here!!"}, "'vector' is a required property"),
+            # Nested dict inside custom vector content
+            ({
+                 "content": {
+                     "content": "custom content is here!!",
+                     "vector": [1.0 for _ in range(index_model_dimensions)]
+                 },
+                 "vector": [1.0 for _ in range(index_model_dimensions)]
+             }, "is not of type 'string'"),
+        ]
+        for case, error_message in invalid_custom_vector_objects:
+            try:
+                validation.validate_dict(field="my_custom_vector",
+                                         field_content=case,
+                                         is_non_tensor_field=False,
+                                         mappings=test_mappings,
+                                         index_model_dimensions=index_model_dimensions)
+                raise AssertionError(case)
+            except InvalidArgError as e:
+                assert error_message in e.message
+
+        # No index model dimensions
+        try:
+            validation.validate_dict(field="my_custom_vector",
+                                     field_content={"content": "custom content is here!!",
+                                                    "vector": [1.0 for _ in range(index_model_dimensions)]},
+                                     is_non_tensor_field=False,
+                                     mappings=test_mappings,
+                                     index_model_dimensions=None)
+            raise AssertionError
+        except base_exceptions.InternalError as e:
+            assert "Index model dimensions should be an `int`" in e.message
+
+        # Non-int index model dimensions
+        try:
+            validation.validate_dict(field="my_custom_vector",
+                                     field_content={"content": "custom content is here!!",
+                                                    "vector": [1.0 for _ in range(index_model_dimensions)]},
+                                     is_non_tensor_field=False,
+                                     mappings=test_mappings,
+                                     index_model_dimensions="wrong type")
+            raise AssertionError
+        except base_exceptions.InternalError as e:
+            assert "Index model dimensions should be an `int`" in e.message
 
 
 class TestValidateDeleteDocsRequest(unittest.TestCase):

@@ -84,6 +84,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo import marqo_docs
 
 logger = get_logger(__name__)
 
@@ -359,7 +360,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 s2_inference.ModelDownloadError) as model_error:
                             raise errors.BadRequestError(
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                                link=marqo_docs.dense_retrieval()
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
@@ -806,7 +807,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 s2_inference.ModelDownloadError) as model_error:
                             raise api_exceptions.BadRequestError(
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                                link=marqo_docs.dense_retrieval()
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
@@ -1591,7 +1592,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                 s2_inference.ModelDownloadError) as model_error:
             raise api_exceptions.BadRequestError(
                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                link=marqo_docs.dense_retrieval()
             )
 
         except s2_inference_errors.S2InferenceError as e:
@@ -1652,7 +1653,7 @@ def get_query_vectors_from_jobs(
                 raise api_exceptions.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
                                                      f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
                                                      f"The original error is `{e}`.\n"
-                                                     f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
+                                                     f"Please check `{marqo_docs.search_context()}`.")
 
             if index_info.normalize_embeddings:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
@@ -2006,7 +2007,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
             s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link="https://marqo.pages.dev/1.4.0/Models-Reference/dense_retrieval/"
+            link=marqo_docs.dense_retrieval()
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
@@ -2144,7 +2145,7 @@ def vectorise_multimodal_combination_field_structured(
             s2_inference_errors.ModelLoadError) as model_error:
         raise api_exceptions.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+            link=marqo_docs.dense_retrieval()
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False

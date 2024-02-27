@@ -27,12 +27,14 @@ class TestCustomVectorField(MarqoTestCase):
         unstructured_custom_index = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
             treat_urls_and_pointers_as_images=True,
-            normalize_embeddings=False
+            normalize_embeddings=False,
+            distance_metric=DistanceMetric.Angular
         )
 
         structured_custom_index = cls.structured_marqo_index_request(
             model=Model(name='ViT-B/32'),
             normalize_embeddings=False,
+            distance_metric=DistanceMetric.Angular,
             fields=[
                 FieldRequest(name="my_custom_vector", type="custom_vector"),
                 FieldRequest(name="text_field", type="text")
@@ -64,7 +66,6 @@ class TestCustomVectorField(MarqoTestCase):
     def tearDown(self) -> None:
         self.device_patcher.stop()
 
-    @unittest.skip
     def test_add_documents_with_custom_vector_field(self):
         """
         TODO: revamp or remove
@@ -82,11 +83,11 @@ class TestCustomVectorField(MarqoTestCase):
                                                                                     '_seq_no': 0, '_primary_term': 1,
                                                                                     'status': 201}}]}
 
-        @mock.patch("marqo._httprequests.HttpRequests.post", mock_post)
+        #@mock.patch("marqo._httprequests.HttpRequests.post", mock_post)
         def run():
             tensor_search.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
+                    index_name=self.indexes[0].name,
                     docs=[{
                         "_id": "0",
                         "my_custom_vector": {
@@ -94,9 +95,12 @@ class TestCustomVectorField(MarqoTestCase):
                             "vector": self.random_vector_1
                         }
                     }],
-                    device="cpu", mappings=self.mappings
+                    device="cpu",
+                    mappings=self.mappings,
+                    tensor_fields=["my_custom_vector"]
                 )
             )
+            print(f"DEBUG: index name is {self.indexes[0].name}")
             return True
 
         assert run()
