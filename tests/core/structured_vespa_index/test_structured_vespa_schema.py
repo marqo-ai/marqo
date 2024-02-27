@@ -191,6 +191,33 @@ class TestStructuredVespaSchema(MarqoTestCase):
             self._remove_whitespace_in_schema(actual_schema)
         )
 
+    def test_generate_schema_all_distance_metrics(self):
+        """A test for the unstructured Vespa schema generation with each of the distance metrics."""
+        index_name = "test_structured_schema_distance_metric"
+
+        for distance_metric in DistanceMetric:
+            with self.subTest(f"Structured index with distance metric: {distance_metric.value}"):
+                marqo_index_request = self.structured_marqo_index_request(
+                    name=index_name,
+                    model=Model(name='ViT-B/32'),
+                    distance_metric=distance_metric,    # Manually set distance metric to each one.
+                    vector_numeric_type=VectorNumericType.Float,
+                    hnsw_config=HnswConfig(ef_construction=100, m=16),
+                    fields=[
+                        FieldRequest(name='title', type=FieldType.Text),
+                        FieldRequest(name='description', type=FieldType.Text)
+                    ],
+                    tensor_fields=['title', 'description']
+                )
+
+                actual_schema, _ = StructuredVespaSchema(marqo_index_request).generate_schema()
+                expected_schema = self._read_schema_from_file(f'test_schemas/structured_distance_metric_{distance_metric.value}.sd')
+
+                self.assertEqual(
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(actual_schema)
+                )
+
     def _read_schema_from_file(self, path: str) -> str:
         currentdir = os.path.dirname(os.path.abspath(__file__))
         abspath = os.path.join(currentdir, path)

@@ -58,31 +58,32 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
             self._remove_whitespace_in_schema(generated_schema)
         )
 
-    def test_unstructured_index_schema_angular_distance_metric(self):
+    def test_unstructured_index_schema_all_distance_metrics(self):
         """A test for the unstructured Vespa schema generation with each of the distance metrics."""
         index_name = "test_unstructured_schema_distance_metric"
 
         for distance_metric in DistanceMetric:
-            test_marqo_index_request: MarqoIndexRequest = IndexSettings(
-                type="unstructured",
-                model="ViT-B/32",
-                annParameters=AnnParameters(
-                    spaceType=distance_metric.value,        # Manually set distance metric to each one.
-                    parameters=core.HnswConfig(
-                        efConstruction=512,
-                        m=16
+            with self.subTest(f"Unstructured index with distance metric: {distance_metric.value}"):
+                test_marqo_index_request: MarqoIndexRequest = IndexSettings(
+                    type="unstructured",
+                    model="ViT-B/32",
+                    annParameters=AnnParameters(
+                        spaceType=distance_metric.value,        # Manually set distance metric to each one.
+                        parameters=core.HnswConfig(
+                            efConstruction=512,
+                            m=16
+                        )
                     )
+                ).to_marqo_index_request(index_name)
+
+                test_unstructured_schema_object = UnstructuredVespaSchema(test_marqo_index_request)
+
+                generated_schema, _ = test_unstructured_schema_object.generate_schema()
+
+                expected_schema = self._read_schema_from_file(
+                    f'test_schemas/unstructured_vespa_index_schema_distance_metric_{distance_metric.value}.sd')
+
+                self.assertEqual(
+                    self._remove_whitespace_in_schema(expected_schema),
+                    self._remove_whitespace_in_schema(generated_schema)
                 )
-            ).to_marqo_index_request(index_name)
-
-            test_unstructured_schema_object = UnstructuredVespaSchema(test_marqo_index_request)
-
-            generated_schema, _ = test_unstructured_schema_object.generate_schema()
-
-            expected_schema = self._read_schema_from_file(
-                f'test_schemas/unstructured_vespa_index_schema_distance_metric_{distance_metric.value}.sd')
-
-            self.assertEqual(
-                self._remove_whitespace_in_schema(expected_schema),
-                self._remove_whitespace_in_schema(generated_schema)
-            )
