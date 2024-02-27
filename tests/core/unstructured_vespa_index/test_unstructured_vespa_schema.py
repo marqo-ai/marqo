@@ -3,7 +3,8 @@ import re
 
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
-from marqo.tensor_search.models.index_settings import IndexSettings
+from marqo.tensor_search.models.index_settings import *
+from marqo.core.models.marqo_index import *
 from tests.marqo_test import MarqoTestCase
 
 
@@ -56,3 +57,32 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
             self._remove_whitespace_in_schema(expected_schema),
             self._remove_whitespace_in_schema(generated_schema)
         )
+
+    def test_unstructured_index_schema_angular_distance_metric(self):
+        """A test for the unstructured Vespa schema generation with each of the distance metrics."""
+        index_name = "test_unstructured_schema_distance_metric"
+
+        for distance_metric in DistanceMetric:
+            test_marqo_index_request: MarqoIndexRequest = IndexSettings(
+                type="unstructured",
+                model="ViT-B/32",
+                annParameters=AnnParameters(
+                    spaceType=distance_metric.value,        # Manually set distance metric to each one.
+                    parameters=core.HnswConfig(
+                        efConstruction=512,
+                        m=16
+                    )
+                )
+            ).to_marqo_index_request(index_name)
+
+            test_unstructured_schema_object = UnstructuredVespaSchema(test_marqo_index_request)
+
+            generated_schema, _ = test_unstructured_schema_object.generate_schema()
+
+            expected_schema = self._read_schema_from_file(
+                f'test_schemas/unstructured_vespa_index_schema_distance_metric_{distance_metric.value}.sd')
+
+            self.assertEqual(
+                self._remove_whitespace_in_schema(expected_schema),
+                self._remove_whitespace_in_schema(generated_schema)
+            )

@@ -152,7 +152,7 @@ class UnstructuredVespaSchema(VespaSchema):
                     field {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
                         indexing: attribute | index | summary
                         attribute {{
-                            distance-metric: {marqo_index.distance_metric.value}
+                            distance-metric: {cls.get_distance_metric(cls, marqo_index.distance_metric)}
                         }}
                         index {{
                             hnsw {{

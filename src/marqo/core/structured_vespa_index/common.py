@@ -17,19 +17,3 @@ QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = 'marqo__add_weights'
 
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
 SUMMARY_ALL_VECTOR = 'all-vector-summary'
-
-_DISTANCE_METRIC_MAP = {
-    DistanceMetric.Euclidean: 'euclidean',
-    DistanceMetric.Angular: 'angular',
-    DistanceMetric.DotProduct: 'dotproduct',
-    DistanceMetric.PrenormalizedAngular: 'prenormalized-angular',
-    DistanceMetric.Geodegrees: 'geodegrees',
-    DistanceMetric.Hamming: 'hamming'
-}
-
-
-def get_distance_metric(marqo_distance_metric: DistanceMetric) -> str:
-    try:
-        return _DISTANCE_METRIC_MAP[marqo_distance_metric]
-    except KeyError:
-        raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
