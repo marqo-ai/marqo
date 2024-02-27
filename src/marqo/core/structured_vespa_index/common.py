@@ -22,7 +22,7 @@ _DISTANCE_METRIC_MAP = {
     DistanceMetric.Euclidean: 'euclidean',
     DistanceMetric.Angular: 'angular',
     DistanceMetric.DotProduct: 'dotproduct',
-    DistanceMetric.PrenormalizedAnguar: 'prenormalized-angular',
+    DistanceMetric.PrenormalizedAngular: 'prenormalized-angular',
     DistanceMetric.Geodegrees: 'geodegrees',
     DistanceMetric.Hamming: 'hamming'
 }
