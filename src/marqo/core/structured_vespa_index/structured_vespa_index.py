@@ -23,9 +23,9 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.Double: [float, int],
         FieldType.ArrayText: (list, str),
         FieldType.ArrayInt: (list, int),
-        FieldType.ArrayFloat: (list, [float, int]),
+        FieldType.ArrayFloat: (list, (float, int)),
         FieldType.ArrayLong: (list, int),
-        FieldType.ArrayDouble: (list, (list, [float, int])),
+        FieldType.ArrayDouble: (list, (float, int)),
         FieldType.ImagePointer: str,
         FieldType.MultimodalCombination: dict
     }
