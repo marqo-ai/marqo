@@ -339,7 +339,7 @@ def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithNa
 def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.
     This API delete all the documents in the indexes specified in the index_names list."""
-    document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
+    document_count: int = marqo_config.document.delete_all_docs_by_index_name(index_name=index_name)
 
     return {"documentCount": document_count}
 

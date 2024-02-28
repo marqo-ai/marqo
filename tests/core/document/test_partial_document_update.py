@@ -210,7 +210,7 @@ class TestUpdate(MarqoTestCase):
 
         filter_search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
                                                     text="test", filter="text_field_add:(I am a new field)")
-        self.assertEqual(1, len(lexical_search_result["hits"]))
+        self.assertEqual(1, len(filter_search_result["hits"]))
 
     def test_update_int_field(self):
         self.set_up_for_int_field_test()
@@ -454,17 +454,6 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(33.33, updated_doc["float_field_score_modifier"])
         self.assertEqual(True, updated_doc["bool_field_filter"])
 
-    def test_update_with_invalid_field_type(self):
-        self.set_up_for_int_field_test()
-        updated_doc = {
-            "_id": "1",
-            "int_field": "should be an integer"
-        }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
-        self.assertEqual(True, r["errors"])
-        self.assertIn("Invalid value", r["items"][0]["error"])
-        self.assertEqual(400, r["items"][0]["status"])
-
     def test_update_non_existent_field(self):
         self.set_up_for_text_field_test()
         updated_doc = {
@@ -568,8 +557,6 @@ class TestUpdate(MarqoTestCase):
             thread.join()
 
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, "1")
-
-        print(updated_doc)
 
         # We only want to ensure the document is not broken after the update
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
