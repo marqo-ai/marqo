@@ -17,8 +17,7 @@ class UpdateBatchDocumentResponse(BaseModel):
     @root_validator(pre=True)
     def check_status_and_message(cls, values):
         status = values.get('status')
-        message = values.get('message')
-        if status == 412 and "Document does not exist" in message:
+        if status == 412:
             values["message"] = "Document does not exist in the index."
             values["status"] = 404
         return values
