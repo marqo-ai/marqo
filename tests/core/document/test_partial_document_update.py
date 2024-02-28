@@ -12,6 +12,7 @@ from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from tests.marqo_test import MarqoTestCase
+from marqo.core.models.update_documents import UpdateDocumentsBodyParams
 
 
 class TestUpdate(MarqoTestCase):
@@ -24,12 +25,13 @@ class TestUpdate(MarqoTestCase):
                 FieldRequest(name='text_field_filter', type=FieldType.Text, features=[FieldFeature.Filter]),
                 FieldRequest(name='text_field_lexical', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name='text_field_add', type=FieldType.Text, features=[FieldFeature.Filter,
-                                                                                      FieldFeature.LexicalSearch]),
-                FieldRequest(name='text_field_tensor', type=FieldType.Text), # A tensor field
+                                                                                   FieldFeature.LexicalSearch]),
+                FieldRequest(name='text_field_tensor', type=FieldType.Text),  # A tensor field
 
                 FieldRequest(name='int_field', type=FieldType.Int),
                 FieldRequest(name='int_field_filter', type=FieldType.Int, features=[FieldFeature.Filter]),
-                FieldRequest(name='int_field_score_modifier', type=FieldType.Int, features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name='int_field_score_modifier', type=FieldType.Int,
+                             features=[FieldFeature.ScoreModifier]),
 
                 FieldRequest(name='float_field', type=FieldType.Float),
                 FieldRequest(name='float_field_filter', type=FieldType.Float, features=[FieldFeature.Filter]),
@@ -43,7 +45,7 @@ class TestUpdate(MarqoTestCase):
                 FieldRequest(name="dependent_field_1", type=FieldType.Text),
                 FieldRequest(name="dependent_field_2", type=FieldType.Text),
                 FieldRequest(name="multi_modal_field", type=FieldType.MultimodalCombination,
-                                dependent_fields={"dependent_field_1": 1.0, "dependent_field_2": 1.0}),
+                             dependent_fields={"dependent_field_1": 1.0, "dependent_field_2": 1.0}),
 
                 FieldRequest(name="array_text_field", type=FieldType.ArrayText, features=[FieldFeature.Filter]),
                 FieldRequest(name="array_int_field", type=FieldType.ArrayInt, features=[FieldFeature.Filter]),
@@ -113,7 +115,7 @@ class TestUpdate(MarqoTestCase):
             docs=[original_doc]
         ))
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
-        
+
     def set_up_for_float_field_test(self):
         """A helper function to set up the index to test the update document feature for float fields with
         different features."""
@@ -137,7 +139,8 @@ class TestUpdate(MarqoTestCase):
             "text_field": "updated text field",
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
         self.assertEqual("updated text field", updated_doc["text_field"])
@@ -149,7 +152,8 @@ class TestUpdate(MarqoTestCase):
             "text_field_filter": "updated text field filter",
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
         self.assertEqual("updated text field filter", updated_doc["text_field_filter"])
@@ -168,7 +172,8 @@ class TestUpdate(MarqoTestCase):
             "text_field_lexical": "search me please",
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
         self.assertEqual("search me please", updated_doc["text_field_lexical"])
@@ -188,7 +193,8 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "I can't be updated",
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         self.assertEqual(True, r["errors"])
         self.assertIn("as this is a tensor field", r["items"][0]["error"])
 
@@ -199,7 +205,8 @@ class TestUpdate(MarqoTestCase):
             "text_field_add": "I am a new field",
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual("I am a new field", updated_doc["text_field_add"])
 
@@ -219,7 +226,8 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(11, updated_doc["int_field"])
 
@@ -230,7 +238,8 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(22, updated_doc["int_field_filter"])
 
@@ -253,7 +262,8 @@ class TestUpdate(MarqoTestCase):
             "add_to_score": [{"field_name": "int_field_score_modifier", "weight": "1"}]
         })
 
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(33, updated_doc["int_field_score_modifier"])
 
@@ -268,7 +278,8 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(11.1, updated_doc["float_field"])
 
@@ -279,7 +290,8 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(22.2, updated_doc["float_field_filter"])
 
@@ -302,7 +314,8 @@ class TestUpdate(MarqoTestCase):
             "add_to_score": [{"field_name": "float_field_score_modifier", "weight": "1"}]
         })
 
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
         self.assertEqual(33.3, updated_doc["float_field_score_modifier"])
 
@@ -326,7 +339,8 @@ class TestUpdate(MarqoTestCase):
             "bool_field_filter": False,
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
         self.assertEqual(False, updated_doc["bool_field_filter"])
@@ -358,7 +372,8 @@ class TestUpdate(MarqoTestCase):
             "image_pointer_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
         self.assertEqual("https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
@@ -382,7 +397,8 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         self.assertEqual(True, r["errors"])
         self.assertIn("dependent field", r["items"][0]["error"])
 
@@ -402,7 +418,8 @@ class TestUpdate(MarqoTestCase):
             "array_text_field": ["text3", "text4"],
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
         self.assertEqual(["text3", "text4"], updated_doc["array_text_field"])
@@ -421,7 +438,8 @@ class TestUpdate(MarqoTestCase):
             "text_field": "updated text field",
             "_id": "1"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         self.assertEqual(True, r["errors"])
         self.assertIn("Document does not exist in the index", r["items"][0]["error"])
         self.assertEqual(404, r["items"][0]["status"])
@@ -431,7 +449,8 @@ class TestUpdate(MarqoTestCase):
         updated_doc = {
             "text_field": "updated text field"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         self.assertEqual(True, r["errors"])
         self.assertIn("'_id' is a required field but it does not exist", r["items"][0]["error"])
         self.assertEqual(400, r["items"][0]["status"])
@@ -446,7 +465,8 @@ class TestUpdate(MarqoTestCase):
             "float_field_score_modifier": 33.33,
             "bool_field_filter": True
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
         self.assertEqual("updated text field multi", updated_doc["text_field"])
@@ -460,7 +480,8 @@ class TestUpdate(MarqoTestCase):
             "_id": "1",
             "non_existent_field": "some value"
         }
-        r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                             index_name=self.structured_index_name, marqo_config=self.config)
         self.assertEqual(True, r["errors"])
         self.assertIn("Invalid field name", r["items"][0]["error"])
         self.assertEqual(400, r["items"][0]["status"])
@@ -484,7 +505,8 @@ class TestUpdate(MarqoTestCase):
             if "_id" not in updated_doc:
                 updated_doc["_id"] = "1"
             with self.subTest(f"{updated_doc} - {msg}"):
-                r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+                r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                                     index_name=self.structured_index_name, marqo_config=self.config)
                 self.assertEqual(expected_error, r["errors"])
                 print(r)
                 if expected_error:
@@ -541,7 +563,7 @@ class TestUpdate(MarqoTestCase):
                     else:
                         raise ValueError(f"Invalid field name {picked_field}")
 
-                r = update_documents(documents=[updated_doc],
+                r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
                                      index_name=self.structured_index_name, marqo_config=self.config)
 
         number_of_threads = 10
@@ -591,7 +613,7 @@ class TestUpdate(MarqoTestCase):
             docs=[original_document]
         ))
 
-        self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.large_score_modifier_index_name)\
+        self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.large_score_modifier_index_name) \
                          .number_of_documents)
 
         def randomly_update_document(number_of_updates: int = 50) -> None:
@@ -606,7 +628,7 @@ class TestUpdate(MarqoTestCase):
                 for picked_field in picked_fields:
                     updated_doc[picked_field] = np.random.uniform(1, 100)
 
-                r = update_documents(documents=[updated_doc],
+                r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
                                      index_name=self.large_score_modifier_index_name, marqo_config=self.config)
 
         number_of_threads = 10
@@ -623,7 +645,7 @@ class TestUpdate(MarqoTestCase):
 
         updated_doc = tensor_search.get_document_by_id(self.config, self.large_score_modifier_index_name, "1")
 
-        self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.large_score_modifier_index_name).\
+        self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.large_score_modifier_index_name). \
                          number_of_documents)
         for i in range(100):
             self.assertTrue(1 <= updated_doc[f"float_field_{i}"] <= 100)
@@ -631,11 +653,12 @@ class TestUpdate(MarqoTestCase):
         # Let do a final update and do a score modifier search to ensure the document is not broken
         final_doc = {f"float_field_{i}": 1.0 for i in range(100)}
         final_doc["_id"] = "1"
-        r = update_documents(documents=[final_doc], index_name=self.large_score_modifier_index_name,
+        r = update_documents(body=UpdateDocumentsBodyParams(documents=[final_doc]),
+                             index_name=self.large_score_modifier_index_name,
                              marqo_config=self.config)
 
         original_score = tensor_search.search(config=self.config, index_name=self.large_score_modifier_index_name,
-                                             text="test")["hits"][0]["_score"]
+                                              text="test")["hits"][0]["_score"]
 
         for i in range(100):
             score_modifiers = ScoreModifier(**{
@@ -646,4 +669,3 @@ class TestUpdate(MarqoTestCase):
                                                   text="test", score_modifiers=score_modifiers)["hits"][0]["_score"]
 
             self.assertAlmostEqual(original_score + 1, modified_score, 1)
-

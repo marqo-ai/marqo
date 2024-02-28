@@ -27,6 +27,7 @@ from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa.vespa_client import VespaClient
+from marqo.core.models.update_documents import UpdateDocumentsBodyParams
 
 logger = get_logger(__name__)
 
@@ -200,12 +201,12 @@ def add_or_replace_documents(
 @app.post("/indexes/{index_name}/documents/update")
 @throttle(RequestType.UPDATE)
 def update_documents(
-        documents: List,
+        body: UpdateDocumentsBodyParams,
         index_name: str,
         marqo_config: config.Config = Depends(get_config)):
     """update_documents endpoint"""
     return marqo_config.document.partial_update_documents_by_index_name(
-        index_name=index_name, documents=documents)
+        index_name=index_name, update_documents_params=body)
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

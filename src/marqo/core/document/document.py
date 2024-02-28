@@ -9,6 +9,7 @@ from marqo.vespa.models import UpdateBatchResponse, VespaDocument
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.models.marqo_index import IndexType
 import marqo.api.exceptions as api_exceptions
+from marqo.core.models.update_documents import UpdateDocumentsBodyParams
 
 
 class Document:
@@ -31,13 +32,14 @@ class Document:
         res: DeleteAllDocumentsResponse = self.vespa_client.delete_all_docs(marqo_index.schema_name)
         return res.document_count
 
-    def partial_update_documents_by_index_name(self, documents, index_name):
+    def partial_update_documents_by_index_name(self, index_name,
+                                               update_documents_params: UpdateDocumentsBodyParams) -> Dict:
         if not self.index_management.index_exists(index_name):
             raise IndexNotFoundError(f"Index {index_name} does not exist")
 
         marqo_index = self.index_management.get_index(index_name)
         if marqo_index.type == IndexType.Structured:
-            return self.structured_partial_update_documents(documents, marqo_index)
+            return self.structured_partial_update_documents(update_documents_params.documents, marqo_index)
         elif marqo_index.type == IndexType.Unstructured:
             raise UnsupportedFeatureError("'Partial document update' is not supported for unstructured indexes. "
                                           "Please use 'add_documents' with 'use_existing_tensor=True' instead.")
