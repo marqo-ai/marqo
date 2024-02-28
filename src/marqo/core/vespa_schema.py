@@ -27,7 +27,7 @@ class VespaSchema(ABC):
         DistanceMetric.Hamming: 'hamming'
     }
 
-    def get_distance_metric(self, marqo_distance_metric: DistanceMetric) -> str:
+    def _get_distance_metric(self, marqo_distance_metric: DistanceMetric) -> str:
         try:
             return self._DISTANCE_METRIC_MAP[marqo_distance_metric]
         except KeyError:
