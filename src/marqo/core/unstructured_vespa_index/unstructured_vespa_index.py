@@ -21,6 +21,11 @@ class UnstructuredVespaIndex(VespaIndex):
     def __init__(self, marqo_index: UnstructuredMarqoIndex):
         self._marqo_index = marqo_index
 
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any],
+                                  fetched_documents: Optional[Dict[str, Dict]] = None) -> Dict[str, Any]:
+        raise NotImplementedError("Partial document update is not supported for unstructured indexes. This"
+                                  "function should not be called.")
+
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         unstructured_document: UnstructuredVespaDocument = \
             (UnstructuredVespaDocument.from_marqo_document(marqo_document,

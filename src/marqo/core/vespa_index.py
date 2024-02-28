@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 
 from marqo.core.models import MarqoQuery, MarqoIndex
 from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
@@ -71,15 +71,17 @@ class VespaIndex(ABC):
         pass
 
     @abstractmethod
-    def to_vespa_update_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any],
+                                  fetched_documents: Optional[Dict[str, Dict]] = None) -> Dict[str, Any]:
         """
-        Construct a MarqoDocument to a Vespa update document in the update format
+        Convert a MarqoDocument to a Vespa partial document.
 
-        This method converts a MarqoDocument to a VespaDocument in the update format. It should only contain
-        the fields that require to be updated following the Vespa format.
+        This method converts a MarqoDocument to a VespaDocument in the partial update format. It should only contain
+        the fields that are require to be updated following the Vespa format.
 
         Args:
             marqo_document: the MarqoDocument to be converted to the update format
+            fetched_documents: A dictionary containing the fetched documents
 
         Returns:
             VespaDocument in dictionary format with keys 'fields' and 'id'

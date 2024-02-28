@@ -604,17 +604,15 @@ class VespaClient:
     async def _update_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                      document: VespaDocument, schema: str,
                                      timeout: int) -> UpdateBatchDocumentResponse:
-        #doc_id = f"id:{schema}:{schema}:document.id"
         doc_id = document.id
         data = {'fields': document.fields}
 
         async with semaphore:
-            end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
+            end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
+            data["condition"] = f'{schema}.marqo__id==\"{doc_id}\"'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
-                print(resp.json())
             except httpx.HTTPError as e:
-                print(resp.json())
                 raise VespaError(e) from e
 
         try:

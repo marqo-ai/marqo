@@ -196,18 +196,16 @@ def add_or_replace_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
 
+
 @app.post("/indexes/{index_name}/documents/update")
-@throttle(RequestType.INDEX)
+@throttle(RequestType.INDEX) # TODO have a dedicate throttle for update
 def update_documents(
         documents: List,
         index_name: str,
         marqo_config: config.Config = Depends(get_config)):
     """update_documents endpoint"""
-    return marqo_config.document.update_documents_by_index_name(
+    return marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, documents=documents)
-
-
-
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

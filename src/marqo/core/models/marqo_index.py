@@ -397,6 +397,13 @@ class StructuredMarqoIndex(MarqoIndex):
                                            for field_type in FieldType}
                                   )
 
+    @property
+    def dependent_fields_names(self) -> Set[str]:
+        return self._cache_or_get('dependent_fields_names',
+                                  lambda: {dependent_field for field in self.fields if field.dependent_fields
+                                           for dependent_field in field.dependent_fields.keys()}
+                                  )
+
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
