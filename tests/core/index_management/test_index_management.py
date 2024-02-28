@@ -113,7 +113,7 @@ class TestIndexManagement(MarqoTestCase):
         marqo_index_request = self.structured_marqo_index_request(
             name=index_name,
             model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAnguar,
+            distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[
@@ -156,7 +156,7 @@ class TestIndexManagement(MarqoTestCase):
         marqo_index_request = self.structured_marqo_index_request(
             name=index_name_1,
             model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAnguar,
+            distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[
@@ -203,7 +203,7 @@ class TestIndexManagement(MarqoTestCase):
         marqo_index_request = self.structured_marqo_index_request(
             name=index_name,
             model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAnguar,
+            distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[

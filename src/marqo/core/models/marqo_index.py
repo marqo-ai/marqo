@@ -57,7 +57,7 @@ class DistanceMetric(Enum):
     Euclidean = 'euclidean'
     Angular = 'angular'
     DotProduct = 'dotproduct'
-    PrenormalizedAnguar = 'prenormalized-angular'
+    PrenormalizedAngular = 'prenormalized-angular'
     Geodegrees = 'geodegrees'
     Hamming = 'hamming'
 

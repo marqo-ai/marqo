@@ -71,7 +71,7 @@ jobs:
         run: |
           pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
-          pip install -r marqo/requirements.txt
+          pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 
       - name: Start Vespa
