@@ -18,15 +18,17 @@ class Document:
         self.vespa_client = vespa_client
         self.index_management = index_management
 
-    def delete_all_docs(self, index_name: str) -> int:
-        # TODO follow the by_index_name code style
-        """Deletes all documents in the given index"""
+    def delete_all_docs_by_index_name(self, index_name: str) -> int:
+        """Deletes all documents in the given index by index name"""
         if not self.index_management.index_exists(index_name):
             raise IndexNotFoundError(f"Index {index_name} does not exist")
 
         marqo_index = self.index_management.get_index(index_name)
-        res: DeleteAllDocumentsResponse = self.vespa_client.delete_all_docs(marqo_index.schema_name)
+        return self.delete_all_docs(marqo_index)
 
+    def delete_all_docs(self, marqo_index):
+        """Deletes all documents in the given index by marqo_index object"""
+        res: DeleteAllDocumentsResponse = self.vespa_client.delete_all_docs(marqo_index.schema_name)
         return res.document_count
 
     def partial_update_documents_by_index_name(self, documents, index_name):
@@ -81,7 +83,10 @@ class Document:
                 if id:
                     new_items[-1].update({'_id': id})
                 if resp.message:
-                    new_items[-1].update({'message': resp.message})
+                    if resp.status >= 400:
+                        new_items[-1].update({'error': resp.message})
+                    else:
+                        new_items[-1].update({'message': resp.message})
 
         if unsuccessful_docs:
             result_dict['errors'] = True

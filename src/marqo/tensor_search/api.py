@@ -198,7 +198,7 @@ def add_or_replace_documents(
 
 
 @app.post("/indexes/{index_name}/documents/update")
-@throttle(RequestType.INDEX) # TODO have a dedicate throttle for update
+@throttle(RequestType.UPDATE)
 def update_documents(
         documents: List,
         index_name: str,

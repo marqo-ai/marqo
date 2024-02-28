@@ -34,4 +34,5 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_DEFAULT_EF_SEARCH: 2000,
         EnvVars.MARQO_ENABLE_BATCH_APIS: "FALSE",
         EnvVars.MARQO_ENABLE_UPGRADE_API: "FALSE",
+        EnvVars.MARQO_MAX_CONCURRENT_UPDATE: 20
     }

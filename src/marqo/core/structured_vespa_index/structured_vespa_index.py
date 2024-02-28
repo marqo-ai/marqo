@@ -21,11 +21,11 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.Long: int,
         FieldType.Float: [float, int],
         FieldType.Double: [float, int],
-        FieldType.ArrayText: list,
-        FieldType.ArrayInt: list,
-        FieldType.ArrayFloat: list,
-        FieldType.ArrayLong: list,
-        FieldType.ArrayDouble: list,
+        FieldType.ArrayText: (list, str),
+        FieldType.ArrayInt: (list, int),
+        FieldType.ArrayFloat: (list, [float, int]),
+        FieldType.ArrayLong: (list, int),
+        FieldType.ArrayDouble: (list, (list, [float, int])),
         FieldType.ImagePointer: str,
         FieldType.MultimodalCombination: dict
     }
@@ -63,6 +63,7 @@ class StructuredVespaIndex(VespaIndex):
                                             f"but it does not exist.")
         else:
             vespa_id = marqo_document[constants.MARQO_DOC_ID]
+            self._verify_id_field(vespa_id)
 
         for marqo_field in marqo_document:
             if marqo_field == constants.MARQO_DOC_ID:
@@ -587,13 +588,24 @@ class StructuredVespaIndex(VespaIndex):
     def _verify_marqo_field_type(self, field_name: str, value: Any):
         marqo_type = self._marqo_index.field_map[field_name].type
         python_type = self._get_python_type(marqo_type)
-        if (
-                isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type) or
-                not isinstance(python_type, list) and not isinstance(value, python_type)
+
+        if isinstance(python_type, tuple):
+            # Logic branch for array types
+            if ((not isinstance(value, python_type[0])) or
+                    (isinstance(value, list) and not all(isinstance(v, python_type[1]) for v in value))):
+                raise InvalidDataTypeError(f'Invalid value {value} for a list field {field_name} with Marqo type '
+                                           f'{marqo_type.value}. All list elements must be the same valid type. ')
+
+        elif (
+                (isinstance(python_type, list) and not any(isinstance(value, t) for t in python_type)) or
+                (not isinstance(python_type, list) and not isinstance(value, python_type))
         ):
             raise InvalidDataTypeError(f'Invalid value {value} for field {field_name} with Marqo type '
                                        f'{marqo_type.value}. Expected a value of type {python_type}, but found '
                                        f'{type(value)}')
+        else:
+            ValueError(f'Invalid python type {python_type} for field {field_name} with Marqo type {marqo_type.value} '
+                       f'during call to _verify_marqo_field_type.')
 
     def _verify_numerical_field_value(self, value: Union[float, int], index_field: Field):
         if index_field.type in (FieldType.Float, FieldType.ArrayFloat):
@@ -629,6 +641,19 @@ class StructuredVespaIndex(VespaIndex):
                                         f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
                                         f"If you wish to store a value outside of this range, create a field with type "
                                         f"'{FieldType.Double}'. ")
+
+    def _verify_id_field(self, value: str):
+        """Validates that the _id value is acceptable.
+
+        Args:
+            value: The _id value to validate
+        """
+        if not isinstance(value, str):
+            raise MarqoDocumentParsingError(
+                "Document _id must be a string type! "
+                f"Received _id {value} of type `{type(value).__name__}`")
+        if not value:
+            raise MarqoDocumentParsingError("Document ID can't be empty")
 
     def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
         # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features

@@ -39,7 +39,8 @@ def throttle(request_type: str):
             # Define maximum thread counts
             throttling_max_threads = {
                 RequestType.INDEX: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_INDEX),
-                RequestType.SEARCH: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_SEARCH) 
+                RequestType.SEARCH: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_SEARCH),
+                RequestType.UPDATE: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_UPDATE)
             }
             
             set_key = f"set:{request_type}"

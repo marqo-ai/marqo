@@ -423,7 +423,7 @@ class TestUpdate(MarqoTestCase):
         }
         r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
         self.assertEqual(True, r["errors"])
-        self.assertIn("Document does not exist in the index", r["items"][0]["message"])
+        self.assertIn("Document does not exist in the index", r["items"][0]["error"])
         self.assertEqual(404, r["items"][0]["status"])
         self.assertEqual(0, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
@@ -475,6 +475,32 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(True, r["errors"])
         self.assertIn("Invalid field name", r["items"][0]["error"])
         self.assertEqual(400, r["items"][0]["status"])
+
+    def test_update_with_incorrect_field_value(self):
+        self.set_up_for_text_field_test()
+
+        test_cases = [
+            ({"int_field_filter": "should be an integer"}, True, "This should be an integer"),
+            ({"_id": 1}, True, "_id field should be a string"),
+            ({"text_field": 1}, True, "This should be a string"),
+            ({"bool_field_filter": "True"}, True, "This should be a boolean"),
+            ({"float_field_score_modifier": "1.34"}, True, "This should be a float"),
+            ({"array_text_field": "should be a list"}, True, "This should be a list"),
+            ({"array_int_field": "should be a list"}, True, "This should be a list"),
+            ({"array_int_field": [1, "should be an integer", 3]}, True, "This should be a list of integers"),
+            ({"array_text_field": ["string", 2, "string"]}, True, "This should be a list of strings"),
+        ]
+
+        for updated_doc, expected_error, msg in test_cases:
+            if "_id" not in updated_doc:
+                updated_doc["_id"] = "1"
+            with self.subTest(f"{updated_doc} - {msg}"):
+                r = update_documents(documents=[updated_doc], index_name=self.structured_index_name, marqo_config=self.config)
+                self.assertEqual(expected_error, r["errors"])
+                print(r)
+                if expected_error:
+                    self.assertEqual(True, r["errors"])
+                    self.assertTrue(r["items"][0]["status"] >= 400)
 
     def test_multi_threading_update(self):
         """Test that we can update documents in multiple threads.
