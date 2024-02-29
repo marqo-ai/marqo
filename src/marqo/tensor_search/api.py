@@ -26,6 +26,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddlewa
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
+from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.core.models.update_documents import UpdateDocumentsBodyParams
 
@@ -48,7 +49,6 @@ _config = generate_config()
 
 if __name__ in ["__main__", "api"]:
     on_start(_config)
-
 
 app = FastAPI(
     title="Marqo",
@@ -76,20 +76,30 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         # More specific errors should take precedence
 
         # Core exceptions
-        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError),
-        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError),
-        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError),
-        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError),
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError, None),
+        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError, None),
+        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None),
+        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None),
+
+        # Vespa client exceptions
+        (
+            vespa_exceptions.VespaTimeoutError,
+            api_exceptions.VectorStoreTimeoutError,
+            "Vector store request timed out. Try your request again later."
+        ),
 
         # Base exceptions
-        (base_exceptions.InternalError, api_exceptions.InternalError),
-        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError),
+        (base_exceptions.InternalError, api_exceptions.InternalError, None),
+        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None),
     ]
 
     converted_error = None
-    for base_exception, api_exception in api_exception_mappings:
+    for base_exception, api_exception, message in api_exception_mappings:
         if isinstance(exc, base_exception):
-            converted_error = api_exception(exc.message)
+            if message is None:
+                converted_error = api_exception(exc.message)
+            else:
+                converted_error = api_exception(message)
             break
 
     # Completely unhandled exception (500)

@@ -35,7 +35,7 @@ class IndexSettings(StrictBaseModel):
     )
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float
     annParameters: AnnParameters = AnnParameters(
-        spaceType=core.DistanceMetric.PrenormalizedAnguar,
+        spaceType=core.DistanceMetric.PrenormalizedAngular,
         parameters=core.HnswConfig(
             efConstruction=512,
             m=16

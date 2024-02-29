@@ -5,6 +5,8 @@ on:
   workflow_call:
   workflow_dispatch:
   push:
+    branches:
+      - mainline
     paths-ignore:
       - '**.md'
   pull_request:
@@ -69,7 +71,7 @@ jobs:
         run: |
           pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
-          pip install -r marqo/requirements.txt
+          pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 
       - name: Start Vespa
@@ -95,7 +97,7 @@ jobs:
           apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
 
-          # Deploy dummy application with test schema
+          # Deploy application with test schema
           curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 
           # wait for vespa to start (document url):
