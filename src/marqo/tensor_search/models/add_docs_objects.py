@@ -7,7 +7,8 @@ from pydantic import Field
 
 from marqo.api.exceptions import BadRequestError
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import get_best_available_device
+from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
+from marqo.tensor_search.enums import EnvVars
 
 
 class AddDocsParamsConfig:
@@ -29,10 +30,6 @@ class AddDocsBodyParams(BaseModel):
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
     imageDownloadThreadCount: int = 20
-
-
-# TODO - Make this configurable
-MAX_DOCS = 128
 
 
 class AddDocsParams(BaseModel):
@@ -78,11 +75,13 @@ class AddDocsParams(BaseModel):
     def validate_docs(cls, docs):
         doc_count = len(docs)
 
+        max_doc = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE)
+
         if doc_count == 0:
             raise BadRequestError(message="Received empty add documents request")
-        elif doc_count > MAX_DOCS:
+        elif doc_count > max_doc:
             raise BadRequestError(
-                message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {MAX_DOCS}. "
+                message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {max_doc}. "
                         f"If using the Python client, break up your `add_documents` request into smaller batches using "
                         f"its `client_batch_size` parameter. "
                         f"See https://marqo.pages.dev/2.0.0/API-Reference/documents/#body for more details."

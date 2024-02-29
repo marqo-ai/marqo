@@ -13,6 +13,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from tests.marqo_test import MarqoTestCase
 from marqo.core.models.update_documents import UpdateDocumentsBodyParams
+from marqo.api.exceptions import BadRequestError
 
 
 class TestUpdate(MarqoTestCase):
@@ -669,3 +670,13 @@ class TestUpdate(MarqoTestCase):
                                                   text="test", score_modifiers=score_modifiers)["hits"][0]["_score"]
 
             self.assertAlmostEqual(original_score + 1, modified_score, 1)
+
+    def test_proper_error_raised_if_received_too_many_documents(self):
+        with self.assertRaises(BadRequestError) as cm:
+            r = update_documents(body=UpdateDocumentsBodyParams(documents=[{"_id": "1"}] * 129),
+                                 index_name=self.structured_index_name, marqo_config=self.config)
+
+        # The same request (size) should work if the max batch size is increased
+        with mock.patch.dict(os.environ, {"MARQO_MAX_DOCUMENTS_BATCH_SIZE": "129"}):
+            r = update_documents(body=UpdateDocumentsBodyParams(documents=[{"_id": "1"}] * 129),
+                                 index_name=self.structured_index_name, marqo_config=self.config)
