@@ -456,6 +456,11 @@ results = mq.index("my-first-index").delete()
 
 ## 
 
+## Running Marqo open source in production
+
+When running Marqo open source in production, you can take advantage of Marqo's kubernetes implementation, which allows you to deploy clusters with replicas, multiple storage shards and multiple inference nodes. The repo can be found here: [https://github.com/marqo-ai/marqo-on-kubernetes](https://github.com/marqo-ai/marqo-on-kubernetes)
+
+
 ## Documentation
 
 The full documentation for Marqo can be found here [https://docs.marqo.ai/](https://docs.marqo.ai/).
