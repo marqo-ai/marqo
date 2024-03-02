@@ -456,6 +456,12 @@ results = mq.index("my-first-index").delete()
 
 ## 
 
+## Running Marqo open source in production
+
+We support Kubernetes templates for Marqo which you can deploy on a cloud provider of your choice. Marqo's Kubernetes implementation allows you to deploy clusters with replicas, multiple storage shards and multiple inference nodes. The repo can be found here: [https://github.com/marqo-ai/marqo-on-kubernetes](https://github.com/marqo-ai/marqo-on-kubernetes)
+
+If you're looking for a fully managed cloud service, you can sign up for Marqo Cloud here: [https://cloud.marqo.ai](https://cloud.marqo.ai).
+
 ## Documentation
 
 The full documentation for Marqo can be found here [https://docs.marqo.ai/](https://docs.marqo.ai/).
