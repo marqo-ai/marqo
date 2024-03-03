@@ -477,7 +477,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.MultimodalCombination.value}'
         )
 
-    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText]:
+    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText, FieldType.CustomVector]:
         raise ValueError(
             f'{name}: Field with {FieldFeature.LexicalSearch.value} feature must be of type '
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'

@@ -615,7 +615,7 @@ class StructuredVespaIndex(VespaIndex):
                 cause=e
             ) from e
 
-        if chunk:
+        if chunk is not None:
             return [{closest_tensor_field.name: chunk}]
         else:
             return []

@@ -13,9 +13,12 @@ from unittest.mock import patch
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
 from marqo.core.models.marqo_index import *
+from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
+    FeedDocumentResponse
 import os
 import pprint
 import unittest
+import httpx
 
 
 class TestCustomVectorField(MarqoTestCase):
@@ -36,10 +39,54 @@ class TestCustomVectorField(MarqoTestCase):
             normalize_embeddings=False,
             distance_metric=DistanceMetric.Angular,
             fields=[
-                FieldRequest(name="my_custom_vector", type="custom_vector"),
-                FieldRequest(name="text_field", type="text")
-            ],  # TODO: Fill in fields
-            tensor_fields=["my_custom_vector", "text_field"]
+                FieldRequest(
+                    name="my_custom_vector",
+                    type="custom_vector",
+                    features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(
+                    name="text_field",
+                    type="text",
+                    features=[FieldFeature.LexicalSearch]),
+
+                # For score modifiers test
+                FieldRequest(
+                    name="multiply",
+                    type="float",
+                    features=[FieldFeature.ScoreModifier]),
+
+                # For searchable_attributes and filter tests
+                FieldRequest(
+                    name="my_custom_vector_2",
+                    type="custom_vector",
+                    features=[FieldFeature.Filter]),
+                FieldRequest(
+                    name="my_custom_vector_3",
+                    type="custom_vector",
+                    features=[FieldFeature.Filter]),
+
+                # For lexical + searchable_attributes test
+                FieldRequest(
+                    name="exact_field",
+                    type="text",
+                    features=[FieldFeature.LexicalSearch]),
+                FieldRequest(
+                    name="barely_field",
+                    type="text",
+                    features=[FieldFeature.LexicalSearch]),
+
+                # For multimodal mixed field tests
+                FieldRequest(
+                    name="multimodal_text",
+                    type="text"),
+                FieldRequest(
+                    name="multimodal_image",
+                    type="image_pointer"),
+                FieldRequest(
+                    name="my_multimodal",
+                    type="multimodal_combination",
+                    dependent_fields={"multimodal_text": 0.4, "multimodal_image": 0.6})
+            ],
+            tensor_fields=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3", "text_field", "my_multimodal"]
         )
 
         cls.indexes = cls.create_indexes([
@@ -68,375 +115,279 @@ class TestCustomVectorField(MarqoTestCase):
 
     def test_add_documents_with_custom_vector_field(self):
         """
-        TODO: revamp or remove
         Add a document with a custom vector field:
-        mock HTTP call
-        In OpenSearch call, reformatted doc, chunks, and chunk metadata should be correct
+        mock call to vespa client
+        Result will be slightly different for unstructured vs structured indexes.
         """
-        mock_post = mock.MagicMock()
-        mock_post.return_value = {'took': 15, 'errors': False, 'items': [{'index': {'_index': 'my-test-index-1',
-                                                                                    '_id': '0', '_version': 1,
-                                                                                    'result': 'created',
-                                                                                    '_shards': {'total': 1,
-                                                                                                'successful': 1,
-                                                                                                'failed': 0},
-                                                                                    '_seq_no': 0, '_primary_term': 1,
-                                                                                    'status': 201}}]}
 
-        #@mock.patch("marqo._httprequests.HttpRequests.post", mock_post)
-        def run():
-            tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.indexes[0].name,
-                    docs=[{
-                        "_id": "0",
-                        "my_custom_vector": {
-                            "content": "custom content is here!!",
-                            "vector": self.random_vector_1
-                        }
-                    }],
-                    device="cpu",
-                    mappings=self.mappings,
-                    tensor_fields=["my_custom_vector"]
+        for index in self.indexes:
+            mock_feed_batch = mock.MagicMock()
+            mock_feed_batch.return_value = FeedBatchResponse(
+                responses=[FeedBatchDocumentResponse(
+                    status=200,
+                    pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
+                    id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)
+                ],
+                errors=False)
+
+            @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
+            def run():
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[{
+                            "_id": "0",
+                            "my_custom_vector": {
+                                "content": "custom content is here!!",
+                                "vector": self.random_vector_1
+                            }
+                        }],
+                        device="cpu",
+                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
                 )
-            )
-            print(f"DEBUG: index name is {self.indexes[0].name}")
-            return True
+                return True
 
-        assert run()
+            assert run()
 
-        call_args = mock_post.call_args_list
-        assert len(call_args) == 2  # 2nd call is the refresh
+            call_args = mock_feed_batch.call_args_list
+            assert len(call_args) == 1
 
-        post_args, post_kwargs = call_args[0]
-        request_body_lines = [json.loads(line) for line in post_kwargs["body"].splitlines() if line]
+            feed_batch_args = call_args[0].args
+            self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
+            vespa_fields = feed_batch_args[0][0].fields
 
-        # Confirm content was used as custom field
-        # First line [0] is index command, Second line [1] is the document itself
-        assert request_body_lines[1]["my_custom_vector"] == "custom content is here!!"
-        assert "vector" not in request_body_lines[1]
+            if isinstance(index, UnstructuredMarqoIndex):
+                self.assertEqual(vespa_fields["marqo__strings"], ["custom content is here!!"])
+                self.assertEqual(vespa_fields["marqo__long_string_fields"], {"my_custom_vector": "custom content is here!!"})
+                self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!'])
+                self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
 
-        assert len(request_body_lines[1]["__chunks"]) == 1
+            elif isinstance(index, StructuredMarqoIndex):
+                self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ["custom content is here!!"])
+                self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
 
-        for chunk in request_body_lines[1]["__chunks"]:
-            # Confirm chunk metadata are all correct
-            assert chunk["my_custom_vector"] == "custom content is here!!"
+            self.assertEqual(vespa_fields["marqo__vector_count"], 1)
 
-            # Confirm chunk data is correct
-            if chunk["__field_name"] == "my_custom_vector":
-                assert chunk["__field_content"] == "custom content is here!!"
-                assert chunk["__vector_marqo_knn_field"] == self.random_vector_1
-            else:
-                raise AssertionError(f"Unexpected chunk field name: {chunk['__field_name']}")
-
-    @unittest.skip
     def test_add_documents_with_custom_vector_field_no_content(self):
-        # TODO - fix
         """
         Add a document with a custom vector field with no content:
         Content should be autofilled with ""
-        mock HTTP call
-        In OpenSearch call, reformatted doc, chunks, and chunk metadata should be correct
+        mock call to vespa client
+        Structured and unstructured should have different calls.
         """
-        mock_post = mock.MagicMock()
-        mock_post.return_value = {'took': 15, 'errors': False, 'items': [{'index': {'_index': 'my-test-index-1',
-                                                                                    '_id': '0', '_version': 1,
-                                                                                    'result': 'created',
-                                                                                    '_shards': {'total': 1,
-                                                                                                'successful': 1,
-                                                                                                'failed': 0},
-                                                                                    '_seq_no': 0, '_primary_term': 1,
-                                                                                    'status': 201}}]}
+        for index in self.indexes:
+            mock_feed_batch = mock.MagicMock()
+            mock_feed_batch.return_value = FeedBatchResponse(
+                responses=[FeedBatchDocumentResponse(
+                    status=200,
+                    pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
+                    id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)
+                ],
+                errors=False)
 
-        @mock.patch("marqo._httprequests.HttpRequests.post", mock_post)
-        def run():
-            tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    docs=[{
-                        "_id": "0",
-                        "my_custom_vector": {
-                            "vector": self.random_vector_1
-                        }
-                    }],
-                    device="cpu", mappings=self.mappings
+            @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
+            def run():
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[{
+                            "_id": "0",
+                            "my_custom_vector": {
+                                # No custom content
+                                "vector": self.random_vector_1
+                            }
+                        }],
+                        device="cpu",
+                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
                 )
-            )
-            return True
+                return True
 
-        assert run()
+            assert run()
 
-        call_args = mock_post.call_args_list
-        assert len(call_args) == 2  # 2nd call is the refresh
+            call_args = mock_feed_batch.call_args_list
+            assert len(call_args) == 1
 
-        post_args, post_kwargs = call_args[0]
-        request_body_lines = [json.loads(line) for line in post_kwargs["body"].splitlines() if line]
+            feed_batch_args = call_args[0].args
+            self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
+            vespa_fields = feed_batch_args[0][0].fields
 
-        # Confirm content is ""
-        # First line [0] is index command, Second line [1] is the document itself
-        assert request_body_lines[1]["my_custom_vector"] == ""
-        assert len(request_body_lines[1]["__chunks"]) == 1
-        for chunk in request_body_lines[1]["__chunks"]:
-            # Confirm chunk metadata are all correct
-            assert chunk["my_custom_vector"] == ""
+            if isinstance(index, UnstructuredMarqoIndex):
+                self.assertEqual(vespa_fields["marqo__strings"], [""])
+                self.assertEqual(vespa_fields["marqo__short_string_fields"],
+                                 {"my_custom_vector": ""})
+                self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::'])
+                self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
 
-            # Confirm chunk data is correct
-            if chunk["__field_name"] == "my_custom_vector":
-                assert chunk["__field_content"] == ""
-                assert chunk["__vector_marqo_knn_field"] == self.random_vector_1
-            else:
-                raise AssertionError(f"Unexpected chunk field name: {chunk['__field_name']}")
+            elif isinstance(index, StructuredMarqoIndex):
+                self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], [""])
+                self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
 
-    @unittest.skip
-    def test_add_documents_with_custom_vector_field_backend_updated(self):
-        """
-        Add a document with a custom vector field:
-        New field added to backend properties
-        """
-        # TODO - fix
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{
-                    "_id": "0",
-                    "my_custom_vector": {
-                        "content": "custom content is here!!",
-                        "vector": self.random_vector_1
-                    }
-                }],
-                device="cpu", mappings=self.mappings
-            )
-        )
+            self.assertEqual(vespa_fields["marqo__vector_count"], 1)
 
-        # Confirm backend was updated
-        index_info = tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1)
-        assert index_info.properties['my_custom_vector']['type'] == 'text'  # It's text because content is stored here
-        assert index_info.properties['__chunks']['properties']['my_custom_vector']['type'] == 'keyword'
-        assert index_info.properties['__chunks']['properties'][enums.TensorField.marqo_knn_field]['type'] == 'knn_vector'
-
-    @unittest.skip
     def test_add_documents_with_different_field_types(self):
         """
         Makes sure custom vector field doesn't mess up other kinds of fields
         Add a document with a custom vector field, multimodal, and standard:
-        In OpenSearch call, reformatted doc, chunks, and chunk metadata should be correct
+        Mock vespa client call
         """
-        # TODO - fix
         # Mixed mapping to test both multimodal and custom vector
-        mixed_mappings = {
-            "my_custom_vector": {
-                "type": "custom_vector"
-            },
+        multimodal_mappings = {
             "my_multimodal": {
                 "type": "multimodal_combination",
                 "weights": {
-                    "text": 0.4,
-                    "image": 0.6
+                    "multimodal_text": 0.4,
+                    "multimodal_image": 0.6
                 }
+            },
+            "my_custom_vector": {
+                "type": "custom_vector"
             }
         }
-        mock_post = mock.MagicMock()
-        mock_post.return_value = {'took': 15, 'errors': False, 'items': [{'index': {'_index': 'my-test-index-1',
-                                                                                    '_id': '0', '_version': 1,
-                                                                                    'result': 'created',
-                                                                                    '_shards': {'total': 1,
-                                                                                                'successful': 1,
-                                                                                                'failed': 0},
-                                                                                    '_seq_no': 0, '_primary_term': 1,
-                                                                                    'status': 201}}]}
 
-        @mock.patch("marqo._httprequests.HttpRequests.post", mock_post)
-        def run():
-            tensor_search.add_documents(
-                config=self.config, add_docs_params=AddDocsParams(
-                    index_name=self.index_name_1,
-                    docs=[{
-                        "_id": "0",
-                        "text_field": "blah",
-                        "my_custom_vector": {
-                            "content": "custom content is here!!",
-                            "vector": self.random_vector_1
-                        },
-                        "my_multimodal": {
-                            "text": "multimodal text",
-                            "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
-                        }
-                    }],
-                    device="cpu", mappings=mixed_mappings
+        for index in self.indexes:
+            mock_feed_batch = mock.MagicMock()
+            mock_feed_batch.return_value = FeedBatchResponse(
+                responses=[FeedBatchDocumentResponse(
+                    status=200,
+                    pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
+                    id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)
+                ],
+                errors=False)
+
+            @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
+            def run():
+                add_docs_res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[{
+                            "_id": "0",
+                            "multimodal_text": "blah",
+                            "multimodal_image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
+                            "my_custom_vector": {
+                                "content": "custom content is here!!",
+                                "vector": self.random_vector_1
+                            }
+                        }],
+                        device="cpu",
+                        mappings=multimodal_mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector", "my_multimodal"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
                 )
-            )
-            return True
+                return True
 
-        assert run()
+            assert run()
 
-        call_args = mock_post.call_args_list
-        assert len(call_args) == 2  # 2nd call is the refresh
+            call_args = mock_feed_batch.call_args_list
+            assert len(call_args) == 1
+            self.maxDiff = None
+            feed_batch_args = call_args[0].args
+            self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
+            vespa_fields = feed_batch_args[0][0].fields
 
-        post_args, post_kwargs = call_args[0]
-        request_body_lines = [json.loads(line) for line in post_kwargs["body"].splitlines() if line]
+            if isinstance(index, UnstructuredMarqoIndex):
+                self.assertEqual(vespa_fields["marqo__strings"],
+                                 ['blah',
+                                  'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
+                                  'custom content is here!!'])
+                self.assertEqual(vespa_fields["marqo__long_string_fields"],
+                                 {'multimodal_image': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
+                                  'my_custom_vector': 'custom content is here!!'})
+                self.assertEqual(vespa_fields["marqo__short_string_fields"],
+                                 {'multimodal_text': 'blah'})
+                self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!',
+                                                                 'my_multimodal::{"multimodal_text": "blah", "multimodal_image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}'])
+                self.assertEqual(vespa_fields["marqo__embeddings"]["0"], self.random_vector_1), # First vector is custom vector
+                self.assertIn("1", vespa_fields["marqo__embeddings"])   # Just checking that multimodal vector is in embeddings, but not actually checking its value
 
-        # Confirm content was used as custom field
-        # First line [0] is index command, Second line [1] is the document itself
-        assert request_body_lines[1]["my_custom_vector"] == "custom content is here!!"
-        assert "vector" not in request_body_lines[1]
-        assert request_body_lines[1]["text_field"] == "blah"
-        assert request_body_lines[1]["my_multimodal"] == {
-            "text": "multimodal text",
-            "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
-        }
+            elif isinstance(index, StructuredMarqoIndex):
+                self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ['custom content is here!!'])
+                self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
+                self.assertEqual(vespa_fields["marqo__chunks_my_multimodal"], ['{"multimodal_text": "blah", "multimodal_image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}'])
+                self.assertIn("0", vespa_fields["marqo__embeddings_my_multimodal"])  # Just checking that multimodal vector is in embeddings, but not actually checking its value
+            self.assertEqual(vespa_fields["marqo__vector_count"], 2)
 
-        for chunk in request_body_lines[1]["__chunks"]:
-            # Confirm chunk metadata are all correct
-            assert chunk["my_custom_vector"] == "custom content is here!!"
-            assert chunk["text_field"] == "blah"
-            assert chunk["my_multimodal"] == {
-                "text": "multimodal text",
-                "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
-            }
-
-            # Confirm chunk data is correct
-            if chunk["__field_name"] == "my_custom_vector":
-                assert chunk["__field_content"] == "custom content is here!!"
-                assert chunk["__vector_marqo_knn_field"] == self.random_vector_1
-            elif chunk["__field_name"] == "text_field":
-                assert chunk["__field_content"] == "blah"
-            elif chunk["__field_name"] == "my_multimodal":
-                assert chunk["__field_content"] == json.dumps({
-                    "text": "multimodal text",
-                    "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
-                })
-            else:
-                raise AssertionError(f"Unexpected chunk field name: {chunk['__field_name']}")
-
-    @unittest.skip
-    def test_add_documents_with_different_field_types_backend_updated(self):
-        """
-        Makes sure custom vector field doesn't mess up other kinds of fields
-        Add a document with a custom vector field, multimodal, and standard
-        OpenSearch mapping is checked here.
-        """
-        # TODO - fix
-        # Mixed mapping to test both multimodal and custom vector
-        mixed_mappings = {
-            "my_custom_vector": {
-                "type": "custom_vector"
-            },
-            "my_multimodal": {
-                "type": "multimodal_combination",
-                "weights": {
-                    "text": 0.4,
-                    "image": 0.6
-                }
-            }
-        }
-
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{
-                    "_id": "0",
-                    "text_field": "blah",
-                    "my_custom_vector": {
-                        "content": "custom content is here!!",
-                        "vector": self.random_vector_1
-                    },
-                    "my_multimodal": {
-                        "text": "multimodal text",
-                        "image": 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'
-                    }
-                }],
-                device="cpu", mappings=mixed_mappings
-            )
-        )
-
-        # Confirm backend was updated
-        index_info = tensor_search.backend.get_index_info(config=self.config, index_name=self.index_name_1)
-        assert index_info.properties['my_custom_vector']['type'] == 'text'  # It's text because content is stored here
-        assert index_info.properties['text_field']['type'] == 'text'
-        assert index_info.properties['my_multimodal']['properties']['text']['type'] == 'text'
-        assert index_info.properties['my_multimodal']['properties']['image']['type'] == 'text'
-
-        assert index_info.properties['__chunks']['properties']['my_custom_vector']['type'] == 'keyword'
-        assert index_info.properties['__chunks']['properties']['text_field']['type'] == 'keyword'
-        assert index_info.properties['__chunks']['properties']['text_field']['type'] == 'keyword'
-        assert index_info.properties['__chunks']['properties']['my_multimodal']['properties']['text'][
-                   'type'] == 'keyword'
-        assert index_info.properties['__chunks']['properties']['my_multimodal']['properties']['image'][
-                   'type'] == 'keyword'
-
-        assert index_info.properties['__chunks']['properties'][enums.TensorField.marqo_knn_field]['type'] == 'knn_vector'
-
-    @unittest.skip
     def test_add_documents_use_existing_tensors_with_custom_vector_field(self):
         """
         Add a document with a custom vector field and use existing tensors:
         Will not actually use existing tensors, as custom vector pipeline
         doesn't chunk or vectorise anyway.
         """
-        # TODO - fix
-        # If we change the custom vector, doc should change
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{
-                    "_id": "0",
-                    "my_custom_vector": {
-                        "content": "1 - custom content is here!!",
-                        "vector": self.random_vector_1
-                    }
-                }],
-                device="cpu", mappings=self.mappings
-            )
-        )
 
-        get_doc_1 = tensor_search.get_document_by_id(
-            config=self.config, index_name=self.index_name_1,
-            document_id="0", show_vectors=True)
+        for index in self.indexes:
+            with self.subTest(f"Index: {index.name}, type: {index.type}"):
+                # If we change the custom vector, doc should change
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[{
+                            "_id": "0",
+                            "my_custom_vector": {
+                                "content": "1 - custom content is here!!",
+                                "vector": self.random_vector_1
+                            }
+                        }],
+                        device="cpu",
+                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
 
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{
-                    "_id": "0",
-                    "my_custom_vector": {
-                        "content": "2 - custom content is here!!",
-                        "vector": self.random_vector_2
-                    }
-                }],
-                device="cpu", mappings=self.mappings,
-                use_existing_tensors=True
-            )
-        )
+                get_doc_1 = tensor_search.get_document_by_id(
+                    config=self.config, index_name=index.name,
+                    document_id="0", show_vectors=True)
 
-        get_doc_2 = tensor_search.get_document_by_id(
-            config=self.config, index_name=self.index_name_1,
-            document_id="0", show_vectors=True)
-        assert get_doc_1["my_custom_vector"] == "1 - custom content is here!!"
-        assert get_doc_1[enums.TensorField.tensor_facets][0][enums.TensorField.embedding] == self.random_vector_1
-        assert get_doc_2["my_custom_vector"] == "2 - custom content is here!!"
-        assert get_doc_2[enums.TensorField.tensor_facets][0][enums.TensorField.embedding] == self.random_vector_2
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[{
+                            "_id": "0",
+                            "my_custom_vector": {
+                                "content": "2 - custom content is here!!",
+                                "vector": self.random_vector_2
+                            }
+                        }],
+                        device="cpu",
+                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                        use_existing_tensors=True
+                    )
+                )
 
-        # If we do not, it should remain the same, no errors
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[{
-                    "_id": "0",
-                    "my_custom_vector": {
-                        "content": "2 - custom content is here!!",
-                        "vector": self.random_vector_2
-                    }
-                }],
-                device="cpu", mappings=self.mappings,
-                use_existing_tensors=True
-            )
-        )
+                get_doc_2 = tensor_search.get_document_by_id(
+                    config=self.config, index_name=index.name,
+                    document_id="0", show_vectors=True)
+                assert get_doc_1["my_custom_vector"] == "1 - custom content is here!!"
+                assert get_doc_1[enums.TensorField.tensor_facets][0][enums.TensorField.embedding] == self.random_vector_1
+                assert get_doc_2["my_custom_vector"] == "2 - custom content is here!!"
+                assert get_doc_2[enums.TensorField.tensor_facets][0][enums.TensorField.embedding] == self.random_vector_2
 
-        get_doc_3 = tensor_search.get_document_by_id(
-            config=self.config, index_name=self.index_name_1,
-            document_id="0", show_vectors=True)
-        assert get_doc_2["my_custom_vector"] == "2 - custom content is here!!"
-        assert get_doc_2[enums.TensorField.tensor_facets][0][enums.TensorField.embedding] == self.random_vector_2
+                # If we do not, it should remain the same, no errors
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[{
+                            "_id": "0",
+                            "my_custom_vector": {
+                                "content": "2 - custom content is here!!",
+                                "vector": self.random_vector_2
+                            }
+                        }],
+                        device="cpu",
+                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                        use_existing_tensors=True
+                    )
+                )
+
+                get_doc_3 = tensor_search.get_document_by_id(
+                    config=self.config, index_name=index.name,
+                    document_id="0", show_vectors=True)
+                assert get_doc_2["my_custom_vector"] == "2 - custom content is here!!"
+                assert get_doc_2[enums.TensorField.tensor_facets][0][enums.TensorField.embedding] == self.random_vector_2
 
     def test_get_document_with_custom_vector_field(self):
         """
@@ -597,7 +548,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         Tensor search for the doc, with highlights
         """
-        for index in self.indexes[0:1]:
+        for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
                 tensor_search.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
@@ -626,10 +577,6 @@ class TestCustomVectorField(MarqoTestCase):
                         tensor_fields=["my_custom_vector", "text_field"] if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-
-                res = tensor_search.get_documents_by_ids(
-                    config=self.config, index_name=index.name,
-                    document_ids=["custom_vector_doc", "empty_content_custom_vector_doc", "normal_doc"], show_vectors=True)
 
                 # Searching with context matching custom vector returns custom vector
                 res = tensor_search.search(
@@ -663,53 +610,57 @@ class TestCustomVectorField(MarqoTestCase):
         """
         Lexical search for the doc
         """
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[
-                    {
-                        "_id": "custom_vector_doc",
-                        "my_custom_vector": {
-                            "content": "custom content is here!!",
-                            "vector": self.random_vector_1  # size is 512
-                        }
-                    },
-                    {
-                        "_id": "empty_content_custom_vector_doc",
-                        "my_custom_vector": {
-                            "vector": self.random_vector_2  # size is 512
-                        }
-                    },
-                    {
-                        "_id": "normal_doc",
-                        "text_field": "blah"
-                    }
-                ],
-                device="cpu", mappings=self.mappings
-            )
-        )
+        for index in self.indexes:
+            with self.subTest(f"Index: {index.name}, type: {index.type}"):
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {
+                                "_id": "custom_vector_doc",
+                                "my_custom_vector": {
+                                    "content": "custom content is here!!",
+                                    "vector": self.random_vector_1  # size is 512
+                                }
+                            },
+                            {
+                                "_id": "empty_content_custom_vector_doc",
+                                "my_custom_vector": {
+                                    "vector": self.random_vector_2  # size is 512
+                                }
+                            },
+                            {
+                                "_id": "normal_doc",
+                                "text_field": "blah"
+                            }
+                        ],
+                        device="cpu",
+                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector", "text_field"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
 
-        # Searching matching custom vector content returns custom vector
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="custom content is here!!",
-            search_method=enums.SearchMethod.LEXICAL
-        )
-        assert len(res["hits"]) == 1
-        assert res["hits"][0]["_id"] == "custom_vector_doc"
-        # Empty content doc should not be in lexical results
-        for hit in res["hits"]:
-            assert hit["_id"] != "empty_content_custom_vector_doc"
+                # Searching matching custom vector content returns custom vector
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="custom content is here!!",
+                    search_method=enums.SearchMethod.LEXICAL
+                )
+                assert len(res["hits"]) == 1
+                assert res["hits"][0]["_id"] == "custom_vector_doc"
+                # Empty content doc should not be in lexical results
+                for hit in res["hits"]:
+                    assert hit["_id"] != "empty_content_custom_vector_doc"
 
-        # Searching with normal text returns text
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="blah",
-            search_method=enums.SearchMethod.LEXICAL,
-        )
-        assert len(res["hits"]) == 1
-        assert res["hits"][0]["_id"] == "normal_doc"
-        # Empty content doc should not be in lexical results
-        for hit in res["hits"]:
-            assert hit["_id"] != "empty_content_custom_vector_doc"
+                # Searching with normal text returns text
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="blah",
+                    search_method=enums.SearchMethod.LEXICAL,
+                )
+                assert len(res["hits"]) == 1
+                assert res["hits"][0]["_id"] == "normal_doc"
+                # Empty content doc should not be in lexical results
+                for hit in res["hits"]:
+                    assert hit["_id"] != "empty_content_custom_vector_doc"
 
 
     def test_search_with_custom_vector_field_score_modifiers(self):
@@ -718,54 +669,314 @@ class TestCustomVectorField(MarqoTestCase):
         """
         # custom vector cannot be used as score modifier, as it cannot be numeric.
         # Using another field as score modifier on a custom vector:
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[
-                    {
-                        "_id": "doc0",
-                        "my_custom_vector": {
-                            "content": "vec 1",
-                            "vector": self.random_vector_1  # size is 512
-                        },
-                        "multiply": 0.001  # Should make score tiny
-                    },
-                    {
-                        "_id": "doc1",
-                        "my_custom_vector": {
-                            "content": "vec 2",
-                            "vector": self.random_vector_2  # size is 512
-                        },
-                        "multiply": 1000  # Should make score huge
-                    },
-                ],
-                device="cpu", mappings=self.mappings
-            )
-        )
+        for index in self.indexes:
+            with self.subTest(f"Index: {index.name}, type: {index.type}"):
+                add_docs_res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {
+                                "_id": "doc0",
+                                "my_custom_vector": {
+                                    "content": "vec 1",
+                                    "vector": self.random_vector_1  # size is 512
+                                },
+                                "multiply": 0.001  # Should make score tiny
+                            },
+                            {
+                                "_id": "doc1",
+                                "my_custom_vector": {
+                                    "content": "vec 2",
+                                    "vector": self.random_vector_2  # size is 512
+                                },
+                                "multiply": 1000.  # Should make score huge
+                            },
+                        ],
+                        device="cpu",
+                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
 
-        # Normal search should favor doc0
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
-        )
-        assert res["hits"][0]["_id"] == "doc0"
+                # Normal search should favor doc0
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
+                )
+                assert res["hits"][0]["_id"] == "doc0"
 
-        # Search with score modifiers multiplyyshould favor doc1
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            score_modifiers=ScoreModifier(**{"multiply_score_by":
-                                                 [{"field_name": "multiply",
-                                                   "weight": 1}
-                                                  ]
-                                             })
-        )
-        assert res["hits"][0]["_id"] == "doc1"
+                # Search with score modifiers multiply should favor doc1
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    score_modifiers=ScoreModifier(**{"multiply_score_by":
+                                                         [{"field_name": "multiply",
+                                                           "weight": 1}
+                                                          ]
+                                                     })
+                )
+                assert res["hits"][0]["_id"] == "doc1"
 
+    def test_search_with_custom_vector_field_filter_string(self):
+        """
+        Search for the doc, with filter string
+        """
+
+        new_mappings = {
+            "my_custom_vector": {
+                "type": "custom_vector"
+            },
+            "my_custom_vector_2": {
+                "type": "custom_vector"
+            },
+            "my_custom_vector_3": {
+                "type": "custom_vector"
+            },
+        }
+
+        for index in self.indexes:
+            with self.subTest(f"Index: {index.name}, type: {index.type}"):
+                add_docs_res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {
+                                "_id": "custom vector doc 1",
+                                "my_custom_vector": {
+                                    "content": "red blue yellow",
+                                    "vector": self.random_vector_1
+                                }
+                            },
+                            {
+                                "_id": "custom vector doc 2",
+                                "my_custom_vector_2": {
+                                    "content": "red",
+                                    "vector": self.random_vector_1
+                                }
+                            },
+                            {
+                                "_id": "custom vector doc 3",
+                                "my_custom_vector_2": {
+                                    "content": "blue",
+                                    "vector": self.random_vector_1
+                                },
+                                "my_custom_vector_3": {
+                                    "content": "chocolate",
+                                    "vector": self.random_vector_1
+                                }
+                            },
+                            {
+                                "_id": "custom vector doc 4",
+                                "my_custom_vector": {
+                                    "content": "yellow",
+                                    "vector": self.random_vector_1
+                                },
+                                # Empty content field. Should not affect the document getting returned.
+                                "my_custom_vector_2": {
+                                    "vector": self.random_vector_1
+                                },
+                                "my_custom_vector_3": {
+                                    "content": "chocolate",
+                                    "vector": self.random_vector_1
+                                }
+                            },
+                        ],
+                        device="cpu",
+                        mappings=new_mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                        tensor_fields=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # No filter: all docs are returned.
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    result_count=10
+                )
+                res_ids = set([hit["_id"] for hit in res["hits"]])
+                assert res_ids == {"custom vector doc 1", "custom vector doc 2", "custom vector doc 3", "custom vector doc 4"}
+
+                # Filter: custom vector 3 has chocolate
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    filter="my_custom_vector_3:chocolate", result_count=10
+                )
+                res_ids = set([hit["_id"] for hit in res["hits"]])
+                assert res_ids == {"custom vector doc 3", "custom vector doc 4"}
+
+                # Filter: AND statement
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    filter="my_custom_vector_3:chocolate AND my_custom_vector_2:blue", result_count=10
+                )
+                res_ids = set([hit["_id"] for hit in res["hits"]])
+                assert res_ids == {"custom vector doc 3"}
+
+                # Filter: OR statement
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    filter="my_custom_vector:red OR my_custom_vector_2:red", result_count=10
+                )
+                res_ids = set([hit["_id"] for hit in res["hits"]])
+                assert res_ids == {"custom vector doc 2"}
+
+                # Filter: parenthesis
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    filter="my_custom_vector:(red blue yellow)", result_count=10
+                )
+                res_ids = set([hit["_id"] for hit in res["hits"]])
+                assert res_ids == {"custom vector doc 1"}
+
+    def test_search_with_custom_vector_field_searchable_attributes(self):
+        """
+        Searchable attributes are only available for structured indexes.
+        """
+        for index in self.indexes:
+            with self.subTest(f"Index: {index.name}, type: {index.type}"):
+                # Skip this test for unstructured indexes.
+                if isinstance(index, UnstructuredMarqoIndex):
+                    break
+
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {
+                                "_id": "custom vector doc 1",
+                                "my_custom_vector": {
+                                    "content": "doesn't matter",
+                                    "vector": self.random_vector_1
+                                }
+                            },
+                            {
+                                "_id": "custom vector doc 2",
+                                "my_custom_vector_2": {
+                                    "content": "doesn't matter",
+                                    "vector": self.random_vector_2
+                                }
+                            },
+                            {
+                                "_id": "custom vector doc 3",
+                                "my_custom_vector_3": {
+                                    "content": "doesn't matter",
+                                    "vector": self.random_vector_3
+                                }
+                            },
+                        ],
+                        device="cpu"
+                    )
+                )
+
+                # All searchable attributes
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    searchable_attributes=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3"]
+                )
+                assert res["hits"][0]["_id"] == "custom vector doc 1"
+
+                # Only 2 and 3
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    searchable_attributes=["my_custom_vector_2", "my_custom_vector_3"]
+                )
+                assert res["hits"][0]["_id"] == "custom vector doc 2"
+
+                # Only 3
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    search_method=enums.SearchMethod.TENSOR,
+                    context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
+                    searchable_attributes=["my_custom_vector_3"]
+                )
+                assert res["hits"][0]["_id"] == "custom vector doc 3"
+
+    def test_lexical_search_with_custom_vector_field_searchable_attributes(self):
+        """
+        Search for the doc with lexical search, with searchable attributes
+        """
+
+        for index in self.indexes:
+            with self.subTest(f"Index: {index.name}, type: {index.type}"):
+                # Skip this test for unstructured indexes.
+                if isinstance(index, UnstructuredMarqoIndex):
+                    break
+                tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {
+                                "_id": "custom vector doc",
+                                "my_custom_vector": {
+                                    "content": "toxt to search",  # almost matching
+                                    "vector": self.random_vector_1  # size is 512
+                                }
+                            },
+                            {
+                                "_id": "barely matching doc",
+                                "barely_field": "random words search"
+                            },
+                            {
+                                "_id": "exactly matching doc",
+                                "exact_field": "text to search"
+                            }
+                        ],
+                        device="cpu"
+                    )
+                )
+
+                # All searchable attributes
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="text to search",
+                    search_method=enums.SearchMethod.LEXICAL,
+                    searchable_attributes=["my_custom_vector", "barely_field", "exact_field"]
+                )
+                assert res["hits"][0]["_id"] == "exactly matching doc"
+
+                # Only custom and barely matching
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="text to search",
+                    search_method=enums.SearchMethod.LEXICAL,
+                    searchable_attributes=["my_custom_vector", "barely_field"]
+                )
+                assert res["hits"][0]["_id"] == "custom vector doc"
+
+                # Only barely matching
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="text to search",
+                    search_method=enums.SearchMethod.LEXICAL,
+                    searchable_attributes=["barely_field"]
+                )
+                assert res["hits"][0]["_id"] == "barely matching doc"
+
+                # Only custom vector
+                res = tensor_search.search(
+                    config=self.config, index_name=index.name, text="text to search",
+                    search_method=enums.SearchMethod.LEXICAL,
+                    searchable_attributes=["my_custom_vector"]
+                )
+                assert res["hits"][0]["_id"] == "custom vector doc"
+
+    @unittest.skip
     def test_search_with_custom_vector_field_boosting(self):
         """
+        SKIPPED WHILE BOOSTING IS NOT YET IMPLEMENTED.
         Search for the doc, with boosting
         """
         mappings = {
@@ -816,248 +1027,3 @@ class TestCustomVectorField(MarqoTestCase):
             boost={"my_custom_vector_2": [5, 1]}
         )
         assert res["hits"][0]["_id"] == "doc1"
-
-    def test_search_with_custom_vector_field_filter_string(self):
-        """
-        Search for the doc, with filter string
-        """
-        new_mappings = {
-            "my_custom_vector_1": {
-                "type": "custom_vector"
-            },
-            "my_custom_vector_2": {
-                "type": "custom_vector"
-            },
-            "my_custom_vector_3": {
-                "type": "custom_vector"
-            },
-        }
-
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[
-                    {
-                        "_id": "custom vector doc 1",
-                        "my_custom_vector_1": {
-                            "content": "red blue yellow",
-                            "vector": self.random_vector_1
-                        }
-                    },
-                    {
-                        "_id": "custom vector doc 2",
-                        "my_custom_vector_2": {
-                            "content": "red",
-                            "vector": self.random_vector_1
-                        }
-                    },
-                    {
-                        "_id": "custom vector doc 3",
-                        "my_custom_vector_2": {
-                            "content": "blue",
-                            "vector": self.random_vector_1
-                        },
-                        "my_custom_vector_3": {
-                            "content": "chocolate",
-                            "vector": self.random_vector_1
-                        }
-                    },
-                    {
-                        "_id": "custom vector doc 4",
-                        "my_custom_vector_1": {
-                            "content": "yellow",
-                            "vector": self.random_vector_1
-                        },
-                        # Empty content field. Should not affect the document getting returned.
-                        "my_custom_vector_2": {
-                            "vector": self.random_vector_1
-                        },
-                        "my_custom_vector_3": {
-                            "content": "chocolate",
-                            "vector": self.random_vector_1
-                        }
-                    },
-                ],
-                device="cpu", mappings=new_mappings
-            )
-        )
-
-        # Filter: all
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            filter="*:*", result_count=10
-        )
-        res_ids = set([hit["_id"] for hit in res["hits"]])
-        assert res_ids == {"custom vector doc 1", "custom vector doc 2", "custom vector doc 3", "custom vector doc 4"}
-
-        # Filter: custom vector 3 has chocolate
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            filter="my_custom_vector_3:chocolate", result_count=10
-        )
-        res_ids = set([hit["_id"] for hit in res["hits"]])
-        assert res_ids == {"custom vector doc 3", "custom vector doc 4"}
-
-        # Filter: AND statement
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            filter="my_custom_vector_3:chocolate AND my_custom_vector_2:blue", result_count=10
-        )
-        res_ids = set([hit["_id"] for hit in res["hits"]])
-        assert res_ids == {"custom vector doc 3"}
-
-        # Filter: OR statement
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            filter="my_custom_vector_1:red OR my_custom_vector_2:red", result_count=10
-        )
-        res_ids = set([hit["_id"] for hit in res["hits"]])
-        assert res_ids == {"custom vector doc 2"}
-
-        # Filter: parenthesis
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            filter="my_custom_vector_1:(red blue yellow)", result_count=10
-        )
-        res_ids = set([hit["_id"] for hit in res["hits"]])
-        assert res_ids == {"custom vector doc 1"}
-
-    def test_search_with_custom_vector_field_searchable_attributes(self):
-        new_mappings = {
-            "my_custom_vector_1": {
-                "type": "custom_vector"
-            },
-            "my_custom_vector_2": {
-                "type": "custom_vector"
-            },
-            "my_custom_vector_3": {
-                "type": "custom_vector"
-            },
-        }
-
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[
-                    {
-                        "_id": "custom vector doc 1",
-                        "my_custom_vector_1": {
-                            "content": "doesn't matter",
-                            "vector": self.random_vector_1
-                        }
-                    },
-                    {
-                        "_id": "custom vector doc 2",
-                        "my_custom_vector_2": {
-                            "content": "doesn't matter",
-                            "vector": self.random_vector_2
-                        }
-                    },
-                    {
-                        "_id": "custom vector doc 3",
-                        "my_custom_vector_3": {
-                            "content": "doesn't matter",
-                            "vector": self.random_vector_3
-                        }
-                    },
-                ],
-                device="cpu", mappings=new_mappings
-            )
-        )
-
-        # All searchable attributes
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            searchable_attributes=["my_custom_vector_1", "my_custom_vector_2", "my_custom_vector_3"]
-        )
-        assert res["hits"][0]["_id"] == "custom vector doc 1"
-
-        # Only 2 and 3
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            searchable_attributes=["my_custom_vector_2", "my_custom_vector_3"]
-        )
-        assert res["hits"][0]["_id"] == "custom vector doc 2"
-
-        # Only 3
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
-            search_method=enums.SearchMethod.TENSOR,
-            context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-            searchable_attributes=["my_custom_vector_3"]
-        )
-        assert res["hits"][0]["_id"] == "custom vector doc 3"
-
-    def test_lexical_search_with_custom_vector_field_searchable_attributes(self):
-        """
-        Search for the doc, with searchable attributes
-        """
-        tensor_search.add_documents(
-            config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1,
-                docs=[
-                    {
-                        "_id": "custom vector doc",
-                        "my_custom_vector": {
-                            "content": "toxt to search",  # almost matching
-                            "vector": self.random_vector_1  # size is 512
-                        }
-                    },
-                    {
-                        "_id": "barely matching doc",
-                        "barely field": "random words search"
-                    },
-                    {
-                        "_id": "exactly matching doc",
-                        "exact field": "text to search"
-                    }
-                ],
-                device="cpu", mappings=self.mappings
-            )
-        )
-
-        # All searchable attributes
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="text to search",
-            search_method=enums.SearchMethod.LEXICAL,
-            searchable_attributes=["my_custom_vector", "barely field", "exact field"]
-        )
-        assert res["hits"][0]["_id"] == "exactly matching doc"
-
-        # Only custom and barely matching
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="text to search",
-            search_method=enums.SearchMethod.LEXICAL,
-            searchable_attributes=["my_custom_vector", "barely field"]
-        )
-        assert res["hits"][0]["_id"] == "custom vector doc"
-
-        # Only barely matching
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="text to search",
-            search_method=enums.SearchMethod.LEXICAL,
-            searchable_attributes=["barely field"]
-        )
-        assert res["hits"][0]["_id"] == "barely matching doc"
-
-        # Only custom vector
-        res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="text to search",
-            search_method=enums.SearchMethod.LEXICAL,
-            searchable_attributes=["my_custom_vector"]
-        )
-        assert res["hits"][0]["_id"] == "custom vector doc"
