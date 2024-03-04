@@ -1996,7 +1996,7 @@ def vectorise_multimodal_combination_field_structured(
     """
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
-    field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+    field_content = {"tensor_field_one" : {"weight":0.5, "parameter": "test-parameter-1"},
                     "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically,
     1. we don't do any chunking here.
