@@ -17,11 +17,11 @@ def create_index():
 
 
 def multimodal_combination_object():
-    return _build_url('Advanced-Usage/document_fields/#multimodal-combination-object/')
+    return _build_url('Guides/Advanced-Usage/document_fields/#multimodal-combination-object/')
 
 
 def custom_vector_object():
-    return _build_url('Advanced-Usage/document_fields/#custom-vectors/')
+    return _build_url('Guides/Advanced-Usage/document_fields/#custom-vectors/')
 
 
 def mappings():
@@ -33,4 +33,4 @@ def dense_retrieval():
 
 
 def search_context():
-    return _build_url('API-Reference/search/#context/')
+    return _build_url('API-Reference/Search/search/#context')
