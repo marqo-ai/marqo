@@ -1,10 +1,13 @@
 import os
 import random
-from unittest import mock
 import threading
+from unittest import mock
 
 import numpy as np
 
+from marqo.api.exceptions import BadRequestError
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
@@ -12,8 +15,6 @@ from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from tests.marqo_test import MarqoTestCase
-from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.api.exceptions import BadRequestError
 
 
 class TestUpdate(MarqoTestCase):
@@ -70,13 +71,19 @@ class TestUpdate(MarqoTestCase):
 
         )
 
+        test_unstructured_index_request = cls.unstructured_marqo_index_request(
+            model=Model(name="random/small"),
+        )
+
         cls.indexes = cls.create_indexes([
             structured_index_request_1,
-            large_score_modifiers_index_request
+            large_score_modifiers_index_request,
+            test_unstructured_index_request
         ])
 
         cls.structured_index_name = structured_index_request_1.name
         cls.large_score_modifier_index_name = large_score_modifiers_index_request.name
+        cls.test_unstructured_index_name = test_unstructured_index_request.name
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -680,3 +687,14 @@ class TestUpdate(MarqoTestCase):
         with mock.patch.dict(os.environ, {"MARQO_MAX_DOCUMENTS_BATCH_SIZE": "129"}):
             r = update_documents(body=UpdateDocumentsBodyParams(documents=[{"_id": "1"}] * 129),
                                  index_name=self.structured_index_name, marqo_config=self.config)
+
+    def test_proper_error_is_raised_for_unstructured_index(self):
+        updated_doc = {
+            "text_field_tensor": "I can't be updated",
+            "_id": "1"
+        }
+        with self.assertRaises(UnsupportedFeatureError) as cm:
+            r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
+                                 index_name=self.test_unstructured_index_name, marqo_config=self.config)
+
+        self.assertIn("is not supported for unstructured indexes", str(cm.exception))
