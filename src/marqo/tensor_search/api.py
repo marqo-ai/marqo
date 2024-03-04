@@ -209,7 +209,7 @@ def add_or_replace_documents(
         )
 
 
-@app.post("/indexes/{index_name}/documents/update")
+@app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
         body: UpdateDocumentsBodyParams,
