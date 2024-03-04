@@ -9,7 +9,7 @@ from marqo.vespa.models import UpdateBatchResponse, VespaDocument
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.models.marqo_index import IndexType
 import marqo.api.exceptions as api_exceptions
-from marqo.core.models.update_documents import UpdateDocumentsBodyParams
+from marqo.core.models.update_documents import UpdateDocumentsParams
 
 
 class Document:
@@ -33,26 +33,27 @@ class Document:
         return res.document_count
 
     def partial_update_documents_by_index_name(self, index_name,
-                                               update_documents_params: UpdateDocumentsBodyParams) -> Dict:
+                                               update_documents_params: UpdateDocumentsParams) -> Dict:
         if not self.index_management.index_exists(index_name):
             raise IndexNotFoundError(f"Index {index_name} does not exist")
 
         marqo_index = self.index_management.get_index(index_name)
-        if marqo_index.type == IndexType.Structured:
-            return self.structured_partial_update_documents(update_documents_params.documents, marqo_index)
-        elif marqo_index.type == IndexType.Unstructured:
+        return self.partial_update_documents(update_documents_params, marqo_index)
+
+    def partial_update_documents(self, update_documents_params: UpdateDocumentsParams, marqo_index):
+        """Partially updates documents in the given index by marqo_index object.
+
+        This is not supported for unstructured indexes."""
+        if marqo_index.type == IndexType.Unstructured:
             raise UnsupportedFeatureError("'Partial document update' is not supported for unstructured indexes. "
                                           "Please use 'add_documents' with 'use_existing_tensor=True' instead.")
-        else:
-            ValueError(f"No known implementation for index type {marqo_index.type}")
 
-    def structured_partial_update_documents(self, documents, marqo_index):
         start_time = timer()
         vespa_index = vespa_index_factory(marqo_index)
         vespa_documents: List[VespaDocument] = []
         unsuccessful_docs: List = []
 
-        for index, doc in enumerate(documents):
+        for index, doc in enumerate(update_documents_params.documents):
             try:
                 vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc))
                 vespa_documents.append(vespa_document)

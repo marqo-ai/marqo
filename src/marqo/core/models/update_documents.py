@@ -1,13 +1,14 @@
 from typing import Dict, Sequence, Any
 
-from marqo.base_model import ImmutableStrictBaseModel
-from pydantic import BaseModel, validator
+from pydantic import validator
+
 from marqo.api.exceptions import BadRequestError
-from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
+from marqo.base_model import ImmutableStrictBaseModel
 from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
-class UpdateDocumentsBodyParams(ImmutableStrictBaseModel):
+class UpdateDocumentsParams(ImmutableStrictBaseModel):
     documents: Sequence[Dict[str, Any]]
 
     @validator('documents')
@@ -24,5 +25,5 @@ class UpdateDocumentsBodyParams(ImmutableStrictBaseModel):
                         f"If using the Python client, break up your `update_documents` request into smaller batches "
                         f"using its `client_batch_size` parameter. "
             )
-        return documents
 
+        return documents

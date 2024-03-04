@@ -28,7 +28,8 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
-from marqo.core.models.update_documents import UpdateDocumentsBodyParams
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.core.models.update_documents import UpdateDocumentsParams
 
 logger = get_logger(__name__)
 
@@ -209,14 +210,17 @@ def add_or_replace_documents(
 
 
 @app.post("/indexes/{index_name}/documents/update")
-@throttle(RequestType.UPDATE)
+@throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
         body: UpdateDocumentsBodyParams,
         index_name: str,
         marqo_config: config.Config = Depends(get_config)):
     """update_documents endpoint"""
+
+    update_documents_params = UpdateDocumentsParams(documents=body.documents)
+
     return marqo_config.document.partial_update_documents_by_index_name(
-        index_name=index_name, update_documents_params=body)
+        index_name=index_name, update_documents_params=update_documents_params)
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

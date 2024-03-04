@@ -12,7 +12,7 @@ from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from tests.marqo_test import MarqoTestCase
-from marqo.core.models.update_documents import UpdateDocumentsBodyParams
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.exceptions import BadRequestError
 
 
