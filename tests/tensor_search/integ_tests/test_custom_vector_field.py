@@ -12,6 +12,7 @@ from unittest import mock
 from unittest.mock import patch
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
+import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse
@@ -19,6 +20,7 @@ import os
 import pprint
 import unittest
 import httpx
+import uuid
 
 
 class TestCustomVectorField(MarqoTestCase):
@@ -86,7 +88,8 @@ class TestCustomVectorField(MarqoTestCase):
                     type="multimodal_combination",
                     dependent_fields={"multimodal_text": 0.4, "multimodal_image": 0.6})
             ],
-            tensor_fields=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3", "text_field", "my_multimodal"]
+            tensor_fields=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3",
+                           "text_field", "my_multimodal"]
         )
 
         cls.indexes = cls.create_indexes([
@@ -94,7 +97,11 @@ class TestCustomVectorField(MarqoTestCase):
             structured_custom_index
         ])
 
+        cls.unstructured_custom_index = cls.indexes[0]
+        cls.structured_custom_index = cls.indexes[1]
+
     def setUp(self):
+        super().setUp()
         self.mappings = {
             "my_custom_vector": {
                 "type": "custom_vector"
@@ -111,6 +118,7 @@ class TestCustomVectorField(MarqoTestCase):
         self.device_patcher.start()
 
     def tearDown(self) -> None:
+        super().tearDown()
         self.device_patcher.stop()
 
     def test_add_documents_with_custom_vector_field(self):
@@ -972,6 +980,68 @@ class TestCustomVectorField(MarqoTestCase):
                     searchable_attributes=["my_custom_vector"]
                 )
                 assert res["hits"][0]["_id"] == "custom vector doc"
+
+    def test_custom_vector_subfield_of_multimodal_should_fail_structured(self):
+        """
+        When attempting to create a structured index, a custom vector can not be a subfield of a multimodal field.
+        Remove this test when this functionality becomes available.
+        """
+
+        with self.assertRaises(base_exceptions.InvalidArgumentError) as cm:
+            bad_index_request = self.structured_marqo_index_request(
+                fields=[
+                    FieldRequest(
+                        name="my_custom_vector",
+                        type="custom_vector"),
+                    FieldRequest(
+                        name="bad_multimodal",
+                        type="multimodal_combination",
+                        dependent_fields={"my_custom_vector": 0.5})
+                ],
+                tensor_fields=["my_custom_vector", "bad_multimodal"]
+            )
+
+        self.assertIn("cannot be a subfield of a multimodal field", cm.exception.message)
+
+    def test_custom_vector_subfield_of_multimodal_should_fail_unstructured(self):
+        """
+        When attempting to add documents to an unstructured index, a custom vector can not be a subfield of a multimodal field.
+        Remove this test when this functionality becomes available.
+        """
+
+        add_docs_res = tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.unstructured_custom_index.name,
+                docs=[
+                    {
+                        "_id": "doc0",
+                        "my_custom_vector": {
+                            "content": "vec 1",
+                            "vector": self.random_vector_1  # size is 512
+                        },
+                    }
+                ],
+                device="cpu",
+                tensor_fields=["my_custom_vector", "bad_multimodal"],
+                mappings={
+                    "my_custom_vector": {
+                        "type": "custom_vector"
+                    },
+                    "bad_multimodal": {
+                        "type": "multimodal_combination",
+                        "weights": {
+                            "my_custom_vector": 0.5
+                        }
+                    }
+                }
+            )
+        )
+
+        self.assertEqual(add_docs_res["errors"], True)
+        self.assertEqual(add_docs_res["items"][0]["code"], "invalid_argument")
+        self.assertEqual(add_docs_res["items"][0]["status"], 400)
+        self.assertIn("Multimodal subfields must be strings", add_docs_res["items"][0]["error"])
+
 
     @unittest.skip
     def test_search_with_custom_vector_field_boosting(self):

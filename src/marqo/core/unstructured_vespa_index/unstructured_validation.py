@@ -91,8 +91,6 @@ def validate_coupling_of_mappings_and_doc(doc: Dict, mappings: Dict, multimodal_
     if multimodal_fields:
         _validate_conflicts_fields(multimodal_fields, doc)
         _validate_multimodal_sub_fields_content(doc, multimodal_sub_fields)
-        # Remove this validation once we support custom vector fields as multimodal subfields
-        _validate_custom_vector_field_not_a_sub_field_of_multimodal(multimodal_sub_fields, custom_vector_fields)
 
 
 def _validate_multimodal_sub_fields_content(doc: Dict, multimodal_sub_fields: List):
@@ -111,14 +109,6 @@ def _validate_conflicts_fields(multimodal_fields: List[str], doc: Dict):
     if mappings_fields.intersection(doc_fields):
         raise errors.InvalidArgError(
             f"Document and mappings object have conflicting fields: {mappings_fields.intersection(doc_fields)}")
-
-
-def _validate_custom_vector_field_not_a_sub_field_of_multimodal(multimodal_sub_fields: List[str], custom_vector_fields: List[str]):
-    for custom_vector_field in custom_vector_fields:
-        if custom_vector_field in multimodal_sub_fields:
-            raise errors.InvalidArgError(
-                f"Custom vector field {custom_vector_field} can not be a multimodal subfield.")
-
 
 def validate_tensor_fields(tensor_fields: Optional[List[str]]) -> None:
     """Validate the tensor fields
