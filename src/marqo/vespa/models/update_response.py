@@ -4,11 +4,6 @@ from pydantic import BaseModel, Field, root_validator
 
 
 class UpdateDocumentResponse(BaseModel):
-    path_id: str = Field(alias='pathId')
-    id: str
-
-
-class UpdateBatchDocumentResponse(BaseModel):
     status: int
     path_id: str = Field(alias='pathId')
     id: Optional[str]
@@ -23,6 +18,6 @@ class UpdateBatchDocumentResponse(BaseModel):
         return values
 
 
-class UpdateBatchResponse(BaseModel):
-    responses: List[UpdateBatchDocumentResponse]
+class UpdateDocumentsBatchResponse(BaseModel):
+    responses: List[UpdateDocumentResponse]
     errors: bool

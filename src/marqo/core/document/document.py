@@ -7,7 +7,7 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
-from marqo.vespa.models import UpdateBatchResponse, VespaDocument
+from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
 from marqo.vespa.vespa_client import VespaClient
 from marqo.core.constants import MARQO_DOC_ID
@@ -103,13 +103,13 @@ class Document:
                     (index, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''), error=e.message,
                                                      status=int(api_exceptions.InvalidArgError.status_code))))
 
-        vespa_res: UpdateBatchResponse = self.vespa_client.update_documents_batch(vespa_documents,
-                                                                                  marqo_index.schema_name)
+        vespa_res: UpdateDocumentsBatchResponse = self.vespa_client.update_documents_batch(vespa_documents,
+                                                                                           marqo_index.schema_name)
 
         return self._translate_update_document_response(vespa_res, unsuccessful_docs,
                                                         marqo_index.name, start_time)
 
-    def _translate_update_document_response(self, responses: UpdateBatchResponse, unsuccessful_docs: List,
+    def _translate_update_document_response(self, responses: UpdateDocumentsBatchResponse, unsuccessful_docs: List,
                                             index_name: str, start_time) \
             -> MarqoUpdateDocumentsResponse:
         """Translates Vespa response dict into MarqoUpdateDocumentsResponse for document update

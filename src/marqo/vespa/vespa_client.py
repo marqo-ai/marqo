@@ -15,7 +15,7 @@ import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError, VespaTimeoutError
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
-    FeedDocumentResponse, UpdateBatchResponse, UpdateBatchDocumentResponse
+    FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
     DeleteBatchResponse, DeleteAllDocumentsResponse
@@ -62,7 +62,6 @@ class VespaClient:
         self.get_pool_size = get_pool_size
         self.delete_pool_size = delete_pool_size
         self.put_pool_size = put_pool_size
-
 
     def close(self):
         """
@@ -445,9 +444,9 @@ class VespaClient:
         return batch_response
 
     def update_documents_batch(self, batch: List[VespaDocument],
-                     schema: str,
-                     concurrency: Optional[int] = None,
-                     timeout: int = 60) -> UpdateBatchResponse:
+                               schema: str,
+                               concurrency: Optional[int] = None,
+                               timeout: int = 60) -> UpdateDocumentsBatchResponse:
         """
         Partial update documents in batch concurrently.
 
@@ -462,11 +461,11 @@ class VespaClient:
             timeout: Timeout in seconds per request
 
         Returns:
-            A UpdateBatchResponse object
+            A UpdateDocumentsBatchResponse object
         """
 
         if not batch:
-            return UpdateBatchResponse(responses=[], errors=False)
+            return UpdateDocumentsBatchResponse(responses=[], errors=False)
 
         if concurrency is None:
             concurrency = self.put_pool_size
@@ -616,8 +615,8 @@ class VespaClient:
         return FeedBatchResponse(responses=responses, errors=errors)
 
     async def _update_documents_batch_async(self, batch: List[VespaDocument],
-                                  schema: str,
-                                  connections: int, timeout: int) -> UpdateBatchResponse:
+                                            schema: str,
+                                            connections: int, timeout: int) -> UpdateDocumentsBatchResponse:
         async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
                                                          max_connections=connections)) as async_client:
             semaphore = asyncio.Semaphore(connections)
@@ -637,11 +636,11 @@ class VespaClient:
             if result.status != 200:
                 errors = True
 
-        return UpdateBatchResponse(responses=responses, errors=errors)
+        return UpdateDocumentsBatchResponse(responses=responses, errors=errors)
 
     async def _update_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                      document: VespaDocument, schema: str,
-                                     timeout: int) -> UpdateBatchDocumentResponse:
+                                     timeout: int) -> UpdateDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
 
@@ -655,7 +654,7 @@ class VespaClient:
 
         try:
             # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
-            return UpdateBatchDocumentResponse(**resp.json(), status=resp.status_code)
+            return UpdateDocumentResponse(**resp.json(), status=resp.status_code)
         except JSONDecodeError:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here
