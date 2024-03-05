@@ -698,3 +698,39 @@ class TestUpdate(MarqoTestCase):
                                  index_name=self.test_unstructured_index_name, marqo_config=self.config)
 
         self.assertIn("is not supported for unstructured indexes", str(cm.exception))
+
+    def test_duplicate_ids_in_one_batch(self):
+        """Test the behaviour when there are duplicate ids in a single batch.
+
+        Note: The expected behaviour is that the last document given in the batch is used while the formers are ignored.
+        """
+
+        self._set_up_for_text_field_test()
+        update_docs = [
+            {
+                "text_field": "updated text field 1",
+                "text_field_lexical": "text field lexical 1",
+                "_id": "1"
+            },
+            {
+                "text_field": "updated text field 2",
+                "text_field_lexical": "text field lexical 2",
+                "_id": "1"
+            },
+            {
+                "text_field": "updated text field 3",
+                "text_field_lexical": "text field lexical 3",
+                "_id": "1"
+            }
+        ]
+        for i in range(10):
+
+            r = update_documents(body=UpdateDocumentsBodyParams(documents=update_docs),
+                                 index_name=self.structured_index_name, marqo_config=self.config)
+
+            updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, "1")
+
+            self.assertEqual(1, len(r["items"]))
+            self.assertEqual(200, r["items"][0]["status"])
+            self.assertEqual("updated text field 3", updated_doc["text_field"])
+            self.assertEqual("text field lexical 3", updated_doc["text_field_lexical"])

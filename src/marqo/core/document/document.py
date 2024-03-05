@@ -10,6 +10,10 @@ from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.vespa.models import UpdateBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
 from marqo.vespa.vespa_client import VespaClient
+from marqo.core.constants import MARQO_DOC_ID
+from marqo.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Document:
@@ -59,6 +63,11 @@ class Document:
             -> MarqoUpdateDocumentsResponse:
         """Partially updates documents in the given index by marqo_index object.
 
+        The partial_documents without _id will error out and the error will be returned in the response without
+        error out the entire batch.
+
+        If there exists duplicate _id in the partial_documents, the last document will be used.
+
         Args:
             partial_documents: A list of documents to partially update
             marqo_index: The index object to partially update documents in
@@ -82,13 +91,16 @@ class Document:
         vespa_documents: List[VespaDocument] = []
         unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]] = []
 
+        # Remove duplicated documents based on _id
+        partial_documents, _ = self.remove_duplicated_documents(partial_documents)
+
         for index, doc in enumerate(partial_documents):
             try:
                 vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc))
                 vespa_documents.append(vespa_document)
             except ParsingError as e:
                 unsuccessful_docs.append(
-                    (index, MarqoUpdateDocumentsItem(id=doc.get('_id', ''), error=e.message,
+                    (index, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''), error=e.message,
                                                      status=int(api_exceptions.InvalidArgError.status_code))))
 
         vespa_res: UpdateBatchResponse = self.vespa_client.update_documents_batch(vespa_documents,
@@ -127,3 +139,32 @@ class Document:
 
         return MarqoUpdateDocumentsResponse(indexName=index_name, items=new_items,
                                             preprocessingTime=(timer() - start_time) * 1000)
+
+    def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
+        """Remove duplicated documents based on _id in the given list of documents
+
+        For a list of documents, if there exists duplicate _id, the last document will be used while the
+        previous ones will be removed from the list.
+
+        This function does not validate the documents, it only removes the duplicates based on _id fields.
+        """
+        # Deduplicate docs, keep the latest
+        docs = []
+        doc_ids = set()
+        for i in range(len(documents) - 1, -1, -1):
+            doc = documents[i]
+
+            if isinstance(doc, dict) and '_id' in doc:
+                doc_id = doc['_id']
+                try:
+                    if doc_id is not None and doc_id in doc_ids:
+                        logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
+                        continue
+                    doc_ids.add(doc_id)
+                except TypeError as e:  # Happens if ID is a non-hashable type -- ID validation will catch this later on
+                    logger.debug(f'Could not hash document ID {doc_id}: {e}')
+
+            docs.append(doc)
+        # Reverse to preserve order in request
+        docs.reverse()
+        return docs, doc_ids
