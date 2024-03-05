@@ -92,7 +92,7 @@ class TestUpdate(MarqoTestCase):
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
-    def set_up_for_text_field_test(self):
+    def _set_up_for_text_field_test(self):
         """A helper function to set up the index to test the update document feature for text fields with
         different features."""
         original_doc = {
@@ -108,7 +108,7 @@ class TestUpdate(MarqoTestCase):
         ))
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
-    def set_up_for_int_field_test(self):
+    def _set_up_for_int_field_test(self):
         """A helper function to set up the index to test the update document feature for int fields with
         different features."""
         original_doc = {
@@ -124,7 +124,7 @@ class TestUpdate(MarqoTestCase):
         ))
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
-    def set_up_for_float_field_test(self):
+    def _set_up_for_float_field_test(self):
         """A helper function to set up the index to test the update document feature for float fields with
         different features."""
         original_doc = {
@@ -141,7 +141,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
     def test_update_text_field(self):
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
 
         updated_doc = {
             "text_field": "updated text field",
@@ -154,7 +154,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual("updated text field", updated_doc["text_field"])
 
     def test_update_text_field_filter(self):
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
 
         updated_doc = {
             "text_field_filter": "updated text field filter",
@@ -175,7 +175,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_text_field_lexical(self):
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
         updated_doc = {
             "text_field_lexical": "search me please",
             "_id": "1"
@@ -196,7 +196,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(0, len(lexical_search_result["hits"]))
 
     def test_update_text_field_tensor(self):
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
         updated_doc = {
             "text_field_tensor": "I can't be updated",
             "_id": "1"
@@ -208,7 +208,7 @@ class TestUpdate(MarqoTestCase):
 
     def test_update_text_field_add(self):
         """Ensure we can add a field to an indexing schema using the update document feature."""
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
         updated_doc = {
             "text_field_add": "I am a new field",
             "_id": "1"
@@ -228,7 +228,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(1, len(filter_search_result["hits"]))
 
     def test_update_int_field(self):
-        self.set_up_for_int_field_test()
+        self._set_up_for_int_field_test()
         updated_doc = {
             "int_field": 11,
             "_id": "1"
@@ -240,7 +240,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(11, updated_doc["int_field"])
 
     def test_update_int_field_filter(self):
-        self.set_up_for_int_field_test()
+        self._set_up_for_int_field_test()
         updated_doc = {
             "int_field_filter": 22,
             "_id": "1"
@@ -260,7 +260,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_int_field_score_modifier(self):
-        self.set_up_for_int_field_test()
+        self._set_up_for_int_field_test()
         updated_doc = {
             "int_field_score_modifier": 33,
             "_id": "1"
@@ -280,7 +280,7 @@ class TestUpdate(MarqoTestCase):
         self.assertTrue(33 <= modified_score <= 34, f"Modified score is {modified_score}")
 
     def test_update_float_field(self):
-        self.set_up_for_float_field_test()
+        self._set_up_for_float_field_test()
         updated_doc = {
             "float_field": 11.1,
             "_id": "1"
@@ -292,7 +292,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(11.1, updated_doc["float_field"])
 
     def test_update_float_field_filter(self):
-        self.set_up_for_float_field_test()
+        self._set_up_for_float_field_test()
         updated_doc = {
             "float_field_filter": 22.2,
             "_id": "1"
@@ -312,7 +312,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_float_field_score_modifier(self):
-        self.set_up_for_float_field_test()
+        self._set_up_for_float_field_test()
         updated_doc = {
             "float_field_score_modifier": 33.3,
             "_id": "1"
@@ -465,7 +465,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(0, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
     def test_update_multiple_fields_simultaneously(self):
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
         updated_doc = {
             "_id": "1",
             "text_field": "updated text field multi",
@@ -483,7 +483,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(True, updated_doc["bool_field_filter"])
 
     def test_update_non_existent_field(self):
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
         updated_doc = {
             "_id": "1",
             "non_existent_field": "some value"
@@ -495,7 +495,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(400, r["items"][0]["status"])
 
     def test_update_with_incorrect_field_value(self):
-        self.set_up_for_text_field_test()
+        self._set_up_for_text_field_test()
 
         test_cases = [
             ({"int_field_filter": "should be an integer"}, True, "This should be an integer"),

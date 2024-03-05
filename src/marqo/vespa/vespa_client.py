@@ -37,7 +37,8 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, pool_size: int = 10):
+                 content_cluster_name: str, pool_size: int = 10, post_pool_size: int = 10,
+                 get_pool_size: int = 10, delete_pool_size: int = 10, put_pool_size: int = 10):
         """
         Create a VespaClient object.
         Args:
@@ -45,6 +46,10 @@ class VespaClient:
             document_url: Vespa Document API base URL
             query_url: Vespa Query API base URL
             pool_size: Number of connections to keep in the connection pool
+            post_pool_size: Number of connections to keep in batch POST requests connection pool to Vespa
+            get_pool_size: Number of connections to keep in batch GET requests connection pool to Vespa
+            delete_pool_size: Number of connections to keep batch DELETE requests connection pool to Vespa
+            put_pool_size: Number of connections to keep batch PUT requests connection pool to Vespa
         """
         self.config_url = config_url.strip('/')
         self.document_url = document_url.strip('/')
@@ -53,6 +58,11 @@ class VespaClient:
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
         self.content_cluster_name = content_cluster_name
+        self.post_pool_size = post_pool_size
+        self.get_pool_size = get_pool_size
+        self.delete_pool_size = delete_pool_size
+        self.put_pool_size = put_pool_size
+
 
     def close(self):
         """
@@ -205,7 +215,7 @@ class VespaClient:
     def feed_batch(self,
                    batch: List[VespaDocument],
                    schema: str,
-                   concurrency: int = 10,
+                   concurrency: Optional[int] = None,
                    timeout: int = 60) -> FeedBatchResponse:
         """
         Feed a batch of documents to Vespa concurrently.
@@ -223,6 +233,9 @@ class VespaClient:
         """
         if not batch:
             return FeedBatchResponse(responses=[], errors=False)
+
+        if concurrency is None:
+            concurrency = self.post_pool_size
 
         batch_response = conc.run_coroutine(
             self._feed_batch_async(batch, schema, concurrency, timeout)
@@ -340,7 +353,7 @@ class VespaClient:
     def get_batch(self,
                   ids: List[str],
                   schema: str,
-                  concurrency: int = 10,
+                  concurrency: Optional[int] = None,
                   timeout: int = 60) -> GetBatchResponse:
         """
         Get a batch of documents by ID concurrently.
@@ -360,6 +373,9 @@ class VespaClient:
         """
         if not ids:
             return GetBatchResponse(responses=[], errors=False)
+
+        if concurrency is None:
+            concurrency = self.get_pool_size
 
         batch_response = conc.run_coroutine(
             self._get_batch_async(ids, schema, concurrency, timeout)
@@ -400,7 +416,7 @@ class VespaClient:
     def delete_batch(self,
                      ids: List[str],
                      schema: str,
-                     concurrency: int = 10,
+                     concurrency: Optional[int] = None,
                      timeout: int = 60) -> DeleteBatchResponse:
         """
         Delete a batch of documents by ID concurrently.
@@ -419,22 +435,44 @@ class VespaClient:
         if not ids:
             return DeleteBatchResponse(responses=[], errors=False)
 
+        if concurrency is None:
+            concurrency = self.delete_pool_size
+
         batch_response = conc.run_coroutine(
             self._delete_batch_async(ids, schema, concurrency, timeout)
         )
 
         return batch_response
 
-    def update_batch(self, batch: List[VespaDocument],
+    def update_documents_batch(self, batch: List[VespaDocument],
                      schema: str,
-                     concurrency: int = 10,
+                     concurrency: Optional[int] = None,
                      timeout: int = 60) -> UpdateBatchResponse:
+        """
+        Partial update documents in batch concurrently.
+
+        If the document does not exist, it will not be created and an error for that document will be
+        returned in the response.
+
+        Args:
+            batch: A list of documents to update
+            schema: schema name
+            concurrency: Number of concurrent delete requests, can be configured by environment variable
+                VESPA_PUT_POOL_SIZE
+            timeout: Timeout in seconds per request
+
+        Returns:
+            A UpdateBatchResponse object
+        """
 
         if not batch:
             return UpdateBatchResponse(responses=[], errors=False)
 
+        if concurrency is None:
+            concurrency = self.put_pool_size
+
         batch_response = conc.run_coroutine(
-            self._update_batch_async(batch, schema, concurrency, timeout)
+            self._update_documents_batch_async(batch, schema, concurrency, timeout)
         )
 
         return batch_response
@@ -577,7 +615,7 @@ class VespaClient:
 
         return FeedBatchResponse(responses=responses, errors=errors)
 
-    async def _update_batch_async(self, batch: List[VespaDocument],
+    async def _update_documents_batch_async(self, batch: List[VespaDocument],
                                   schema: str,
                                   connections: int, timeout: int) -> UpdateBatchResponse:
         async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
@@ -641,10 +679,10 @@ class VespaClient:
         try:
             # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
             return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
-        except JSONDecodeError:
+        except JSONDecodeError as e:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here
-                raise VespaError(f'Unexpected response: {resp.text}')
+                raise VespaError(f'Unexpected response: {resp.text}') from e
 
             self._raise_for_status(resp)
 

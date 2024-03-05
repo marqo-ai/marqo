@@ -58,9 +58,7 @@ class StructuredVespaIndex(VespaIndex):
         score_modifiers: Dict[str, float] = dict()
 
         if constants.MARQO_DOC_ID not in marqo_document:
-            raise MarqoDocumentParsingError(f"Marqo encountered an error when parsing the partial update document "
-                                            f"'{marqo_document}'. '{constants.MARQO_DOC_ID}' is a required field "
-                                            f"but it does not exist.")
+            raise MarqoDocumentParsingError(f"'{constants.MARQO_DOC_ID}' is a required field but it does not exist.")
         else:
             vespa_id = marqo_document[constants.MARQO_DOC_ID]
             self._verify_id_field(vespa_id)
@@ -69,20 +67,15 @@ class StructuredVespaIndex(VespaIndex):
             if marqo_field == constants.MARQO_DOC_ID:
                 continue
             if marqo_field == constants.MARQO_DOC_TENSORS:
-                raise MarqoDocumentParsingError(f"Marqo encountered an error when parsing the partial update document "
-                                                f"'{marqo_document}'. You can not modify '{marqo_field}' "
-                                                f"field. ")
+                raise MarqoDocumentParsingError(f" You cannot modify '{marqo_field}' field. ")
 
             tensor_fields_names = [tensor_field.name for tensor_field in self._marqo_index.tensor_fields]
             if marqo_field in tensor_fields_names:
-                raise MarqoDocumentParsingError(f"Marqo encountered an error when parsing the partial update document "
-                                                f"'{marqo_document}'. You CAN NOT modify '{marqo_field}' "
-                                                f"field as this is a tensor field.")
+                raise MarqoDocumentParsingError(f"You cannot modify '{marqo_field}' field as this is a tensor field.")
 
             dependent_fields_names = self._marqo_index.dependent_fields_names
             if marqo_field in dependent_fields_names:
-                raise MarqoDocumentParsingError(f"Marqo encountered an error when parsing the partial update document "
-                                                f"'{marqo_document}'. You CAN NOT modify '{marqo_field}' "
+                raise MarqoDocumentParsingError(f"You cannot modify '{marqo_field}' "
                                                 f"field as this is a dependent field of a multimodal combination field.")
 
             marqo_value = marqo_document[marqo_field]
@@ -103,14 +96,17 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_value = int(marqo_value)
 
             if index_field.lexical_field_name:
-                vespa_fields[index_field.lexical_field_name] = dict()
-                vespa_fields[index_field.lexical_field_name]["assign"] = marqo_value
+                vespa_fields[index_field.lexical_field_name] = {
+                    "assign": marqo_value
+                }
             if index_field.filter_field_name:
-                vespa_fields[index_field.filter_field_name] = dict()
-                vespa_fields[index_field.filter_field_name]["assign"] = marqo_value
+                vespa_fields[index_field.filter_field_name] = {
+                    "assign": marqo_value
+                }
             if not index_field.lexical_field_name and not index_field.filter_field_name:
-                vespa_fields[index_field.name] = dict()
-                vespa_fields[index_field.name]["assign"] = marqo_value
+                vespa_fields[index_field.name] = {
+                    "assign": marqo_value
+                }
 
             if FieldFeature.ScoreModifier in index_field.features:
                 score_modifiers[index_field.name] = marqo_value

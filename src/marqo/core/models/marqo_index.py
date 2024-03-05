@@ -399,6 +399,7 @@ class StructuredMarqoIndex(MarqoIndex):
 
     @property
     def dependent_fields_names(self) -> Set[str]:
+        """Return the names of all fields that are dependent fields of multimodal combination fields."""
         return self._cache_or_get('dependent_fields_names',
                                   lambda: {dependent_field for field in self.fields if field.dependent_fields
                                            for dependent_field in field.dependent_fields.keys()}

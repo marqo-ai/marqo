@@ -29,7 +29,6 @@ from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.core.models.update_documents import UpdateDocumentsParams
 
 logger = get_logger(__name__)
 
@@ -41,6 +40,10 @@ def generate_config() -> config.Config:
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
         content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
+        post_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POST_POOL_SIZE),
+        get_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_GET_POOL_SIZE),
+        delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
+        put_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PUT_POOL_SIZE)
     )
     index_management = IndexManagement(vespa_client)
     return config.Config(vespa_client, index_management)
@@ -217,10 +220,8 @@ def update_documents(
         marqo_config: config.Config = Depends(get_config)):
     """update_documents endpoint"""
 
-    update_documents_params = UpdateDocumentsParams(documents=body.documents)
-
     return marqo_config.document.partial_update_documents_by_index_name(
-        index_name=index_name, update_documents_params=update_documents_params)
+        index_name=index_name, partial_documents=body.documents)
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

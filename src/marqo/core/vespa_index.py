@@ -71,15 +71,15 @@ class VespaIndex(ABC):
         pass
 
     @abstractmethod
-    def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_partial_document: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Convert a MarqoDocument to a Vespa partial document.
+        Convert a marqo_partial_update_document to a Vespa partial document.
 
         This method converts a MarqoDocument to a VespaDocument in the partial update format. It should only contain
         the fields that are require to be updated.
 
         Args:
-            marqo_document: the MarqoDocument to be converted to the update format
+            marqo_partial_document: The marqo_partial_document to convert
 
         Returns:
             VespaDocument in dictionary format with keys 'fields' and 'id'
