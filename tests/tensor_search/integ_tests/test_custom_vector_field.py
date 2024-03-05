@@ -987,7 +987,7 @@ class TestCustomVectorField(MarqoTestCase):
         Remove this test when this functionality becomes available.
         """
 
-        with self.assertRaises(base_exceptions.InvalidArgumentError) as cm:
+        with self.assertRaises(ValueError) as cm:
             bad_index_request = self.structured_marqo_index_request(
                 fields=[
                     FieldRequest(
@@ -1001,7 +1001,7 @@ class TestCustomVectorField(MarqoTestCase):
                 tensor_fields=["my_custom_vector", "bad_multimodal"]
             )
 
-        self.assertIn("cannot be a subfield of a multimodal field", cm.exception.message)
+        self.assertIn("cannot be a subfield of a multimodal field", str(cm.exception.args[0][0].exc))
 
     def test_custom_vector_subfield_of_multimodal_should_fail_unstructured(self):
         """
