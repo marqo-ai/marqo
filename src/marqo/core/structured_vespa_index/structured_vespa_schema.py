@@ -21,7 +21,8 @@ class StructuredVespaSchema(VespaSchema):
         FieldType.ArrayFloat: 'array<float>',
         FieldType.ArrayDouble: 'array<double>',
         FieldType.ImagePointer: 'string',
-        FieldType.MultimodalCombination: 'map<string, float>'
+        FieldType.MultimodalCombination: 'map<string, float>',
+        FieldType.CustomVector: 'string'        # Custom Vector "content" is stored as string in backend.
     }
 
     _FIELD_INDEX_PREFIX = 'marqo__lexical_'

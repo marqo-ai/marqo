@@ -27,7 +27,8 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.ArrayLong: (list, int),
         FieldType.ArrayDouble: (list, (float, int)),
         FieldType.ImagePointer: str,
-        FieldType.MultimodalCombination: dict
+        FieldType.MultimodalCombination: dict,
+        FieldType.CustomVector: str
     }
 
     _VESPA_DOC_ID = 'id'
@@ -709,7 +710,7 @@ class StructuredVespaIndex(VespaIndex):
                 cause=e
             ) from e
 
-        if chunk:
+        if chunk is not None:
             return [{closest_tensor_field.name: chunk}]
         else:
             return []
