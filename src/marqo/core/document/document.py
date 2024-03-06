@@ -108,7 +108,7 @@ class Document:
         vespa_res: UpdateDocumentsBatchResponse = (
             self.vespa_client.update_documents_batch(vespa_documents,
                                                      marqo_index.schema_name,
-                                                     vespa_id_field=vespa_index.get_vespa_field_id()))
+                                                     vespa_id_field=vespa_index.get_vespa_id_field()))
 
         return self._translate_update_document_response(vespa_res, unsuccessful_docs,
                                                         marqo_index.name, start_time)

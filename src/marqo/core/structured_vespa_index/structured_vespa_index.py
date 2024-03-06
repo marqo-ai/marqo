@@ -52,7 +52,7 @@ class StructuredVespaIndex(VespaIndex):
     def __init__(self, marqo_index: StructuredMarqoIndex):
         self._marqo_index = marqo_index
 
-    def get_vespa_field_id(self) -> str:
+    def get_vespa_id_field(self) -> str:
         return common.FIELD_ID
 
     def to_vespa_partial_document(self, marqo_document: Dict[str,Any]) -> Dict[str, Any]:
