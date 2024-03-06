@@ -68,6 +68,8 @@ class Document:
 
         If there exists duplicate _id in the partial_documents, the last document will be used.
 
+        If the document does not exist, this document will error out and the error will be returned in the response.
+
         Args:
             partial_documents: A list of documents to partially update
             marqo_index: The index object to partially update documents in
