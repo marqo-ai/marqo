@@ -37,8 +37,8 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, pool_size: int = 10, post_pool_size: int = 10,
-                 get_pool_size: int = 10, delete_pool_size: int = 10, put_pool_size: int = 10):
+                 content_cluster_name: str, pool_size: int = 10, feed_pool_size: int = 10,
+                 get_pool_size: int = 10, delete_pool_size: int = 10, partial_update_pool_size: int = 10):
         """
         Create a VespaClient object.
         Args:
@@ -46,10 +46,10 @@ class VespaClient:
             document_url: Vespa Document API base URL
             query_url: Vespa Query API base URL
             pool_size: Number of connections to keep in the connection pool
-            post_pool_size: Number of connections to keep in batch POST requests connection pool to Vespa
-            get_pool_size: Number of connections to keep in batch GET requests connection pool to Vespa
-            delete_pool_size: Number of connections to keep batch DELETE requests connection pool to Vespa
-            put_pool_size: Number of connections to keep batch PUT requests connection pool to Vespa
+            feed_pool_size: Number of connections to keep in batch feed requests connection pool to Vespa
+            get_pool_size: Number of connections to keep in batch get requests connection pool to Vespa
+            delete_pool_size: Number of connections to keep batch delete requests connection pool to Vespa
+            partial_update_pool_size: Number of connections to keep batch partial update requests connection pool to Vespa
         """
         self.config_url = config_url.strip('/')
         self.document_url = document_url.strip('/')
@@ -58,10 +58,10 @@ class VespaClient:
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
         self.content_cluster_name = content_cluster_name
-        self.post_pool_size = post_pool_size
+        self.feed_pool_size = feed_pool_size
         self.get_pool_size = get_pool_size
         self.delete_pool_size = delete_pool_size
-        self.put_pool_size = put_pool_size
+        self.partial_pool_size = partial_update_pool_size
 
     def close(self):
         """
@@ -234,7 +234,7 @@ class VespaClient:
             return FeedBatchResponse(responses=[], errors=False)
 
         if concurrency is None:
-            concurrency = self.post_pool_size
+            concurrency = self.feed_pool_size
 
         batch_response = conc.run_coroutine(
             self._feed_batch_async(batch, schema, concurrency, timeout)
@@ -458,7 +458,7 @@ class VespaClient:
             batch: A list of documents to update
             schema: schema name
             concurrency: Number of concurrent delete requests, can be configured by environment variable
-                VESPA_PUT_POOL_SIZE
+                VESPA_PARTIAL_UPDATE_POOL_SIZE
             timeout: Timeout in seconds per request
             marqo_id_field: The field name of the marqo_id_field that we to identify and check
                 the existence of the document
@@ -471,7 +471,7 @@ class VespaClient:
             return UpdateDocumentsBatchResponse(responses=[], errors=False)
 
         if concurrency is None:
-            concurrency = self.put_pool_size
+            concurrency = self.partial_pool_size
 
         batch_response = conc.run_coroutine(
             self._update_documents_batch_async(batch, schema, concurrency, timeout, marqo_id_field)
