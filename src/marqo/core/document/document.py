@@ -57,7 +57,7 @@ class Document:
         marqo_index = self.index_management.get_index(index_name)
 
         res: MarqoUpdateDocumentsResponse = self.partial_update_documents(partial_documents, marqo_index)
-        return res.dict(exclude_none=True)
+        return res.dict(exclude_none=True, by_alias=True)
 
     def partial_update_documents(self, partial_documents: List[Dict], marqo_index) \
             -> MarqoUpdateDocumentsResponse:
@@ -134,7 +134,7 @@ class Document:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
                 item = MarqoUpdateDocumentsItem(
-                    _id=doc_id, status=resp.status, message=resp.message
+                    id=doc_id, status=resp.status, message=resp.message
                 )
                 new_items.append(item)
 
