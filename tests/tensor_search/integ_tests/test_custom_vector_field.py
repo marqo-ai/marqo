@@ -532,25 +532,20 @@ class TestCustomVectorField(MarqoTestCase):
                 ]
 
                 for case in test_cases:
-                    res = tensor_search.add_documents(
-                        config=self.config, add_docs_params=AddDocsParams(
-                            index_name=index.name,
-                            docs=[{
-                                "_id": "0",
-                                "my_custom_vector": case
-                            }],
-                            device="cpu",
-                            mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
-                            tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
-                        )
-                    )
-
-                    assert res["errors"]
-                    try:
-                        tensor_search.get_document_by_id(config=self.config, index_name=index.name, document_id="0")
-                        raise AssertionError
-                    except DocumentNotFoundError:
-                        pass
+                    with self.subTest(f"Case: {case}"):
+                        with self.assertRaises(pydantic.ValidationError):
+                            res = tensor_search.add_documents(
+                                config=self.config, add_docs_params=AddDocsParams(
+                                    index_name=index.name,
+                                    docs=[{
+                                        "_id": "0",
+                                        "my_custom_vector": case
+                                    }],
+                                    device="cpu",
+                                    mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
+                                    tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
+                                )
+                            )
 
     def test_search_with_custom_vector_field(self):
         """
@@ -1001,7 +996,7 @@ class TestCustomVectorField(MarqoTestCase):
                 tensor_fields=["my_custom_vector", "bad_multimodal"]
             )
 
-        self.assertIn("cannot be a subfield of a multimodal field", str(cm.exception.args[0][0].exc))
+        self.assertIn("cannot be a dependent field of multimodal field", str(cm.exception.args[0][0].exc))
 
     def test_custom_vector_subfield_of_multimodal_should_fail_unstructured(self):
         """

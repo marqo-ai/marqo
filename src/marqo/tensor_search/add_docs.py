@@ -190,6 +190,6 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
         elif mappings[field_name]["type"] == enums.MappingsObjectType.custom_vector:
             return FieldType.CustomVector
         else:
-            raise base_exceptions.InternalError(f"Invalid dict field type: {mappings[field_name]['type']} for field: {field_name} in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
+            raise base_exceptions.InternalError(f"Invalid dict field type: '{mappings[field_name]['type']}' for field: '{field_name}' in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
     else:
         return None

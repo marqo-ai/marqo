@@ -47,8 +47,20 @@ class TestAddDocumentsUtils(MarqoTestCase):
                 mappings=mixed_mappings
             )
 
+        with self.assertRaises(base_exceptions.InternalError):
+            add_docs.determine_document_dict_field_type(
+                field_name="bad_custom_vector",
+                field_content={"vector": [1, 2, 3]},
+                mappings={
+                    "my_custom_vector": {
+                        "type": "random type"
+                    }
+                }
+            )
+
         assert add_docs.determine_document_dict_field_type(
             field_name="Any name. Doesn't matter.",
             field_content="normal text",
             mappings=mixed_mappings
         ) == None
+

@@ -19,7 +19,7 @@ from marqo.tensor_search.models.mappings_object import (
     custom_vector_mappings_schema
 )
 from marqo.core.models.marqo_index import *
-from marqo.tensor_search.models.custom_vector_object import custom_vector_schema
+from marqo.tensor_search.models.custom_vector_object import CustomVector
 from marqo import marqo_docs
 
 
@@ -456,31 +456,12 @@ def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index
         "content" key will be added to the field_content as empty string if it is not provided.
     """
 
-    if not isinstance(index_model_dimensions, int):
-        raise base_exceptions.InternalError(
-            f"Index model dimensions should be an `int`."
-        )
-
-    # Must be a tensor_field
-    if is_non_tensor_field:
-        raise InvalidArgError(
-            f"Cannot create custom_vector field (given field content: `{field_content}`) as a non-tensor field. "
-            f"Add this field to `tensor_fields` to fix this problem."
-        )
-
-    try:
-        jsonschema.validate(instance=field_content, schema=custom_vector_schema(index_model_dimensions))
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Invalid custom_vector field format. Reason: \n{str(e)}"
-            f"\n For info on how to use custom_vector, please see: `{marqo_docs.custom_vector_object()}`"
-        )
-
-    # Fill in default content as empty string if not provided.
-    if "content" not in field_content:
-        field_content["content"] = ""
-
-    return field_content
+    validated_custom_vector = CustomVector(
+        dict_data=field_content,
+        dimension=index_model_dimensions,
+        is_non_tensor_field=is_non_tensor_field
+    )
+    return validated_custom_vector.to_dict()
 
 
 def validate_mappings_object(

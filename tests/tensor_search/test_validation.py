@@ -13,6 +13,7 @@ from marqo.tensor_search import validation
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext
+from pydantic import ValidationError
 
 
 class TestValidation(unittest.TestCase):
@@ -946,20 +947,20 @@ class TestValidateIndexSettings(unittest.TestCase):
 
         invalid_custom_vector_objects = [
             # Wrong vector length
-            ({"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]}, "is too short"),
-            ({"content": "custom content is here!!", "vector": [1.0] * 1000}, "is too long"),
+            ({"content": "custom content is here!!", "vector": [1.0, 1.0, 1.0]}, "given vector is of length"),
+            ({"content": "custom content is here!!", "vector": [1.0] * 1000}, "given vector is of length"),
             # Wrong content type
             ({"content": 12345, "vector": [1.0 for _ in range(index_model_dimensions)]},
-             "12345 is not of type 'string'"),
+             "must be one of the following types"),
             # Wrong vector type inside list (even if correct length)
             ({"content": "custom content is here!!",
               "vector": [1.0 for _ in range(index_model_dimensions - 1)] + ["NOT A FLOAT"]},
-             "'NOT A FLOAT' is not of type 'number'"),
+             "must be a list of numbers"),
             # Field that shouldn't be there
             ({"content": "custom content is here!!", "vector": [1.0 for _ in range(index_model_dimensions)],
-              "extra_field": "blah"}, "Additional properties are not allowed ('extra_field' was unexpected)"),
+              "extra_field": "blah"}, "unexpected extra fields"),
             # No vector
-            ({"content": "custom content is here!!"}, "'vector' is a required property"),
+            ({"content": "custom content is here!!"}, "missing 'vector'"),
             # Nested dict inside custom vector content
             ({
                  "content": {
@@ -967,42 +968,42 @@ class TestValidateIndexSettings(unittest.TestCase):
                      "vector": [1.0 for _ in range(index_model_dimensions)]
                  },
                  "vector": [1.0 for _ in range(index_model_dimensions)]
-             }, "is not of type 'string'"),
+             }, "must be one of the following types"),
         ]
         for case, error_message in invalid_custom_vector_objects:
-            try:
-                validation.validate_dict(field="my_custom_vector",
-                                         field_content=case,
-                                         is_non_tensor_field=False,
-                                         mappings=test_mappings,
-                                         index_model_dimensions=index_model_dimensions)
-                raise AssertionError(case)
-            except InvalidArgError as e:
-                assert error_message in e.message
+            with self.subTest(f"case={case}, error_message={error_message}"):
+                try:
+                    validation.validate_dict(field="my_custom_vector",
+                                             field_content=case,
+                                             is_non_tensor_field=False,
+                                             mappings=test_mappings,
+                                             index_model_dimensions=index_model_dimensions)
+                    raise AssertionError
+                except ValidationError as e:
+                    assert error_message in str(e.args[0][0].exc)
 
         # No index model dimensions
-        try:
-            validation.validate_dict(field="my_custom_vector",
-                                     field_content={"content": "custom content is here!!",
-                                                    "vector": [1.0 for _ in range(index_model_dimensions)]},
-                                     is_non_tensor_field=False,
-                                     mappings=test_mappings,
-                                     index_model_dimensions=None)
-            raise AssertionError
-        except base_exceptions.InternalError as e:
-            assert "Index model dimensions should be an `int`" in e.message
+        with self.subTest("No index model dimensions"):
+            with self.assertRaises(ValidationError) as cm:
+                validation.validate_dict(field="my_custom_vector",
+                                         field_content={"content": "custom content is here!!",
+                                                        "vector": [1.0 for _ in range(index_model_dimensions)]},
+                                         is_non_tensor_field=False,
+                                         mappings=test_mappings,
+                                         index_model_dimensions=None)
+            self.assertIn("none is not an allowed value", str(cm.exception.args[0][0].exc))
 
         # Non-int index model dimensions
-        try:
-            validation.validate_dict(field="my_custom_vector",
-                                     field_content={"content": "custom content is here!!",
-                                                    "vector": [1.0 for _ in range(index_model_dimensions)]},
-                                     is_non_tensor_field=False,
-                                     mappings=test_mappings,
-                                     index_model_dimensions="wrong type")
-            raise AssertionError
-        except base_exceptions.InternalError as e:
-            assert "Index model dimensions should be an `int`" in e.message
+        with self.subTest("No index model dimensions"):
+            with self.assertRaises(ValidationError) as cm:
+                validation.validate_dict(field="my_custom_vector",
+                                         field_content={"content": "custom content is here!!",
+                                                        "vector": [1.0 for _ in range(index_model_dimensions)]},
+                                         is_non_tensor_field=False,
+                                         mappings=test_mappings,
+                                         index_model_dimensions="wrong type")
+
+            self.assertIn("value is not a valid integer", str(cm.exception.args[0][0].exc))
 
 
 class TestValidateDeleteDocsRequest(unittest.TestCase):

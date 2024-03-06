@@ -77,7 +77,7 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
         must_be_tensor_fields = multimodal_fields + custom_vector_fields
         for field in must_be_tensor_fields:
             if field.name not in tensor_field_names:
-                raise ValueError(f"Field '{field.name}' has type '{field.type.value}' and must be a tensor field")
+                raise ValueError(f"Field '{field.name}' has type '{field.type.value}' and must be a tensor field.")
 
         # Verify no custom vector field is a subfield of a multimodal field
         for multimodal_field in multimodal_fields:
@@ -87,6 +87,6 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
                     for custom_vector_field in custom_vector_fields:
                         if subfield == custom_vector_field.name:
                             raise ValueError(
-                                f"Field '{subfield}' is a custom vector field and cannot be a subfield of a multimodal field "
-                                f"(Please check field: '{multimodal_field.name}')")
+                                f"Field '{subfield}' is a custom vector field and cannot be a dependent field of "
+                                f"multimodal field '{multimodal_field.name}'.")
         return values

@@ -6,6 +6,7 @@ from marqo.api import exceptions as errors
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_mappings_schema, custom_vector_mappings_schema
 from marqo.core.models.marqo_index import validate_field_name as common_validate_field_name
+from marqo import marqo_docs
 
 _FILTER_STRING_BOOL_VALUES = ["true", "false"]
 _RESERVED_FIELD_SUBSTRING = "::"
@@ -30,7 +31,7 @@ def validate_mappings_object_format(mappings: Dict) -> None:
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating mappings object. Reason: {str(e)}. "
-            f"Read about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f"Read about the mappings object here: {marqo_docs.mappings()}"
         )
 
 
@@ -48,7 +49,7 @@ def _validate_multimodal_combination_configuration_format(configuration: Dict):
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating multimodal combination mappings object. Reason: \n{str(e)}"
-            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
+            f"\n Read about the mappings object here: {marqo_docs.mappings()}"
         )
 
 
@@ -58,7 +59,7 @@ def _validate_custom_vector_configuration_format(configuration: Dict):
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating custom vector mappings object. Reason: \n{str(e)}"
-            f"\n Read about the mappings object here: https://docs.marqo.ai/1.4.0/API-Reference/Documents/mappings/"
+            f"\n Read about the mappings object here: {marqo_docs.mappings()}"
         )
 
 

@@ -266,18 +266,6 @@ class StructuredMarqoIndex(MarqoIndex):
     def __init__(self, **data):
         super().__init__(**data)
 
-    @root_validator
-    def validate_model(cls, values):
-        # Verify all combination fields are tensor fields
-        combination_fields = [field for field in values.get('fields', []) if
-                              field.type == FieldType.MultimodalCombination]
-        tensor_field_names = {tensor_field.name for tensor_field in values.get('tensor_fields', [])}
-        for field in combination_fields:
-            if field.name not in tensor_field_names:
-                raise ValueError(f'Field {field.name} has type {field.type.value()} and must be a tensor field')
-
-        return values
-
     @classmethod
     def _valid_type(cls) -> IndexType:
         return IndexType.Structured
