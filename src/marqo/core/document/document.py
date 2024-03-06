@@ -24,7 +24,7 @@ class Document:
         self.index_management = index_management
 
     def delete_all_docs_by_index_name(self, index_name: str) -> int:
-        """Delete all documents in the given index by index name
+        """Delete all documents in the given index by index name.
 
         Args:
             index_name: The name of the index to delete documents from"""
@@ -32,7 +32,7 @@ class Document:
         return self.delete_all_docs(marqo_index)
 
     def delete_all_docs(self, marqo_index) -> int:
-        """Delete all documents in the given index by marqo_index object
+        """Delete all documents in the given index by marqo_index object.
 
         Args:
             marqo_index: The index object to delete documents from"""
@@ -114,7 +114,7 @@ class Document:
     def _translate_update_document_response(self, responses: UpdateDocumentsBatchResponse, unsuccessful_docs: List,
                                             index_name: str, start_time) \
             -> MarqoUpdateDocumentsResponse:
-        """Translate Vespa response dict into MarqoUpdateDocumentsResponse for document update
+        """Translate Vespa response dict into MarqoUpdateDocumentsResponse for document update.
 
         Args:
             responses: The response from Vespa
@@ -143,7 +143,7 @@ class Document:
                                             preprocessingTime=(timer() - start_time) * 1000)
 
     def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
-        """Remove duplicated documents based on _id in the given list of documents
+        """Remove duplicated documents based on _id in the given list of documents.
 
         For a list of documents, if there exists duplicate _id, the last document will be used while the
         previous ones will be removed from the list.
