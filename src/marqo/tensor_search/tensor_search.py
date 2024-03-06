@@ -138,6 +138,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     batch_size = len(add_docs_params.docs)
     image_repo = {}
 
+    docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
+
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images:
             with RequestMetricsStore.for_request().time(
@@ -154,17 +156,16 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     if add_docs_params.tensor_fields else []
                 tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
-                    add_docs.download_images(docs=add_docs_params.docs,
+                    add_docs.download_images(docs=docs,
                                              thread_count=add_docs_params.image_download_thread_count,
                                              tensor_fields=tensor_fields_and_multimodal_subfields,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 
         if add_docs_params.use_existing_tensors:
-            ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
             existing_docs_dict: Dict[str, dict] = {}
-            if len(ids) > 0:
-                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, ids, ignore_invalid_ids=True)
+            if len(doc_ids) > 0:
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, doc_ids, ignore_invalid_ids=True)
                 for doc in existing_docs:
                     id = doc["_id"]
                     if id in existing_docs_dict:
@@ -173,7 +174,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
-        for i, doc in enumerate(add_docs_params.docs):
+        for i, doc in enumerate(docs):
 
             copied = copy.deepcopy(doc)
 
@@ -529,24 +530,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     image_repo = {}
 
     # Deduplicate docs, keep the latest
-    docs = []
-    doc_ids = set()
-    for i in range(len(add_docs_params.docs) - 1, -1, -1):
-        doc = add_docs_params.docs[i]
-
-        if isinstance(doc, dict) and '_id' in doc:
-            doc_id = doc['_id']
-            try:
-                if doc_id is not None and doc_id in doc_ids:
-                    logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
-                    continue
-                doc_ids.add(doc_id)
-            except TypeError as e:  # Happens if ID is a non-hashable type -- ID validation will catch this later on
-                logger.debug(f'Could not hash document ID {doc_id}: {e}')
-
-        docs.append(doc)
-    # Reverse to preserve order in request
-    docs.reverse()
+    docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
     with ExitStack() as exit_stack:
         image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
