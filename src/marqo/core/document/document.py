@@ -41,7 +41,7 @@ class Document:
 
     def partial_update_documents_by_index_name(self, index_name,
                                                partial_documents: List[Dict]) \
-            -> Dict:
+            -> MarqoUpdateDocumentsResponse:
         """Partially update documents in the given index by index name.
 
         Args:
@@ -52,12 +52,11 @@ class Document:
             IndexNotFoundError: If the index does not exist
 
         Return:
-            A dict containing the response of the partial update operation
+            A MarqoUpdateDocumentsResponse containing the response of the partial update operation
         """
         marqo_index = self.index_management.get_index(index_name)
 
-        res: MarqoUpdateDocumentsResponse = self.partial_update_documents(partial_documents, marqo_index)
-        return res.dict(exclude_none=True, by_alias=True)
+        return self.partial_update_documents(partial_documents, marqo_index)
 
     def partial_update_documents(self, partial_documents: List[Dict], marqo_index) \
             -> MarqoUpdateDocumentsResponse:

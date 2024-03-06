@@ -220,8 +220,10 @@ def update_documents(
         marqo_config: config.Config = Depends(get_config)):
     """update_documents endpoint"""
 
-    return marqo_config.document.partial_update_documents_by_index_name(
+    res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
+
+    return res.dict(exclude_none=True, by_alias=True)
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
