@@ -22,8 +22,8 @@ class UpdateDocumentsBodyParams(ImmutableStrictBaseModel):
         elif doc_count > max_doc:
             raise BadRequestError(
                 message=f"Number of docs in update_documents request ({doc_count}) exceeds limit of {max_doc}. "
-                        f"If using the Python client, break up your `update_documents` request into smaller batches "
-                        f"using its `client_batch_size` parameter. "
+                        f"If using the Python client, break up your update_documents request into smaller batches "
+                        f"using its client_batch_size parameter. "
             )
 
         return documents
