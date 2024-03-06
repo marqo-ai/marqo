@@ -361,7 +361,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 s2_inference.ModelDownloadError) as model_error:
                             raise errors.BadRequestError(
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                                link=marqo_docs.dense_retrieval()
+                                link=marqo_docs.list_of_models()
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
@@ -791,7 +791,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 s2_inference.ModelDownloadError) as model_error:
                             raise api_exceptions.BadRequestError(
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                                link=marqo_docs.dense_retrieval()
+                                link=marqo_docs.list_of_models()
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
@@ -1576,7 +1576,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                 s2_inference.ModelDownloadError) as model_error:
             raise api_exceptions.BadRequestError(
                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                link=marqo_docs.dense_retrieval()
+                link=marqo_docs.list_of_models()
             )
 
         except s2_inference_errors.S2InferenceError as e:
@@ -1991,7 +1991,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
             s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link=marqo_docs.dense_retrieval()
+            link=marqo_docs.list_of_models()
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
@@ -2129,7 +2129,7 @@ def vectorise_multimodal_combination_field_structured(
             s2_inference_errors.ModelLoadError) as model_error:
         raise api_exceptions.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link=marqo_docs.dense_retrieval()
+            link=marqo_docs.list_of_models()
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False

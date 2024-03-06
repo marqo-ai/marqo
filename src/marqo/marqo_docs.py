@@ -28,9 +28,10 @@ def mappings():
     return _build_url('API-Reference/Documents/mappings/')
 
 
-def dense_retrieval():
-    return _build_url('Guides/Models-Reference/dense_retrieval/')
+def list_of_models():
+    return _build_url('Guides/Models-Reference/list_of_models/')
 
 
 def search_context():
     return _build_url('API-Reference/Search/search/#context')
+
