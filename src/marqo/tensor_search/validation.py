@@ -5,14 +5,22 @@ from typing import Any, Dict, List, Optional, Type, Sequence, Union
 import jsonschema
 
 import marqo.core.models.marqo_index as marqo_index
+import marqo.exceptions as base_exceptions
 from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
-from marqo.tensor_search import constants
+from marqo.tensor_search import constants as tensor_search_constants
 from marqo.tensor_search import enums, utils
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
-from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_schema
 from marqo.tensor_search.models.search import SearchContext
+from marqo.tensor_search.models.mappings_object import (
+    mappings_schema,
+    multimodal_combination_mappings_schema,
+    custom_vector_mappings_schema
+)
+from marqo.core.models.marqo_index import *
+from marqo.tensor_search.models.custom_vector_object import CustomVector
+from marqo import marqo_docs
 
 
 def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
@@ -138,7 +146,7 @@ def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any
     Raises:
         InvalidArgError if field_content is not acceptable
     """
-    if type(field_content) in constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES:
+    if type(field_content) in tensor_search_constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES:
         if isinstance(field_content, list):
             validate_list(field_content, is_non_tensor_field)
         return field_content
@@ -146,7 +154,7 @@ def validate_field_content(field_content: Any, is_non_tensor_field: bool) -> Any
         raise InvalidArgError(
             f"Field content `{field_content}` \n"
             f"of type `{type(field_content).__name__}` is not of valid content type!"
-            f"Allowed content types: {[ty.__name__ for ty in constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES]}"
+            f"Allowed content types: {[ty.__name__ for ty in tensor_search_constants.ALLOWED_UNSTRUCTURED_FIELD_TYPES]}"
         )
 
 
@@ -164,7 +172,7 @@ def validate_context(context: Optional[SearchContext], search_method: SearchMeth
             f"and a parameter `context`.\n"  # do not return true {context} here as it might be huge.
             f"This is not supported as the context only works when the query is a dictionary."
             f"If you aim to search with your custom vectors, reformat the query as a dictionary.\n"
-            f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context` for more information."
+            f"Please check `{marqo_docs.search_context()}` for more information."
         )
 
 
@@ -242,7 +250,7 @@ def validate_field_name(field_name) -> str:
     if field_name.startswith(enums.TensorField.chunks):
         raise InvalidFieldNameError(F"can't name field with protected field name {enums.TensorField.chunks}."
                                     F" Error raised for field name: {field_name}")
-    char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
+    char_validation = [(c, c not in tensor_search_constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
                        for c in field_name]
     char_validation_failures = [c for c in char_validation if not c[1]]
     if char_validation_failures:
@@ -279,7 +287,7 @@ def validate_unstructured_index_field_name(field_name) -> str:
         raise InvalidFieldNameError(F"can't name field with protected field name {enums.TensorField.chunks}."
                                     F" Error raised for field name: {field_name}")
 
-    char_validation = [(c, c not in constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
+    char_validation = [(c, c not in tensor_search_constants.ILLEGAL_CUSTOMER_FIELD_NAME_CHARS)
                        for c in field_name]
     char_validation_failures = [c for c in char_validation if not c[1]]
     if char_validation_failures:
@@ -341,64 +349,82 @@ def validate_id(_id: str):
     return _id
 
 
-def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict):
-    '''
-
+def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict,
+                  index_model_dimensions: int = None, structured_field_type: FieldType = None):
+    """
     Args:
         field: the field name
         field_content: the field when it is a dict, especially used for multimodal tensor combination field
+        structured_field_type: the type of the field (only for structured index).
         is_non_tensor_field: for multimodal tensor combination field, this should be True
         mappings: a dictionary to help validate the object field content
-
+        index_model_dimensions: the dimensions of the model of the index. used to validate custom vector field.
     Returns:
-        True or raise an error
-    '''
-    if mappings is None:
-        raise InvalidArgError(
-            f"The field `{field}` contains a dictionary field content `{field_content}`."
-            f"However, the parameter `mappings` is {mappings}. Dictionary field contents are not supported in"
-            f"Marqo unless `mappings` is provided. Please change the type of field."
-            f"If you aim to use dictionary filed content as a special field,"
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+        Updated field_content dict or raise an error
+    """
 
-    if field not in mappings:
-        raise InvalidArgError(
-            f"The field `{field}` contains a dictionary field content `{field_content}`."
-            f"However, this field `{field}` is not in the add_document parameter mappings `{mappings}`, which is not supported."
-            f"Please change the type of your field content."
-            f"If you aim to use dictionary filed content as a special field,"
-            f"please check `https://docs.marqo.ai/0.0.15/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
-
-    if mappings[field]["type"] == "multimodal_combination":
-        validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
+    # If field is declared in mappings, it overwrites the default.
+    if mappings and field in mappings:
+        if mappings[field]["type"] == FieldType.MultimodalCombination:
+            field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
+        elif mappings[field]["type"] == FieldType.CustomVector:
+            field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+        else:
+            raise InvalidArgError(
+                f"The field `{field}` is of invalid type in the `mappings` parameter. The only object field type supported "
+                f"is `custom_vector`. However, the `mappings` provided is: {mappings}. Please change the "
+                f"type of {field}. "
+                f"See `{marqo_docs.mappings()}` for more info on object fields. "
+            )
+    else:
+        # Use type declared in structured_field_type if not in mappings
+        if structured_field_type:
+            if structured_field_type == FieldType.MultimodalCombination:
+                field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
+            elif structured_field_type == FieldType.CustomVector:
+                field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+            else:
+                raise InvalidArgError(
+                    f"The field {field} is of type `{structured_field_type}`, which is not a valid object field type. "
+                    f"The only object field type supported "
+                    f"is `custom_vector`. Please change the type of {field} to use it as an object field. "
+                    f"See `{marqo_docs.mappings()}` for more info on object fields. "
+                )
+        else:
+            # Index is unstructured, so it must be in mappings.
+            raise InvalidArgError(
+                f"The field {field} must be in the add_documents `mappings` parameter to use it as an object field type. "
+                f"However, the `mappings` provided is: {mappings}. Please change the field content or add the field to `mappings`. "
+                f"See `{marqo_docs.mappings()}` for more info on object fields."
+            )
 
     return field_content
 
 
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
-    '''
-
+    """
+    Validates the field content if it is a multimodal combination field (dict)
     Args:
         field_content: the field content
         is_non_tensor_field: whether this is a non-tensor-field
         field_mapping: the mapping to help validate this field content
 
     Returns:
-
-    '''
+        The field content
+    """
     if len(field_content) < 1:
         raise InvalidArgError(
-            f"The multimodal_combination_field `{field_content}` is an empty dictionary. "
+            f"The multimodal_combination field `{field_content}` is an empty dictionary."
             f"This is not a valid format of field content."
             f"If you aim to use multimodal_combination, it must contain at least 1 field. "
-            f"please check `https://docs.marqo.ai/0.1.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+            f"please check `{marqo_docs.multimodal_combination_object()}` for more info.")
 
     for key, value in field_content.items():
-        if not ((type(key) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (
-                type(value) in constants.ALLOWED_MULTIMODAL_FIELD_TYPES)):
+        if not ((type(key) in tensor_search_constants.ALLOWED_MULTIMODAL_FIELD_TYPES) and (
+                type(value) in tensor_search_constants.ALLOWED_MULTIMODAL_FIELD_TYPES)):
             raise InvalidArgError(
                 f"Multimodal-combination field content `{key}:{value}` \n  "
-                f"of type `{type(key).__name__} : {type(value).__name__}` is not of valid content type (one of {constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
+                f"of type `{type(key).__name__} : {type(value).__name__}` is not of valid content type (one of {tensor_search_constants.ALLOWED_MULTIMODAL_FIELD_TYPES})."
             )
 
         if not key in field_mapping["weights"]:
@@ -406,7 +432,7 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
                 f"Multimodal-combination field content `{key}:{value}` \n  "
                 f"is not in the multimodal_field mappings weights `{field_mapping['weights']}`. Each sub_field requires a weight."
                 f"Please add `{key}` to the mappings."
-                f"Please check `https://docs.marqo.ai/0.1.0/Advanced-Usage/document_fields/#multimodal-combination-object` for more info.")
+                f"Please check `{marqo_docs.multimodal_combination_object()}` for more info.")
 
     if is_non_tensor_field:
         raise InvalidArgError(
@@ -415,7 +441,27 @@ def validate_multimodal_combination(field_content, is_non_tensor_field, field_ma
             f"It must be a tensor field. Add this field to `tensorFields` or "
             f"add it as a normal field to fix this problem."
         )
-    return True
+    return field_content
+
+
+def validate_custom_vector(field_content: dict, is_non_tensor_field: bool, index_model_dimensions: int):
+    """
+    Validates the field content if it is a custom vector field (dict)
+    Args:
+        field_content: the field content
+        is_non_tensor_field: whether this is a non-tensor-field
+        index_model_dimensions: the `dimensions` property of the index to be added to
+    Returns:
+        field_content if the validation passes
+        "content" key will be added to the field_content as empty string if it is not provided.
+    """
+
+    validated_custom_vector = CustomVector(
+        dict_data=field_content,
+        dimension=index_model_dimensions,
+        is_non_tensor_field=is_non_tensor_field
+    )
+    return validated_custom_vector.to_dict()
 
 
 def validate_mappings_object(
@@ -435,9 +481,9 @@ def validate_mappings_object(
     try:
         jsonschema.validate(instance=mappings_object, schema=mappings_schema)
         for field_name, config in mappings_object.items():
+            validate_field_name(field_name)
             if config["type"] == enums.MappingsObjectType.multimodal_combination:
-                validate_multimodal_combination_object(config)
-
+                validate_multimodal_combination_mappings_object(config)
                 if structured_marqo_index is not None:
                     if (
                             field_name not in structured_marqo_index.field_map or
@@ -457,15 +503,21 @@ def validate_mappings_object(
                                 f'Field {field} is not a dependent field of {field_name}'
                             )
 
+            elif config["type"] == enums.MappingsObjectType.custom_vector:
+                validate_custom_vector_mappings_object(config)
+                # TODO: add validation for custom vector structured/unstructured here
+
+
+
         return mappings_object
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating mappings object. Reason: {str(e)}. "
-            f"Read about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f" Read about the mappings object here: `{marqo_docs.mappings()}`"
         )
 
 
-def validate_multimodal_combination_object(multimodal_mappings: Dict):
+def validate_multimodal_combination_mappings_object(mappings_object: Dict):
     """Validates the multimodal mappings object
 
     Args:
@@ -476,13 +528,55 @@ def validate_multimodal_combination_object(multimodal_mappings: Dict):
     Raises InvalidArgError if the object is badly formatted
     """
     try:
-        jsonschema.validate(instance=multimodal_mappings, schema=multimodal_combination_schema)
-        return multimodal_mappings
+        jsonschema.validate(instance=mappings_object, schema=multimodal_combination_mappings_schema)
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
-            f"Error validating multimodal combination object. Reason: \n{str(e)}"
-            f"\nRead about the mappings object here: https://docs.marqo.ai/0.0.15/API-Reference/mappings/"
+            f"Error validating multimodal combination mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
         )
+
+    # TODO: compare, this might be wrong for v2.
+    # TODO: Move this validation into schema in mappings_object
+    for child_field, weight in mappings_object["weights"].items():
+        # TODO: We may need to validate field name of child field.
+        if type(child_field) not in tensor_search_constants.ALLOWED_MULTIMODAL_FIELD_TYPES:
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{mappings_object}` has an invalid child_field `{child_field}` of type `{type(child_field).__name__}`."
+                f"In multimodal_combination fields, it must be a string."
+                f"Please check `{marqo_docs.multimodal_combination_object()}` for more info."
+            )
+
+        if not isinstance(weight, (float, int)):
+            raise InvalidArgError(
+                f"The multimodal_combination mapping `{mappings_object}` has an invalid weight `{weight}` of type `{type(weight).__name__}`."
+                f"In multimodal_combination fields, weight must be an int or float."
+                f"Please check `{marqo_docs.multimodal_combination_object()}` for more info."
+            )
+
+    return mappings_object
+
+
+def validate_custom_vector_mappings_object(mappings_object: Dict):
+    """Validates the custom vector mappings object
+    Args:
+        mappings_object:
+    Returns:
+        The original object, if it passes validation
+    Raises InvalidArgError if the object is badly formatted
+    Example custom vector mappings must look exactly like this:
+    "my_custom_vector_field": {
+        "type": "custom_vector"
+    }
+    """
+    try:
+        jsonschema.validate(instance=mappings_object, schema=custom_vector_mappings_schema)
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating custom vector mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
+        )
+
+    return mappings_object
 
 
 def validate_delete_docs_request(delete_request: MqDeleteDocsRequest, max_delete_docs_count: int):

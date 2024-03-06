@@ -79,8 +79,9 @@ class RequestType:
     PARTIAL_UPDATE = "PARTIAL_UPDATE"
 
 
-class MappingsObjectType:
+class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
+    custom_vector = "custom_vector"
 
 
 class SearchDb:

@@ -25,7 +25,7 @@ class IndexType(Enum):
     Unstructured = 'unstructured'
 
 
-class FieldType(Enum):
+class FieldType(str, Enum):
     Text = 'text'
     Bool = 'bool'
     Int = 'int'
@@ -39,6 +39,7 @@ class FieldType(Enum):
     ArrayDouble = 'array<double>'
     ImagePointer = 'image_pointer'
     MultimodalCombination = 'multimodal_combination'
+    CustomVector = "custom_vector"
 
 
 class VectorNumericType(Enum):
@@ -265,18 +266,6 @@ class StructuredMarqoIndex(MarqoIndex):
     def __init__(self, **data):
         super().__init__(**data)
 
-    @root_validator
-    def validate_model(cls, values):
-        # Verify all combination fields are tensor fields
-        combination_fields = [field for field in values.get('fields', []) if
-                              field.type == FieldType.MultimodalCombination]
-        tensor_field_names = {tensor_field.name for tensor_field in values.get('tensor_fields', [])}
-        for field in combination_fields:
-            if field.name not in tensor_field_names:
-                raise ValueError(f'Field {field.name} has type {field.type.value()} and must be a tensor field')
-
-        return values
-
     @classmethod
     def _valid_type(cls) -> IndexType:
         return IndexType.Structured
@@ -484,7 +473,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.MultimodalCombination.value}'
         )
 
-    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText]:
+    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText, FieldType.CustomVector]:
         raise ValueError(
             f'{name}: Field with {FieldFeature.LexicalSearch.value} feature must be of type '
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
