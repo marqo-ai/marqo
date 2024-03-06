@@ -16,7 +16,7 @@ from marqo.exceptions import InternalError
 class UnstructuredVespaIndex(VespaIndex):
     _FILTER_STRING_BOOL_VALUES = ["true", "false"]
     _RESERVED_FIELD_SUBSTRING = "::"
-    _SUPPORTED_FIELD_CONTENT_TYPES = [str, int, float, bool, list]
+    _SUPPORTED_FIELD_CONTENT_TYPES = [str, int, float, bool, list, dict]
 
     def __init__(self, marqo_index: UnstructuredMarqoIndex):
         self._marqo_index = marqo_index
