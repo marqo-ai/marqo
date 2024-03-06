@@ -28,6 +28,7 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 
 logger = get_logger(__name__)
 
@@ -39,6 +40,10 @@ def generate_config() -> config.Config:
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
         content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
+        feed_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_FEED_POOL_SIZE),
+        get_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_GET_POOL_SIZE),
+        delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
+        partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE)
     )
     index_management = IndexManagement(vespa_client)
     return config.Config(vespa_client, index_management)
@@ -207,6 +212,20 @@ def add_or_replace_documents(
         )
 
 
+@app.patch("/indexes/{index_name}/documents")
+@throttle(RequestType.PARTIAL_UPDATE)
+def update_documents(
+        body: UpdateDocumentsBodyParams,
+        index_name: str,
+        marqo_config: config.Config = Depends(get_config)):
+    """update_documents endpoint"""
+
+    res = marqo_config.document.partial_update_documents_by_index_name(
+        index_name=index_name, partial_documents=body.documents)
+
+    return res.dict(exclude_none=True, by_alias=True)
+
+
 @app.get("/indexes/{index_name}/documents/{document_id}")
 def get_document_by_id(index_name: str, document_id: str,
                        marqo_config: config.Config = Depends(get_config),
@@ -338,7 +357,7 @@ def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithNa
 def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.
     This API delete all the documents in the indexes specified in the index_names list."""
-    document_count: int = marqo_config.document.delete_all_docs(index_name=index_name)
+    document_count: int = marqo_config.document.delete_all_docs_by_index_name(index_name=index_name)
 
     return {"documentCount": document_count}
 

@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://uploads-ssl.webflow.com/62dfa8e3960a6e2b47dc7fae/62fdf9cef684e6f16158b094_MARQO%20LOGO-UPDATED-GREEN.svg" width="50%" height="40%">
+<img src="https://github.com/marqo-ai/public-assets/blob/main/marqowbackground.png" width="50%" height="40%">
 </p>
 
 <p align="center">
@@ -455,6 +455,12 @@ results = mq.index("my-first-index").delete()
 ```
 
 ## 
+
+## Running Marqo open source in production
+
+We support Kubernetes templates for Marqo which you can deploy on a cloud provider of your choice. Marqo's Kubernetes implementation allows you to deploy clusters with replicas, multiple storage shards and multiple inference nodes. The repo can be found here: [https://github.com/marqo-ai/marqo-on-kubernetes](https://github.com/marqo-ai/marqo-on-kubernetes)
+
+If you're looking for a fully managed cloud service, you can sign up for Marqo Cloud here: [https://cloud.marqo.ai](https://cloud.marqo.ai).
 
 ## Documentation
 

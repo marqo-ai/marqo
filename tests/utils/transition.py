@@ -2,15 +2,13 @@
 Our test suite is quite brittle. This helps the unit test suite navigate
 refactoring transitions in Marqo
 """
-from marqo.tensor_search.tensor_search import add_documents
-from marqo.tensor_search.configs import default_env_vars
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.enums import EnvVars
-from marqo.config import Config
 from copy import deepcopy
 
-# TODO - Change when max docs becomes configurable
-from marqo.tensor_search.models.add_docs_objects import MAX_DOCS
+from marqo.config import Config
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.tensor_search import add_documents
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
 def add_docs_caller(config: Config, **kwargs):
@@ -28,7 +26,8 @@ def add_docs_caller(config: Config, **kwargs):
     return add_documents(config=config, add_docs_params=AddDocsParams(**kwargs))
 
 
-def add_docs_batched(config: Config, batch_size: int = MAX_DOCS, **kwargs):
+def add_docs_batched(config: Config,
+                     batch_size: int = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE), **kwargs):
     """
     Helper function to batch large add_documents calls in testing
     Default batch size is the default max add docs count env var

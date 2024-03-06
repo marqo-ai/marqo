@@ -71,7 +71,8 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars
+    Device, TensorField, SearchMethod, EnvVars,
+    MappingsObjectType
 )
 from marqo.tensor_search.index_meta_cache import get_cache, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -83,6 +84,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo import marqo_docs
 
 logger = get_logger(__name__)
 
@@ -115,6 +117,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
     unstructured_vespa_index = UnstructuredVespaIndex(marqo_index)
+    index_model_dimensions = marqo_index.model.get_dimension()
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
@@ -138,6 +141,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     batch_size = len(add_docs_params.docs)
     image_repo = {}
 
+    docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
+
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images:
             with RequestMetricsStore.for_request().time(
@@ -154,17 +159,16 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     if add_docs_params.tensor_fields else []
                 tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
-                    add_docs.download_images(docs=add_docs_params.docs,
+                    add_docs.download_images(docs=docs,
                                              thread_count=add_docs_params.image_download_thread_count,
                                              tensor_fields=tensor_fields_and_multimodal_subfields,
                                              image_download_headers=add_docs_params.image_download_headers)
                 )
 
         if add_docs_params.use_existing_tensors:
-            ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
             existing_docs_dict: Dict[str, dict] = {}
-            if len(ids) > 0:
-                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, ids, ignore_invalid_ids=True)
+            if len(doc_ids) > 0:
+                existing_docs = _get_marqo_documents_by_ids(config, marqo_index.name, doc_ids, ignore_invalid_ids=True)
                 for doc in existing_docs:
                     id = doc["_id"]
                     if id in existing_docs_dict:
@@ -173,7 +177,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
-        for i, doc in enumerate(add_docs_params.docs):
+        for i, doc in enumerate(docs):
 
             copied = copy.deepcopy(doc)
 
@@ -215,6 +219,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         field_content=copied[field],
                         is_tensor_field=is_tensor_field
                     )
+                    # Used to validate custom_vector field or any other new dict field type
+                    if isinstance(field_content, dict):
+                        field_content = validation.validate_dict(
+                            field=field, field_content=field_content,
+                            is_non_tensor_field=not is_tensor_field,
+                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions)
                 except (errors.InvalidArgError, core_exceptions.MarqoDocumentParsingError) as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -231,7 +241,27 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 chunks: List[str] = []
                 embeddings: List[List[float]] = []
 
-                if (
+                # 4 current options for chunking/vectorisation behavior:
+                # A) field type is custom_vector -> no chunking or vectorisation
+                # B) use_existing_tensors=True and field content hasn't changed -> no chunking or vectorisation
+                # C) field type is standard -> chunking and vectorisation
+                # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
+                # Do step D regardless. It will generate separate chunks for multimodal.
+
+                # A) Calculate custom vector field logic here. It should ignore use_existing_tensors, as this step has no vectorisation.
+                document_dict_field_type = add_docs.determine_document_dict_field_type(field, field_content,
+                                                                                       add_docs_params.mappings)
+                if document_dict_field_type == FieldType.CustomVector:
+                    # Generate exactly 1 chunk with the custom vector.
+                    chunks = [f"{field}::{copied[field]['content']}"]
+                    embeddings = [copied[field]["vector"]]
+
+                    # Update parent document (copied) to fit new format. Use content (text) to replace input dict
+                    copied[field] = field_content["content"]
+                    logger.debug(f"Custom vector field {field} added as 1 chunk.")
+
+                # B) Use existing tensors if available and existing content did not change.
+                elif (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
                         field in existing_docs_dict[doc_id] and
@@ -252,6 +282,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         logger.debug(f"Found document but not tensors for field {field} for doc {doc_id}. "
                                      f"Is this a new tensor field?")
 
+                # C) field type is standard
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
                     if isinstance(field_content, (str, Image.Image)):
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
@@ -330,7 +361,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 s2_inference.ModelDownloadError) as model_error:
                             raise errors.BadRequestError(
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                                link=marqo_docs.list_of_models()
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
@@ -345,7 +376,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         if len(vector_chunks) != len(text_chunks):
                             raise RuntimeError(
                                 f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                                f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                                f"received text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
                                 f"check the preprocessing functions and try again. ")
 
                         chunks: List[str] = [f"{field}::{text_chunk}" for text_chunk in text_chunks]
@@ -506,6 +537,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
     vespa_index = StructuredVespaIndex(marqo_index)
+    index_model_dimensions = marqo_index.model.get_dimension()
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
@@ -529,24 +561,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     image_repo = {}
 
     # Deduplicate docs, keep the latest
-    docs = []
-    doc_ids = set()
-    for i in range(len(add_docs_params.docs) - 1, -1, -1):
-        doc = add_docs_params.docs[i]
-
-        if isinstance(doc, dict) and '_id' in doc:
-            doc_id = doc['_id']
-            try:
-                if doc_id is not None and doc_id in doc_ids:
-                    logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
-                    continue
-                doc_ids.add(doc_id)
-            except TypeError as e:  # Happens if ID is a non-hashable type -- ID validation will catch this later on
-                logger.debug(f'Could not hash document ID {doc_id}: {e}')
-
-        docs.append(doc)
-    # Reverse to preserve order in request
-    docs.reverse()
+    docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
     with ExitStack() as exit_stack:
         image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
@@ -635,11 +650,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         field_content=copied[field],
                         is_non_tensor_field=not is_tensor_field
                     )
+                    # Used to validate custom_vector field or any other new dict field type
                     if isinstance(field_content, dict):
                         field_content = validation.validate_dict(
                             field=field, field_content=field_content,
                             is_non_tensor_field=not is_tensor_field,
-                            mappings=add_docs_params.mappings)
+                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions,
+                            structured_field_type=marqo_field.type)
                 except api_exceptions.InvalidArgError as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
@@ -656,7 +673,24 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 chunks = []
                 embeddings = []
 
-                if (
+                # 4 current options for chunking/vectorisation behavior:
+                # A) field type is custom_vector -> no chunking or vectorisation
+                # B) use_existing_tensors=True and field content hasn't changed -> no chunking or vectorisation
+                # C) field type is standard -> chunking and vectorisation
+                # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
+
+                # A) Calculate custom vector field logic here. It should ignore use_existing_tensors, as this step has no vectorisation.
+                if marqo_field.type == FieldType.CustomVector:
+                    # Generate exactly 1 chunk with the custom vector.
+                    chunks = [copied[field]['content']]
+                    embeddings = [copied[field]["vector"]]
+
+                    # Update parent document (copied) to fit new format. Use content (text) to replace input dict
+                    copied[field] = field_content["content"]
+                    logger.debug(f"Custom vector field {field} added as 1 chunk.")
+
+                # B) Use existing tensors if available and existing content did not change.
+                elif (
                         add_docs_params.use_existing_tensors and
                         doc_id in existing_docs_dict and
                         field in existing_docs_dict[doc_id] and
@@ -757,7 +791,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 s2_inference.ModelDownloadError) as model_error:
                             raise api_exceptions.BadRequestError(
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                                link=marqo_docs.list_of_models()
                             )
                         except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
@@ -772,7 +806,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         if len(vector_chunks) != len(text_chunks):
                             raise RuntimeError(
                                 f"the input content after preprocessing and its vectorized counterparts must be the same length."
-                                f"recevied text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
+                                f"received text_chunks={len(text_chunks)} and vector_chunks={len(vector_chunks)}. "
                                 f"check the preprocessing functions and try again. ")
 
                         chunks = text_chunks
@@ -811,7 +845,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         if (
                                 add_docs_params.mappings is not None and
                                 field_name in add_docs_params.mappings and
-                                add_docs_params.mappings[field_name]["type"] == "multimodal_combination"
+                                add_docs_params.mappings[field_name]["type"] == FieldType.MultimodalCombination
                         ):
                             mappings = add_docs_params.mappings[field_name]
                             # Record custom weights in the document
@@ -1542,7 +1576,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                 s2_inference.ModelDownloadError) as model_error:
             raise api_exceptions.BadRequestError(
                 message=f'Problem vectorising query. Reason: {str(model_error)}',
-                link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+                link=marqo_docs.list_of_models()
             )
 
         except s2_inference_errors.S2InferenceError as e:
@@ -1590,7 +1624,7 @@ def get_query_vectors_from_jobs(
                  content
                 ) for content, weight in ordered_queries
             ]
-            # TODO how doe we ensure order?
+            # TODO how do we ensure order?
             weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
 
             context_tensors = q.get_context_tensor()
@@ -1603,7 +1637,7 @@ def get_query_vectors_from_jobs(
                 raise api_exceptions.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
                                                      f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
                                                      f"The original error is `{e}`.\n"
-                                                     f"Please check `https://docs.marqo.ai/0.0.16/API-Reference/search/#context`.")
+                                                     f"Please check `{marqo_docs.search_context()}`.")
 
             if index_info.normalize_embeddings:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
@@ -1957,7 +1991,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
             s2_inference_errors.ModelLoadError) as model_error:
         raise errors.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link="https://marqo.pages.dev/1.4.0/Models-Reference/dense_retrieval/"
+            link=marqo_docs.list_of_models()
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
@@ -1996,7 +2030,7 @@ def vectorise_multimodal_combination_field_structured(
     """
     This function is used to vectorise multimodal combination field. The field content should
     have the following structure:
-    field_conent = {"tensor_field_one" : {"weight":0.5, "parameter": "test-paramater-1"},
+    field_content = {"tensor_field_one" : {"weight":0.5, "parameter": "test-parameter-1"},
                     "tensor_field_two" : {"weight": 0.5, parameter": "test-parameter-2"}},
     Over all this is a simplified version of the vectorise pipeline in add_documents. Specifically,
     1. we don't do any chunking here.
@@ -2095,7 +2129,7 @@ def vectorise_multimodal_combination_field_structured(
             s2_inference_errors.ModelLoadError) as model_error:
         raise api_exceptions.BadRequestError(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
-            link="https://marqo.pages.dev/latest/Models-Reference/dense_retrieval/"
+            link=marqo_docs.list_of_models()
         )
     except s2_inference_errors.S2InferenceError:
         combo_document_is_valid = False
