@@ -90,6 +90,7 @@ class Document:
 
         start_time = timer()
         vespa_index = vespa_index_factory(marqo_index)
+
         vespa_documents: List[VespaDocument] = []
         unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]] = []
 
@@ -105,8 +106,10 @@ class Document:
                     (index, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''), error=e.message,
                                                      status=int(api_exceptions.InvalidArgError.status_code))))
 
-        vespa_res: UpdateDocumentsBatchResponse = self.vespa_client.update_documents_batch(vespa_documents,
-                                                                                           marqo_index.schema_name)
+        vespa_res: UpdateDocumentsBatchResponse = (
+            self.vespa_client.update_documents_batch(vespa_documents,
+                                                     marqo_index.schema_name,
+                                                     marqo_id_field=vespa_index.get_vespa_field_id()))
 
         return self._translate_update_document_response(vespa_res, unsuccessful_docs,
                                                         marqo_index.name, start_time)

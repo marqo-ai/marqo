@@ -86,6 +86,12 @@ class VespaIndex(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_vespa_field_id(self) -> str:
+        """
+        Get the name of the id field in Vespa documents, inside the 'fields' dictionary."""
+        pass
+
 
 def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
     """
