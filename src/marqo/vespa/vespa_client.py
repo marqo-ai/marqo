@@ -447,7 +447,7 @@ class VespaClient:
                                schema: str,
                                concurrency: Optional[int] = None,
                                timeout: int = 60,
-                               marqo_id_field: str = "marqo__id") -> UpdateDocumentsBatchResponse:
+                               vespa_id_field: str = "marqo__id") -> UpdateDocumentsBatchResponse:
         """
         Partial update documents in batch concurrently.
 
@@ -460,8 +460,7 @@ class VespaClient:
             concurrency: Number of concurrent delete requests, can be configured by environment variable
                 VESPA_PARTIAL_UPDATE_POOL_SIZE
             timeout: Timeout in seconds per request
-            marqo_id_field: The field name of the marqo_id_field that we to identify and check
-                the existence of the document
+            vespa_id_field: The field name of the vespa document id under the fields dictionary
 
         Returns:
             A UpdateDocumentsBatchResponse object
@@ -474,7 +473,7 @@ class VespaClient:
             concurrency = self.partial_pool_size
 
         batch_response = conc.run_coroutine(
-            self._update_documents_batch_async(batch, schema, concurrency, timeout, marqo_id_field)
+            self._update_documents_batch_async(batch, schema, concurrency, timeout, vespa_id_field)
         )
 
         return batch_response
@@ -620,13 +619,13 @@ class VespaClient:
     async def _update_documents_batch_async(self, batch: List[VespaDocument],
                                             schema: str,
                                             connections: int, timeout: int,
-                                            marqo_id_field: str) -> UpdateDocumentsBatchResponse:
+                                            vespa_id_field: str) -> UpdateDocumentsBatchResponse:
         async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
                                                          max_connections=connections)) as async_client:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
-                    self._update_document_async(semaphore, async_client, document, schema, timeout, marqo_id_field)
+                    self._update_document_async(semaphore, async_client, document, schema, timeout, vespa_id_field)
                 )
                 for document in batch
             ]
@@ -644,13 +643,13 @@ class VespaClient:
 
     async def _update_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                      document: VespaDocument, schema: str,
-                                     timeout: int, marqo_id_field: str) -> UpdateDocumentResponse:
+                                     timeout: int, vespa_id_field: str) -> UpdateDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
 
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
-            data["condition"] = f'{schema}.{marqo_id_field}==\"{doc_id}\"'
+            data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
             except httpx.HTTPError as e:
