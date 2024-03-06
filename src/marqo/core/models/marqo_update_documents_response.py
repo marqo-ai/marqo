@@ -6,7 +6,7 @@ from marqo.base_model import MarqoBaseModel
 
 
 class MarqoUpdateDocumentsItem(MarqoBaseModel):
-    _id: str
+    id: str = Field(alias="_id")
     status: int
     message: Optional[str] = None
     error: Optional[str] = None
