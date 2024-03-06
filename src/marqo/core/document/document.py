@@ -32,7 +32,7 @@ class Document:
         return self.delete_all_docs(marqo_index)
 
     def delete_all_docs(self, marqo_index) -> int:
-        """Deletes all documents in the given index by marqo_index object
+        """Delete all documents in the given index by marqo_index object
 
         Args:
             marqo_index: The index object to delete documents from"""
@@ -42,7 +42,7 @@ class Document:
     def partial_update_documents_by_index_name(self, index_name,
                                                partial_documents: List[Dict]) \
             -> Dict:
-        """Partially updates documents in the given index by index name.
+        """Partially update documents in the given index by index name.
 
         Args:
             index_name: The name of the index to partially update documents in
@@ -61,7 +61,7 @@ class Document:
 
     def partial_update_documents(self, partial_documents: List[Dict], marqo_index) \
             -> MarqoUpdateDocumentsResponse:
-        """Partially updates documents in the given index by marqo_index object.
+        """Partially update documents in the given index by marqo_index object.
 
         The partial_documents without _id will error out and the error will be returned in the response without
         error out the entire batch.
@@ -112,7 +112,7 @@ class Document:
     def _translate_update_document_response(self, responses: UpdateDocumentsBatchResponse, unsuccessful_docs: List,
                                             index_name: str, start_time) \
             -> MarqoUpdateDocumentsResponse:
-        """Translates Vespa response dict into MarqoUpdateDocumentsResponse for document update
+        """Translate Vespa response dict into MarqoUpdateDocumentsResponse for document update
 
         Args:
             responses: The response from Vespa
