@@ -140,8 +140,8 @@ class Document:
         for loc, error_info in unsuccessful_docs:
             new_items.insert(loc, error_info)
 
-        return MarqoUpdateDocumentsResponse(indexName=index_name, items=new_items,
-                                            preprocessingTime=(timer() - start_time) * 1000)
+        return MarqoUpdateDocumentsResponse(index_name=index_name, items=new_items,
+                                            processingTimeMs=(timer() - start_time) * 1000)
 
     def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
         """Remove duplicated documents based on _id in the given list of documents.
