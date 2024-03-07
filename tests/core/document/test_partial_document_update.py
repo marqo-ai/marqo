@@ -750,6 +750,8 @@ class TestUpdate(MarqoTestCase):
                                      index_name=self.structured_index_name,
                                      marqo_config=self.config)
 
+                print(r)
+
                 self.assertEqual(expected_error, r["errors"])
                 self.assertEqual(expected_status, r["items"][0]["status"])
                 self.assertEqual(expected_id, r["items"][0]["_id"])

@@ -22,9 +22,9 @@ class MarqoUpdateDocumentsItem(MarqoBaseModel):
 
 class MarqoUpdateDocumentsResponse(MarqoBaseModel):
     errors: bool
-    indexName: str = Field(alias="index_name")
+    index_name: str
     items: List[MarqoUpdateDocumentsItem]
-    preprocessingTimeMs: float
+    processingTimeMs: float
 
     @root_validator(pre=True)
     def check_errors(cls, values):
