@@ -89,11 +89,12 @@ jobs:
           pip install tox==3.26
           pip install flake8
       
-      # TODO: linting here
       - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
-          if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]] || [[ "${{ inputs.py_marqo_branch }}" == "" ]]; then
+          if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]]; then
             echo "MQ_PY_MARQO_BRANCH=marqo" >> $GITHUB_ENV
+          elif [[ "${{ inputs.py_marqo_branch }}" == "" ]]; then
+            echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@mainline" >> $GITHUB_ENV
           else
             echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
           fi
