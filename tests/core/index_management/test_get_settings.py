@@ -86,7 +86,7 @@ class TestGetSettings(MarqoTestCase):
                 {
                     'annParameters': {
                         'parameters': {'efConstruction': 512, 'm': 16},
-                        'spaceType': DistanceMetric.PrenormalizedAnguar
+                        'spaceType': DistanceMetric.PrenormalizedAngular
                     },
                     'filterStringMaxLength': 20,
                     'imagePreprocessing': {},
@@ -122,7 +122,7 @@ class TestGetSettings(MarqoTestCase):
                     ],
                     'annParameters': {
                         'parameters': {'efConstruction': 512, 'm': 16},
-                        'spaceType': DistanceMetric.PrenormalizedAnguar
+                        'spaceType': DistanceMetric.PrenormalizedAngular
                     },
                     'imagePreprocessing': {},
                     'model': 'hf/e5-base-v2',
@@ -151,7 +151,7 @@ class TestGetSettings(MarqoTestCase):
                 {
                     'annParameters': {
                         'parameters': {'efConstruction': 512, 'm': 16},
-                        'spaceType': DistanceMetric.PrenormalizedAnguar
+                        'spaceType': DistanceMetric.PrenormalizedAngular
                     },
                     'filterStringMaxLength': 20,
                     'imagePreprocessing': {},
@@ -186,7 +186,7 @@ class TestGetSettings(MarqoTestCase):
                     ],
                     'annParameters': {
                         'parameters': {'efConstruction': 512, 'm': 16},
-                        'spaceType': DistanceMetric.PrenormalizedAnguar
+                        'spaceType': DistanceMetric.PrenormalizedAngular
                     },
                     'imagePreprocessing': {},
                     'model': 'ViT-B/32',
