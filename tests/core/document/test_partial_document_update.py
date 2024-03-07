@@ -753,3 +753,5 @@ class TestUpdate(MarqoTestCase):
                 self.assertEqual(expected_error, r["errors"])
                 self.assertEqual(expected_status, r["items"][0]["status"])
                 self.assertEqual(expected_id, r["items"][0]["_id"])
+                self.assertIn("index_name", r)
+                self.assertIn("processingTimeMs", r)
