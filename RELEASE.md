@@ -1,17 +1,17 @@
 # Release 2.3.0
 
 ## New features
-- New `update_documents` API (https://github.com/marqo-ai/marqo/pull/773). This API is ideal for modifying or inserting non-tensor fields (e.g., int fields or list fields) in existing documents with high throughput. See usages [here](https://docs.marqo.ai/2.3.0/API-Reference/Documents/update_documents/)
+- New `update_documents` API (https://github.com/marqo-ai/marqo/pull/773). Structured indexes now support high throughput partial updates to non-tensor fields. Unstructured indexes do not support partial updates. See usages [here](https://docs.marqo.ai/2.3.0/API-Reference/Documents/update_documents/)
 - The custom vectors feature is now supported again for both structured and unstructured indexes (https://github.com/marqo-ai/marqo/pull/777). You can now add externally generated vectors to Marqo documents. See usages [here](https://docs.marqo.ai/2.3.0/API-Reference/Documents/add_or_replace_documents/#mappings)
+
 ## Bug fixes and minor changes
-- The distance metric in an unstructured index is configurable now (https://github.com/marqo-ai/marqo/pull/772).
-- Introduced a guide for running Marqo open source in production environments, offering insights and best practices (https://github.com/marqo-ai/marqo/pull/775).
-- Removed outdated examples from the README to improve clarity and relevance (https://github.com/marqo-ai/marqo/pull/766).
+- Fix an issue where non-default distance metrics are not configured correctly with unstructured indexes (https://github.com/marqo-ai/marqo/pull/772).
+- Introduce a guide for running Marqo open source in production environments, offering insights and best practices (https://github.com/marqo-ai/marqo/pull/775).
+- Remove outdated examples from the README to improve clarity and relevance (https://github.com/marqo-ai/marqo/pull/766).
 
 ## Contributor shout-outs
 - A huge thank you to all our 4k stargazers! This is a new milestone for Marqo!
 - Stay connected and share your thoughts on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! Your insights, questions, and feedback are always welcome and highly appreciated.
-
 
 # Release 2.2.1
 
