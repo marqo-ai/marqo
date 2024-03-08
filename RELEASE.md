@@ -1,8 +1,8 @@
 # Release 2.3.0
 
 ## New features
-- New `update_documents` API that can modify or insert field values of existing documents in a structured index (https://github.com/marqo-ai/marqo/pull/773). This API is ideal for modifying or inserting non-tensor fields (e.g., int fields or list fields) in existing documents with high throughput. See usages [here]()
-- The custom vectors feature is now supported again for both structured and unstructured indexes (https://github.com/marqo-ai/marqo/pull/777). You can now add externally generated vectors to Marqo documents. See usages [here]()
+- New `update_documents` API that can modify or insert field values of existing documents in a structured index (https://github.com/marqo-ai/marqo/pull/773). This API is ideal for modifying or inserting non-tensor fields (e.g., int fields or list fields) in existing documents with high throughput. See usages [here](https://docs.marqo.ai/2.3.0/API-Reference/Documents/update_documents/)
+- The custom vectors feature is now supported again for both structured and unstructured indexes (https://github.com/marqo-ai/marqo/pull/777). You can now add externally generated vectors to Marqo documents. See usages [here](https://docs.marqo.ai/2.3.0/API-Reference/Documents/add_or_replace_documents/#mappings)
 ## Bug fixes and minor changes
 - The distance metric in an unstructured index is configurable now (https://github.com/marqo-ai/marqo/pull/772).
 - Introduced a guide for running Marqo open source in production environments, offering insights and best practices (https://github.com/marqo-ai/marqo/pull/775).
