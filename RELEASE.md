@@ -1,3 +1,45 @@
+# Release 2.3.0
+
+## New features
+New `update_documents` API that can modify or insert field values of existing documents in a structured index (https://github.com/marqo-ai/marqo/pull/773). This API is ideal for modifying or inserting non-tensor fields (e.g., int fields or list fields) in existing documents with high throughput. See usages [here]()
+The custom vectors feature is now supported again for both structured and unstructured indexes (https://github.com/marqo-ai/marqo/pull/777). You can now add externally generated vectors to Marqo documents. See usages [here]()
+## Bug fixes and minor changes
+The distance metric in an unstructured index is configurable now (https://github.com/marqo-ai/marqo/pull/772).
+Introduced a guide for running Marqo open source in production environments, offering insights and best practices (https://github.com/marqo-ai/marqo/pull/775).
+Removed outdated examples from the README to improve clarity and relevance (https://github.com/marqo-ai/marqo/pull/766).
+
+## Contributor shout-outs
+A huge thank you to all our 4k stargazers! This is a new milestone for Marqo!
+Stay connected and share your thoughts on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! Your insights, questions, and feedback are always welcome and highly appreciated.
+
+
+# Release 2.2.1
+
+## Bug fixes and minor changes
+- Fix response code for vector store timeout, change it from 429 to 504 (https://github.com/marqo-ai/marqo/pull/763)
+
+# Release 2.2.0
+
+## New features
+* Support filtering on document ID with structured indexes. This was already supported with unstructured indexes ([#749](https://github.com/marqo-ai/marqo/pull/749))
+* New structured index data types: `long`, `double`, `array<long>` and `array<double>` for a higher precision and range of values Available for indexes created with Marqo 2.2+ ([#722](https://github.com/marqo-ai/marqo/pull/722))
+* Higher precision numeric fields for unstructured indexes. Unstructured indexes created with Marqo 2.2+ will use double precision floats and longs for a higher precision and wider range of values ([#722](https://github.com/marqo-ai/marqo/pull/722))
+* Numeric value range validation. Values that are out of range for the field type will now receive a 400 validation error when adding documents. ([#722](https://github.com/marqo-ai/marqo/pull/722))
+
+## Bug fixes and minor changes
+* Fix unstructured index bug where filtering for boolean-like strings (e.g., `"true"`) would not work as expected ([#709](https://github.com/marqo-ai/marqo/pull/709))
+* Better handling of vector store timeouts. Marqo will now return a 429 (throttled) error message when the backend vector store is receiving more traffic than it can handle([#758](https://github.com/marqo-ai/marqo/pull/758))
+* Improved error logging. Stack trace will now always be logged ([#745](https://github.com/marqo-ai/marqo/pull/745))
+* Better API 500 error message. Marqo will no longer return verbose error messages in the API response ([#751](https://github.com/marqo-ai/marqo/pull/751))
+* Default index model is now hf/e5-base-v2 ([#710](https://github.com/marqo-ai/marqo/pull/710))
+* Improve error messages ([#746](https://github.com/marqo-ai/marqo/pull/746), [#747](https://github.com/marqo-ai/marqo/pull/747))
+* Improve error handling at startup when vector store is not ready. Marqo will now start and wait for vector store to become available ([#752](https://github.com/marqo-ai/marqo/pull/752))
+
+## Contributor shout-outs
+* A huge thank you to all our 3.9k stargazers!
+* Thank you [@Dmitri](https://marqo-community.slack.com/team/U06GL2R5NMT) for helping us identify the issue with running Marqo on older AMD64 processors!
+
+
 # Release 2.1.0
 
 ## New features
