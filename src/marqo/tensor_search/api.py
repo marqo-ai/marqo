@@ -5,6 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
+import threading
 
 from marqo import config
 from marqo import exceptions as base_exceptions
@@ -177,7 +178,7 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
-        return tensor_search.search(
+        r = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
             searchable_attributes=search_query.searchableAttributes,
@@ -192,6 +193,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth
         )
+        r["threadId"] = threading.get_ident()
+        return r
 
 
 @app.post("/indexes/{index_name}/documents")
@@ -222,8 +225,9 @@ def update_documents(
 
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
-
-    return res.dict(exclude_none=True, by_alias=True)
+    r = res.dict(exclude_none=True, by_alias=True)
+    r["threadId"] = threading.get_ident()
+    return r
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
