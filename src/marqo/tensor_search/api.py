@@ -1,4 +1,6 @@
 """The API entrypoint for Tensor Search"""
+import threading
+import uuid
 from typing import List
 
 import uvicorn
@@ -12,6 +14,7 @@ from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.rollback_request import RollbackRequest
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
@@ -28,7 +31,6 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
-from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 
 logger = get_logger(__name__)
 
@@ -60,6 +62,7 @@ app = FastAPI(
 )
 app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
+instance_uuid = uuid.uuid4()
 
 
 def get_config():
@@ -177,7 +180,7 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
-        return tensor_search.search(
+        result_dict = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
             searchable_attributes=search_query.searchableAttributes,
@@ -192,6 +195,11 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth
         )
+        # add instance uuid
+        result_dict["instance_uuid"] = instance_uuid
+        result_dict["thread_id"] = threading.get_ident()
+
+        return result_dict
 
 
 @app.post("/indexes/{index_name}/documents")
@@ -207,9 +215,13 @@ def add_or_replace_documents(
                                                              device=device, auto_refresh=refresh)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        return tensor_search.add_documents(
+        result_dict = tensor_search.add_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
+        result_dict["instance_uuid"] = instance_uuid
+        result_dict["thread_id"] = threading.get_ident()
+
+        return result_dict
 
 
 @app.patch("/indexes/{index_name}/documents")
