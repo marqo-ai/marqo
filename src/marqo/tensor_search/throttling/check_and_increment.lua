@@ -21,6 +21,6 @@ if current_thread_count + 1 > thread_limit then
 else
     -- add item to sorted set (time, key name)
     redis.call("zadd", set_key, now, thread_name)
-    return 0
+    return current_thread_count + 1
     
 end

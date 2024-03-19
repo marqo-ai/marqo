@@ -74,7 +74,8 @@ def throttle(request_type: str):
             redis_time = (t1 - t0)*1000
 
             # Thread limit exceeded, throw 429
-            if check_result != 0:
+            logger.info(f'Redis counter: {check_result}, type: {request_type}')
+            if check_result == -1:
                 throttling_message = f"Throttled because maximum thread count ({throttling_max_threads[request_type]}) for request type '{request_type}' has been exceeded. Try your request again later."
                 raise TooManyRequestsError(message=throttling_message)
 
