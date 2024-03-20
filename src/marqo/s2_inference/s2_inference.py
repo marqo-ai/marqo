@@ -78,7 +78,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
     except UnidentifiedImageError as e:
-        raise VectoriseError(str(e)) from e
+        raise VectoriseError(f"Could not process given image: {content}") from e
 
     return _convert_vectorized_output(vectorised)
 
@@ -182,37 +182,67 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                                        f"Please wait for 10 seconds and send the request again.\n")
 
 
-def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
+def validate_model_properties(model_name: str, model_properties: dict) -> dict:
     """validate model_properties, if not given then return model_registry properties
     """
     if model_properties is not None:
         """checks model dict to see if all required keys are present
         """
         required_keys = []
-        if model_properties.get("type", None) in (None, "sbert"):
+
+        if "type" not in model_properties:
+            base_error_message = ("You do not have a type key in your model_properties, so Marqo will try to load a "
+                                  "'sbert' model by default. If you want to load a different model, "
+                                  "please provide a type key. ")
+        else:
+            base_error_message = ""
+
+        model_type = model_properties.get("type", None)
+
+        if model_type in (None, "sbert"):
             required_keys = ["dimensions", "name"]
             # updates model dict with default values if optional keys are missing for sbert
             optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
             for key, value in optional_keys_values:
                 if key not in model_properties:
                     model_properties[key] = value
-
-        elif model_properties.get("type", None) in ("clip", "open_clip"):
+        elif model_type in ("clip", "open_clip"):
             required_keys = ["name", "dimensions"]
-
-        elif model_properties.get("type", None) in ("hf", ):
+        elif model_type in ("hf", ):
             required_keys = ["dimensions"]
+        elif model_type in ("no_model", ):
+            required_keys = ["dimensions"]
+            if not model_name == "no_model":
+                raise ModelLoadError(f"To use the no_model feature, you must provide model = no_models and "
+                                     f"type = no_model, but received model = {model_name} and "
+                                     f"type = {model_properties.get('type', None)}.")
+        elif model_type in ("test", "random", "multilingual_clip", "fp16_clip", 'sbert_onnx', "clip_onnx"):
+            pass
+        else:
+            raise InvalidModelPropertiesError("Invalid model type. Please check the model type in model_properties. "
+                                              "Support model types are 'sbert', 'clip', 'open_clip', 'hf', 'no_model', "
+                                              "'test', 'random', 'multilingual_clip', 'fp16_clip', 'sbert_onnx', "
+                                              "'clip_onnx'")
 
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
-                                                  f"please update your model properties with required key `{key}`"
-                                                  f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+                raise InvalidModelPropertiesError(base_error_message + f"model_properties has missing key '{key}'. "
+                                                  f"please update your model properties with required key `{key}` "
+                                                  f"check 'https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/' "
+                                                  f"for more info")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
 
+    _validate_model_properties_dimension(model_properties.get("dimensions", None))
+
     return model_properties
+
+
+def _validate_model_properties_dimension(dimensions: Optional[int]) -> None:
+    if dimensions is None or not isinstance(dimensions, int) or dimensions < 1:
+        raise InvalidModelPropertiesError(
+            f"Invalid model properties: `dimensions` must be a positive integer, but received {dimensions}.")
 
 
 def _validate_model_into_device(model_name:str, model_properties: dict, device: str, calling_func: str = None) -> bool:
@@ -373,7 +403,11 @@ def get_model_properties_from_registry(model_name: str) -> dict:
         raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
                                 f"Model is not supported by default.")
 
-    return MODEL_PROPERTIES['models'][model_name]
+    model_properties = MODEL_PROPERTIES['models'][model_name]
+
+    validate_model_properties(model_name, model_properties)
+
+    return model_properties
 
 
 def _check_output_type(output: List[List[float]]) -> bool:

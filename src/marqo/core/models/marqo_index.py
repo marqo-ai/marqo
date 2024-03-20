@@ -15,7 +15,7 @@ from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
-from marqo.s2_inference.errors import UnknownModelError
+from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 
 logger = get_logger(__name__)
 
@@ -123,6 +123,33 @@ class Model(StrictBaseModel):
     properties: Optional[Dict[str, Any]]
     custom: bool = False
 
+    @root_validator(pre=False)
+    def validate_and_set_properties(cls, values):
+        """Set model properties if not provided and validate the properties.
+
+        Raises:
+            InvalidArgumentError: If model properties are not populated or the properties are invalid.
+            UnknownModelError: If model properties are not populated and the model is not found in the registry.
+        """
+        model_name = values.get('name')
+        properties = values.get('properties')
+        try:
+            if properties is None:
+                logger.debug('Model properties not populated. Trying to update from registry')
+                properties = s2_inference.get_model_properties_from_registry(model_name)
+            else:
+                s2_inference.validate_model_properties(model_name, properties)
+        except UnknownModelError:
+            raise InvalidArgumentError(
+                f'Could not find model properties for model={model_name}. '
+                f'Please check that the model name is correct. '
+                f'Please provide model_properties if the model is a custom model and is not supported by default')
+        except InvalidModelPropertiesError as e:
+            raise InvalidArgumentError(
+                f'Invalid model properties for model={model_name}. Reason: {e}.')
+        values["properties"] = properties
+        return values
+
     def dict(self, *args, **kwargs):
         """
         Custom dict method that removes the properties field if the model is not custom. This ensures we don't store
@@ -134,38 +161,24 @@ class Model(StrictBaseModel):
         return d
 
     def get_dimension(self) -> int:
-        self._update_model_properties_from_registry()
-        try:
-            return self.properties['dimensions']
-        except KeyError:
+        if "dimensions" not in self.properties:
             raise InvalidArgumentError(
                 "The given model properties does not contain a 'dimensions' key"
             )
+        else:
+            dimensions = self.properties['dimensions']
+            if not isinstance(dimensions, int) or dimensions < 1:
+                raise InvalidArgumentError(
+                    f"The given model properties does not contain a valid 'dimensions' value. "
+                    f"It must be a positive integer, but received: {dimensions}"
+                )
+            return dimensions
 
     def get_properties(self) -> Dict[str, Any]:
         """
-        Get model properties. Try to update model properties from the registry first if model properties
-        are not populated.
-
-        Raises:
-            InvalidArgumentError: If model properties are not populated and the model is not found in the registry.
-            UnknownModelError: If model properties are not populated and the model is not found in the registry.
+        Get model properties.
         """
-        self._update_model_properties_from_registry()
         return self.properties
-
-    def _update_model_properties_from_registry(self) -> None:
-        if not self.properties:
-            logger.debug('Model properties not populated. Trying to update from registry')
-
-            model_name = self.name
-            try:
-                self.properties = s2_inference.get_model_properties_from_registry(model_name)
-            except UnknownModelError:
-                raise InvalidArgumentError(
-                    f'Could not find model properties for model={model_name}. '
-                    f'Please check that the model name is correct. '
-                    f'Please provide model_properties if the model is a custom model and is not supported by default')
 
 
 class MarqoIndex(ImmutableStrictBaseModel, ABC):
