@@ -1641,21 +1641,17 @@ def get_query_vectors_from_jobs(
 
             context_tensors = q.get_context_tensor()
             if context_tensors is not None:
-                for v in context_tensors:
-                    if len(v.vector) != q.index.model.get_dimension():
-                        raise api_exceptions.InvalidArgError(
-                            f"The provided context vectors are not in the same dimension of the index. "
-                            f"Expect {q.index.model.get_dimension()} but got {len(v.vector)}. "
-                        )
-                    weighted_vectors += [np.asarray(v.vector) * v.weight]
+                weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
 
-            try:
-                merged_vector = np.mean(weighted_vectors, axis=0)
-            except ValueError as e:
-                raise api_exceptions.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
-                                                     f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
-                                                     f"The original error is `{e}`.\n"
-                                                     f"Please check `{marqo_docs.search_context()}`.")
+            for vector in weighted_vectors:
+                if not q.index.model.get_dimension() == len(vector):
+                    raise api_exceptions.InvalidArgError(
+                        f"The dimension of the vectors returned by the model or given by the context vectors "
+                        f"does not match the expected dimension. "
+                        f"Expect dimension {q.index.model.get_dimension()} but got {len(vector)}"
+                    )
+
+            merged_vector = np.mean(weighted_vectors, axis=0)
 
             if q.index.normalize_embeddings:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
