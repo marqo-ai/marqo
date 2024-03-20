@@ -23,11 +23,14 @@ from marqo.tensor_search.models.custom_vector_object import CustomVector
 from marqo import marqo_docs
 
 
-def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod]):
+def validate_query(q: Optional[Union[dict, str]], search_method: Union[str, SearchMethod]) -> Optional[Union[dict, str]]:
     """
     Returns q if an error is not raised"""
     usage_ref = "\nSee query reference here: https://docs.marqo.ai/0.0.13/API-Reference/search/#query-q"
-    if isinstance(q, dict):
+
+    if isinstance(q, str) or q is None:
+        pass
+    elif isinstance(q, dict):
         if search_method.upper() != SearchMethod.TENSOR:
             raise InvalidArgError(
                 'Multi-query search is currently only supported for search_method="TENSOR" '
@@ -49,9 +52,9 @@ def validate_query(q: Union[dict, str], search_method: Union[str, SearchMethod])
                     f"{base_invalid_kv_message}Found value of type `{type(v)}` instead of float. Value=`{v}`"
                     f" {usage_ref}"
                 )
-    elif not isinstance(q, str):
+    else:
         raise InvalidArgError(
-            f"q must be a string or dict! Received q of type `{type(q)}`. "
+            f"q must be a string, a dict, or None with context! Received q of type `{type(q)}`. "
             f"\nq=`{q}`"
             f"{usage_ref}"
         )

@@ -139,7 +139,6 @@ class Model(StrictBaseModel):
                 logger.debug('Model properties not populated. Trying to update from registry')
                 properties = s2_inference.get_model_properties_from_registry(model_name)
             else:
-                custom = True
                 s2_inference.validate_model_properties(model_name, properties)
         except UnknownModelError:
             raise InvalidArgumentError(

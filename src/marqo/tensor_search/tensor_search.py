@@ -804,8 +804,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
-                                (i, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
-                                     'code': errors.InvalidArgError.code})
+                                (i,
+                                 {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
+                                  'code': errors.InvalidArgError.code})
                             )
                             break
 
@@ -1425,7 +1426,8 @@ def _lexical_search(
     return gathered_docs
 
 
-def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoIndex) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Optional[Union[str, Dict]], index_info: MarqoIndex) \
+        -> Tuple[List[str], List[str]]:
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
@@ -1442,7 +1444,7 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoInd
             return [], [query, ]
         else:
             return [query, ], []
-    else:  # is dict:
+    elif isinstance(query, dict):  # is dict:
         ordered_queries = list(query.items())
         if treat_urls_as_images:
             text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
@@ -1450,6 +1452,10 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoInd
             return text_queries, image_queries
         else:
             return [k for k, _ in ordered_queries], []
+    elif query is None:
+        return [], []
+    else:
+        raise ValueError(f"Incorrect type for query: {type(query).__name__}")
 
 
 def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
@@ -1549,10 +1555,9 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     jobs: Dict[JHash, VectorisedJobs] = {}
     for i, q in enumerate(queries):
         q = queries[i]
-        index_info = get_index(config=config, index_name=q.index)
         # split images from text:
-        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
-        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
+        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
+        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, q.index, device)
 
     return qidx_to_job, jobs
 
@@ -1614,28 +1619,35 @@ def get_query_vectors_from_jobs(
 
         # qidx_to_vectors[qidx].append(vectors)
         q = queries[qidx]
-        index_info = get_index(config=config, index_name=q.index)
 
-        ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
-        if ordered_queries:
-            # multiple queries. We have to weight and combine them:
-            vectorised_ordered_queries = [
-                (get_content_vector(
-                    possible_jobs=qidx_to_job[qidx],
-                    jobs=jobs,
-                    job_to_vectors=job_to_vectors,
-                    treat_urls_as_images=True,  # TODO - infer this from model
-                    content=content),
-                 weight,
-                 content
-                ) for content, weight in ordered_queries
-            ]
-            # TODO how do we ensure order?
-            weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+        if isinstance(q.q, dict) or q.q is None:
+            ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
+            weighted_vectors = []
+            if ordered_queries:
+                # multiple queries. We have to weight and combine them:
+                vectorised_ordered_queries = [
+                    (get_content_vector(
+                        possible_jobs=qidx_to_job[qidx],
+                        jobs=jobs,
+                        job_to_vectors=job_to_vectors,
+                        treat_urls_as_images=True,  # TODO - infer this from model
+                        content=content),
+                     weight,
+                     content
+                    ) for content, weight in ordered_queries
+                ]
+                # TODO how do we ensure order?
+                weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
 
             context_tensors = q.get_context_tensor()
             if context_tensors is not None:
-                weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
+                for v in context_tensors:
+                    if len(v.vector) != q.index.model.get_dimension():
+                        raise api_exceptions.InvalidArgError(
+                            f"The provided context vectors are not in the same dimension of the index. "
+                            f"Expect {q.index.model.get_dimension()} but got {len(v.vector)}. "
+                        )
+                    weighted_vectors += [np.asarray(v.vector) * v.weight]
 
             try:
                 merged_vector = np.mean(weighted_vectors, axis=0)
@@ -1645,12 +1657,12 @@ def get_query_vectors_from_jobs(
                                                      f"The original error is `{e}`.\n"
                                                      f"Please check `{marqo_docs.search_context()}`.")
 
-            if index_info.normalize_embeddings:
+            if q.index.normalize_embeddings:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
                 if norm > 0:
                     merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
-        else:
+        elif isinstance(q.q, str):
             # result[qidx] = vectors[0]
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
@@ -1712,7 +1724,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5, offset: int = 0,
         ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
@@ -1724,8 +1736,8 @@ def _vector_text_search(
     Args:
         config:
         index_name:
-        query: either a string query (which can be a URL or natural language text), or a dict of
-            <query string>:<weight float> pairs.
+        query: either a string query (which can be a URL or natural language text), a dict of
+            <query string>:<weight float> pairs, or None with a context
         result_count:
         offset:
         searchable_attributes: Iterable of field names to search. If left as None, then all will
@@ -1771,7 +1783,7 @@ def _vector_text_search(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=index_name, modelAuth=model_auth
+        index=marqo_index, modelAuth=model_auth
     )]
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
