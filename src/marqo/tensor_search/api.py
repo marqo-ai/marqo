@@ -5,7 +5,6 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi import Request, Depends
 from fastapi.responses import JSONResponse
-import threading
 
 from marqo import config
 from marqo import exceptions as base_exceptions
