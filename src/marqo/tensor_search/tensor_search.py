@@ -769,8 +769,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 document_is_valid = False
                                 unsuccessful_docs.append(
                                     (i, {'_id': doc_id, 'error': e.message,
-                                         'status': int(api_exceptions.InvalidArgError.status_code),
-                                         'code': api_exceptions.InvalidArgError.code})
+                                         'status': int(errors.InvalidArgError.status_code),
+                                         'code': errors.InvalidArgError.code})
                                 )
                                 break
 
@@ -804,7 +804,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
-                                (i, {'_id': doc_id, 'error': e.message, 'status': errors.InvalidArgError.status_code,
+                                (i, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
                                      'code': errors.InvalidArgError.code})
                             )
                             break

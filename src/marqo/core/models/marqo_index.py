@@ -133,11 +133,13 @@ class Model(StrictBaseModel):
         """
         model_name = values.get('name')
         properties = values.get('properties')
+        custom = values.get('custom')
         try:
             if properties is None:
                 logger.debug('Model properties not populated. Trying to update from registry')
                 properties = s2_inference.get_model_properties_from_registry(model_name)
             else:
+                custom = True
                 s2_inference.validate_model_properties(model_name, properties)
         except UnknownModelError:
             raise InvalidArgumentError(
@@ -147,7 +149,9 @@ class Model(StrictBaseModel):
         except InvalidModelPropertiesError as e:
             raise InvalidArgumentError(
                 f'Invalid model properties for model={model_name}. Reason: {e}.')
+
         values["properties"] = properties
+        values["custom"] = custom
         return values
 
     def dict(self, *args, **kwargs):
@@ -167,11 +171,6 @@ class Model(StrictBaseModel):
             )
         else:
             dimensions = self.properties['dimensions']
-            if not isinstance(dimensions, int) or dimensions < 1:
-                raise InvalidArgumentError(
-                    f"The given model properties does not contain a valid 'dimensions' value. "
-                    f"It must be a positive integer, but received: {dimensions}"
-                )
             return dimensions
 
     def get_properties(self) -> Dict[str, Any]:

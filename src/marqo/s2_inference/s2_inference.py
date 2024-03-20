@@ -20,6 +20,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
+from marqo.s2_inference.models.model_type import ModelType
 
 logger = get_logger(__name__)
 
@@ -56,7 +57,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
     
-    validated_model_properties = _validate_model_properties(model_name, model_properties)
+    validated_model_properties = validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(
@@ -199,30 +200,32 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
 
         model_type = model_properties.get("type", None)
 
-        if model_type in (None, "sbert"):
+        if model_type in (None, ModelType.SBERT):
             required_keys = ["dimensions", "name"]
             # updates model dict with default values if optional keys are missing for sbert
-            optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
+            optional_keys_values = [("type", ModelType.SBERT), ("tokens", get_default_seq_length())]
             for key, value in optional_keys_values:
                 if key not in model_properties:
                     model_properties[key] = value
-        elif model_type in ("clip", "open_clip"):
+        elif model_type in (ModelType.OpenCLIP, ModelType.CLIP):
             required_keys = ["name", "dimensions"]
-        elif model_type in ("hf", ):
+        elif model_type in (ModelType.HF_MODEL, ):
             required_keys = ["dimensions"]
-        elif model_type in ("no_model", ):
+        elif model_type in (ModelType.NoModel, ):
             required_keys = ["dimensions"]
             if not model_name == "no_model":
-                raise ModelLoadError(f"To use the no_model feature, you must provide model = no_models and "
+                raise InvalidModelPropertiesError(f"To use the no_model feature, you must provide model = no_models and "
                                      f"type = no_model, but received model = {model_name} and "
-                                     f"type = {model_properties.get('type', None)}.")
-        elif model_type in ("test", "random", "multilingual_clip", "fp16_clip", 'sbert_onnx', "clip_onnx"):
+                                     f"type = {model_type}.")
+        elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
+                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
             pass
         else:
-            raise InvalidModelPropertiesError("Invalid model type. Please check the model type in model_properties. "
-                                              "Support model types are 'sbert', 'clip', 'open_clip', 'hf', 'no_model', "
-                                              "'test', 'random', 'multilingual_clip', 'fp16_clip', 'sbert_onnx', "
-                                              "'clip_onnx'")
+            raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
+                                              f"Support model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
+                                              f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.NoModel}', "
+                                              f"'{ModelType.Test}', '{ModelType.Random}', '{ModelType.MultilingualClip}', "
+                                              f"'{ModelType.FP16_CLIP}', '{ModelType.SBERT_ONNX}', '{ModelType.CLIP_ONNX}' ")
 
         for key in required_keys:
             if key not in model_properties:
