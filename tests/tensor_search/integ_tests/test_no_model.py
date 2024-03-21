@@ -17,12 +17,15 @@ from unittest.mock import patch
 import os
 import pprint
 from tests.utils.transition import *
+from marqo.api.exceptions import InvalidArgError
+from marqo.tensor_search.models.search import SearchContext
 
 
 class TestNoModel(MarqoTestCase):
 
     structured_index_with_no_model = "structured_index_with_no_model"
     unstructured_index_with_no_model = "unstructured_index_with_no_model"
+    DIMENSION = 16
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -30,7 +33,7 @@ class TestNoModel(MarqoTestCase):
 
         structured_index_with_no_model_request = cls.structured_marqo_index_request(
             name=cls.structured_index_with_no_model,
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
+            model=Model(name="no_model", properties={"dimensions": cls.DIMENSION, "type": "no_model"}, custom=True),
             fields=[
                 FieldRequest(name='text_field_1', type=FieldType.Text),
                 FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
@@ -40,7 +43,7 @@ class TestNoModel(MarqoTestCase):
         )
         unstructured_index_with_no_model_request = cls.unstructured_marqo_index_request(
             name=cls.unstructured_index_with_no_model,
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
+            model=Model(name="no_model", properties={"dimensions": cls.DIMENSION, "type": "no_model"}, custom=True),
         )
 
         # List of indexes to loop through per test. Test itself should extract index name.
@@ -111,7 +114,7 @@ class TestNoModel(MarqoTestCase):
                 "custom_field_1":
                     {
                         "content": "test custom field content",
-                        "vector": [1.0 for _ in range(16)]
+                        "vector": [1.0 for _ in range(self.DIMENSION)]
                     }
             }
         ]
@@ -137,3 +140,34 @@ class TestNoModel(MarqoTestCase):
                 self.assertEqual(200, r["items"][1]["status"])
                 self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name).number_of_documents)
                 self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name).number_of_vectors)
+
+    def test_no_model_raise_error_if_query_in_search(self):
+        """Test to ensure that providing a query to vectorise will raise an error."""
+        for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
+            with (self.subTest(index_name=index_name)):
+                with self.assertRaises(InvalidArgError) as e:
+                    r = tensor_search.search(config=self.config, index_name=index_name, text="test")
+                self.assertIn("'no_model' cannot vectorise your content.", str(e.exception))
+
+    def test_no_model_work_with_context_vectors_in_search(self):
+        """Test to ensure that context vectors work with no_model by setting query as None"""
+        for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
+            with (self.subTest(index_name=index_name)):
+                r = tensor_search.search(config=self.config, index_name=index_name, text=None,
+                                         context=SearchContext(**{"tensor": [{"vector": [1, ] * self.DIMENSION,
+                                                                              "weight": -1},
+                                                                             {"vector": [1, ] * self.DIMENSION,
+                                                                              "weight": 1}], }))
+                self.assertEqual(0, len(r["hits"]))
+
+    def test_no_model_and_context_vectors_dimension(self):
+        """Test to ensure no_model still raises error if context vector dimension is incorrect."""
+        for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
+            with (self.subTest(index_name=index_name)):
+                with self.assertRaises(InvalidArgError) as e:
+                    r = tensor_search.search(config=self.config, index_name=index_name, text=None,
+                                             context=SearchContext(**{"tensor": [{"vector": [1, ] * (self.DIMENSION + 1),
+                                                                                  "weight": -1},
+                                                                                 {"vector": [1, ] * (self.DIMENSION + 1),
+                                                                                  "weight": 1}], }))
+                self.assertIn("does not match the expected dimension", str(e.exception.message))

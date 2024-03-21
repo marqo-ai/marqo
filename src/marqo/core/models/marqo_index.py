@@ -124,8 +124,8 @@ class Model(StrictBaseModel):
     custom: bool = False
 
     @root_validator(pre=False)
-    def validate_properties(cls, values):
-        """Validate model properties.
+    def validate_custom_properties(cls, values):
+        """Validate custom model properties.
 
         Raises:
             InvalidArgumentError: If model properties are not populated or the properties are invalid.
@@ -133,20 +133,18 @@ class Model(StrictBaseModel):
         """
         model_name = values.get('name')
         properties = values.get('properties')
-        try:
-            if properties is None:
-                logger.debug('Model properties not populated. Trying to update from registry')
-                properties = s2_inference.get_model_properties_from_registry(model_name)
-            else:
+        custom = values.get('custom')
+        if (not properties) and custom:
+            try:
                 s2_inference.validate_model_properties(model_name, properties)
-        except UnknownModelError:
-            raise InvalidArgumentError(
-                f'Could not find model properties for model={model_name}. '
-                f'Please check that the model name is correct. '
-                f'Please provide model_properties if the model is a custom model and is not supported by default')
-        except InvalidModelPropertiesError as e:
-            raise InvalidArgumentError(
-                f'Invalid model properties for model={model_name}. Reason: {e}.')
+            except UnknownModelError:
+                raise InvalidArgumentError(
+                    f'Could not find model properties for model={model_name}. '
+                    f'Please check that the model name is correct. '
+                    f'Please provide model_properties if the model is a custom model and is not supported by default')
+            except InvalidModelPropertiesError as e:
+                raise InvalidArgumentError(
+                    f'Invalid model properties for model={model_name}. Reason: {e}.')
         return values
 
     def dict(self, *args, **kwargs):
