@@ -124,8 +124,8 @@ class Model(StrictBaseModel):
     custom: bool = False
 
     @root_validator(pre=False)
-    def validate_and_set_properties(cls, values):
-        """Set model properties if not provided and validate the properties.
+    def validate_properties(cls, values):
+        """Validate model properties.
 
         Raises:
             InvalidArgumentError: If model properties are not populated or the properties are invalid.
@@ -133,7 +133,6 @@ class Model(StrictBaseModel):
         """
         model_name = values.get('name')
         properties = values.get('properties')
-        custom = values.get('custom')
         try:
             if properties is None:
                 logger.debug('Model properties not populated. Trying to update from registry')
@@ -148,9 +147,6 @@ class Model(StrictBaseModel):
         except InvalidModelPropertiesError as e:
             raise InvalidArgumentError(
                 f'Invalid model properties for model={model_name}. Reason: {e}.')
-
-        values["properties"] = properties
-        values["custom"] = custom
         return values
 
     def dict(self, *args, **kwargs):
@@ -164,19 +160,38 @@ class Model(StrictBaseModel):
         return d
 
     def get_dimension(self) -> int:
-        if "dimensions" not in self.properties:
+        self._update_model_properties_from_registry()
+        try:
+            return self.properties['dimensions']
+        except KeyError:
             raise InvalidArgumentError(
                 "The given model properties does not contain a 'dimensions' key"
             )
-        else:
-            dimensions = self.properties['dimensions']
-            return dimensions
 
     def get_properties(self) -> Dict[str, Any]:
         """
-        Get model properties.
+        Get model properties. Try to update model properties from the registry first if model properties
+        are not populated.
+
+        Raises:
+            InvalidArgumentError: If model properties are not populated and the model is not found in the registry.
+            UnknownModelError: If model properties are not populated and the model is not found in the registry.
         """
+        self._update_model_properties_from_registry()
         return self.properties
+
+    def _update_model_properties_from_registry(self) -> None:
+        if not self.properties:
+            logger.debug('Model properties not populated. Trying to update from registry')
+
+            model_name = self.name
+            try:
+                self.properties = s2_inference.get_model_properties_from_registry(model_name)
+            except UnknownModelError:
+                raise InvalidArgumentError(
+                    f'Could not find model properties for model={model_name}. '
+                    f'Please check that the model name is correct. '
+                    f'Please provide model_properties if the model is a custom model and is not supported by default')
 
 
 class MarqoIndex(ImmutableStrictBaseModel, ABC):

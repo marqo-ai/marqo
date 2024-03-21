@@ -30,7 +30,7 @@ class TestNoModel(MarqoTestCase):
 
         structured_index_with_no_model_request = cls.structured_marqo_index_request(
             name=cls.structured_index_with_no_model,
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}),
+            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
             fields=[
                 FieldRequest(name='text_field_1', type=FieldType.Text),
                 FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
@@ -40,7 +40,7 @@ class TestNoModel(MarqoTestCase):
         )
         unstructured_index_with_no_model_request = cls.unstructured_marqo_index_request(
             name=cls.unstructured_index_with_no_model,
-            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}),
+            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
         )
 
         # List of indexes to loop through per test. Test itself should extract index name.
