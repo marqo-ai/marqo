@@ -19,7 +19,7 @@ import pprint
 from tests.utils.transition import *
 
 
-class TestGetDocuments(MarqoTestCase):
+class TestNoModel(MarqoTestCase):
 
     structured_index_with_no_model = "structured_index_with_no_model"
     unstructured_index_with_no_model = "unstructured_index_with_no_model"
