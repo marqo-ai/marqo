@@ -21,6 +21,7 @@ import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 from marqo.tensor_search.configs import EnvVars
 from marqo.s2_inference.models.model_type import ModelType
+from marqo import marqo_docs
 
 logger = get_logger(__name__)
 
@@ -184,7 +185,14 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
 
 
 def validate_model_properties(model_name: str, model_properties: dict) -> dict:
-    """validate model_properties, if not given then return model_registry properties
+    """validate model_properties, if not given then return model_registry properties.
+
+    This is a rough validation as it only checks the minimum required fields and dimensions values. More indepth
+    check should be done when loading the model.
+
+    Raises:
+        InvalidModelPropertiesError: if the model_properties are invalid
+        UnknownModelError: if the model_name is not in the model registry
     """
     if model_properties is not None:
         """checks model dict to see if all required keys are present
@@ -231,8 +239,8 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
             if key not in model_properties:
                 raise InvalidModelPropertiesError(base_error_message + f"model_properties has missing key '{key}'. "
                                                   f"please update your model properties with required key `{key}` "
-                                                  f"check 'https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/' "
-                                                  f"for more info")
+                                                  f"check '{marqo_docs.list_of_models()}', "
+                                                  f"'{marqo_docs.bring_your_own_model()}' for more info")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)

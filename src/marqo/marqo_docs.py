@@ -39,3 +39,7 @@ def search_context():
 def configuring_preloaded_models():
     return _build_url('Guides/Advanced-Usage/configuration/#configuring-preloaded-models')
 
+
+def bring_your_own_model():
+    return _build_url('Guides/Models-Reference/bring_your_own_model/')
+
