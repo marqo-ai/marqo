@@ -35,3 +35,7 @@ def list_of_models():
 def search_context():
     return _build_url('API-Reference/Search/search/#context')
 
+
+def configuring_preloaded_models():
+    return _build_url('Guides/Advanced-Usage/configuration/#configuring-preloaded-models')
+

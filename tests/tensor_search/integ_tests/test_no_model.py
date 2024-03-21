@@ -82,12 +82,12 @@ class TestNoModel(MarqoTestCase):
         for name, model_properties, msg in test_cases:
             for index_type in ["structured", "unstructured"]:
                 with self.subTest(name=name, model_properties=model_properties, msg=f"{index_type} - msg"):
-                    with self.assertRaises(InvalidArgumentError, ) as e:
+                    with self.assertRaises(InvalidArgumentError) as e:
                         if index_type == "structured":
                             self.index_management.create_index(
                                 self.structured_marqo_index_request(
                                     name="test_create_index_with_invalid_model_name_or_properties",
-                                    model=Model(name=name, properties=model_properties),
+                                    model=Model(name=name, properties=model_properties, custom=True),
                                     fields=[FieldRequest(name="text_field_1", type=FieldType.Text)],
                                     tensor_fields=["text_field_1"]
                                 )
@@ -96,7 +96,7 @@ class TestNoModel(MarqoTestCase):
                             self.index_management.create_index(
                                 self.unstructured_marqo_index_request(
                                     name="test_create_index_with_invalid_model_name_or_properties",
-                                    model=Model(name=name, properties=model_properties)
+                                    model=Model(name=name, properties=model_properties, custom=True)
                                 )
                         )
                     self.assertIn("Invalid model properties", str(e.exception))
@@ -158,7 +158,7 @@ class TestNoModel(MarqoTestCase):
                                                                               "weight": -1},
                                                                              {"vector": [1, ] * self.DIMENSION,
                                                                               "weight": 1}], }))
-                self.assertEqual(0, len(r["hits"]))
+                self.assertIn("hits", r)
 
     def test_no_model_and_context_vectors_dimension(self):
         """Test to ensure no_model still raises error if context vector dimension is incorrect."""

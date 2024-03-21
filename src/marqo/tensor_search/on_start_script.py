@@ -9,9 +9,12 @@ from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
 # we need to import backend before index_meta_cache to prevent circular import error:
+from marqo.tensor_search import constants
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo import marqo_docs
+
 
 logger = get_logger(__name__)
 
@@ -143,6 +146,24 @@ class ModelsForCacheing:
         N = 10
         messages = []
         for model in self.models:
+            # Skip preloading of models that can't be preloaded (eg. no_model)
+            if isinstance(model, str):
+                model_name = model
+            elif isinstance(model, dict):
+                try:
+                    model_name = model["model"]
+                except KeyError as e:
+                    raise exceptions.EnvVarError(
+                        f"Your custom model {model} is missing 'model' key."
+                        f"To add a custom model, it must be a dict with keys 'model' and 'model_properties' "
+                        f"as defined in '{marqo_docs.configuring_preloaded_models()}'"
+                    ) from e
+            else:
+                continue
+
+            if model_name in constants.MODELS_TO_SKIP_PRELOADING:
+                self.logger.info(f"Skipping preloading of `{model_name}`.")
+                continue
             for device in self.default_devices:
                 self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
 

@@ -134,14 +134,9 @@ class Model(StrictBaseModel):
         model_name = values.get('name')
         properties = values.get('properties')
         custom = values.get('custom')
-        if (not properties) and custom:
+        if properties and custom:
             try:
                 s2_inference.validate_model_properties(model_name, properties)
-            except UnknownModelError:
-                raise InvalidArgumentError(
-                    f'Could not find model properties for model={model_name}. '
-                    f'Please check that the model name is correct. '
-                    f'Please provide model_properties if the model is a custom model and is not supported by default')
             except InvalidModelPropertiesError as e:
                 raise InvalidArgumentError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.')
@@ -190,6 +185,10 @@ class Model(StrictBaseModel):
                     f'Could not find model properties for model={model_name}. '
                     f'Please check that the model name is correct. '
                     f'Please provide model_properties if the model is a custom model and is not supported by default')
+            except InvalidModelPropertiesError as e:
+                raise InvalidArgumentError(
+                    f'Invalid model properties for model={model_name}. Reason: {e}.'
+                )
 
 
 class MarqoIndex(ImmutableStrictBaseModel, ABC):

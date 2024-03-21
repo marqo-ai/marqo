@@ -178,6 +178,25 @@ class TestOnStartScript(MarqoTestCase):
             
             assert run()
 
+    def test_preload_no_model(self):
+        no_model_object = {
+            "model": "no_model",
+            "model_properties": {
+                "dimensions": 123,
+                "type": "no_model"
+            }
+        }
+        mock_preload = mock.MagicMock()
+
+        @mock.patch("marqo.tensor_search.on_start_script._preload_model", mock_preload)
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([no_model_object])})
+        def run():
+            model_caching_script = on_start_script.ModelsForCacheing()
+            model_caching_script.run()
+            mock_preload.assert_not_called()  # The preloading function should never be called for no_model
+
+        run()
+
 
 
 
