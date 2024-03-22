@@ -128,8 +128,7 @@ class Model(StrictBaseModel):
         """Validate custom model properties.
 
         Raises:
-            InvalidArgumentError: If model properties are not populated or the properties are invalid.
-            UnknownModelError: If model properties are not populated and the model is not found in the registry.
+            InvalidArgumentError: If model properties are invalid.
         """
         model_name = values.get('name')
         properties = values.get('properties')
