@@ -1,24 +1,14 @@
-import functools
 import os
-import pprint
-import unittest
-import uuid
-from unittest import mock
+from unittest.mock import patch
 
-from marqo.core.exceptions import IndexNotFoundError
-from marqo.exceptions import InvalidArgumentError
-from marqo.tensor_search import enums
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase
+from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from unittest.mock import patch
-import os
-import pprint
-from tests.utils.transition import *
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.search import SearchContext
-from marqo.api.exceptions import InvalidArgError
+from tests.marqo_test import MarqoTestCase
+from tests.utils.transition import *
+
 
 class TestContextVectors(MarqoTestCase):
 
