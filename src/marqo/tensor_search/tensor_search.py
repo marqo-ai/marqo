@@ -363,7 +363,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
                                 link=marqo_docs.list_of_models()
                             )
-                        except s2_inference_errors.S2InferenceError:
+                        except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
                                 (i, {'_id': doc_id, 'error': e.message,
