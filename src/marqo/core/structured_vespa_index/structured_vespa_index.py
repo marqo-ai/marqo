@@ -5,7 +5,7 @@ from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
 from marqo.core.structured_vespa_index import common
-from marqo.core.vespa_index import VespaIndex
+from marqo.core.vespa_index import VespaIndex, convert_to_in_list
 from marqo.exceptions import InternalError
 
 
@@ -361,7 +361,7 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking,
+            'ranking': ranking
         }
         query = {k: v for k, v in query.items() if v is not None}
 
@@ -507,6 +507,13 @@ class StructuredVespaIndex(VespaIndex):
                         return upper
                     else:
                         raise InternalError('RangeTerm has no lower or upper bound')
+                elif isinstance(node, search_filter.InTerm):
+                    # TODO: We have to remove the quotes from numbers IF the marqo_field is a numeric one.
+
+                    # IF marqo field is INT, remove quotes
+                    # IF marqo field is string or array string, keep quotes
+                    # ELSE, error out
+                    return f'{marqo_field_name} in {convert_to_in_list(node.value_list)}'
 
             raise InternalError(f'Unknown node type {type(node)}')
 

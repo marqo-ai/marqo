@@ -9,8 +9,9 @@ from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, 
                                            ScoreModifierType)
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
-from marqo.core.vespa_index import VespaIndex
+from marqo.core.vespa_index import VespaIndex, convert_to_in_list
 from marqo.exceptions import InternalError
+from typing import List
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -80,7 +81,7 @@ class UnstructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f"select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}",
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
@@ -122,6 +123,42 @@ class UnstructuredVespaIndex(VespaIndex):
     def _get_filter_term(cls, marqo_query: MarqoQuery) -> Optional[str]:
         def escape(s: str) -> str:
             return s.replace('\\', '\\\\').replace('"', '\\"')
+
+        def escape_list(l: List[str]) -> List[str]:
+            return [escape(s) for s in l]
+
+        def type_sort_values(values: List[str]) -> List[str]:
+            """
+            From the initial value list of strings, determine which can be cast into bool or number.
+            Put them in their respective lists for filtering.
+            Used for IN Term lists, as they can contain values of different types.
+            """
+            type_sorted_values = {
+                "bool": [],
+                "float": [],
+                "int": []
+            }
+
+            for value in values:
+                # Check if value can be bool
+                if value.lower() in cls._FILTER_STRING_BOOL_VALUES:
+                    if value.lower() == "true":
+                        type_sorted_values["bool"].append(int(True))
+                    else:
+                        type_sorted_values["bool"].append(int(False))
+
+                # Check if value can be a number
+                try:
+                    numeric_value = int(value)
+                    type_sorted_values["int"].append(numeric_value)
+                except ValueError:
+                    try:
+                        numeric_value = float(value)
+                        type_sorted_values["float"].append(numeric_value)
+                    except ValueError:
+                        pass
+
+            return type_sorted_values
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
             filter_parts = []
@@ -169,6 +206,43 @@ class UnstructuredVespaIndex(VespaIndex):
             final_filter_string = f"({' OR '.join(filter_parts)})"
             return final_filter_string
 
+        def generate_in_filter_string(node: search_filter.InTerm) -> str:
+            """
+            Vespa only accepts str or int in IN Terms.
+            TODO: Re-add once sameElement is supported with nested in lists. Right now it is not.
+            """
+            filter_parts = []
+
+            escaped_str_value_list: List[str] = escape_list(node.value_list)
+            type_sorted_values = type_sort_values(escaped_str_value_list)
+
+            # Filter on `_id`
+            if node.field == index_constants.MARQO_DOC_ID:
+                return f'({unstructured_common.VESPA_FIELD_ID} in {convert_to_in_list(escaped_str_value_list)})'
+
+            # Short String Filter
+            short_string_filter_string = (f'({unstructured_common.SHORT_STRINGS_FIELDS} '
+                                          f'contains sameElement(key contains "{node.field}", '
+                                          f'value in {convert_to_in_list(escaped_str_value_list)}))')
+            filter_parts.append(short_string_filter_string)
+
+            # String Array Filter
+            # TODO: IN will work differently. Test this well.
+            string_array_filter_string = (f'({unstructured_common.STRING_ARRAY} in '
+                                          f'{convert_to_in_list([f"{node.field}::{value}" for value in escaped_str_value_list])})')
+            filter_parts.append(string_array_filter_string)
+
+            # int Filter
+            if type_sorted_values["int"]:
+                int_filter_string = (f'({unstructured_common.INT_FIELDS} contains '
+                                     f'sameElement(key contains "{node.field}", value in '
+                                     f'{convert_to_in_list(type_sorted_values["int"])}))')
+                filter_parts.append(int_filter_string)
+
+            # Final Filter String
+            final_filter_string = f"({' OR '.join(filter_parts)})"
+            return final_filter_string
+
         def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
             lower = f'value >= {node.lower}' if node.lower is not None else ""
             higher = f'value <= {node.upper}' if node.upper is not None else ""
@@ -203,6 +277,8 @@ class UnstructuredVespaIndex(VespaIndex):
                     return generate_equality_filter_string(node)
                 elif isinstance(node, search_filter.RangeTerm):
                     return generate_range_filter_string(node)
+                elif isinstance(node, search_filter.InTerm):
+                    return generate_in_filter_string(node)
             raise InternalError(f'Unknown node type {type(node)}')
 
         if marqo_query.filter is not None:
