@@ -363,21 +363,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
                                 link=marqo_docs.list_of_models()
                             )
-                        except s2_inference_errors.VectoriseError as e:
+                        except s2_inference_errors.S2InferenceError:
                             document_is_valid = False
                             unsuccessful_docs.append(
                                 (i, {'_id': doc_id, 'error': e.message,
                                      'status': int(errors.InvalidArgError.status_code),
                                      'code': errors.InvalidArgError.code})
-                            )
-                            break
-                        except s2_inference_errors.S2InferenceError:
-                            document_is_valid = False
-                            image_err = errors.InvalidArgError(
-                                message=f'Could not process given image: {field_content}')
-                            unsuccessful_docs.append(
-                                (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                                     'code': image_err.code})
                             )
                             break
 
@@ -2007,12 +1998,11 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
             message=f'Problem vectorising query. Reason: {str(model_error)}',
             link=marqo_docs.list_of_models()
         )
-    except s2_inference_errors.S2InferenceError:
+    except s2_inference_errors.S2InferenceError as e:
         combo_document_is_valid = False
-        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
         unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                         'code': image_err.code})
+            (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
+                         'code': errors.InvalidArgError.code})
 
         return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
@@ -2145,12 +2135,11 @@ def vectorise_multimodal_combination_field_structured(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
             link=marqo_docs.list_of_models()
         )
-    except s2_inference_errors.S2InferenceError:
+    except s2_inference_errors.S2InferenceError as e:
         combo_document_is_valid = False
-        image_err = api_exceptions.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
         unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                         'code': image_err.code})
+            (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
+             'code': errors.InvalidArgError.code})
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 

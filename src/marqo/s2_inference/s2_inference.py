@@ -251,6 +251,11 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
 
 
 def _validate_model_properties_dimension(dimensions: Optional[int]) -> None:
+    """Validate the dimensions value in model_properties as the dimensions value must be a positive integer.
+
+    Raises:
+        InvalidModelPropertiesError: if the dimensions value is invalid
+        """
     if dimensions is None or not isinstance(dimensions, int) or dimensions < 1:
         raise InvalidModelPropertiesError(
             f"Invalid model properties: `dimensions` must be a positive integer, but received {dimensions}.")
