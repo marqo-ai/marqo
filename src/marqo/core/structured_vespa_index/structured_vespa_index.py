@@ -5,7 +5,7 @@ from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
 from marqo.core.structured_vespa_index import common
-from marqo.core.vespa_index import VespaIndex, convert_to_in_list
+from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
 
 
@@ -453,6 +453,45 @@ class StructuredVespaIndex(VespaIndex):
         else:
             return ''
 
+    def convert_to_in_list_str(self, value_list: list, marqo_field_name: str, marqo_field_type: FieldType) -> str:
+        """
+        Change list into its string representation, replacing [] with ().
+        This is different from `tuple()` because it does not add a comma for single element lists.
+
+        IN only works for 2 field types: string and int.
+        For string: Each element is enclosed in DOUBLE quotes.
+        For int: Add int with no quotes. If wrong type, error out.
+        Otherwise: error out.
+        """
+
+        in_list = '('
+        for i in range(len(value_list)):
+            # str type fields
+            if marqo_field_type in {FieldType.Text, FieldType.ArrayText, FieldType.CustomVector}:
+                in_list += f'"{value_list[i]}"'
+            # int type fields
+            elif marqo_field_type in {FieldType.Int, FieldType.Long, FieldType.ArrayInt, FieldType.ArrayLong}:
+                try:
+                    test_int_val = int(value_list[i])
+                    in_list += str(value_list[i])
+                except ValueError:
+                    raise InvalidDataTypeError(
+                        f"Attempting to use the IN filter operator on field: '{marqo_field_name}' of type: '{marqo_field_type}',"
+                        f" but found list element '{value_list[i]}', which is not of type 'int'."
+                    )
+            else:
+                raise InvalidDataTypeError(
+                    f"The IN filter operator is only supported for 'int' and 'string' fields. However, '{marqo_field_name}'"
+                    f" is of unsupported type: '{marqo_field_type}'."
+                )
+
+            # Add comma if not the last element
+            if i < len(value_list) - 1:
+                in_list += ', '
+
+        in_list += ')'
+        return in_list
+
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
         def escape(s: str) -> str:
             return s.replace('\\', '\\\\').replace('"', '\\"')
@@ -508,12 +547,8 @@ class StructuredVespaIndex(VespaIndex):
                     else:
                         raise InternalError('RangeTerm has no lower or upper bound')
                 elif isinstance(node, search_filter.InTerm):
-                    # TODO: We have to remove the quotes from numbers IF the marqo_field is a numeric one.
-
-                    # IF marqo field is INT, remove quotes
-                    # IF marqo field is string or array string, keep quotes
-                    # ELSE, error out
-                    return f'{marqo_field_name} in {convert_to_in_list(node.value_list)}'
+                    return (f'{marqo_field_name} in '
+                            f'{self.convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}')
 
             raise InternalError(f'Unknown node type {type(node)}')
 

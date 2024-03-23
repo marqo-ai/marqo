@@ -112,26 +112,3 @@ def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
         return UnstructuredVespaIndex(marqo_index)
     else:
         raise ValueError(f"No known implementation for index type {type(marqo_index)}")
-
-def convert_to_in_list(value_list: list) -> str:
-    """
-    Change list into its string representation, replacing [] with ().
-    This is different from `tuple()` because it does not add a comma for single element lists.
-
-    Ensure each string element is enclosed in DOUBLE quotes.
-    int element has no quotes.
-    """
-
-    in_list = '('
-    for i in range(len(value_list)):
-        if isinstance(value_list[i], str):
-            in_list += f'"{value_list[i]}"'
-        else:
-            in_list += str(value_list[i])
-
-        # Add comma if not the last element
-        if i < len(value_list) - 1:
-            in_list += ', '
-
-    in_list += ')'
-    return in_list

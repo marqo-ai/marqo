@@ -201,7 +201,7 @@ class TestSearch(MarqoTestCase):
                         ("list_field_1 in (tag2, random)", 0, None, False),         # incomplete match for "tag2 some"
                         ("text_field_3 in (b, c)", 1, "5678", True),
                         ("text_field_3 in (a, c, (b but wrong))", 0, None, False),  # incomplete match for "b"
-                        # ("int_field_1 in (1, 2, 3)", 1, "1234", True)               # number TODO: remove comment
+                        ("int_field_1 in (1, 2, 3)", 1, "1234", True)               # int
                     ]
 
                 for filter_query, expected_count, expected_id, highlight_exists in test_cases:
@@ -247,7 +247,7 @@ class TestSearch(MarqoTestCase):
                         ("list_field_1 in (tag2, random)", 0, None),  # incomplete match for "tag2 some"
                         ("text_field_3 in (b, c)", 1, "5678"),
                         ("text_field_3 in (a, c, (b but wrong))", 0, None),  # incomplete match for "b"
-                        # ("int_field_1 in (1, 2, 3)", 1, "1234")               # number TODO: remove comment
+                        ("int_field_1 in (1, 2, 3, 4)", 1, "1234")               # int
                     ]
 
                 for filter_string, expected_hits, expected_id in test_cases:
@@ -297,7 +297,6 @@ class TestSearch(MarqoTestCase):
                         ("list_field_1 in (tag2, random)", 0, None),  # incomplete match for "tag2 some"
                         ("text_field_3 in (b, c)", 1, "5678"),
                         ("text_field_3 in (a, c, (b but wrong))", 0, None),  # incomplete match for "b"
-                        # ("int_field_1 in (1, 2, 3)", 1, "1234")               # number TODO: remove comment
                     ]
 
                 for filter_string, expected_hits, expected_id in test_cases:
@@ -360,8 +359,8 @@ class TestSearch(MarqoTestCase):
                     test_cases += [
                         # normal string in
                         ("text_field_1 in (random1, true)", 2, ["in1", "1232"]),
-                        # normal int in  TODO: remove comment
-                        #("int_field_1 in (100, 200)", 2, ["in1", "in2"]),
+                        # normal int in
+                        ("int_field_1 in (100, 200)", 2, ["in1", "in2"]),
                         # in with AND
                         ("text_field_1 in (random1, true) AND int_field_1:100", 1, ["in1"]),
                         # in with OR
@@ -375,7 +374,9 @@ class TestSearch(MarqoTestCase):
                         # NOT with in
                         ("NOT text_field_1 in (random1, true)", 5, ["5678", "1234", "1233", "1231", "in2"]),
                         # combining string in and int in
-                        #("text_field_1 in (random1, true) AND int_field_1 in (100, 200)", 1, ["in1"]),
+                        ("text_field_1 in (random1, true) AND int_field_1 in (100, 200)", 1, ["in1"]),
+                        # int in with no results
+                        ("int_field_1 in (123, 456, 789)", 0, None),
                         # Filtering on empty string returns no results
                         ("text_field_1 in ()", 0, None),
                     ]
@@ -538,8 +539,9 @@ class TestSearch(MarqoTestCase):
                             )
 
     def test_filtering_in_with_wrong_type(self):
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index):
+        # TODO: add unstructured when it in is supported
+        for index in [self.structured_default_text_index]:
+            with self.subTest(index=index.type):
                 # Adding documents
                 tensor_search.add_documents(
                     config=self.config,
@@ -550,7 +552,7 @@ class TestSearch(MarqoTestCase):
                             {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
                              "int_field_1": 2},
                             {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                             "bool_field_1": True}
+                             "bool_field_1": True, "float_field_1": 1.2, "double_field_1": 2.4}
                         ],
                         tensor_fields=["text_field_1", "text_field_2"] if \
                             isinstance(index, UnstructuredMarqoIndex) else None
@@ -559,13 +561,18 @@ class TestSearch(MarqoTestCase):
 
                 # Define test parameters as tuples (filter_string)
                 bad_filter_strings = [
-                    # TODO add IN tests
+                    ("int_field_1 IN (1,2,not_int)", "'not_int', which is not of type 'int'"),
+                    ("float_field_1 IN (1.2, 1.3, 2.4)", "unsupported type: 'float'"),
+                    ("double_field_1 IN (1.2, 1.3, 2.4)", "unsupported type: 'double'"),
+                    ("bool_field_1 IN (true)", "unsupported type: 'bool'")
                 ]
 
-                for filter_string in bad_filter_strings:
+                for filter_string, error_message in bad_filter_strings:
                     with self.subTest(f"filter_string={filter_string}"):
-                        with self.assertRaises(core_exceptions.FilterStringParsingError):
+                        with self.assertRaises(core_exceptions.InvalidDataTypeError) as cm:
                             tensor_search.search(
                                 config=self.config, index_name=index.name, text="some text",
                                 result_count=3, filter=filter_string, verbose=0
                             )
+
+                        self.assertIn(error_message, str(cm.exception))
