@@ -85,10 +85,14 @@ class TestSearch(MarqoTestCase):
                              features=[FieldFeature.Filter]),
                 FieldRequest(name="long_field_1", type=FieldType.Long, features=[FieldFeature.Filter]),
                 FieldRequest(name="double_field_1", type=FieldType.Double, features=[FieldFeature.Filter]),
+                FieldRequest(name="custom_vector_field_1", type=FieldType.CustomVector, features=[FieldFeature.Filter]),
+                FieldRequest(name="multimodal_field_1", type=FieldType.MultimodalCombination,
+                             dependent_fields={"text_field_7": 0.1, "text_field_8": 0.1})
             ],
 
             tensor_fields=["text_field_1", "text_field_2", "text_field_3",
-                           "text_field_4", "text_field_5", "text_field_6"]
+                           "text_field_4", "text_field_5", "text_field_6",
+                           "custom_vector_field_1", "multimodal_field_1"]
         )
 
         structured_default_text_index_encoded_name = cls.structured_marqo_index_request(
@@ -159,11 +163,13 @@ class TestSearch(MarqoTestCase):
         cls.structured_image_index_with_random_model = cls.indexes[8]
 
     def setUp(self) -> None:
+        super().setUp()
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self) -> None:
+        super().tearDown()
         self.device_patcher.stop()
 
     def test_filtering_list_case_tensor(self):
@@ -327,11 +333,32 @@ class TestSearch(MarqoTestCase):
                              "bool_field_1": True},
                             {"_id": "1232", "text_field_1": "true"},
                             {"_id": "1231", "text_field_1": "some text", "bool_field_2": False},
-                            {"_id": "in1", "text_field_1": "random1", "int_field_1": 100},
-                            {"_id": "in2", "text_field_1": "blahblah", "int_field_1": 200},
+                            {"_id": "in1", "text_field_1": "random1", "int_field_1": 100,
+                             "text_field_7": "multimodal red herring"},
+
+                            {"_id": "in2", "text_field_1": "blahblah", "int_field_1": 200, "long_field_1": 300,
+                             "text_field_7": "multimodal correct",
+                             "text_field_8": "multimodal correct",
+                             "custom_vector_field_1": {
+                                 "content": "custom vector text!",
+                                 "vector": [i for i in range(384)]
+                             }},
                         ],
-                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] if \
-                            isinstance(index, UnstructuredMarqoIndex) else None
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3", "custom_vector_field_1",
+                                       "multimodal_field_1"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None,
+                        mappings={
+                            "custom_vector_field_1": {
+                                "type": "custom_vector",
+                            },
+                            "multimodal_field_1": {
+                                "type": "multimodal_combination",
+                                "weights": {
+                                    "text_field_7": 0.1,
+                                    "text_field_8": 0.1
+                                }
+                            }
+                        } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 
@@ -361,6 +388,12 @@ class TestSearch(MarqoTestCase):
                         ("text_field_1 in (random1, true)", 2, ["in1", "1232"]),
                         # normal int in
                         ("int_field_1 in (100, 200)", 2, ["in1", "in2"]),
+                        # normal long in
+                        ("long_field_1 in (299, 300)", 1, ["in2"]),
+                        # normal custom vector in
+                        ("custom_vector_field_1 in ((custom vector text!))", 1, ["in2"]),
+                        # multimodal subfield in
+                        ("text_field_7 in ((multimodal correct)) AND text_field_8 in ((multimodal correct))", 1, ["in2"]),
                         # in with AND
                         ("text_field_1 in (random1, true) AND int_field_1:100", 1, ["in1"]),
                         # in with OR

@@ -465,12 +465,15 @@ class StructuredVespaIndex(VespaIndex):
         """
 
         in_list = '('
+
+        STR_FIELD_TYPES = [FieldType.Text, FieldType.ArrayText, FieldType.CustomVector]
+        INT_FIELD_TYPES = [FieldType.Int, FieldType.Long, FieldType.ArrayInt, FieldType.ArrayLong]
         for i in range(len(value_list)):
             # str type fields
-            if marqo_field_type in {FieldType.Text, FieldType.ArrayText, FieldType.CustomVector}:
+            if marqo_field_type in STR_FIELD_TYPES:
                 in_list += f'"{value_list[i]}"'
             # int type fields
-            elif marqo_field_type in {FieldType.Int, FieldType.Long, FieldType.ArrayInt, FieldType.ArrayLong}:
+            elif marqo_field_type in INT_FIELD_TYPES:
                 try:
                     test_int_val = int(value_list[i])
                     in_list += str(value_list[i])
@@ -481,8 +484,9 @@ class StructuredVespaIndex(VespaIndex):
                     )
             else:
                 raise InvalidDataTypeError(
-                    f"The IN filter operator is only supported for 'int' and 'string' fields. However, '{marqo_field_name}'"
-                    f" is of unsupported type: '{marqo_field_type}'."
+                    f"The IN filter operator is only supported for the following field types: "
+                    f"{[t.value for t in STR_FIELD_TYPES + INT_FIELD_TYPES]}. However, '{marqo_field_name}' "
+                    f"is of unsupported type: '{marqo_field_type}'."
                 )
 
             # Add comma if not the last element
