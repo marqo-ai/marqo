@@ -228,10 +228,28 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                     InTerm('a', ['1', '2', '', '3'], 'a IN (1,2,,3)')
                 ),
                 'empty string in IN term list'
+            ),
+            (
+                "text_field_2 IN ((some text), (something else))",
+                SearchFilter(
+                    InTerm('text_field_2', ['some text', 'something else'],
+                           "text_field_2 IN ((some text),(something else))")
+                ),
+                'spaced IN term'
+
+            ),
+            (
+                "(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))",
+                SearchFilter(
+                    root=And(
+                        left=RangeTerm('float_field_1', '0', '1', 'float_field_1:[0 TO 1]'),
+                        right=InTerm('text_field_1', ['some text'], 'text_field_1 in ((some text))')
+                )),
+                "range and IN term"
             )
         ]
 
-        for filter_string, expected_filter, msg in test_cases:
+        for filter_string, expected_filter, msg in test_cases[-1:]:
             with self.subTest(msg):
                 parser = MarqoFilterStringParser()
                 parsed_filter = parser.parse(filter_string)

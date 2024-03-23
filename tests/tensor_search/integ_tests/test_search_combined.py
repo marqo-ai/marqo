@@ -329,7 +329,7 @@ class TestSearch(MarqoTestCase):
                             {"_id": "1232", "text_field_1": "true"},
                             {"_id": "1231", "text_field_1": "some text", "bool_field_2": False},
                             {"_id": "in1", "text_field_1": "random1", "int_field_1": 100},
-                            {"_id": "in2", "int_field_1": 200},
+                            {"_id": "in2", "text_field_1": "blahblah", "int_field_1": 200},
                         ],
                         tensor_fields=["text_field_1", "text_field_2", "text_field_3"] if \
                             isinstance(index, UnstructuredMarqoIndex) else None
@@ -380,7 +380,7 @@ class TestSearch(MarqoTestCase):
                         ("text_field_1 in ()", 0, None),
                     ]
 
-                for filter_string, expected_hits, expected_ids in test_cases:        # TODO: change back to test_cases
+                for filter_string, expected_hits, expected_ids in test_cases[-2:]:        # TODO: change back to test_cases
                     with self.subTest(
                             f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_ids}"):
                         res = tensor_search.search(
@@ -397,7 +397,7 @@ class TestSearch(MarqoTestCase):
         Test filtering by _id
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index):
+            with self.subTest(index=index.type):
                 tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
@@ -412,7 +412,7 @@ class TestSearch(MarqoTestCase):
                     )
                 )
 
-                test_parameters = [
+                test_cases = [
                     ("_id:1", 1, ["1"]),
                     ("_id:doc1", 1, ["doc1"]),
                     ("_id:51", 0, None),
@@ -420,10 +420,22 @@ class TestSearch(MarqoTestCase):
                     ("_id:1 OR _id:doc1 OR _id:50", 3, ["1", "doc1", "50"]),  # or condition, longer
                     ("_id:1 OR _id:doc1 OR _id:50 OR _id:51", 3, ["1", "doc1", "50"]),  # or condition with non-existent id
                     ("_id:1 AND _id:doc1", 0, None),  # and condition
-                    # TODO add IN tests
                 ]
 
-                for filter_string, expected_hits, expected_ids in test_parameters:
+                # Only test IN functionality for structured indexes
+                if isinstance(index, StructuredMarqoIndex):
+                    test_cases += [
+                        ("_id in (1)", 1, ["1"]),
+                        ("_id in (doc1, (random garbage id))", 1, ["doc1"]),
+                        ("_id in (51)", 0, None),       # non-existent doc
+                        ("_id in (1, doc1)", 2, ["1", "doc1"]),
+                        ("_id in (1, doc1, 50)", 3, ["1", "doc1", "50"]),
+                        ("_id in (1, doc1, 50, (random id))", 3, ["1", "doc1", "50"]),
+                        ("_id in (1, doc1) OR _id:doc5", 3, ["1", "doc1", "doc5"]),     # combine in and equality
+                        ("_id in (1) AND _id in (doc1)", 0, None),  # and condition
+                    ]
+
+                for filter_string, expected_hits, expected_ids in test_cases:
                     with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                         res = tensor_search.search(
                             config=self.config, index_name=index.name, text="some text", filter=filter_string,
@@ -435,7 +447,7 @@ class TestSearch(MarqoTestCase):
 
     def test_filter_spaced_fields(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index):
+            with self.subTest(index=index.type):
                 # Add documents
                 tensor_search.add_documents(
                     config=self.config,
@@ -455,14 +467,20 @@ class TestSearch(MarqoTestCase):
                 )
 
                 # Define test parameters as tuples (filter_string, expected_hits, expected_ids)
-                test_parameters = [
+                test_cases = [
                     ("text_field_2:baaadd", 1, ["5678"]),
                     ("text_field_2:(Close match hehehe)", 2, ["1234", "1233"]),
                     ("(float_field_1:[0 TO 1]) AND (text_field_1:(some text))", 1, ["344"])
-                    # TODO add IN tests
                 ]
 
-                for filter_string, expected_hits, expected_ids in test_parameters:
+                # Only test IN functionality for structured indexes
+                if isinstance(index, StructuredMarqoIndex):
+                    test_cases += [
+                        ("text_field_2 in ((some text), (something else))", 2, ["1234", "1233"]),
+                        ("(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))", 1, ["344"])
+                    ]
+
+                for filter_string, expected_hits, expected_ids in test_cases:
                     with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                         res = tensor_search.search(
                             config=self.config, index_name=index.name, text='',

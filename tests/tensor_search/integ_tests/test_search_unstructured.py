@@ -520,7 +520,6 @@ class TestSearchUnstructured(MarqoTestCase):
             ("my_bool:true", 1, "1233"),
             ("an_int:[0 TO 30] OR my_bool:true", 2, None),  # Multiple hits, so expected_id is None
             ("(an_int:[0 TO 30] AND an_int:2) AND abc:(some text)", 1, "1234"),
-            # TODO add IN tests
         ]
 
         for filter_string, expected_hits, expected_id in test_parameters:
@@ -563,7 +562,6 @@ class TestSearchUnstructured(MarqoTestCase):
             ("bool_field_2:false", 1, "1"),
             ("bool_field_2:false AND bool_field_1:false", 0, None),
             ("bool_field_2:false AND text_field_1:true", 1, "1"),
-            # TODO add IN tests
         ]
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             for filter_string, expected_hits, expected_id in test_cases:
@@ -602,7 +600,6 @@ class TestSearchUnstructured(MarqoTestCase):
             ("other_field:baaadd", 1, ["5678"]),
             ("other_field:(Close match hehehe)", 2, ["1234", "1233"]),
             ("(Floaty_Field:[0 TO 1]) AND (abc:(some text))", 1, ["344"]),
-            # TODO add IN tests
         ]
 
         for filter_string, expected_hits, expected_ids in test_parameters:
@@ -636,7 +633,6 @@ class TestSearchUnstructured(MarqoTestCase):
             "(other_field):baaadd",  # Incorrect syntax for field name with space
             "(an_int:[0 TO 30] and an_int:2) AND abc:(some text)",  # and instead of AND here
             "",  # Empty filter string
-            # TODO add IN tests
         ]
 
         for filter_string in bad_filter_strings:
