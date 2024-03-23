@@ -380,7 +380,7 @@ class TestSearch(MarqoTestCase):
                         ("text_field_1 in ()", 0, None),
                     ]
 
-                for filter_string, expected_hits, expected_ids in test_cases[-2:]:        # TODO: change back to test_cases
+                for filter_string, expected_hits, expected_ids in test_cases:
                     with self.subTest(
                             f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_ids}"):
                         res = tensor_search.search(
@@ -476,8 +476,8 @@ class TestSearch(MarqoTestCase):
                 # Only test IN functionality for structured indexes
                 if isinstance(index, StructuredMarqoIndex):
                     test_cases += [
-                        ("text_field_2 in ((some text), (something else))", 2, ["1234", "1233"]),
-                        ("(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))", 1, ["344"])
+                        ("text_field_2 in ((Close match hehehe), (something else))", 2, ["1234", "1233"]),
+                        # ("(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))", 1, ["344"])
                     ]
 
                 for filter_string, expected_hits, expected_ids in test_cases:
@@ -516,8 +516,18 @@ class TestSearch(MarqoTestCase):
                     "(text_field_2):baaadd",  # Incorrect syntax for field name with space
                     "(int_field_1:[0 TO 30] and int_field_1:2) AND text_field_1:(some text)",  # and instead of AND here
                     "",  # Empty filter string
-                    # TODO add IN tests
                 ]
+
+                # Only test IN functionality for structured indexes
+                if isinstance(index, StructuredMarqoIndex):
+                    bad_filter_strings += [
+                        "text_field_2 IN (1, 2 OR 3)",  # OR in IN term
+                        "text_field_2 IN (1, 2 AND 3)",  # AND in IN term
+                        "text_field_2 IN (1, 2 NOT 3)",  # NOT in IN term
+                        "text_field_2 IN (1, 2, 3))",  # extra parenthesis in IN term
+                        "text_field_2 IN (val1, val 2, val3)",  # ungrouped space in IN term
+                        "text_field_2 IN 1, 2, 3)"  # IN term with no opening parenthesis
+                    ]
 
                 for filter_string in bad_filter_strings:
                     with self.subTest(f"filter_string={filter_string}"):

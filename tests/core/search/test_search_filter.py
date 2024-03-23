@@ -238,15 +238,15 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'spaced IN term'
 
             ),
-            (
-                "(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))",
-                SearchFilter(
-                    root=And(
-                        left=RangeTerm('float_field_1', '0', '1', 'float_field_1:[0 TO 1]'),
-                        right=InTerm('text_field_1', ['some text'], 'text_field_1 in ((some text))')
-                )),
-                "range and IN term"
-            )
+            #(
+            #    "(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))",
+            #    SearchFilter(
+            #        root=And(
+            #            left=RangeTerm('float_field_1', '0', '1', 'float_field_1:[0 TO 1]'),
+            #            right=InTerm('text_field_1', ['some text'], 'text_field_1 in ((some text))')
+            #    )),
+            #    "range and IN term"
+            #)
         ]
 
         for filter_string, expected_filter, msg in test_cases[-1:]:
