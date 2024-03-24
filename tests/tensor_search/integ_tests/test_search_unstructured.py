@@ -63,11 +63,13 @@ class TestSearchUnstructured(MarqoTestCase):
         cls.image_index_with_random_model = image_index_with_random_model.name
 
     def setUp(self) -> None:
+        super().setUp()
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self) -> None:
+        super().tearDown()
         self.device_patcher.stop()
 
     # TODO - Test efSearch parameter
