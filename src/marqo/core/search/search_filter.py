@@ -369,13 +369,14 @@ class MarqoFilterStringParser:
                 parenthesis_count -= 1
                 # Last parenthesis in an IN list
                 # Example: a IN (1, 2, 3)
-                if self._term_type == MarqoFilterStringParser._TermType.In:
+                # Note: token is NOT pushed at this state. Just note that term has ended.
+                if self._term_type == MarqoFilterStringParser._TermType.In and not self._reached_term_end:
                     self._current_token.append(c)
                     self._current_raw_token.append(c)
                     self._reached_term_end = True
-                # Grouping parenthesis for expressions
-                # Example: (a:1 AND b:2) OR c:3
                 else:
+                    # Grouping parenthesis for expressions (grouping multiple terms)
+                    # Example: (a:1 AND b in (2)) OR c:3
                     self._push_token(
                         stack,
                         filter_string,

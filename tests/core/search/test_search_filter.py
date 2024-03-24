@@ -238,18 +238,39 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'spaced IN term'
 
             ),
-            #(
-            #    "(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))",
-            #    SearchFilter(
-            #        root=And(
-            #            left=RangeTerm('float_field_1', '0', '1', 'float_field_1:[0 TO 1]'),
-            #            right=InTerm('text_field_1', ['some text'], 'text_field_1 in ((some text))')
-            #    )),
-            #    "range and IN term"
-            #)
+            (
+                "(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))",
+                SearchFilter(
+                    root=And(
+                        left=RangeTerm('float_field_1', 0, 1, 'float_field_1:[0 TO 1]'),
+                        right=InTerm('text_field_1', ['some text'], 'text_field_1 IN ((some text))')
+                    )),
+                "Parenthesis around equality and IN terms"
+            ),
+            (
+                "((float_field_1:[0 TO 1])) AND ((text_field_1 in ((some text))))",
+                SearchFilter(
+                    root=And(
+                        left=RangeTerm('float_field_1', 0, 1, 'float_field_1:[0 TO 1]'),
+                        right=InTerm('text_field_1', ['some text'], 'text_field_1 IN ((some text))')
+                    )),
+                "Even more parenthesis around equality and IN terms"
+            ),
+            (
+                "((float_field_1:[0 TO 1])) AND ((text_field_1 in ((some text)) OR text_field_2 IN (1,2,3)))",
+                SearchFilter(
+                    root=And(
+                        left=RangeTerm('float_field_1', 0, 1, 'float_field_1:[0 TO 1]'),
+                        right=Or(
+                            left=InTerm('text_field_1', ['some text'], 'text_field_1 IN ((some text))'),
+                            right=InTerm('text_field_2', ['1', '2', '3'], 'text_field_2 IN (1,2,3)')
+                        )
+                    )),
+                "Many parenthesis, nested groupings"
+            ),
         ]
 
-        for filter_string, expected_filter, msg in test_cases[-1:]:
+        for filter_string, expected_filter, msg in test_cases:
             with self.subTest(msg):
                 parser = MarqoFilterStringParser()
                 parsed_filter = parser.parse(filter_string)

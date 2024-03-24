@@ -511,7 +511,7 @@ class TestSearch(MarqoTestCase):
                 if isinstance(index, StructuredMarqoIndex):
                     test_cases += [
                         ("text_field_2 in ((Close match hehehe), (something else))", 2, ["1234", "1233"]),
-                        # ("(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))", 1, ["344"])
+                        ("(float_field_1:[0 TO 1]) AND (text_field_1 in ((some text)))", 1, ["344"])
                     ]
 
                 for filter_string, expected_hits, expected_ids in test_cases:
