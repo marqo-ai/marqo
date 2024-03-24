@@ -1,4 +1,4 @@
-# tensor search, idential to requirements.txt:
+# tensor search, identical to requirements.txt:
 requests==2.28.1
 anyio==3.7.1
 fastapi==0.86.0
