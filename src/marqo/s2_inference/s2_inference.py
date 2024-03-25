@@ -219,19 +219,19 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
             required_keys = ["name", "dimensions"]
         elif model_type in (ModelType.HF_MODEL, ):
             required_keys = ["dimensions"]
-        elif model_type in (ModelType.NoModel, ):
+        elif model_type in (ModelType.No_Model,):
             required_keys = ["dimensions"]
             if not model_name == "no_model":
-                raise InvalidModelPropertiesError(f"To use the no_model feature, you must provide model = no_models and "
-                                     f"type = no_model, but received model = {model_name} and "
-                                     f"type = {model_type}.")
+                raise InvalidModelPropertiesError(f"To use the 'no_model' feature, you must provide 'model = no_model' "
+                                                  f"and 'type = no_model', but received 'model = {model_name}' and "
+                                                  f"'type = {model_type}'.")
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
                             ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
             pass
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
-                                              f"Support model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
-                                              f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.NoModel}', "
+                                              f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
+                                              f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.No_Model}', "
                                               f"'{ModelType.Test}', '{ModelType.Random}', '{ModelType.MultilingualClip}', "
                                               f"'{ModelType.FP16_CLIP}', '{ModelType.SBERT_ONNX}', '{ModelType.CLIP_ONNX}' ")
 
