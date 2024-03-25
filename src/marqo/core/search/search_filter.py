@@ -6,8 +6,6 @@ from marqo.core.exceptions import FilterStringParsingError
 from marqo.exceptions import InternalError
 
 
-IN_TERM_DIVIDER = ' IN ('
-
 class Node(ABC):
     def __init__(self, raw: str):
         """
@@ -228,17 +226,19 @@ class MarqoFilterStringParser:
     #  Modifier: Instance of Modifier class (Not) without a modified (otherwise it's an expression)
     #  Token: A single character or a sequence of characters read from the filter string
 
+    IN_TERM_DIVIDER = ' IN ('
+
     class _TermType(Enum):
         Equality = 1
         Range = 2
         In = 3
 
-    def _term_divider_is_IN(self, i: int, filter_string: str):
+    def _term_divider_is_IN(self, i: int, filter_string: str) -> bool:
         """
         Given 'i' and the full filter string, determine if 'i' is at the beginning of the IN term divider.
         If any of the spaces or parenthesis are missing, this will return False.
         """
-        return filter_string[i:i + len(IN_TERM_DIVIDER)].upper() == IN_TERM_DIVIDER
+        return filter_string[i:i + len(self.IN_TERM_DIVIDER)].upper() == self.IN_TERM_DIVIDER
 
     def _append_to_term_value(self, c: str):
         """
@@ -400,12 +400,12 @@ class MarqoFilterStringParser:
                     self._term_type = MarqoFilterStringParser._TermType.In
                     self._term_value = [[]]
                     self._term_field = ''.join(self._current_token)
-                    self._current_token.append(IN_TERM_DIVIDER)
-                    self._current_raw_token.append(IN_TERM_DIVIDER)
+                    self._current_token.append(self.IN_TERM_DIVIDER)
+                    self._current_raw_token.append(self.IN_TERM_DIVIDER)
                     parenthesis_count += 1
 
                     # Skip the next 4 characters (they were used in ' IN (' operator).
-                    i += len(IN_TERM_DIVIDER) - 1
+                    i += len(self.IN_TERM_DIVIDER) - 1
 
                 else:
                     self._push_token(

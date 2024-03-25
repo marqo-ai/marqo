@@ -311,6 +311,7 @@ class TestMarqoFilterStringParser(MarqoTestCase):
             ('a IN (1, 2 OR 3)', 'OR in IN term'),
             ('a IN (1, 2 AND 3)', 'AND in IN term'),
             ('a IN (1, 2 NOT 3)', 'NOT in IN term'),
+            ('a IN (1, 2, 3, [0 TO 1])', 'RANGE in IN term'),
             ('a IN (1, 2, 3))', 'extra parenthesis in IN term'),
             ('a IN (val1, val 2, val3)', 'ungrouped space in IN term'),
             ('a IN 1, 2, 3)', 'IN term with no opening parenthesis'),
