@@ -1,27 +1,28 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
+import datetime
+import threading
+
 import numpy as np
-from marqo.api.exceptions import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
+import torch
+from PIL import UnidentifiedImageError
+
+from marqo import marqo_docs
+from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
+from marqo.s2_inference import constants
+from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-    UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
-from PIL import UnidentifiedImageError
-from marqo.s2_inference.model_registry import load_model_properties
-from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
-from marqo.s2_inference.types import *
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError)
 from marqo.s2_inference.logger import get_logger
-import torch
-import datetime
-from marqo.s2_inference import constants
-from marqo.tensor_search.enums import AvailableModelsKey
-from marqo.tensor_search.configs import EnvVars
-from marqo.tensor_search.models.private_models import ModelAuth
-import threading
-from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
-from marqo.tensor_search.configs import EnvVars
+from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
-from marqo import marqo_docs
+from marqo.s2_inference.types import *
+from marqo.tensor_search.configs import EnvVars
+from marqo.tensor_search.enums import AvailableModelsKey
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 
 logger = get_logger(__name__)
 
@@ -219,7 +220,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
             required_keys = ["name", "dimensions"]
         elif model_type in (ModelType.HF_MODEL, ):
             required_keys = ["dimensions"]
-        elif model_type in (ModelType.No_Model,):
+        elif model_type in (ModelType.NO_MODEL,):
             required_keys = ["dimensions"]
             if not model_name == "no_model":
                 raise InvalidModelPropertiesError(f"To use the 'no_model' feature, you must provide 'model = no_model' "
@@ -231,7 +232,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
                                               f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
-                                              f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.No_Model}', "
+                                              f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.NO_MODEL}', "
                                               f"'{ModelType.Test}', '{ModelType.Random}', '{ModelType.MultilingualClip}', "
                                               f"'{ModelType.FP16_CLIP}', '{ModelType.SBERT_ONNX}', '{ModelType.CLIP_ONNX}' ")
 

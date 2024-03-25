@@ -11,6 +11,6 @@ class NO_MODEL(Model):
         pass
 
     def encode(self, *args, **kwargs) -> None:
-        raise VectoriseError(f"Cannot vectorise anything with '{ModelType.No_Model}'. "
+        raise VectoriseError(f"Cannot vectorise anything with '{ModelType.NO_MODEL}'. "
                              f"This model is intended for adding documents and searching with custom vectors only. "
                              f"If vectorisation is needed, please use a different model ")

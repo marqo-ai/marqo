@@ -13,4 +13,4 @@ class ModelType(str, Enum):
     FP16_CLIP = "fp16_clip"
     Random = 'random'
     HF_MODEL = 'hf'
-    No_Model = "no_model"
+    NO_MODEL= "no_model"
