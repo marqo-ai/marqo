@@ -54,7 +54,7 @@ def validate_query(q: Optional[Union[dict, str]], search_method: Union[str, Sear
                 )
     else:
         raise InvalidArgError(
-            f"q must be a string, a dict, or None with context! Received q of type `{type(q)}`. "
+            f"'q' must be a 'string', a 'dict', or 'None' (if 'context' is provided)! Received q of type `{type(q)}`. "
             f"\nq=`{q}`"
             f"{usage_ref}"
         )

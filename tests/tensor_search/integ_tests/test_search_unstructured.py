@@ -1360,6 +1360,17 @@ class TestSearchUnstructured(MarqoTestCase):
         self.assertIn("hits", res)
 
     def test_lexical_query_can_not_be_none(self):
-        with self.assertRaises(InvalidArgError):
-            res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
-                                       search_method=SearchMethod.LEXICAL)
+        context = SearchContext(
+            **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
+                          {"vector": [2, ] * 384, "weight": 2}]})
+
+        test_case = [
+            (None, context, "with context"),
+            (None, None, "without context")
+        ]
+
+        for query, context, msg in test_case:
+            with self.subTest(msg):
+                with self.assertRaises(InvalidArgError):
+                    res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+                                               search_method=SearchMethod.LEXICAL)

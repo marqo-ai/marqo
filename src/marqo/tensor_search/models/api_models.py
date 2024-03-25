@@ -41,7 +41,12 @@ class SearchQuery(BaseMarqoModel):
     modelAuth: Optional[ModelAuth] = None
 
     @root_validator(pre=False)
-    def validate_query(cls, values):
+    def validate_query_and_context(cls, values):
+        """Validate that one of query and context are present for tensor search, or just the query for lexical search.
+
+        Raises:
+            InvalidArgError: If validation fails
+        """
         search_method = values.get('searchMethod')
         query = values.get('q')
         context = values.get('context')

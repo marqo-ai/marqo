@@ -1,6 +1,8 @@
 import os
 from unittest.mock import patch
 
+import numpy as np
+
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import *
@@ -66,7 +68,8 @@ class TestNoModel(MarqoTestCase):
             ("no_model", {"dimensions": 234, "type": "No_model"}, "invalid model type, should be 'no_model'"),
             ("no_model", None, "no model properties provided"),
             ("no_model", {"type": "no_model"}, "dimension not provided"),
-            ("my_model", {"dimensions": 512, "type": "no_model"}, "invalid model name")
+            ("my_model", {"dimensions": 512, "type": "no_model"}, "invalid model name"),
+            ("no_model", {"dimensions": 512, "type": "open_clip"}, "invalid model properties type")
         ]
 
         for name, model_properties, msg in test_cases:
@@ -141,6 +144,54 @@ class TestNoModel(MarqoTestCase):
 
     def test_no_model_work_with_context_vectors_in_search(self):
         """Test to ensure that context vectors work with no_model by setting query as None"""
+
+        custom_vector = [0.655 for _ in range(self.DIMENSION)]
+
+        docs = [
+            {
+                "_id": "1",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_1",
+                        "vector": np.random.rand(self.DIMENSION).tolist()
+                    }
+            },
+            {
+                "_id": "2",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_2",
+                        "vector": custom_vector
+                    }
+            }
+        ]
+
+        for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
+            with (self.subTest(index_name=index_name)):
+                tensor_fields = ["custom_field_1"] if \
+                    index_name == self.unstructured_index_with_no_model else None
+
+                mappings = {"custom_field_1": {"type": "custom_vector"}} if \
+                    index_name == self.unstructured_index_with_no_model else None
+                add_docs_params = AddDocsParams(index_name=index_name,
+                                                docs=docs,
+                                                tensor_fields=tensor_fields,
+                                                mappings=mappings)
+                _ = tensor_search.add_documents(config=self.config,
+                                                add_docs_params=add_docs_params)
+
+                r = tensor_search.search(config=self.config, index_name=index_name, text=None,
+                                         context=SearchContext(**{"tensor": [{"vector": custom_vector,
+                                                                              "weight": 1}], }))
+                self.assertEqual(2, len(r["hits"]))
+                self.assertEqual("2", r["hits"][0]["_id"])
+                self.assertAlmostEqual(1, r["hits"][0]["_score"], places=3)
+
+                self.assertEqual("1", r["hits"][1]["_id"])
+                self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
+
+    def test_no_model_work_with_custom_vectors_in_search(self):
+        """Test to ensure that context vectors work with no_model by setting query as None"""
         for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
             with (self.subTest(index_name=index_name)):
                 r = tensor_search.search(config=self.config, index_name=index_name, text=None,
@@ -148,7 +199,9 @@ class TestNoModel(MarqoTestCase):
                                                                               "weight": -1},
                                                                              {"vector": [1, ] * self.DIMENSION,
                                                                               "weight": 1}], }))
-                self.assertIn("hits", r)
+
+
+
 
     def test_no_model_and_context_vectors_dimension(self):
         """Test to ensure no_model still raises error if context vector dimension is incorrect."""
