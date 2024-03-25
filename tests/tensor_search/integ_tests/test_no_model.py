@@ -140,7 +140,7 @@ class TestNoModel(MarqoTestCase):
             with (self.subTest(index_name=index_name)):
                 with self.assertRaises(InvalidArgError) as e:
                     r = tensor_search.search(config=self.config, index_name=index_name, text="test")
-                self.assertIn("'no_model' cannot vectorise your content.", str(e.exception))
+                self.assertIn("Cannot vectorise anything with 'no_model'", str(e.exception))
 
     def test_no_model_work_with_context_vectors_in_search(self):
         """Test to ensure that context vectors work with no_model by setting query as None"""
