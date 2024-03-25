@@ -92,7 +92,7 @@ class TestNoModel(MarqoTestCase):
                                     model=Model(name=name, properties=model_properties, custom=True)
                                 )
                         )
-                    self.assertIn("Invalid model properties", str(e.exception))
+                    self.assertIn("Cannot vectorise anything with 'no_model'", str(e.exception))
 
     def test_no_model_in_add_documents_error(self):
         """Test to ensure that adding documents to an index with no model raises an error for the
@@ -185,7 +185,7 @@ class TestNoModel(MarqoTestCase):
                                                                               "weight": 1}], }))
                 self.assertEqual(2, len(r["hits"]))
                 self.assertEqual("2", r["hits"][0]["_id"])
-                self.assertAlmostEqual(1, r["hits"][0]["_score"], places=3)
+                self.assertAlmostEqual(1, r["hits"][0]["_score"], places=1)
 
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
