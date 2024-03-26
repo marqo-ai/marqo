@@ -128,11 +128,13 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str
         metric_obj.times = reduce_thread_metrics(metric_obj.times)
         yield image_repo
     finally:
+        closed = 0
         for p in image_repo.values():
             if isinstance(p, ImageFile):
                 p.close()
-        logger.info(f'Closed {len(image_repo)} images. '
-                    f'Size of repo after closing: {len(image_repo)}. '
+                closed += 1
+        logger.info(f'Closed {closed} images. '
+                    f'Size of repo: {len(image_repo)}. '
                     f'Repo: {image_repo}')
 
 
