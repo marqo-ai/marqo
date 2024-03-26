@@ -1,6 +1,8 @@
 """The API entrypoint for Tensor Search"""
+import json
 from typing import List
 
+import pydantic
 import uvicorn
 from fastapi import FastAPI
 from fastapi import Request, Depends
@@ -10,8 +12,10 @@ from marqo import config
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
+from marqo.api.exceptions import InvalidArgError
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.rollback_request import RollbackRequest
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
@@ -28,7 +32,6 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
-from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 
 logger = get_logger(__name__)
 
@@ -134,6 +137,24 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
         )
     else:
         return JSONResponse(content=body, status_code=exc.status_code)
+
+
+@app.exception_handler(pydantic.error_wrappers.ValidationError)
+async def validation_exception_handler(request, exc: pydantic.error_wrappers.ValidationError) -> JSONResponse:
+    """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
+    error_messages = [{
+        'loc': error.get('loc', ''),
+        'msg': error.get('msg', ''),
+        'type': error.get('type', '')
+    } for error in exc.errors()]
+
+    body = {
+        "message": json.dumps(error_messages),
+        "code": InvalidArgError.code,
+        "type": InvalidArgError.error_type,
+        "link": InvalidArgError.link
+    }
+    return JSONResponse(content=body, status_code=InvalidArgError.status_code)
 
 
 @app.exception_handler(api_exceptions.MarqoError)
