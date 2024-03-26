@@ -85,6 +85,11 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
                                 continue
 
 
+from marqo.s2_inference.logger import get_logger
+
+logger = get_logger(__name__)
+
+
 @contextmanager
 def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str],
                     image_download_headers: dict) -> ContextManager[dict]:
@@ -126,6 +131,9 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str
         for p in image_repo.values():
             if isinstance(p, ImageFile):
                 p.close()
+        logger.info(f'Closed {len(image_repo)} images. '
+                    f'Size of repo after closing: {len(image_repo)}. '
+                    f'Repo: {image_repo}')
 
 
 def reduce_thread_metrics(data):
