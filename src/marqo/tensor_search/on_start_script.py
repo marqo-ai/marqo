@@ -162,10 +162,10 @@ class ModelsForCacheing:
                 continue
 
             if model_name in constants.MODELS_TO_SKIP_PRELOADING:
-                self.logger.info(f"Skipping preloading of `{model_name}`.")
+                self.logger.info(f"Skipping preloading of '{model_name}' because the model does not require preloading.")
                 continue
             for device in self.default_devices:
-                self.logger.debug(f"Beginning loading for model: {model} on device: {device}")
+                self.logger.debug(f"Loading model: {model} on device: {device}")
 
                 # warm it up
                 _ = _preload_model(model=model, content=test_string, device=device)

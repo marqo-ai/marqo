@@ -201,7 +201,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         required_keys = []
 
         if "type" not in model_properties:
-            base_error_message = ("You do not have a type key in your model_properties, so Marqo will try to load a "
+            base_error_message = ("You do not have a type key in your model_properties, so Marqo will try to load an "
                                   "'sbert' model by default. If you want to load a different model, "
                                   "please provide a type key. ")
         else:
@@ -240,8 +240,8 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
             if key not in model_properties:
                 raise InvalidModelPropertiesError(base_error_message + f"model_properties has missing key '{key}'. "
                                                   f"please update your model properties with required key `{key}` "
-                                                  f"check '{marqo_docs.list_of_models()}', "
-                                                  f"'{marqo_docs.bring_your_own_model()}' for more info")
+                                                  f"check {marqo_docs.list_of_models()}, "
+                                                  f"{marqo_docs.bring_your_own_model()} for more info")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
@@ -259,7 +259,7 @@ def _validate_model_properties_dimension(dimensions: Optional[int]) -> None:
         """
     if dimensions is None or not isinstance(dimensions, int) or dimensions < 1:
         raise InvalidModelPropertiesError(
-            f"Invalid model properties: `dimensions` must be a positive integer, but received {dimensions}.")
+            f"Invalid model properties: 'dimensions' must be a positive integer, but received {dimensions}.")
 
 
 def _validate_model_into_device(model_name:str, model_properties: dict, device: str, calling_func: str = None) -> bool:

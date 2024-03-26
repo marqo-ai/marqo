@@ -1639,7 +1639,7 @@ def get_query_vectors_from_jobs(
                     raise api_exceptions.InvalidArgError(
                         f"The dimension of the vectors returned by the model or given by the context vectors "
                         f"does not match the expected dimension. "
-                        f"Expect dimension {q.index.model.get_dimension()} but got {len(vector)}"
+                        f"Expected dimension {q.index.model.get_dimension()} but got {len(vector)}"
                     )
 
             merged_vector = np.mean(weighted_vectors, axis=0)
@@ -1658,6 +1658,8 @@ def get_query_vectors_from_jobs(
                 treat_urls_as_images=True,  # TODO - infer this from model
                 content=q.q
             )
+        else:
+            raise ValueError(f"Unexpected query type: {type(q.q).__name__}")
     return result
 
 

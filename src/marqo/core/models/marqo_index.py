@@ -137,7 +137,7 @@ class Model(StrictBaseModel):
             try:
                 s2_inference.validate_model_properties(model_name, properties)
             except InvalidModelPropertiesError as e:
-                raise InvalidArgumentError(
+                raise ValueError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.')
         return values
 
