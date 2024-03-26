@@ -12,3 +12,4 @@ urllib3==1.26.0
 pydantic==1.10.11
 httpx==0.25.0
 semver==3.0.2
+memory_profiler

@@ -154,6 +154,32 @@ def root():
             "version": version.get_version()}
 
 
+@app.get('/memory')
+def memory():
+    import tracemalloc
+
+    tracemalloc.start()
+
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('lineno')
+
+    # GC
+    import gc
+
+    gc.collect()  # Force garbage collection
+
+    # Get mem used
+    from memory_profiler import memory_usage
+
+    mem_used = memory_usage(-1, interval=0.1, timeout=1)
+
+    return {
+        'stats': [str(s) for s in top_stats],
+        'garbage': gc.garbage,
+        'mem_used': mem_used
+    }
+
+
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
     marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
