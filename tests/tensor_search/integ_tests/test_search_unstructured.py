@@ -65,13 +65,13 @@ class TestSearchUnstructured(MarqoTestCase):
         cls.image_index_with_random_model = image_index_with_random_model.name
 
     def setUp(self) -> None:
-        self.clear_indexes(self.indexes)
-
+        super().setUp()
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self) -> None:
+        super().tearDown()
         self.device_patcher.stop()
 
     # TODO - Test efSearch parameter
@@ -603,7 +603,7 @@ class TestSearchUnstructured(MarqoTestCase):
         test_parameters = [
             ("other_field:baaadd", 1, ["5678"]),
             ("other_field:(Close match hehehe)", 2, ["1234", "1233"]),
-            ("(Floaty_Field:[0 TO 1]) AND (abc:(some text))", 1, ["344"])
+            ("(Floaty_Field:[0 TO 1]) AND (abc:(some text))", 1, ["344"]),
         ]
 
         for filter_string, expected_hits, expected_ids in test_parameters:
