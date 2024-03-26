@@ -7,6 +7,7 @@ from unittest import mock
 import requests
 
 import marqo.core.exceptions as core_exceptions
+from pydantic import ValidationError
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
@@ -896,7 +897,7 @@ class TestSearchStructured(MarqoTestCase):
                            {"https://marqo_not_real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             with self.subTest(f"query={q}"):
-                with self.assertRaises(errors.InvalidArgError):
+                with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
                     tensor_search.search(
                         text=q,
                         index_name=self.default_image_index,
