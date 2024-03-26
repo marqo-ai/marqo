@@ -25,16 +25,6 @@ class TestUtils(unittest.TestCase):
             "vs": [{"otherfield": "jkerhjbrbhj", "__vector_abc": [1, 2, 3, 4, 5, 6, 7, 8]}]
         }, new_length=3)
 
-    def test_construct_authorized_url(self):
-        assert "https://admin:admin@localhost:9200" == utils.construct_authorized_url(
-            url_base="https://localhost:9200", username="admin", password="admin"
-        )
-
-    def test_construct_authorized_url_empty(self):
-        assert "https://:@localhost:9200" == utils.construct_authorized_url(
-            url_base="https://localhost:9200", username="", password=""
-        )
-
     def test_check_device_is_available(self):
         mock_cuda_is_available = mock.MagicMock()
         mock_cuda_device_count = mock.MagicMock()

@@ -1,7 +1,7 @@
 import json
 import pprint
 import time
-from marqo.api.exceptions import IndexNotFoundError, MarqoError
+from marqo.api.exceptions import IndexNotFoundError
 from marqo.tensor_search import tensor_search, constants, index_meta_cache
 import unittest
 import copy

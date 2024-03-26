@@ -136,23 +136,6 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
         return JSONResponse(content=body, status_code=exc.status_code)
 
 
-@app.exception_handler(api_exceptions.MarqoError)
-def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
-    """MarqoErrors are treated as internal errors"""
-
-    headers = getattr(exc, "headers", None)
-    body = {
-        "message": exc.message,
-        "code": 500,
-        "type": "internal_error",
-        "link": ""
-    }
-    if headers:
-        return JSONResponse(content=body, status_code=500, headers=headers)
-    else:
-        return JSONResponse(content=body, status_code=500)
-
-
 @app.get("/")
 def root():
     return {"message": "Welcome to Marqo",
