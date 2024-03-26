@@ -139,8 +139,8 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
         return JSONResponse(content=body, status_code=exc.status_code)
 
 
-@app.exception_handler(pydantic.error_wrappers.ValidationError)
-async def validation_exception_handler(request, exc: pydantic.error_wrappers.ValidationError) -> JSONResponse:
+@app.exception_handler(pydantic.ValidationError)
+async def validation_exception_handler(request, exc: pydantic.ValidationError) -> JSONResponse:
     """Catch pydantic validation errors and rewrite as an InvalidArgError whilst keeping error messages from the ValidationError."""
     error_messages = [{
         'loc': error.get('loc', ''),
