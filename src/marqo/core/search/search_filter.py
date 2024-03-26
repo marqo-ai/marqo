@@ -13,7 +13,7 @@ class Node(ABC):
 
         Args:
             raw: The raw user input string that this node was parsed from. This is used for error messages and
-            debugging only and must not be  used when interpreting the semantics of the node.
+            debugging only and must not be used when interpreting the semantics of the node.
         """
         self.raw = raw
 
@@ -141,6 +141,24 @@ class RangeTerm(Term):
         return cls(field, lower, upper, raw)
 
 
+class InTerm(Term):
+    def __init__(self, field: str, value_list: List[str], raw: str):
+        super().__init__(field, raw)
+        self.value_list = value_list
+
+    def __eq__(self, other):
+        return (
+                type(self) == type(other) and
+                self.field == other.field and
+                # Order is disregarded for IN lists.
+                set(self.value_list) == set(other.value_list) and
+                self.raw == other.raw
+        )
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({repr(self.field)}, {repr(self.value_list)}, {repr(self.raw)})'
+
+
 class And(Operator):
     def __init__(self, left: Node, right: Node, raw: str = 'AND'):
         super().__init__(left, right, raw)
@@ -195,7 +213,11 @@ class MarqoFilterStringParser:
     """
 
     # Terminology:
-    #  Term: A single term in the form of 'field:value' or 'field:[lower|* TO upper|*]'
+    #  Term: A single term in the form of:
+    #       a) 'field:value'
+    #       b) 'field:[lower|* TO upper|*]'
+    #       c) 'field IN (value1, value2, ...)'
+    #  Term Divider: Character/s that separate term into field and value. Either ':' or ' IN '.
     #  Expression:
     #       * A term or,
     #       * A combination of terms and operators e.g., 'a:1 AND b:2' or,
@@ -204,9 +226,55 @@ class MarqoFilterStringParser:
     #  Modifier: Instance of Modifier class (Not) without a modified (otherwise it's an expression)
     #  Token: A single character or a sequence of characters read from the filter string
 
+    IN_TERM_DIVIDER = ' IN ('
+
     class _TermType(Enum):
         Equality = 1
         Range = 2
+        In = 3
+
+    def _term_divider_is_IN(self, i: int, filter_string: str) -> bool:
+        """
+        Given 'i' and the full filter string, determine if 'i' is at the beginning of the IN term divider.
+        If any of the spaces or parenthesis are missing, this will return False.
+        """
+        return filter_string[i:i + len(self.IN_TERM_DIVIDER)].upper() == self.IN_TERM_DIVIDER
+
+    def _append_to_term_value(self, c: str):
+        """
+        If the term type is IN, append c to the last list in term_value.
+        Otherwise, append c to term_value.
+
+        For IN terms, term_value is a list of lists.
+        """
+        if self._term_type == MarqoFilterStringParser._TermType.In:
+            self._term_value[-1].append(c)
+        else:
+            self._term_value.append(c)
+
+    def _get_current_term_value(self):
+        """
+        If the term type is IN, return the last list in term_value.
+        Otherwise, return term_value.
+
+        For IN terms, term_value is a list of lists.
+        """
+        if self._term_type == MarqoFilterStringParser._TermType.In:
+            return self._term_value[-1]
+        else:
+            return self._term_value
+
+    def _join_term_value(self, term_value: Union[List[str], List[List[str]]]) -> Union[str, List[str]]:
+        """
+        If the term type is IN, join every list in term_value
+        Otherwise, join term_value.
+
+        For IN terms, term_value is a list of lists.
+        """
+        if self._term_type == MarqoFilterStringParser._TermType.In:
+            return [''.join(item) for item in term_value]
+        else:
+            return ''.join(term_value)
 
     def parse(self, filter_string: str) -> SearchFilter:
         self._reset_state()
@@ -219,37 +287,66 @@ class MarqoFilterStringParser:
         escape = False
         read_space_until = None  # ignore space until reaching the value of this variable
 
-        for i in range(len(filter_string)):
+        i = 0
+        while i < len(filter_string):
             c = filter_string[i]
 
+            # Stop ignoring white spaces if we are not in a list after a comma
+            if c != ' ':
+                self._in_term_value_after_comma = False
+
             # Special processing if we are reading a term value
-            if self._read_term_value and not (c in [' ', ')'] and not escape and read_space_until is None):
+            if self._read_term_value and (
+                    c not in [' ', ')'] or
+                    read_space_until != None or
+                    self._in_term_value_after_comma or
+                    escape
+            ):
                 if self._reached_term_end:
                     self._error(f"Expected end of term, but found '{c}'", filter_string, i)
 
                 if escape:
                     self._current_token.append(c)
                     self._current_raw_token.append(c)
-                    self._term_value.append(c)
+                    self._append_to_term_value(c)
                     escape = False
                 elif c == '\\':
                     self._current_raw_token.append(c)
                     escape = True
+                elif c == ',' and self._term_type == MarqoFilterStringParser._TermType.In:
+                    # Comma only has special meaning in IN term lists.
+                    # Break into the next list for term_value.
+                    self._term_value.append([])
+                    self._current_token.append(c)
+                    self._current_raw_token.append(c)
+                    self._in_term_value_after_comma = True
+                elif self._in_term_value_after_comma and c == ' ':
+                    # Ignore all whitespace after comma in IN term lists.
+                    pass
                 else:
                     if c == read_space_until:
                         read_space_until = None
-                        self._reached_term_end = True
-                    elif len(self._term_value) == 0 and c == '(' and not read_space_until:  # start of term value
+                        # Term end is reached if ) or ] are reached, EXCEPT for grouped items in IN lists.
+                        # Example: a IN (1, 2, (3, 4))
+                        # In this case, reaching the ) after 4 does NOT end the term.
+                        if not (self._term_type == MarqoFilterStringParser._TermType.In and c == ')'):
+                            self._reached_term_end = True
+                    elif len(self._get_current_term_value()) == 0 and c == '(' and not read_space_until:  # start of term value
                         read_space_until = ')'
-                    elif len(self._term_value) == 0 and c == '[' and not read_space_until:  # start of term value
+                    elif len(self._get_current_term_value()) == 0 and c == '[' and not read_space_until:  # start of term value
                         read_space_until = ']'
-                        self._term_type = MarqoFilterStringParser._TermType.Range
+                        if self._term_type != MarqoFilterStringParser._TermType.In:
+                            self._term_type = MarqoFilterStringParser._TermType.Range
+                        else:
+                            self._error('Unexpected [ after IN operator.', filter_string, i)
                     else:
-                        self._term_value.append(c)
+                        self._append_to_term_value(c)
 
                     self._current_token.append(c)
                     self._current_raw_token.append(c)
 
+                # Increment i for loop
+                i += 1
                 continue
 
             if escape:
@@ -269,39 +366,66 @@ class MarqoFilterStringParser:
                 stack.append(c)
                 parenthesis_count += 1
             elif c == ')':
-                self._push_token(
-                    stack,
-                    filter_string,
-                    self._current_token,
-                    self._current_raw_token,
-                    self._term_field,
-                    self._term_value,
-                    self._term_type,
-                    i
-                )
-                self._reset_state()
-
-                self._merge_expression(stack, filter_string, i)
                 parenthesis_count -= 1
+                # Last parenthesis in an IN list
+                # Example: a IN (1, 2, 3)
+                # Note: token is NOT pushed at this state. Just note that term has ended.
+                if self._term_type == MarqoFilterStringParser._TermType.In and not self._reached_term_end:
+                    self._current_token.append(c)
+                    self._current_raw_token.append(c)
+                    self._reached_term_end = True
+                else:
+                    # Grouping parenthesis for expressions (grouping multiple terms)
+                    # Example: (a:1 AND b in (2)) OR c:3
+                    self._push_token(
+                        stack,
+                        filter_string,
+                        self._current_token,
+                        self._current_raw_token,
+                        self._term_field,
+                        self._term_value,
+                        self._term_type,
+                        i
+                    )
+                    self._reset_state()
+                    self._merge_expression(stack, filter_string, i)
+
             elif c == '\\':
                 self._current_raw_token.append(c)
                 escape = True
             elif c == ' ':
-                self._push_token(
-                    stack,
-                    filter_string,
-                    self._current_token,
-                    self._current_raw_token,
-                    self._term_field,
-                    self._term_value,
-                    self._term_type,
-                    i
-                )
-                self._reset_state()
+                if self._term_divider_is_IN(i, filter_string):
+                    # Found the ' IN ' operator. Look for a list starting with '(' on the next pass.
+                    self._read_term_value = True
+                    self._term_type = MarqoFilterStringParser._TermType.In
+                    self._term_value = [[]]
+                    self._term_field = ''.join(self._current_token)
+                    self._current_token.append(self.IN_TERM_DIVIDER)
+                    self._current_raw_token.append(self.IN_TERM_DIVIDER)
+                    parenthesis_count += 1
+
+                    # Skip the next 4 characters (they were used in ' IN (' operator).
+                    i += len(self.IN_TERM_DIVIDER) - 1
+
+                else:
+                    self._push_token(
+                        stack,
+                        filter_string,
+                        self._current_token,
+                        self._current_raw_token,
+                        self._term_field,
+                        self._term_value,
+                        self._term_type,
+                        i
+                    )
+                    self._reset_state()
             else:
                 self._current_token.append(c)
                 self._current_raw_token.append(c)
+            # Increment i for loop
+            i += 1
 
+        # Post-parse loop cleanup
         if len(self._current_token) > 0:
             self._push_token(
                 stack,
@@ -334,7 +458,7 @@ class MarqoFilterStringParser:
                     current_token: List[str],
                     current_raw_token: List[str],
                     term_field: Optional[str],
-                    term_value: Optional[List[str]],
+                    term_value: Optional[Union[List[str], List[List[str]]]],
                     term_type: Optional[_TermType],
                     pos: int):
         if len(current_token) == 0:
@@ -381,7 +505,7 @@ class MarqoFilterStringParser:
             if not term_field or not term_value:
                 self._error(f"Cannot parse token '{token}'", filter_string, pos)
 
-            term_value = ''.join(term_value)
+            term_value = self._join_term_value(term_value)
 
             # Term must come at the beginning of an expression, after a modifier or after an operator
             if not (self._is_start_of_expression(prev) or self._is_modifier(prev) or self._is_operator(prev)):
@@ -398,6 +522,9 @@ class MarqoFilterStringParser:
                     node = RangeTerm.parse(term_field, term_value, raw_token)
                 except ValueError as e:
                     self._error(f"Cannot parse range term '{token}': {str(e)}", filter_string, pos)
+            elif term_type == self._TermType.In:
+                # For IN terms, term_value should already be a list, not a string
+                node = InTerm(term_field, term_value, raw_token)
             else:
                 raise InternalError(f'Unexpected term type {term_type}')
 
@@ -539,7 +666,8 @@ class MarqoFilterStringParser:
         self._current_token: List[str] = []
         self._current_raw_token: List[str] = []
         self._term_field: Optional[str] = None
-        self._term_value: List[str] = []
+        self._term_value: Union[List[str], List[List[str]]] = []
         self._read_term_value: bool = False
         self._reached_term_end: bool = False
         self._term_type: Optional[MarqoFilterStringParser._TermType] = None
+        self._in_term_value_after_comma: bool = False
