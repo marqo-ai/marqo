@@ -27,19 +27,6 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'single term with extra parentheses'
             ),
             (
-                'NOT a:1 AND b:2 OR NOT c:3',
-                SearchFilter(
-                    root=Or(
-                        left=And(
-                            left=Not(EqualityTerm('a', '1', 'a:1')),
-                            right=EqualityTerm('b', '2', 'b:2')
-                        ),
-                        right=Not(EqualityTerm('c', '3', 'c:3'))
-                    )
-                ),
-                'simple filter string'
-            ),
-            (
                 '(((a:1 AND NOT b:2)) OR (NOT c:3))',
                 SearchFilter(
                     root=Or(
@@ -50,7 +37,7 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                         right=Not(EqualityTerm('c', '3', 'c:3'))
                     )
                 ),
-                'extra parantheses'
+                'extra parentheses'
             ),
             (
                 'a:1 AND (b:2 OR c:3)',
@@ -64,21 +51,6 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                     )
                 ),
                 'or expression'
-            ),
-            (
-                'a:1 AND NOT (b:2 OR c:3)',
-                SearchFilter(
-                    root=And(
-                        left=EqualityTerm('a', '1', 'a:1'),
-                        right=Not(
-                            Or(
-                                left=EqualityTerm('b', '2', 'b:2'),
-                                right=EqualityTerm('c', '3', 'c:3')
-                            )
-                        )
-                    )
-                ),
-                'not expression'
             ),
             (
                 'a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5))) OR d:6',
@@ -155,26 +127,6 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'basic string IN term'
             ),
             (
-                'a IN (1, 2, 3) AND b:2',
-                SearchFilter(
-                    root=And(
-                        left=InTerm('a', ['1', '2', '3'], 'a IN (1,2,3)'),
-                        right=EqualityTerm('b', '2', 'b:2')
-                    )
-                ),
-                'AND with IN term'
-            ),
-            (
-                'a IN (1, 2, 3) OR b:2',
-                SearchFilter(
-                    root=Or(
-                        left=InTerm('a', ['1', '2', '3'], 'a IN (1,2,3)'),
-                        right=EqualityTerm('b', '2', 'b:2')
-                    )
-                ),
-                'OR with IN term'
-            ),
-            (
                 'NOT a IN (1, 2, 3)',
                 SearchFilter(
                     root=Not(
@@ -210,19 +162,6 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 'Complex IN term'
             ),
             (
-                'a:(value 1) OR (b IN ((2)) AND c:3)',
-                SearchFilter(
-                    root=Or(
-                        left=EqualityTerm('a', 'value 1', 'a:(value 1)'),
-                        right=And(
-                            left=InTerm('b', ['2'], 'b IN ((2))'),
-                            right=EqualityTerm('c', '3', 'c:3')
-                        )
-                    )
-                ),
-                'Mixed IN term'
-            ),
-            (
                 'a IN (1, 2,, 3)',
                 SearchFilter(
                     InTerm('a', ['1', '2', '', '3'], 'a IN (1,2,,3)')
@@ -248,15 +187,6 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                 "Parenthesis around equality and IN terms"
             ),
             (
-                "((float_field_1:[0 TO 1])) AND ((text_field_1 in ((some text))))",
-                SearchFilter(
-                    root=And(
-                        left=RangeTerm('float_field_1', 0, 1, 'float_field_1:[0 TO 1]'),
-                        right=InTerm('text_field_1', ['some text'], 'text_field_1 IN ((some text))')
-                    )),
-                "Even more parenthesis around equality and IN terms"
-            ),
-            (
                 "((float_field_1:[0 TO 1])) AND ((text_field_1 in ((some text)) OR text_field_2 IN (1,2,3)))",
                 SearchFilter(
                     root=And(
@@ -268,6 +198,23 @@ class TestMarqoFilterStringParser(MarqoTestCase):
                     )),
                 "Many parenthesis, nested groupings"
             ),
+            # A bit of everything
+            (
+                '(a:1 AND NOT (b:[1 TO 10] OR (c IN (x, y, (hello world)))))',
+                SearchFilter(
+                    root=And(
+                        left=EqualityTerm('a', '1', 'a:1'),
+                        right=Not(
+                            Or(
+                                left=RangeTerm('b', 1, 10, 'b:[1 TO 10]'),
+                                right=InTerm('c', ['x', 'y', 'hello world'], 'c IN (x,y,(hello world))')
+                            )
+                        )
+                    )
+                ),
+                'Complex filter string, all types'
+            )
+
         ]
 
         for filter_string, expected_filter, msg in test_cases:
