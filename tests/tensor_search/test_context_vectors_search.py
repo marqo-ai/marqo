@@ -1,6 +1,8 @@
 import os
 from unittest.mock import patch
 
+from pydantic.error_wrappers import ValidationError
+
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -120,7 +122,7 @@ class TestContextVectors(MarqoTestCase):
         """Test to ensure that a proper error is raised if both query and context is None"""
         for index_name in [self.structured_index_with_random_model, self.unstructured_index_with_random_model]:
             with self.subTest(msg=index_name):
-                with self.assertRaises(InvalidArgError) as e:
+                with self.assertRaises(ValidationError) as e:
                     res = tensor_search.search(text=None, config=self.config, index_name=index_name, context=None)
                 self.assertIn("One of Query(q) or context is required for tensor search",
-                              str(e.exception.message))
+                              str(e.exception))

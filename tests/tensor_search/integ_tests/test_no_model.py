@@ -5,6 +5,7 @@ import numpy as np
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.exceptions import IndexNotFoundError
+from pydantic.error_wrappers import ValidationError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
@@ -75,7 +76,7 @@ class TestNoModel(MarqoTestCase):
         for name, model_properties, msg in test_cases:
             for index_type in ["structured", "unstructured"]:
                 with self.subTest(name=name, model_properties=model_properties, msg=f"{index_type} - msg"):
-                    with self.assertRaises(InvalidArgumentError) as e:
+                    with self.assertRaises((ValidationError, InvalidArgumentError)) as e:
                         if index_type == "structured":
                             self.index_management.create_index(
                                 self.structured_marqo_index_request(
