@@ -238,7 +238,12 @@ class MarqoFilterStringParser:
         Given 'i' and the full filter string, determine if 'i' is at the beginning of the IN term divider.
         If any of the spaces or parenthesis are missing, this will return False.
         """
-        return filter_string[i:i + len(self.IN_TERM_DIVIDER)].upper() == self.IN_TERM_DIVIDER
+        candidate_substring = filter_string[i:i + len(self.IN_TERM_DIVIDER)].upper()
+        # Extra check if substring has " IN " but is missing the open parenthesis
+        if candidate_substring[:3] == ' IN' and candidate_substring[3:] != ' (':
+            self._error('Expected open parenthesis after " IN "', filter_string, i)
+
+        return candidate_substring == self.IN_TERM_DIVIDER
 
     def _append_to_term_value(self, c: str):
         """
@@ -394,8 +399,8 @@ class MarqoFilterStringParser:
                 self._current_raw_token.append(c)
                 escape = True
             elif c == ' ':
+                # Found the ' IN ' operator. Look for a list starting with '(' on the next pass.
                 if self._term_divider_is_IN(i, filter_string):
-                    # Found the ' IN ' operator. Look for a list starting with '(' on the next pass.
                     self._read_term_value = True
                     self._term_type = MarqoFilterStringParser._TermType.In
                     self._term_value = [[]]
@@ -407,7 +412,11 @@ class MarqoFilterStringParser:
                     # Skip the next 4 characters (they were used in ' IN (' operator).
                     i += len(self.IN_TERM_DIVIDER) - 1
 
+                elif not self._reached_term_end and self._term_type == MarqoFilterStringParser._TermType.In:
+                    # Found UNGROUPED white space in IN term list. This should be an error.
+                    self._error('Unexpected white space in IN term list', filter_string, i)
                 else:
+                    # Found the space AFTER a full term/token.
                     self._push_token(
                         stack,
                         filter_string,

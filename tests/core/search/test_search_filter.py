@@ -228,48 +228,51 @@ class TestMarqoFilterStringParser(MarqoTestCase):
         # modifier not valid after term, after modifier, at the end of exp, end of string
         # after modifier, can only have a term
         test_cases = [
-            ('AND a:1 OR b:2', 'string starts with operator'),
-            ('a:(b))', 'extra parenthesis after grouped text'),
-            ('a:1 AND b:2 (OR c:3)', 'expression starts with operator'),
-            ('a:1 AND b:2 OR', 'string ends with operator'),
-            ('a:1 AND (b:2 OR c:3 AND) OR e:5', 'expression ends with operator'),
-            ('a:1 AND b:2 OR OR c:3', 'operator after operator'),
-            ('a:1 AND b:2 OR NOT OR c:3', 'operator after modifier'),
-            ('a:1 AND b:2 OR NOT', 'string ends with a modifier'),
-            ('a:1 AND (b:2 OR c:3 NOT) OR e:5', 'expression ends with a modifier'),
-            ('a:1 AND b:2 OR NOT NOT c:3', 'modifier after modifier'),
-            ('a:1 NOT a:1', 'modifier after term'),
-            ('a:1 a:1', 'term after term'),
-            ('(a:1 AND b:2) b:2', 'term after expression'),
-            ('(a:1 AND b:2)(c:3 AND d:4)', 'expression after expression'),
-            ('a:1 (c:3 AND d:4)', 'expression after term'),
-            ('a:1 AND b:2)', 'expression not opened'),
-            ('(a:1 AND b:2', 'expression not closed'),
-            ('', 'empty expression'),
-            (' ', 'empty expression'),
-            ('   ', 'empty expression'),
-            ('(', '('),
-            (')', ')'),
-            ('()', '()'),
-            ('a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5)) OR d:6', 'imbalanced parentheses, not closed'),
-            ('a:1 AND b:2 OR (c:3 AND (d:4 OR e:5))) OR d:6', 'imbalanced parentheses, not opened'),
+            ('AND a:1 OR b:2', 'Unexpected AND', 'string starts with operator'),
+            ('a:(b))', 'Unexpected )', 'extra parenthesis after grouped text'),
+            ('a:1 AND b:2 (OR c:3)', 'Unexpected OR', 'expression starts with operator'),
+            ('a:1 AND b:2 OR', 'but found OR', 'string ends with operator'),
+            ('a:1 AND (b:2 OR c:3 AND) OR e:5', 'but found AND', 'expression ends with operator'),
+            ('a:1 AND b:2 OR OR c:3', 'but found OR', 'operator after operator'),
+            ('a:1 AND b:2 OR NOT OR c:3', 'but found OR', 'operator after modifier'),
+            ('a:1 AND b:2 OR NOT', 'but found NOT', 'string ends with a modifier'),
+            ('a:1 AND (b:2 OR c:3 NOT) OR e:5', "Unexpected modifier 'NOT'", 'expression ends with a modifier'),
+            ('a:1 AND b:2 OR NOT NOT c:3', "Unexpected modifier 'NOT'", 'modifier after modifier'),
+            ('a:1 NOT a:1', "Unexpected modifier 'NOT'", 'modifier after term'),
+            ('a:1 a:1', 'Expected an operator', 'term after term'),
+            ('(a:1 AND b:2) b:2', 'Expected an operator', 'term after expression'),
+            ('(a:1 AND b:2)(c:3 AND d:4)', 'Unexpected expression ending', 'expression after expression'),
+            ('a:1 (c:3 AND d:4)', 'Unexpected expression ending', 'expression after term'),
+            ('a:1 AND b:2)', 'Unexpected )', 'expression not opened'),
+            ('(a:1 AND b:2', 'Unbalanced parentheses', 'expression not closed'),
+            ('', 'empty filter string', 'empty expression'),
+            (' ', 'Empty filter string', 'empty expression'),
+            ('   ', 'Empty filter string', 'empty expression'),
+            ('(', 'Unbalanced parentheses', 'unbalanced parenthesis'),
+            (')', 'Unexpected )', 'unexpected )'),
+            ('()', 'Empty expression', '()'),
+            ('a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5)) OR d:6', 'Unbalanced parentheses', 'imbalanced parentheses, not closed'),
+            ('a:1 AND b:2 OR (c:3 AND (d:4 OR e:5))) OR d:6', 'Unexpected )', 'imbalanced parentheses, not opened'),
 
             # In term tests
-            ('a IN (1, 2 OR 3)', 'OR in IN term'),
-            ('a IN (1, 2 AND 3)', 'AND in IN term'),
-            ('a IN (1, 2 NOT 3)', 'NOT in IN term'),
-            ('a IN (1, 2, 3, [0 TO 1])', 'RANGE in IN term'),
-            ('a IN (1, 2, 3))', 'extra parenthesis in IN term'),
-            ('a IN (val1, val 2, val3)', 'ungrouped space in IN term'),
-            ('a IN 1, 2, 3)', 'IN term with no opening parenthesis'),
+            ('a IN (1, 2 OR 3)', 'Unexpected white space', 'OR in IN term'),
+            ('a IN (1, 2 AND 3)', 'Unexpected white space', 'AND in IN term'),
+            ('a IN (1, 2 NOT 3)', 'Unexpected white space', 'NOT in IN term'),
+            ('a IN (1, 2, 3, [0 TO 1])', 'Unexpected [ after IN operator', 'RANGE in IN term'),
+            ('a IN (1, 2, 3))', 'Unexpected )', 'extra parenthesis in IN term'),
+            ('a IN (val1, val 2, val3)', 'Unexpected white space', 'ungrouped space in IN term'),
+            ('a IN 1, 2, 3)', 'Expected open parenthesis', 'IN term with no opening parenthesis'),
         ]
 
-        for filter_string, msg in test_cases:
+        for filter_string, expected_error_msg, msg in test_cases:
             with self.subTest(msg):
                 with self.assertRaises(FilterStringParsingError,
-                                       msg=f"Did not raise error on malformed filter string '{filter_string}'"):
+                                       msg=f"Did not raise error on malformed filter string '{filter_string}'") as cm:
                     parser = MarqoFilterStringParser()
                     parser.parse(filter_string)
+
+            actual_error = str(cm.exception)
+            self.assertIn(expected_error_msg, actual_error)
 
     def test_equality(self):
         """
