@@ -1,25 +1,28 @@
 """This is the interface for interacting with S2 Inference
 The functions defined here would have endpoints, later on.
 """
+import datetime
+import threading
+
 import numpy as np
-from marqo.api.exceptions import ModelCacheManagementError, InvalidArgError, ConfigurationError, InternalError
+import torch
+from PIL import UnidentifiedImageError
+
+from marqo import marqo_docs
+from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
+from marqo.s2_inference import constants
+from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
-    UnknownModelError, ModelNotInCacheError, ModelDownloadError, S2InferenceError)
-from PIL import UnidentifiedImageError
-from marqo.s2_inference.model_registry import load_model_properties
-from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
-from marqo.s2_inference.types import *
+    UnknownModelError, ModelNotInCacheError, ModelDownloadError)
 from marqo.s2_inference.logger import get_logger
-import torch
-import datetime
-from marqo.s2_inference import constants
+from marqo.s2_inference.model_registry import load_model_properties
+from marqo.s2_inference.models.model_type import ModelType
+from marqo.s2_inference.types import *
+from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
-from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.models.private_models import ModelAuth
-import threading
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
-from marqo.tensor_search.configs import EnvVars
 
 logger = get_logger(__name__)
 
@@ -56,7 +59,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
     
-    validated_model_properties = _validate_model_properties(model_name, model_properties)
+    validated_model_properties = validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
     _update_available_models(
@@ -78,7 +81,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
     except UnidentifiedImageError as e:
-        raise VectoriseError(str(e)) from e
+        raise VectoriseError(f"Could not process given image: {content}") from e
 
     return _convert_vectorized_output(vectorised)
 
@@ -182,37 +185,80 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                                        f"Please wait for 10 seconds and send the request again.\n")
 
 
-def _validate_model_properties(model_name: str, model_properties: dict) -> dict:
-    """validate model_properties, if not given then return model_registry properties
+def validate_model_properties(model_name: str, model_properties: dict) -> dict:
+    """validate model_properties, if not given then return model_registry properties.
+
+    This is a rough validation as it only checks the minimum required fields and dimensions values. More indepth
+    check should be done when loading the model.
+
+    Raises:
+        InvalidModelPropertiesError: if the model_properties are invalid
+        UnknownModelError: if the model_name is not in the model registry
     """
     if model_properties is not None:
         """checks model dict to see if all required keys are present
         """
         required_keys = []
-        if model_properties.get("type", None) in (None, "sbert"):
+
+        if "type" not in model_properties:
+            error_message_postfix = "Marqo is loading the model with default type 'sbert' as the type was not provided."
+        else:
+            error_message_postfix = ""
+
+        model_type = model_properties.get("type", None)
+
+        if model_type in (None, ModelType.SBERT):
             required_keys = ["dimensions", "name"]
             # updates model dict with default values if optional keys are missing for sbert
-            optional_keys_values = [("type", "sbert"), ("tokens", get_default_seq_length())]
+            optional_keys_values = [("type", ModelType.SBERT), ("tokens", get_default_seq_length())]
             for key, value in optional_keys_values:
                 if key not in model_properties:
                     model_properties[key] = value
-
-        elif model_properties.get("type", None) in ("clip", "open_clip"):
+        elif model_type in (ModelType.OpenCLIP, ModelType.CLIP):
             required_keys = ["name", "dimensions"]
-
-        elif model_properties.get("type", None) in ("hf", ):
+        elif model_type in (ModelType.HF_MODEL, ):
             required_keys = ["dimensions"]
+        elif model_type in (ModelType.NO_MODEL,):
+            required_keys = ["dimensions"]
+            if not model_name == "no_model":
+                raise InvalidModelPropertiesError(f"To use the 'no_model' feature, you must provide 'model = no_model' "
+                                                  f"and 'type = no_model', but received 'model = {model_name}' and "
+                                                  f"'type = {model_type}'.")
+        elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
+                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
+            pass
+        else:
+            raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
+                                              f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
+                                              f"'{ModelType.CLIP}', '{ModelType.HF_MODEL}', '{ModelType.NO_MODEL}', "
+                                              f"'{ModelType.Test}', '{ModelType.Random}', '{ModelType.MultilingualClip}', "
+                                              f"'{ModelType.FP16_CLIP}', '{ModelType.SBERT_ONNX}', '{ModelType.CLIP_ONNX}' ")
 
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'."
-                                                  f"please update your model properties with required key `{key}`"
-                                                  f"check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. "
+                                                  f"please update your model properties with required key `{key}`. "
+                                                  f"{error_message_postfix} "
+                                                  f"check {marqo_docs.list_of_models()}, "
+                                                  f"{marqo_docs.bring_your_own_model()} for more info")
 
     else:
         model_properties = get_model_properties_from_registry(model_name)
 
+    _validate_model_properties_dimension(model_properties.get("dimensions", None))
+
     return model_properties
+
+
+def _validate_model_properties_dimension(dimensions: Optional[int]) -> None:
+    """Validate the dimensions value in model_properties as the dimensions value must be a positive integer.
+
+    Raises:
+        InvalidModelPropertiesError: if the dimensions value is invalid
+        """
+    if dimensions is None or not isinstance(dimensions, int) or dimensions < 1:
+        raise InvalidModelPropertiesError(
+            f"Invalid model properties: 'dimensions' must be a positive integer, but received {dimensions}.")
 
 
 def _validate_model_into_device(model_name:str, model_properties: dict, device: str, calling_func: str = None) -> bool:
@@ -373,7 +419,11 @@ def get_model_properties_from_registry(model_name: str) -> dict:
         raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
                                 f"Model is not supported by default.")
 
-    return MODEL_PROPERTIES['models'][model_name]
+    model_properties = MODEL_PROPERTIES['models'][model_name]
+
+    validate_model_properties(model_name, model_properties)
+
+    return model_properties
 
 
 def _check_output_type(output: List[List[float]]) -> bool:

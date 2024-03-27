@@ -7,8 +7,10 @@ from unittest import mock
 import requests
 
 import marqo.core.exceptions as core_exceptions
+from pydantic import ValidationError
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
+from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
@@ -16,6 +18,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase
 
 
@@ -894,7 +897,7 @@ class TestSearchStructured(MarqoTestCase):
                            {"https://marqo_not_real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             with self.subTest(f"query={q}"):
-                with self.assertRaises(errors.InvalidArgError):
+                with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
                     tensor_search.search(
                         text=q,
                         index_name=self.default_image_index,
@@ -1085,3 +1088,26 @@ class TestSearchStructured(MarqoTestCase):
                     self.assertEqual(1, len(res["hits"]))
                     self.assertEqual(expected_document_ids, res["hits"][0]["_id"])
 
+    def test_tensor_search_query_can_be_none(self):
+        res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+                                   context=SearchContext(
+                                       **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
+                                                     {"vector": [2, ] * 384, "weight": 2}]}))
+
+        self.assertIn("hits", res)
+
+    def test_lexical_query_can_not_be_none(self):
+        context = SearchContext(
+            **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
+                          {"vector": [2, ] * 384, "weight": 2}]})
+
+        test_case = [
+            (None, context, "with context"),
+            (None, None, "without context")
+        ]
+
+        for query, context, msg in test_case:
+            with self.subTest(msg):
+                with self.assertRaises(InvalidArgError):
+                    res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+                                               search_method=SearchMethod.LEXICAL)
