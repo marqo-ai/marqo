@@ -201,11 +201,9 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         required_keys = []
 
         if "type" not in model_properties:
-            base_error_message = ("You do not have a type key in your model_properties, so Marqo will try to load an "
-                                  "'sbert' model by default. If you want to load a different model, "
-                                  "please provide a type key. ")
+            error_message_postfix = "Marqo is loading the model with default type 'sbert' as the type is not provided."
         else:
-            base_error_message = ""
+            error_message_postfix = ""
 
         model_type = model_properties.get("type", None)
 
@@ -238,8 +236,9 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
 
         for key in required_keys:
             if key not in model_properties:
-                raise InvalidModelPropertiesError(base_error_message + f"model_properties has missing key '{key}'. "
-                                                  f"please update your model properties with required key `{key}` "
+                raise InvalidModelPropertiesError(f"model_properties has missing key '{key}'. "
+                                                  f"please update your model properties with required key `{key}`. "
+                                                  f"{error_message_postfix} "
                                                   f"check {marqo_docs.list_of_models()}, "
                                                   f"{marqo_docs.bring_your_own_model()} for more info")
 
