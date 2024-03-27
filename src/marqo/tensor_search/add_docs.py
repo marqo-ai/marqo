@@ -123,9 +123,9 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str
             th.join()
 
         # Fix up metric_obj to make it not mention thread-ids
-        metric_obj = RequestMetricsStore.for_request()
-        metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
-        metric_obj.times = reduce_thread_metrics(metric_obj.times)
+        # metric_obj = RequestMetricsStore.for_request()
+        # metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
+        # metric_obj.times = reduce_thread_metrics(metric_obj.times)
         yield image_repo
     finally:
         closed = 0
