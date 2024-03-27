@@ -339,7 +339,8 @@ query = {
     # a weighting of 1.1 gives this query slightly more importance
     "I need to buy a communications device, what should I get?": 1.1,
     # a weighting of 1 gives this query a neutral importance
-    "Technology that became prevelant in the 21st century": 1.0
+    # this will lead to 'Smartphone' being the top result
+    "The device should work like an intelligent computer.": 1.0,
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
@@ -352,7 +353,8 @@ query = {
     # a weighting of 1 gives this query a neutral importance
     "I need to buy a communications device, what should I get?": 1.0,
     # a weighting of -1 gives this query a negation effect
-    "Technology that became prevelant in the 21st century": -1.0
+    # this will lead to 'Telephone' being the top result
+    "The device should work like an intelligent computer.": -0.3,
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
