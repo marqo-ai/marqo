@@ -53,7 +53,7 @@ app = FastAPI(
     title="Marqo",
     version=version.get_version()
 )
-app.add_middleware(TelemetryMiddleware)
+# app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
 
 
@@ -227,10 +227,10 @@ def add_or_replace_documents(
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
                                                              device=device, auto_refresh=refresh)
 
-    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        return tensor_search.add_documents(
-            config=marqo_config, add_docs_params=add_docs_params
-        )
+    # with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
+    return tensor_search.add_documents(
+        config=marqo_config, add_docs_params=add_docs_params
+    )
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

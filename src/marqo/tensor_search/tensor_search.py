@@ -116,7 +116,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     vespa_client = config.vespa_client
     unstructured_vespa_index = UnstructuredVespaIndex(marqo_index)
 
-    RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
+    # RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     unstructured_index_add_doc_validation.validate_tensor_fields(add_docs_params.tensor_fields)
 
@@ -140,25 +140,25 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images:
-            with RequestMetricsStore.for_request().time(
-                    "image_download.full_time",
-                    lambda t: logger.debug(
-                        f"add_documents image download: took {t:.3f}ms to concurrently download "
-                        f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
-                    )
-            ):
-                # TODO - Refactor this part to make it more readable
-                # We need to pass the subfields to the image downloader, so that it can download the images in the
-                # multimodal subfields even if the subfield is not a tensor_field
-                tensor_fields_and_multimodal_subfields = copy.deepcopy(add_docs_params.tensor_fields) \
-                    if add_docs_params.tensor_fields else []
-                tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
-                image_repo = exit_stack.enter_context(
-                    add_docs.download_images(docs=add_docs_params.docs,
-                                             thread_count=add_docs_params.image_download_thread_count,
-                                             tensor_fields=tensor_fields_and_multimodal_subfields,
-                                             image_download_headers=add_docs_params.image_download_headers)
-                )
+            # with RequestMetricsStore.for_request().time(
+            #         "image_download.full_time",
+            #         lambda t: logger.debug(
+            #             f"add_documents image download: took {t:.3f}ms to concurrently download "
+            #             f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+            #         )
+            # ):
+            # TODO - Refactor this part to make it more readable
+            # We need to pass the subfields to the image downloader, so that it can download the images in the
+            # multimodal subfields even if the subfield is not a tensor_field
+            tensor_fields_and_multimodal_subfields = copy.deepcopy(add_docs_params.tensor_fields) \
+                if add_docs_params.tensor_fields else []
+            tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
+            image_repo = exit_stack.enter_context(
+                add_docs.download_images(docs=add_docs_params.docs,
+                                         thread_count=add_docs_params.image_download_thread_count,
+                                         tensor_fields=tensor_fields_and_multimodal_subfields,
+                                         image_download_headers=add_docs_params.image_download_headers)
+            )
 
         if add_docs_params.use_existing_tensors:
             ids = [doc["_id"] for doc in add_docs_params.docs if "_id" in doc]
@@ -313,14 +313,14 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                             # ADD DOCS TIMER-LOGGER (4)
                             start_time = timer()
-                            with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
-                                vector_chunks = s2_inference.vectorise(
-                                    model_name=marqo_index.model.name,
-                                    model_properties=marqo_index.model.get_properties(), content=content_chunks,
-                                    device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
-                                    infer=marqo_index.treat_urls_and_pointers_as_images,
-                                    model_auth=add_docs_params.model_auth
-                                )
+                            # with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                            vector_chunks = s2_inference.vectorise(
+                                model_name=marqo_index.model.name,
+                                model_properties=marqo_index.model.get_properties(), content=content_chunks,
+                                device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
+                                infer=marqo_index.treat_urls_and_pointers_as_images,
+                                model_auth=add_docs_params.model_auth
+                            )
 
                             end_time = timer()
                             total_vectorise_time += (end_time - start_time)
@@ -440,8 +440,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 copied[constants.MARQO_DOC_ID] = doc_id
                 bulk_parent_dicts.append(copied)
 
-    total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
-        "add_documents.processing_before_vespa")
+    # total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
+    #     "add_documents.processing_before_vespa")
+    total_preproc_time = 0.001
+
     logger.debug(
         f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
         f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
@@ -456,8 +458,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
         ]
         # ADD DOCS TIMER-LOGGER (5)
         start_time_5 = timer()
-        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.schema_name)
+        # with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
+        index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.schema_name)
 
         end_time_5 = timer()
         total_http_time = end_time_5 - start_time_5
@@ -468,38 +470,38 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     else:
         index_responses = None
 
-    with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-        t1 = timer()
+    # with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+    t1 = timer()
 
-        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates Vespa response dict into Marqo dict"""
-            result_dict = {}
-            new_items = []
+    def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
+        """translates Vespa response dict into Marqo dict"""
+        result_dict = {}
+        new_items = []
 
-            if responses is not None:
-                result_dict['errors'] = responses.errors
+        if responses is not None:
+            result_dict['errors'] = responses.errors
 
-                for resp in responses.responses:
-                    id = resp.id.split('::')[-1] if resp.id else None
-                    new_items.append({'status': resp.status})
-                    if id:
-                        new_items[-1].update({'_id': id})
-                    if resp.message:
-                        new_items[-1].update({'message': resp.message})
+            for resp in responses.responses:
+                id = resp.id.split('::')[-1] if resp.id else None
+                new_items.append({'status': resp.status})
+                if id:
+                    new_items[-1].update({'_id': id})
+                if resp.message:
+                    new_items[-1].update({'message': resp.message})
 
-            if unsuccessful_docs:
-                result_dict['errors'] = True
+        if unsuccessful_docs:
+            result_dict['errors'] = True
 
-            for loc, error_info in unsuccessful_docs:
-                new_items.insert(loc, error_info)
+        for loc, error_info in unsuccessful_docs:
+            new_items.insert(loc, error_info)
 
-            result_dict["processingTimeMs"] = time_diff * 1000
-            result_dict["index_name"] = add_docs_params.index_name
-            result_dict["items"] = new_items
+        result_dict["processingTimeMs"] = time_diff * 1000
+        result_dict["index_name"] = add_docs_params.index_name
+        result_dict["items"] = new_items
 
-            return result_dict
+        return result_dict
 
-        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
+    return translate_add_doc_response(index_responses, time_diff=t1 - t0)
 
 
 def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
