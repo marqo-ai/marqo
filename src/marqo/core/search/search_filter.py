@@ -241,7 +241,7 @@ class MarqoFilterStringParser:
         candidate_substring = filter_string[i:i + len(self.IN_TERM_DIVIDER)].upper()
         # Extra check if substring has " IN " but is missing the open parenthesis
         if candidate_substring[:4] == ' IN ' and candidate_substring[4] != '(':
-            self._error('Expected open parenthesis after " IN "', filter_string, i)
+            self._error("Expected ( after ' IN '", filter_string, i)
 
         return candidate_substring == self.IN_TERM_DIVIDER
 
