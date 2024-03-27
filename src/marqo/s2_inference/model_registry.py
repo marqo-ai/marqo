@@ -6,6 +6,7 @@ from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
 from marqo.s2_inference.sbert_utils import SBERT, TEST
 from marqo.s2_inference.types import Dict
+from marqo.s2_inference.no_model_utils import NO_MODEL
 
 
 # we need to keep track of the embed dim and model load functions/classes
@@ -783,7 +784,7 @@ def _get_onnx_clip_properties() -> Dict:
                 "resolution": 224,
                 "pretrained": "laionb_s32b_b82k",
                 "image_mean": (0.5, 0.5, 0.5),
-                 "image_std": (0.5, 0.5, 0.5),
+                "image_std": (0.5, 0.5, 0.5),
             },
         "onnx32/open_clip/ViT-L-14-336/openai":
             {
@@ -1734,6 +1735,15 @@ def _get_random_properties() -> Dict:
     }
     return RANDOM_MODEL_PROPERTIES
 
+
+def _get_no_model_properties() -> Dict:
+    return {
+        'no_model': {
+            'type': 'no_model',
+            'note': "This is a special model no_model that requires users to provide 'dimensions'"
+        }
+    }
+
 def _get_model_load_mappings() -> Dict:
     return {'clip':CLIP,
             'open_clip': OPEN_CLIP,
@@ -1744,7 +1754,8 @@ def _get_model_load_mappings() -> Dict:
             "multilingual_clip" : MULTILINGUAL_CLIP,
             "fp16_clip": FP16_CLIP,
             'random':Random,
-            'hf':HF_MODEL}
+            'hf':HF_MODEL,
+            "no_model": NO_MODEL}
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already
@@ -1761,6 +1772,7 @@ def load_model_properties() -> Dict:
     onnx_clip_model_properties = _get_onnx_clip_properties()
     multilingual_clip_model_properties = get_multilingual_clip_properties()
     fp16_clip_model_properties = _get_fp16_clip_properties()
+    no_model_properties = _get_no_model_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -1773,6 +1785,8 @@ def load_model_properties() -> Dict:
     model_properties.update(onnx_clip_model_properties)
     model_properties.update(multilingual_clip_model_properties)
     model_properties.update(fp16_clip_model_properties)
+    model_properties.update(no_model_properties)
+
 
     all_properties = dict()
     all_properties['models'] = model_properties
