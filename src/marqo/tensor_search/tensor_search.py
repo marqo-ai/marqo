@@ -45,6 +45,7 @@ import torch.cuda
 from PIL import Image
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
+from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -71,8 +72,7 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars,
-    MappingsObjectType
+    Device, TensorField, SearchMethod, EnvVars
 )
 from marqo.tensor_search.index_meta_cache import get_cache, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -84,7 +84,6 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
-from marqo import marqo_docs
 
 logger = get_logger(__name__)
 
@@ -541,7 +540,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     if add_docs_params.tensor_fields is not None:
-        raise api_exceptions.InvalidArgError('Cannot specify `tensorFields` for a structured index')
+        raise api_exceptions.InvalidArgError("Cannot specify 'tensorFields' when adding documents to a "
+                                             "structured index. 'tensorFields' must be defined in structured "
+                                             "index schema at index creation time")
 
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(
