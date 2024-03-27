@@ -201,7 +201,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         required_keys = []
 
         if "type" not in model_properties:
-            error_message_postfix = "Marqo is loading the model with default type 'sbert' as the type is not provided."
+            error_message_postfix = "Marqo is loading the model with default type 'sbert' as the type was not provided."
         else:
             error_message_postfix = ""
 
