@@ -24,7 +24,6 @@ from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
 
-
 logger = get_logger(__name__)
 
 # The avaiable has the structure:
