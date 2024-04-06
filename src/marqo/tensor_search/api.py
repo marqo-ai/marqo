@@ -41,6 +41,7 @@ def generate_config() -> config.Config:
         config_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONFIG_URL),
         query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
+        approximate_search_timeout=utils.read_env_vars_and_defaults(EnvVars.VESPA_APPROXIMATE_SEARCH_TIMEOUT),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
         content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
         feed_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_FEED_POOL_SIZE),

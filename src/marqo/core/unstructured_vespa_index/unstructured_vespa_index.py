@@ -93,6 +93,9 @@ class UnstructuredVespaIndex(VespaIndex):
         if not marqo_query.approximate:
             query['ranking.softtimeout.enable'] = False
             query['timeout'] = '300s'
+        else:
+            # Approximate search has default timeout of 1s
+            query['timeout'] = '1s'
 
         return query
 
