@@ -71,7 +71,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "5678", "finally": "some field efgh "},
                 {"abc": "shouldn't really match ", "other field": "Nope.....",
                  "_id": "1234", "finally": "Random text here efgh "},
-            ], auto_refresh=True)
+            ])
         search_res = tensor_search._vector_text_search(
             config=self.config, index_name=self.index_name_1, query=" efgh ", result_count=10, device="cpu"
         )

@@ -220,12 +220,11 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 def add_or_replace_documents(
         body: AddDocsBodyParams,
         index_name: str,
-        refresh: bool = True,
         marqo_config: config.Config = Depends(get_config),
         device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
-                                                             device=device, auto_refresh=refresh)
+                                                             device=device)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(

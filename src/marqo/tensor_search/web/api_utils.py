@@ -116,7 +116,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
 
 
 def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
-                                 device: str, auto_refresh: bool = True) -> AddDocsParams:
+                                 device: str) -> AddDocsParams:
     """An orchestrator for the add_documents API.
     All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
 
@@ -133,7 +133,7 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
     image_download_thread_count = body.imageDownloadThreadCount
 
     return AddDocsParams(
-        index_name=index_name, docs=docs, auto_refresh=auto_refresh,
+        index_name=index_name, docs=docs,
         device=device, tensor_fields=tensor_fields,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
         image_download_thread_count=image_download_thread_count,

@@ -92,7 +92,6 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
                                     modelAuth=ModelAuth(s3=S3Auth(aws_secret_access_key="test", aws_access_key_id="test")),
                                     mappings={"map1": "value1"})
         device = "test-device"
-        auto_refresh = True
 
         # Query parameters should be parsed as default values
         non_tensor_fields = []
@@ -102,7 +101,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         mappings = dict()
 
         # Call the function with the arguments
-        result = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
+        result = add_docs_params_orchestrator(index_name, body, device, non_tensor_fields, mappings,
                                               model_auth, image_download_headers, use_existing_tensors)
 
         # Assert that the result is as expected
