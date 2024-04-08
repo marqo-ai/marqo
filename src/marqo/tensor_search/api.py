@@ -19,11 +19,12 @@ from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.embed import embed
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
-from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.tensor_search.models.api_models import SearchQuery, EmbeddingRequestParams
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
@@ -233,6 +234,19 @@ def add_or_replace_documents(
         )
 
 
+@app.post("/indexes/{index_name}/embed")
+@throttle(RequestType.EMBED)
+def embed(embedding_request: EmbeddingRequestParams, index_name: str, device: str = Depends(api_validation.validate_device),
+           marqo_config: config.Config = Depends(get_config)):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
+        return embed.embed_content(
+            config=marqo_config, content=embedding_request.content,
+            index_name=index_name, device=device,
+            image_download_headers=embedding_request.image_download_headers,
+            model_auth=embedding_request.modelAuth
+        )
+
+
 @app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
@@ -245,6 +259,7 @@ def update_documents(
         index_name=index_name, partial_documents=body.documents)
 
     return res.dict(exclude_none=True, by_alias=True)
+
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")

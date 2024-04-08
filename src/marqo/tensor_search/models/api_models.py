@@ -85,6 +85,40 @@ class BulkSearchQuery(BaseMarqoModel):
     queries: List[BulkSearchQueryEntity]
 
 
+class EmbeddingRequestParams(BaseMarqoModel):
+    # content can be a single query or list of queries. Queries can be a string or a dictionary.
+    content: Union[Union[str, Dict[str, float]], List[Union[str, Dict[str, float]]]]
+    image_download_headers: Optional[Dict] = None
+    modelAuth: Optional[ModelAuth] = None
+
+    @pydantic.validator('content')
+    def validate_content(cls, value):
+        # Convert all types of content into a list
+        if isinstance(value, str) or isinstance(value, dict):
+            list_to_validate = [value]
+        elif isinstance(value, List):
+            list_to_validate = value
+        else:
+            raise ValueError("Embed content should be a string, dictionary, or a list of strings or dictionaries")
+
+        # Iterate through content list items
+        if len(list_to_validate) == 0:
+            raise ValueError("Embed content list should not be empty")
+
+        for item in list_to_validate:
+            if isinstance(item, str):
+                pass
+            elif isinstance(item, dict):
+                if len(item) == 0:
+                    raise ValueError("Dictionary content should not be empty")
+                if not all(isinstance(k, str) for k in item.keys()):
+                    raise ValueError("Keys in dictionary content should all be strings")
+                if not all(isinstance(v, float) for v in item.values()):
+                    raise ValueError("Values in dictionary content should all be floats")
+            else:
+                raise ValueError("Embed content should be a string, dictionary, or a list of strings or dictionaries")
+
+
 class ErrorResponse(BaseModel):
     message: str
     code: str
