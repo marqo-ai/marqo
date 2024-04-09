@@ -147,6 +147,7 @@ class RequestMetricsStore():
     @classmethod
     def clear_metrics_for(cls, r: Request) -> None:
         cls.METRIC_STORES.pop(r, None)
+        cls.current_request.set(None)
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
