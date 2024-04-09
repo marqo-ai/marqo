@@ -183,6 +183,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             call_next: A callable to the remaining request call-chain.
 
         """
+        logger.info('Setting metrics for request')
         RequestMetricsStore.set_in_request(request)
 
         response = await call_next(request)
@@ -207,11 +208,13 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             )
             get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
 
+        logger.info('Clearing metrics for request')
         RequestMetricsStore.clear_metrics_for(request)
 
         body = json.dumps(data).encode()
         response.headers["content-length"] = str(len(body))
-        
+
+        logger.info('Returning response with telemetry')
         return Response(
             content=body,
             status_code=response.status_code,
