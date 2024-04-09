@@ -148,6 +148,7 @@ class RequestMetricsStore():
     def clear_metrics_for(cls, r: Request) -> None:
         cls.METRIC_STORES.pop(r, None)
         cls.current_request.set(None)
+        logger.info(f'Size of METRIC_STORES={len(cls.METRIC_STORES)}')
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
