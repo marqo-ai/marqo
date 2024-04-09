@@ -190,6 +190,8 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
 
         # Early exit if opentelemetry is not to be injected into response.
         if not self.telemetry_enabled_for_request(request):
+            logger.info('No telemetry. Clearing metrics for request and returning response')
+            RequestMetricsStore.clear_metrics_for(request)
             return response
 
         data = await self.get_response_json(response)
