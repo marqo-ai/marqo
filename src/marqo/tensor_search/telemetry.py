@@ -185,33 +185,33 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         """
         logger.info('Setting metrics for request')
         RequestMetricsStore.set_in_request(request)
+        try:
+            response = await call_next(request)
 
-        response = await call_next(request)
+            # Early exit if opentelemetry is not to be injected into response.
+            if not self.telemetry_enabled_for_request(request):
+                return response
 
-        # Early exit if opentelemetry is not to be injected into response.
-        if not self.telemetry_enabled_for_request(request):
-            logger.info('No telemetry. Clearing metrics for request and returning response')
+            data = await self.get_response_json(response)
+
+            # Inject telemetry and fix content-length header
+            if isinstance(data, dict):
+                telemetry = RequestMetricsStore.for_request(request).json()
+                if len(telemetry["timesMs"]) == 0:
+                    telemetry.pop("timesMs")
+                if len(telemetry["counter"]) == 0:
+                    telemetry.pop("counter")
+                data["telemetry"] = telemetry
+            else:
+                get_logger(__name__).warning(
+                    f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
+                )
+                get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
+
+            logger.info('Clearing metrics for request')
+        finally:
+            logger.info('Clearing metrics for request')
             RequestMetricsStore.clear_metrics_for(request)
-            return response
-
-        data = await self.get_response_json(response)
-
-        # Inject telemetry and fix content-length header
-        if isinstance(data, dict):
-            telemetry = RequestMetricsStore.for_request(request).json()
-            if len(telemetry["timesMs"]) == 0:
-                telemetry.pop("timesMs")
-            if len(telemetry["counter"]) == 0:
-                telemetry.pop("counter")
-            data["telemetry"] = telemetry
-        else:
-            get_logger(__name__).warning(
-                f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
-            )
-            get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
-
-        logger.info('Clearing metrics for request')
-        RequestMetricsStore.clear_metrics_for(request)
 
         body = json.dumps(data).encode()
         response.headers["content-length"] = str(len(body))
