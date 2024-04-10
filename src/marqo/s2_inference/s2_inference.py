@@ -7,6 +7,7 @@ import threading
 import numpy as np
 import torch
 from PIL import UnidentifiedImageError
+from PIL.Image import Image
 
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
@@ -22,7 +23,10 @@ from marqo.s2_inference.types import *
 from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches
+from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
+from marqo.s2_inference.inference_cache.inference_cache import InferenceCache
+
+import time
 
 logger = get_logger(__name__)
 
@@ -32,6 +36,7 @@ available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
+marqo_inference_cache = InferenceCache(cache_size=20, cache_type="LRU")
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
@@ -67,22 +72,64 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         model_auth=model_auth
     )
 
+    start_time = time.time()
+    if marqo_inference_cache.is_enabled():
+        if isinstance(content, str):
+            inference_cache_key = f"{model_cache_key}||{content}"
+            vectorised = marqo_inference_cache.get(inference_cache_key)
+            if vectorised is None:
+                vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, start_time, **kwargs)
+                marqo_inference_cache[inference_cache_key] = vectorised
+            else:
+                return vectorised
+        elif isinstance(content, list):
+            contents_to_vectorise = []
+            cached_output = List[Tuple[int, List[float]]] = []
+
+            for loc, content_item in enumerate(content):
+                if not isinstance(content_item, str):
+                    contents_to_vectorise.append(content_item)
+                else:
+                    inference_cache_key = f"{model_cache_key}||{content_item}"
+                    vectorised = marqo_inference_cache.get(inference_cache_key)
+                    if vectorised is None:
+                        contents_to_vectorise.append(content_item)
+                    else:
+                        cached_output.append((loc, vectorised[0]))
+            vectorised_outputs = _encode_without_cache(model_cache_key, contents_to_vectorise, normalize_embeddings,
+                                                       start_time, **kwargs)
+            for loc, cached_vector in cached_output:
+                vectorised_outputs.insert(loc, cached_vector)
+            return vectorised_outputs
+        else:
+            raise TypeError(f"Unsupported content type: {type(content).__name__}")
+    else:
+        return _encode_without_cache(model_cache_key, content, normalize_embeddings, start_time, **kwargs)
+
+
+def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image]], normalize_embeddings: bool,
+                          start_time: float, **kwargs) -> List[List[float]]:
     try:
         if isinstance(content, str):
-            vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content, normalize=normalize_embeddings, **kwargs)
+            vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content,
+                                                                                            normalize=normalize_embeddings,
+                                                                                            **kwargs)
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
             for batch in generate_batches(content, batch_size=batch_size):
-                vector_batches.append(_convert_tensor_to_numpy(available_models[model_cache_key][AvailableModelsKey.model].encode(batch, normalize=normalize_embeddings, **kwargs)))
+                vector_batches.append(_convert_tensor_to_numpy(
+                    available_models[model_cache_key][AvailableModelsKey.model].encode(batch,
+                                                                                       normalize=normalize_embeddings,
+                                                                                       **kwargs)))
             if not vector_batches or all(
                     len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
+        print(f"Time taken for vectorise: {time.time() - start_time}")
     except UnidentifiedImageError as e:
         raise VectoriseError(f"Could not process given image: {content}") from e
-
     return _convert_vectorized_output(vectorised)
 
 
