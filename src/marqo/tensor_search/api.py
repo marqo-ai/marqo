@@ -19,6 +19,7 @@ from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -181,29 +182,9 @@ def root():
 
 
 @app.get('/memory')
+@utils.enable_debug_apis()
 def memory():
-    import tracemalloc
-
-    tracemalloc.start()
-
-    snapshot = tracemalloc.take_snapshot()
-    top_stats = snapshot.statistics('lineno')
-
-    # GC
-    import gc
-
-    gc.collect()  # Force garbage collection
-
-    # Get mem used
-    from memory_profiler import memory_usage
-
-    mem_used = memory_usage(-1, interval=0.1, timeout=1)
-
-    return {
-        'stats': [str(s) for s in top_stats],
-        'garbage': gc.garbage,
-        'mem_used': mem_used
-    }
+    return memory_profiler.get_memory_profile()
 
 
 @app.post("/indexes/{index_name}")
