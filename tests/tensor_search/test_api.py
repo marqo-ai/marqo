@@ -36,16 +36,25 @@ class ApiTests(MarqoTestCase):
             mock_add_documents.assert_called_once()
 
     def test_memory(self):
+        """
+        Test that the memory endpoint returns the expected keys when debug API is enabled.
+        """
         with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'TRUE'}):
             response = self.client.get("/memory")
             data = response.json()
             assert set(data.keys()) == {"memory_used", "stats", "garbage"}
 
     def test_memory_defaultDisabled(self):
+        """
+        Test that the memory endpoint returns 403 by default.
+        """
         response = self.client.get("/memory")
         self.assertEqual(response.status_code, 403)
 
     def test_memory_disabled_403(self):
+        """
+        Test that the memory endpoint returns 403 when debug API is disabled explicitly.
+        """
         with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'FALSE'}):
             response = self.client.get("/memory")
             self.assertEqual(response.status_code, 403)
