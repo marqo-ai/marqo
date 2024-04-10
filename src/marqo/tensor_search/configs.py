@@ -12,6 +12,10 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_DOCUMENT_URL: "http://localhost:8080",
         EnvVars.VESPA_CONTENT_CLUSTER_NAME: "content_default",
         EnvVars.VESPA_POOL_SIZE: 10,
+        EnvVars.VESPA_FEED_POOL_SIZE: 10,
+        EnvVars.VESPA_GET_POOL_SIZE: 10,
+        EnvVars.VESPA_DELETE_POOL_SIZE: 10,
+        EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
         EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
@@ -34,4 +38,6 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_DEFAULT_EF_SEARCH: 2000,
         EnvVars.MARQO_ENABLE_BATCH_APIS: "FALSE",
         EnvVars.MARQO_ENABLE_UPGRADE_API: "FALSE",
+        EnvVars.MARQO_MAX_CONCURRENT_PARTIAL_UPDATE: 100,
+        EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE: 128
     }

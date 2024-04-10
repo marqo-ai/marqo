@@ -9,7 +9,7 @@ from marqo.s2_inference.s2_inference import clear_loaded_models
 from marqo.s2_inference.s2_inference import (
     available_models,
     vectorise,
-    _validate_model_properties,
+    validate_model_properties,
     _update_available_models
 )
 
@@ -98,7 +98,7 @@ class TestGenericModelSupport(MarqoTestCase):
             index_name=index_name, docs=docs, auto_refresh=auto_refresh, device="cpu"))
 
     def test_validate_model_properties_missing_required_keys(self):
-        """_validate_model_properties should throw an exception if required keys are not given.
+        """validate_model_properties should throw an exception if required keys are not given.
         """
         model_name = "test-model"
         model_properties = {  # "name": "sentence-transformers/all-mpnet-base-v2",
@@ -106,19 +106,19 @@ class TestGenericModelSupport(MarqoTestCase):
             "tokens": 128,
             "type": "sbert"}
 
-        self.assertRaises(InvalidModelPropertiesError, _validate_model_properties, model_name, model_properties)
+        self.assertRaises(InvalidModelPropertiesError, validate_model_properties, model_name, model_properties)
 
-        """_validate_model_properties should not throw an exception if required keys are given.
+        """validate_model_properties should not throw an exception if required keys are given.
         """
         model_properties['dimensions'] = 768
         model_properties['name'] = "sentence-transformers/all-mpnet-base-v2"
 
-        validated_model_properties = _validate_model_properties(model_name, model_properties)
+        validated_model_properties = validate_model_properties(model_name, model_properties)
 
         self.assertEqual(validated_model_properties, model_properties)
 
     def test_validate_model_properties_missing_optional_keys(self):
-        """If optional keys are not given, _validate_model_properties should add the keys with default values.
+        """If optional keys are not given, validate_model_properties should add the keys with default values.
         """
         model_name = 'test-model'
         model_properties = {"name": "sentence-transformers/all-mpnet-base-v2",
@@ -127,7 +127,7 @@ class TestGenericModelSupport(MarqoTestCase):
                             # "type":"sbert"
                             }
 
-        validated_model_properties = _validate_model_properties(model_name, model_properties)
+        validated_model_properties = validate_model_properties(model_name, model_properties)
         default_tokens_value = validated_model_properties.get('tokens')
         default_type_value = validated_model_properties.get('type')
 
@@ -135,7 +135,7 @@ class TestGenericModelSupport(MarqoTestCase):
         self.assertEqual(default_type_value, "sbert")
 
     def test_validate_model_properties_missing_properties(self):
-        """If model_properties is None _validate_model_properties should use model_registry properties
+        """If model_properties is None validate_model_properties should use model_registry properties
         """
         model_name = 'test'
         registry_test_model_properties = {"name": "sentence-transformers/all-MiniLM-L6-v1",
@@ -144,13 +144,13 @@ class TestGenericModelSupport(MarqoTestCase):
                                           "type": "test",
                                           "notes": ""}
 
-        validated_model_properties = _validate_model_properties(
+        validated_model_properties = validate_model_properties(
             model_name=model_name, model_properties=None)
 
         self.assertEqual(registry_test_model_properties, validated_model_properties)
 
     def test_validate_model_properties_unknown_model_error(self):
-        """_validate_model_properties should throw an error if model is not in registry,
+        """validate_model_properties should throw an error if model is not in registry,
             and if model_properties have not been given in index
 
             note: this validation is executed at vectorise time, however an InvalidArgError will already be raised
@@ -159,7 +159,7 @@ class TestGenericModelSupport(MarqoTestCase):
         model_name = "test-model"
         model_properties = None
 
-        self.assertRaises(UnknownModelError, _validate_model_properties, model_name, model_properties)
+        self.assertRaises(UnknownModelError, validate_model_properties, model_name, model_properties)
 
     def test_update_available_models_model_load_error(self):
         """_update_available_models should throw an error if model_name given in

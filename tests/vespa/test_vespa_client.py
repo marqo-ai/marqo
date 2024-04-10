@@ -381,3 +381,5 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
     def test_deploy_application_invalidApp_fails(self):
         with self.assertRaises(VespaError):
             self.client.deploy_application(os.path.abspath(os.path.curdir))
+
+

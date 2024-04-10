@@ -16,10 +16,17 @@ from marqo.exceptions import InternalError
 class UnstructuredVespaIndex(VespaIndex):
     _FILTER_STRING_BOOL_VALUES = ["true", "false"]
     _RESERVED_FIELD_SUBSTRING = "::"
-    _SUPPORTED_FIELD_CONTENT_TYPES = [str, int, float, bool, list]
+    _SUPPORTED_FIELD_CONTENT_TYPES = [str, int, float, bool, list, dict]
 
     def __init__(self, marqo_index: UnstructuredMarqoIndex):
         self._marqo_index = marqo_index
+
+    def get_vespa_id_field(self) -> str:
+        return unstructured_common.VESPA_FIELD_ID
+
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+        raise NotImplementedError("Partial document update is not supported for unstructured indexes. This"
+                                  "function should not be called.")
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         unstructured_document: UnstructuredVespaDocument = \

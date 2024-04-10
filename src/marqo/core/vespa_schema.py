@@ -5,6 +5,8 @@ from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest, StructuredMarqoIndexRequest, \
     UnstructuredMarqoIndexRequest
 
+from marqo.core.models.marqo_index import *
+
 
 class VespaSchema(ABC):
     """
@@ -15,6 +17,21 @@ class VespaSchema(ABC):
         '_': '_00',
         '-': '_01',
     }
+
+    _DISTANCE_METRIC_MAP = {
+        DistanceMetric.Euclidean: 'euclidean',
+        DistanceMetric.Angular: 'angular',
+        DistanceMetric.DotProduct: 'dotproduct',
+        DistanceMetric.PrenormalizedAngular: 'prenormalized-angular',
+        DistanceMetric.Geodegrees: 'geodegrees',
+        DistanceMetric.Hamming: 'hamming'
+    }
+
+    def _get_distance_metric(self, marqo_distance_metric: DistanceMetric) -> str:
+        try:
+            return self._DISTANCE_METRIC_MAP[marqo_distance_metric]
+        except KeyError:
+            raise ValueError(f'Unknown Marqo distance metric: {marqo_distance_metric}')
 
     @abstractmethod
     def generate_schema(self) -> (str, MarqoIndex):

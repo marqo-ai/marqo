@@ -147,3 +147,6 @@ dump.rdb
 .vscode/
 
 .DS_Store
+
+# Tester app for unit tests
+scripts/vespa_local/vespa_tester_app.zip

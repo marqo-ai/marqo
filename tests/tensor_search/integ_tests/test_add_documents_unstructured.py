@@ -917,3 +917,30 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 )
                 print(res)
                 self.assertEqual(res['errors'], error)
+
+    def test_duplicate_ids_behaviour(self):
+        """Test the behaviour when there are duplicate ids in a single batch.
+
+        Note: The expected behaviour is that the last document given in the batch is used while the formers are ignored.
+        """
+
+        test_cases = [
+            ([{"_id": "1", "text_field": "test 1"}, {"_id": "1", "text_field": "test 2"}], 1, "Normal case"),
+            ([{"_id": "1", "text_field": "test 1"}, {"_id": "1", "text_field::": "test 2"}], 0,
+             "Even if the last document is invalid, it should be used"),
+            ([{"_id": "1", "text_field::": "test 2"}, {"_id": "1", "text_field": "test 1"}], 1,
+             "If the previous document is invalid, it should not affect the last document"),
+        ]
+
+        for documents, number_of_docs, msg in test_cases:
+            self.clear_index_by_name(self.default_text_index)
+            with self.subTest(msg):
+                r = tensor_search.add_documents(config=self.config,
+                                                add_docs_params=AddDocsParams(
+                                                    index_name=self.default_text_index, docs=documents,
+                                                    device="cpu", tensor_fields=["text_field"]
+                                                ))
+                self.assertEqual(1, len(r["items"]))
+                number_of_docs_in_index = self.config.monitoring.get_index_stats_by_name(
+                    index_name=self.default_text_index).number_of_documents
+                self.assertEqual(number_of_docs, number_of_docs_in_index)

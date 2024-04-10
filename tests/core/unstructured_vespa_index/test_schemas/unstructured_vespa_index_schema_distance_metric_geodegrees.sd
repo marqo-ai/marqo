@@ -1,0 +1,171 @@
+schema marqo__test_00unstructured_00schema_00distance_00metric {
+    document {
+        field marqo__id type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+
+        field marqo__strings type array<string>{
+            indexing: index
+            index: enable-bm25
+        }
+
+        field marqo__long_string_fields type map<string, string> {
+            indexing: summary
+        }
+
+        field marqo__short_string_fields type map<string, string> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field marqo__string_array type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+
+        field marqo__multimodal_params type map<string, string> {
+            indexing: summary
+        }
+
+        field marqo__int_fields type map<string, long> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__bool_fields type map<string, byte> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                                attribute: fast-search
+                                rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+            }
+
+        field marqo__float_fields type map<string, double> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__score_modifiers type tensor<float>(p{}) {
+            indexing: attribute | summary
+        }
+
+        field marqo__chunks type array<string> {
+            indexing: summary
+        }
+
+        field marqo__vector_count type int {
+            indexing: attribute | summary
+        }
+
+        field marqo__embeddings type tensor<float>(p{}, x[512]) {
+            indexing: attribute | index | summary
+            attribute {
+                distance-metric: geodegrees
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 512
+                }
+            }
+        }
+    }
+
+    fieldset default {
+        fields: marqo__strings
+    }
+
+    rank-profile embedding_similarity inherits default {
+        inputs {
+            query(embedding_query) tensor<float>(x[512])
+        }
+        first-phase {
+            expression: closeness(field, marqo__embeddings)
+        }
+        match-features: closest(marqo__embeddings)
+    }
+
+    rank-profile bm25 inherits default {
+        first-phase {
+        expression: bm25(marqo__strings)
+        }
+    }
+
+    rank-profile modifiers inherits default {
+        inputs {
+            query(marqo__mult_weights) tensor<float>(p{})
+            query(marqo__add_weights) tensor<float>(p{})
+        }
+        function modify(score) {
+            expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
+       }
+    }
+
+    rank-profile bm25_modifiers inherits modifiers {
+        inputs {
+            query(marqo__mult_weights) tensor<float>(p{})
+            query(marqo__add_weights) tensor<float>(p{})
+        }
+        first-phase {
+            expression: modify(bm25(marqo__strings))
+        }
+    }
+
+    rank-profile embedding_similarity_modifiers inherits modifiers {
+        inputs {
+            query(marqo__mult_weights) tensor<float>(p{})
+            query(marqo__add_weights) tensor<float>(p{})
+            query(embedding_query) tensor<float>(x[512])
+        }
+        first-phase {
+            expression: modify(closeness(field, marqo__embeddings))
+        }
+        match-features: closest(marqo__embeddings)
+    }
+
+    document-summary all-non-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__strings type array<string> {}
+        summary marqo__long_string_fields type map<string, string> {}
+        summary marqo__short_string_fields type map<string, string> {}
+        summary marqo__string_array type array<string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        summary marqo__chunks type array<string> {}
+    }
+
+    document-summary all-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__strings type array<string> {}
+        summary marqo__long_string_fields type map<string, string> {}
+        summary marqo__short_string_fields type map<string, string> {}
+        summary marqo__string_array type array<string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        summary marqo__chunks type array<string> {}
+        summary marqo__embeddings type tensor<float>(p{}, x[512]) {}
+    }
+}

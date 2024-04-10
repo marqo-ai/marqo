@@ -6,6 +6,7 @@ from pydantic import root_validator, validator
 
 import marqo.core.models.marqo_index as marqo_index
 from marqo.base_model import StrictBaseModel, ImmutableStrictBaseModel
+from marqo import exceptions as base_exceptions
 
 
 class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
@@ -59,19 +60,33 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
 
     @root_validator
     def validate_model(cls, values):
+        fields = values.get('fields', [])
         # Verify all tensor fields are valid fields
-        field_names = {field.name for field in values.get('fields', [])}
+        field_names = {field.name for field in fields}
         tensor_field_names = values.get('tensor_fields', [])
         for tensor_field in tensor_field_names:
             if tensor_field not in field_names:
-                raise ValueError(f"Tensor field {tensor_field} is not a defined field. "
-                                 f'Field names: {", ".join(field_names)}')
+                raise ValueError(f"Tensor field '{tensor_field}' is not a defined field. "
+                                 f'Field names: [{", ".join(field_names)}]')
 
-        # Verify all combination fields are tensor fields
-        combination_fields = [field for field in values.get('fields', []) if
+        # Verify all multimodal and custom vector fields are tensor fields
+        multimodal_fields = [field for field in fields if
                               field.type == marqo_index.FieldType.MultimodalCombination]
-        for field in combination_fields:
+        custom_vector_fields = [field for field in fields if
+                                field.type == marqo_index.FieldType.CustomVector]
+        must_be_tensor_fields = multimodal_fields + custom_vector_fields
+        for field in must_be_tensor_fields:
             if field.name not in tensor_field_names:
-                raise ValueError(f'Field {field.name} has type {field.type.value} and must be a tensor field')
+                raise ValueError(f"Field '{field.name}' has type '{field.type.value}' and must be a tensor field.")
 
+        # Verify no custom vector field is a subfield of a multimodal field
+        for multimodal_field in multimodal_fields:
+            if multimodal_field.dependent_fields:
+                for subfield in multimodal_field.dependent_fields:
+                    # Iterate through Custom Vector fields to check if subfield exists
+                    for custom_vector_field in custom_vector_fields:
+                        if subfield == custom_vector_field.name:
+                            raise ValueError(
+                                f"Field '{subfield}' is a custom vector field and cannot be a dependent field of "
+                                f"multimodal field '{multimodal_field.name}'.")
         return values

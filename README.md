@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://uploads-ssl.webflow.com/62dfa8e3960a6e2b47dc7fae/62fdf9cef684e6f16158b094_MARQO%20LOGO-UPDATED-GREEN.svg" width="50%" height="40%">
+<img src="https://github.com/marqo-ai/public-assets/blob/main/marqowbackground.png" width="50%" height="40%">
 </p>
 
 <p align="center">
@@ -146,16 +146,14 @@ This integration lets you leverage open source or custom fine tuned models throu
 ## Getting started
 
 
-1. Marqo requires docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
+1. Marqo requires Docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
 
 2. Use docker to run Marqo:
 
 ```bash
-
 docker rm -f marqo
 docker pull marqoai/marqo:latest
-docker run --name marqo -it --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway marqoai/marqo:latest
-
+docker run --name marqo -p 8882:8882 marqoai/marqo:latest
 ```
 
 Note: If your `marqo` container keeps getting killed, this is most likely due to a lack of memory being allocated to Docker. Increasing the memory limit for Docker to at least 6GB (8GB recommended) in your Docker settings may fix the problem.
@@ -192,12 +190,11 @@ mq.index("my-first-index").add_documents([
 results = mq.index("my-first-index").search(
     q="What is the best outfit to wear on the moon?"
 )
-
 ```
 
 - `mq` is the client that wraps the `marqo` API.
 - `create_index()` creates a new index with default settings. You have the option to specify what model to use. For example, `mq.create_index("my-first-index", model="hf/all_datasets_v4_MiniLM-L6")` will create an index with the default text model `hf/all_datasets_v4_MiniLM-L6`. Experimentation with different models is often required to achieve the best retrieval for your specific use case. Different models also offer a tradeoff between inference speed and relevancy. See [here](https://docs.marqo.ai/1.0.0/Models-Reference/dense_retrieval/) for the full list of models.
-- `add_documents()` takes a list of documents, represented as python dicts for indexing.
+- `add_documents()` takes a list of documents, represented as python dicts for indexing. `tensor_fields` refers to the fields that will be indexed as vector collections and made searchable.
 - You can optionally set a document's ID with the special `_id` field. Otherwise, Marqo will generate one.
 
 Let's have a look at the results:
@@ -246,9 +243,7 @@ pprint.pprint(results)
 Retrieve a document by ID.
 
 ```python
-
 result = mq.index("my-first-index").get_document(document_id="article_591")
-
 ```
 
 Note that by adding the document using ```add_documents``` again using the same ```_id``` will cause a document to be updated.
@@ -258,9 +253,7 @@ Note that by adding the document using ```add_documents``` again using the same 
 Get information about an index.
 
 ```python
-
 results = mq.index("my-first-index").get_stats()
-
 ```
 
 ### Lexical search
@@ -268,9 +261,7 @@ results = mq.index("my-first-index").get_stats()
 Perform a keyword search.
 
 ```python
-
 result = mq.index("my-first-index").search('marco polo', search_method=marqo.SearchMethods.LEXICAL)
-
 ```
 
 ### Multi modal and cross modal search
@@ -278,42 +269,34 @@ result = mq.index("my-first-index").search('marco polo', search_method=marqo.Sea
 To power image and text search, Marqo allows users to plug and play with CLIP models from HuggingFace. **Note that if you do not configure multi modal search, image urls will be treated as strings.** To start indexing and searching with images, first create an index with a CLIP configuration, as below:
 
 ```python
-
 settings = {
     "treat_urls_and_pointers_as_images":True,   # allows us to find an image file and index it 
     "model":"ViT-L/14"
 }
 response = mq.create_index("my-multimodal-index", **settings)
-
 ```
 
 Images can then be added within documents as follows. You can use urls from the internet (for example S3) or from the disk of the machine:
 
 ```python
-
 response = mq.index("my-multimodal-index").add_documents([{
     "My_Image": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
     "Description": "The hippopotamus, also called the common hippopotamus or river hippopotamus, is a large semiaquatic mammal native to sub-Saharan Africa",
     "_id": "hippo-facts"
 }], tensor_fields=["My_Image"])
-
 ```
 
 You can then search the image field using text.
 
 ```python
-
 results = mq.index("my-multimodal-index").search('animal')
-
 ```
 
 ### Searching using an image
 Searching using an image can be achieved by providing the image link.
 
 ```python
-
 results = mq.index("my-multimodal-index").search('https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png')
-
 ```
 
 ### Searching using weights in queries
@@ -322,7 +305,6 @@ Queries can also be provided as dictionaries where each key is a query and their
 The example below shows the application of this to a scenario where a user may want to ask a question but also negate results that match a certain semantic criterion. 
 
 ```python
-
 import marqo
 import pprint
 
@@ -357,7 +339,8 @@ query = {
     # a weighting of 1.1 gives this query slightly more importance
     "I need to buy a communications device, what should I get?": 1.1,
     # a weighting of 1 gives this query a neutral importance
-    "Technology that became prevelant in the 21st century": 1.0
+    # this will lead to 'Smartphone' being the top result
+    "The device should work like an intelligent computer.": 1.0,
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
@@ -370,14 +353,14 @@ query = {
     # a weighting of 1 gives this query a neutral importance
     "I need to buy a communications device, what should I get?": 1.0,
     # a weighting of -1 gives this query a negation effect
-    "Technology that became prevelant in the 21st century": -1.0
+    # this will lead to 'Telephone' being the top result
+    "The device should work like an intelligent computer.": -0.3,
 }
 
 results = mq.index("my-weighted-query-index").search(q=query)
 
 print("\nQuery 2:")
 pprint.pprint(results)
-
 ```
 
 ### Creating and searching indexes with multimodal combination fields
@@ -386,7 +369,6 @@ Marqo lets you have indexes with multimodal combination fields. Multimodal combi
 The example below demonstrates this with retrieval of caption and image pairs using multiple types of queries.
 
 ```python
-
 import marqo
 import pprint
 
@@ -454,7 +436,6 @@ results = mq.index("my-first-multimodal-index").search(
 )
 print("\nQuery 3:")
 pprint.pprint(results)
-
 ```
 
 ### Delete documents
@@ -472,10 +453,16 @@ results = mq.index("my-first-index").delete_documents(ids=["article_591", "artic
 Delete an index.
 
 ```python
-
 results = mq.index("my-first-index").delete()
-
 ```
+
+## 
+
+## Running Marqo open source in production
+
+We support Kubernetes templates for Marqo which you can deploy on a cloud provider of your choice. Marqo's Kubernetes implementation allows you to deploy clusters with replicas, multiple storage shards and multiple inference nodes. The repo can be found here: [https://github.com/marqo-ai/marqo-on-kubernetes](https://github.com/marqo-ai/marqo-on-kubernetes)
+
+If you're looking for a fully managed cloud service, you can sign up for Marqo Cloud here: [https://cloud.marqo.ai](https://cloud.marqo.ai).
 
 ## Documentation
 
@@ -483,13 +470,13 @@ The full documentation for Marqo can be found here [https://docs.marqo.ai/](http
 
 ## Warning
 
-Note that you should not run other applications on Marqo's Opensearch cluster as Marqo automatically changes and adapts the settings on the cluster.
+Note that you should not run other applications on Marqo's Vespa cluster as Marqo automatically changes and adapts the settings on the cluster.
 
 ## Contributors
 
 Marqo is a community project with the goal of making tensor search accessible to the wider developer community. We are glad that you are interested in helping out! Please read [this](./CONTRIBUTING.md) to get started.
 
-## Dev set up
+## Dev setup
 
 1. Create a virtual env ```python -m venv ./venv```.
 

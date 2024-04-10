@@ -42,7 +42,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=find_packages(where="src", exclude=("tests*",)),
-    keywords="search python marqo opensearch neural tensor semantic vector embedding",
+    keywords="search python marqo opensearch vespa neural tensor semantic vector embedding",
     platform="any",
     classifiers=[
         "Programming Language :: Python :: 3.8",

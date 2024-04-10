@@ -16,7 +16,7 @@ class TestStructuredVespaIndex(MarqoTestCase):
             name='my_index',
             schema_name='my_index',
             model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAnguar,
+            distance_metric=DistanceMetric.PrenormalizedAngular,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(ef_construction=100, m=16),
             fields=[

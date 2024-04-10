@@ -15,7 +15,7 @@ from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
-from marqo.s2_inference.errors import UnknownModelError
+from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 
 logger = get_logger(__name__)
 
@@ -25,7 +25,7 @@ class IndexType(Enum):
     Unstructured = 'unstructured'
 
 
-class FieldType(Enum):
+class FieldType(str, Enum):
     Text = 'text'
     Bool = 'bool'
     Int = 'int'
@@ -39,6 +39,7 @@ class FieldType(Enum):
     ArrayDouble = 'array<double>'
     ImagePointer = 'image_pointer'
     MultimodalCombination = 'multimodal_combination'
+    CustomVector = "custom_vector"
 
 
 class VectorNumericType(Enum):
@@ -56,7 +57,7 @@ class DistanceMetric(Enum):
     Euclidean = 'euclidean'
     Angular = 'angular'
     DotProduct = 'dotproduct'
-    PrenormalizedAnguar = 'prenormalized-angular'
+    PrenormalizedAngular = 'prenormalized-angular'
     Geodegrees = 'geodegrees'
     Hamming = 'hamming'
 
@@ -122,6 +123,24 @@ class Model(StrictBaseModel):
     properties: Optional[Dict[str, Any]]
     custom: bool = False
 
+    @root_validator(pre=False)
+    def validate_custom_properties(cls, values):
+        """Validate custom model properties.
+
+        Raises:
+            InvalidArgumentError: If model properties are invalid.
+        """
+        model_name = values.get('name')
+        properties = values.get('properties')
+        custom = values.get('custom')
+        if properties and custom:
+            try:
+                s2_inference.validate_model_properties(model_name, properties)
+            except InvalidModelPropertiesError as e:
+                raise ValueError(
+                    f'Invalid model properties for model={model_name}. Reason: {e}.')
+        return values
+
     def dict(self, *args, **kwargs):
         """
         Custom dict method that removes the properties field if the model is not custom. This ensures we don't store
@@ -165,6 +184,10 @@ class Model(StrictBaseModel):
                     f'Could not find model properties for model={model_name}. '
                     f'Please check that the model name is correct. '
                     f'Please provide model_properties if the model is a custom model and is not supported by default')
+            except InvalidModelPropertiesError as e:
+                raise InvalidArgumentError(
+                    f'Invalid model properties for model={model_name}. Reason: {e}.'
+                )
 
 
 class MarqoIndex(ImmutableStrictBaseModel, ABC):
@@ -264,18 +287,6 @@ class StructuredMarqoIndex(MarqoIndex):
 
     def __init__(self, **data):
         super().__init__(**data)
-
-    @root_validator
-    def validate_model(cls, values):
-        # Verify all combination fields are tensor fields
-        combination_fields = [field for field in values.get('fields', []) if
-                              field.type == FieldType.MultimodalCombination]
-        tensor_field_names = {tensor_field.name for tensor_field in values.get('tensor_fields', [])}
-        for field in combination_fields:
-            if field.name not in tensor_field_names:
-                raise ValueError(f'Field {field.name} has type {field.type.value()} and must be a tensor field')
-
-        return values
 
     @classmethod
     def _valid_type(cls) -> IndexType:
@@ -397,6 +408,14 @@ class StructuredMarqoIndex(MarqoIndex):
                                            for field_type in FieldType}
                                   )
 
+    @property
+    def dependent_fields_names(self) -> Set[str]:
+        """Return the names of all fields that are dependent fields of multimodal combination fields."""
+        return self._cache_or_get('dependent_fields_names',
+                                  lambda: {dependent_field for field in self.fields if field.dependent_fields
+                                           for dependent_field in field.dependent_fields.keys()}
+                                  )
+
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
 _VESPA_NAME_PATTERN = r'[a-zA-Z_][a-zA-Z0-9_]*'
@@ -476,7 +495,7 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.MultimodalCombination.value}'
         )
 
-    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText]:
+    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText, FieldType.CustomVector]:
         raise ValueError(
             f'{name}: Field with {FieldFeature.LexicalSearch.value} feature must be of type '
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'

@@ -3,7 +3,7 @@ import unittest.mock
 from unittest.mock import patch
 from marqo.api.exceptions import ModelCacheManagementError
 from marqo.tensor_search import tensor_search
-from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, _validate_model_properties, \
+from marqo.s2_inference.s2_inference import clear_loaded_models, vectorise, validate_model_properties, \
     _validate_model_into_device, _check_memory_threshold_for_model
 from marqo.s2_inference import s2_inference
 import threading, queue
@@ -92,7 +92,7 @@ class TestAutomaticModelEject(unittest.TestCase):
         }
 
         for model_name, size in models_and_sizes.items():
-            self.assertEqual(s2_inference.get_model_size(model_name, _validate_model_properties(model_name, None)),
+            self.assertEqual(s2_inference.get_model_size(model_name, validate_model_properties(model_name, None)),
                              size, msg=model_name)
 
         generic_model = {
@@ -132,7 +132,7 @@ class TestAutomaticModelEject(unittest.TestCase):
 
     def test_thread_safe_function_call(self):
         model_name = "ViT-B/32"
-        validated_model_properties = _validate_model_properties(model_name, None)
+        validated_model_properties = validate_model_properties(model_name, None)
         device = "cpu"
         model_size = 1
 

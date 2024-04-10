@@ -21,7 +21,7 @@ The problem is that multimodal search can be extremely beneficial in many multim
 
 ## What is Marqo?
 
-<a href="https://www.marqo.ai">Marqo</a> is developing "tensor search for humans" that improves search relevance for multimodal search applications (text 💬, image 🖼️, video 📽️), while being simple to set up and scale. Whereas many current neural databases require specialised search engineers, Marqo is a simple Python API where developers can index and query within seconds. Specifically, Marqo effortlessly combines the robustness and expressiveness of OpenSearch, allowing for complex filters and lexical search, with your favourite multimodal neural search models such as S-Bert and CLIP. Furthermore, Marqo's cloud platform enables customers to pay-per-query and reduces costs due to pooled resources ☁️. They are already powering child-friendly search engines, NFT recommendation systems, and much much more! 
+<a href="https://www.marqo.ai">Marqo</a> is developing "tensor search for humans" that improves search relevance for multimodal search applications (text 💬, image 🖼️, video 📽️), while being simple to set up and scale. Whereas many current neural databases require specialised search engineers, Marqo is a simple Python API where developers can index and query within seconds. Specifically, Marqo effortlessly combines the robustness and expressiveness of Vespa, allowing for complex filters and lexical search, with your favourite multimodal neural search models such as S-Bert and CLIP. Furthermore, Marqo's cloud platform enables customers to pay-per-query and reduces costs due to pooled resources ☁️. They are already powering child-friendly search engines, NFT recommendation systems, and much much more! 
 
 More than just the technology, we are backing two incredible founders. Jesse has a PhD in Physics from La Trogue, Postdocs at UCL and Stanford, and was a Lead Machine Learning Scientist at Alexa and Amazon Robotics. Tom Hamer has software degrees from Australian National University and Cambridge, and was a software engineer within AWS' ElasticSearch and Database teams. Together, they have built a team of search enthusiasts with the passion and skillset to enable developers worldwide effortless access to neural search. 
 
@@ -70,7 +70,7 @@ Next, let's look at our example news documents corpus, which contains BBC and Re
 ]
 ```  
 
-We then index our news documents that manage both the lexical and neural embeddings. By default, Marqo uses SBERT from neural text embeding and has complete OpenSearch lexical and metadata functionality natively. 
+We then index our news documents that manage both the lexical and neural embeddings. By default, Marqo uses SBERT from neural text embedding and has complete lexical and metadata functionality natively. 
 ```  
 from news import MARQO_DOCUMENTS
 

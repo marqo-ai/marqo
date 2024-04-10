@@ -7,8 +7,10 @@ from unittest import mock
 import requests
 
 import marqo.core.exceptions as core_exceptions
+from pydantic import ValidationError
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
+from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
@@ -16,6 +18,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase
 
 
@@ -118,13 +121,13 @@ class TestSearchStructured(MarqoTestCase):
         cls.image_index_with_random_model = image_index_with_random_model.name
 
     def setUp(self) -> None:
-        self.clear_indexes(self.indexes)
-
+        super().setUp()
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
 
     def tearDown(self) -> None:
+        super().tearDown()
         self.device_patcher.stop()
 
     # TODO - Test efSearch parameter
@@ -472,255 +475,8 @@ class TestSearchStructured(MarqoTestCase):
                     search_method=search_method)
                 assert len(s_res["hits"]) > 0
 
-    def test_filtering_list_case_tensor(self):
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[
-                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
-                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "int_field_1": 2},
-                    {"_id": "1235", "text_field_1": "some text", "list_field_1": ["tag1", "tag2 some"]}
-                ]
-            )
-        )
-
-        test_cases = [
-            ("list_field_1:tag1", 1, "1235", True),
-            ("list_field_1:tag55", 0, None, False),
-            ("text_field_3:b", 1, "5678", True),
-            ("list_field_1:tag2", 0, None, False),
-            ("list_field_1:(tag2 some)", 1, "1235", True)
-        ]
-
-        for filter_query, expected_count, expected_id, highlight_exists in test_cases:
-            with self.subTest(filter_query=filter_query):
-                res = tensor_search.search(
-                    index_name=self.default_text_index, config=self.config, text="", filter=filter_query)
-
-                assert len(res["hits"]) == expected_count
-                if expected_id:
-                    assert res["hits"][0]["_id"] == expected_id
-                    assert ("_highlights" in res["hits"][0]) == highlight_exists
-
-    def test_filtering_list_case_lexical(self):
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[
-                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
-                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "int_field_1": 2},
-                    {"_id": "1235", "text_field_1": "some text", "list_field_1": ["tag1", "tag2 some"]}
-                ]
-            )
-        )
-
-        test_input = [
-            ("list_field_1:tag1", 1, "1235"),
-            ("list_field_1:tag55", 0, None),
-            ("text_field_3:b", 1, "5678"),
-        ]
-
-        for filter_string, expected_hits, expected_id in test_input:
-            with self.subTest(
-                    f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
-                res = tensor_search.search(
-                    index_name=self.default_text_index, config=self.config, text="some",
-                    search_method=SearchMethod.LEXICAL, filter=filter_string
-                )
-                self.assertEqual(expected_hits, len(res["hits"]))
-                if expected_id:
-                    self.assertEqual(expected_id, res["hits"][0]["_id"])
-
-    def test_filtering_list_case_image(self):
-        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_image_index,
-                docs=[
-                    {"image_field_1": hippo_img, "text_field_1": "some text", "text_field_2": "baaadd", "_id": "5678",
-                     "text_field_3": "b"},
-                    {"image_field_1": hippo_img, "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "_id": "1234", "int_field_1": 2},
-                    {"image_field_1": hippo_img, "text_field_1": "some text", "_id": "1235",
-                     "list_field_1": ["tag1", "tag2 some"]}
-                ]
-            )
-        )
-
-        test_parameters = [
-            ("list_field_1:tag1", 1, "1235"),
-            ("list_field_1:tag55", 0, None),
-            ("text_field_3:b", 1, "5678"),
-        ]
-
-        for filter_string, expected_hits, expected_id in test_parameters:
-            with self.subTest(
-                    f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
-                res = tensor_search.search(
-                    index_name=self.default_image_index, config=self.config, text="some",
-                    search_method=SearchMethod.TENSOR, filter=filter_string
-                )
-
-                self.assertEqual(expected_hits, len(res["hits"]))
-                if expected_id:
-                    self.assertEqual(expected_id, res["hits"][0]["_id"])
-
-    def test_filtering(self):
-        # Add documents first
-        res = tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[
-                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
-                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "int_field_1": 2},
-                    {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "bool_field_1": True},
-                    {"_id": "1232", "text_field_1": "true"},
-                    {"_id": "1231", "text_field_1": "some text", "bool_field_2": False},
-                ]
-            )
-        )
-
-        # Define test parameters
-        test_parameters = [
-            ("text_field_3:c", 0, None),
-            ("int_field_1:2", 1, "1234"),
-            ("text_field_3:b", 1, "5678"),
-            ("int_field_1:5", 0, None),
-            ("int_field_1:[5 TO 30]", 0, None),
-            ("int_field_1:[0 TO 30]", 1, "1234"),
-            ("bool_field_1:true", 1, "1233"),
-            ("bool_field_1:True", 1, "1233"),
-            ("bool_field_1:tRue", 1, "1233"),
-            ("bool_field_2:false", 1, "1231"),
-            ("bool_field_1:false", 0, None),  # no hits for bool_field_1=false
-            ("bool_field_1:some_value", 0, None),  # no hits for bool_field_1 not boolean
-            ("int_field_1:[0 TO 30] OR bool_field_1:true", 2, None),
-            ("(int_field_1:[0 TO 30] AND int_field_1:2) AND text_field_1:(some text)", 1, "1234"),
-            ("text_field_1:true", 1, "1232")  # string field with boolean-like value
-        ]
-
-        for filter_string, expected_hits, expected_id in test_parameters:
-            with self.subTest(
-                    f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
-                res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="", result_count=3,
-                    filter=filter_string, verbose=0
-                )
-
-                self.assertEqual(expected_hits, len(res["hits"]))
-                if expected_id:
-                    self.assertEqual(expected_id, res["hits"][0]["_id"])
-
-    def test_filter_id(self):
-        """
-        Test filtering by _id
-        """
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[
-                    {"_id": "1", "text_field_1": "some text"},
-                    {"_id": "doc1", "text_field_1": "some text"},
-                    {"_id": "doc5", "text_field_1": "some text"},
-                    {"_id": "50", "text_field_1": "some text"},
-                ]
-            )
-        )
-
-        test_parameters = [
-            ("_id:1", 1, ["1"]),
-            ("_id:doc1", 1, ["doc1"]),
-            ("_id:51", 0, None),
-            ("_id:1 OR _id:doc1", 2, ["1", "doc1"]),  # or condition
-            ("_id:1 OR _id:doc1 OR _id:50", 3, ["1", "doc1", "50"]),  # or condition, longer
-            ("_id:1 OR _id:doc1 OR _id:50 OR _id:51", 3, ["1", "doc1", "50"]),  # or condition with non-existent id
-            ("_id:1 AND _id:doc1", 0, None),  # and condition
-        ]
-
-        for filter_string, expected_hits, expected_ids in test_parameters:
-            with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
-                res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text", filter=filter_string,
-                )
-
-                self.assertEqual(expected_hits, len(res["hits"]))
-                if expected_ids:
-                    self.assertEqual(set(expected_ids), {hit["_id"] for hit in res["hits"]})
-
-    def test_filter_spaced_fields(self):
-        # Add documents
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[
-                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
-                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "int_field_1": 2},
-                    {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "bool_field_1": True},
-                    {"_id": "344", "text_field_1": "some text", "float_field_1": 0.548, "bool_field_1": True},
-                ]
-            )
-        )
-
-        # Define test parameters as tuples (filter_string, expected_hits, expected_ids)
-        test_parameters = [
-            ("text_field_2:baaadd", 1, ["5678"]),
-            ("text_field_2:(Close match hehehe)", 2, ["1234", "1233"]),
-            ("(float_field_1:[0 TO 1]) AND (text_field_1:(some text))", 1, ["344"])
-        ]
-
-        for filter_string, expected_hits, expected_ids in test_parameters:
-            with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
-                res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text='',
-                    filter=filter_string, verbose=0
-                )
-
-                self.assertEqual(expected_hits, len(res["hits"]))
-                for expected_id in expected_ids:
-                    self.assertIn(expected_id, [hit['_id'] for hit in res['hits']])
-
-    def test_filtering_bad_syntax(self):
-        # Adding documents
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
-                docs=[
-                    {"_id": "5678", "text_field_1": "some text", "text_field_2": "baaadd", "text_field_3": "b"},
-                    {"_id": "1234", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "int_field_1": 2},
-                    {"_id": "1233", "text_field_1": "some text", "text_field_2": "Close match hehehe",
-                     "bool_field_1": True}
-                ]
-            )
-        )
-
-        # Define test parameters as tuples (filter_string)
-        bad_filter_strings = [
-            "(text_field_2):baaadd",  # Incorrect syntax for field name with space
-            "(int_field_1:[0 TO 30] and int_field_1:2) AND text_field_1:(some text)",  # and instead of AND here
-            "",  # Empty filter string
-        ]
-
-        for filter_string in bad_filter_strings:
-            with self.subTest(f"filter_string={filter_string}"):
-                with self.assertRaises(core_exceptions.FilterStringParsingError):
-                    tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, text="some text",
-                        result_count=3, filter=filter_string, verbose=0
-                    )
+    # TODO: All filtering tests have been moved to test_search_combined.py
+    # Do the same with all other tests.
 
     def test_set_device(self):
         """calling search with a specified device overrides MARQO_BEST_AVAILABLE_DEVICE"""
@@ -1141,7 +897,7 @@ class TestSearchStructured(MarqoTestCase):
                            {"https://marqo_not_real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             with self.subTest(f"query={q}"):
-                with self.assertRaises(errors.InvalidArgError):
+                with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
                     tensor_search.search(
                         text=q,
                         index_name=self.default_image_index,
@@ -1332,3 +1088,26 @@ class TestSearchStructured(MarqoTestCase):
                     self.assertEqual(1, len(res["hits"]))
                     self.assertEqual(expected_document_ids, res["hits"][0]["_id"])
 
+    def test_tensor_search_query_can_be_none(self):
+        res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+                                   context=SearchContext(
+                                       **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
+                                                     {"vector": [2, ] * 384, "weight": 2}]}))
+
+        self.assertIn("hits", res)
+
+    def test_lexical_query_can_not_be_none(self):
+        context = SearchContext(
+            **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
+                          {"vector": [2, ] * 384, "weight": 2}]})
+
+        test_case = [
+            (None, context, "with context"),
+            (None, None, "without context")
+        ]
+
+        for query, context, msg in test_case:
+            with self.subTest(msg):
+                with self.assertRaises(InvalidArgError):
+                    res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+                                               search_method=SearchMethod.LEXICAL)

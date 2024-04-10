@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 
 from marqo.core.models import MarqoQuery, MarqoIndex
 from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
@@ -68,6 +68,28 @@ class VespaIndex(ABC):
             ```
             while for an empty index, `query_result.root.children[0].children is None` will hold true.
         """
+        pass
+
+    @abstractmethod
+    def to_vespa_partial_document(self, marqo_partial_document: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert a marqo_partial_update_document to a Vespa partial document.
+
+        This method converts a MarqoDocument to a VespaDocument in the partial update format. It should only contain
+        the fields that are require to be updated.
+
+        Args:
+            marqo_partial_document: The marqo_partial_document to convert
+
+        Returns:
+            VespaDocument in dictionary format with keys 'fields' and 'id'
+        """
+        pass
+
+    @abstractmethod
+    def get_vespa_id_field(self) -> str:
+        """
+        Get the name of the id field in Vespa documents, inside the 'fields' dictionary."""
         pass
 
 

@@ -4,13 +4,18 @@ import math
 import random
 import threading
 from contextlib import contextmanager
-from typing import List, Optional, ContextManager
+from typing import List, Optional, Tuple, ContextManager, Union
 
 import PIL
 from PIL.ImageFile import ImageFile
 
 from marqo.s2_inference import clip_utils
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+from marqo.tensor_search import enums
+from marqo.tensor_search import constants
+import marqo.core.exceptions as core_exceptions
+import marqo.exceptions as base_exceptions
+from marqo.core.models.marqo_index import *
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
@@ -162,3 +167,29 @@ def reduce_thread_metrics(data):
             else:
                 result[new_key] = value
     return result
+
+
+def determine_document_dict_field_type(field_name: str, field_content, mappings: dict) -> FieldType:
+    """
+    Only used for unstructured. Structured indexes have field types declared upon index creation.
+    Determines the type of a document field if it is a dict
+    using its name, content, and the add docs mappings object.
+    3 Options:
+    1. `None` if standard (str, int, float, bool, list)
+    2. `MultimodalCombination` (dict)
+    3. `CustomVector` (dict)
+    4. Add other dict types as needed
+    """
+
+    if isinstance(field_content, dict):
+        if field_name not in mappings:
+            raise base_exceptions.InternalError(f"Invalid dict field {field_name}. Could not find field in mappings object.")
+
+        if mappings[field_name]["type"] == enums.MappingsObjectType.multimodal_combination:
+            return FieldType.MultimodalCombination
+        elif mappings[field_name]["type"] == enums.MappingsObjectType.custom_vector:
+            return FieldType.CustomVector
+        else:
+            raise base_exceptions.InternalError(f"Invalid dict field type: '{mappings[field_name]['type']}' for field: '{field_name}' in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
+    else:
+        return None

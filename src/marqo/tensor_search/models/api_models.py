@@ -4,7 +4,7 @@ Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
 import pydantic
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 from typing import Union, List, Dict, Optional, Any
 
 from marqo.tensor_search import validation
@@ -12,6 +12,8 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.api.exceptions import InvalidArgError
+from marqo.core.models.marqo_index import MarqoIndex
 
 
 class BaseMarqoModel(BaseModel):
@@ -21,7 +23,7 @@ class BaseMarqoModel(BaseModel):
 
 
 class SearchQuery(BaseMarqoModel):
-    q: Union[str, Dict[str, float]]
+    q: Optional[Union[str, Dict[str, float]]] = None
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10
@@ -38,6 +40,27 @@ class SearchQuery(BaseMarqoModel):
     scoreModifiers: Optional[ScoreModifier] = None
     modelAuth: Optional[ModelAuth] = None
 
+    @root_validator(pre=False)
+    def validate_query_and_context(cls, values):
+        """Validate that one of query and context are present for tensor search, or just the query for lexical search.
+
+        Raises:
+            InvalidArgError: If validation fails
+        """
+        search_method = values.get('searchMethod')
+        query = values.get('q')
+        context = values.get('context')
+
+        if search_method.upper() == SearchMethod.TENSOR:
+            if query is None and context is None:
+                raise ValueError("One of Query(q) or context is required for tensor search but both are missing")
+        elif search_method.upper() == SearchMethod.LEXICAL:
+            if query is None:
+                raise ValueError("Query(q) is required for lexical search")
+        else:
+            raise ValueError(f"Invalid search method {search_method}")
+        return values
+
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
         return validation.validate_str_against_enum(
@@ -50,7 +73,7 @@ class SearchQuery(BaseMarqoModel):
         return self.context.tensor if self.context is not None else None
 
 class BulkSearchQueryEntity(SearchQuery):
-    index: str
+    index: MarqoIndex
 
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
