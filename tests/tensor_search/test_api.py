@@ -42,7 +42,7 @@ class ApiTests(MarqoTestCase):
         with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'TRUE'}):
             response = self.client.get("/memory")
             data = response.json()
-            assert set(data.keys()) == {"memory_used", "stats", "garbage"}
+            assert set(data.keys()) == {"memory_used", "stats"}
 
     def test_memory_defaultDisabled(self):
         """

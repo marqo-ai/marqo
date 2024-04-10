@@ -1,4 +1,3 @@
-import gc
 import tracemalloc
 
 from memory_profiler import memory_usage
@@ -12,14 +11,10 @@ def get_memory_profile() -> MemoryProfile:
     snapshot = tracemalloc.take_snapshot()
     stats = snapshot.statistics('lineno')
 
-    # GC
-    gc.collect()  # Force garbage collection
-
     # Get mem used
     mem_used = memory_usage(-1, interval=0.1, timeout=1)
 
     return MemoryProfile(
         memory_used=mem_used[0],
-        stats=[str(s) for s in stats],
-        garbage=gc.garbage
+        stats=[str(s) for s in stats]
     )
