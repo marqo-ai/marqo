@@ -148,7 +148,6 @@ class RequestMetricsStore():
     def clear_metrics_for(cls, r: Request) -> None:
         cls.METRIC_STORES.pop(r, None)
         cls.current_request.set(None)
-        logger.info(f'Size of METRIC_STORES={len(cls.METRIC_STORES)}')
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
@@ -183,7 +182,6 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             call_next: A callable to the remaining request call-chain.
 
         """
-        logger.info('Setting metrics for request')
         RequestMetricsStore.set_in_request(request)
         try:
             response = await call_next(request)
@@ -208,9 +206,8 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
                 )
                 get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
 
-            logger.info('Clearing metrics for request')
         finally:
-            logger.info('Clearing metrics for request')
+            logger.debug('Clearing metrics for request')
             RequestMetricsStore.clear_metrics_for(request)
 
         body = json.dumps(data).encode()
