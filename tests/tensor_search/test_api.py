@@ -9,6 +9,7 @@ from marqo import exceptions as base_exceptions
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
 
@@ -33,6 +34,21 @@ class ApiTests(MarqoTestCase):
             )
             self.assertEqual(response.status_code, 200)
             mock_add_documents.assert_called_once()
+
+    def test_memory(self):
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'TRUE'}):
+            response = self.client.get("/memory")
+            data = response.json()
+            assert set(data.keys()) == {"memory_used", "stats", "garbage"}
+
+    def test_memory_defaultDisabled(self):
+        response = self.client.get("/memory")
+        self.assertEqual(response.status_code, 403)
+
+    def test_memory_disabled_403(self):
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'FALSE'}):
+            response = self.client.get("/memory")
+            self.assertEqual(response.status_code, 403)
 
 
 class TestApiErrors(MarqoTestCase):
