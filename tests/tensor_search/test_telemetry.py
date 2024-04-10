@@ -226,7 +226,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         response = self.client.get("/?telemetry=true")
         self.assertIn("telemetry", response.json())
 
-    @unittest.skip("Error running in GH Actions")
+    # @unittest.skip("Error running in GH Actions")
     def test_counter_usage(self):
         @self.app.route("/test", methods=["GET"])
         def test_endpoint(request):
@@ -241,7 +241,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
             "counter": {"key": 1.0}
         })
 
-    @unittest.skip("Error running in GH Actions")
+    # @unittest.skip("Error running in GH Actions")
     def test_timing_usage(self):
         @self.app.route("/test", methods=["GET"])
         def test_endpoint(request):
@@ -255,7 +255,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         self.assertIn("timesMs", response.json()["telemetry"])
         self.assertIn("key", response.json()["telemetry"]["timesMs"])
 
-    @unittest.skip("Error running in GH Actions")
+    # @unittest.skip("Error running in GH Actions")
     def test_with_timing_usage(self):
         @self.app.route("/test", methods=["GET"])
         def test_endpoint(request):
@@ -297,6 +297,9 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         async def call_next(request):
             return Response()
 
+        self.scope = {'type': 'http', 'query_string': b'telemetry=false'}
+        self.request = Request(self.scope)
+
         response = await self.middleware.dispatch(self.request, call_next)
         self.assertIsInstance(response, Response)
         self.assertNotIn("telemetry", response.body.decode())
@@ -306,7 +309,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         mock_send.return_value = Response()
 
         async def call_next(request):
-            return Response(content=json.dumps(["not", "a", "dict"]))
+            return StreamingResponse(iter([json.dumps(["not", "a", "dict"]).encode()]))
 
         self.scope = {'type': 'http', 'query_string': b'telemetry=true'}
         self.request = Request(self.scope)
@@ -323,7 +326,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         mock_send.return_value = Response()
 
         async def call_next(request):
-            return Response(content=json.dumps({"data": "value"}))
+            return StreamingResponse(iter([json.dumps({"data": "value"}).encode()]))
 
         response = await self.middleware.dispatch(self.request, call_next)
         self.assertIsInstance(response, Response)
