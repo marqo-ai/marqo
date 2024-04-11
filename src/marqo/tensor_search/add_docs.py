@@ -229,6 +229,7 @@ def determine_text_chunk_prefix(request_level_prefix: str, index_info: IndexInfo
     model_prefix = index_info.get_model_properties().get(enums.ModelProperties.text_chunk_prefix)
     return model_prefix
 
+# Might use this function instead of the above
 def determine_text_prefix(request_level_prefix: str, index_info: IndexInfo, prefix_type: str) -> str:
     """
     Determines the text prefix to be used for chunking text fields or search queries.
