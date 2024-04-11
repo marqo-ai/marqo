@@ -1,4 +1,5 @@
 """The API entrypoint for Tensor Search"""
+import gc
 import json
 from typing import List
 
@@ -115,6 +116,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
     if not converted_error:
         converted_error = api_exceptions.MarqoWebError("Marqo encountered an unexpected internal error.")
 
+    gc.collect()
     return marqo_api_exception_handler(request, converted_error)
 
 
@@ -132,6 +134,7 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
         "type": exc.error_type,
         "link": exc.link
     }
+    gc.collect()
     if headers:
         return JSONResponse(
             content=body, status_code=exc.status_code, headers=headers
@@ -155,6 +158,7 @@ async def validation_exception_handler(request, exc: pydantic.ValidationError) -
         "type": InvalidArgError.error_type,
         "link": InvalidArgError.link
     }
+    gc.collect()
     return JSONResponse(content=body, status_code=InvalidArgError.status_code)
 
 
@@ -169,6 +173,7 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
         "type": "internal_error",
         "link": ""
     }
+    gc.collect()
     if headers:
         return JSONResponse(content=body, status_code=500, headers=headers)
     else:
