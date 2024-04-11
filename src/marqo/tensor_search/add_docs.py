@@ -209,6 +209,10 @@ def determine_text_chunk_prefix(request_level_prefix: str, index_info: IndexInfo
     4. If not provided, keep as None (will be handled by dict .get() method)
     """
 
+    """
+    Note: Replace IndexSettingsField with the relevant datastructure, likely now class IndexSettings(StrictBaseModel) from index_settings.py
+    """
+
     if request_level_prefix is not None:
         return request_level_prefix
 
@@ -242,6 +246,10 @@ def determine_text_prefix(request_level_prefix: str, index_info: IndexInfo, pref
 
     Returns:
         str: The determined prefix, or None if no prefix is found
+    """
+
+    """
+    Note: Replace IndexSettingsField with the relevant datastructure, likely now class IndexSettings(StrictBaseModel) from index_settings.py
     """
 
     if request_level_prefix is not None:
