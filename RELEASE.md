@@ -1,3 +1,23 @@
+# Release 2.4.0
+
+## New features
+- Add `IN` operator to the query filter string DSL (https://github.com/marqo-ai/marqo/pull/790, https://github.com/marqo-ai/marqo/pull/793, & https://github.com/marqo-ai/marqo/pull/795). 
+For structured indexes, you can now use the `IN` keyword to restrict text and integer fields to be within a list of values. See usage [here](https://docs.marqo.ai/2.4.0/Guides/query_dsl/#in-queries). 
+ 
+- Add `no_model` option for index creation (https://github.com/marqo-ai/marqo/pull/789). This allows for indexes that do no vectorisation, 
+providing easy use of custom vectors with no risk of accidentally mixing them up with Marqo-generated vectors. See usage [here](https://docs.marqo.ai/2.4.0/Guides/Models-Reference/list_of_models/#no-model). 
+- Optional `q` parameter for the search endpoint if context vectors are provided. (https://github.com/marqo-ai/marqo/pull/789). 
+This is particularly useful when using context vectors to search across your documents that have custom vector fields. See usage [here](https://docs.marqo.ai/2.4.0/API-Reference/Search/search/#query-q).
+
+## Bug fixes and minor changes
+- Improve error message for defining `tensorFields` when adding documents to a structured index (https://github.com/marqo-ai/marqo/pull/788). 
+
+## Contributor shout-outs
+- A huge thank you to all our 4.1k stargazers! We appreciate all of you continuing to use our product and helping Marqo grow.
+- Thanks for sharing your questions and feedback on our [forum](https://community.marqo.ai/) and 
+[Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! 
+If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+
 # Release 2.3.0
 
 ## New features
