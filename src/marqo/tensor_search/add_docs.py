@@ -17,6 +17,7 @@ import marqo.core.exceptions as core_exceptions
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models import IndexInfo
+from marqo.tensor_search.models import IndexSettings
 
 
 
