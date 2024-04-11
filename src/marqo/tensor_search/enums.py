@@ -102,6 +102,8 @@ class ObjectStores:
 class ModelProperties:
     auth_required = 'auth_required'
     model_location = 'model_location'
+    text_chunk_prefix = 'text_chunk_prefix'
+    text_query_prefix = 'text_query_prefix'
 
 
 class InferenceParams:

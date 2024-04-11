@@ -64,6 +64,7 @@ class AddDocsParams(BaseModel):
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
+    text_chunk_prefix: Optional[str] = None
 
     def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device
