@@ -64,7 +64,7 @@ app = FastAPI(
     version=version.get_version()
 )
 app.add_middleware(TelemetryMiddleware)
-app.router.route_class = MarqoCustomRoute
+# app.router.route_class = MarqoCustomRoute
 
 
 def get_config():
