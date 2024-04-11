@@ -223,3 +223,39 @@ def determine_text_chunk_prefix(request_level_prefix: str, index_info: IndexInfo
     # Use model-defined prefix (None if it does not exist)
     model_prefix = index_info.get_model_properties().get(enums.ModelProperties.text_chunk_prefix)
     return model_prefix
+
+def determine_text_prefix(request_level_prefix: str, index_info: IndexInfo, prefix_type: str) -> str:
+    """
+    Determines the text prefix to be used for chunking text fields or search queries.
+    This prefix will be added before each text chunk or query to be used for better inference.
+        
+    Logic:
+    1. Prioritize request-level prefix
+    2. If not provided, use override in text_preprocessing
+    3. If not provided, use model_properties defined prefix
+    4. If not provided, keep as None (will be handled by dict .get() method)
+
+    Args:
+        request_level_prefix (str): The prefix provided in the request
+        index_info (IndexInfo): The index info object
+        prefix_type (str): Either "text_query_prefix" or "text_chunk_prefix"
+
+    Returns:
+        str: The determined prefix, or None if no prefix is found
+    """
+
+    if request_level_prefix is not None:
+        return request_level_prefix
+
+    # Use override in text_preprocessing (if not None)
+    index_settings = index_info.get_index_settings()
+    if enums.IndexSettingsField.text_preprocessing in index_settings[enums.IndexSettingsField.index_defaults]:
+        text_preproc = index_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.text_preprocessing]
+        override_prefix_field = f"override_{prefix_type}"
+        if override_prefix_field in text_preproc:
+            if text_preproc[override_prefix_field] is not None:
+                return text_preproc[override_prefix_field]
+
+    # Use model-defined prefix (None if it does not exist)
+    model_prefix = index_info.get_model_properties().get(prefix_type)
+    return model_prefix
