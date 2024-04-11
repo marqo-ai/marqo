@@ -177,6 +177,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
         for i, doc in enumerate(docs):
+            """Insert chunk prefix logic somewhere here"""
 
             copied = copy.deepcopy(doc)
 
@@ -600,6 +601,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
         for i, doc in enumerate(docs):
+            """Insert chunk prefix logic somewhere here"""
             copied = copy.deepcopy(doc)
 
             document_is_valid = True
@@ -830,6 +832,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             # Multimodal fields haven't been processed yet, so we do that here
             if document_is_valid:  # No need to process multimodal fields if the document is invalid
                 for tensor_field in marqo_index.tensor_fields:
+                    
                     marqo_field = marqo_index.field_map[tensor_field.name]
                     if marqo_field.type == FieldType.MultimodalCombination:
                         field_name = tensor_field.name
