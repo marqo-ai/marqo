@@ -153,6 +153,11 @@ def get_available_models() -> Dict:
     return available_models
 
 
+def get_marqo_inference_cache() -> InferenceCache:
+    """Returns the marqo_inference_cache object"""
+    return marqo_inference_cache
+
+
 def _get_max_vectorise_batch_size() -> int:
     """Gets MARQO_MAX_VECTORISE_BATCH_SIZE from the environment, validates it before returning it."""
 
