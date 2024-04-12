@@ -150,6 +150,9 @@ class TestVectoriseInferenceCache(unittest.TestCase):
         FREQUENT_ACCESS_SUBSET_SIZE = 5000
         TOTAL_QUERY_SET_SIZE = 1_000_000
 
+        # Have a warm-up call to ensure the model is loaded
+        _ = vectorise(model_name="random/small", content="test", device="cpu", enable_cache=True)
+
         def call_vectorise():
             if random.random() < FREQUENT_ACCESS_RATIO:
                 text = random.sample(frequent_texts, np.random.randint(1, 30))
