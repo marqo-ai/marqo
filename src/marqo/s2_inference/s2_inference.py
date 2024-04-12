@@ -135,8 +135,11 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
-    except UnidentifiedImageError as e:
-        raise VectoriseError(f"Could not process given image: {content}") from e
+    except (UnidentifiedImageError, OSError) as e:
+        if isinstance(e, UnidentifiedImageError) or "image file is truncated" in str(e):
+            raise VectoriseError(f"Could not process given image: {content}. Original Error message: {e}") from e
+        else:
+            raise e
     return _convert_vectorized_output(vectorised)
 
 
