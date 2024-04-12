@@ -20,6 +20,7 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.embed import embed as embed_module
+from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -179,6 +180,12 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
 def root():
     return {"message": "Welcome to Marqo",
             "version": version.get_version()}
+
+
+@app.get('/memory')
+@utils.enable_debug_apis()
+def memory():
+    return memory_profiler.get_memory_profile()
 
 
 @app.post("/indexes/{index_name}")
