@@ -34,8 +34,8 @@ available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
-marqo_inference_cache = InferenceCache(cache_size=read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CACHE_SIZE),
-                                       cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
+_marqo_inference_cache = InferenceCache(cache_size=read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CACHE_SIZE),
+                                        cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
 
 
 def vectorise(model_name: str, content: Union[str, List[Union[str,Image]], List[Image]],
@@ -77,13 +77,13 @@ def vectorise(model_name: str, content: Union[str, List[Union[str,Image]], List[
         model_auth=model_auth
     )
 
-    if marqo_inference_cache.is_enabled() and enable_cache:
+    if _marqo_inference_cache.is_enabled() and enable_cache:
         if isinstance(content, str):
             inference_cache_key = f"{model_cache_key}||{content}"
-            vectorised = marqo_inference_cache.get(inference_cache_key)
+            vectorised = _marqo_inference_cache.get(inference_cache_key)
             if vectorised is None:
                 vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
-                marqo_inference_cache[inference_cache_key] = vectorised[0]
+                _marqo_inference_cache[inference_cache_key] = vectorised[0]
                 return vectorised
             else:
                 return _convert_cached_embeddings_to_output(vectorised)
@@ -96,7 +96,7 @@ def vectorise(model_name: str, content: Union[str, List[Union[str,Image]], List[
                     contents_to_vectorise.append(content_item)
                 else:
                     inference_cache_key = f"{model_cache_key}||{content_item}"
-                    vectorised = marqo_inference_cache.get(inference_cache_key)
+                    vectorised = _marqo_inference_cache.get(inference_cache_key)
                     if vectorised is None:
                         contents_to_vectorise.append(content_item)
                     else:
@@ -106,7 +106,7 @@ def vectorise(model_name: str, content: Union[str, List[Union[str,Image]], List[
                 vectorised_outputs: List[List[float]] = _encode_without_cache(model_cache_key, contents_to_vectorise,
                                                                               normalize_embeddings, **kwargs)
                 for contents_to_vectorise_loc, vectorised_output in enumerate(vectorised_outputs):
-                    marqo_inference_cache[f"{model_cache_key}||{contents_to_vectorise[contents_to_vectorise_loc]}"] = (
+                    _marqo_inference_cache[f"{model_cache_key}||{contents_to_vectorise[contents_to_vectorise_loc]}"] = (
                         vectorised_output)
 
                 for loc, cached_vector in cached_output:
@@ -154,8 +154,8 @@ def get_available_models() -> Dict:
 
 
 def get_marqo_inference_cache() -> InferenceCache:
-    """Returns the marqo_inference_cache object"""
-    return marqo_inference_cache
+    """Returns the _marqo_inference_cache object"""
+    return _marqo_inference_cache
 
 
 def _get_max_vectorise_batch_size() -> int:
