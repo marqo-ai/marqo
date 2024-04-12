@@ -227,7 +227,6 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                     AvailableModelsKey.most_recently_used_time: most_recently_used_time,
                     AvailableModelsKey.model_size: model_size
                 }
-                print(id(available_models))
                 logger.info(
                     f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
             except Exception as e:
