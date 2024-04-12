@@ -1568,7 +1568,8 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
                     image_download_headers=v.image_download_headers,
-                    model_auth=v.model_auth
+                    model_auth=v.model_auth,
+                    enable_cache=True
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
 

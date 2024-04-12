@@ -16,6 +16,7 @@ from marqo.s2_inference.configs import get_default_normalization, get_default_se
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError)
+from marqo.s2_inference.inference_cache.inference_cache import InferenceCache
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
@@ -24,9 +25,6 @@ from marqo.tensor_search.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
-from marqo.s2_inference.inference_cache.inference_cache import InferenceCache
-
-import time
 
 logger = get_logger(__name__)
 
@@ -36,13 +34,14 @@ available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
-marqo_inference_cache = InferenceCache(cache_size=20, cache_type="LRU")
+marqo_inference_cache = InferenceCache(cache_size=read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_CACHE_SIZE),
+                                       cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
               device: str = None, normalize_embeddings: bool = get_default_normalization(),
-              model_auth: ModelAuth = None, **kwargs) -> List[List[float]]:
-    """vectorizes the content by model name
+              model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs) -> List[List[float]]:
+    """Vectorizes the content by model name.
 
     Args:
         model_name (str) : Acts as an identifying alias if model_properties is given.
@@ -53,6 +52,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
                                 if model_properties['name'] is in model_registry, default properties are overridden
                                 model_properties can be None only if model_name is a model present in the registry
         model_auth: Authorisation details for downloading a model (if required)
+        enable_cache: A flag to enable or disable the cache
 
     Returns:
         List[List[float]]: _description_
@@ -63,7 +63,7 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
 
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
-    
+
     validated_model_properties = validate_model_properties(model_name, model_properties)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
 
@@ -72,19 +72,19 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
         model_auth=model_auth
     )
 
-    start_time = time.time()
-    if marqo_inference_cache.is_enabled():
+    if marqo_inference_cache.is_enabled() and enable_cache:
         if isinstance(content, str):
             inference_cache_key = f"{model_cache_key}||{content}"
             vectorised = marqo_inference_cache.get(inference_cache_key)
             if vectorised is None:
-                vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, start_time, **kwargs)
-                marqo_inference_cache[inference_cache_key] = vectorised
-            else:
+                vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
+                marqo_inference_cache[inference_cache_key] = vectorised[0]
                 return vectorised
+            else:
+                return _convert_cached_embeddings_to_output(vectorised)
         elif isinstance(content, list):
             contents_to_vectorise = []
-            cached_output = List[Tuple[int, List[float]]] = []
+            cached_output: List[Tuple[int, List[float]]] = []
 
             for loc, content_item in enumerate(content):
                 if not isinstance(content_item, str):
@@ -95,20 +95,28 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
                     if vectorised is None:
                         contents_to_vectorise.append(content_item)
                     else:
-                        cached_output.append((loc, vectorised[0]))
-            vectorised_outputs = _encode_without_cache(model_cache_key, contents_to_vectorise, normalize_embeddings,
-                                                       start_time, **kwargs)
-            for loc, cached_vector in cached_output:
-                vectorised_outputs.insert(loc, cached_vector)
+                        cached_output.append((loc, vectorised))
+
+            if contents_to_vectorise:
+                vectorised_outputs: List[List[float]] = _encode_without_cache(model_cache_key, contents_to_vectorise,
+                                                                              normalize_embeddings, **kwargs)
+                for contents_to_vectorise_loc, vectorised_output in enumerate(vectorised_outputs):
+                    marqo_inference_cache[f"{model_cache_key}||{contents_to_vectorise[contents_to_vectorise_loc]}"] = (
+                        vectorised_output)
+
+                for loc, cached_vector in cached_output:
+                    vectorised_outputs.insert(loc, cached_vector)
+            else:
+                vectorised_outputs = [vector for _, vector in cached_output]
             return vectorised_outputs
         else:
             raise TypeError(f"Unsupported content type: {type(content).__name__}")
     else:
-        return _encode_without_cache(model_cache_key, content, normalize_embeddings, start_time, **kwargs)
+        return _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
 
 
-def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image]], normalize_embeddings: bool,
-                          start_time: float, **kwargs) -> List[List[float]]:
+def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image]],
+                          normalize_embeddings: bool, **kwargs) -> List[List[float]]:
     try:
         if isinstance(content, str):
             vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content,
@@ -127,7 +135,6 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
-        print(f"Time taken for vectorise: {time.time() - start_time}")
     except UnidentifiedImageError as e:
         raise VectoriseError(f"Could not process given image: {content}") from e
     return _convert_vectorized_output(vectorised)
@@ -537,6 +544,22 @@ def _convert_tensor_to_numpy(output:Union[FloatTensor, Tensor]) -> ndarray:
         return output
     else:
         raise ValueError(f"Marqo received an unexpected output type=`{type(output).__name__}`from encode function.")
+
+
+def _convert_cached_embeddings_to_output(cached_embeddings: List[float]) -> List[List[float]]:
+    """
+    A function that converts cached embeddings List[float] to the expected output List[List[float]]
+
+    Args:
+        cached_embeddings (List[float]): The cached embeddings to convert
+    Return:
+        List[List[float]]: The converted embeddings in the expected output format
+    """
+    if not isinstance(cached_embeddings, list):
+        raise TypeError(f"expected a list of floats but received {type(cached_embeddings)}")
+    if not isinstance(cached_embeddings[0], float):
+        raise TypeError(f"expected a list of floats but received {type(cached_embeddings[0])}")
+    return [cached_embeddings, ]
 
 
 def _convert_vectorized_output(output: Union[FloatTensor, ndarray, List[List[float]]], fp16: bool = False) -> List[
