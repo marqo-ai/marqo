@@ -118,6 +118,8 @@ class EmbeddingRequestParams(BaseMarqoModel):
             else:
                 raise ValueError("Embed content should be a string, dictionary, or a list of strings or dictionaries")
 
+        return value
+
 
 class ErrorResponse(BaseModel):
     message: str

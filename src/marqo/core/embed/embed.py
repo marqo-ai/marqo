@@ -29,7 +29,7 @@ from marqo.s2_inference.reranking import rerank
 from marqo.tensor_search import delete_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
-from marqo.tensor_search import utils, validation, add_docs
+from marqo.tensor_search import utils, validation, add_docs, tensor_search
 from marqo.tensor_search.enums import (
     Device, TensorField, SearchMethod, EnvVars
 )
@@ -43,6 +43,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+
+logger = get_logger(__name__)
 
 
 def embed_content(
@@ -80,6 +82,8 @@ def embed_content(
         content_list = content
     elif isinstance(content, str) or isinstance(content, Dict):
         content_list = [content]
+    else:
+        raise base_exceptions.InternalError(f"Content type {type(content)} is not supported for embed endpoint.")
 
     queries = []
     for content_entry in content_list:
@@ -97,7 +101,7 @@ def embed_content(
 
     # Vectorise the queries
     with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
-        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+        qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(config, queries, selected_device)
     embeddings = list(qidx_to_vectors.values())
 
     # Record time and return final result

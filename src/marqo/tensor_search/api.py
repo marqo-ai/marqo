@@ -19,7 +19,7 @@ from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.embed import embed
+from marqo.core.embed import embed as embed_module
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -239,7 +239,7 @@ def add_or_replace_documents(
 def embed(embedding_request: EmbeddingRequestParams, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
-        return embed.embed_content(
+        return embed_module.embed_content(
             config=marqo_config, content=embedding_request.content,
             index_name=index_name, device=device,
             image_download_headers=embedding_request.image_download_headers,
