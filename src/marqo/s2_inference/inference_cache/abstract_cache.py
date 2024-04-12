@@ -13,30 +13,62 @@ class MarqoAbstractCache(ABC):
     """
     @abstractmethod
     def get(self, key: str, default=None) -> List[float]:
-        """Return the value for key if key is in the cache, else default."""
+        """Return the value for key if key is in the cache, else default.
+        Args:
+            key: __description__
+            default: __description__
+        Returns:
+            __description__
+        """
         pass
 
     @abstractmethod
-    def set(self, key: str, value: List[float]):
-        """Set the value for key in the cache."""
+    def set(self, key: str, value: List[float]) -> None:
+        """Set the value for key in the cache.
+
+        Args:
+            key: __description__
+            value: __description__
+        """
         pass
 
     @abstractmethod
     def __contains__(self, key: str) -> bool:
-        """Return True if the key is in the cache, else False."""
+        """Return True if the key is in the cache, else False.
+
+        Args:
+            key: __description__
+        Returns:
+            If the key is in the cache, return True. Otherwise, return False.
+        """
         pass
 
     @abstractmethod
-    def __setitem__(self, key: str, value: List[float]):
-        """Set the value for key in the cache if the cache is not full, else popitem() until there is enough room."""
+    def __setitem__(self, key: str, value: List[float]) -> None:
+        """Set the value for key in the cache if the cache is not full, else popitem() until there is enough room.
+
+        Args:
+            key: __description__
+            value: __description__
+        """
         pass
 
     @abstractmethod
     def __getitem__(self, key: str) -> List[float]:
-        """Return the value for key if key is in the cache, else raise KeyError."""
+        """Return the value for key if key is in the cache, else raise KeyError.
+
+        Args:
+            key: __description__
+
+        Raises:
+            KeyError: If the key is not in the cache.
+
+        Returns:
+            __description__
+        """
         pass
 
     @abstractmethod
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the number of items in the cache."""
         pass
