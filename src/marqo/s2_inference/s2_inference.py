@@ -148,6 +148,11 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
     return _convert_vectorized_output(vectorised)
 
 
+def get_available_models() -> Dict:
+    """Returns the available models in the cache."""
+    return available_models
+
+
 def _get_max_vectorise_batch_size() -> int:
     """Gets MARQO_MAX_VECTORISE_BATCH_SIZE from the environment, validates it before returning it."""
 
@@ -222,6 +227,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                     AvailableModelsKey.most_recently_used_time: most_recently_used_time,
                     AvailableModelsKey.model_size: model_size
                 }
+                print(id(available_models))
                 logger.info(
                     f'loaded {model_name} on device {device} with normalization={normalize_embeddings} at time={most_recently_used_time}.')
             except Exception as e:
@@ -418,7 +424,6 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
     type = model_properties.get("type", None)
     return constants.MODEL_TYPE_SIZE_MAPPING.get(type, constants.DEFAULT_MODEL_SIZE)
-
 
 def _load_model(
         model_name: str, model_properties: dict, device: str,

@@ -20,7 +20,9 @@ class TestVectoriseInferenceCache(unittest.TestCase):
         if 'MARQO_INFERENCE_CACHE_SIZE' in os.environ:
             del os.environ['MARQO_INFERENCE_CACHE_SIZE']
         if 'marqo.s2_inference.s2_inference' in sys.modules:
-            del sys.modules['marqo.s2_inference.s2_inference']
+            importlib.reload(sys.modules['marqo.s2_inference.s2_inference'])
+        if "marqo.s2_inference" in sys.modules:
+            importlib.reload(sys.modules['marqo.s2_inference'])
 
     def _import_vectorise_with_inference_cache(self, cache_size: int = 50, cache_type="LRU"):
         """Import the vectorise function with the specified cache size and type."""
