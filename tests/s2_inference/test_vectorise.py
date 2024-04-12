@@ -37,7 +37,7 @@ class TestVectorise(unittest.TestCase):
                 AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
 
-        @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
+        @mock.patch('marqo.s2_inference.s2_inference._available_models', mock_available_models)
         @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
         def run():
             s2_inference.vectorise(model_name='mock_model', content=['just a single content'],
@@ -72,7 +72,7 @@ class TestVectorise(unittest.TestCase):
                 AvailableModelsKey.most_recently_used_time: datetime.datetime.now(),}
         }
 
-        @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
+        @mock.patch('marqo.s2_inference.s2_inference._available_models', mock_available_models)
         @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
         def run():
             try:
@@ -112,7 +112,7 @@ class TestVectorise(unittest.TestCase):
 
         content_list = ['content1', 'content2', 'content3', 'content4', 'content5']
 
-        @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
+        @mock.patch('marqo.s2_inference.s2_inference._available_models', mock_available_models)
         @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
         @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults', side_effect=[2, 3, 10])
         def run(mock_read_env_vars_and_defaults):
@@ -171,7 +171,7 @@ class TestVectorise(unittest.TestCase):
 
         content_list = ['content1', 'content2', 'content3', 'content4', 'content5']
 
-        @mock.patch('marqo.s2_inference.s2_inference.available_models', mock_available_models)
+        @mock.patch('marqo.s2_inference.s2_inference._available_models', mock_available_models)
         @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
         @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults', side_effect=['2', '3', '10'])
         def run(mock_read_env_vars_and_defaults):
@@ -230,7 +230,7 @@ class TestVectoriseBatching(unittest.TestCase):
 
         self.content_list = ['content1', 'content2', 'content3', 'content4', 'content5']
 
-    @mock.patch('marqo.s2_inference.s2_inference.available_models', {})
+    @mock.patch('marqo.s2_inference.s2_inference._available_models', {})
     @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
     def test_vectorise_single_content_item(self):
         get_available_models().update(self.mock_available_models)
@@ -243,7 +243,7 @@ class TestVectoriseBatching(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 
-    @mock.patch('marqo.s2_inference.s2_inference.available_models', {})
+    @mock.patch('marqo.s2_inference.s2_inference._available_models', {})
     @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
     def test_vectorise_varying_content_lengths(self):
         get_available_models().update(self.mock_available_models)
