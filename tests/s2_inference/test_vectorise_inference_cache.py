@@ -1,13 +1,14 @@
-import importlib
 import os
 import random
-import sys
 import unittest.mock
-from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from PIL import Image
+
+import importlib
+import sys
 
 
 class TestVectoriseInferenceCache(unittest.TestCase):
@@ -16,9 +17,9 @@ class TestVectoriseInferenceCache(unittest.TestCase):
         """Import the vectorise function with the specified cache size and type."""
         os.environ["MARQO_INFERENCE_CACHE_TYPE"] = cache_type
         os.environ["MARQO_INFERENCE_CACHE_SIZE"] = str(cache_size)
-
-        # Reload the module to apply the new environment variables
-        importlib.reload(sys.modules['marqo.s2_inference.s2_inference'])
+        # Assuming the module has already been potentially imported, reload it:
+        if 'marqo.s2_inference.s2_inference' in sys.modules:
+            importlib.reload(sys.modules['marqo.s2_inference.s2_inference'])
         from marqo.s2_inference.s2_inference import vectorise
         return vectorise
 
