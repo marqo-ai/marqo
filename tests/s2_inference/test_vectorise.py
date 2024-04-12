@@ -1,5 +1,6 @@
 import PIL
 from marqo.s2_inference import random_utils, s2_inference
+from marqo.s2_inference.s2_inference import get_available_models
 import unittest
 from unittest import mock
 from marqo.api.exceptions import ConfigurationError, InternalError
@@ -232,7 +233,7 @@ class TestVectoriseBatching(unittest.TestCase):
     @mock.patch('marqo.s2_inference.s2_inference.available_models', {})
     @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
     def test_vectorise_single_content_item(self):
-        s2_inference.available_models.update(self.mock_available_models)
+        get_available_models().update(self.mock_available_models)
 
         single_content = 'just a single content'
         result = s2_inference.vectorise(model_name='mock_model', content=single_content,
@@ -245,7 +246,7 @@ class TestVectoriseBatching(unittest.TestCase):
     @mock.patch('marqo.s2_inference.s2_inference.available_models', {})
     @mock.patch('marqo.s2_inference.s2_inference._update_available_models', mock.MagicMock())
     def test_vectorise_varying_content_lengths(self):
-        s2_inference.available_models.update(self.mock_available_models)
+        get_available_models().update(self.mock_available_models)
 
         varying_length_content = [
             'short',
@@ -261,7 +262,7 @@ class TestVectoriseBatching(unittest.TestCase):
 
     @mock.patch('marqo.tensor_search.utils.read_env_vars_and_defaults')
     def test_vectorise_large_batch_size(self, mock_read_env_vars_and_defaults):
-        s2_inference.available_models.update(self.mock_available_models)
+        get_available_models().update(self.mock_available_models)
 
         # Set the batch size larger than the number of content items
         large_batch_size = len(self.content_list) + 5
@@ -277,7 +278,7 @@ class TestVectoriseBatching(unittest.TestCase):
 
     @mock.patch('marqo.s2_inference.s2_inference.read_env_vars_and_defaults', return_value=1)
     def test_vectorise_batch_size_one(self, mock_read_env_vars_and_defaults):
-        s2_inference.available_models.update(self.mock_available_models)
+        get_available_models().update(self.mock_available_models)
 
         # Test with a batch size of 1
         s2_inference.vectorise(model_name='mock_model', content=self.content_list,
@@ -289,7 +290,7 @@ class TestVectoriseBatching(unittest.TestCase):
             self.assertEqual(call_args_list[i][0][0], [self.content_list[i]])
 
     def test_vectorise_error_handling(self):
-        s2_inference.available_models.update(self.mock_available_models)
+        get_available_models().update(self.mock_available_models)
 
         mock_available_models = mock.MagicMock()
         mock_available_models.return_value = self.mock_available_models
@@ -325,7 +326,7 @@ class TestVectoriseBatching(unittest.TestCase):
             vectorise call should raise an internal error
         """
         try:
-            s2_inference.available_models.update(self.mock_available_models)
+            get_available_models().update(self.mock_available_models)
 
             # Test with a batch size of 1
             s2_inference.vectorise(model_name='mock_model', content=self.content_list,

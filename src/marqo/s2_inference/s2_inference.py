@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 
 # The avaiable has the structure:
 # {"model_cache_key_1":{"model" : model_object, "most_recently_used_time": time, "model_size" : model_size}}
-available_models = dict()
+_available_models = dict()
 # A lock to protect the model loading process
 lock = threading.Lock()
 MODEL_PROPERTIES = load_model_properties()
@@ -124,17 +124,17 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                           normalize_embeddings: bool, **kwargs) -> List[List[float]]:
     try:
         if isinstance(content, str):
-            vectorised = available_models[model_cache_key][AvailableModelsKey.model].encode(content,
-                                                                                            normalize=normalize_embeddings,
-                                                                                            **kwargs)
+            vectorised = _available_models[model_cache_key][AvailableModelsKey.model].encode(content,
+                                                                                             normalize=normalize_embeddings,
+                                                                                             **kwargs)
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
             for batch in generate_batches(content, batch_size=batch_size):
                 vector_batches.append(_convert_tensor_to_numpy(
-                    available_models[model_cache_key][AvailableModelsKey.model].encode(batch,
-                                                                                       normalize=normalize_embeddings,
-                                                                                       **kwargs)))
+                    _available_models[model_cache_key][AvailableModelsKey.model].encode(batch,
+                                                                                        normalize=normalize_embeddings,
+                                                                                        **kwargs)))
             if not vector_batches or all(
                     len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
@@ -150,7 +150,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
 
 def get_available_models() -> Dict:
     """Returns the available models in the cache."""
-    return available_models
+    return _available_models
 
 
 def get_marqo_inference_cache() -> InferenceCache:
@@ -210,7 +210,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
     """loads the model if it is not already loaded.
     Note this method assume the model_properties are validated.
     """
-    if model_cache_key not in available_models:
+    if model_cache_key not in _available_models:
         model_size = get_model_size(model_name, validated_model_properties)
         if lock.locked():
             raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while "
@@ -222,7 +222,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                                        calling_func=_update_available_models.__name__)
             try:
                 most_recently_used_time = datetime.datetime.now()
-                available_models[model_cache_key] = {
+                _available_models[model_cache_key] = {
                     AvailableModelsKey.model: _load_model(
                         model_name, validated_model_properties,
                         device=device,
@@ -250,7 +250,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
         most_recently_used_time = datetime.datetime.now()
         logger.debug(f'renewed {model_name} on device {device} with new most recently time={most_recently_used_time}.')
         try:
-            available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
+            _available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
         except KeyError:
             raise ModelNotInCacheError(f"Marqo cannot renew model {model_name} on device {device} with normalization={normalize_embeddings}. "
                                        f"Maybe another thread is updating the model cache at the same time."
@@ -355,15 +355,15 @@ def _validate_model_into_device(model_name:str, model_properties: dict, device: 
     if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
         return True
     else:
-        model_cache_key_for_device = [key for key in list(available_models) if key.endswith(device)]
+        model_cache_key_for_device = [key for key in list(_available_models) if key.endswith(device)]
         sorted_key_for_device = sorted(model_cache_key_for_device,
-                                       key=lambda x: available_models[x][
+                                       key=lambda x: _available_models[x][
                                            AvailableModelsKey.most_recently_used_time])
         for key in sorted_key_for_device:
             logger.info(
-                f"Eject model = `{key.split('||')[0]}` with size = `{available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
+                f"Eject model = `{key.split('||')[0]}` with size = `{_available_models[key].get('model_size', constants.DEFAULT_MODEL_SIZE)}` from device = `{device}` "
                 f"to save space for model = `{model_name}`.")
-            del available_models[key]
+            del _available_models[key]
             if _check_memory_threshold_for_model(device, model_size, calling_func = _validate_model_into_device.__name__):
                 return True
 
@@ -394,12 +394,12 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
     if device.startswith("cuda"):
         torch.cuda.synchronize(device)
         torch.cuda.empty_cache()
-        used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
-                           available_models.items() if key.endswith(device)])
+        used_memory = sum([_available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                           _available_models.items() if key.endswith(device)])
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY))
     elif device.startswith("cpu"):
-        used_memory = sum([available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
-                           available_models.items() if key.endswith("cpu")])
+        used_memory = sum([_available_models[key].get("model_size", constants.DEFAULT_MODEL_SIZE) for key, values in
+                           _available_models.items() if key.endswith("cpu")])
         threshold = float(read_env_vars_and_defaults(EnvVars.MARQO_MAX_CPU_MODEL_MEMORY))
     else:
         raise ModelCacheManagementError(
@@ -466,7 +466,7 @@ def clear_loaded_models() -> None:
         Future_Change:
             expose cache related functions to the client
     """
-    available_models.clear()
+    _available_models.clear()
     if torch.cuda.is_available():
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
@@ -649,11 +649,11 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
 
 
 def get_available_models():
-    return available_models
+    return _available_models
 
 
 def eject_model(model_name: str, device: str):
-    model_cache_keys = available_models.keys()
+    model_cache_keys = _available_models.keys()
 
     model_cache_key = None
 
@@ -670,8 +670,8 @@ def eject_model(model_name: str, device: str):
     if model_cache_key is None:
         raise ModelNotInCacheError(f"The model_name `{model_name}` device `{device}` is not cached or found")
 
-    if model_cache_key in available_models:
-        del available_models[model_cache_key]
+    if model_cache_key in _available_models:
+        del _available_models[model_cache_key]
         if device.startswith("cuda"):
             torch.cuda.empty_cache()
         return {"result": "success", "message": f"successfully eject model_name `{model_name}` from device `{device}`"}
