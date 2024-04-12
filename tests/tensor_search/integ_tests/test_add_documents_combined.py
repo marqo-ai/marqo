@@ -1,20 +1,10 @@
-import functools
-import math
 import os
 import uuid
 from unittest import mock
 from unittest.mock import patch
 
-import PIL
-import pytest
-import requests
-
-from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference import types
-from marqo.tensor_search import add_docs
-from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
@@ -91,3 +81,26 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 self.assertEqual(200, r["items"][0]["status"])
                 self.assertEqual(400, r["items"][1]["status"])
                 self.assertIn("image file is truncated", r["items"][1]["error"])
+
+    def test_add_document_callVectoriseWithEnableCacheFalse(self):
+        """Ensure vectorise is called with enable_cache=False when calling add_documents."""
+        documents = [
+            {
+                "text_field_1": "Test test",
+                "_id": "1"
+            }
+        ]
+        dummy_return = [[1.0,] * 512, ]
+        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
+            tensor_fields = ["text_field_1"] if index_name == self.unstructured_marqo_index_name \
+                else None
+            with self.subTest(index_name):
+                with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
+                    r = tensor_search.add_documents(config=self.config,
+                                                    add_docs_params=AddDocsParams(index_name=index_name,
+                                                                                  docs=documents,
+                                                                                  tensor_fields=tensor_fields))
+                    mock_vectorise.assert_called_once()
+                    args, kwargs = mock_vectorise.call_args
+                    self.assertFalse(kwargs["enable_cache"])
+                mock_vectorise.reset_mock()

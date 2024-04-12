@@ -349,7 +349,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                     model_properties=marqo_index.model.get_properties(), content=content_chunks,
                                     device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                                     infer=marqo_index.treat_urls_and_pointers_as_images,
-                                    model_auth=add_docs_params.model_auth
+                                    model_auth=add_docs_params.model_auth,
+                                    enable_cache=False
                                 )
 
                             end_time = timer()
@@ -780,7 +781,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     model_properties=marqo_index.model.get_properties(), content=content_chunks,
                                     device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                                     infer=marqo_field.type == FieldType.ImagePointer,
-                                    model_auth=add_docs_params.model_auth
+                                    model_auth=add_docs_params.model_auth,
+                                    enable_cache=False
                                 )
 
                             end_time = timer()
@@ -1982,7 +1984,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=infer_if_image, model_auth=model_auth
+                    infer=infer_if_image, model_auth=model_auth, enable_cache=False
                 )
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
@@ -1991,7 +1993,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=infer_if_image, model_auth=model_auth
+                    infer=infer_if_image, model_auth=model_auth, enable_cache=False
                 )
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
@@ -2119,7 +2121,7 @@ def vectorise_multimodal_combination_field_structured(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.get_properties(), content=text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=False, model_auth=model_auth
+                    infer=False, model_auth=model_auth, enable_cache=False
                 )
         image_vectors = []
         if len(image_content_to_vectorise) > 0:
@@ -2128,7 +2130,7 @@ def vectorise_multimodal_combination_field_structured(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.get_properties(), content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=True, model_auth=model_auth
+                    infer=True, model_auth=model_auth, enable_cache=False
                 )
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)

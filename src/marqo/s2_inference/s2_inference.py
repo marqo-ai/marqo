@@ -38,7 +38,8 @@ marqo_inference_cache = InferenceCache(cache_size=read_env_vars_and_defaults_int
                                        cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
 
 
-def vectorise(model_name: str, content: Union[str, List[str]], model_properties: dict = None,
+def vectorise(model_name: str, content: Union[str, List[Union[str,Image]], List[Image]],
+              model_properties: dict = None,
               device: str = None, normalize_embeddings: bool = get_default_normalization(),
               model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs) -> List[List[float]]:
     """Vectorizes the content by model name.
@@ -46,7 +47,11 @@ def vectorise(model_name: str, content: Union[str, List[str]], model_properties:
     Args:
         model_name (str) : Acts as an identifying alias if model_properties is given.
                         If model_properties is None then model_name is used to fetch properties from model_registry
-        content (_type_): _description_
+        content (_type_):
+            str: A single string to vectorize, can be text or an image path
+            List[str]: A list of strings to vectorize, can be text or image paths
+            List[Image]: A list of PIL images to vectorize
+            List[Union[str, Image]]: A list of strings and PIL images to vectorize
         model_properties(dict): {"name": str, "dimensions": int, "tokens": int, "type": str}
                                 if model_properties['name'] is not in model_registry, these properties are used to fetch the model
                                 if model_properties['name'] is in model_registry, default properties are overridden
