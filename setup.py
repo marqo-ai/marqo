@@ -32,7 +32,9 @@ setup(
         "fastapi_utils",
         "opencv-python-headless",
         "psutil",
-        "multilingual_clip"
+        "multilingual_clip",
+        "readerwriterlock==1.0.9",
+        "cachetools==5.3.1"
     ],
     name="marqo-engine",
     version="0.1.10",
