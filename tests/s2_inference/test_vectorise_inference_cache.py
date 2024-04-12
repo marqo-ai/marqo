@@ -46,135 +46,135 @@ class TestVectoriseInferenceCache(unittest.TestCase):
                 mock_encode.assert_not_called()
                 self.assertEqual(original_vector, cached_vector)
 
-    # def test_vectorise_withInferenceCacheForListString_success(self):
-    #     """Test if the vectorise function returns the correct embeddings for a list of strings."""
-    #     vectorise = self._import_vectorise_with_inference_cache()
-    #     content = ["test1", "test2"]
-    #     # First call
-    #     original_vector = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
-    #     # following calls
-    #     for _ in range(10):
-    #         with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
-    #             cached_vector = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
-    #             mock_encode.assert_not_called()
-    #             self.assertEqual(original_vector, cached_vector)
-    #
-    # def test_vectorise_enableCaseIsFalse(self):
-    #     """Test if the vectorise function returns the correct embeddings when enable_cache is False."""
-    #     vectorise = self._import_vectorise_with_inference_cache()
-    #     for first_call_enable_cache in [True, False]:
-    #         with self.subTest(f"First call enable_cache={first_call_enable_cache}"):
-    #             # First call
-    #             _ = vectorise(model_name="random/small", content="test", device="cpu",
-    #                           enable_cache=first_call_enable_cache)
-    #             # following calls
-    #             with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
-    #                 _ = vectorise(model_name="random/small", content="test", device="cpu", enable_cache=False)
-    #                 mock_encode.assert_called_once()
-    #
-    # def test_vectorise_listOfStringsPartialCache(self):
-    #     """A test to check if the cache is working correctly when part of the list is already cached."""
-    #     vectorise = self._import_vectorise_with_inference_cache()
-    #     cached_content = ["test1", "test2"]
-    #     # First call
-    #     original_vector = vectorise(model_name="random/small", content=cached_content, device="cpu", enable_cache=True)
-    #
-    #     # following calls
-    #     new_content = ["test3", "test4"]
-    #     with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
-    #         _ = vectorise(model_name="random/small", content=cached_content + new_content, device="cpu",
-    #                       enable_cache=True)
-    #         args, _ = mock_encode.call_args
-    #         self.assertEqual(new_content, args[1])
-    #
-    # def test_vectorise_listOfStringsPartialCacheVectorsCorrect(self):
-    #     """A test to check if the cache is working correctly when part of the list is already cached."""
-    #     iterations = 10
-    #     initial_size = 20
-    #     new_cached_size = 20
-    #     total_size = initial_size + new_cached_size
-    #     for _ in range(iterations):
-    #         vectorise = self._import_vectorise_with_inference_cache(cache_size=total_size)
-    #         cached_content = [f"test{i}" for i in range(initial_size)]
-    #         # First call
-    #         original_vector = vectorise(model_name="random/small", content=cached_content, device="cpu",
-    #                                     enable_cache=True)
-    #
-    #         # following calls with partially cached content
-    #         new_content = [f"test{i}" for i in range(initial_size, total_size)]
-    #         content = cached_content + new_content
-    #         random.shuffle(content)
-    #         vectors = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
-    #         self.assertEqual(len(vectors), total_size)
-    #         self.assertEqual([vectors[content.index(c)] for c in cached_content], original_vector)
-    #
-    #         # following calls with fully cached content
-    #         random.shuffle(content)
-    #         with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
-    #             _ = vectorise(model_name="random/small", content=content, device="cpu",
-    #                           enable_cache=True)
-    #             mock_encode.assert_not_called()
-    #
-    # def test_vectorise_cacheNotWorkForPILImage(self):
-    #     """Test if the cache does not work for PIL.Image.Image objects."""
-    #     vectorise = self._import_vectorise_with_inference_cache()
-    #     content = [Image.fromarray(np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8)), ]
-    #     # First call
-    #     _ = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
-    #     # following calls
-    #     with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
-    #         _ = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
-    #         mock_encode.assert_called_once()
-    #
-    # def test_vectorise_cacheWorkForImagePath(self):
-    #     """Test if the cache works for image paths."""
-    #     vectorise = self._import_vectorise_with_inference_cache()
-    #     content = ["https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg"]
-    #     # First call
-    #     original_vector = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
-    #                                 device="cpu", enable_cache=True, infer=True)
-    #     # following calls
-    #     with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
-    #         _ = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
-    #                       device="cpu", enable_cache=True, infer=True)
-    #         mock_encode.assert_not_called()
-    #     cached_vector = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
-    #                               device="cpu", enable_cache=True, infer=True)
-    #     self.assertEqual(original_vector, cached_vector)
-    #
-    # def test_vectorise_cacheDifferentModelsSameContent(self):
-    #     """Test if the cache works for different models with the same content."""
-    #     vectorise = self._import_vectorise_with_inference_cache()
-    #     content = "test"
-    #     # First call
-    #     original_vector = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
-    #     # following calls
-    #     with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
-    #         cached_vector = vectorise(model_name="random/large", content=content, device="cpu", enable_cache=True)
-    #         mock_encode.assert_called_once()
-    #
-    # def test_vectorise_cacheConcurrentSafety(self):
-    #     """Test if the cache works concurrently."""
-    #     vectorise = self._import_vectorise_with_inference_cache()
-    #     ITERATIONS = 50_000
-    #     FREQUENT_ACCESS_RATIO = 0.5
-    #     FREQUENT_ACCESS_SUBSET_SIZE = 5000
-    #     TOTAL_QUERY_SET_SIZE = 1_000_000
-    #
-    #     # Have a warm-up call to ensure the model is loaded
-    #     _ = vectorise(model_name="random/small", content="test", device="cpu", enable_cache=True)
-    #
-    #     def call_vectorise():
-    #         if random.random() < FREQUENT_ACCESS_RATIO:
-    #             text = random.sample(frequent_texts, np.random.randint(1, 30))
-    #         else:
-    #             text = random.sample(frequent_texts, np.random.randint(1, 30))
-    #         return vectorise(model_name="random/small", content=text, device="cpu", enable_cache=True)
-    #
-    #     texts = [f"text{i} " * 5 for i in range(TOTAL_QUERY_SET_SIZE)]
-    #     frequent_texts = random.sample(texts, FREQUENT_ACCESS_SUBSET_SIZE)
-    #     with ThreadPoolExecutor(max_workers=8) as executor:
-    #         futures = [executor.submit(call_vectorise) for _ in
-    #                    range(ITERATIONS)]
-    #         result = [future.result() for future in futures]
-    #     self.assertEqual(ITERATIONS, len(result))
+    def test_vectorise_withInferenceCacheForListString_success(self):
+        """Test if the vectorise function returns the correct embeddings for a list of strings."""
+        vectorise = self._import_vectorise_with_inference_cache()
+        content = ["test1", "test2"]
+        # First call
+        original_vector = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
+        # following calls
+        for _ in range(10):
+            with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
+                cached_vector = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
+                mock_encode.assert_not_called()
+                self.assertEqual(original_vector, cached_vector)
+
+    def test_vectorise_enableCaseIsFalse(self):
+        """Test if the vectorise function returns the correct embeddings when enable_cache is False."""
+        vectorise = self._import_vectorise_with_inference_cache()
+        for first_call_enable_cache in [True, False]:
+            with self.subTest(f"First call enable_cache={first_call_enable_cache}"):
+                # First call
+                _ = vectorise(model_name="random/small", content="test", device="cpu",
+                              enable_cache=first_call_enable_cache)
+                # following calls
+                with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
+                    _ = vectorise(model_name="random/small", content="test", device="cpu", enable_cache=False)
+                    mock_encode.assert_called_once()
+
+    def test_vectorise_listOfStringsPartialCache(self):
+        """A test to check if the cache is working correctly when part of the list is already cached."""
+        vectorise = self._import_vectorise_with_inference_cache()
+        cached_content = ["test1", "test2"]
+        # First call
+        original_vector = vectorise(model_name="random/small", content=cached_content, device="cpu", enable_cache=True)
+
+        # following calls
+        new_content = ["test3", "test4"]
+        with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
+            _ = vectorise(model_name="random/small", content=cached_content + new_content, device="cpu",
+                          enable_cache=True)
+            args, _ = mock_encode.call_args
+            self.assertEqual(new_content, args[1])
+
+    def test_vectorise_listOfStringsPartialCacheVectorsCorrect(self):
+        """A test to check if the cache is working correctly when part of the list is already cached."""
+        iterations = 10
+        initial_size = 20
+        new_cached_size = 20
+        total_size = initial_size + new_cached_size
+        for _ in range(iterations):
+            vectorise = self._import_vectorise_with_inference_cache(cache_size=total_size)
+            cached_content = [f"test{i}" for i in range(initial_size)]
+            # First call
+            original_vector = vectorise(model_name="random/small", content=cached_content, device="cpu",
+                                        enable_cache=True)
+
+            # following calls with partially cached content
+            new_content = [f"test{i}" for i in range(initial_size, total_size)]
+            content = cached_content + new_content
+            random.shuffle(content)
+            vectors = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
+            self.assertEqual(len(vectors), total_size)
+            self.assertEqual([vectors[content.index(c)] for c in cached_content], original_vector)
+
+            # following calls with fully cached content
+            random.shuffle(content)
+            with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
+                _ = vectorise(model_name="random/small", content=content, device="cpu",
+                              enable_cache=True)
+                mock_encode.assert_not_called()
+
+    def test_vectorise_cacheNotWorkForPILImage(self):
+        """Test if the cache does not work for PIL.Image.Image objects."""
+        vectorise = self._import_vectorise_with_inference_cache()
+        content = [Image.fromarray(np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8)), ]
+        # First call
+        _ = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
+        # following calls
+        with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
+            _ = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
+            mock_encode.assert_called_once()
+
+    def test_vectorise_cacheWorkForImagePath(self):
+        """Test if the cache works for image paths."""
+        vectorise = self._import_vectorise_with_inference_cache()
+        content = ["https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg"]
+        # First call
+        original_vector = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
+                                    device="cpu", enable_cache=True, infer=True)
+        # following calls
+        with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
+            _ = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
+                          device="cpu", enable_cache=True, infer=True)
+            mock_encode.assert_not_called()
+        cached_vector = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
+                                  device="cpu", enable_cache=True, infer=True)
+        self.assertEqual(original_vector, cached_vector)
+
+    def test_vectorise_cacheDifferentModelsSameContent(self):
+        """Test if the cache works for different models with the same content."""
+        vectorise = self._import_vectorise_with_inference_cache()
+        content = "test"
+        # First call
+        original_vector = vectorise(model_name="random/small", content=content, device="cpu", enable_cache=True)
+        # following calls
+        with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
+            cached_vector = vectorise(model_name="random/large", content=content, device="cpu", enable_cache=True)
+            mock_encode.assert_called_once()
+
+    def test_vectorise_cacheConcurrentSafety(self):
+        """Test if the cache works concurrently."""
+        vectorise = self._import_vectorise_with_inference_cache()
+        ITERATIONS = 50_000
+        FREQUENT_ACCESS_RATIO = 0.5
+        FREQUENT_ACCESS_SUBSET_SIZE = 5000
+        TOTAL_QUERY_SET_SIZE = 1_000_000
+
+        # Have a warm-up call to ensure the model is loaded
+        _ = vectorise(model_name="random/small", content="test", device="cpu", enable_cache=True)
+
+        def call_vectorise():
+            if random.random() < FREQUENT_ACCESS_RATIO:
+                text = random.sample(frequent_texts, np.random.randint(1, 30))
+            else:
+                text = random.sample(frequent_texts, np.random.randint(1, 30))
+            return vectorise(model_name="random/small", content=text, device="cpu", enable_cache=True)
+
+        texts = [f"text{i} " * 5 for i in range(TOTAL_QUERY_SET_SIZE)]
+        frequent_texts = random.sample(texts, FREQUENT_ACCESS_SUBSET_SIZE)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(call_vectorise) for _ in
+                       range(ITERATIONS)]
+            result = [future.result() for future in futures]
+        self.assertEqual(ITERATIONS, len(result))
