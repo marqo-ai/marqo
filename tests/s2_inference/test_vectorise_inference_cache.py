@@ -13,6 +13,12 @@ import sys
 
 class TestVectoriseInferenceCache(unittest.TestCase):
 
+    def tearDown(self):
+        if 'marqo.s2_inference.s2_inference' in sys.modules:
+            os.environ["MARQO_INFERENCE_CACHE_TYPE"] = "LRU"
+            os.environ["MARQO_INFERENCE_CACHE_SIZE"] = str(0)
+            importlib.reload(sys.modules['marqo.s2_inference.s2_inference'])
+
     def _import_vectorise_with_inference_cache(self, cache_size: int = 50, cache_type="LRU"):
         """Import the vectorise function with the specified cache size and type."""
         os.environ["MARQO_INFERENCE_CACHE_TYPE"] = cache_type
