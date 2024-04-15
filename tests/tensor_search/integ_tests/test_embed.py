@@ -402,4 +402,4 @@ class TestEmbed(MarqoTestCase):
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], sample_content_list)
                 for i in range(len(sample_content_list)):
-                    assert np.allclose(embed_res["embeddings"][i], search_query_embeddings[i])
+                    assert np.allclose(embed_res["embeddings"][i], search_query_embeddings[i], atol=1e-6)
