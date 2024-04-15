@@ -6,7 +6,10 @@ from marqo.s2_inference.inference_cache.abstract_cache import MarqoAbstractCache
 
 
 class MarqoLFUCache(MarqoAbstractCache):
-    """Least Frequently Used (LFU) cache implementation using cachetools."""
+    """Least Frequently Used (LFU) cache implementation.
+
+    This class is currently implemented using cachetools.LFUCache, but it can be replaced with any other LFU cache.
+    """
     def __init__(self, maxsize: int):
         self.cache = LFUCache(maxsize=maxsize, )
 
@@ -28,3 +31,5 @@ class MarqoLFUCache(MarqoAbstractCache):
     def __len__(self) -> int:
         return len(self.cache)
 
+    def popitem(self) -> None:
+        self.cache.popitem()

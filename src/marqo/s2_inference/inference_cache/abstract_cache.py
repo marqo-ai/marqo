@@ -33,6 +33,15 @@ class MarqoAbstractCache(ABC):
         pass
 
     @abstractmethod
+    def popitem(self) -> None:
+        """Remove an item from the cache according to the defined eviction policy. The item is not returned.
+
+        Raises:
+            Exception: If there is an issue in removing an item (e.g., cache is already empty).
+        """
+        pass
+
+    @abstractmethod
     def __contains__(self, key: str) -> bool:
         """Return True if the key is in the cache, else False.
 

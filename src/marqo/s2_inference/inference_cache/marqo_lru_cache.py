@@ -6,7 +6,9 @@ from marqo.s2_inference.inference_cache.abstract_cache import MarqoAbstractCache
 
 
 class MarqoLRUCache(MarqoAbstractCache):
-    """Least Recently Used (LRU) cache implementation using cachetools."""
+    """Least Recently Used (LRU) cache implementation.
+
+    This class is currently implemented using cachetools.LRUCache, but it can be replaced with any other LRU cache."""
     def __init__(self, maxsize: int):
         self.cache = LRUCache(maxsize=maxsize)
 
@@ -27,3 +29,6 @@ class MarqoLRUCache(MarqoAbstractCache):
 
     def __len__(self) -> int:
         return len(self.cache)
+
+    def popitem(self) -> None:
+        self.cache.popitem()
