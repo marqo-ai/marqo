@@ -395,3 +395,17 @@ def enable_upgrade_api():
         return wrapper
 
     return decorator_function
+
+
+def enable_debug_apis():
+    def decorator_function(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_DEBUG_API).lower() != 'true':
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_DEBUG_API to true to enable it.")
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator_function
