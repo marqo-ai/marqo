@@ -19,7 +19,7 @@ from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResp
     FeedDocumentResponse
 from marqo.vespa.models.query_result import Root, Child, RootFields
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
-from marqo.tensor_search.models.api_models import EmbeddingRequestParams
+from marqo.api.models.embed_request import EmbeddingRequest
 import os
 import pprint
 import unittest
@@ -159,7 +159,7 @@ class TestEmbed(MarqoTestCase):
                 # Embed request the same text
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbeddingRequestParams(
+                    embedding_request=EmbeddingRequest(
                         content=["I am the GOAT."]
                     ),
                     device="cpu"
@@ -201,7 +201,7 @@ class TestEmbed(MarqoTestCase):
                 # Embed request the same text
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbeddingRequestParams(
+                    embedding_request=EmbeddingRequest(
                         content=["I am the GOAT."]
                     ),
                     device="cpu"
@@ -246,7 +246,7 @@ class TestEmbed(MarqoTestCase):
                 # Embed request the same text
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbeddingRequestParams(
+                    embedding_request=EmbeddingRequest(
                         content=[image_url]
                     ),
                     device="cpu"
@@ -280,7 +280,7 @@ class TestEmbed(MarqoTestCase):
                 def run():
                     embed_res = embed(
                         marqo_config=self.config, index_name=index.name,
-                        embedding_request=EmbeddingRequestParams(
+                        embedding_request=EmbeddingRequest(
                             content=[image_url],
                             image_download_headers={"Authorization": "my secret key"},
                             modelAuth=ModelAuth(s3=S3Auth(
@@ -341,7 +341,7 @@ class TestEmbed(MarqoTestCase):
                 # Embed request the same text
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbeddingRequestParams(
+                    embedding_request=EmbeddingRequest(
                         content=[{"I am the GOATest of all time.": 0.7, image_url: 0.3}]
                     ),
                     device="cpu"
@@ -393,7 +393,7 @@ class TestEmbed(MarqoTestCase):
                 # Embed request the content list
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
-                    embedding_request=EmbeddingRequestParams(
+                    embedding_request=EmbeddingRequest(
                         content=sample_content_list
                     ),
                     device="cpu"
@@ -410,7 +410,7 @@ class TestEmbed(MarqoTestCase):
                 with self.assertRaises(ValidationError) as e:
                     embed_res = embed(
                         marqo_config=self.config, index_name=index.name,
-                        embedding_request=EmbeddingRequestParams(
+                        embedding_request=EmbeddingRequest(
                             content=[]
                         ),
                         device="cpu"
@@ -430,7 +430,7 @@ class TestEmbed(MarqoTestCase):
                         with self.assertRaises(ValidationError) as e:
                             embed(
                                 marqo_config=self.config, index_name=index.name,
-                                embedding_request=EmbeddingRequestParams(
+                                embedding_request=EmbeddingRequest(
                                     content=content
                                 ),
                                 device="cpu"

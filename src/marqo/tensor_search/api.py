@@ -16,7 +16,7 @@ from marqo.api.exceptions import InvalidArgError
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.api.models.embed_request import EmbeddingParams
+from marqo.api.models.embed_request import EmbeddingRequest
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
@@ -244,7 +244,7 @@ def add_or_replace_documents(
 
 @app.post("/indexes/{index_name}/embed")
 @throttle(RequestType.EMBED)
-def embed(embedding_request: EmbeddingParams, index_name: str, device: str = Depends(api_validation.validate_device),
+def embed(embedding_request: EmbeddingRequest, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
         return embed_module.embed_content(

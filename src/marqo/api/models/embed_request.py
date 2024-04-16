@@ -12,6 +12,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
+from marqo.tensor_search.models.api_models import BaseMarqoModel
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import MarqoIndex
 
