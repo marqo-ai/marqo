@@ -403,3 +403,36 @@ class TestEmbed(MarqoTestCase):
                 self.assertEqual(embed_res["content"], sample_content_list)
                 for i in range(len(sample_content_list)):
                     assert np.allclose(embed_res["embeddings"][i], search_query_embeddings[i], atol=1e-6)
+
+    def test_embed_empty_content_list(self):
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                with self.assertRaises(ValidationError) as e:
+                    embed_res = embed(
+                        marqo_config=self.config, index_name=index.name,
+                        embedding_request=EmbeddingRequestParams(
+                            content=[]
+                        ),
+                        device="cpu"
+                    )
+
+                self.assertIn("should not be empty", str(e.exception))
+
+    def test_embed_invalid_content_type(self):
+        test_cases = [
+            ({"key": "not a number"}, "not a valid float"),  # dict with wrong typed value
+            ([{"key": "value"}], "not a valid float")  # list of dict with wrong typed value
+        ]
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                for content, error_message in test_cases:
+                    with self.subTest(content=content):
+                        with self.assertRaises(ValidationError) as e:
+                            embed(
+                                marqo_config=self.config, index_name=index.name,
+                                embedding_request=EmbeddingRequestParams(
+                                    content=content
+                                ),
+                                device="cpu"
+                            )
+                    self.assertIn(error_message, str(e.exception))
