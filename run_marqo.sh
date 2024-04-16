@@ -145,7 +145,7 @@ MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
 
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
-memray run --live-remote --live-port 8888 -m uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level $MARQO_LOG_LEVEL &
+memray run --live-remote --native --live-port 8888 -m uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level $MARQO_LOG_LEVEL &
 export api_pid=$!
 wait "$api_pid"
 
