@@ -16,6 +16,7 @@ from marqo.api.exceptions import InvalidArgError
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.api.models.embed_request import EmbeddingParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
@@ -25,7 +26,7 @@ from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
-from marqo.tensor_search.models.api_models import SearchQuery, EmbeddingRequestParams
+from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
@@ -243,7 +244,7 @@ def add_or_replace_documents(
 
 @app.post("/indexes/{index_name}/embed")
 @throttle(RequestType.EMBED)
-def embed(embedding_request: EmbeddingRequestParams, index_name: str, device: str = Depends(api_validation.validate_device),
+def embed(embedding_request: EmbeddingParams, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
         return embed_module.embed_content(
