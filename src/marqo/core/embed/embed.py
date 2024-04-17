@@ -9,7 +9,6 @@ from marqo.api import exceptions as api_exceptions
 from marqo.core import exceptions as core_exceptions
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
-from marqo.config import Config
 from marqo.core import constants
 
 from marqo.core.index_management.index_management import IndexManagement
@@ -47,73 +46,77 @@ from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
 logger = get_logger(__name__)
 
 
-def embed_content(
-                config: Config, content: Union[Union[str, Dict[str, float]], List[Union[str, Dict[str, float]]]],
-                index_name: str, device: str = None,
-                image_download_headers: Optional[Dict] = None,
-                model_auth: Optional[ModelAuth] = None
-                ) -> List[List[float]]:
-    """
-    Use the index's model to embed the content
+class Embed:
+    def __init__(self, config):
+        self.config = config
 
-    Returns:
-            List of embeddings corresponding to the content. If content is a list, the return list will be in the same order.
-            If content is a string, the return list will only have 1 item.
-    """
+    def embed_content(
+                    self, content: Union[Union[str, Dict[str, float]], List[Union[str, Dict[str, float]]]],
+                    index_name: str, device: str = None,
+                    image_download_headers: Optional[Dict] = None,
+                    model_auth: Optional[ModelAuth] = None
+                    ) -> List[List[float]]:
+        """
+        Use the index's model to embed the content
 
-    # Content validation is done in API model layer
-    t0 = timer()
+        Returns:
+                List of embeddings corresponding to the content. If content is a list, the return list will be in the same order.
+                If content is a string, the return list will only have 1 item.
+        """
 
-    # Determine device
-    if device is None:
-        selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-        if selected_device is None:
-            raise base_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
-        logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
-    else:
-        selected_device = device
+        # Content validation is done in API model layer
+        t0 = timer()
 
-    # Generate input for the vectorise pipeline (Preprocessing)
-    RequestMetricsStore.for_request().start("embed.query_preprocessing")
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+        # Determine device
+        if device is None:
+            selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
+            if selected_device is None:
+                raise base_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
+            logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
+        else:
+            selected_device = device
 
-    # Transform content to list if it is not already
-    if isinstance(content, List):
-        content_list = content
-    elif isinstance(content, str) or isinstance(content, Dict):
-        content_list = [content]
-    else:
-        raise base_exceptions.InternalError(f"Content type {type(content)} is not supported for embed endpoint.")
+        # Generate input for the vectorise pipeline (Preprocessing)
+        RequestMetricsStore.for_request().start("embed.query_preprocessing")
+        marqo_index = index_meta_cache.get_index(config=self.config, index_name=index_name)
 
-    queries = []
-    for content_entry in content_list:
-        queries.append(
-            # TODO (future): Change to different object with only the necessary fields. Do the same with search.
-            BulkSearchQueryEntity(
-                q=content_entry,
-                index=marqo_index,
-                image_download_headers=image_download_headers,
-                modelAuth=model_auth
-                # TODO: Check if it's fine that we leave out the other parameters
+        # Transform content to list if it is not already
+        if isinstance(content, List):
+            content_list = content
+        elif isinstance(content, str) or isinstance(content, Dict):
+            content_list = [content]
+        else:
+            raise base_exceptions.InternalError(f"Content type {type(content)} is not supported for embed endpoint.")
+
+        queries = []
+        for content_entry in content_list:
+            queries.append(
+                # TODO (future): Change to different object with only the necessary fields. Do the same with search.
+                BulkSearchQueryEntity(
+                    q=content_entry,
+                    index=marqo_index,
+                    image_download_headers=image_download_headers,
+                    modelAuth=model_auth
+                    # TODO: Check if it's fine that we leave out the other parameters
+                )
             )
-        )
-    RequestMetricsStore.for_request().stop("embed.query_preprocessing")
+        RequestMetricsStore.for_request().stop("embed.query_preprocessing")
 
-    # Vectorise the queries
-    with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
-        qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(config, queries, selected_device)
-    embeddings = list(qidx_to_vectors.values())
+        # Vectorise the queries
+        with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
+            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(self.config, queries, selected_device)
+        embeddings = list(qidx_to_vectors.values())
 
-    # Record time and return final result
-    time_taken = timer() - t0
-    embeddings_final_result = {
-        "content": content,
-        "embeddings": embeddings,
-        "processingTimeMs": round(time_taken * 1000)
-    }
-    logger.debug(f"embed request completed with total processing time: {(time_taken):.3f}s.")
+        # Record time and return final result
+        time_taken = timer() - t0
+        embeddings_final_result = {
+            "content": content,
+            "embeddings": embeddings,
+            "processingTimeMs": round(time_taken * 1000)
+        }
+        logger.debug(f"embed request completed with total processing time: {(time_taken):.3f}s.")
 
-    return embeddings_final_result
+        return embeddings_final_result
 
 
 

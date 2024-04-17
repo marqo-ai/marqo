@@ -56,6 +56,7 @@ def generate_config() -> config.Config:
 
 
 _config = generate_config()
+_embed = embed_module.Embed(config=_config)
 
 if __name__ in ["__main__", "api"]:
     on_start(_config)
@@ -247,8 +248,8 @@ def add_or_replace_documents(
 def embed(embedding_request: EmbeddingRequest, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
-        return embed_module.embed_content(
-            config=marqo_config, content=embedding_request.content,
+        return _embed.embed_content(
+            content=embedding_request.content,
             index_name=index_name, device=device,
             image_download_headers=embedding_request.image_download_headers,
             model_auth=embedding_request.modelAuth
