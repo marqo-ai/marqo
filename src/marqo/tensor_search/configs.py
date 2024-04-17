@@ -40,5 +40,6 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_ENABLE_UPGRADE_API: "FALSE",
         EnvVars.MARQO_ENABLE_DEBUG_API: "FALSE",
         EnvVars.MARQO_MAX_CONCURRENT_PARTIAL_UPDATE: 100,
-        EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE: 128
+        EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE: 128,
+        EnvVars.PYTHONMALLOC: "malloc"
     }
