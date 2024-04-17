@@ -1,6 +1,6 @@
 import torch.cuda
 from tests.marqo_test import MarqoTestCase
-from marqo.s2_inference.s2_inference import _validate_model_properties,\
+from marqo.s2_inference.s2_inference import validate_model_properties,\
     _create_model_cache_key, _update_available_models, available_models, clear_loaded_models
 from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models, get_cpu_info
 from marqo.api.exceptions import ModelNotInCacheError, HardwareCompatabilityError
@@ -13,7 +13,7 @@ from marqo.tensor_search import tensor_search
 
 
 def load_model(model_name: str, device: str, model_properteis: dict = None) -> None:
-    validated_model_properties = _validate_model_properties(model_name, model_properteis)
+    validated_model_properties = validate_model_properties(model_name, model_properteis)
     model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
     _update_available_models(model_cache_key, model_name, validated_model_properties, device, True)
 
@@ -126,7 +126,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
         loaded_models = get_loaded_models()["models"]
         loaded_models_keys = [_create_model_cache_key(dic["model_name"], dic["model_device"],
-                                _validate_model_properties(dic["model_name"], None)) for dic in loaded_models]
+                                validate_model_properties(dic["model_name"], None)) for dic in loaded_models]
         assert loaded_models_keys==list(available_models.keys())
 
 
@@ -225,7 +225,7 @@ class TestModelCacheManagement(MarqoTestCase):
             raise AssertionError
 
         for model_name in self.MODEL_LIST:
-            validated_model_properties = _validate_model_properties(model_name, None)
+            validated_model_properties = validate_model_properties(model_name, None)
             model_cache_key = _create_model_cache_key(model_name, "cpu", validated_model_properties)
             _update_available_models(model_cache_key, model_name, validated_model_properties, "cpu", True)
 
@@ -245,7 +245,7 @@ class TestModelCacheManagement(MarqoTestCase):
 
         if self.CUDA_FLAG is True:
             for model_name in self.MODEL_LIST:
-                validated_model_properties = _validate_model_properties(model_name, None)
+                validated_model_properties = validate_model_properties(model_name, None)
                 model_cache_key = _create_model_cache_key(model_name, "cuda", validated_model_properties)
                 _update_available_models(model_cache_key, model_name, validated_model_properties, "cuda", True)
 

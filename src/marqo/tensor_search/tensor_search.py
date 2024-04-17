@@ -45,6 +45,7 @@ import torch.cuda
 from PIL import Image
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
+from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -71,8 +72,7 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars,
-    MappingsObjectType
+    Device, TensorField, SearchMethod, EnvVars
 )
 from marqo.tensor_search.index_meta_cache import get_cache, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -84,7 +84,6 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
-from marqo import marqo_docs
 
 logger = get_logger(__name__)
 
@@ -363,13 +362,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
                                 link=marqo_docs.list_of_models()
                             )
-                        except s2_inference_errors.S2InferenceError:
+                        except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
-                            image_err = errors.InvalidArgError(
-                                message=f'Could not process given image: {field_content}')
                             unsuccessful_docs.append(
-                                (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                                     'code': image_err.code})
+                                (i, {'_id': doc_id, 'error': e.message,
+                                     'status': int(errors.InvalidArgError.status_code),
+                                     'code': errors.InvalidArgError.code})
                             )
                             break
 
@@ -542,7 +540,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     if add_docs_params.tensor_fields is not None:
-        raise api_exceptions.InvalidArgError('Cannot specify `tensorFields` for a structured index')
+        raise api_exceptions.InvalidArgError("Cannot specify 'tensorFields' when adding documents to a "
+                                             "structured index. 'tensorFields' must be defined in structured "
+                                             "index schema at index creation time")
 
     if add_docs_params.mappings is not None:
         validation.validate_mappings_object(
@@ -761,8 +761,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 document_is_valid = False
                                 unsuccessful_docs.append(
                                     (i, {'_id': doc_id, 'error': e.message,
-                                         'status': int(api_exceptions.InvalidArgError.status_code),
-                                         'code': api_exceptions.InvalidArgError.code})
+                                         'status': int(errors.InvalidArgError.status_code),
+                                         'code': errors.InvalidArgError.code})
                                 )
                                 break
 
@@ -793,13 +793,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 message=f'Problem vectorising query. Reason: {str(model_error)}',
                                 link=marqo_docs.list_of_models()
                             )
-                        except s2_inference_errors.S2InferenceError:
+                        except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
-                            image_err = api_exceptions.InvalidArgError(
-                                message=f'Could not process given image: {field_content}')
                             unsuccessful_docs.append(
-                                (i, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                                     'code': image_err.code})
+                                (i,
+                                 {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
+                                  'code': errors.InvalidArgError.code})
                             )
                             break
 
@@ -1172,7 +1171,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
         raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
 
-def search(config: Config, index_name: str, text: Union[str, dict],
+def search(config: Config, index_name: str, text: Union[None, str, dict],
            result_count: int = 3, offset: int = 0,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
@@ -1419,7 +1418,8 @@ def _lexical_search(
     return gathered_docs
 
 
-def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoIndex) -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Optional[Union[str, Dict]], index_info: MarqoIndex) \
+        -> Tuple[List[str], List[str]]:
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
@@ -1436,7 +1436,7 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoInd
             return [], [query, ]
         else:
             return [query, ], []
-    else:  # is dict:
+    elif isinstance(query, dict):  # is dict:
         ordered_queries = list(query.items())
         if treat_urls_as_images:
             text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
@@ -1444,6 +1444,10 @@ def construct_vector_input_batches(query: Union[str, Dict], index_info: MarqoInd
             return text_queries, image_queries
         else:
             return [k for k, _ in ordered_queries], []
+    elif query is None:
+        return [], []
+    else:
+        raise ValueError(f"Incorrect type for query: {type(query).__name__}")
 
 
 def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
@@ -1543,10 +1547,9 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     jobs: Dict[JHash, VectorisedJobs] = {}
     for i, q in enumerate(queries):
         q = queries[i]
-        index_info = get_index(config=config, index_name=q.index)
         # split images from text:
-        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, index_info)
-        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, index_info, device)
+        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
+        qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, q.index, device)
 
     return qidx_to_job, jobs
 
@@ -1608,43 +1611,46 @@ def get_query_vectors_from_jobs(
 
         # qidx_to_vectors[qidx].append(vectors)
         q = queries[qidx]
-        index_info = get_index(config=config, index_name=q.index)
 
-        ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
-        if ordered_queries:
-            # multiple queries. We have to weight and combine them:
-            vectorised_ordered_queries = [
-                (get_content_vector(
-                    possible_jobs=qidx_to_job[qidx],
-                    jobs=jobs,
-                    job_to_vectors=job_to_vectors,
-                    treat_urls_as_images=True,  # TODO - infer this from model
-                    content=content),
-                 weight,
-                 content
-                ) for content, weight in ordered_queries
-            ]
-            # TODO how do we ensure order?
-            weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
+        if isinstance(q.q, dict) or q.q is None:
+            ordered_queries = list(q.q.items()) if isinstance(q.q, dict) else None
+            weighted_vectors = []
+            if ordered_queries:
+                # multiple queries. We have to weight and combine them:
+                vectorised_ordered_queries = [
+                    (get_content_vector(
+                        possible_jobs=qidx_to_job[qidx],
+                        jobs=jobs,
+                        job_to_vectors=job_to_vectors,
+                        treat_urls_as_images=True,  # TODO - infer this from model
+                        content=content),
+                     weight,
+                     content
+                    ) for content, weight in ordered_queries
+                ]
+                # TODO how do we ensure order?
+                weighted_vectors = [np.asarray(vec) * weight for vec, weight, content in vectorised_ordered_queries]
 
             context_tensors = q.get_context_tensor()
             if context_tensors is not None:
                 weighted_vectors += [np.asarray(v.vector) * v.weight for v in context_tensors]
 
-            try:
-                merged_vector = np.mean(weighted_vectors, axis=0)
-            except ValueError as e:
-                raise api_exceptions.InvalidArgError(f"The provided vectors are not in the same dimension of the index."
-                                                     f"This causes the error when we do `numpy.mean()` over all the vectors.\n"
-                                                     f"The original error is `{e}`.\n"
-                                                     f"Please check `{marqo_docs.search_context()}`.")
+            for vector in weighted_vectors:
+                if not q.index.model.get_dimension() == len(vector):
+                    raise api_exceptions.InvalidArgError(
+                        f"The dimension of the vectors returned by the model or given by the context vectors "
+                        f"does not match the expected dimension. "
+                        f"Expected dimension {q.index.model.get_dimension()} but got {len(vector)}"
+                    )
 
-            if index_info.normalize_embeddings:
+            merged_vector = np.mean(weighted_vectors, axis=0)
+
+            if q.index.normalize_embeddings:
                 norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
                 if norm > 0:
                     merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
-        else:
+        elif isinstance(q.q, str):
             # result[qidx] = vectors[0]
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
@@ -1653,6 +1659,8 @@ def get_query_vectors_from_jobs(
                 treat_urls_as_images=True,  # TODO - infer this from model
                 content=q.q
             )
+        else:
+            raise ValueError(f"Unexpected query type: {type(q.q).__name__}")
     return result
 
 
@@ -1706,7 +1714,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Union[str, dict], result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5, offset: int = 0,
         ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
@@ -1718,8 +1726,8 @@ def _vector_text_search(
     Args:
         config:
         index_name:
-        query: either a string query (which can be a URL or natural language text), or a dict of
-            <query string>:<weight float> pairs.
+        query: either a string query (which can be a URL or natural language text), a dict of
+            <query string>:<weight float> pairs, or None with a context
         result_count:
         offset:
         searchable_attributes: Iterable of field names to search. If left as None, then all will
@@ -1765,7 +1773,7 @@ def _vector_text_search(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=index_name, modelAuth=model_auth
+        index=marqo_index, modelAuth=model_auth
     )]
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
@@ -1993,12 +2001,11 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
             message=f'Problem vectorising query. Reason: {str(model_error)}',
             link=marqo_docs.list_of_models()
         )
-    except s2_inference_errors.S2InferenceError:
+    except s2_inference_errors.S2InferenceError as e:
         combo_document_is_valid = False
-        image_err = errors.InvalidArgError(message=f'Could not process given image: {field_content_copy}')
         unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                         'code': image_err.code})
+            (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
+                         'code': errors.InvalidArgError.code})
 
         return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
@@ -2131,12 +2138,11 @@ def vectorise_multimodal_combination_field_structured(
             message=f'Problem vectorising query. Reason: {str(model_error)}',
             link=marqo_docs.list_of_models()
         )
-    except s2_inference_errors.S2InferenceError:
+    except s2_inference_errors.S2InferenceError as e:
         combo_document_is_valid = False
-        image_err = api_exceptions.InvalidArgError(message=f'Could not process given image: {multimodal_object_copy}')
         unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': image_err.message, 'status': int(image_err.status_code),
-                         'code': image_err.code})
+            (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
+             'code': errors.InvalidArgError.code})
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 

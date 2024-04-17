@@ -13,3 +13,4 @@ pydantic==1.10.11
 httpx==0.25.0
 semver==3.0.2
 scipy==1.10.1
+memory-profiler==0.61.0
