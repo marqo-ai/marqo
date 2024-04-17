@@ -29,6 +29,9 @@ class VectorInterpolation(abc.ABC):
 
 class Lerp(VectorInterpolation):
     def interpolate(self, vectors: List[List[float]], weights: List[float] = None) -> List[float]:
+        if len(vectors) < 1:
+            raise ValueError('Cannot interpolate an empty list of vectors')
+
         if not weights:
             weights = [1] * len(vectors)
         weight_sum = sum(weights)
