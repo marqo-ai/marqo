@@ -19,6 +19,7 @@ from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -279,6 +280,11 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
             'storageUsedPercentage': stats.backend.storage_used_percentage
         }
     }
+
+
+@app.get('/memory')
+def memory():
+    return memory_profiler.get_memory_profile()
 
 
 @app.delete("/indexes/{index_name}")
