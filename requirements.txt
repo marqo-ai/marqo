@@ -9,3 +9,7 @@ fastapi-utils==0.2.1
 jsonschema==4.17.1
 typing-extensions==4.5.0
 urllib3==1.25.8
+memory-profiler==0.61.0
+memray==1.12.0
+
+
