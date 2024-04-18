@@ -36,7 +36,7 @@ class VespaClient:
             self.wanted_generation = wanted_generation
             self.converged = converged
 
-    def __init__(self, config_url: str, document_url: str, query_url: str,
+    def __init__(self, config_url: str, document_url: str, search_timeout_ms: int, query_url: str,
                  content_cluster_name: str, pool_size: int = 10, feed_pool_size: int = 10,
                  get_pool_size: int = 10, delete_pool_size: int = 10, partial_update_pool_size: int = 10):
         """
@@ -57,6 +57,7 @@ class VespaClient:
         self.http_client = httpx.Client(
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
+        self.search_timeout_ms = search_timeout_ms
         self.content_cluster_name = content_cluster_name
         self.feed_pool_size = feed_pool_size
         self.get_pool_size = get_pool_size
