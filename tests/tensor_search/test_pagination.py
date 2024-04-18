@@ -79,7 +79,7 @@ class TestPagination(MarqoTestCase):
                     search_method=search_method,
                     config=self.config,
                     index_name=index.name,
-                    text='my title',
+                    query='my title',
                     result_count=400)
 
                 for page_size in [5, 10, 100, 200]:
@@ -93,7 +93,7 @@ class TestPagination(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=index.name,
-                                text='my title',
+                                query='my title',
                                 result_count=lim, offset=off)
 
                             paginated_search_results["hits"].extend(page_res["hits"])
@@ -152,7 +152,7 @@ class TestPagination(MarqoTestCase):
                                     search_method=search_method,
                                     config=self.config,
                                     index_name=index.name,
-                                    text='my title',
+                                    query='my title',
                                     result_count=lim, offset=off,
                                     # Approximate search retrieved ~8400 docs, under investigation
                                     approximate=False if search_method == SearchMethod.TENSOR else None
@@ -179,7 +179,7 @@ class TestPagination(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=index.name,
-                                text='my title',
+                                query='my title',
                                 result_count=limit, offset=0,
                             )
 
@@ -196,7 +196,7 @@ class TestPagination(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=index.name,
-                                text='my title',
+                                query='my title',
                                 result_count=100, offset=offset,
                             )
 
@@ -231,7 +231,7 @@ class TestPagination(MarqoTestCase):
                     search_method=search_method,
                     config=self.config,
                     index_name=self.index_name_1,
-                    text='a',
+                    query='a',
                     result_count=doc_count)
 
                 for page_size in [5, 10, 100, 1000]:
@@ -244,7 +244,7 @@ class TestPagination(MarqoTestCase):
                             search_method=search_method,
                             config=self.config,
                             index_name=self.index_name_1,
-                            text='a',
+                            query='a',
                             result_count=lim, offset=off)
 
                         paginated_search_results["hits"].extend(page_res["hits"])
@@ -262,7 +262,7 @@ class TestPagination(MarqoTestCase):
             for lim in [1, 10, 1000]:
                 for off in [-1, -10, -1000]:
                     try:
-                        tensor_search.search(text=" ",
+                        tensor_search.search(query=" ",
                                              index_name=self.index_name_1,
                                              config=self.config,
                                              result_count=lim,
@@ -277,7 +277,7 @@ class TestPagination(MarqoTestCase):
             for lim in [0, -1, -10, -1000]:
                 for off in [1, 10, 1000]:
                     try:
-                        tensor_search.search(text=" ",
+                        tensor_search.search(query=" ",
                                              index_name=self.index_name_1,
                                              config=self.config,
                                              result_count=lim,
@@ -295,7 +295,7 @@ class TestPagination(MarqoTestCase):
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
                 try:
                     tensor_search.search(search_method=search_method,
-                                         config=self.config, index_name=self.index_name_1, text=' ',
+                                         config=self.config, index_name=self.index_name_1, query=' ',
                                          result_count=10000,
                                          offset=1)
                     raise AssertionError
@@ -330,7 +330,7 @@ class TestPagination(MarqoTestCase):
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text="some text",
+            config=self.config, index_name=self.index_name_1, query="some text",
             searchable_attributes=[], search_method="TENSOR", offset=1
         )
         assert res["hits"] == []

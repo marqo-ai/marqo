@@ -46,10 +46,10 @@ class TestBoostFieldScores(MarqoTestCase):
         q = "What is the best outfit to wear on the moon?"
 
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q,
+            config=self.config, index_name=self.index_name_1, query=q,
         )
         res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, boost={'Title': [5, 1]}
+            config=self.config, index_name=self.index_name_1, query=q, boost={'Title': [5, 1]}
         )
         score = res['hits'][0]['_score']
         score_boosted = res_boosted['hits'][0]['_score']
@@ -61,10 +61,10 @@ class TestBoostFieldScores(MarqoTestCase):
         q = "What is the best outfit to wear on the moon?"
 
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q
+            config=self.config, index_name=self.index_name_1, query=q
         )
         res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, boost={}
+            config=self.config, index_name=self.index_name_1, query=q, boost={}
         )
 
         score = res['hits'][0]['_score']
@@ -80,7 +80,7 @@ class TestBoostFieldScores(MarqoTestCase):
 
         with self.assertRaises(InvalidArgError) as ctx:
             res_boosted = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q,
+                config=self.config, index_name=self.index_name_1, query=q,
                 searchable_attributes=['Description'], boost={'Title': [0.5, 1]}
             )
 
@@ -98,7 +98,7 @@ class TestBoostFieldScores(MarqoTestCase):
         ]
         for boost in boosts:
             res_boosted = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q, boost=boost
+                config=self.config, index_name=self.index_name_1, query=q, boost=boost
             )
 
 @unittest.skip
@@ -137,7 +137,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         q = "What are the best pets"
 
         res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, boost={
+            config=self.config, index_name=self.index_name_1, query=q, boost={
                 'Title': [5, 1], 'Description': [-1, -4]
             }
         )
@@ -145,7 +145,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             assert list(res['_highlights'].keys())[0] == 'Title'
 
         res_boosted_inverse = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, boost={
+            config=self.config, index_name=self.index_name_1, query=q, boost={
                 'Title': [-1, -4], 'Description': [5, 1]
             }
         )
@@ -170,17 +170,17 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         q = "What are the best pets"
 
         res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, searchable_attributes=['Title'], boost={
+            config=self.config, index_name=self.index_name_1, query=q, searchable_attributes=['Title'], boost={
                 'Title': [5, 1]
             }
         )
 
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, searchable_attributes=['Title']
+            config=self.config, index_name=self.index_name_1, query=q, searchable_attributes=['Title']
         )
 
         res_boosted_inverse = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, searchable_attributes=['Title'],
+            config=self.config, index_name=self.index_name_1, query=q, searchable_attributes=['Title'],
             boost={
                 'Title': [-1, -4]
             }
@@ -211,13 +211,13 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         q = "What are the best pets"
 
         res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, boost={
+            config=self.config, index_name=self.index_name_1, query=q, boost={
                 'Title': [5, 1], 'Description': [-1, -1],
             }
         )
 
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q,
+            config=self.config, index_name=self.index_name_1, query=q,
         )
         score = res['hits'][0]['_score']
         score_boosted = res_boosted['hits'][0]['_score']
@@ -237,13 +237,13 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             q = "What are the best pets"
 
             res_boosted = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q, boost={
+                config=self.config, index_name=self.index_name_1, query=q, boost={
                     'Title': [5, 1],
                 }
             )
 
             res = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q,
+                config=self.config, index_name=self.index_name_1, query=q,
             )
 
             for regular, boosted in zip(res['hits'], res_boosted['hits']):
@@ -272,12 +272,12 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             q = "What are the best pets"
 
             res_boosted = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q, boost={
+                config=self.config, index_name=self.index_name_1, query=q, boost={
                     'Title': [1, 1], 'Description': [1, 1]
                 }
             )
             res = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q,
+                config=self.config, index_name=self.index_name_1, query=q,
             )
 
             for regular, boosted in zip(res['hits'], res_boosted['hits']):
@@ -306,13 +306,13 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
         q = "What are the best pets"
 
         res_boosted = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, boost={
+            config=self.config, index_name=self.index_name_1, query=q, boost={
                 'Title': [1, 1], "Description": [1, 1],
             }
         )
 
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text=q, offset=20, searchable_attributes=["Title"],
+            config=self.config, index_name=self.index_name_1, query=q, offset=20, searchable_attributes=["Title"],
         )
 
         for regular, boosted in zip(res['hits'], res_boosted['hits']):
@@ -343,11 +343,11 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
             q = "What are the best pets"
 
             res_boosted = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q, boost=boost
+                config=self.config, index_name=self.index_name_1, query=q, boost=boost
             )
 
             res = tensor_search.search(
-                config=self.config, index_name=self.index_name_1, text=q,
+                config=self.config, index_name=self.index_name_1, query=q,
             )
 
             for regular, boosted in zip(res['hits'], res_boosted['hits']):

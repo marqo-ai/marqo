@@ -59,7 +59,7 @@ class TestContextVectors(MarqoTestCase):
                 query = {
                     "A rider is riding a horse jumping over the barrier": 1,
                 }
-                res = tensor_search.search(config=self.config, index_name=index_name, text=query,
+                res = tensor_search.search(config=self.config, index_name=index_name, query=query,
                                            context=SearchContext(
                                                **{"tensor": [{"vector": [1, ] * self.DIMENSION, "weight": 2},
                                                              {"vector": [2, ] * self.DIMENSION, "weight": -1}]}))
@@ -71,7 +71,7 @@ class TestContextVectors(MarqoTestCase):
                     "A rider is riding a horse jumping over the barrier": 1,
                 }
                 with self.assertRaises(InvalidArgError) as e:
-                    tensor_search.search(config=self.config, index_name=index_name, text=query, context=SearchContext(
+                    tensor_search.search(config=self.config, index_name=index_name, query=query, context=SearchContext(
                         **{"tensor": [{"vector": [1, ] * 3, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}], }))
                 self.assertIn("does not match the expected dimension", str(e.exception.message))
 
@@ -80,7 +80,7 @@ class TestContextVectors(MarqoTestCase):
             with self.subTest(msg=index_name):
                 query = "A rider is riding a horse jumping over the barrier"
                 with self.assertRaises(InvalidArgError) as e:
-                    res = tensor_search.search(config=self.config, index_name=index_name, text=query, context=
+                    res = tensor_search.search(config=self.config, index_name=index_name, query=query, context=
                     SearchContext(
                         **{"tensor": [{"vector": [1, ] * 512, "weight": 0}, {"vector": [2, ] * 512, "weight": 0}]}))
                 self.assertIn("This is not supported as the context only works when the query is a dictionary.",
@@ -101,10 +101,10 @@ class TestContextVectors(MarqoTestCase):
                     "A rider is riding a horse jumping over the barrier": 1,
                 }
 
-                res_1 = tensor_search.search(config=self.config, index_name=index_name, text=query)
-                res_2 = tensor_search.search(config=self.config, index_name=index_name, text=query, context=
+                res_1 = tensor_search.search(config=self.config, index_name=index_name, query=query)
+                res_2 = tensor_search.search(config=self.config, index_name=index_name, query=query, context=
                 SearchContext(**{"tensor": [{"vector": [1, ] * self.DIMENSION, "weight": 0}, {"vector": [2, ] * self.DIMENSION, "weight": 0}], }))
-                res_3 = tensor_search.search(config=self.config, index_name=index_name, text=query, context=
+                res_3 = tensor_search.search(config=self.config, index_name=index_name, query=query, context=
                 SearchContext(**{"tensor": [{"vector": [1, ] * self.DIMENSION, "weight": -1}, {"vector": [1, ] * self.DIMENSION, "weight": 1}], }))
 
                 self.assertEqual(res_1["hits"][0]["_score"], res_2["hits"][0]["_score"])
@@ -114,7 +114,7 @@ class TestContextVectors(MarqoTestCase):
         """Test to ensure that the context vector can be used without a query."""
         for index_name in [self.structured_index_with_random_model, self.unstructured_index_with_random_model]:
             with self.subTest(msg=index_name):
-                res = tensor_search.search(text=None, config=self.config, index_name=index_name, context=SearchContext(
+                res = tensor_search.search(query=None, config=self.config, index_name=index_name, context=SearchContext(
                     **{"tensor": [{"vector": [1, ] * self.DIMENSION, "weight": 1},
                                   {"vector": [2, ] * self.DIMENSION, "weight": 2}]}))
 
@@ -123,6 +123,6 @@ class TestContextVectors(MarqoTestCase):
         for index_name in [self.structured_index_with_random_model, self.unstructured_index_with_random_model]:
             with self.subTest(msg=index_name):
                 with self.assertRaises(ValidationError) as e:
-                    res = tensor_search.search(text=None, config=self.config, index_name=index_name, context=None)
+                    res = tensor_search.search(query=None, config=self.config, index_name=index_name, context=None)
                 self.assertIn("One of Query(q) or context is required for tensor search",
                               str(e.exception))

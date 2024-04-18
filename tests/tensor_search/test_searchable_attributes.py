@@ -76,7 +76,7 @@ class TestSearchableAttributes(MarqoTestCase):
                 res = tensor_search.search(
                     config=self.config,
                     index_name=self.default_text_index,
-                    text=query,
+                    query=query,
                     searchable_attributes=[field_name]
                 )
                 self.assertEqual(expected_id, res["hits"][0]["_id"])
@@ -114,7 +114,7 @@ class TestSearchableAttributes(MarqoTestCase):
                     res = tensor_search.search(
                         config=self.config,
                         index_name=self.default_text_index,
-                        text=query,
+                        query=query,
                         searchable_attributes=searchable_attributes,
                         filter=filter_string
                     )
@@ -146,7 +146,7 @@ class TestSearchableAttributes(MarqoTestCase):
                 res = tensor_search.search(
                     config=self.config,
                     index_name=self.default_text_index,
-                    text="exact match field",
+                    query="exact match field",
                     searchable_attributes=[],
                     search_method=search_method
                 )
@@ -182,7 +182,7 @@ class TestSearchableAttributes(MarqoTestCase):
                     res = tensor_search.search(
                         config=self.config,
                         index_name=self.default_text_index,
-                        text="exact match field",
+                        query="exact match field",
                         searchable_attributes=[],
                         search_method=search_method,
                         filter=filter_string
@@ -215,7 +215,7 @@ class TestSearchableAttributes(MarqoTestCase):
                 res = tensor_search.search(
                     config=self.config,
                     index_name=self.default_text_index,
-                    text="exact match field",
+                    query="exact match field",
                     searchable_attributes=None,
                     search_method=search_method
                 )

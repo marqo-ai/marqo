@@ -20,11 +20,12 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
+from marqo.core.search.recommender import Recommender
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
-from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.tensor_search.models.api_models import SearchQuery, RecommendQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
@@ -49,8 +50,8 @@ def generate_config() -> config.Config:
         delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE)
     )
-    index_management = IndexManagement(vespa_client)
-    return config.Config(vespa_client, index_management)
+
+    return config.Config(vespa_client)
 
 
 _config = generate_config()
@@ -206,7 +207,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return tensor_search.search(
-            config=marqo_config, text=search_query.q,
+            config=marqo_config, query=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
             searchable_attributes=search_query.searchableAttributes,
             search_method=search_query.searchMethod,
@@ -220,6 +221,21 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth
         )
+
+
+@app.post("/indexes/{index_name}/recommend")
+@throttle(RequestType.SEARCH)
+def recommend(query: RecommendQuery, index_name: str, device: str = Depends(api_validation.validate_device),
+              marqo_config: config.Config = Depends(get_config)):
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
+        return marqo_config.recommender.recommend(
+            index_name,
+            query.documents,
+            query.tensorFields,
+            query.searchableAttributes,
+            query.excludeInputDocuments,
+        )
+
 
 
 @app.post("/indexes/{index_name}/documents")

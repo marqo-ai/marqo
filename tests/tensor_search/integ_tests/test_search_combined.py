@@ -213,7 +213,7 @@ class TestSearch(MarqoTestCase):
                 for filter_query, expected_count, expected_id, highlight_exists in test_cases:
                     with self.subTest(filter_query=filter_query):
                         res = tensor_search.search(
-                            index_name=index.name, config=self.config, text="", filter=filter_query)
+                            index_name=index.name, config=self.config, query="", filter=filter_query)
 
                         assert len(res["hits"]) == expected_count
                         if expected_id:
@@ -260,7 +260,7 @@ class TestSearch(MarqoTestCase):
                     with self.subTest(
                             f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                         res = tensor_search.search(
-                            index_name=index.name, config=self.config, text="some",
+                            index_name=index.name, config=self.config, query="some",
                             search_method=SearchMethod.LEXICAL, filter=filter_string
                         )
                         self.assertEqual(expected_hits, len(res["hits"]))
@@ -309,7 +309,7 @@ class TestSearch(MarqoTestCase):
                     with self.subTest(
                             f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                         res = tensor_search.search(
-                            index_name=index.name, config=self.config, text="some",
+                            index_name=index.name, config=self.config, query="some",
                             search_method=SearchMethod.TENSOR, filter=filter_string
                         )
 
@@ -418,7 +418,7 @@ class TestSearch(MarqoTestCase):
                     with self.subTest(
                             f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_ids}"):
                         res = tensor_search.search(
-                            config=self.config, index_name=index.name, text="", result_count=5,
+                            config=self.config, index_name=index.name, query="", result_count=5,
                             filter=filter_string, verbose=0
                         )
 
@@ -472,7 +472,7 @@ class TestSearch(MarqoTestCase):
                 for filter_string, expected_hits, expected_ids in test_cases:
                     with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                         res = tensor_search.search(
-                            config=self.config, index_name=index.name, text="some text", filter=filter_string,
+                            config=self.config, index_name=index.name, query="some text", filter=filter_string,
                         )
 
                         self.assertEqual(expected_hits, len(res["hits"]))
@@ -517,7 +517,7 @@ class TestSearch(MarqoTestCase):
                 for filter_string, expected_hits, expected_ids in test_cases:
                     with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                         res = tensor_search.search(
-                            config=self.config, index_name=index.name, text='',
+                            config=self.config, index_name=index.name, query='',
                             filter=filter_string, verbose=0
                         )
 
@@ -567,7 +567,7 @@ class TestSearch(MarqoTestCase):
                     with self.subTest(f"filter_string={filter_string}"):
                         with self.assertRaises(core_exceptions.FilterStringParsingError):
                             tensor_search.search(
-                                config=self.config, index_name=index.name, text="some text",
+                                config=self.config, index_name=index.name, query="some text",
                                 result_count=3, filter=filter_string, verbose=0
                             )
 
@@ -604,7 +604,7 @@ class TestSearch(MarqoTestCase):
                     with self.subTest(f"filter_string={filter_string}"):
                         with self.assertRaises(core_exceptions.InvalidDataTypeError) as cm:
                             tensor_search.search(
-                                config=self.config, index_name=index.name, text="some text",
+                                config=self.config, index_name=index.name, query="some text",
                                 result_count=3, filter=filter_string, verbose=0
                             )
 

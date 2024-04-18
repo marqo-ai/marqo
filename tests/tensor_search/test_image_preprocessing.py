@@ -58,7 +58,7 @@ class TestImagePreprocessing(MarqoTestCase):
                                                                           tensor_fields=tensor_fields))
                 search_result = tensor_search.search(config=self.config,
                                                      index_name=index_name,
-                                                     text="test")
+                                                     query="test")
                 self.assertIn("_highlights", search_result["hits"][0])
                 self.assertIn("image_field_1", search_result["hits"][0]["_highlights"][0])
                 self.assertTrue(isinstance(search_result["hits"][0]["_highlights"][0]["image_field_1"], str))

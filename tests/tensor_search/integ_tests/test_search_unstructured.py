@@ -217,7 +217,7 @@ class TestSearchUnstructured(MarqoTestCase):
         )
 
         res = tensor_search.search(
-            text="In addition to NiS collection fire assay for a five element",
+            query="In addition to NiS collection fire assay for a five element",
             config=self.config, index_name=self.default_text_index
         )
 
@@ -242,7 +242,7 @@ class TestSearchUnstructured(MarqoTestCase):
         )
 
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text=q, result_count=50
+            config=self.config, index_name=self.default_text_index, query=q, result_count=50
         )
 
         assert "processingTimeMs" in search_res
@@ -258,7 +258,7 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_searchable_attributes_not_supported_in_unstructured_index(self):
         with self.assertRaises(errors.InvalidArgError) as ex:
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="",
+                config=self.config, index_name=self.default_text_index, query="",
                 searchable_attributes=["None"], result_count=50
             )
         self.assertIn("searchable_attributes is not supported", str(ex.exception))
@@ -266,7 +266,7 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_search_format_empty(self):
         """Is the result formatted correctly? - on an emtpy index?"""
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text=""
+            config=self.config, index_name=self.default_text_index, query=""
         )
         assert "processingTimeMs" in search_res
         assert search_res["processingTimeMs"] > 0
@@ -295,14 +295,14 @@ class TestSearchUnstructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # too big
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
                 result_count=-1
             )
 
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # too small
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
                 result_count=1000000
             )
             raise AssertionError
@@ -310,14 +310,14 @@ class TestSearchUnstructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # should not work with 0
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
                 result_count=0
             )
             raise AssertionError
 
         # should work with 1:
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+            config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
             result_count=1
         )
         assert len(search_res['hits']) >= 1
@@ -335,14 +335,14 @@ class TestSearchUnstructured(MarqoTestCase):
         )
 
         tensor_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text", highlights=True)
+            config=self.config, index_name=self.default_text_index, query="some text", highlights=True)
         self.assertEqual(2, len(tensor_highlights["hits"]))
 
         for hit in tensor_highlights["hits"]:
             assert "_highlights" in hit
 
         tensor_no_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text", highlights=False)
+            config=self.config, index_name=self.default_text_index, query="some text", highlights=False)
         self.assertEqual(2, len(tensor_highlights["hits"]))
         for hit in tensor_no_highlights["hits"]:
             assert "_highlights" not in hit
@@ -359,14 +359,14 @@ class TestSearchUnstructured(MarqoTestCase):
         )
 
         res = lexical_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text",
+            config=self.config, index_name=self.default_text_index, query="some text",
             search_method=SearchMethod.LEXICAL, highlights=True)
         assert len(lexical_highlights["hits"]) == 2
         for hit in lexical_highlights["hits"]:
             assert "_highlights" in hit
 
         lexical_no_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text",
+            config=self.config, index_name=self.default_text_index, query="some text",
             search_method=SearchMethod.LEXICAL, highlights=False)
         assert len(lexical_no_highlights["hits"]) == 2
         for hit in lexical_no_highlights["hits"]:
@@ -388,7 +388,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             with self.subTest(f"search_method={search_method}"):
                 s_res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="cool match",
+                    config=self.config, index_name=self.default_text_index, query="cool match",
                     search_method=search_method)
                 assert len(s_res["hits"]) > 0
 
@@ -406,21 +406,21 @@ class TestSearchUnstructured(MarqoTestCase):
         )
 
         res_exists = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:tag1")
+            index_name=self.default_text_index, config=self.config, query="", filter="my_list:tag1")
 
         res_not_exists = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:tag55")
+            index_name=self.default_text_index, config=self.config, query="", filter="my_list:tag55")
 
         res_other = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_string:b")
+            index_name=self.default_text_index, config=self.config, query="", filter="my_string:b")
 
         # strings in lists are converted into keyword, which aren't filterable on a token basis.
         # Because the list member is "tag2 some" we can only exact match (incl. the space).
         # "tag2" by itself doesn't work, only "(tag2 some)"
         res_should_only_match_keyword_bad = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:tag2")
+            index_name=self.default_text_index, config=self.config, query="", filter="my_list:tag2")
         res_should_only_match_keyword_good = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:(tag2 some)")
+            index_name=self.default_text_index, config=self.config, query="", filter="my_list:(tag2 some)")
 
         assert res_exists["hits"][0]["_id"] == "1235"
         assert res_exists["hits"][0]["_highlights"][0] == {"abc": "some text"}
@@ -458,7 +458,7 @@ class TestSearchUnstructured(MarqoTestCase):
             with self.subTest(
                     f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                    index_name=self.default_text_index, config=self.config, text="some",
+                    index_name=self.default_text_index, config=self.config, query="some",
                     search_method=SearchMethod.LEXICAL, filter=filter_string
                 )
                 self.assertEqual(expected_hits, len(res["hits"]))
@@ -491,7 +491,7 @@ class TestSearchUnstructured(MarqoTestCase):
             with self.subTest(
                     f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                    index_name=self.default_image_index, config=self.config, text="some",
+                    index_name=self.default_image_index, config=self.config, query="some",
                     search_method=SearchMethod.TENSOR, filter=filter_string
                 )
 
@@ -531,7 +531,7 @@ class TestSearchUnstructured(MarqoTestCase):
             with self.subTest(
                     f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text", result_count=3,
+                    config=self.config, index_name=self.default_text_index, query="some text", result_count=3,
                     filter=filter_string, verbose=0
                 )
 
@@ -574,7 +574,7 @@ class TestSearchUnstructured(MarqoTestCase):
                         f"search_method = {search_method}, filter_string={filter_string}, "
                         f"expected_hits={expected_hits}, expected_id={expected_id}")):
                     res = tensor_search.search(
-                        index_name=self.default_text_index, config=self.config, text="search me",
+                        index_name=self.default_text_index, config=self.config, query="search me",
                         search_method=search_method, filter=filter_string
                     )
                     self.assertEqual(expected_hits, len(res["hits"]))
@@ -610,7 +610,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for filter_string, expected_hits, expected_ids in test_parameters:
             with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text='',
+                    config=self.config, index_name=self.default_text_index, query='',
                     filter=filter_string, verbose=0
                 )
 
@@ -644,7 +644,7 @@ class TestSearchUnstructured(MarqoTestCase):
             with self.subTest(f"filter_string={filter_string}"):
                 with self.assertRaises(core_exceptions.FilterStringParsingError):
                     tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, text="some text",
+                        config=self.config, index_name=self.default_text_index, query="some text",
                         result_count=3, filter=filter_string, verbose=0
                     )
 
@@ -660,7 +660,7 @@ class TestSearchUnstructured(MarqoTestCase):
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="some text",
+                config=self.config, index_name=self.default_text_index, query="some text",
                 search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
             return True
 
@@ -711,12 +711,12 @@ class TestSearchUnstructured(MarqoTestCase):
 
         for field, to_search in docs[0].items():
             assert "hits" in tensor_search.search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
+                query=str(to_search), config=self.config, index_name=self.default_text_index,
                 search_method=SearchMethod.TENSOR, filter=f"{field}:{to_search}"
             )
 
             assert "hits" in tensor_search.search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
+                query=str(to_search), config=self.config, index_name=self.default_text_index,
                 search_method=SearchMethod.LEXICAL, filter=f"{field}:{to_search}"
             )
 
@@ -774,7 +774,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for filter_string, expected_hits, expected_id in test_parameters:
             with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text",
+                    config=self.config, index_name=self.default_text_index, query="some text",
                     result_count=3, filter=filter_string, search_method=SearchMethod.LEXICAL
                 )
 
@@ -814,7 +814,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for name, filter_query, expected_count, expected_ids in test_cases:
             with self.subTest(name=name):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text",
+                    config=self.config, index_name=self.default_text_index, query="some text",
                     filter=filter_query
                 )
                 self.assertEqual(expected_count, len(res["hits"]))
@@ -861,7 +861,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 with self.subTest(
                         f"search_method = {search_method}, searchable_attributes={searchable_attributes}, expected_fields = {expected_fields}"):
                     res = tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                        config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
                         attributes_to_retrieve=searchable_attributes, search_method=search_method
                     )
 
@@ -898,7 +898,7 @@ class TestSearchUnstructured(MarqoTestCase):
                             search_method=search_method,
                             config=self.config,
                             index_name=self.default_text_index,
-                            text=search_text,
+                            query=search_text,
                             result_count=max_doc // 2
                         )
                         self.assertEqual(max_doc // 2, half_search['limit'])
@@ -908,7 +908,7 @@ class TestSearchUnstructured(MarqoTestCase):
                             search_method=search_method,
                             config=self.config,
                             index_name=self.default_text_index,
-                            text=search_text,
+                            query=search_text,
                             result_count=max_doc
                         )
                         self.assertEqual(max_doc, limit_search['limit'])
@@ -919,7 +919,7 @@ class TestSearchUnstructured(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=self.default_text_index,
-                                text=search_text,
+                                query=search_text,
                                 result_count=max_doc + 1
                             )
 
@@ -928,7 +928,7 @@ class TestSearchUnstructured(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=self.default_text_index,
-                                text=search_text,
+                                query=search_text,
                                 result_count=(max_doc + 1) * 2
                             )
 
@@ -943,7 +943,7 @@ class TestSearchUnstructured(MarqoTestCase):
                     tensor_search.search(
                         config=self.config,
                         index_name=self.default_text_index,
-                        text="",
+                        query="",
                         result_count=limit
                     )
 
@@ -969,7 +969,7 @@ class TestSearchUnstructured(MarqoTestCase):
         )
         res = tensor_search.search(
             config=self.config, index_name=self.default_image_index,
-            text="A hippo in the water", result_count=3,
+            query="A hippo in the water", result_count=3,
         )
         assert len(res['hits']) == 2
         assert {hit['image_field'] for hit in res['hits']} == {url_2, url_1}
@@ -1002,7 +1002,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for query, expected_ordering in queries_expected_ordering:
             with self.subTest(f"query={query}, expected_ordering={expected_ordering}"):
                 res = tensor_search.search(
-                    text=query,
+                    query=query,
                     index_name=self.default_text_index,
                     result_count=5,
                     config=self.config,
@@ -1048,7 +1048,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for query, expected_ordering in queries_expected_ordering:
             with self.subTest(f"query={query}, expected_ordering={expected_ordering}"):
                 res = tensor_search.search(
-                    text=query,
+                    query=query,
                     index_name=self.default_image_index,
                     result_count=5,
                     config=self.config,
@@ -1083,7 +1083,7 @@ class TestSearchUnstructured(MarqoTestCase):
             with self.subTest(f"query={q}"):
                 with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
                     tensor_search.search(
-                        text=q,
+                        query=q,
                         index_name=self.default_image_index,
                         result_count=5,
                         config=self.config,
@@ -1112,7 +1112,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for q in alright_queries:
             with self.subTest(f"query={alright_queries}"):
                 tensor_search.search(
-                    text=q,
+                    query=q,
                     index_name=self.default_image_index,
                     result_count=5,
                     config=self.config,
@@ -1138,7 +1138,7 @@ class TestSearchUnstructured(MarqoTestCase):
             with self.subTest(f"bad_method={bad_method}"):
                 with self.assertRaises(errors.InvalidArgError):
                     tensor_search.search(
-                        text={'something': 1},
+                        query={'something': 1},
                         index_name=self.default_text_index,
                         result_count=5,
                         config=self.config,
@@ -1169,7 +1169,7 @@ class TestSearchUnstructured(MarqoTestCase):
             )
         )
         res = tensor_search.search(
-            text=hippo_image,
+            query=hippo_image,
             index_name=self.default_image_index,
             result_count=5,
             config=self.config,
@@ -1198,7 +1198,7 @@ class TestSearchUnstructured(MarqoTestCase):
             )
         )
         lexical_search_result = tensor_search.search(
-            text="some text",
+            query="some text",
             index_name=self.default_text_index,
             config=self.config,
             search_method=SearchMethod.LEXICAL,
@@ -1224,7 +1224,7 @@ class TestSearchUnstructured(MarqoTestCase):
             )
         )
         tensor_search_result = tensor_search.search(
-            text="some text",
+            query="some text",
             index_name=self.default_text_index,
             config=self.config,
             search_method=SearchMethod.TENSOR
@@ -1275,7 +1275,7 @@ class TestSearchUnstructured(MarqoTestCase):
                                   f"expected_document_ids = {expected_document_ids}, "
                                   f"search_method = {search_method}"):
                     res = tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, text="some text",
+                        config=self.config, index_name=self.default_text_index, query="some text",
                         filter=filter_string, search_method=SearchMethod.LEXICAL
                     )
                     self.assertEqual(1, len(res["hits"]))
@@ -1294,7 +1294,7 @@ class TestSearchUnstructured(MarqoTestCase):
             )
         )
         tensor_search_result = tensor_search.search(
-            text="some text",
+            query="some text",
             index_name=self.default_text_index,
             config=self.config,
             search_method=SearchMethod.TENSOR,
@@ -1343,7 +1343,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 )
 
                 search_result = tensor_search.search(
-                    text="some text",
+                    query="some text",
                     index_name=self.default_text_index,
                     config=self.config,
                     search_method=SearchMethod.TENSOR,
@@ -1353,7 +1353,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 self.assertEqual(document, self.strip_marqo_fields(search_result['hits'][0], strip_id=False))
 
     def test_tensor_search_query_can_be_none(self):
-        res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+        res = tensor_search.search(query=None, config=self.config, index_name=self.default_text_index,
                                    context=SearchContext(
                                        **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
                                                      {"vector": [2, ] * 384, "weight": 2}]}))
@@ -1373,5 +1373,5 @@ class TestSearchUnstructured(MarqoTestCase):
         for query, context, msg in test_case:
             with self.subTest(msg):
                 with self.assertRaises(InvalidArgError):
-                    res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+                    res = tensor_search.search(query=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)

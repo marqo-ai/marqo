@@ -461,7 +461,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         )
                     )
                     self.assertEqual(1, self.monitoring.get_index_stats_by_name(index.name).number_of_documents)
-                    res = tensor_search.search(config=self.config, index_name=index.name, text="",
+                    res = tensor_search.search(config=self.config, index_name=index.name, query="",
                                                result_count=1)
                     return res["hits"][0]["_score"]
 
@@ -578,7 +578,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         tensor_fields=["zero_weight_combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None
                     ))
                     res = tensor_search.search(config=self.config, index_name=index.name,
-                                               text="test", result_count=1)
+                                               query="test", result_count=1)
 
                     return res["hits"][0]["_score"]
 
@@ -918,11 +918,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 }}, device="cpu", tensor_fields=["my_combination_field"])
                                     )
         res = tensor_search.search(config=self.config, index_name=self.unstructured_multimodal_index.name,
-                                   text="search me please", search_method="LEXICAL")
+                                   query="search me please", search_method="LEXICAL")
         assert res["hits"][0]["_id"] == "article_591"
 
         res = tensor_search.search(config=self.config, index_name=self.unstructured_multimodal_index.name,
-                                   text="test_search here", search_method="LEXICAL")
+                                   query="test_search here", search_method="LEXICAL")
         assert res["hits"][0]["_id"] == "article_592"
 
     def test_search_with_filtering_and_infer_image_false(self):
@@ -963,17 +963,17 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     }}, device="cpu", tensor_fields=["my_combination_field"]
             ))
         res_exist_0 = tensor_search.search(index_name=self.unstructured_random_multimodal_index.name, config=self.config,
-                                           text="", filter="filter_field:test_this_0")
+                                           query="", filter="filter_field:test_this_0")
 
         assert res_exist_0["hits"][0]["_id"] == "0"
 
         res_exist_2 = tensor_search.search(index_name=self.unstructured_random_multimodal_index.name, config=self.config,
-                                           text="", filter="filter_field:test_this_2")
+                                           query="", filter="filter_field:test_this_2")
 
         assert res_exist_2["hits"][0]["_id"] == "2"
 
         res_nonexist_1 = tensor_search.search(index_name=self.unstructured_random_multimodal_index.name, config=self.config,
-                                              text="", filter="filter_field:test_this_5")
+                                              query="", filter="filter_field:test_this_5")
 
         assert res_nonexist_1["hits"] == []
 

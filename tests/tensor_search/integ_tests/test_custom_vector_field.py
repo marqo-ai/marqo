@@ -583,7 +583,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Searching with context matching custom vector returns custom vector
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
                 )
@@ -594,7 +594,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Tensor search should work even if content is empty (highlight is empty string)
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_2, "weight": 1}], })
                 )
@@ -604,7 +604,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Searching with normal text returns text
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text="blah",
+                    config=self.config, index_name=index.name, query="blah",
                     search_method=enums.SearchMethod.TENSOR
                 )
                 assert res["hits"][0]["_id"] == "normal_doc"
@@ -645,7 +645,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Searching matching custom vector content returns custom vector
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text="custom content is here!!",
+                    config=self.config, index_name=index.name, query="custom content is here!!",
                     search_method=enums.SearchMethod.LEXICAL
                 )
                 assert len(res["hits"]) == 1
@@ -656,7 +656,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Searching with normal text returns text
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text="blah",
+                    config=self.config, index_name=index.name, query="blah",
                     search_method=enums.SearchMethod.LEXICAL,
                 )
                 assert len(res["hits"]) == 1
@@ -703,7 +703,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Normal search should favor doc0
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
                 )
@@ -711,7 +711,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Search with score modifiers multiply should favor doc1
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     score_modifiers=ScoreModifier(**{"multiply_score_by":
@@ -795,7 +795,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # No filter: all docs are returned.
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     result_count=10
@@ -805,7 +805,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Filter: custom vector 3 has chocolate
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     filter="my_custom_vector_3:chocolate", result_count=10
@@ -815,7 +815,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Filter: AND statement
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     filter="my_custom_vector_3:chocolate AND my_custom_vector_2:blue", result_count=10
@@ -825,7 +825,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Filter: OR statement
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     filter="my_custom_vector:red OR my_custom_vector_2:red", result_count=10
@@ -835,7 +835,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Filter: parenthesis
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     filter="my_custom_vector:(red blue yellow)", result_count=10
@@ -885,7 +885,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # All searchable attributes
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     searchable_attributes=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3"]
@@ -894,7 +894,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Only 2 and 3
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     searchable_attributes=["my_custom_vector_2", "my_custom_vector_3"]
@@ -903,7 +903,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Only 3
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text={"dummy text": 0},
+                    config=self.config, index_name=index.name, query={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
                     searchable_attributes=["my_custom_vector_3"]
@@ -946,7 +946,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # All searchable attributes
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text="text to search",
+                    config=self.config, index_name=index.name, query="text to search",
                     search_method=enums.SearchMethod.LEXICAL,
                     searchable_attributes=["my_custom_vector", "barely_field", "exact_field"]
                 )
@@ -954,7 +954,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Only custom and barely matching
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text="text to search",
+                    config=self.config, index_name=index.name, query="text to search",
                     search_method=enums.SearchMethod.LEXICAL,
                     searchable_attributes=["my_custom_vector", "barely_field"]
                 )
@@ -962,7 +962,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Only barely matching
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text="text to search",
+                    config=self.config, index_name=index.name, query="text to search",
                     search_method=enums.SearchMethod.LEXICAL,
                     searchable_attributes=["barely_field"]
                 )
@@ -970,7 +970,7 @@ class TestCustomVectorField(MarqoTestCase):
 
                 # Only custom vector
                 res = tensor_search.search(
-                    config=self.config, index_name=index.name, text="text to search",
+                    config=self.config, index_name=index.name, query="text to search",
                     search_method=enums.SearchMethod.LEXICAL,
                     searchable_attributes=["my_custom_vector"]
                 )
@@ -1078,7 +1078,7 @@ class TestCustomVectorField(MarqoTestCase):
 
         # Normal search should favor doc0
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            config=self.config, index_name=self.index_name_1, query={"dummy text": 0},
             search_method=enums.SearchMethod.TENSOR,
             context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], })
         )
@@ -1086,7 +1086,7 @@ class TestCustomVectorField(MarqoTestCase):
 
         # Search with boosting should favor doc1
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text={"dummy text": 0},
+            config=self.config, index_name=self.index_name_1, query={"dummy text": 0},
             search_method=enums.SearchMethod.TENSOR,
             context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
             boost={"my_custom_vector_2": [5, 1]}

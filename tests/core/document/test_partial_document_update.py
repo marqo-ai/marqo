@@ -167,11 +167,11 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual("updated text field filter", updated_doc["text_field_filter"])
 
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="text_field_filter:(updated text field filter)")
+                                             query="test", filter="text_field_filter:(updated text field filter)")
         self.assertEqual(1, len(search_result["hits"]))
         # Ensure we can't filter on the old text
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="text_field_filter:(text field filter)")
+                                             query="test", filter="text_field_filter:(text field filter)")
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_text_field_lexical(self):
@@ -186,12 +186,12 @@ class TestUpdate(MarqoTestCase):
 
         self.assertEqual("search me please", updated_doc["text_field_lexical"])
         lexical_search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                                     search_method="LEXICAL", text="search me please",
+                                                     search_method="LEXICAL", query="search me please",
                                                      searchable_attributes=["text_field_lexical"])
         self.assertEqual(1, len(lexical_search_result["hits"]))
         # Ensure we can't lexical search on the old text
         lexical_search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                                     search_method="LEXICAL", text="text field lexical",
+                                                     search_method="LEXICAL", query="text field lexical",
                                                      searchable_attributes=["text_field_lexical"])
         self.assertEqual(0, len(lexical_search_result["hits"]))
 
@@ -219,12 +219,12 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual("I am a new field", updated_doc["text_field_add"])
 
         lexical_search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                                     search_method="LEXICAL", text="I am a new field",
+                                                     search_method="LEXICAL", query="I am a new field",
                                                      searchable_attributes=["text_field_lexical"])
         self.assertEqual(1, len(lexical_search_result["hits"]))
 
         filter_search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                                    text="test", filter="text_field_add:(I am a new field)")
+                                                    query="test", filter="text_field_add:(I am a new field)")
         self.assertEqual(1, len(filter_search_result["hits"]))
 
     def test_update_int_field(self):
@@ -252,11 +252,11 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(22, updated_doc["int_field_filter"])
 
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="int_field_filter:(22)")
+                                             query="test", filter="int_field_filter:(22)")
         self.assertEqual(1, len(search_result["hits"]))
         # Ensure we can't filter on the old int
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="int_field_filter:(2)")
+                                             query="test", filter="int_field_filter:(2)")
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_int_field_score_modifier(self):
@@ -276,7 +276,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(33, updated_doc["int_field_score_modifier"])
 
         modified_score = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                              text="test", score_modifiers=score_modifier)["hits"][0]["_score"]
+                                              query="test", score_modifiers=score_modifier)["hits"][0]["_score"]
         self.assertTrue(33 <= modified_score <= 34, f"Modified score is {modified_score}")
 
     def test_update_float_field(self):
@@ -304,11 +304,11 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(22.2, updated_doc["float_field_filter"])
 
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="float_field_filter:(22.2)")
+                                             query="test", filter="float_field_filter:(22.2)")
         self.assertEqual(1, len(search_result["hits"]))
         # Ensure we can't filter on the old float
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="float_field_filter:(2.2)")
+                                             query="test", filter="float_field_filter:(2.2)")
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_float_field_score_modifier(self):
@@ -328,7 +328,7 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(33.3, updated_doc["float_field_score_modifier"])
 
         modified_score = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                              text="test", score_modifiers=score_modifier)["hits"][0]["_score"]
+                                              query="test", score_modifiers=score_modifier)["hits"][0]["_score"]
         self.assertTrue(33.3 <= modified_score <= 34.3, f"Modified score is {modified_score}")
 
     def test_update_bool_field_filter(self):
@@ -354,11 +354,11 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(False, updated_doc["bool_field_filter"])
 
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="bool_field_filter:(false)")
+                                             query="test", filter="bool_field_filter:(false)")
         self.assertEqual(1, len(search_result["hits"]))
         # Ensure we can't filter on the old bool value
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="bool_field_filter:(true)")
+                                             query="test", filter="bool_field_filter:(true)")
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_image_pointer_field(self):
@@ -433,11 +433,11 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(["text3", "text4"], updated_doc["array_text_field"])
 
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="array_text_field:(text3)")
+                                             query="test", filter="array_text_field:(text3)")
         self.assertEqual(1, len(search_result["hits"]))
         # Ensure we can't filter on the old array<text> value
         search_result = tensor_search.search(config=self.config, index_name=self.structured_index_name,
-                                             text="test", filter="array_text_field:(text1)")
+                                             query="test", filter="array_text_field:(text1)")
         self.assertEqual(0, len(search_result["hits"]))
 
     def test_update_a_document_that_does_not_exist(self):
@@ -666,7 +666,7 @@ class TestUpdate(MarqoTestCase):
                              marqo_config=self.config)
 
         original_score = tensor_search.search(config=self.config, index_name=self.large_score_modifier_index_name,
-                                              text="test")["hits"][0]["_score"]
+                                              query="test")["hits"][0]["_score"]
 
         for i in range(100):
             score_modifiers = ScoreModifier(**{
@@ -674,7 +674,7 @@ class TestUpdate(MarqoTestCase):
             })
 
             modified_score = tensor_search.search(config=self.config, index_name=self.large_score_modifier_index_name,
-                                                  text="test", score_modifiers=score_modifiers)["hits"][0]["_score"]
+                                                  query="test", score_modifiers=score_modifiers)["hits"][0]["_score"]
 
             self.assertAlmostEqual(original_score + 1, modified_score, 1)
 
