@@ -73,17 +73,17 @@ class TestIndexMetaCache(MarqoTestCase):
             # reset the cache, too:
             index_meta_cache.empty_cache()
             # there needs to be an error because the index doesn't exist yet
-            tensor_search.search(config=self.config, query="some text", index_name=self.index_name_3)
+            tensor_search.search(config=self.config, text="some text", index_name=self.index_name_3)
         except IndexNotFoundError as s:
             pass
 
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_3)
         # no error, because there is an index, and the cache is updated:
-        tensor_search.search(config=self.config, query="some text", index_name=self.index_name_3)
+        tensor_search.search(config=self.config, text="some text", index_name=self.index_name_3)
         # emptying the cache:
         index_meta_cache.empty_cache()
         # no error is thrown because the index is search, and the cache is updated
-        tensor_search.search(config=self.config, query="some text", index_name=self.index_name_3)
+        tensor_search.search(config=self.config, text="some text", index_name=self.index_name_3)
         assert self.index_name_3 in index_meta_cache.get_cache()
 
     def test_add_new_fields_preserves_index_cache(self):
@@ -233,13 +233,13 @@ class TestIndexMetaCache(MarqoTestCase):
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
              search_method=SearchMethod.LEXICAL)
         assert len(result["hits"]) == 0
         # REFRESH INTERVAL IS 2 seconds
         time.sleep(4)
         result_2 = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
              search_method=SearchMethod.LEXICAL)
         assert result_2["hits"][0]["_id"] == "1234"
 
@@ -252,13 +252,13 @@ class TestIndexMetaCache(MarqoTestCase):
         self._simulate_externally_added_docs(
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         result = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
              search_method=SearchMethod.TENSOR)
         # With single KNN Field, correct result appears even when field is not in cache!
         assert "1234" in [h["_id"] for h in result["hits"]]
         assert len([h["_id"] for h in result["hits"]]) > 0
         result_2 = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
              search_method=SearchMethod.TENSOR)
         assert result_2["hits"][0]["_id"] == "1234"
 
@@ -270,7 +270,7 @@ class TestIndexMetaCache(MarqoTestCase):
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.TENSOR)
         # With single KNN Field, correct result appears even when field is not in cache!
@@ -288,12 +288,12 @@ class TestIndexMetaCache(MarqoTestCase):
             self.index_name_3, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_3, config=self.config, query="a line of text",
+            index_name=self.index_name_3, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.LEXICAL)
         assert result["hits"][0]["_id"] == "1234"
         result_2 = tensor_search.search(
-            index_name=self.index_name_3, config=self.config, query="a line of text",
+            index_name=self.index_name_3, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.LEXICAL)
         assert result_2["hits"][0]["_id"] == "1234"
@@ -304,7 +304,7 @@ class TestIndexMetaCache(MarqoTestCase):
                 docs=[{"some field": "Plane 1"}], auto_refresh=True, device="cpu"))
         assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.TENSOR)
         assert result['hits'] == []
@@ -317,7 +317,7 @@ class TestIndexMetaCache(MarqoTestCase):
         assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         # no error:
         result = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="sftstsbtdts",
+            index_name=self.index_name_1, config=self.config, text="sftstsbtdts",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.LEXICAL)
 
@@ -334,7 +334,7 @@ class TestIndexMetaCache(MarqoTestCase):
             self.index_name_1, [{"brand new field": "a line of text", "_id": "1234"}], "brand new field")
         assert "brand new field" not in index_meta_cache.get_cache()[self.index_name_1].properties
         result = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.TENSOR)
         assert result["hits"][0]["_id"] == "1234"
@@ -343,7 +343,7 @@ class TestIndexMetaCache(MarqoTestCase):
             # Allow extra time if using a remote cluster
             time.sleep(3)
         result_2 = tensor_search.search(
-            index_name=self.index_name_1, config=self.config, query="a line of text",
+            index_name=self.index_name_1, config=self.config, text="a line of text",
             searchable_attributes=["brand new field"],
              search_method=SearchMethod.TENSOR)
         assert "brand new field" in index_meta_cache.get_cache()[self.index_name_1].properties

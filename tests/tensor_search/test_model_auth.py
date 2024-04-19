@@ -189,7 +189,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
             res = tensor_search.search(config=self.config,
-                                       index_name=self.index_name_1, query='hi'
+                                       index_name=self.index_name_1, text='hi'
                                        )
             assert 'hits' in res
             mock_req.assert_not_called()
@@ -325,7 +325,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
 
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client)  as mock_boto3_client:
             res = tensor_search.search(
-                config=self.config, query='hello', index_name=self.index_name_1,
+                config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
             )
 
@@ -376,7 +376,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
             with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
                 try:
                     res = tensor_search.search(
-                        config=self.config, query='hello', index_name=self.index_name_1,
+                        config=self.config, text='hello', index_name=self.index_name_1,
                         model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
                 except BadRequestError:
                     # bad request due to no models actually being loaded
@@ -432,7 +432,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
             with self.assertRaises(BadRequestError) as cm:
                 tensor_search.search(
-                    config=self.config, query='hello', index_name=self.index_name_1,
+                    config=self.config, text='hello', index_name=self.index_name_1,
                     model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
 
                 self.assertIn("s3 authorisation information is required", str(cm.exception))
@@ -553,7 +553,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
                 index_name=self.index_name_1,
                 config=self.config,
                 model_auth=model_auth,
-                query={
+                text={
                     (f"https://raw.githubusercontent.com/marqo-ai/"
                      f"marqo-api-tests/mainline/assets/ai_hippo_realistic.png"): 0.3,
                     'my text': -1.3
@@ -685,7 +685,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
             with self.assertRaises(BadRequestError) as cm:
                 tensor_search.search(
-                    config=self.config, query='hello', index_name=self.index_name_1,
+                    config=self.config, text='hello', index_name=self.index_name_1,
                 )
                 self.assertIn("s3 authorisation information is required", str(cm.exception))
 
@@ -732,7 +732,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
 
         with self.assertRaises(BadRequestError) as cm:
             tensor_search.search(
-                config=self.config, query='hello', index_name=self.index_name_1,
+                config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
 
@@ -774,7 +774,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
 
         with self.assertRaises(BadRequestError) as cm:
             tensor_search.search(
-                config=self.config, query='hello', index_name=self.index_name_1,
+                config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
 
@@ -818,7 +818,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
 
         with self.assertRaises(BadRequestError) as cm:
             tensor_search.search(
-                config=self.config, query='hello', index_name=self.index_name_1,
+                config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
         self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))
@@ -1151,7 +1151,7 @@ class TestModelAuthDownloadAndExtractS3HFModel(MarqoTestCase):
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
             res = tensor_search.search(config=self.config,
-                                       index_name=self.index_name_1, query='hi'
+                                       index_name=self.index_name_1, text='hi'
                                        )
             assert 'hits' in res
             mock_req.assert_not_called()
@@ -1241,7 +1241,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                     with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             res = tensor_search.search(
-                                config=self.config, query='hello', index_name=self.index_name_1,
+                                config=self.config, text='hello', index_name=self.index_name_1,
                                 model_auth=ModelAuth(hf=HfAuth(token=hf_token))
                             )
                         except KeyError as e:
@@ -1301,7 +1301,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                     with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             res = tensor_search.search(
-                                config=self.config, query='hello', index_name=self.index_name_1,)
+                                config=self.config, text='hello', index_name=self.index_name_1,)
                         except KeyError as e:
                             # KeyError as this is not a real model. It does not have an attention_mask
                             assert "attention_mask" in str(e)
@@ -1372,7 +1372,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                         with unittest.mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", mock_extract_huggingface_archive):
                             try:
                                 res = tensor_search.search(
-                                    config=self.config, query='hello', index_name=self.index_name_1,
+                                    config=self.config, text='hello', index_name=self.index_name_1,
                                     model_auth=ModelAuth(s3=S3Auth(aws_access_key_id=fake_access_key_id, aws_secret_access_key=fake_secret_key))
                                 )
                             except KeyError as e:
@@ -1424,7 +1424,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
             with mock.patch('marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url', new=mock_download):
                 with mock.patch("marqo.s2_inference.hf_utils.extract_huggingface_archive", new=mock_extract_huggingface_archive):
-                    res = tensor_search.search(config=self.config, query='hello', index_name=self.index_name_1)
+                    res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
         assert len(mock_extract_huggingface_archive.call_args_list) == 1
         assert mock_extract_huggingface_archive.call_args_list[0][0][0] == (ModelCache.hf_cache_path + os.path.basename(public_url))
@@ -1463,7 +1463,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         with unittest.mock.patch("transformers.AutoModel.from_pretrained",  mock_automodel_from_pretrained):
             with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained", mock_autotokenizer_from_pretrained):
-                res = tensor_search.search(config=self.config, query='hello', index_name=self.index_name_1,
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
                                            model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
 
         mock_automodel_from_pretrained.assert_called_once_with(
@@ -1501,7 +1501,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         with unittest.mock.patch("transformers.AutoModel.from_pretrained",  mock_automodel_from_pretrained):
             with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained", mock_autotokenizer_from_pretrained):
-                res = tensor_search.search(config=self.config, query='hello', index_name=self.index_name_1)
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
         mock_automodel_from_pretrained.assert_called_once_with(
             public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
@@ -1527,7 +1527,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         mock_automodel_from_pretrained = mock.MagicMock(side_effect=AutoModel.from_pretrained)
 
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
-                    res = tensor_search.search(config=self.config, query='hello', index_name=self.index_name_1)
+                    res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
         mock_automodel_from_pretrained.assert_called_once_with(
             public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
@@ -1842,7 +1842,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
             with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained",
                                      mock_autotokenizer_from_pretrained):
-                res = tensor_search.search(config=self.config, query='hello', index_name=self.index_name_1)
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
         mock_automodel_from_pretrained.assert_called_once_with(
             public_repo_name, use_auth_token=None, cache_dir=ModelCache.hf_cache_path
@@ -1906,7 +1906,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
             with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained",
                                      mock_autotokenizer_from_pretrained):
-                res = tensor_search.search(config=self.config, query='hello', index_name=self.index_name_1,
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
                                            model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
 
         mock_automodel_from_pretrained.assert_called_once_with(
@@ -1980,7 +1980,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         with unittest.mock.patch("transformers.AutoModel.from_pretrained", mock_automodel_from_pretrained):
             with unittest.mock.patch("transformers.AutoTokenizer.from_pretrained", mock_autotokenizer_from_pretrained):
-                res = tensor_search.search(config=self.config, query='hello', index_name=self.index_name_1,
+                res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1,
                                            model_auth=ModelAuth(hf=HfAuth(token=hf_token)))
 
         assert len(mock_automodel_from_pretrained.call_args_list) == 1
@@ -2140,7 +2140,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 index_name=self.index_name_1,
                 config=self.config,
                 model_auth=model_auth,
-                query={
+                text={
                     (f"https://raw.githubusercontent.com/marqo-ai/"
                      f"marqo-api-tests/mainline/assets/ai_hippo_realistic.png"): 0.3,
                     'my text': -1.3
@@ -2263,7 +2263,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client):
             with self.assertRaises(BadRequestError) as cm:
                 tensor_search.search(
-                    config=self.config, query='hello', index_name=self.index_name_1,
+                    config=self.config, text='hello', index_name=self.index_name_1,
                 )
                 self.assertIn("s3 authorisation information is required", str(cm.exception))
 
@@ -2309,7 +2309,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
 
         with self.assertRaises(BadRequestError) as cm:
             tensor_search.search(
-                config=self.config, query='hello', index_name=self.index_name_1,
+                config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
         self.assertIn("403 error when trying to retrieve model from s3", str(cm.exception))
@@ -2349,7 +2349,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
 
         with self.assertRaises(BadRequestError) as cm:
             tensor_search.search(
-                config=self.config, query='hello', index_name=self.index_name_1,
+                config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
 
@@ -2392,7 +2392,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
 
         with self.assertRaises(BadRequestError) as cm:
             tensor_search.search(
-                config=self.config, query='hello', index_name=self.index_name_1,
+                config=self.config, text='hello', index_name=self.index_name_1,
                 model_auth=model_auth
             )
         self.assertIn("Could not find the specified Hugging Face model repository.", str(cm.exception))

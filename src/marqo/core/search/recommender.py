@@ -61,7 +61,7 @@ class Recommender:
         results = tensor_search.search(
             config.Config(self.vespa_client),
             index_name,
-            query=interpolated_vector,
+            text=interpolated_vector,
             searchable_attributes=searchable_attributes
         )
 

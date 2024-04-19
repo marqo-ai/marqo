@@ -261,7 +261,7 @@ class TestSearchStructured(MarqoTestCase):
         )
 
         res = tensor_search.search(
-            query="In addition to NiS collection fire assay for a five element",
+            text="In addition to NiS collection fire assay for a five element",
             config=self.config, index_name=self.default_text_index
         )
 
@@ -296,7 +296,7 @@ class TestSearchStructured(MarqoTestCase):
         )
 
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, query=q, result_count=50
+            config=self.config, index_name=self.default_text_index, text=q, result_count=50
         )
 
         assert "processingTimeMs" in search_res
@@ -312,7 +312,7 @@ class TestSearchStructured(MarqoTestCase):
     def test_search_format_empty(self):
         """Is the result formatted correctly? - on an emtpy index?"""
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, query=""
+            config=self.config, index_name=self.default_text_index, text=""
         )
         assert "processingTimeMs" in search_res
         assert search_res["processingTimeMs"] > 0
@@ -352,14 +352,14 @@ class TestSearchStructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # too big
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                 result_count=-1
             )
 
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # violates total results
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                 result_count=1000000
             )
             raise AssertionError
@@ -367,7 +367,7 @@ class TestSearchStructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # violates max limit of 1000
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                 result_count=1001
             )
             raise AssertionError
@@ -375,7 +375,7 @@ class TestSearchStructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # violates max offset of 10,000
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                 result_count=1,
                 offset=10001
             )
@@ -384,14 +384,14 @@ class TestSearchStructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # should not work with 0
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                 result_count=0
             )
             raise AssertionError
 
         # should work with 1:
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
+            config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
             result_count=1
         )
         assert len(search_res['hits']) >= 1
@@ -409,14 +409,14 @@ class TestSearchStructured(MarqoTestCase):
         )
 
         tensor_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, query="some text", highlights=True)
+            config=self.config, index_name=self.default_text_index, text="some text", highlights=True)
         self.assertEqual(2, len(tensor_highlights["hits"]))
 
         for hit in tensor_highlights["hits"]:
             assert "_highlights" in hit
 
         tensor_no_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, query="some text", highlights=False)
+            config=self.config, index_name=self.default_text_index, text="some text", highlights=False)
         self.assertEqual(2, len(tensor_highlights["hits"]))
         for hit in tensor_no_highlights["hits"]:
             assert "_highlights" not in hit
@@ -433,14 +433,14 @@ class TestSearchStructured(MarqoTestCase):
             )
         )
         lexical_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, query="some text",
+            config=self.config, index_name=self.default_text_index, text="some text",
             search_method=SearchMethod.LEXICAL, highlights=True)
         assert len(lexical_highlights["hits"]) == 2
         for hit in lexical_highlights["hits"]:
             assert "_highlights" in hit
 
         lexical_no_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, query="some text",
+            config=self.config, index_name=self.default_text_index, text="some text",
             search_method=SearchMethod.LEXICAL, highlights=False)
         assert len(lexical_no_highlights["hits"]) == 2
         for hit in lexical_no_highlights["hits"]:
@@ -471,7 +471,7 @@ class TestSearchStructured(MarqoTestCase):
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             with self.subTest(f"search_method={search_method}"):
                 s_res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, query="cool match",
+                    config=self.config, index_name=self.default_text_index, text="cool match",
                     search_method=search_method)
                 assert len(s_res["hits"]) > 0
 
@@ -490,7 +490,7 @@ class TestSearchStructured(MarqoTestCase):
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.search(
-                config=self.config, index_name=self.default_text_index, query="some text",
+                config=self.config, index_name=self.default_text_index, text="some text",
                 search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
             return True
 
@@ -540,12 +540,12 @@ class TestSearchStructured(MarqoTestCase):
 
         for field, to_search in docs[0].items():
             assert "hits" in tensor_search.search(
-                query=str(to_search), config=self.config, index_name=self.default_text_index,
+                text=str(to_search), config=self.config, index_name=self.default_text_index,
                 search_method=SearchMethod.TENSOR, filter=f"{field}:{to_search}"
             )
 
             assert "hits" in tensor_search.search(
-                query=str(to_search), config=self.config, index_name=self.default_text_index,
+                text=str(to_search), config=self.config, index_name=self.default_text_index,
                 search_method=SearchMethod.LEXICAL, filter=f"{field}:{to_search}"
             )
 
@@ -593,7 +593,7 @@ class TestSearchStructured(MarqoTestCase):
         for filter_string, expected_hits, expected_id in test_parameters:
             with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, query="some text",
+                    config=self.config, index_name=self.default_text_index, text="some text",
                     result_count=3, filter=filter_string, search_method=SearchMethod.LEXICAL
                 )
 
@@ -683,7 +683,7 @@ class TestSearchStructured(MarqoTestCase):
                         f"search_method = {search_method}, attributes_to_retrieve={attributes_to_retrieve},"
                         f" expected_fields = {expected_fields}"):
                     res = tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, query="Exact match hehehe",
+                        config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                         attributes_to_retrieve=attributes_to_retrieve, search_method=search_method
                     )
 
@@ -716,7 +716,7 @@ class TestSearchStructured(MarqoTestCase):
                             search_method=search_method,
                             config=self.config,
                             index_name=self.image_index_with_random_model,
-                            query=search_text,
+                            text=search_text,
                             result_count=max_doc // 2
                         )
 
@@ -727,7 +727,7 @@ class TestSearchStructured(MarqoTestCase):
                             search_method=search_method,
                             config=self.config,
                             index_name=self.image_index_with_random_model,
-                            query=search_text,
+                            text=search_text,
                             result_count=max_doc
                         )
 
@@ -738,7 +738,7 @@ class TestSearchStructured(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=self.image_index_with_random_model,
-                                query=search_text,
+                                text=search_text,
                                 result_count=max_doc + 1
                             )
                         except errors.IllegalRequestedDocCount:
@@ -748,7 +748,7 @@ class TestSearchStructured(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=self.image_index_with_random_model,
-                                query=search_text,
+                                text=search_text,
                                 result_count=(max_doc + 1) * 2
                             )
                         except errors.IllegalRequestedDocCount:
@@ -768,7 +768,7 @@ class TestSearchStructured(MarqoTestCase):
                     tensor_search.search(
                         config=self.config,
                         index_name=self.default_text_index,
-                        query="",
+                        text="",
                         result_count=limit
                     )
 
@@ -789,7 +789,7 @@ class TestSearchStructured(MarqoTestCase):
         )
         res = tensor_search.search(
             config=self.config, index_name=self.default_image_index,
-            query="A hippo in the water", result_count=3,
+            text="A hippo in the water", result_count=3,
         )
         assert len(res['hits']) == 2
         assert {hit['image_field_1'] for hit in res['hits']} == {url_2, url_1}
@@ -821,7 +821,7 @@ class TestSearchStructured(MarqoTestCase):
         for query, expected_ordering in queries_expected_ordering:
             with self.subTest(f"query={query}, expected_ordering={expected_ordering}"):
                 res = tensor_search.search(
-                    query=query,
+                    text=query,
                     index_name=self.default_text_index,
                     result_count=5,
                     config=self.config,
@@ -865,7 +865,7 @@ class TestSearchStructured(MarqoTestCase):
         for query, expected_ordering in queries_expected_ordering:
             with self.subTest(f"query={query}, expected_ordering={expected_ordering}"):
                 res = tensor_search.search(
-                    query=query,
+                    text=query,
                     index_name=self.default_image_index,
                     result_count=5,
                     config=self.config,
@@ -899,7 +899,7 @@ class TestSearchStructured(MarqoTestCase):
             with self.subTest(f"query={q}"):
                 with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
                     tensor_search.search(
-                        query=q,
+                        text=q,
                         index_name=self.default_image_index,
                         result_count=5,
                         config=self.config,
@@ -928,7 +928,7 @@ class TestSearchStructured(MarqoTestCase):
         for q in alright_queries:
             with self.subTest(f"query={q}"):
                 tensor_search.search(
-                    query=q,
+                    text=q,
                     index_name=self.default_image_index,
                     result_count=5,
                     config=self.config,
@@ -952,7 +952,7 @@ class TestSearchStructured(MarqoTestCase):
             with self.subTest(f"bad_method={bad_method}"):
                 with self.assertRaises(errors.InvalidArgError):
                     tensor_search.search(
-                        query={'something': 1},
+                        text={'something': 1},
                         index_name=self.default_text_index,
                         result_count=5,
                         config=self.config,
@@ -976,7 +976,7 @@ class TestSearchStructured(MarqoTestCase):
             )
         )
         res = tensor_search.search(
-            query=hippo_image,
+            text=hippo_image,
             index_name=self.default_image_index,
             result_count=5,
             config=self.config,
@@ -1006,7 +1006,7 @@ class TestSearchStructured(MarqoTestCase):
         )
 
         lexical_search_result = tensor_search.search(
-            query="some text",
+            text="some text",
             index_name=self.default_text_index,
             result_count=5,
             config=self.config,
@@ -1032,7 +1032,7 @@ class TestSearchStructured(MarqoTestCase):
             )
         )
         tensor_search_result = tensor_search.search(
-            query="some text",
+            text="some text",
             index_name=self.default_text_index,
             config=self.config,
             search_method=SearchMethod.TENSOR
@@ -1082,14 +1082,14 @@ class TestSearchStructured(MarqoTestCase):
                                   f"expected_document_ids = {expected_document_ids}, "
                                   f"search_method = {search_method}"):
                     res = tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, query="some text",
+                        config=self.config, index_name=self.default_text_index, text="some text",
                         filter=filter_string, search_method=SearchMethod.LEXICAL
                     )
                     self.assertEqual(1, len(res["hits"]))
                     self.assertEqual(expected_document_ids, res["hits"][0]["_id"])
 
     def test_tensor_search_query_can_be_none(self):
-        res = tensor_search.search(query=None, config=self.config, index_name=self.default_text_index,
+        res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                    context=SearchContext(
                                        **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
                                                      {"vector": [2, ] * 384, "weight": 2}]}))
@@ -1109,5 +1109,5 @@ class TestSearchStructured(MarqoTestCase):
         for query, context, msg in test_case:
             with self.subTest(msg):
                 with self.assertRaises(InvalidArgError):
-                    res = tensor_search.search(query=None, config=self.config, index_name=self.default_text_index,
+                    res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)

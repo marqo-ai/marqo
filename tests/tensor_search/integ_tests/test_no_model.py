@@ -140,7 +140,7 @@ class TestNoModel(MarqoTestCase):
         for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
             with (self.subTest(index_name=index_name)):
                 with self.assertRaises(InvalidArgError) as e:
-                    r = tensor_search.search(config=self.config, index_name=index_name, query="test")
+                    r = tensor_search.search(config=self.config, index_name=index_name, text="test")
                 self.assertIn("Cannot vectorise anything with 'no_model'", str(e.exception))
 
     def test_no_model_work_with_context_vectors_in_search(self):
@@ -181,7 +181,7 @@ class TestNoModel(MarqoTestCase):
                 _ = tensor_search.add_documents(config=self.config,
                                                 add_docs_params=add_docs_params)
 
-                r = tensor_search.search(config=self.config, index_name=index_name, query=None,
+                r = tensor_search.search(config=self.config, index_name=index_name, text=None,
                                          context=SearchContext(**{"tensor": [{"vector": custom_vector,
                                                                               "weight": 1}], }))
                 self.assertEqual(2, len(r["hits"]))
@@ -195,7 +195,7 @@ class TestNoModel(MarqoTestCase):
         """Test to ensure that context vectors work with no_model by setting query as None"""
         for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
             with (self.subTest(index_name=index_name)):
-                r = tensor_search.search(config=self.config, index_name=index_name, query=None,
+                r = tensor_search.search(config=self.config, index_name=index_name, text=None,
                                          context=SearchContext(**{"tensor": [{"vector": [1, ] * self.DIMENSION,
                                                                               "weight": -1},
                                                                              {"vector": [1, ] * self.DIMENSION,
@@ -209,7 +209,7 @@ class TestNoModel(MarqoTestCase):
         for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
             with (self.subTest(index_name=index_name)):
                 with self.assertRaises(InvalidArgError) as e:
-                    r = tensor_search.search(config=self.config, index_name=index_name, query=None,
+                    r = tensor_search.search(config=self.config, index_name=index_name, text=None,
                                              context=SearchContext(**{"tensor": [{"vector": [1, ] * (self.DIMENSION + 1),
                                                                                   "weight": -1},
                                                                                  {"vector": [1, ] * (self.DIMENSION + 1),

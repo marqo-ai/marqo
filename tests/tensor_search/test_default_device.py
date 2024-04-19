@@ -179,7 +179,7 @@ class TestDefaultDevice(MarqoTestCase):
                 tensor_search.search(
                     config=self.config, 
                     index_name=self.index_name_1, 
-                    query="random search lol",
+                    text="random search lol",
                     reranker="owl/ViT-B/32",
                     searchable_attributes=["test"],
                     # no device set, so should use default
@@ -223,7 +223,7 @@ class TestDefaultDevice(MarqoTestCase):
                 tensor_search.search(
                     config=self.config, 
                     index_name=self.index_name_1, 
-                    query="random search lol",
+                    text="random search lol",
                     reranker="owl/ViT-B/32",
                     searchable_attributes=["test"],
                     device=explicitly_set_device,
@@ -255,7 +255,7 @@ class TestDefaultDevice(MarqoTestCase):
             tensor_search.search(
                 config=self.config, 
                 index_name=self.index_name_1, 
-                query="random search lol",
+                text="random search lol",
                 reranker="owl/ViT-B/32",
                 searchable_attributes=["test"],
             )

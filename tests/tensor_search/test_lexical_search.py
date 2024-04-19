@@ -198,7 +198,7 @@ class TestLexicalSearch(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, text="Marqo field",
             searchable_attributes=["field lambda", "FIELD omega"])
         res_search_entry_point = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, query="Marqo field", device="cpu",
+            config=self.config, index_name=self.index_name_1, text="Marqo field", device="cpu",
             searchable_attributes=["field lambda", "FIELD omega"],
             search_method=enums.SearchMethod.LEXICAL)
         res_search_entry_point_no_processing_time = res_search_entry_point.copy()

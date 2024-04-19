@@ -95,7 +95,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
                     self.assertEqual(0, mock_vectorise.call_count, 'vectorise should not be called')
 
-                    search_res = tensor_search.search(config=self.config, index_name=index_name, query="content")
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
                     get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
                                                                    document_id="1", show_vectors=True)
 
@@ -149,7 +149,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
                     self.assertEqual(1, mock_vectorise.call_count, 'vectorise should not be called')
 
-                    search_res = tensor_search.search(config=self.config, index_name=index_name, query="content")
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
                     get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
                                                                    document_id="1", show_vectors=True)
 
@@ -209,7 +209,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
                     self.assertEqual(0, mock_vectorise.call_count, 'vectorise should not be called')
 
-                    search_res = tensor_search.search(config=self.config, index_name=index_name, query="content")
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
                     get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
                                                                    document_id="1", show_vectors=True)
 
@@ -273,7 +273,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
                     self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called')
 
-                    search_res = tensor_search.search(config=self.config, index_name=index_name, query="content")
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
                     get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
                                                                    document_id="1", show_vectors=True)
 
@@ -340,7 +340,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
                     self.assertEqual(1, mock_vectorise.call_count, 'vectorise should be called again')
 
-                    search_res = tensor_search.search(config=self.config, index_name=index_name, query="content")
+                    search_res = tensor_search.search(config=self.config, index_name=index_name, text="content")
                     get_doc_res = tensor_search.get_document_by_id(config=self.config, index_name=index_name,
                                                                    document_id="1", show_vectors=True)
 

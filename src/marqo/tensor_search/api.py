@@ -207,7 +207,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return tensor_search.search(
-            config=marqo_config, query=search_query.q,
+            config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
             searchable_attributes=search_query.searchableAttributes,
             search_method=search_query.searchMethod,

@@ -1171,7 +1171,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
         raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
 
-def search(config: Config, index_name: str, query: Union[None, str, dict, List[float]],
+def search(config: Config, index_name: str, text: Union[None, str, dict],
            result_count: int = 3, offset: int = 0,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
@@ -1196,7 +1196,7 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
     Args:
         config:
         index_name:
-        query:
+        text:
         result_count:
         offset:
         search_method:
@@ -1223,8 +1223,8 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
     if offset < 0:
         raise api_exceptions.IllegalRequestedDocCount("search result offset cannot be less than 0!")
 
-    # validate query
-    # validation.validate_query(q=query, search_method=search_method)
+        # validate query
+    validation.validate_query(q=text, search_method=search_method)
 
     # Validate max limits
     max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
@@ -1251,7 +1251,7 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
             f"[{max_search_offset}]. Marqo received search result offset of `{offset}`.")
 
     t0 = timer()
-    validation.validate_context(context=context, query=query, search_method=search_method)
+    validation.validate_context(context=context, query=text, search_method=search_method)
     validation.validate_boost(boost=boost, search_method=search_method)
     validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
     if searchable_attributes is not None:
@@ -1261,7 +1261,7 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
             raise api_exceptions.InvalidArgError("attributes_to_retrieve must be a sequence!")
         [validation.validate_field_name(attribute) for attribute in attributes_to_retrieve]
     if verbose:
-        print(f"determined_search_method: {search_method}, text query: {query}")
+        print(f"determined_search_method: {search_method}, text query: {text}")
 
     if device is None:
         selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
@@ -1284,7 +1284,7 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
             approximate = True
 
         search_result = _vector_text_search(
-            config=config, index_name=index_name, query=query, result_count=result_count, offset=offset,
+            config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
@@ -1303,7 +1303,7 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
             )
 
         search_result = _lexical_search(
-            config=config, index_name=index_name, text=query, result_count=result_count, offset=offset,
+            config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights
         )
@@ -1318,7 +1318,7 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
         try:
             # SEARCH TIMER-LOGGER (reranking)
             RequestMetricsStore.for_request().start(f"search.rerank")
-            rerank.rerank_search_results(search_result=search_result, query=query,
+            rerank.rerank_search_results(search_result=search_result, query=text,
                                          model_name=reranker,
                                          device=selected_device,
                                          searchable_attributes=searchable_attributes,
@@ -1330,7 +1330,7 @@ def search(config: Config, index_name: str, query: Union[None, str, dict, List[f
         except Exception as e:
             raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
-    search_result["query"] = query
+    search_result["query"] = text
     search_result["limit"] = result_count
     search_result["offset"] = offset
 
@@ -1714,7 +1714,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Optional[Union[str, dict, List[float]]], result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5, offset: int = 0,
         ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
@@ -1769,18 +1769,15 @@ def _vector_text_search(
 
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
-    if not isinstance(query, list):
-        queries = [BulkSearchQueryEntity(
-            q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
-            offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
-            boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
-            index=marqo_index, modelAuth=model_auth
-        )]
-        with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
-            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
-        vectorised_text = list(qidx_to_vectors.values())[0]
-    else:
-        vectorised_text = query
+    queries = [BulkSearchQueryEntity(
+        q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
+        offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
+        boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
+        index=marqo_index, modelAuth=model_auth
+    )]
+    with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
+        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+    vectorised_text = list(qidx_to_vectors.values())[0]
 
     marqo_query = MarqoTensorQuery(
         index_name=index_name,
