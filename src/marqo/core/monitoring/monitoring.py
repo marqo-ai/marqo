@@ -166,15 +166,18 @@ class Monitoring:
             cuda_devices = []
             for device_id in range(torch.cuda.device_count()):
                 device_name = torch.cuda.get_device_name(device_id)
-                memory_used = f"{round(torch.cuda.memory_allocated(device_id) / 1024 ** 3, 1)} GiB"
-                total_memory = f"{round(torch.cuda.get_device_properties(device_id).total_memory / 1024 ** 3, 1)} GiB"
-                utilization = f"{round(torch.cuda.utilization(device_id), 2)} %"
+                memory_used = torch.cuda.memory_allocated(device_id) / 1024 ** 3
+                total_memory = torch.cuda.get_device_properties(device_id).total_memory / 1024 ** 3
+                utilization = torch.cuda.utilization(device_id)
+                memory_used_percentage = memory_used / total_memory * 100
+
                 marqo_cuda_device_info = MarqoCudaDeviceInfo(
                     device_id=device_id,
                     device_name=device_name,
-                    memory_used=memory_used,
-                    total_memory=total_memory,
-                    utilization=utilization
+                    memory_used=f"{round(memory_used, 1)} GiB",
+                    total_memory=f"{round(total_memory, 1)} GiB",
+                    utilization=utilization,
+                    memory_used_percent=f"{round(memory_used_percentage, 1)} %"
                 )
                 cuda_devices.append(marqo_cuda_device_info)
             return MarqoCudaInfoResponse(cuda_devices=cuda_devices)

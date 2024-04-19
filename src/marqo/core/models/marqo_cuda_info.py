@@ -8,6 +8,7 @@ class MarqoCudaDeviceInfo(StrictBaseModel):
     memory_used: str
     total_memory: str
     utilization: str
+    memory_used_percent: str
 
 
 class MarqoCudaInfoResponse(StrictBaseModel):
