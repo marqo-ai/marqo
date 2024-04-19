@@ -32,7 +32,8 @@ setup(
         "fastapi_utils",
         "opencv-python-headless",
         "psutil",
-        "multilingual_clip"
+        "multilingual_clip,"
+        "pynvml==11.5.0"
     ],
     name="marqo-engine",
     version="0.1.10",
