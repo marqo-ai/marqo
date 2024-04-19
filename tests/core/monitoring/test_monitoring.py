@@ -1,5 +1,7 @@
 import uuid
+from unittest.mock import patch
 
+from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, IndexType
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -362,3 +364,38 @@ class TestMonitoring(MarqoTestCase):
         self.assertLessEqual(actual.backend.memory_used_percentage, 100.0)
         self.assertGreater(actual.backend.storage_used_percentage, 0.0)
         self.assertLessEqual(actual.backend.storage_used_percentage, 100.0)
+
+    def test_getCudaInfo_fail_on_cpu_instance(self):
+        """
+        getCudaInfo raise the correct error when called on a CPU instance
+        """
+        with self.assertRaises(HardwareCompatabilityError) as cm:
+            self.monitoring.get_cuda_info()
+        self.assertIn("CUDA is not available on this machine", cm.exception.message)
+
+    @patch('marqo.core.monitoring.monitoring.torch.cuda.is_available', return_value=True)
+    @patch('marqo.core.monitoring.monitoring.torch.cuda.device_count', return_value=1)
+    @patch('marqo.core.monitoring.monitoring.torch.cuda.get_device_name', return_value='Tesla T4')
+    @patch('marqo.core.monitoring.monitoring.torch.cuda.memory_allocated', return_value=3 * 1024 ** 3)
+    @patch('marqo.core.monitoring.monitoring.torch.cuda.utilization', return_value=58)
+    def test_getCudaInfo_success_on_gpu_instance(self, *mocks):
+        """
+        getCudaInfo returns the correct information when called on a GPU instance
+        """
+        class MockCudaProperties:
+            total_memory = 12 * 1024 ** 3
+
+        with patch('marqo.core.monitoring.monitoring.torch.cuda.get_device_properties',
+                   return_value=MockCudaProperties()):
+            response = self.monitoring.get_cuda_info()
+            self.assertEqual(response.dict(), {
+                "cuda_devices": [
+                    {
+                        "device_id": 0,
+                        "device_name": "Tesla T4",
+                        "memory_used": "3.0 GiB",
+                        "total_memory": "12.0 GiB",
+                        "utilization": "58 %"
+                    }
+                ]
+            })
