@@ -27,7 +27,7 @@ from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
-from marqo.core.schema_validation import validate_settings_object
+from marqo.core.validation.validation import validate_settings_object
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
@@ -188,7 +188,7 @@ def memory():
     return memory_profiler.get_memory_profile()
 
 
-@app.get('/validation')
+@app.post('/validation')
 @utils.enable_schema_validation()
 def schema_validation(index_name, settings_object):
     return validate_settings_object(index_name, settings_object)

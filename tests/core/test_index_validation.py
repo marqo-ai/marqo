@@ -3,7 +3,7 @@ import unittest
 
 from fastapi.responses import JSONResponse
 
-from marqo.core.schema_validation import validate_settings_object
+from marqo.core.validation.validation import validate_settings_object
 
 
 class TestValidateSettings(unittest.TestCase):

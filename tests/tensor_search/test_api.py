@@ -63,7 +63,7 @@ class ApiTests(MarqoTestCase):
         """
         Test that the schema_validation endpoint returns 403 by default.
         """
-        response = self.client.get("/validation")
+        response = self.client.post("/validation")
         self.assertEqual(response.status_code, 403)
 
     def schema_validation_disabled_403(self):
@@ -71,7 +71,7 @@ class ApiTests(MarqoTestCase):
         Test that the validation endpoint returns 403 when debug API is disabled explicitly.
         """
         with patch.dict('os.environ', {EnvVars.MARQO_SCHEMA_VALIDATION: 'FALSE'}):
-            response = self.client.get("/validation")
+            response = self.client.post("/validation")
             self.assertEqual(response.status_code, 403)
 
 
