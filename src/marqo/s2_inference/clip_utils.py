@@ -2,7 +2,10 @@ import os
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 import validators
-import requests
+# import requests
+import pycurl
+import certifi
+from io import BytesIO
 import numpy as np
 import clip
 import torch
@@ -25,7 +28,6 @@ logger = get_logger(__name__)
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 BICUBIC = InterpolationMode.BICUBIC
-
 
 def get_allowed_image_types():
     return set(('.jpg', '.png', '.bmp', '.jpeg'))
@@ -80,6 +82,42 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     
     return results
 
+def download_image(image_url: str, timeout: int, image_download_headers: dict) -> ImageType:
+    """Helper to download an image with PyCurl
+
+    Args:
+        image_url (str): The image url to download
+        timeout (int): Timeout for download
+        image_download_headers (dict): Header for the request
+
+    Raises:
+        Exception: For any non 200 response code
+        Exception: For any other pycurl error
+
+    Returns:
+        ImageType: a PIL image
+    """
+    buffer = BytesIO()
+    c = pycurl.Curl()
+    c.setopt(c.CAINFO, certifi.where())
+    c.setopt(c.URL, image_url)
+    c.setopt(c.WRITEDATA, buffer)
+    c.setopt(c.TIMEOUT, timeout)
+    c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in image_download_headers.items()])
+    
+    try:
+        c.perform()
+        if c.getinfo(c.RESPONSE_CODE) != 200:
+            raise Exception(f"image url `{image_url}` returned {c.getinfo(c.RESPONSE_CODE)}")
+    except pycurl.error as e:
+        raise Exception(f"An error occurred: {e}")
+    finally:
+        c.close()
+
+    buffer.seek(0)
+    img = Image.open(buffer)
+    return img
+
 
 def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3,
                          metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
@@ -103,23 +141,21 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
             if metrics_obj is not None:
                 metrics_obj.start(f"image_download.{image_path}")
 
-            with requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers) as resp:
-                if not resp.ok:
-                    raise UnidentifiedImageError(
-                        f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
-
-                img = Image.open(resp.raw)
+            img = download_image(
+                image_url=image_path, 
+                timeout=timeout, 
+                image_download_headers=image_download_headers
+            )
 
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")
 
-        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException
-                ) as e:
+        except Exception as e:
             raise UnidentifiedImageError(
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "
                 f"Timeout threshold is set to {timeout} seconds."
-                f"\nConnection error type: `{e.__class__.__name__}`")
+                f"\nConnection error type: `{e.__class__.__name__}`"
+                f"\n{e}")
     else:
         raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 

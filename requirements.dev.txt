@@ -1,5 +1,7 @@
 # tensor search, idential to requirements.txt:
 requests==2.28.1
+pycurl==7.45.3
+certifi==2019.11.28
 anyio==3.7.1
 fastapi==0.86.0
 uvicorn[standard]
