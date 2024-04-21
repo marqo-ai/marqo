@@ -22,7 +22,8 @@ setup(
         "numpy",
         "validators",
         "sentence-transformers",
-         "onnxruntime",
+        #This package provides the CPU execution backend for ONNX Runtime. It leverages the CPU resources of your system to perform inference tasks on ONNX models.
+        "onnxruntime",
         "onnx",
         "protobuf==3.20.1",
         "pandas",

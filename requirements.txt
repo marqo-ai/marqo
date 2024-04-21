@@ -13,4 +13,5 @@ pydantic==1.10.11
 httpx==0.25.0
 semver==3.0.2
 memory-profiler==0.61.0
+#This package provides the CPU execution backend for ONNX Runtime. It leverages the CPU resources of your system to perform inference tasks on ONNX models.
 onnxruntime
