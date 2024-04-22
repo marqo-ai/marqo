@@ -1,4 +1,4 @@
-__version__ = "2.4.3+open-clip-upgrade"
+__version__ = "2.4.3"
 
 
 def get_version() -> str:
