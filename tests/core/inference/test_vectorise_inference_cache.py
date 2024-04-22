@@ -1,14 +1,15 @@
+import importlib
 import os
 import random
+import sys
 import unittest.mock
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
-from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from PIL import Image
 
-import importlib
-import sys
+from marqo.s2_inference.s2_inference import get_marqo_inference_cache
 
 
 class TestVectoriseInferenceCache(unittest.TestCase):
@@ -178,3 +179,32 @@ class TestVectoriseInferenceCache(unittest.TestCase):
                        range(ITERATIONS)]
             result = [future.result() for future in futures]
         self.assertEqual(ITERATIONS, len(result))
+
+    def test_inferenceCacheOrder_preserved_successfully(self):
+        """Test if the order of embeddings is preserved when part of the content is already cached."""
+        NUMBER_OF_ITERATIONS = 100
+
+        for _ in range(NUMBER_OF_ITERATIONS):
+            vectorise = self._import_vectorise_with_inference_cache(cache_size=20)
+            list_of_contents = [f"test{i}" for i in range(20)]
+            intended_cache_size = random.randint(0, 20)
+            cached_items = random.sample(list_of_contents, intended_cache_size)
+
+            # First call
+            original_vectors = vectorise(model_name="random/small",
+                                         content=cached_items, device="cpu", enable_cache=True)
+
+            cache = get_marqo_inference_cache()
+            self.assertEqual(cache.currsize, intended_cache_size, "Cache size is not as expected.")
+
+            cached_vectors_mapping = {content: vector for content, vector in zip(cached_items, original_vectors)}
+
+            # Second call with partially cached content
+            vectors = vectorise(model_name="random/small",
+                                content=list_of_contents, device="cpu", enable_cache=True)
+
+            all_vectors_mapping = {content: vector for content, vector in zip(list_of_contents, vectors)}
+
+            for content in cached_items:
+                self.assertEqual(cached_vectors_mapping[content], all_vectors_mapping[content],
+                                 f"Order of cached content {content} is not preserved.")

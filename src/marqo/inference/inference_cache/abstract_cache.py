@@ -1,18 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import Any, Hashable
 
 
 class MarqoAbstractCache(ABC):
-    """Abstract class for Marqo cache implementations.
+    """Abstract class for Marqo cache implementations, MUST be thread-safe.
 
-    The acceptable key is a string consisting of model_cache_key and content to identify the cache.
-    The acceptable value is a list of floats representing the embeddings.
+    The acceptable key must be Hashable.
+    The acceptable value is Any.
 
     When a cache is full, self.__setitem__() calls self.popitem() repeatedly
     until there is enough room for the item to be added.
+
+    The cache MUST be a thread-safe implementation.
     """
+
     @abstractmethod
-    def get(self, key: str, default=None) -> List[float]:
+    def get(self, key: Hashable, default=None) -> Any:
         """Return the value for key if key is in the cache, else default.
         Args:
             key: __description__
@@ -23,7 +26,7 @@ class MarqoAbstractCache(ABC):
         pass
 
     @abstractmethod
-    def set(self, key: str, value: List[float]) -> None:
+    def set(self, key: Hashable, value: Any) -> None:
         """Set the value for key in the cache.
 
         Args:
@@ -42,7 +45,7 @@ class MarqoAbstractCache(ABC):
         pass
 
     @abstractmethod
-    def __contains__(self, key: str) -> bool:
+    def __contains__(self, key: Hashable) -> bool:
         """Return True if the key is in the cache, else False.
 
         Args:
@@ -53,7 +56,7 @@ class MarqoAbstractCache(ABC):
         pass
 
     @abstractmethod
-    def __setitem__(self, key: str, value: List[float]) -> None:
+    def __setitem__(self, key: Hashable, value: Any) -> None:
         """Set the value for key in the cache if the cache is not full, else popitem() until there is enough room.
 
         Args:
@@ -63,7 +66,7 @@ class MarqoAbstractCache(ABC):
         pass
 
     @abstractmethod
-    def __getitem__(self, key: str) -> List[float]:
+    def __getitem__(self, key: Hashable) -> Any:
         """Return the value for key if key is in the cache, else raise KeyError.
 
         Args:
@@ -80,4 +83,16 @@ class MarqoAbstractCache(ABC):
     @abstractmethod
     def __len__(self) -> int:
         """Return the number of items in the cache."""
+        pass
+
+    @property
+    @abstractmethod
+    def maxsize(self) -> int:
+        """Return the maximum size of the cache."""
+        pass
+
+    @property
+    @abstractmethod
+    def currsize(self) -> int:
+        """Return the current size of the cache."""
         pass
