@@ -102,5 +102,6 @@ class TestAddDocumentsStructured(MarqoTestCase):
                                                                                   tensor_fields=tensor_fields))
                     mock_vectorise.assert_called_once()
                     args, kwargs = mock_vectorise.call_args
-                    self.assertFalse(kwargs["enable_cache"])
+                    self.assertFalse("enable_cache" in kwargs, "enable_cache should not be passed to "
+                                                               "vectorise for add_documents")
                 mock_vectorise.reset_mock()
