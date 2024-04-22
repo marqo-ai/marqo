@@ -82,8 +82,8 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 self.assertEqual(400, r["items"][1]["status"])
                 self.assertIn("image file is truncated", r["items"][1]["error"])
 
-    def test_add_document_callVectoriseWithEnableCacheFalse(self):
-        """Ensure vectorise is called with enable_cache=False when calling add_documents."""
+    def test_add_document_callVectoriseWithoutPassingEnableCache(self):
+        """Ensure vectorise does not receive enable_cache when calling add_documents."""
         documents = [
             {
                 "text_field_1": "Test test",
