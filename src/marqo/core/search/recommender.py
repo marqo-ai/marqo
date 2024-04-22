@@ -5,6 +5,8 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.utils.vector_interpolation import from_interpolation_method
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient
 
@@ -18,10 +20,22 @@ class Recommender:
                   index_name: str,
                   documents: Union[List[str], Dict[str, float]],
                   tensor_fields: Optional[List[str]] = None,
-                  searchable_attributes: Optional[List[str]] = None,
-                  filter: str = None,
+                  interpolation_method: Optional[InterpolationMethod] = None,
                   exclude_input_documents=True,
-                  interpolation_method: Optional[InterpolationMethod] = None
+                  result_count: int = 3,
+                  offset: int = 0,
+                  highlights: bool = True,
+                  ef_search: Optional[int] = None,
+                  approximate: Optional[bool] = None,
+                  searchable_attributes: Optional[List[str]] = None,
+                  verbose: int = 0,
+                  reranker: Union[str, Dict] = None,
+                  filter: str = None,
+                  attributes_to_retrieve: Optional[List[str]] = None,
+                  device: str = None,
+                  boost: Optional[Dict] = None,
+                  score_modifiers: Optional[ScoreModifier] = None,
+                  model_auth: Optional[ModelAuth] = None
                   ):
         # TODO - Extract search and get_docs from tensor_search and refactor this
         # TODO - The dependence on Config in tensor_search is bad design. Refactor to require specific dependencies
@@ -70,15 +84,29 @@ class Recommender:
         )
 
         if exclude_input_documents:
-            filter = self._get_exclusion_filter(document_ids, filter)
+            recommend_filter = self._get_exclusion_filter(document_ids, filter)
+        else:
+            recommend_filter = filter
 
         results = tensor_search.search(
             config.Config(self.vespa_client),
             index_name,
             text=None,
             context=SearchContext(tensor=[SearchContextTensor(vector=interpolated_vector, weight=1)]),
+            result_count=result_count,
+            offset=offset,
+            highlights=highlights,
+            ef_search=ef_search,
+            approximate=approximate,
             searchable_attributes=searchable_attributes,
-            filter=filter
+            verbose=verbose,
+            reranker=reranker,
+            filter=recommend_filter,
+            attributes_to_retrieve=attributes_to_retrieve,
+            device=device,
+            boost=boost,
+            score_modifiers=score_modifiers,
+            model_auth=model_auth
         )
 
         return results
@@ -90,7 +118,7 @@ class Recommender:
             return InterpolationMethod.LERP
 
     def _get_exclusion_filter(self, documents: List[str], user_filter: Optional[str]) -> str:
-        not_in = 'NOT _id IN ("' + '","'.join(documents) + '")'
+        not_in = 'NOT (' + ' OR '.join([f'_id:({doc})' for doc in documents]) + ')'
 
         if user_filter is not None and user_filter.strip() != '':
             return f'({user_filter}) AND {not_in}'

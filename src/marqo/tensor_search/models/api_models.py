@@ -8,6 +8,7 @@ from typing import Union, List, Dict, Optional
 import pydantic
 from pydantic import BaseModel, root_validator
 
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
@@ -77,18 +78,20 @@ class SearchQuery(BaseMarqoModel):
 class RecommendQuery(BaseMarqoModel):
     documents: Union[List[str], Dict[str, float]]
     tensorFields: Optional[List[str]] = None
-    searchableAttributes: Optional[List[str]] = None
+    interpolationMethod: Optional[InterpolationMethod] = None
+    excludeInputDocuments: bool = True
     limit: int = 10
     offset: int = 0
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
+    searchableAttributes: Optional[List[str]] = None
     showHighlights: bool = True
     reRanker: str = None
     filter: str = None
     attributesToRetrieve: Union[None, List[str]] = None
     boost: Optional[Dict] = None
     scoreModifiers: Optional[ScoreModifier] = None
-    excludeInputDocuments: bool = True
+    modelAuth: Optional[ModelAuth] = None
 
 
 class BulkSearchQueryEntity(SearchQuery):

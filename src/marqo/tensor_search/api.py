@@ -18,9 +18,7 @@ from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
-from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
-from marqo.core.search.recommender import Recommender
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
@@ -232,10 +230,22 @@ def recommend(query: RecommendQuery, index_name: str, device: str = Depends(api_
             index_name=index_name,
             documents=query.documents,
             tensor_fields=query.tensorFields,
-            searchable_attributes=query.searchableAttributes,
+            interpolation_method=query.interpolationMethod,
             exclude_input_documents=query.excludeInputDocuments,
+            result_count=query.limit,
+            offset=query.offset,
+            highlights=query.showHighlights,
+            ef_search=query.efSearch,
+            approximate=query.approximate,
+            searchable_attributes=query.searchableAttributes,
+            reranker=query.reRanker,
+            filter=query.filter,
+            attributes_to_retrieve=query.attributesToRetrieve,
+            device=device,
+            boost=query.boost,
+            score_modifiers=query.scoreModifiers,
+            model_auth=query.modelAuth
         )
-
 
 
 @app.post("/indexes/{index_name}/documents")
