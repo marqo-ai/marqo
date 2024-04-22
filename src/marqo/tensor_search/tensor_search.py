@@ -74,7 +74,7 @@ from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
     Device, TensorField, SearchMethod, EnvVars
 )
-from marqo.tensor_search.index_meta_cache import get_cache, get_index
+from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
@@ -1183,7 +1183,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            image_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
-           model_auth: Optional[ModelAuth] = None) -> Dict:
+           model_auth: Optional[ModelAuth] = None,
+           processing_start: float = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1250,7 +1251,11 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
             f"The search result offset must be less than or equal to the MARQO_MAX_SEARCH_OFFSET limit of "
             f"[{max_search_offset}]. Marqo received search result offset of `{offset}`.")
 
-    t0 = timer()
+    if processing_start is None:
+        t0 = timer()
+    else:
+        t0 = processing_start
+
     validation.validate_context(context=context, query=text, search_method=search_method)
     validation.validate_boost(boost=boost, search_method=search_method)
     validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
@@ -2142,7 +2147,7 @@ def vectorise_multimodal_combination_field_structured(
         combo_document_is_valid = False
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
-             'code': errors.InvalidArgError.code})
+                         'code': errors.InvalidArgError.code})
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 

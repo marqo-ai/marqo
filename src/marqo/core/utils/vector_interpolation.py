@@ -95,15 +95,16 @@ class Slerp(VectorInterpolation):
         return result
 
     def _interpolate_hierarchical(self, vectors: List[List[float]], weights: List[float]) -> List[float]:
-        if len(vectors) > 1 and len(vectors) % 2 != 0:
-            # interpolate the first pair to get an even number of vectors
-            vectors = [self._slerp_impl(vectors[0], vectors[1], weights[1] / (weights[0] + weights[1]))] + vectors[2:]
-            weights = [(weights[0] + weights[1]) / 2] + weights[2:]
-
         while len(vectors) > 1:
             result = []
             new_weights = []
             for i in range(0, len(vectors), 2):
+                if i + 1 == len(vectors):
+                    # if there is an odd number of vectors, just append the last one
+                    result.append(vectors[i])
+                    new_weights.append(weights[i])
+                    continue
+
                 result.append(
                     self._slerp_impl(vectors[i], vectors[i + 1], weights[i + 1] / (weights[i] + weights[i + 1]))
                 )
