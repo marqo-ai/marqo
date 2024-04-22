@@ -78,7 +78,6 @@ class RequestType:
     DELETE = "DELETE"
     CREATE = "CREATE"
     PARTIAL_UPDATE = "PARTIAL_UPDATE"
-    EMBED = "EMBED"     # Request for embeddings of a given input content
 
 
 class MappingsObjectType(str, Enum):

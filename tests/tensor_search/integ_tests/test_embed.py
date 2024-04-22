@@ -130,6 +130,10 @@ class TestEmbed(MarqoTestCase):
         self.device_patcher.stop()
 
     def test_embed_equivalent_to_add_docs(self):
+        """
+        Ensure that the embedding returned by embed endpoint matches the one created by add_docs.
+        Embedding from add_docs is retrieved using get_document_by_id with show_vectors=True.
+        """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 add_docs_res = tensor_search.add_documents(
@@ -167,9 +171,13 @@ class TestEmbed(MarqoTestCase):
 
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], ["I am the GOAT."])
-                assert np.allclose(embed_res["embeddings"][0], get_docs_embedding)
+                self.assertTrue(np.allclose(embed_res["embeddings"][0], get_docs_embedding))
 
     def test_embed_equivalent_to_search_text(self):
+        """
+            Ensure that the embedding returned by embed endpoint matches the one created by search.
+            Embedding from search is retrieved using mock on query.
+        """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 original_query = self.config.vespa_client.query
@@ -186,10 +194,10 @@ class TestEmbed(MarqoTestCase):
                         search_method=enums.SearchMethod.TENSOR
                     )
                     return True
-                assert run()
+                self.assertTrue(run())
 
                 call_args = mock_vespa_client_query.call_args_list
-                assert len(call_args) == 1
+                self.assertEqual(len(call_args), 1)
 
                 vespa_query_kwargs = call_args[0].kwargs
                 if isinstance(index, UnstructuredMarqoIndex):
@@ -209,9 +217,13 @@ class TestEmbed(MarqoTestCase):
 
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], ["I am the GOAT."])
-                assert np.allclose(embed_res["embeddings"][0], search_query_embedding)
+                self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
 
     def test_embed_equivalent_to_search_image(self):
+        """
+            Ensure that the embedding returned by embed endpoint matches the one created by search, on image content.
+            Embedding from search is retrieved using mock on query.
+        """
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index.type):
                 image_url = "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg"
@@ -231,10 +243,10 @@ class TestEmbed(MarqoTestCase):
                     )
                     return True
 
-                assert run()
+                self.assertTrue(run())
 
                 call_args = mock_vespa_client_query.call_args_list
-                assert len(call_args) == 1
+                self.assertEqual(len(call_args), 1)
 
                 vespa_query_kwargs = call_args[0].kwargs
                 if isinstance(index, UnstructuredMarqoIndex):
@@ -254,7 +266,7 @@ class TestEmbed(MarqoTestCase):
 
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], [image_url])
-                assert np.allclose(embed_res["embeddings"][0], search_query_embedding)
+                self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
 
     def test_embed_with_image_download_headers_and_model_auth(self):
         """
@@ -291,10 +303,10 @@ class TestEmbed(MarqoTestCase):
                     )
                     return True
 
-                assert run()
+                self.assertTrue(run())
 
                 call_args = mock_vectorise.call_args_list
-                assert len(call_args) == 1
+                self.assertEqual(len(call_args), 1)
 
                 vectorise_kwargs = call_args[0].kwargs
                 self.assertEqual(vectorise_kwargs["image_download_headers"], {"Authorization": "my secret key"})
@@ -326,10 +338,10 @@ class TestEmbed(MarqoTestCase):
                     )
                     return True
 
-                assert run()
+                self.assertTrue(run())
 
                 call_args = mock_vespa_client_query.call_args_list
-                assert len(call_args) == 1
+                self.assertEqual(len(call_args), 1)
 
                 vespa_query_kwargs = call_args[0].kwargs
                 if isinstance(index, UnstructuredMarqoIndex):
@@ -349,10 +361,15 @@ class TestEmbed(MarqoTestCase):
 
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], [{"I am the GOATest of all time.": 0.7, image_url: 0.3}])
-                assert np.allclose(embed_res["embeddings"][0], search_query_embedding)
+                self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
 
 
     def test_embed_equivalent_to_search_multiple_content(self):
+        """
+            Ensure that the embedding returned by embed endpoint matches the one created by search, on list content
+            containing both strings and dicts.
+            Embedding from search is retrieved using mock on query.
+        """
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index.type):
                 image_url = "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg"
@@ -378,10 +395,10 @@ class TestEmbed(MarqoTestCase):
                         )
                         return True
 
-                    assert run()
+                    self.assertTrue(run())
 
                     call_args = mock_vespa_client_query.call_args_list
-                    assert len(call_args) == 1
+                    self.assertEqual(len(call_args), 1)
 
                     vespa_query_kwargs = call_args[0].kwargs
                     if isinstance(index, UnstructuredMarqoIndex):
@@ -402,9 +419,9 @@ class TestEmbed(MarqoTestCase):
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], sample_content_list)
                 for i in range(len(sample_content_list)):
-                    assert np.allclose(embed_res["embeddings"][i], search_query_embeddings[i], atol=1e-6)
+                    self.assertTrue(np.allclose(embed_res["embeddings"][i], search_query_embeddings[i], atol=1e-6))
 
-    def test_embed_empty_content_list(self):
+    def test_embed_empty_content_list_fails(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 with self.assertRaises(ValidationError) as e:
@@ -418,7 +435,7 @@ class TestEmbed(MarqoTestCase):
 
                 self.assertIn("should not be empty", str(e.exception))
 
-    def test_embed_invalid_content_type(self):
+    def test_embed_invalid_content_type_fails(self):
         test_cases = [
             ({"key": "not a number"}, "not a valid float"),  # dict with wrong typed value
             ([{"key": "value"}], "not a valid float")  # list of dict with wrong typed value

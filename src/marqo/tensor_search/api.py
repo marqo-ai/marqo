@@ -247,7 +247,7 @@ def add_or_replace_documents(
 
 
 @app.post("/indexes/{index_name}/embed")
-@throttle(RequestType.EMBED)
+@throttle(RequestType.SEARCH)
 def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depends(api_validation.validate_device),
           marqo_config: config.Config = Depends(get_config)):
 
