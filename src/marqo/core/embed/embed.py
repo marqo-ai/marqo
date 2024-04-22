@@ -2,13 +2,12 @@ from timeit import default_timer as timer
 from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 import numpy as np
 
+import pydantic
 import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import marqo_docs
 from marqo import exceptions as base_exceptions
 from marqo.api import exceptions as api_exceptions
 from marqo.core import exceptions as core_exceptions
-# We depend on _httprequests.py for now, but this may be replaced in the future, as
-# _httprequests.py is designed for the client
 from marqo.core import constants
 
 from marqo.core.index_management.index_management import IndexManagement
@@ -25,35 +24,34 @@ from marqo.s2_inference.clip_utils import _is_image
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
-from marqo.tensor_search import delete_docs
-from marqo.tensor_search import enums
-from marqo.tensor_search import index_meta_cache
-from marqo.tensor_search import utils, validation, add_docs, tensor_search
-from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars
-)
-from marqo.tensor_search.index_meta_cache import get_cache, get_index
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifier
-from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
 
 
 class Embed:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, default_device: str):
+        self.vespa_client = vespa_client
+        self.index_management = index_management
+        self.default_device = default_device
+
+    @pydantic.validator('default_device')
+    def validate_default_device(cls, value):
+        if not value:
+            raise ValueError("Default Device cannot be 'None'. Marqo default device must have been declared upon startup.")
+        return value
 
     def embed_content(
                     self, content: Union[Union[str, Dict[str, float]], List[Union[str, Dict[str, float]]]],
-                    index_name: str, device: str = None,
-                    image_download_headers: Optional[Dict] = None,
+                    index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None
                     ) -> List[List[float]]:
         """
@@ -64,21 +62,26 @@ class Embed:
                 If content is a string, the return list will only have 1 item.
         """
 
+        # TODO: Remove this config constructor once vectorise pipeline doesn't need it. Just pass the vespa client
+        # and index management objects.
+        from marqo import config
+        from marqo.tensor_search import utils, validation, tensor_search, index_meta_cache
+        temp_config = config.Config(
+            vespa_client=self.vespa_client,
+            index_management=self.index_management,
+            default_device=self.default_device
+        )
+
+        # Set default device if not provided
+        if device is None:
+            device = self.default_device
+
         # Content validation is done in API model layer
         t0 = timer()
 
-        # Determine device
-        if device is None:
-            selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-            if selected_device is None:
-                raise base_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
-            logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
-        else:
-            selected_device = device
-
         # Generate input for the vectorise pipeline (Preprocessing)
         RequestMetricsStore.for_request().start("embed.query_preprocessing")
-        marqo_index = index_meta_cache.get_index(config=self.config, index_name=index_name)
+        marqo_index = index_meta_cache.get_index(config=temp_config, index_name=index_name)
 
         # Transform content to list if it is not already
         if isinstance(content, List):
@@ -104,7 +107,7 @@ class Embed:
 
         # Vectorise the queries
         with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
-            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(self.config, queries, selected_device)
+            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(temp_config, queries, device)
         embeddings = list(qidx_to_vectors.values())
 
         # Record time and return final result

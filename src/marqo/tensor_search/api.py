@@ -16,7 +16,7 @@ from marqo.api.exceptions import InvalidArgError
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.api.models.embed_request import EmbeddingRequest
+from marqo.api.models.embed_request import EmbedRequest
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
@@ -52,11 +52,14 @@ def generate_config() -> config.Config:
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE)
     )
     index_management = IndexManagement(vespa_client)
-    return config.Config(vespa_client, index_management)
+
+    # Determine default device
+    default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
+
+    return config.Config(vespa_client, index_management, default_device)
 
 
 _config = generate_config()
-_embed = embed_module.Embed(config=_config)
 
 if __name__ in ["__main__", "api"]:
     on_start(_config)
@@ -245,10 +248,11 @@ def add_or_replace_documents(
 
 @app.post("/indexes/{index_name}/embed")
 @throttle(RequestType.EMBED)
-def embed(embedding_request: EmbeddingRequest, index_name: str, device: str = Depends(api_validation.validate_device),
-           marqo_config: config.Config = Depends(get_config)):
+def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depends(api_validation.validate_device),
+          marqo_config: config.Config = Depends(get_config)):
+
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
-        return _embed.embed_content(
+        return marqo_config.embed.embed_content(
             content=embedding_request.content,
             index_name=index_name, device=device,
             image_download_headers=embedding_request.image_download_headers,

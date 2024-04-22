@@ -17,7 +17,7 @@ from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import MarqoIndex
 
 
-class EmbeddingRequest(BaseMarqoModel):
+class EmbedRequest(BaseMarqoModel):
     # content can be a single query or list of queries. Queries can be a string or a dictionary.
     content: Union[Union[str, Dict[str, float]], List[Union[str, Dict[str, float]]]]
     image_download_headers: Optional[Dict] = None
@@ -35,19 +35,20 @@ class EmbeddingRequest(BaseMarqoModel):
         elif isinstance(value, List):
             list_to_validate = value
         else:
-            raise ValueError("Embed content should be a string, dictionary, or a list of strings or dictionaries")
+            raise ValueError("Embed content should be a string, a dictionary, or a list of strings or dictionaries")
 
         for item in list_to_validate:
             if isinstance(item, str):
-                pass
+                continue
             elif isinstance(item, dict):
                 if len(item) == 0:
                     raise ValueError("Dictionary content should not be empty")
-                if not all(isinstance(k, str) for k in item.keys()):
-                    raise ValueError("Keys in dictionary content should all be strings")
-                if not all(isinstance(v, float) for v in item.values()):
-                    raise ValueError("Values in dictionary content should all be floats")
+                for key in item:
+                    if not isinstance(key, str):
+                        raise ValueError("Keys in dictionary content should all be strings")
+                    if not isinstance(item[key], float):
+                        raise ValueError("Values in dictionary content should all be floats")
             else:
-                raise ValueError("Embed content should be a string, dictionary, or a list of strings or dictionaries")
+                raise ValueError("Embed content should be a string, a dictionary, or a list of strings or dictionaries")
 
         return value
