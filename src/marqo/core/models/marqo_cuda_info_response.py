@@ -2,7 +2,7 @@ from marqo.base_model import StrictBaseModel
 from typing import List
 
 
-class MarqoCudaDeviceInfo(StrictBaseModel):
+class MarqoCudaInfo(StrictBaseModel):
     device_id: int
     device_name: str
     memory_used: str
@@ -12,4 +12,4 @@ class MarqoCudaDeviceInfo(StrictBaseModel):
 
 
 class MarqoCudaInfoResponse(StrictBaseModel):
-    cuda_devices: List[MarqoCudaDeviceInfo]
+    cuda_devices: List[MarqoCudaInfo]

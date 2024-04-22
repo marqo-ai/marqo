@@ -6,7 +6,7 @@ import marqo.logging
 from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
-from marqo.core.models.marqo_cuda_info import MarqoCudaInfoResponse, MarqoCudaDeviceInfo
+from marqo.core.models.marqo_cuda_info_response import MarqoCudaInfoResponse, MarqoCudaInfo
 from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus, \
     InferenceHealthStatus
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
@@ -172,7 +172,7 @@ class Monitoring:
                 utilization = torch.cuda.utilization(device_id)
                 memory_used_percentage = memory_used / total_memory * 100
 
-                marqo_cuda_device_info = MarqoCudaDeviceInfo(
+                marqo_cuda_device_info = MarqoCudaInfo(
                     device_id=device_id,
                     device_name=device_name,
                     memory_used=f"{round(memory_used, 1)} GiB",
