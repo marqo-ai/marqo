@@ -229,11 +229,11 @@ def recommend(query: RecommendQuery, index_name: str, device: str = Depends(api_
               marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return marqo_config.recommender.recommend(
-            index_name,
-            query.documents,
-            query.tensorFields,
-            query.searchableAttributes,
-            query.excludeInputDocuments,
+            index_name=index_name,
+            documents=query.documents,
+            tensor_fields=query.tensorFields,
+            searchable_attributes=query.searchableAttributes,
+            exclude_input_documents=query.excludeInputDocuments,
         )
 
 

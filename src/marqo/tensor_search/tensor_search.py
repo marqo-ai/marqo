@@ -1171,13 +1171,13 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
         raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
 
-def search(config: Config, index_name: str, text: Union[None, str, dict],
+def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            result_count: int = 3, offset: int = 0,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
-           reranker: Union[str, Dict] = None, filter: str = None,
+           reranker: Union[str, Dict] = None, filter: Optional[str] = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device: str = None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,

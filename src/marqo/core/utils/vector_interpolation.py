@@ -7,6 +7,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp
 
+from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.exceptions import InternalError
 
 
@@ -25,6 +26,17 @@ class VectorInterpolation(abc.ABC):
             The interpolated vector.
         """
         pass
+
+
+def from_interpolation_method(method: InterpolationMethod):
+    if method == InterpolationMethod.SLERP:
+        return Slerp()
+    elif method == InterpolationMethod.NLERP:
+        return Nlerp()
+    elif method == InterpolationMethod.LERP:
+        return Lerp()
+    else:
+        raise InternalError(f'Unknown interpolation method: {method}')
 
 
 class Lerp(VectorInterpolation):
