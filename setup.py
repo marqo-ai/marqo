@@ -33,6 +33,8 @@ setup(
         "opencv-python-headless",
         "psutil",
         "multilingual_clip",
+        "readerwriterlock==1.0.9",
+        "cachetools==5.3.1"
         "pynvml==11.5.0"
     ],
     name="marqo-engine",
