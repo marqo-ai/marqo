@@ -34,7 +34,6 @@ class Recommender:
                   reranker: Union[str, Dict] = None,
                   filter: str = None,
                   attributes_to_retrieve: Optional[List[str]] = None,
-                  device: str = None,
                   score_modifiers: Optional[ScoreModifier] = None
                   ):
         """
@@ -56,7 +55,6 @@ class Recommender:
             reranker: Reranker to use
             filter: Filter string
             attributes_to_retrieve: List of attributes to retrieve
-            device: Device to use
             score_modifiers: Score modifiers to apply
         """
         # TODO - Extract search and get_docs from tensor_search and refactor this

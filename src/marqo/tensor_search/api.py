@@ -223,7 +223,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 
 @app.post("/indexes/{index_name}/recommend")
 @throttle(RequestType.SEARCH)
-def recommend(query: RecommendQuery, index_name: str, device: str = Depends(api_validation.validate_device),
+def recommend(query: RecommendQuery, index_name: str,
               marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return marqo_config.recommender.recommend(
@@ -241,7 +241,6 @@ def recommend(query: RecommendQuery, index_name: str, device: str = Depends(api_
             reranker=query.reRanker,
             filter=query.filter,
             attributes_to_retrieve=query.attributesToRetrieve,
-            device=device,
             score_modifiers=query.scoreModifiers
         )
 
