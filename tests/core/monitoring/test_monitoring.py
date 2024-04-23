@@ -395,7 +395,7 @@ class TestMonitoring(MarqoTestCase):
                         "device_name": "Tesla T4",
                         "memory_used": "3.0 GiB",
                         "total_memory": "12.0 GiB",
-                        "utilization": "58 %",
+                        "utilization": "58.0 %",
                         "memory_used_percent": "25.0 %"
                     }
                 ]

@@ -177,7 +177,7 @@ class Monitoring:
                     device_name=device_name,
                     memory_used=f"{round(memory_used, 1)} GiB",
                     total_memory=f"{round(total_memory, 1)} GiB",
-                    utilization=f"{round(utilization, 2)} %",
+                    utilization=f"{round(float(utilization), 1)} %",
                     memory_used_percent=f"{round(memory_used_percentage, 1)} %"
                 )
                 cuda_devices.append(marqo_cuda_device_info)
