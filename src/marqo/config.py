@@ -5,6 +5,7 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search import enums
 from marqo.vespa.vespa_client import VespaClient
+from marqo.core.embed.embed import Embed
 
 
 class Config:
@@ -12,8 +13,9 @@ class Config:
             self,
             vespa_client: VespaClient,
             index_management: IndexManagement,
+            default_device: str,
             timeout: Optional[int] = None,
-            backend: Optional[Union[enums.SearchDb, str]] = None,
+            backend: Optional[Union[enums.SearchDb, str]] = None
     ) -> None:
         """
         Parameters
@@ -21,6 +23,7 @@ class Config:
         url:
             The url to the S2Search API (ex: http://localhost:9200)
         """
+        self.default_device = default_device
         self.vespa_client = vespa_client
         self.set_is_remote(vespa_client)
         self.timeout = timeout
@@ -30,6 +33,7 @@ class Config:
         self.index_management = index_management
         self.monitoring = Monitoring(vespa_client, index_management)
         self.document = Document(vespa_client, index_management)
+        self.embed = Embed(vespa_client, index_management, default_device)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

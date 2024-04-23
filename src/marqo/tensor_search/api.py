@@ -16,9 +16,11 @@ from marqo.api.exceptions import InvalidArgError
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.api.models.embed_request import EmbedRequest
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.embed import embed as embed_module
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
@@ -44,13 +46,18 @@ def generate_config() -> config.Config:
         document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
         pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
         content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
+        default_search_timeout_ms=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_SEARCH_TIMEOUT_MS),
         feed_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_FEED_POOL_SIZE),
         get_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_GET_POOL_SIZE),
         delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
-        partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE)
+        partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
     index_management = IndexManagement(vespa_client)
-    return config.Config(vespa_client, index_management)
+
+    # Determine default device
+    default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
+
+    return config.Config(vespa_client, index_management, default_device)
 
 
 _config = generate_config()
@@ -240,6 +247,20 @@ def add_or_replace_documents(
         )
 
 
+@app.post("/indexes/{index_name}/embed")
+@throttle(RequestType.SEARCH)
+def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depends(api_validation.validate_device),
+          marqo_config: config.Config = Depends(get_config)):
+
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
+        return marqo_config.embed.embed_content(
+            content=embedding_request.content,
+            index_name=index_name, device=device,
+            image_download_headers=embedding_request.image_download_headers,
+            model_auth=embedding_request.modelAuth
+        )
+
+
 @app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
@@ -252,6 +273,7 @@ def update_documents(
         index_name=index_name, partial_documents=body.documents)
 
     return res.dict(exclude_none=True, by_alias=True)
+
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
