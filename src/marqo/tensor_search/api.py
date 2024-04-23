@@ -347,8 +347,8 @@ def get_cpu_info():
 
 
 @app.get("/device/cuda")
-def get_cuda_info():
-    return tensor_search.get_cuda_info()
+def get_cuda_info(marqo_config: config.Config = Depends(get_config)):
+    return marqo_config.monitoring.get_cuda_info()
 
 
 @app.post("/batch/indexes/delete")

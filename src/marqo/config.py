@@ -1,9 +1,9 @@
 from typing import Optional, Union
 
+from marqo.core.document.document import Document
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search import enums
-from marqo.core.document.document import Document
 from marqo.vespa.vespa_client import VespaClient
 
 

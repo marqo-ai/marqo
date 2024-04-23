@@ -13,3 +13,4 @@ pydantic==1.10.11
 httpx==0.25.0
 semver==3.0.2
 memory-profiler==0.61.0
+pynvml==11.5.0 # For cuda utilization
