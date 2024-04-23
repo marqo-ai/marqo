@@ -473,12 +473,6 @@ class TestRecommender(MarqoTestCase):
                         device='cpu',
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
-                        ),
-                        model_auth=ModelAuth(
-                            s3=S3Auth(
-                                aws_access_key_id="access_key_id",
-                                aws_secret_access_key="secret_access"
-                            )
                         )
                     )
 
@@ -500,12 +494,6 @@ class TestRecommender(MarqoTestCase):
                         device='cpu',
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
-                        ),
-                        model_auth=ModelAuth(
-                            s3=S3Auth(
-                                aws_access_key_id="access_key_id",
-                                aws_secret_access_key="secret_access"
-                            )
                         ),
                         processing_start=mock.ANY
                     )
@@ -529,12 +517,6 @@ class TestRecommender(MarqoTestCase):
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
-                        model_auth=ModelAuth(
-                            s3=S3Auth(
-                                aws_access_key_id="access_key_id",
-                                aws_secret_access_key="secret_access"
-                            )
-                        )
                     )
 
                     mock_search.assert_called_once_with(
@@ -555,12 +537,6 @@ class TestRecommender(MarqoTestCase):
                         device='cuda',
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
-                        ),
-                        model_auth=ModelAuth(
-                            s3=S3Auth(
-                                aws_access_key_id="access_key_id",
-                                aws_secret_access_key="secret_access"
-                            )
                         ),
                         processing_start=mock.ANY
                     )

@@ -36,8 +36,7 @@ class Recommender:
                   filter: str = None,
                   attributes_to_retrieve: Optional[List[str]] = None,
                   device: str = None,
-                  score_modifiers: Optional[ScoreModifier] = None,
-                  model_auth: Optional[ModelAuth] = None
+                  score_modifiers: Optional[ScoreModifier] = None
                   ):
         # TODO - Extract search and get_docs from tensor_search and refactor this
         # TODO - The dependence on Config in tensor_search is bad design. Refactor to require specific dependencies
@@ -142,7 +141,6 @@ class Recommender:
             attributes_to_retrieve=attributes_to_retrieve,
             device=device,
             score_modifiers=score_modifiers,
-            model_auth=model_auth,
             processing_start=t0
         )
 

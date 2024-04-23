@@ -242,9 +242,7 @@ def recommend(query: RecommendQuery, index_name: str, device: str = Depends(api_
             filter=query.filter,
             attributes_to_retrieve=query.attributesToRetrieve,
             device=device,
-            boost=query.boost,
-            score_modifiers=query.scoreModifiers,
-            model_auth=query.modelAuth
+            score_modifiers=query.scoreModifiers
         )
 
 

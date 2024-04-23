@@ -89,9 +89,7 @@ class RecommendQuery(BaseMarqoModel):
     reRanker: str = None
     filter: str = None
     attributesToRetrieve: Union[None, List[str]] = None
-    boost: Optional[Dict] = None
     scoreModifiers: Optional[ScoreModifier] = None
-    modelAuth: Optional[ModelAuth] = None
 
 
 class BulkSearchQueryEntity(SearchQuery):
