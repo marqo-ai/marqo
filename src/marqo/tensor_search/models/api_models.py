@@ -4,7 +4,7 @@ Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
 import pydantic
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, root_validator, Field
 from typing import Union, List, Dict, Optional, Any
 
 from marqo.tensor_search import validation
