@@ -1,17 +1,12 @@
+import functools
 import unittest
 
 from marqo.s2_inference.s2_inference import (
-    _check_output_type, vectorise, 
-    _convert_vectorized_output, 
-    available_models,
-    clear_loaded_models,
+    _check_output_type, _convert_vectorized_output,
     get_model_properties_from_registry
-    )
-from torch import FloatTensor
-import numpy as np
-import functools
-from unittest import mock
+)
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
+
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 class TestTestModelOutputs(unittest.TestCase):

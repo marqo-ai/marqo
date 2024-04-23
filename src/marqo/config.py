@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 from marqo.core.document.document import Document
+from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
@@ -12,6 +13,7 @@ class Config:
     def __init__(
             self,
             vespa_client: VespaClient,
+            default_device: str,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
     ) -> None:
@@ -31,6 +33,7 @@ class Config:
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management)
         self.recommender = Recommender(vespa_client, self.index_management)
+        self.embed = Embed(vespa_client, self.index_management, default_device)
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

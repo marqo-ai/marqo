@@ -3,6 +3,7 @@
 Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
+
 from typing import Union, List, Dict, Optional
 
 import pydantic
