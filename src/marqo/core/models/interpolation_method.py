@@ -1,5 +1,3 @@
-from enum import Enum
-
 from marqo.case_insensitive_enum import CaseInsensitiveEnum
 
 
