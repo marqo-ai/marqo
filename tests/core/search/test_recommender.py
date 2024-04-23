@@ -10,8 +10,6 @@ from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.external_apis.s3 import S3Auth
-from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier, ScoreModifierOperator
 from tests.marqo_test import MarqoTestCase
 
@@ -229,7 +227,7 @@ class TestRecommender(MarqoTestCase):
 
     def test_recommend_docsWithoutVectors(self):
         """
-        Test that the recommender returns empty results when the documents do not have vectors
+        Test that the recommender fails when one or more documents do not have embeddings
         """
         docs = [
             {
@@ -239,6 +237,7 @@ class TestRecommender(MarqoTestCase):
             {
                 "_id": "2",
                 "title": "Cephalanthera longifolia",
+                "content": "Content"
             }
         ]
         index = self.unstructured_text_index
@@ -251,12 +250,11 @@ class TestRecommender(MarqoTestCase):
             )
         )
 
-        res = self.recommender.recommend(
-            index_name=index.name,
-            documents=["1", "2"],
-        )
-
-        self._assert_empty_response(res)
+        with self.assertRaisesStrict(InvalidArgumentError):
+            self.recommender.recommend(
+                index_name=index.name,
+                documents=["1", "2"],
+            )
 
     def test_recommend_structuredInvalidTensorFields_fails(self):
         """

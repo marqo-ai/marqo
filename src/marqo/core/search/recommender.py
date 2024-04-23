@@ -104,6 +104,7 @@ class Recommender:
             raise InvalidArgumentError(f'The following document IDs were not found: {", ".join(not_found)}')
 
         doc_vectors: Dict[str, List[List[float]]] = {}
+        docs_without_vectors = []
         for document in marqo_documents['results']:
             vectors: List[List[float]] = []
             for tensor_facet in document['_tensor_facets']:
@@ -112,6 +113,14 @@ class Recommender:
                     vectors.append(tensor_facet['_embedding'])
 
             doc_vectors[document['_id']] = vectors
+
+            if len(vectors) == 0:
+                docs_without_vectors.append(document['_id'])
+
+        if len(docs_without_vectors) > 0:
+            raise InvalidArgumentError(
+                f'The following documents do not have embeddings: {", ".join(docs_without_vectors)}'
+            )
 
         vectors: List[List[float]] = []
         weights: List[float] = []
@@ -123,16 +132,6 @@ class Recommender:
                 weight = 1
             vectors.extend(vector_list)
             weights.extend([weight] * len(vector_list))
-
-        if len(vectors) == 0:
-            time_taken = timer() - t0
-            return {
-                'query': None,
-                'hits': [],
-                'limit': result_count,
-                'offset': offset,
-                'processingTimeMs': round(time_taken * 1000)
-            }
 
         interpolated_vector = vector_interpolation.interpolate(
             vectors, weights
