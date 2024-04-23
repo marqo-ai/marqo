@@ -8,7 +8,6 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.utils.vector_interpolation import from_interpolation_method
 from marqo.exceptions import InvalidArgumentError
-from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient
@@ -24,7 +23,7 @@ class Recommender:
                   documents: Union[List[str], Dict[str, float]],
                   tensor_fields: Optional[List[str]] = None,
                   interpolation_method: Optional[InterpolationMethod] = None,
-                  exclude_input_documents=True,
+                  exclude_input_documents: bool = True,
                   result_count: int = 3,
                   offset: int = 0,
                   highlights: bool = True,
@@ -38,6 +37,28 @@ class Recommender:
                   device: str = None,
                   score_modifiers: Optional[ScoreModifier] = None
                   ):
+        """
+        Recommend documents similar to the provided documents.
+
+        Args:
+            index_name: Name of the index to search
+            documents: A list of document IDs or a dictionary where the keys are document IDs and the values are weights
+            tensor_fields: List of tensor fields to use for recommendation
+            interpolation_method: Interpolation method to use for combining vectors
+            exclude_input_documents: Whether to exclude the input documents from the search results
+            result_count: Number of results to return
+            offset: Offset of the first result
+            highlights: Whether to include highlights in the results
+            ef_search: ef_search parameter for HNSW search
+            approximate: Whether to use approximate search
+            searchable_attributes: List of attributes to search in
+            verbose: Verbosity level
+            reranker: Reranker to use
+            filter: Filter string
+            attributes_to_retrieve: List of attributes to retrieve
+            device: Device to use
+            score_modifiers: Score modifiers to apply
+        """
         # TODO - Extract search and get_docs from tensor_search and refactor this
         # TODO - The dependence on Config in tensor_search is bad design. Refactor to require specific dependencies
         from marqo import config
@@ -61,7 +82,7 @@ class Recommender:
                 for tensor_field in tensor_fields:
                     if tensor_field not in valid_tensor_fields:
                         raise InvalidFieldNameError(f'Tensor field "{tensor_field}" not found in index "{index_name}". '
-                                         f'Available tensor fields: {", ".join(valid_tensor_fields)}')
+                                                    f'Available tensor fields: {", ".join(valid_tensor_fields)}')
 
         if isinstance(documents, dict):
             document_ids = list(documents.keys())
