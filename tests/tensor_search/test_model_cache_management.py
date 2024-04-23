@@ -1,15 +1,12 @@
-import torch.cuda
-from tests.marqo_test import MarqoTestCase
-from marqo.s2_inference.s2_inference import validate_model_properties,\
-    _create_model_cache_key, _update_available_models, available_models, clear_loaded_models
-from marqo.tensor_search.tensor_search import eject_model, get_cuda_info, get_loaded_models, get_cpu_info
-from marqo.api.exceptions import ModelNotInCacheError, HardwareCompatabilityError
-from marqo.s2_inference.reranking.cross_encoders import ReRankerText, ReRankerOwl
-from marqo.s2_inference.reranking.model_utils import load_owl_vit
-from marqo.s2_inference.reranking import rerank
 import psutil
-from marqo.tensor_search import tensor_search
+import torch.cuda
 
+from marqo.api.exceptions import ModelNotInCacheError, HardwareCompatabilityError
+from marqo.s2_inference.reranking.model_utils import load_owl_vit
+from marqo.s2_inference.s2_inference import validate_model_properties, \
+    _create_model_cache_key, _update_available_models, available_models, clear_loaded_models
+from marqo.tensor_search.tensor_search import eject_model, get_loaded_models, get_cpu_info
+from tests.marqo_test import MarqoTestCase
 
 
 def load_model(model_name: str, device: str, model_properteis: dict = None) -> None:
@@ -95,19 +92,6 @@ class TestModelCacheManagement(MarqoTestCase):
                 pass
         else:
             pass
-
-
-    def test_cuda_info(self):
-        if self.CUDA_FLAG is True:
-            res = get_cuda_info()
-            if "cuda_devices" not in res:
-                raise AssertionError
-        else:
-            try:
-                get_cuda_info()
-            except HardwareCompatabilityError:
-                pass
-
 
     def test_get_cpu_info(self) -> None:
         res = get_cpu_info()

@@ -1,8 +1,12 @@
 from typing import Optional
 
+import torch
+
 import marqo.logging
+from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
+from marqo.core.models.marqo_cuda_info_response import MarqoCudaInfoResponse, MarqoCudaInfo
 from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus, \
     InferenceHealthStatus
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
@@ -148,3 +152,35 @@ class Monitoring:
             memory_is_available=memory_utilization is not None and memory_utilization < 1.0,
             storage_is_available=disk_utilization is not None and disk_utilization < 1.0
         )
+
+    def get_cuda_info(self) -> MarqoCudaInfoResponse:
+        """A function to get information about the CUDA devices on the machine
+
+        Returns:
+            MarqoCudaInfoResponse: A response object containing information about the CUDA devices on the machine
+
+        Raise:
+            HardwareCompatabilityError: If CUDA is not available on the machine
+        """
+        if torch.cuda.is_available():
+            cuda_devices = []
+            for device_id in range(torch.cuda.device_count()):
+
+                device_name = torch.cuda.get_device_name(device_id)
+                memory_used = torch.cuda.memory_allocated(device_id) / 1024 ** 3
+                total_memory = torch.cuda.get_device_properties(device_id).total_memory / 1024 ** 3
+                utilization = torch.cuda.utilization(device_id)
+                memory_used_percentage = memory_used / total_memory * 100
+
+                marqo_cuda_device_info = MarqoCudaInfo(
+                    device_id=device_id,
+                    device_name=device_name,
+                    memory_used=f"{round(memory_used, 1)} GiB",
+                    total_memory=f"{round(total_memory, 1)} GiB",
+                    utilization=f"{round(float(utilization), 1)} %",
+                    memory_used_percent=f"{round(memory_used_percentage, 1)} %"
+                )
+                cuda_devices.append(marqo_cuda_device_info)
+            return MarqoCudaInfoResponse(cuda_devices=cuda_devices)
+        else:
+            raise HardwareCompatabilityError("CUDA is not available on this instance")
