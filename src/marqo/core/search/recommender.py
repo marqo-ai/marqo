@@ -36,7 +36,6 @@ class Recommender:
                   filter: str = None,
                   attributes_to_retrieve: Optional[List[str]] = None,
                   device: str = None,
-                  boost: Optional[Dict] = None,
                   score_modifiers: Optional[ScoreModifier] = None,
                   model_auth: Optional[ModelAuth] = None
                   ):
@@ -142,7 +141,6 @@ class Recommender:
             filter=recommend_filter,
             attributes_to_retrieve=attributes_to_retrieve,
             device=device,
-            boost=boost,
             score_modifiers=score_modifiers,
             model_auth=model_auth,
             processing_start=t0

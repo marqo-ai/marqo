@@ -471,7 +471,6 @@ class TestRecommender(MarqoTestCase):
                         reranker='bm25',
                         attributes_to_retrieve=['title'],
                         device='cpu',
-                        boost=dict(),
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
@@ -499,7 +498,6 @@ class TestRecommender(MarqoTestCase):
                         filter=mock.ANY,
                         attributes_to_retrieve=['title'],
                         device='cpu',
-                        boost=dict(),
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
@@ -528,7 +526,6 @@ class TestRecommender(MarqoTestCase):
                         reranker='bm25',
                         attributes_to_retrieve=['title'],
                         device='cuda',
-                        boost=None,
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
@@ -556,7 +553,6 @@ class TestRecommender(MarqoTestCase):
                         filter=mock.ANY,
                         attributes_to_retrieve=['title'],
                         device='cuda',
-                        boost=None,
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
