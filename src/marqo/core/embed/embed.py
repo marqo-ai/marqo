@@ -50,7 +50,7 @@ class Embed:
         return value
 
     def embed_content(
-                    self, content: Union[Union[str, Dict[str, float]], List[Union[str, Dict[str, float]]]],
+                    self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
                     index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None
                     ) -> List[List[float]]:

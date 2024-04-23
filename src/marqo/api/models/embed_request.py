@@ -19,7 +19,7 @@ from marqo.core.models.marqo_index import MarqoIndex
 
 class EmbedRequest(BaseMarqoModel):
     # content can be a single query or list of queries. Queries can be a string or a dictionary.
-    content: Union[Union[str, Dict[str, float]], List[Union[str, Dict[str, float]]]]
+    content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
     image_download_headers: Optional[Dict] = None
     modelAuth: Optional[ModelAuth] = None
 
