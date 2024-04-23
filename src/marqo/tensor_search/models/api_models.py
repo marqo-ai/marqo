@@ -3,23 +3,25 @@
 Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
-import pydantic
-from pydantic import BaseModel, root_validator, Field
-from typing import Union, List, Dict, Optional, Any
 
+from typing import Union, List, Dict, Optional
+
+import pydantic
+from pydantic import BaseModel, root_validator
+
+from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
-from marqo.api.exceptions import InvalidArgError
-from marqo.core.models.marqo_index import MarqoIndex
 
 
 class BaseMarqoModel(BaseModel):
-     class Config:
-         extra: str = "forbid"
-     pass
+    class Config:
+        extra: str = "forbid"
+
+    pass
 
 
 class SearchQuery(BaseMarqoModel):
@@ -67,16 +69,18 @@ class SearchQuery(BaseMarqoModel):
             value=value, enum_class=SearchMethod,
             case_sensitive=False
         )
-    
+
     def get_context_tensor(self) -> Optional[List[SearchContextTensor]]:
         """Extract the tensor from the context, if provided"""
         return self.context.tensor if self.context is not None else None
+
 
 class BulkSearchQueryEntity(SearchQuery):
     index: MarqoIndex
 
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
+
     def to_search_query(self):
         return SearchQuery(**self.dict())
 

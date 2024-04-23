@@ -1170,19 +1170,20 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
         raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
 
-def search(config: Config, index_name: str, text: Union[None, str, dict],
+def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            result_count: int = 3, offset: int = 0,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
-           reranker: Union[str, Dict] = None, filter: str = None,
+           reranker: Union[str, Dict] = None, filter: Optional[str] = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device: str = None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
-           model_auth: Optional[ModelAuth] = None) -> Dict:
+           model_auth: Optional[ModelAuth] = None,
+           processing_start: float = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1249,7 +1250,11 @@ def search(config: Config, index_name: str, text: Union[None, str, dict],
             f"The search result offset must be less than or equal to the MARQO_MAX_SEARCH_OFFSET limit of "
             f"[{max_search_offset}]. Marqo received search result offset of `{offset}`.")
 
-    t0 = timer()
+    if processing_start is None:
+        t0 = timer()
+    else:
+        t0 = processing_start
+
     validation.validate_context(context=context, query=text, search_method=search_method)
     validation.validate_boost(boost=boost, search_method=search_method)
     validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
@@ -2129,7 +2134,7 @@ def vectorise_multimodal_combination_field_structured(
         combo_document_is_valid = False
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
-             'code': errors.InvalidArgError.code})
+                         'code': errors.InvalidArgError.code})
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
