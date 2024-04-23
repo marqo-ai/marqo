@@ -43,6 +43,10 @@ class MarqoLRUCache(MarqoAbstractCache):
         with self.lock.gen_wlock():
             self._cache.popitem()
 
+    def clear(self) -> None:
+        with self.lock.gen_wlock():
+            self._cache.clear()
+
     @property
     def maxsize(self) -> int:
         """Return the maximum size of the cache."""

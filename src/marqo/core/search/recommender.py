@@ -8,6 +8,8 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.utils.vector_interpolation import from_interpolation_method
 from marqo.exceptions import InvalidArgumentError
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient

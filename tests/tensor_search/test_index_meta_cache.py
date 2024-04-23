@@ -10,13 +10,13 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import index_meta_cache
 from marqo.config import Config
-from marqo.api.exceptions import MarqoError, MarqoApiError, IndexNotFoundError
+from marqo.api.exceptions import IndexNotFoundError
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import TensorField, SearchMethod
-from marqo.tensor_search import configs
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
-from marqo.api import exceptions
+from marqo.api import exceptions, configs
+
 
 @unittest.skip
 class TestIndexMetaCache(MarqoTestCase):

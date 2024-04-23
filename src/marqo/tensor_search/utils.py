@@ -12,9 +12,9 @@ from typing import (
 import torch
 from fastapi import HTTPException
 
-from marqo.api import exceptions
+from marqo.api import exceptions, configs
 from marqo.marqo_logging import logger
-from marqo.tensor_search import enums, configs
+from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
 
 

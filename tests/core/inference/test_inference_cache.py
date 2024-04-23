@@ -219,3 +219,14 @@ class TestInferenceCache(unittest.TestCase):
                     self.assertEqual(ITERATIONS, len(result))
                     self.assertTrue(hits.qsize() > 0)
                     self.assertTrue(misses.qsize() > 0)
+
+    def test_inference_cache_clear(self):
+        """Test if the cache clears all items."""
+        for cache_type in ['LRU', 'LFU']:
+            with self.subTest(cache_type=cache_type):
+                cache = MarqoInferenceCache(cache_size=self.cache_size, cache_type=cache_type)
+                cache.set("model-cache-key", "content", [1.0])
+                cache.clear()
+                self.assertEqual(cache.currsize, 0)
+                self.assertIsNone(cache.get("model-cache-key", "content"))
+                self.assertEqual(cache.maxsize, self.cache_size)

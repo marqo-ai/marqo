@@ -21,7 +21,7 @@ from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.types import *
-from marqo.tensor_search.configs import EnvVars
+from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
@@ -473,6 +473,11 @@ def clear_loaded_models() -> None:
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
 
+
+def clear_marqo_inference_cache() -> None:
+    """ clears the inference cache if it is enabled"""
+    if _marqo_inference_cache.is_enabled():
+        _marqo_inference_cache.clear()
 
 def get_model_properties_from_registry(model_name: str) -> dict:
     """ Returns a dict describing properties of a model.
