@@ -31,7 +31,7 @@ class Embed:
                     self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
                     index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None
-                    ) -> List[List[float]]:
+                    ) -> Dict:
         """
         Use the index's model to embed the content
 
@@ -84,7 +84,8 @@ class Embed:
         # Vectorise the queries
         with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
             qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(temp_config, queries, device)
-        embeddings = list(qidx_to_vectors.values())
+
+        embeddings: List[List[float]] = list(qidx_to_vectors.values())
 
         # Record time and return final result
         time_taken = timer() - t0
