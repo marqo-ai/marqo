@@ -183,4 +183,4 @@ class Monitoring:
                 cuda_devices.append(marqo_cuda_device_info)
             return MarqoCudaInfoResponse(cuda_devices=cuda_devices)
         else:
-            raise HardwareCompatabilityError("CUDA is not available on this machine")
+            raise HardwareCompatabilityError("CUDA is not available on this instance")

@@ -371,7 +371,7 @@ class TestMonitoring(MarqoTestCase):
         """
         with self.assertRaises(HardwareCompatabilityError) as cm:
             self.monitoring.get_cuda_info()
-        self.assertIn("CUDA is not available on this machine", cm.exception.message)
+        self.assertIn("CUDA is not available on this instance", cm.exception.message)
 
     @patch('marqo.core.monitoring.monitoring.torch.cuda.is_available', return_value=True)
     @patch('marqo.core.monitoring.monitoring.torch.cuda.device_count', return_value=1)
