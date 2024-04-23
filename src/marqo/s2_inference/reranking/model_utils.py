@@ -16,8 +16,8 @@ from sentence_transformers import CrossEncoder
 import torch
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.s2_inference.types import *
-from marqo.s2_inference.s2_inference import available_models
-from marqo.s2_inference.s2_inference import _create_model_cache_key, _float_tensor_to_list, _nd_array_to_list
+from marqo.s2_inference.s2_inference import (_create_model_cache_key, _float_tensor_to_list,
+                                             _nd_array_to_list, get_available_models)
 from marqo.s2_inference.configs import ModelCache
 
 from marqo.s2_inference.logger import get_logger
@@ -252,8 +252,8 @@ def load_sbert_cross_encoder_model(model_name: str, device: str, max_length: int
     """
     model_cache_key = _create_model_cache_key(model_name, device)
 
-    if model_cache_key in available_models:
-        model = available_models[model_cache_key][AvailableModelsKey.model]
+    if model_cache_key in get_available_models():
+        model = get_available_models()[model_cache_key][AvailableModelsKey.model]
     else:
         logger.info(f"loading {model_name} on device {device} and adding to cache...")
         if model_name == '_testing':
@@ -268,7 +268,7 @@ def load_sbert_cross_encoder_model(model_name: str, device: str, max_length: int
                 if max_length > model_max_len:
                     model.max_length = model_max_len
                     logger.warning(f"specified max_length of {max_length} is greater than model max length of {model_max_len}, setting to model max length")
-        available_models[model_cache_key] ={AvailableModelsKey.model: model, AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
+        get_available_models()[model_cache_key] ={AvailableModelsKey.model: model, AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
 
     return {'model':model}
 
@@ -289,13 +289,14 @@ def load_hf_cross_encoder_model(model_name: str, device: str) -> Dict:
 
     model_cache_key = _create_model_cache_key(model_name, device)
 
-    if model_cache_key in available_models:
-        model, tokenizer = available_models[model_cache_key][AvailableModelsKey.model]
+    if model_cache_key in get_available_models():
+        model, tokenizer = get_available_models()[model_cache_key][AvailableModelsKey.model]
     else:
         logger.info(f"loading {model_name} on device {device} and adding to cache...")    
         model = AutoModelForSequenceClassification.from_pretrained(model_name).to(device)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        available_models[model_cache_key] = {AvailableModelsKey.model:(model, tokenizer), AvailableModelsKey.most_recently_used_time: datetime.datetime.now()}
+        get_available_models()[model_cache_key] = {AvailableModelsKey.model:(model, tokenizer),
+                                                   AvailableModelsKey.most_recently_used_time: datetime.datetime.now()}
 
     model.eval()
     
@@ -314,13 +315,13 @@ def load_owl_vit(model_name: str, device: str) -> Dict:
 
     model_cache_key = _create_model_cache_key(model_name, device)
 
-    if model_cache_key in available_models:
+    if model_cache_key in get_available_models():
         logger.info(f"loading {model_cache_key} from cache...")
-        model, processor = available_models[model_cache_key][AvailableModelsKey.model]
+        model, processor = get_available_models()[model_cache_key][AvailableModelsKey.model]
     else:
         processor = OwlViTProcessor.from_pretrained(model_name)
         model = OwlViTForObjectDetection.from_pretrained(model_name).to(device)
-        available_models[model_cache_key] = {AvailableModelsKey.model: (model, processor),
+        get_available_models()[model_cache_key] = {AvailableModelsKey.model: (model, processor),
                                              AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
 
     model.eval()

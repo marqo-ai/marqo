@@ -1,4 +1,4 @@
-# tensor search, idential to requirements.txt:
+# tensor search, identical to requirements.txt:
 requests==2.28.1
 anyio==3.7.1
 fastapi==0.86.0
@@ -11,6 +11,7 @@ pydantic==1.10.11
 httpx==0.25.0
 semver==3.0.2
 memory-profiler==0.61.0
+pynvml==11.5.0
 
 # s2_inference:
 more_itertools
@@ -23,7 +24,7 @@ Pillow==9.3.0
 numpy==1.23.4
 validators==0.20.0
 sentence-transformers==2.2.2
-open_clip_torch==2.18.0
+open_clip_torch==2.24.0
 clip-marqo==1.0.2
 onnx
 protobuf
@@ -34,11 +35,14 @@ opencv-python-headless==4.6.0.66
 psutil==5.9.4
 multilingual-clip==1.0.10
 redis==4.4.2
+readerwriterlock==1.0.9
+cachetools==5.3.1
 
 # pin specific packages (last working 0.0.19 image)
 # to fix ARM64 build scikit-learn error
 platformdirs==3.5.0
-timm==0.6.13
+safetensors==0.4.1
+timm==0.9.12
 transformers==4.29.0
 
 flatbuffers==23.5.9

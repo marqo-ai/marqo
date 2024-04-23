@@ -41,7 +41,6 @@ from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 
 import numpy as np
 import psutil
-import torch.cuda
 from PIL import Image
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
@@ -74,7 +73,7 @@ from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
     Device, TensorField, SearchMethod, EnvVars
 )
-from marqo.tensor_search.index_meta_cache import get_cache, get_index
+from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifier
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
@@ -1171,19 +1170,20 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
         raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
 
-def search(config: Config, index_name: str, text: Union[None, str, dict],
+def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            result_count: int = 3, offset: int = 0,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
            searchable_attributes: Iterable[str] = None, verbose: int = 0,
-           reranker: Union[str, Dict] = None, filter: str = None,
+           reranker: Union[str, Dict] = None, filter: Optional[str] = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device: str = None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
-           model_auth: Optional[ModelAuth] = None) -> Dict:
+           model_auth: Optional[ModelAuth] = None,
+           processing_start: float = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1250,7 +1250,11 @@ def search(config: Config, index_name: str, text: Union[None, str, dict],
             f"The search result offset must be less than or equal to the MARQO_MAX_SEARCH_OFFSET limit of "
             f"[{max_search_offset}]. Marqo received search result offset of `{offset}`.")
 
-    t0 = timer()
+    if processing_start is None:
+        t0 = timer()
+    else:
+        t0 = processing_start
+
     validation.validate_context(context=context, query=text, search_method=search_method)
     validation.validate_boost(boost=boost, search_method=search_method)
     validation.validate_searchable_attributes(searchable_attributes=searchable_attributes, search_method=search_method)
@@ -1568,7 +1572,8 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
                     image_download_headers=v.image_download_headers,
-                    model_auth=v.model_auth
+                    model_auth=v.model_auth,
+                    enable_cache=True
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
 
@@ -1874,19 +1879,6 @@ def get_cpu_info() -> dict:
     }
 
 
-def get_cuda_info() -> dict:
-    if torch.cuda.is_available():
-        return {"cuda_devices": [{"device_id": _device_id, "device_name": torch.cuda.get_device_name(_device_id),
-                                  "memory_used": f"{round(torch.cuda.memory_allocated(_device_id) / 1024 ** 3, 1)} GiB",
-                                  "total_memory": f"{round(torch.cuda.get_device_properties(_device_id).total_memory / 1024 ** 3, 1)} GiB"}
-                                 for _device_id in range(torch.cuda.device_count())]}
-
-    else:
-        raise api_exceptions.HardwareCompatabilityError(message=str(
-            "ERROR: cuda is not supported in your machine!!"
-        ))
-
-
 def vectorise_multimodal_combination_field_unstructured(field: str,
                                                         field_content: Dict[str, str], doc_index: int,
                                                         doc_id: str, device: str, marqo_index: UnstructuredMarqoIndex,
@@ -2142,7 +2134,7 @@ def vectorise_multimodal_combination_field_structured(
         combo_document_is_valid = False
         unsuccessful_doc_to_append = \
             (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
-             'code': errors.InvalidArgError.code})
+                         'code': errors.InvalidArgError.code})
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 

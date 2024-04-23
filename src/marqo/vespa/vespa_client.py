@@ -37,8 +37,9 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, pool_size: int = 10, feed_pool_size: int = 10,
-                 get_pool_size: int = 10, delete_pool_size: int = 10, partial_update_pool_size: int = 10):
+                 content_cluster_name: str, default_search_timeout_ms: int = 1000, pool_size: int = 10,
+                 feed_pool_size: int = 10, get_pool_size: int = 10, delete_pool_size: int = 10,
+                 partial_update_pool_size: int = 10):
         """
         Create a VespaClient object.
         Args:
@@ -57,6 +58,7 @@ class VespaClient:
         self.http_client = httpx.Client(
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
+        self.default_search_timeout_ms = default_search_timeout_ms
         self.content_cluster_name = content_cluster_name
         self.feed_pool_size = feed_pool_size
         self.get_pool_size = get_pool_size
@@ -151,7 +153,7 @@ class VespaClient:
         raise VespaError(f"Vespa application did not converge within {timeout} seconds")
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
-              query_features: Dict[str, Any] = None, **kwargs) -> QueryResult:
+              query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
         """
         Query Vespa.
         Args:
@@ -167,6 +169,7 @@ class VespaClient:
         query_features_list = {
             f'input.query({key})': value for key, value in query_features.items()
         } if query_features else {}
+
         query = {
             'yql': yql,
             'hits': hits,
@@ -175,6 +178,13 @@ class VespaClient:
             **query_features_list,
             **kwargs
         }
+
+        # Use default timeout if not already set.
+        if timeout:
+            query['timeout'] = f"{timeout}ms"
+        else:
+            query['timeout'] = f"{self.default_search_timeout_ms}ms"
+
         query = {key: value for key, value in query.items() if value is not None}
 
         logger.debug(f'Query: {query}')
