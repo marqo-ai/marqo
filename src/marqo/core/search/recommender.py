@@ -157,7 +157,6 @@ class Recommender:
             reranker=reranker,
             filter=recommend_filter,
             attributes_to_retrieve=attributes_to_retrieve,
-            device=device,
             score_modifiers=score_modifiers,
             processing_start=t0
         )

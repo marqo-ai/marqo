@@ -149,10 +149,6 @@ class TestRecommender(MarqoTestCase):
             )
         )
 
-    def _assert_empty_response(self, res):
-        self.assertEqual(res["hits"], [])
-        self.assertEqual(res.keys(), {"query", "hits", "limit", "offset", "processingTimeMs"})
-
     def test_recommend_slerp(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
             with self.subTest(type=index.type):
@@ -270,20 +266,19 @@ class TestRecommender(MarqoTestCase):
                 tensor_fields=['title', 'invalid_field']
             )
 
-    def test_recommend_unstructuredInvalidTensorFields_successful(self):
+    def test_recommend_unstructuredInvalidTensorFields_fails(self):
         """
-        Test that the recommender returns empty results when the tensor fields are invalid for an unstructured index
+        Test that the recommender fails when the tensor fields are invalid for an unstructured index (no vectors).
         """
         index = self.unstructured_text_index
         self._populate_index(index)
 
-        res = self.recommender.recommend(
-            index_name=index.name,
-            documents=["1", "2"],
-            tensor_fields=['invalid_field']
-        )
-
-        self._assert_empty_response(res)
+        with self.assertRaisesStrict(InvalidArgumentError):
+            self.recommender.recommend(
+                index_name=index.name,
+                documents=["1", "2"],
+                tensor_fields=['invalid_field']
+            )
 
     def test_recommend_emptyTensorFields_successful(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
@@ -468,7 +463,6 @@ class TestRecommender(MarqoTestCase):
                         verbose=1,
                         reranker='bm25',
                         attributes_to_retrieve=['title'],
-                        device='cpu',
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         )
@@ -489,7 +483,6 @@ class TestRecommender(MarqoTestCase):
                         reranker='bm25',
                         filter=mock.ANY,
                         attributes_to_retrieve=['title'],
-                        device='cpu',
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
@@ -511,7 +504,6 @@ class TestRecommender(MarqoTestCase):
                         verbose=2,
                         reranker='bm25',
                         attributes_to_retrieve=['title'],
-                        device='cuda',
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
@@ -532,7 +524,6 @@ class TestRecommender(MarqoTestCase):
                         reranker='bm25',
                         filter=mock.ANY,
                         attributes_to_retrieve=['title'],
-                        device='cuda',
                         score_modifiers=ScoreModifier(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
