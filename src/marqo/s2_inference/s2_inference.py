@@ -474,6 +474,11 @@ def clear_loaded_models() -> None:
         torch.cuda.empty_cache()
 
 
+def clear_marqo_inference_cache() -> None:
+    """ clears the inference cache if it is enabled"""
+    if _marqo_inference_cache.is_enabled():
+        _marqo_inference_cache.clear()
+
 def get_model_properties_from_registry(model_name: str) -> dict:
     """ Returns a dict describing properties of a model.
 

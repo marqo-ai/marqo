@@ -9,12 +9,14 @@ from unittest.mock import patch
 import numpy as np
 from PIL import Image
 
-from marqo.s2_inference.s2_inference import get_marqo_inference_cache
+from marqo.s2_inference.s2_inference import get_marqo_inference_cache, clear_marqo_inference_cache, clear_loaded_models
 
 
 class TestVectoriseInferenceCache(unittest.TestCase):
 
     def tearDown(self):
+        clear_marqo_inference_cache()
+        clear_loaded_models()
         # Remove the specific environment variables and loaded modules
         if 'MARQO_INFERENCE_CACHE_TYPE' in os.environ:
             del os.environ['MARQO_INFERENCE_CACHE_TYPE']

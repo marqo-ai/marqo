@@ -45,6 +45,11 @@ class MarqoAbstractCache(ABC):
         pass
 
     @abstractmethod
+    def clear(self) -> None:
+        """Remove all items from the cache."""
+        pass
+
+    @abstractmethod
     def __contains__(self, key: Hashable) -> bool:
         """Return True if the key is in the cache, else False.
 

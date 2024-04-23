@@ -84,3 +84,14 @@ class TestLFUCache(unittest.TestCase):
                 cache.set('key1', 'value1')
                 cache.set('key2', 'value2')
                 self.assertEqual(cache.currsize, 2, f"{cache_type} Currsize property incorrect after adding items.")
+
+    def test_cache_clear(self):
+        """Test the clear method for both cache types."""
+        for cache_type, cache in self.caches.items():
+            with self.subTest(cache_type=cache_type):
+                cache.set('key1', 'value1')
+                cache.set('key2', 'value2')
+                cache.clear()
+                self.assertEqual(len(cache), 0, f"{cache_type} cache did not clear.")
+                self.assertEqual(cache.currsize, 0, f"{cache_type} cache did not clear currsize.")
+                self.assertEqual(cache.maxsize, 2, f"{cache_type} cache maxsize changed after clear.")

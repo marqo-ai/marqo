@@ -83,6 +83,11 @@ class MarqoInferenceCache:
             raise TypeError(f"content must be a string, not {type(content)}")
         return f"{model_cache_key}||{content}"
 
+    def clear(self) -> None:
+        """Clear the cache."""
+        if self._cache is not None:
+            self._cache.clear()
+
     def is_enabled(self) -> bool:
         """Return True if the cache is enabled, else False."""
         return self._cache is not None
