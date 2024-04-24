@@ -1,5 +1,7 @@
 """The API entrypoint for Tensor Search"""
+import importlib
 import json
+import sys
 from typing import List
 
 import pydantic
@@ -22,6 +24,7 @@ from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
+from marqo.s2_inference.s2_inference import clear_loaded_models
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
@@ -189,6 +192,19 @@ def root():
 @utils.enable_debug_apis()
 def memory():
     return memory_profiler.get_memory_profile()
+
+
+@app.get('/reload')
+def reload():
+    clear_loaded_models()
+    if 'marqo.s2_inference.s2_inference' in sys.modules:
+        logger.info("Reloading s2_inference.s2_inference")
+        importlib.reload(sys.modules['marqo.s2_inference.s2_inference'])
+    if "marqo.s2_inference" in sys.modules:
+        logger.info("Reloading s2_inference")
+        importlib.reload(sys.modules['marqo.s2_inference'])
+
+    return {"message": "Reloaded s2_inference"}
 
 
 @app.post("/indexes/{index_name}")
