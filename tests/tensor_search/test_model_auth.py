@@ -189,8 +189,8 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
             res = tensor_search.search(config=self.config,
-                index_name=self.index_name_1, text='hi'
-            )
+                                       index_name=self.index_name_1, text='hi'
+                                       )
             assert 'hits' in res
             mock_req.assert_not_called()
 
