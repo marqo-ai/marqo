@@ -17,8 +17,8 @@ import marqo.core.exceptions as core_exceptions
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models import IndexInfo
-from marqo.tensor_search.models import IndexSettings
-
+# from marqo.tensor_search.models import IndexSettings
+from marqo.tensor_search.models.index_settings import IndexSettings
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
@@ -198,39 +198,8 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
         return None
     
 
-def determine_text_chunk_prefix(request_level_prefix: str, index_info: IndexInfo) -> str:
-    """
-    Determines the text chunk prefix to be used for chunking text fields.
-    This prefix will be added before each text chunk to be used for better inference.
-        
-    Logic:
-    1. Prioritize request-level prefix
-    2. If not provided, use override in text_preprocessing
-    3. If not provided, use model_properties defined prefix
-    4. If not provided, keep as None (will be handled by dict .get() method)
-    """
-
-    """
-    Note: Replace IndexSettingsField with the relevant datastructure, likely now class IndexSettings(StrictBaseModel) from index_settings.py
-    """
-
-    if request_level_prefix is not None:
-        return request_level_prefix
-
-    # Use override in text_preprocessing (if not None)
-    index_settings = index_info.get_index_settings()
-    if enums.IndexSettingsField.text_preprocessing in index_settings[enums.IndexSettingsField.index_defaults]:
-        text_preproc = index_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.text_preprocessing]
-        if enums.IndexSettingsField.override_text_chunk_prefix in text_preproc:
-            if text_preproc[enums.IndexSettingsField.override_text_chunk_prefix] is not None:
-                return text_preproc[enums.IndexSettingsField.override_text_chunk_prefix]
-
-    # Use model-defined prefix (None if it does not exist)
-    model_prefix = index_info.get_model_properties().get(enums.ModelProperties.text_chunk_prefix)
-    return model_prefix
-
 # Might use this function instead of the above
-def determine_text_prefix(request_level_prefix: str, index_info: IndexInfo, prefix_type: str) -> str:
+def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettings, prefix_type: str) -> str:
     """
     Determines the text prefix to be used for chunking text fields or search queries.
     This prefix will be added before each text chunk or query to be used for better inference.
@@ -258,14 +227,9 @@ def determine_text_prefix(request_level_prefix: str, index_info: IndexInfo, pref
         return request_level_prefix
 
     # Use override in text_preprocessing (if not None)
-    index_settings = index_info.get_index_settings()
-    if enums.IndexSettingsField.text_preprocessing in index_settings[enums.IndexSettingsField.index_defaults]:
-        text_preproc = index_settings[enums.IndexSettingsField.index_defaults][enums.IndexSettingsField.text_preprocessing]
-        override_prefix_field = f"override_{prefix_type}"
-        if override_prefix_field in text_preproc:
-            if text_preproc[override_prefix_field] is not None:
-                return text_preproc[override_prefix_field]
-
-    # Use model-defined prefix (None if it does not exist)
-    model_prefix = index_info.get_model_properties().get(prefix_type)
-    return model_prefix
+    if prefix_type == "text_query_prefix":
+        return index_settings.text_query_prefix
+    elif prefix_type == "text_chunk_prefix":
+        return index_settings.text_chunk_prefix
+    else:
+        raise ValueError(f"Invalid prefix_type: {prefix_type}")
