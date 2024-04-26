@@ -75,8 +75,6 @@ class TestNlerp(unittest.TestCase):
 
 
 class TestSlerp(unittest.TestCase):
-    # TODO - Improve tests so that hierarchical and sequential have different results
-    # TODO - Test with nonnomralized vectors
     def setUp(self):
         # Define simple vectors along the axes
         self.vectors = [
@@ -191,7 +189,7 @@ class TestSlerp(unittest.TestCase):
                 ] * 2,
                 [1] * 2,
                 [math.sqrt(0.5), math.sqrt(0.5), 0],
-                'Same vector * 2'
+                'Same vector * 2 - colinear'
             ),
             (
                 [
@@ -199,7 +197,7 @@ class TestSlerp(unittest.TestCase):
                 ] * 2,
                 [2] * 2,
                 [math.sqrt(0.5), math.sqrt(0.5), 0],
-                'Same vector * 2, weight 2'
+                'Same vector * 2 - colinear, weight 2'
             ),
             (
                 [
@@ -207,7 +205,7 @@ class TestSlerp(unittest.TestCase):
                 ] * 5,
                 [1] * 5,
                 [math.sqrt(0.5), math.sqrt(0.5), 0],
-                'Same vector * 5'
+                'Same vector * 5 - colinear'
             ),
             (
                 [
@@ -273,6 +271,35 @@ class TestSlerp(unittest.TestCase):
         expected = []
 
     def test_interpolate_colinearVectors_success(self):
+        cases = [
+            (
+                [
+                    [1, 0, 0],
+                    [1, 0, 0]
+                ],
+                [1, 2],
+                [1, 0, 0],
+                'Unit norm vectors'
+            ),
+            (
+                [
+                    [1, 2, 0],
+                    [2, 4, 0]
+                ],
+                [1, 2],
+                [5/3, 10/3, 0],
+                'Non-unit norm vectors'
+            ),
+        ]
+
+        for vectors, weights, expected, msg in cases:
+            for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
+                slerp = Slerp(method)
+                with self.subTest(msg):
+                    result = slerp.interpolate(vectors, weights)
+                    np.testing.assert_array_almost_equal(result, expected, decimal=5)
+
+    def test_interpolate_zeroWeight_failure(self):
         pass
 
     def test_interpolate_zeroVector_failure(self):
