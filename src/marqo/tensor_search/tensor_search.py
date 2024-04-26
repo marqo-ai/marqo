@@ -296,9 +296,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
+                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index.index_settings, "text_chunk_prefix")
                             content_chunks: List[str] = text_processor.split_text(field_content, split_by=split_by,
                                                                                   split_length=split_length,
-                                                                                  split_overlap=split_overlap)
+                                                                                  split_overlap=split_overlap,
+                                                                                  prefix=text_chunk_prefix)
                             text_chunks = content_chunks
                         else:
                             # TODO put the logic for getting field parameters into a function and add per field options
@@ -728,9 +730,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
+                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index.index_settings, "text_chunk_prefix")
                             content_chunks = text_processor.split_text(field_content, split_by=split_by,
                                                                        split_length=split_length,
-                                                                       split_overlap=split_overlap)
+                                                                       split_overlap=split_overlap,
+                                                                       prefix=text_chunk_prefix)
                             text_chunks = content_chunks
                         else:
                             # TODO put the logic for getting field parameters into a function and add per field options
@@ -1290,12 +1294,15 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         if approximate is None:
             approximate = True
 
+        marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+        text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index.index_settings, "text_query_prefix")
+
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
-            model_auth=model_auth, highlights=highlights
+            model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         if ef_search is not None:
@@ -1728,7 +1735,7 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False) -> Dict:
+        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
     """
     
     Args:
@@ -1777,11 +1784,14 @@ def _vector_text_search(
 
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
+    # Determine the text query prefix
+    text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index.index_settings, "text_query_prefix")
+
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=marqo_index, modelAuth=model_auth
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
     )]
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)

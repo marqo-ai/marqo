@@ -101,7 +101,7 @@ def check_make_string_valid(text: str, coerce: bool = True) -> str:
     return text
 
 def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, split_overlap: int = 1, 
-               language: str = 'english', custom_seperator: str = None) -> List[str]:
+               language: str = 'english', custom_seperator: str = None, prefix: Optional[str] = None) -> List[str]:
     """ splits a single piece of text into smaller sub-texts based on splitting method (split_by).
         for example, the text can can be split at the character, word, sentence or passage level.
         optionally it can be split with a custom splitting string
@@ -149,6 +149,11 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
     # reconstruct the segments. there is potential for a lossy process here as we
     # assume a uniform seperator when reconstructing the sentences
     text_splits = _reconstruct_multi_list(segments, seperator)
+
+    # Add prefix to each text split if provided
+    if prefix is not None:
+        text_splits = [f"{prefix} {split}" for split in text_splits]
+
 
     return text_splits
 
