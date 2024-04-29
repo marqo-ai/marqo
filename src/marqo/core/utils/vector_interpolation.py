@@ -88,6 +88,11 @@ class Slerp(VectorInterpolation):
         if not prenormalized:
             norm_v0 = np.linalg.norm(v0)
             norm_v1 = np.linalg.norm(v1)
+
+            # Note we can only detect zero length if we calculate the norm
+            if norm_v0 == 0 or norm_v1 == 0:
+                raise ValueError('One or more vectors had zero length. Cannot interpolate vectors with zero length')
+
             dot = dot / (norm_v0 * norm_v1)
 
         # Ensure the dot product is within the range [-1, 1]
@@ -110,8 +115,13 @@ class Slerp(VectorInterpolation):
         weights_copy = weights.copy()
         result = vectors[0]
         for i in range(1, len(vectors)):
-            result = self._slerp(result, vectors[i], weights_copy[i] / (weights_copy[i - 1] + weights_copy[i]))
-            weights_copy[i] = (weights_copy[i - 1] + weights_copy[i]) / 2
+            w0 = weights_copy[i - 1]
+            w1 = weights_copy[i]
+            if w0 == 0 and w1 == 0:
+                raise ValueError('Encountered two consecutive zero weights in the list of weights')
+
+            result = self._slerp(result, vectors[i], w1 / (w0 + w1))
+            weights_copy[i] = (w0 + w1) / 2
         return result
 
     def _interpolate_hierarchical(self, vectors: List[List[float]], weights: List[float]) -> List[float]:
@@ -125,10 +135,16 @@ class Slerp(VectorInterpolation):
                     new_weights.append(weights[i])
                     continue
 
+                w0 = weights[i]
+                w1 = weights[i + 1]
+
+                if w0 == 0 and w1 == 0:
+                    raise ValueError('Encountered two consecutive zero weights in the list of weights')
+
                 result.append(
-                    self._slerp(vectors[i], vectors[i + 1], weights[i + 1] / (weights[i] + weights[i + 1]))
+                    self._slerp(vectors[i], vectors[i + 1], w1 / (w0 + w1))
                 )
-                new_weights.append((weights[i] + weights[i + 1]) / 2)
+                new_weights.append((w0 + w1) / 2)
             vectors = result
             weights = new_weights
 
