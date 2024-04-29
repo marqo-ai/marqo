@@ -296,7 +296,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
-                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index.index_settings, "text_chunk_prefix")
+                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
                             content_chunks: List[str] = text_processor.split_text(field_content, split_by=split_by,
                                                                                   split_length=split_length,
                                                                                   split_overlap=split_overlap,
@@ -729,7 +729,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
-                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index.index_settings, "text_chunk_prefix")
+                            #index_settings = config.index_management.get_index(add_docs_params.index_name) 
+                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
                             content_chunks = text_processor.split_text(field_content, split_by=split_by,
                                                                        split_length=split_length,
                                                                        split_overlap=split_overlap,
@@ -1295,8 +1296,10 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         if approximate is None:
             approximate = True
 
+        # Retrieve index settings
+        #index_settings = config.index_management.get_index(index_name)
         marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
-        text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index.index_settings, "text_query_prefix")
+        text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index, "text_query_prefix")
 
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
@@ -1786,7 +1789,7 @@ def _vector_text_search(
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     # Determine the text query prefix
-    text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index.index_settings, "text_query_prefix")
+    text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index, "text_query_prefix")
 
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,

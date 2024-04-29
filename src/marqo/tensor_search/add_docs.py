@@ -200,7 +200,7 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
     
 
 
-def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettings, prefix_type: str) -> str:
+def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, prefix_type: str) -> str:
     """
     Determines the text prefix to be used for chunking text fields or search queries.
     This prefix will be added before each text chunk or query to enhance processing accuracy.
@@ -219,25 +219,23 @@ def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettin
     Returns:
         str: The determined prefix, or None if no prefix is found
     """
-
     if request_level_prefix is not None:
         return request_level_prefix
 
-    # Use the appropriate prefix from index_settings based on prefix_type
-    if prefix_type == "text_query_prefix" and index_settings.textQueryPrefix is not None:
-        return index_settings.textQueryPrefix
-    elif prefix_type == "text_chunk_prefix" and index_settings.textChunkPrefix is not None:
-        return index_settings.textChunkPrefix
-
+    # Check for the presence of the textChunkPrefix or textQueryPrefix in the MarqoIndex object.
+    if prefix_type == "text_query_prefix" and marqo_index.text_query_prefix is not None:
+        return marqo_index.text_query_prefix
+    elif prefix_type == "text_chunk_prefix" and marqo_index.text_chunk_prefix is not None:
+        return marqo_index.text_chunk_prefix
 
     # Fallback to model_properties defined prefix
-    model_properties = get_model_properties_from_registry(index_settings.model)
+    model_properties = get_model_properties_from_registry(marqo_index.model.name)
     if model_properties is not None:
         default_prefixes = model_properties.get(prefix_type)
         if default_prefixes is not None:
             return default_prefixes
     else:
-        raise ValueError(f"Model properties not found for model: {index_settings.model}")
+        raise ValueError(f"Model properties not found for model: {marqo_index.model}")
 
     # If no prefix is found, return None
     return None
