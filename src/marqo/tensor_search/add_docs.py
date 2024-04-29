@@ -229,7 +229,8 @@ def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettin
         return index_settings.text_chunk_prefix
 
     # Fallback to model_properties defined prefix
-    model_prefix = getattr(index_settings, 'model_properties_prefix', None)
+    default_prefixes = _get_model_registry_defaults(model_name)
+    model_prefix = default_prefixes.get(prefix_type)
     if model_prefix is not None:
         return model_prefix
 
