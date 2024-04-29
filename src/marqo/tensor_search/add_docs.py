@@ -18,7 +18,7 @@ import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models import IndexInfo
 from marqo.tensor_search.models.index_settings import IndexSettings
-from marqo.s2_inference.model_registry import get_model_properties_from_registry
+from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 
 
 
@@ -224,10 +224,10 @@ def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettin
         return request_level_prefix
 
     # Use the appropriate prefix from index_settings based on prefix_type
-    if prefix_type == "text_query_prefix" and index_settings.text_query_prefix is not None:
-        return index_settings.text_query_prefix
-    elif prefix_type == "text_chunk_prefix" and index_settings.text_chunk_prefix is not None:
-        return index_settings.text_chunk_prefix
+    if prefix_type == "text_query_prefix" and index_settings.textQueryPrefix is not None:
+        return index_settings.textQueryPrefix
+    elif prefix_type == "text_chunk_prefix" and index_settings.textChunkPrefix is not None:
+        return index_settings.textChunkPrefix
 
 
     # Fallback to model_properties defined prefix

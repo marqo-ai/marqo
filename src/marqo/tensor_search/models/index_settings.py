@@ -41,8 +41,8 @@ class IndexSettings(StrictBaseModel):
             m=16
         )
     )
-    text_query_prefix: Optional[str] = None
-    text_chunk_prefix: Optional[str] = None
+    textQueryPrefix: Optional[str] = None
+    textChunkPrefix: Optional[str] = None
 
     @root_validator(pre=True)
     def validate_field_names(cls, values):

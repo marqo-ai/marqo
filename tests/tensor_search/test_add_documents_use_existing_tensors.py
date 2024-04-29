@@ -357,14 +357,14 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         Ensures proper priority order is followed when determining the chunk prefix.
         add docs request-level > index override-level > model default level
         """
-        
+
         index_settings_with_model_default = IndexSettings(
             model="test_prefix"
         )
 
         index_settings_with_override = IndexSettings(
             model="test_prefix",
-            text_chunk_prefix="index-override"
+            textChunkPrefix="index-override"
         )
 
         with self.subTest("All prefixes on (request level chosen)"):
@@ -381,7 +381,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         with self.subTest("Only model default on (model default chosen)"):
             result = determine_text_prefix(None, index_settings_with_model_default, "text_chunk_prefix")
-            self.assertEqual(result, "model-default")          
+            self.assertEqual(result, "test passage: ")          
 
     @unittest.skip
     def test_use_existing_tensors_resilience(self):

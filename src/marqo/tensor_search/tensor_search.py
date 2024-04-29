@@ -1189,7 +1189,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifier] = None,
            model_auth: Optional[ModelAuth] = None,
-           processing_start: float = None) -> Dict:
+           processing_start: float = None,
+           text_query_prefix: Optional[str] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1215,6 +1216,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
+        text_query_prefix: The prefix to be used for chunking text fields or search queries.
     Returns:
 
     """
