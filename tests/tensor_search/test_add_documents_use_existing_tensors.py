@@ -7,6 +7,8 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
+from marqo.tensor_search.add_docs import determine_text_prefix
+from marqo.tensor_search.models.index_settings import IndexSettings
 
 
 class TestAddDocumentsUseExistingTensors(MarqoTestCase):
@@ -349,6 +351,37 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
                     self.assertEqual('{"text_field_1": "content 1", "text_field_2": "content 2-updated"}',
                                      get_doc_res["_tensor_facets"][0]["multimodal_field"])
+                    
+    def test_determine_text_chunk_prefix(self):
+        """
+        Ensures proper priority order is followed when determining the chunk prefix.
+        add docs request-level > index override-level > model default level
+        """
+        
+        index_settings_with_model_default = IndexSettings(
+            model="test_prefix"
+        )
+
+        index_settings_with_override = IndexSettings(
+            model="test_prefix",
+            text_chunk_prefix="index-override"
+        )
+
+        with self.subTest("All prefixes on (request level chosen)"):
+            result = determine_text_prefix("request-level", index_settings_with_override, "text_chunk_prefix")
+            self.assertEqual(result, "request-level")
+
+        with self.subTest("Request and model default on (request level chosen)"):
+            result = determine_text_prefix("request-level", index_settings_with_model_default, "text_chunk_prefix")
+            self.assertEqual(result, "request-level")
+
+        with self.subTest("Index override and model default on (index override chosen)"):
+            result = determine_text_prefix(None, index_settings_with_override, "text_chunk_prefix")
+            self.assertEqual(result, "index-override")
+
+        with self.subTest("Only model default on (model default chosen)"):
+            result = determine_text_prefix(None, index_settings_with_model_default, "text_chunk_prefix")
+            self.assertEqual(result, "model-default")          
 
     @unittest.skip
     def test_use_existing_tensors_resilience(self):

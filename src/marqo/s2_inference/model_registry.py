@@ -703,8 +703,8 @@ def _get_sbert_test_properties() -> Dict:
                 "dimensions": 16,
                 "tokens":128,
                 "type":"test",
-                "text_query_prefix": "query: ",
-                "text_chunk_prefix": "passage: ",
+                "text_query_prefix": "test query: ",
+                "text_chunk_prefix": "test passage: ",
                 "notes": ""},
     }
     return TEST_MODEL_PROPERTIES
