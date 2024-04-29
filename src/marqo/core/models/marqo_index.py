@@ -205,8 +205,8 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
-    text_query_prefix: Optional[str]
-    text_chunk_prefix: Optional[str]
+    override_text_query_prefix: Optional[str]
+    override_text_chunk_prefix: Optional[str]
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
     _cache: Dict[str, Any] = PrivateAttr()

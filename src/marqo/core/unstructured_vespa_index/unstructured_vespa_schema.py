@@ -60,8 +60,8 @@ class UnstructuredVespaSchema(VespaSchema):
             updated_at=self._index_request.updated_at,
             treat_urls_and_pointers_as_images=self._index_request.treat_urls_and_pointers_as_images,
             filter_string_max_length=self._index_request.filter_string_max_length,
-            text_query_prefix=self._index_request.text_query_prefix,
-            text_chunk_prefix=self._index_request.text_chunk_prefix
+            override_text_query_prefix=self._index_request.override_text_query_prefix,
+            override_text_chunk_prefix=self._index_request.override_text_chunk_prefix
         )
 
     @classmethod

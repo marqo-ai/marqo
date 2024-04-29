@@ -26,8 +26,8 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
     distance_metric: marqo_index.DistanceMetric
     vector_numeric_type: marqo_index.VectorNumericType
     hnsw_config: marqo_index.HnswConfig
-    text_query_prefix: Optional[str]
-    text_chunk_prefix: Optional[str]
+    override_text_query_prefix: Optional[str]
+    override_text_chunk_prefix: Optional[str]
     marqo_version: str
     created_at: int
     updated_at: int

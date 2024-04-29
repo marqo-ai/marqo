@@ -407,7 +407,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             updated_at=int(time.time()),
             treat_urls_and_pointers_as_images=False,
             filter_string_max_length=20,
-            text_chunk_prefix="index-override"
+            override_text_chunk_prefix="index-override"
         )
 
         with self.subTest("All prefixes on (request level chosen)"):
