@@ -17,8 +17,8 @@ import marqo.core.exceptions as core_exceptions
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models import IndexInfo
-# from marqo.tensor_search.models import IndexSettings
 from marqo.tensor_search.models.index_settings import IndexSettings
+from marqo.s2_inference.model_registry import get_model_properties_from_registry
 
 
 
@@ -229,11 +229,15 @@ def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettin
     elif prefix_type == "text_chunk_prefix" and index_settings.text_chunk_prefix is not None:
         return index_settings.text_chunk_prefix
 
+
     # Fallback to model_properties defined prefix
-    if index_settings.modelProperties is not None:
-        default_prefixes = index_settings.modelProperties.get(prefix_type)
+    model_properties = get_model_properties_from_registry(index_settings.model)
+    if model_properties is not None:
+        default_prefixes = model_properties.get(prefix_type)
         if default_prefixes is not None:
             return default_prefixes
+    else:
+        raise ValueError(f"Model properties not found for model: {index_settings.model}")
 
     # If no prefix is found, return None
     return None
