@@ -19,7 +19,6 @@ from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models import IndexInfo
 # from marqo.tensor_search.models import IndexSettings
 from marqo.tensor_search.models.index_settings import IndexSettings
-from model_registry import get_model_properties_from_registry
 
 
 
