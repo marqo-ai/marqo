@@ -167,4 +167,9 @@ def prefix_text_chunks(text_splits: List[str], text_chunk_prefix: str) -> List[s
     """
     if not text_chunk_prefix:
         return text_splits
+    
+    # Note that with this we directly concatenate the prefix to the text chunk
+    # So we should make sure that there is a space between the prefix and the text
+    # In text_chunk_prefix
     return [text_chunk_prefix + text for text in text_splits]
+
