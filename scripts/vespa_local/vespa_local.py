@@ -24,7 +24,7 @@ def restart(args):
 def deploy_config(args):
     os.system('vespa config set target local')
     here = os.path.dirname(os.path.abspath(__file__))
-    os.system(f'vespa deploy {here}')
+    os.system(f'vespa deploy "{here}"')
 
 
 def stop(args):
