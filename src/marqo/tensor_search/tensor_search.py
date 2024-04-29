@@ -177,7 +177,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
         for i, doc in enumerate(docs):
-            """Insert chunk prefix logic somewhere here"""
 
             copied = copy.deepcopy(doc)
 
@@ -603,7 +602,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 logger.debug(f"Found {len(existing_docs_dict)} existing docs")
 
         for i, doc in enumerate(docs):
-            """Insert chunk prefix logic somewhere here"""
             copied = copy.deepcopy(doc)
 
             document_is_valid = True
