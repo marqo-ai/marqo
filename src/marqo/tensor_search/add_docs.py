@@ -198,38 +198,41 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
         return None
     
 
-# Might use this function instead of the above
+
 def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettings, prefix_type: str) -> str:
     """
     Determines the text prefix to be used for chunking text fields or search queries.
-    This prefix will be added before each text chunk or query to be used for better inference.
+    This prefix will be added before each text chunk or query to enhance processing accuracy.
         
     Logic:
     1. Prioritize request-level prefix
-    2. If not provided, use override in text_preprocessing
-    3. If not provided, use model_properties defined prefix
-    4. If not provided, keep as None (will be handled by dict .get() method)
+    2. If not provided, use settings based on prefix_type
+    3. If still not provided, use model_properties defined prefix
+    4. Return None if no prefix is found, handling is expected by the caller
 
     Args:
         request_level_prefix (str): The prefix provided in the request
-        index_info (IndexInfo): The index info object
+        index_settings (IndexSettings): The settings object containing prefix information
         prefix_type (str): Either "text_query_prefix" or "text_chunk_prefix"
 
     Returns:
         str: The determined prefix, or None if no prefix is found
     """
 
-    """
-    Note: Replace IndexSettingsField with the relevant datastructure, likely now class IndexSettings(StrictBaseModel) from index_settings.py
-    """
-
     if request_level_prefix is not None:
         return request_level_prefix
 
-    # Use override in text_preprocessing (if not None)
-    if prefix_type == "text_query_prefix":
+    # Use the appropriate prefix from index_settings based on prefix_type
+    if prefix_type == "text_query_prefix" and index_settings.text_query_prefix is not None:
         return index_settings.text_query_prefix
-    elif prefix_type == "text_chunk_prefix":
+    elif prefix_type == "text_chunk_prefix" and index_settings.text_chunk_prefix is not None:
         return index_settings.text_chunk_prefix
-    else:
-        raise ValueError(f"Invalid prefix_type: {prefix_type}")
+
+    # Fallback to model_properties defined prefix
+    model_prefix = getattr(index_settings, 'model_properties_prefix', None)
+    if model_prefix is not None:
+        return model_prefix
+
+    # If no prefix is found, return None
+    return None
+
