@@ -46,7 +46,7 @@ class AddDocsParams(BaseModel):
         mappings: a dictionary used to handle all the object field content in the doc,
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
-
+        text_chunk_prefix: an optional prefix to add to each text chunk
     """
 
     class Config:
