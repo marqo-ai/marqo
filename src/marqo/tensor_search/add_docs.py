@@ -19,6 +19,8 @@ from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models import IndexInfo
 # from marqo.tensor_search.models import IndexSettings
 from marqo.tensor_search.models.index_settings import IndexSettings
+from model_registry import get_model_properties_from_registry
+
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
@@ -229,11 +231,13 @@ def determine_text_prefix(request_level_prefix: str, index_settings: IndexSettin
         return index_settings.text_chunk_prefix
 
     # Fallback to model_properties defined prefix
-    default_prefixes = _get_model_registry_defaults(model_name)
-    model_prefix = default_prefixes.get(prefix_type)
-    if model_prefix is not None:
-        return model_prefix
+    if index_settings.modelProperties is not None:
+        default_prefixes = index_settings.modelProperties.get(prefix_type)
+        if default_prefixes is not None:
+            return default_prefixes
 
     # If no prefix is found, return None
     return None
+
+
 
