@@ -1,13 +1,14 @@
 from enum import Enum
 from decimal import Decimal
-from typing import Optional, Tuple
 from marqo.tensor_search.models.index_settings import IndexSettings
 from pydantic import ValidationError
-from fastapi.responses import JSONResponse
 import json
+import marqo.logging
+
+logger = marqo.logging.get_logger(__name__)
 
 
-def validate_settings_object(index_name, settings_json) -> Tuple[int, Optional[str]]:
+def validate_settings_object(index_name, settings_json) -> bool:
     """
     Validates index settings.
 
@@ -20,34 +21,14 @@ def validate_settings_object(index_name, settings_json) -> Tuple[int, Optional[s
     try:
         settings_object = json.loads(settings_json)
         index_settings = IndexSettings(**settings_object)
-        marqo_request = index_settings.to_marqo_index_request(index_name)
-        # Convert the successful marqo_request (if needed) to a dictionary representation
-        convert_marqo_request_to_dict(marqo_request)
-        return JSONResponse(
-            content={
-                "validated": True,
-                "index": index_name
-            },
-            status_code=200
-        )
+        index_settings.to_marqo_index_request(index_name)
+        return True
     except ValidationError as e:
-        return JSONResponse(
-            content={
-                "validated": False,
-                "validation_error": str(e),
-                "index": index_name
-            },
-            status_code=400
-        )
+        logger.debug(f'Validation error for index {index_name}: {e}')
+        raise e
     except Exception as e:
-        return JSONResponse(
-            content={
-                "validated": False,
-                "validation_error": str(e),
-                "index": index_name
-            },
-            status_code=500
-        )
+        logger.error(f'Exception while validating index {index_name}: {e}')
+        raise e
 
 
 def convert_marqo_request_to_dict(index_settings):

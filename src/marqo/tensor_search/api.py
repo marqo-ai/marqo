@@ -28,13 +28,14 @@ from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
-from marqo.core.validation.validation import validate_settings_object
+from marqo.core.index_management.validation import validate_settings_object
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
+from pydantic import ValidationError
 
 logger = get_logger(__name__)
 
@@ -81,7 +82,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
     Catch a base/core Marqo Error and convert to its corresponding API Marqo Error.
     The API Error will be passed to the `marqo_api_exception_handler` below.
     This ensures that raw base errors are never returned by the API.
-    
+
     Mappings are in an ordered list to allow for hierarchical resolution of errors.
     Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
     """
@@ -192,10 +193,37 @@ def memory():
     return memory_profiler.get_memory_profile()
 
 
-@app.post('/validation')
-@utils.enable_schema_validation()
+@app.post('/validate/index')
+@utils.enable_ops_api()
 def schema_validation(index_name, settings_object):
-    return validate_settings_object(index_name, settings_object)
+    try:
+        settings_object = json.loads(settings_object)
+        validate_settings_object(index_name, settings_object)
+        return JSONResponse(
+            content={
+                "validated": True,
+                "index": index_name
+            },
+            status_code=200
+        )
+    except ValidationError as e:
+        return JSONResponse(
+            content={
+                "validated": False,
+                "validation_error": str(e),
+                "index": index_name
+            },
+            status_code=400
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "validated": False,
+                "validation_error": str(e),
+                "index": index_name
+            },
+            status_code=500
+        )
 
 
 @app.post("/indexes/{index_name}")
@@ -410,11 +438,11 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
 
 @app.post("/batch/indexes/create")
 @utils.enable_batch_apis()
-def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName], \
+def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName],
                          marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
 
-    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for \
+    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for
                             settings in index_settings_with_name_list]
 
     marqo_config.index_management.batch_create_indexes(marqo_index_requests)

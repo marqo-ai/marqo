@@ -1,9 +1,11 @@
+from pydantic import ValidationError
+import pytest
 import json
 import unittest
 
 from fastapi.responses import JSONResponse
 
-from marqo.core.validation.validation import validate_settings_object
+from marqo.core.index_management.validation import validate_settings_object
 
 
 class TestValidateSettings(unittest.TestCase):
@@ -84,8 +86,7 @@ class TestValidateSettings(unittest.TestCase):
 
         # When validating the input settings object
         result = validate_settings_object("test_index", input_settings)
-        self.assert_json_response_equal(JSONResponse(
-            content={"validated": True, "index": "test_index"}, status_code=200), result)
+        self.assertTrue(result)
 
     def test_validate_settings_object_with_valid_multimodal_based_input(self):
         input_settings = self.generate_test_input(
@@ -94,8 +95,7 @@ class TestValidateSettings(unittest.TestCase):
         )
 
         result = validate_settings_object("test_index", input_settings)
-        self.assert_json_response_equal(JSONResponse(
-            content={"validated": True, "index": "test_index"}, status_code=200), result)
+        self.assertTrue(result)
 
     def test_validate_settings_object_with_invalid_index_defaults(self):
         # Given an invalid input settings object (missing a required field)
@@ -107,37 +107,34 @@ class TestValidateSettings(unittest.TestCase):
         }
 
         # When validating the input settings object
-        result = validate_settings_object("test_index", json.dumps(input_settings))
+        with pytest.raises(ValidationError) as exc_info:
+            validate_settings_object("test_index", json.dumps(input_settings))
 
-        expected_error = {
-            "validated": False,
-            "validation_error": (
-                "2 validation errors for IndexSettings\n"
-                "numberOfReplicas\n  extra fields not permitted (type=value_error.extra)\n"
-                "numberOfShards\n  extra fields not permitted (type=value_error.extra)"
-            ),
-            "index": "test_index"
-        }
-        self.assert_json_response_equal(JSONResponse(content=expected_error, status_code=400), result)
+        # Check the exception details
+        assert str(exc_info.value) == (
+            "2 validation errors for IndexSettings\n"
+            "numberOfReplicas\n  extra fields not permitted (type=value_error.extra)\n"
+            "numberOfShards\n  extra fields not permitted (type=value_error.extra)"
+        ), "Expected validation errors did not match."
 
     def test_validate_settings_object_with_invalid_snake_case_input(self):
         # Given an invalid input settings object (snake case)
-        input_settings = self.generate_invalid_test_input_snake_case()
+        input_settings = {
+            "dependent_fields": "value1",
+            # other necessary fields as per your IndexSettings model
+        }
 
         # When validating the input settings object
-        result = validate_settings_object("test_index", input_settings)
+        with pytest.raises(ValidationError) as exc_info:
+            validate_settings_object("test_index", json.dumps(input_settings))
 
-        expected_error = {
-            "validated": False,
-            "validation_error": (
-                "1 validation error for IndexSettings\n"
-                "__root__\n  Invalid field name 'dependent_fields'. See Create Index API reference "
-                "here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/ "
-                "(type=value_error)"
-            ),
-            "index": "test_index"
-        }
-        self.assert_json_response_equal(JSONResponse(content=expected_error, status_code=400), result)
+        # Check the exception details
+        assert str(exc_info.value) == (
+            "1 validation error for IndexSettings\n"
+            "__root__\n  Invalid field name 'dependent_fields'. See Create Index API reference "
+            "here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/ "
+            "(type=value_error)"
+        ), "Expected validation errors did not match."
 
     def assert_json_response_equal(self, response1: JSONResponse, response2: JSONResponse):
         self.assertEqual(response1.status_code,

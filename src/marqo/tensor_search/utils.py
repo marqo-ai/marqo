@@ -411,13 +411,13 @@ def enable_debug_apis():
     return decorator_function
 
 
-def enable_schema_validation():
+def enable_ops_api():
     def decorator_function(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if read_env_vars_and_defaults(EnvVars.MARQO_SCHEMA_VALIDATION).lower() != 'true':
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_OPS_API).lower() != 'true':
                 raise HTTPException(status_code=403,
-                                    detail="This API endpoint is disabled. Please set MARQO_SCHEMA_VALIDATION to true to enable it.")
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_OPS_API to true to enable it.")
             return func(*args, **kwargs)
 
         return wrapper
