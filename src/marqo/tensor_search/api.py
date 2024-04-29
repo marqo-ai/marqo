@@ -222,7 +222,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             image_download_headers=search_query.image_download_headers,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
-            model_auth=search_query.modelAuth
+            model_auth=search_query.modelAuth,
+            text_query_prefix=search_query.textQueryPrefix
         )
 
 
@@ -260,7 +261,8 @@ def add_or_replace_documents(
         device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
-                                                             device=device, auto_refresh=refresh)
+                                                             device=device, auto_refresh=refresh,
+                                                             text_chunk_prefix=body.textChunkPrefix)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(

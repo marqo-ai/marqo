@@ -116,7 +116,7 @@ def decode_mappings(mappings: Optional[str] = None) -> dict:
 
 
 def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams, List[Dict]],
-                                 device: str, auto_refresh: bool = True, text_chunk_prefix: Optional[str] = None) -> AddDocsParams:
+                                 device: str, auto_refresh: bool = True) -> AddDocsParams:
     """An orchestrator for the add_documents API.
     All the arguments are decoded and validated in the API function. This function is only responsible for orchestrating.
 

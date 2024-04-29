@@ -41,7 +41,7 @@ class SearchQuery(BaseMarqoModel):
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
     modelAuth: Optional[ModelAuth] = None
-    text_query_prefix: Optional[str] = None
+    textQueryPrefix: Optional[str] = None
 
     @root_validator(pre=False)
     def validate_query_and_context(cls, values):
