@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp, ZeroSumWeightsError, ZeroLengthVectorError
+from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp, ZeroSumWeightsError, ZeroMagnitudeVectorError
 from marqo.exceptions import InternalError
 from tests.marqo_test import MarqoTestCase
 
@@ -283,7 +283,7 @@ class TestNlerp(MarqoTestCase):
         for vectors, weights, msg in cases:
             with self.subTest(msg):
                 nlerp = Nlerp()
-                with self.assertRaisesStrict(ZeroLengthVectorError) as ex:
+                with self.assertRaisesStrict(ZeroMagnitudeVectorError) as ex:
                     nlerp.interpolate(vectors, weights)
                 self.assertIn('zero magnitude', str(ex.exception))
 

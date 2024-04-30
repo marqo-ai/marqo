@@ -3,7 +3,8 @@ from unittest import mock
 
 from marqo.core.exceptions import InvalidFieldNameError
 from marqo.core.models.interpolation_method import InterpolationMethod
-from marqo.core.models.marqo_index import Model, FieldFeature, FieldType, MarqoIndex, IndexType
+from marqo.core.models.marqo_index import Model, FieldFeature, FieldType, MarqoIndex, IndexType, TextPreProcessing, \
+    TextSplitMethod
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.search.recommender import Recommender
 from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp
@@ -20,12 +21,25 @@ class TestRecommender(MarqoTestCase):
     def setUpClass(cls):
         super().setUpClass()
 
+        # Note text_preprocessing is set to create one vector per field, so that vector count is predictable
+        # This is required for some tests
+
         unstructured_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            text_preprocessing=TextPreProcessing(
+                split_length=1000,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            )
         )
 
         unstructured_text_index_nonnormalized = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6'), normalize_embeddings=False
+            model=Model(name='hf/all_datasets_v4_MiniLM-L6'), normalize_embeddings=False,
+            text_preprocessing=TextPreProcessing(
+                split_length=1000,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            ),
         )
 
         structured_text_index = cls.structured_marqo_index_request(
@@ -43,7 +57,12 @@ class TestRecommender(MarqoTestCase):
                              dependent_fields={"title": 0.5, "description": 0.5})
             ],
             tensor_fields=["title", "description", "content",
-                           "multimodal_field"]
+                           "multimodal_field"],
+            text_preprocessing=TextPreProcessing(
+                split_length=1000,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            ),
         )
 
         cls.indexes = cls.create_indexes(
@@ -149,7 +168,7 @@ class TestRecommender(MarqoTestCase):
             )
         )
 
-    def test_recommend_slerp(self):
+    def test_recommend_slerp_success(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
             with self.subTest(type=index.type):
                 self._populate_index(index)
@@ -173,7 +192,25 @@ class TestRecommender(MarqoTestCase):
 
                     self.assertEqual(set(ids), {"1", "2", "6"})
 
-    def test_recommend_nlerp(self):
+    def test_recommend_slerpZeroSumWeights_failure(self):
+        """
+        Test that the recommender fails when the sum of consecutive weights is zero
+        """
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self._populate_index(index)
+
+                with self.assertRaisesStrict(InvalidArgumentError) as ex:
+                    self.recommender.recommend(
+                        index_name=index.name,
+                        documents={"1": 1, "2": -1},
+                        tensor_fields=['title'],
+                        interpolation_method=InterpolationMethod.SLERP,
+                        exclude_input_documents=False,
+                    )
+                self.assertIn('SLERP cannot interpolate', str(ex.exception))
+
+    def test_recommend_nlerp_success(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
             with self.subTest(type=index.type):
                 self._populate_index(index)
@@ -197,7 +234,36 @@ class TestRecommender(MarqoTestCase):
 
                     self.assertEqual(set(ids), {"1", "2", "6"})
 
-    def test_recommend_lerp(self):
+    def test_recommend_nlerpZeroMagnitudeVector_failure(self):
+        """
+        Test that the recommender fails when the interpolated vector has zero magnitude with NLERP
+        """
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self._populate_index(index)
+
+                original_nlerp = Nlerp().interpolate
+
+                def interpolate(vectors, weights):
+                    return original_nlerp(
+                        [
+                            [1, 0, 2, 0],
+                            [-1, 0, -2, 0]
+                        ],
+                        [1, 1]
+                    )
+
+                with mock.patch.object(Nlerp, "interpolate", wraps=interpolate):
+                    with self.assertRaisesStrict(InvalidArgumentError) as ex:
+                        self.recommender.recommend(
+                            index_name=index.name,
+                            documents=["1", "2"],
+                            interpolation_method=InterpolationMethod.NLERP,
+                            exclude_input_documents=False,
+                        )
+                    self.assertIn('zero-magnitude vector', str(ex.exception))
+
+    def test_recommend_lerp_success(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
             with self.subTest(type=index.type):
                 self._populate_index(index)
@@ -221,7 +287,58 @@ class TestRecommender(MarqoTestCase):
 
                     self.assertEqual(set(ids), {"1", "2", "6"})
 
-    def test_recommend_docsWithoutVectors(self):
+    def test_recommend_lerpZeroSumWeights_failure(self):
+        """
+        Test that the recommender fails when the sum of all weights is zero with LERP (and NLERP)
+        """
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            for method in [InterpolationMethod.LERP, InterpolationMethod.NLERP]:
+                with self.subTest(type=index.type, method=method):
+                    self._populate_index(index)
+
+                    with self.assertRaisesStrict(InvalidArgumentError) as ex:
+                        self.recommender.recommend(
+                            index_name=index.name,
+                            documents={"1": 1, "2": 2, "3": -3},
+                            tensor_fields=['title'],
+                            interpolation_method=method,
+                            exclude_input_documents=False,
+                        )
+                    self.assertIn('Sum of weights is zero', str(ex.exception))
+
+    def test_recommend_docsWithZeroWeight_success(self):
+        """
+        Test that the recommender ignores documents with zero weight
+        """
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self._populate_index(index)
+
+                # This will fail unless zero weight docs are ignored, due to SLERP on zero-sum weights
+                self.recommender.recommend(
+                    index_name=index.name,
+                    documents={"1": 0, "2": 0, "3": 1},
+                    tensor_fields=['title'],
+                    interpolation_method=InterpolationMethod.SLERP,
+                    exclude_input_documents=False,
+                )
+
+    def test_recommend_allDocsZeroWeight_failure(self):
+        """
+        Test that the recommender fails when all documents have zero weight
+        """
+        for index in [self.unstructured_text_index, self.structured_text_index]:
+            with self.subTest(type=index.type):
+                self._populate_index(index)
+
+                with self.assertRaisesStrict(InvalidArgumentError) as ex:
+                    self.recommender.recommend(
+                        index_name=index.name,
+                        documents={"1": 0, "2": 0, "3": 0}
+                    )
+                self.assertIn('No documents with non-zero weight provided', str(ex.exception))
+
+    def test_recommend_docsWithoutVectors_success(self):
         """
         Test that the recommender fails when one or more documents do not have embeddings
         """
@@ -252,7 +369,7 @@ class TestRecommender(MarqoTestCase):
                 documents=["1", "2"],
             )
 
-    def test_recommend_structuredInvalidTensorFields_fails(self):
+    def test_recommend_structuredInvalidTensorFields_failure(self):
         """
         Test that the recommender fails when the tensor fields are invalid for a structured index
         """
@@ -266,7 +383,7 @@ class TestRecommender(MarqoTestCase):
                 tensor_fields=['title', 'invalid_field']
             )
 
-    def test_recommend_unstructuredInvalidTensorFields_fails(self):
+    def test_recommend_unstructuredInvalidTensorFields_failure(self):
         """
         Test that the recommender fails when the tensor fields are invalid for an unstructured index (no vectors).
         """
@@ -280,7 +397,7 @@ class TestRecommender(MarqoTestCase):
                 tensor_fields=['invalid_field']
             )
 
-    def test_recommend_emptyTensorFields_successful(self):
+    def test_recommend_emptyTensorFields_success(self):
         for index in [self.unstructured_text_index, self.structured_text_index]:
             with self.subTest(type=index.type):
                 self._populate_index(index)
@@ -295,7 +412,7 @@ class TestRecommender(MarqoTestCase):
 
                 self.assertEqual(set(ids), {"1", "2", "6"})
 
-    def test_recommend_missingDocuments_fails(self):
+    def test_recommend_missingDocuments_failure(self):
         """
         Test that the recommender fails when some documents are missing
         """
@@ -309,7 +426,7 @@ class TestRecommender(MarqoTestCase):
                         documents=["100", "2"],
                     )
 
-    def test_recommend_emptyDocuments_fails(self):
+    def test_recommend_emptyDocuments_failure(self):
         """
         Test that the recommender fails when documents is empty
         """
@@ -325,7 +442,7 @@ class TestRecommender(MarqoTestCase):
                 documents=[]
             )
 
-    def test_defaultInterpolationMethodNormalized(self):
+    def test_defaultInterpolationMethodNormalized_success(self):
         """
         Test that correct default SLERP is picked correctly for normalized indexes
         """
@@ -345,7 +462,7 @@ class TestRecommender(MarqoTestCase):
 
             mock_interpolate.assert_called_once()
 
-    def test_defaultInterpolationMethodNonNormalized(self):
+    def test_defaultInterpolationMethodNonNormalized_success(self):
         """
         Test that correct default LERP is picked for non-normalized indexes
         """
@@ -365,7 +482,7 @@ class TestRecommender(MarqoTestCase):
 
             mock_interpolate.assert_called_once()
 
-    def test_recommend_excludeInputDocuments(self):
+    def test_recommend_excludeInputDocuments_success(self):
         """
         Test that the recommender excludes input documents when requested
         """
@@ -375,15 +492,15 @@ class TestRecommender(MarqoTestCase):
 
                 res = self.recommender.recommend(
                     index_name=index.name,
-                    documents=["1", "2"],
+                    documents={"1": 1, "2": 1, "3": 0},
                     exclude_input_documents=True,
                 )
 
-                ids = [doc["_id"] for doc in res["hits"]]
+                ids = set([doc["_id"] for doc in res["hits"]])
 
-                self.assertFalse({"1", "2"}.issubset(set(ids)))
+                self.assertFalse(any(doc in ids for doc in ["1", "2", "3"]))
 
-    def test_recommend_includeInputDocuments(self):
+    def test_recommend_includeInputDocuments_success(self):
         """
         Test that the recommender includes input documents when requested
         """
@@ -401,7 +518,7 @@ class TestRecommender(MarqoTestCase):
 
                 self.assertTrue({"1", "2"}.issubset(set(ids)))
 
-    def test_recommend_filterWithoutExcludeInputDocs(self):
+    def test_recommend_filterWithoutExcludeInputDocs_success(self):
         """
         Test that the recommender uses the given filter and includes input documents
         """
@@ -420,7 +537,7 @@ class TestRecommender(MarqoTestCase):
 
                 self.assertEqual(ids, ['1'])
 
-    def test_recommend_filterWithExcludeInputDocs(self):
+    def test_recommend_filterWithExcludeInputDocs_success(self):
         """
         Test that the recommender uses the given filter and excludes input documents
         """
@@ -439,7 +556,7 @@ class TestRecommender(MarqoTestCase):
 
                 self.assertEqual(ids, [])
 
-    def test_recommend_searchCallValid(self):
+    def test_recommend_searchCallValid_success(self):
         """
         Test that the recommender calls the search method with the correct arguments
 

@@ -6,10 +6,8 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
-from marqo.core.utils.vector_interpolation import from_interpolation_method
+from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, ZeroMagnitudeVectorError
 from marqo.exceptions import InvalidArgumentError
-from marqo.tensor_search import utils
-from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient
@@ -68,7 +66,13 @@ class Recommender:
         if documents is None or len(documents) == 0:
             raise InvalidArgumentError('No document IDs provided')
 
-        # remove docs with 0 weight, error out if all zero weight
+        # remove docs with zero weight
+        original_documents = documents
+        if isinstance(documents, dict):
+            documents = {k: v for k, v in documents.items() if v != 0}
+
+        if len(documents) == 0:
+            raise InvalidArgumentError('No documents with non-zero weight provided')
 
         marqo_index = index_meta_cache.get_index(config.Config(self.vespa_client), index_name=index_name)
 
@@ -88,8 +92,10 @@ class Recommender:
 
         if isinstance(documents, dict):
             document_ids = list(documents.keys())
+            all_document_ids = list(original_documents.keys())
         else:
             document_ids = documents
+            all_document_ids = original_documents
 
         t0 = timer()
 
@@ -137,13 +143,36 @@ class Recommender:
             vectors.extend(vector_list)
             weights.extend([weight] * len(vector_list))
 
-        # Handle ZeroSumWeightsError and ZeroLengthVectorError
-        interpolated_vector = vector_interpolation.interpolate(
-            vectors, weights
-        )
+        try:
+            interpolated_vector = vector_interpolation.interpolate(
+                vectors, weights
+            )
+        except ZeroSumWeightsError as e:
+            if interpolation_method == InterpolationMethod.SLERP:
+                raise InvalidArgumentError(
+                    'Sum of one or more consecutive weights is zero. '
+                    'SLERP cannot interpolate vectors with zero sum of weights. Such weight pairs are prone to causing '
+                    'this error depending on document embeddings, and should be avoided',
+                    cause=e
+                ) from e
+            else:  # lerp or nlerp
+                raise InvalidArgumentError(
+                    'Sum of weights is zero. LERP/NLERP requires non-zero sum of weights',
+                    cause=e
+                ) from e
+        except ZeroMagnitudeVectorError as e:
+            if interpolation_method == InterpolationMethod.NLERP:
+                raise InvalidArgumentError(
+                    'Linear interpolation of embeddings led to a zero-magnitude vector. '
+                    'NLERP cannot normalize a vector with zero magnitude',
+                    cause=e
+                ) from e
+            else:  # shouldn't reach here
+                raise e
 
         if exclude_input_documents:
-            recommend_filter = self._get_exclusion_filter(document_ids, filter)
+            # Make sure to include zero-weight documents in this filter
+            recommend_filter = self._get_exclusion_filter(all_document_ids, filter)
         else:
             recommend_filter = filter
 

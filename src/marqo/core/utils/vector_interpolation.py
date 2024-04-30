@@ -13,7 +13,7 @@ class ZeroSumWeightsError(InvalidArgumentError):
     pass
 
 
-class ZeroLengthVectorError(InvalidArgumentError):
+class ZeroMagnitudeVectorError(InvalidArgumentError):
     pass
 
 
@@ -80,7 +80,7 @@ class Nlerp(Lerp):
         length = math.sqrt(sum(x ** 2 for x in lerp_result))
 
         if length == 0:
-            raise ZeroLengthVectorError(
+            raise ZeroMagnitudeVectorError(
                 'Interpolated vector has zero magnitude. Cannot normalize a vector with zero magnitude'
             )
 
