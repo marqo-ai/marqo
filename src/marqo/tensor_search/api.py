@@ -193,11 +193,12 @@ def memory():
     return memory_profiler.get_memory_profile()
 
 
-@app.post('/validate/{index_name}')
+@app.post('/validate/index/{index_name}')
 @utils.enable_ops_api()
-def schema_validation(index_name: str, settings_object: str):
+def schema_validation(index_name: str, settings_sting: str):
     try:
-        validate_settings_object(index_name, settings_object)
+        settings_json = json.loads(settings_sting)
+        validate_settings_object(index_name, settings_json)
         return JSONResponse(
             content={
                 "validated": True,
@@ -209,7 +210,7 @@ def schema_validation(index_name: str, settings_object: str):
         return JSONResponse(
             content={
                 "validated": False,
-                "validation_error": str(e),
+                "validationError": str(e),
                 "index": index_name
             },
             status_code=400

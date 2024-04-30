@@ -1,29 +1,31 @@
 from marqo.tensor_search.models.index_settings import IndexSettings
 from pydantic import ValidationError
-import json
 import marqo.logging
 
 logger = marqo.logging.get_logger(__name__)
 
 
-def validate_settings_object(index_name, settings_json) -> bool:
+def validate_settings_object(index_name: str, settings_dict: dict) -> None:
     """
-    Validates index settings.
+    Validates index settings using the IndexSettings model.
+
+    Args:
+        index_name (str): The name of the index to validate settings for.
+        settings_dict (dict): A dictionary of settings to validate.
+
+    Raises:
+        ValidationError: If the settings do not conform to the IndexSettings model.
+        Exception: If an unexpected error occurs during the validation process.
 
     Returns:
-        A tuple containing an HTTP status code and optionally a dictionary or an error message. 
-        On success, it returns 200 and a dictionary representing the settings.
-        On failure due to an ValidationError, it returns 400 and an error message.
-        For any other exception, it returns 500 and an error message.
+        None: If the validation is successful, nothing is returned.
     """
     try:
-        settings_object = json.loads(settings_json)
-        index_settings = IndexSettings(**settings_object)
+        index_settings = IndexSettings(**settings_dict)
         index_settings.to_marqo_index_request(index_name)
-        return True
     except ValidationError as e:
         logger.debug(f'Validation error for index {index_name}: {e}')
-        raise e
+        raise
     except Exception as e:
         logger.error(f'Exception while validating index {index_name}: {e}')
-        raise e
+        raise
