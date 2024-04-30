@@ -193,11 +193,10 @@ def memory():
     return memory_profiler.get_memory_profile()
 
 
-@app.post('/validate/index')
+@app.post('/validate/{index_name}')
 @utils.enable_ops_api()
-def schema_validation(index_name, settings_object):
+def schema_validation(index_name: str, settings_object: str):
     try:
-        settings_object = json.loads(settings_object)
         validate_settings_object(index_name, settings_object)
         return JSONResponse(
             content={

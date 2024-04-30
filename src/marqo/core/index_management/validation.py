@@ -1,5 +1,3 @@
-from enum import Enum
-from decimal import Decimal
 from marqo.tensor_search.models.index_settings import IndexSettings
 from pydantic import ValidationError
 import json
@@ -29,27 +27,3 @@ def validate_settings_object(index_name, settings_json) -> bool:
     except Exception as e:
         logger.error(f'Exception while validating index {index_name}: {e}')
         raise e
-
-
-def convert_marqo_request_to_dict(index_settings):
-    """Converts a MarqoIndexRequest to a dictionary.
-    Returns
-        A dictionary representation of the MarqoIndexRequest
-    """
-    index_settings_dict = index_settings.dict(exclude_none=True)
-    return convert_enums_to_values(index_settings_dict)
-
-
-def convert_enums_to_values(data):
-    if isinstance(data, dict):
-        return {key: convert_enums_to_values(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [convert_enums_to_values(element) for element in data]
-    elif isinstance(data, Enum):
-        if isinstance(data.value, float):
-            return Decimal(str(data.value))
-        return data.value
-    elif isinstance(data, float):
-        return Decimal(str(data))
-    else:
-        return data
