@@ -1296,10 +1296,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         if approximate is None:
             approximate = True
 
-        # Retrieve index settings
-        #index_settings = config.index_management.get_index(index_name)
-        marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
-        text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index, "text_query_prefix")
 
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,

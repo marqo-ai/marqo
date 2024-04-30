@@ -6,6 +6,7 @@ import sys
 import typing
 import unittest
 from unittest import mock
+import time
 
 import numpy as np
 import requests
@@ -19,6 +20,9 @@ from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from tests.utils.transition import add_docs_caller
+from marqo.tensor_search.add_docs import determine_text_prefix
+from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
+    ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod
 
 
 @unittest.skip
@@ -1372,3 +1376,74 @@ class TestVectorSearch(MarqoTestCase):
             return True
 
         assert run()
+
+    def test_determine_text_query_prefix(self):
+        """
+        Ensures proper priority order is followed when determining the query prefix.
+        search request-level > index override-level > model default level
+        """
+
+        marqo_index_with_model_default = UnstructuredMarqoIndex(
+            name="test_index",
+            schema_name="test_schema",
+            model=Model(name="prefix-test-model"),
+            normalize_embeddings=True,
+            text_preprocessing=TextPreProcessing(
+                split_length=10,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing=ImagePreProcessing(),
+            distance_metric=DistanceMetric.Euclidean,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(
+                ef_construction=100,
+                m=16
+            ),
+            marqo_version="0.0.1",
+            created_at=int(time.time()),
+            updated_at=int(time.time()),
+            treat_urls_and_pointers_as_images=False,
+            filter_string_max_length=20
+        )
+
+        marqo_index_with_override = UnstructuredMarqoIndex(
+            name="test_index",
+            schema_name="test_schema",
+            model=Model(name="prefix-test-model"),
+            normalize_embeddings=True,
+            text_preprocessing=TextPreProcessing(
+                split_length=10,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing=ImagePreProcessing(),
+            distance_metric=DistanceMetric.Euclidean,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(
+                ef_construction=100,
+                m=16
+            ),
+            marqo_version="0.0.1",
+            created_at=int(time.time()),
+            updated_at=int(time.time()),
+            treat_urls_and_pointers_as_images=False,
+            filter_string_max_length=20,
+            override_text_query_prefix="index-override"
+        )
+
+        with self.subTest("All prefixes on (request level chosen)"):
+            result = determine_text_prefix("request-level", marqo_index_with_override, "text_query_prefix")
+            self.assertEqual(result, "request-level")
+
+        with self.subTest("Request and model default on (request level chosen)"):
+            result = determine_text_prefix("request-level", marqo_index_with_model_default, "text_query_prefix")
+            self.assertEqual(result, "request-level")
+
+        with self.subTest("Index override and model default on (index override chosen)"):
+            result = determine_text_prefix(None, marqo_index_with_override, "text_query_prefix")
+            self.assertEqual(result, "index-override")
+
+        with self.subTest("Only model default on (model default chosen)"):
+            result = determine_text_prefix(None, marqo_index_with_model_default, "text_query_prefix")
+            self.assertEqual(result, "test query: ")

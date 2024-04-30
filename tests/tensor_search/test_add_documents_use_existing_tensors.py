@@ -11,7 +11,6 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.add_docs import determine_text_prefix
-from marqo.tensor_search.models.index_settings import IndexSettings
 
 
 class TestAddDocumentsUseExistingTensors(MarqoTestCase):
