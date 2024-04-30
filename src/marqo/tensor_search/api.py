@@ -195,9 +195,9 @@ def memory():
 
 @app.post('/validate/index/{index_name}')
 @utils.enable_ops_api()
-def schema_validation(index_name: str, settings_sting: str):
+def schema_validation(index_name: str, settings: str):
     try:
-        settings_json = json.loads(settings_sting)
+        settings_json = json.loads(settings)
         validate_settings_object(index_name, settings_json)
         return JSONResponse(
             content={
