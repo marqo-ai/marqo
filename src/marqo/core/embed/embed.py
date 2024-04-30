@@ -31,7 +31,7 @@ class Embed:
                     self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
                     index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None,
-                    text_chunk_prefix: Optional[str] = None
+                    text_query_prefix: Optional[str] = None
                     ) -> Dict:
         """
         Use the index's model to embed the content
@@ -77,7 +77,7 @@ class Embed:
                     index=marqo_index,
                     image_download_headers=image_download_headers,
                     modelAuth=model_auth,
-                    text_chunk_prefix=text_chunk_prefix
+                    text_query_prefix=text_query_prefix
                     # TODO: Check if it's fine that we leave out the other parameters
                 )
             )

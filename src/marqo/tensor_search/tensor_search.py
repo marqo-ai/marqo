@@ -1956,7 +1956,8 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                                                         field_content: Dict[str, str], doc_index: int,
                                                         doc_id: str, device: str, marqo_index: UnstructuredMarqoIndex,
                                                         image_repo, field_map: dict,
-                                                        model_auth: Optional[ModelAuth] = None
+                                                        model_auth: Optional[ModelAuth] = None,
+                                                        text_chunk_prefix: str = ""
                                                         ):
     '''
     This function is used to vectorise multimodal combination field.
@@ -2042,9 +2043,10 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
+                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
-                    model_properties=marqo_index.model.properties, content=text_content_to_vectorise,
+                    model_properties=marqo_index.model.properties, content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=infer_if_image, model_auth=model_auth
                 )
@@ -2097,7 +2099,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
         doc_id: str, device: str, marqo_index: StructuredMarqoIndex, image_repo, field_map: dict,
-        model_auth: Optional[ModelAuth] = None
+        model_auth: Optional[ModelAuth] = None, text_chunk_prefix: str = ""
 ):
     """
     This function is used to vectorise multimodal combination field. The field content should
@@ -2179,9 +2181,10 @@ def vectorise_multimodal_combination_field_structured(
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
+                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
-                    model_properties=marqo_index.model.get_properties(), content=text_content_to_vectorise,
+                    model_properties=marqo_index.model.get_properties(), content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=False, model_auth=model_auth
                 )
