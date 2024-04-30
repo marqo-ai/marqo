@@ -214,15 +214,6 @@ def schema_validation(index_name: str, settings_object: str):
             },
             status_code=400
         )
-    except Exception as e:
-        return JSONResponse(
-            content={
-                "validated": False,
-                "validation_error": str(e),
-                "index": index_name
-            },
-            status_code=500
-        )
 
 
 @app.post("/indexes/{index_name}")
