@@ -1,10 +1,6 @@
 from pydantic import ValidationError
 import pytest
-import json
 import unittest
-
-from fastapi.responses import JSONResponse
-
 from marqo.core.index_management.validation import validate_settings_object
 
 
@@ -29,7 +25,7 @@ class TestValidateSettings(unittest.TestCase):
             },
             "type": "unstructured",
         }
-        return json.dumps(test_data)
+        return test_data
 
     def generate_invalid_test_input_snake_case(
         self, model="hf/e5-large", treat_urls_and_pointers_as_images=False
@@ -78,15 +74,14 @@ class TestValidateSettings(unittest.TestCase):
                 "title_and_description"
             ]
         }
-        return json.dumps(test_data)
+        return test_data
 
     def test_validate_settings_object_with_valid_text_based_input(self):
         # Given a valid input settings object
         input_settings = self.generate_test_input()
 
-        # When validating the input settings object
-        result = validate_settings_object("test_index", input_settings)
-        self.assertTrue(result)
+        # When validating the input settings object should not raise any exceptions
+        validate_settings_object("test_index", input_settings)
 
     def test_validate_settings_object_with_valid_multimodal_based_input(self):
         input_settings = self.generate_test_input(
@@ -94,8 +89,8 @@ class TestValidateSettings(unittest.TestCase):
             treat_urls_and_pointers_as_images=True,
         )
 
-        result = validate_settings_object("test_index", input_settings)
-        self.assertTrue(result)
+        # When validating the input settings object should not raise any exceptions
+        validate_settings_object("test_index", input_settings)
 
     def test_validate_settings_object_with_invalid_index_defaults(self):
         # Given an invalid input settings object (missing a required field)
@@ -108,7 +103,7 @@ class TestValidateSettings(unittest.TestCase):
 
         # When validating the input settings object
         with pytest.raises(ValidationError) as exc_info:
-            validate_settings_object("test_index", json.dumps(input_settings))
+            validate_settings_object("test_index", input_settings)
 
         # Check the exception details
         assert str(exc_info.value) == (
@@ -126,7 +121,7 @@ class TestValidateSettings(unittest.TestCase):
 
         # When validating the input settings object
         with pytest.raises(ValidationError) as exc_info:
-            validate_settings_object("test_index", json.dumps(input_settings))
+            validate_settings_object("test_index", input_settings)
 
         # Check the exception details
         assert str(exc_info.value) == (
