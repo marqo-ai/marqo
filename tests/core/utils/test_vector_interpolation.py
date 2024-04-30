@@ -262,13 +262,17 @@ class TestSlerp(unittest.TestCase):
 
     def test_interpolate_nonUnitNorm_success(self):
         vectors = [
-            [0.24079554, -0.50855556, -0.69860205, 0.4419773],
-            [0.60970949, 0.4784225, 0.61885735, -0.12799152],
+            [0.24079554, -0.70855556, -0.69860205, 0.4419773],  # non-normalized
+            [0.60970949, 0.4784225, 0.61885735, -0.02799152],  # non-normalized
             [0.76591685, -0.59245083, 0.08972328, 0.23307321],
-            [0.53470714, 1, 0.36148952, -2.0067081, 0.36148952]
+            [0.53470714, 0.36148952, -2.0067081, 0.16148952]  # non-normalized
         ]
         weights = [1, -0.5, 2, 1.5]
-        expected = []
+        expected = [0.7917869864963851, -0.15221528929873665, -1.428205025357183, 0.14390162492903472]
+
+        slerp = Slerp(Slerp.Method.Hierarchical)
+        result = slerp.interpolate(vectors, weights)
+        np.testing.assert_array_almost_equal(result, expected, decimal=5)
 
     def test_interpolate_colinearVectors_success(self):
         cases = [
@@ -287,7 +291,7 @@ class TestSlerp(unittest.TestCase):
                     [2, 4, 0]
                 ],
                 [1, 2],
-                [5/3, 10/3, 0],
+                [5 / 3, 10 / 3, 0],
                 'Non-unit norm vectors'
             ),
         ]
@@ -300,17 +304,47 @@ class TestSlerp(unittest.TestCase):
                     np.testing.assert_array_almost_equal(result, expected, decimal=5)
 
     def test_interpolate_zeroWeight_failure(self):
-        pass
+        """
+        Test interpolating two consecutive zero weights fails
+        """
+        vectors = [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 1, 1]
+        ]
+        weights = [0, 0, 1, 1]
+
+        for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
+            with self.subTest(method=method):
+                slerp = Slerp(method)
+                with self.assertRaises(ValueError) as ex:
+                    slerp.interpolate(vectors, weights)
+                self.assertIn('zero weights', str(ex.exception))
 
     def test_interpolate_zeroVector_failure(self):
-        pass
+        vectors = [
+            [1, 0, 0],
+            [0, 0, 0],  # Zero vector
+            [0, 0, 1],
+            [1, 1, 1]
+        ]
+        weights = [1, 1, 1, 1]
+
+        for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
+            with self.subTest(method=method):
+                slerp = Slerp(method)
+                with self.assertRaises(ValueError) as ex:
+                    slerp.interpolate(vectors, weights)
+                self.assertIn('zero length', str(ex.exception))
 
     def test_interpolate_emptyVectors_failure(self):
         for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
             with self.subTest(method=method):
                 slerp = Slerp(method)
-                with self.assertRaises(ValueError):
-                    slerp.interpolate([])
+                with self.assertRaises(ValueError) as ex:
+                    slerp.interpolate([], [])
+                self.assertIn('empty list of vectors', str(ex.exception))
 
     def test_interpolate_differentVectorLengths_failure(self):
         vectors = [
@@ -322,8 +356,9 @@ class TestSlerp(unittest.TestCase):
         for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
             with self.subTest(method=method):
                 slerp = Slerp(method)
-                with self.assertRaises(ValueError):
+                with self.assertRaises(ValueError) as ex:
                     slerp.interpolate(vectors, [1] * 3)
+                self.assertIn('same shape', str(ex.exception))
 
     def test_interpolate_wrongWeightsLength_failure(self):
         vectors = [
@@ -331,25 +366,13 @@ class TestSlerp(unittest.TestCase):
             [0, 1, 0],
             [0, 0, 1]
         ]
-        weights = [1] * 4
+        weights = [1] * 2
         for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
             with self.subTest(method=method):
                 slerp = Slerp(method)
-                with self.assertRaises(ValueError):
+                with self.assertRaises(ValueError) as ex:
                     slerp.interpolate(vectors, weights)
-
-    def test_interpolate_missingWeights_failure(self):
-        vectors = [
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
-        ]
-        weights = [1] * 4
-        for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
-            with self.subTest(method=method):
-                slerp = Slerp(method)
-                with self.assertRaises(ValueError):
-                    slerp.interpolate(vectors, None)
+                self.assertIn('must have the same length', str(ex.exception))
 
     def test_wrongInterpolationMethod_failure(self):
         slerp = Slerp("non_existing_method")

@@ -73,6 +73,9 @@ class Slerp(VectorInterpolation):
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
 
+        if len(vectors) != len(weights):
+            raise ValueError('Vectors and weights must have the same length')
+
         if self.method == self.Method.Sequential:
             return self._interpolate_sequential(vectors, weights)
         elif self.method == self.Method.Hierarchical:
@@ -82,6 +85,9 @@ class Slerp(VectorInterpolation):
 
     def _slerp(self, v0: List[float], v1: List[float], t: float, prenormalized: bool = False) -> List[float]:
         v0, v1 = np.array(v0), np.array(v1)
+
+        if v0.shape != v1.shape:
+            raise ValueError('Vectors must have the same shape. Got {} and {}'.format(v0.shape, v1.shape))
 
         dot = np.dot(v0, v1)
 
