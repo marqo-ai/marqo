@@ -13,6 +13,21 @@
 - Shoutout to all our 4.1k stargazers! Thanks for continuing to use our product and helping Marqo grow.
 - Keep on sharing your questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
 
+# Release 2.4.3
+
+## Bug fixes and minor changes
+- Fix incorrect Marqo version number (https://github.com/marqo-ai/marqo/pull/805). Version number updated from 2.4.1 to 2.4.3
+
+# Release 2.4.2
+
+## Bug fixes and minor changes
+- Better response for truncated images in `add_documents` (https://github.com/marqo-ai/marqo/pull/797). Truncated images no longer cause a 500 error. The individual document will fail and return a 400 error in add docs response (full response will be a 200).
+
+# Release 2.4.1
+
+## Bug fixes and minor changes
+- Fix memory leak issue when `telemetry=False` (https://github.com/marqo-ai/marqo/pull/800). Objects created by `telemetry` are now all properly deallocated after use.
+
 # Release 2.4.0
 
 ## New features
