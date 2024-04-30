@@ -6,7 +6,11 @@ from typing import List
 import numpy as np
 
 from marqo.core.models.interpolation_method import InterpolationMethod
-from marqo.exceptions import InternalError
+from marqo.exceptions import InternalError, InvalidArgumentError
+
+
+class ZeroSumError(InvalidArgumentError):
+    pass
 
 
 class VectorInterpolation(abc.ABC):
@@ -43,9 +47,11 @@ class Lerp(VectorInterpolation):
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
 
-        if not weights:
-            weights = [1] * len(vectors)
         weight_sum = sum(weights)
+
+        if weight_sum == 0:
+            raise ValueError('Sum of weights is zero. LERP cannot interpolate vectors with zero sum of weights')
+
         result = [0] * len(vectors[0])
         for vector, weight in zip(vectors, weights):
             for i, value in enumerate(vector):
@@ -86,8 +92,8 @@ class Slerp(VectorInterpolation):
     def _slerp(self, v0: List[float], v1: List[float], t: float, prenormalized: bool = False) -> List[float]:
         v0, v1 = np.array(v0), np.array(v1)
 
-        if v0.shape != v1.shape:
-            raise ValueError('Vectors must have the same shape. Got {} and {}'.format(v0.shape, v1.shape))
+        if len(v0) != len(v1):
+            raise ValueError('Vectors must have the same length. Got {} and {}'.format(len(v0), len(v1)))
 
         dot = np.dot(v0, v1)
 
@@ -97,14 +103,17 @@ class Slerp(VectorInterpolation):
 
             # Note we can only detect zero length if we calculate the norm
             if norm_v0 == 0 or norm_v1 == 0:
-                raise ValueError('One or more vectors had zero length. Cannot interpolate vectors with zero length')
+                raise ValueError('One or more vectors had zero length. '
+                                 'SLERP cannot interpolate vectors with zero length')
 
-            dot = dot / (norm_v0 * norm_v1)
+            cos = dot / (norm_v0 * norm_v1)
+        else:
+            cos = dot
 
         # Ensure the dot product is within the range [-1, 1]
-        dot = np.clip(dot, -1.0, 1.0)
+        cos = np.clip(cos, -1.0, 1.0)
 
-        theta = math.acos(dot)
+        theta = math.acos(cos)
 
         sin_theta = math.sin(theta)
         if sin_theta == 0:
@@ -123,11 +132,14 @@ class Slerp(VectorInterpolation):
         for i in range(1, len(vectors)):
             w0 = weights_copy[i - 1]
             w1 = weights_copy[i]
-            if w0 == 0 and w1 == 0:
-                raise ValueError('Encountered two consecutive zero weights in the list of weights')
+            sum = w0 + w1
 
-            result = self._slerp(result, vectors[i], w1 / (w0 + w1))
-            weights_copy[i] = (w0 + w1) / 2
+            if sum == 0:
+                raise ZeroSumError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                   'vectors with a sum weight of zero'.format(w0, w1))
+
+            result = self._slerp(result, vectors[i], w1 / sum)
+            weights_copy[i] = sum / 2
         return result
 
     def _interpolate_hierarchical(self, vectors: List[List[float]], weights: List[float]) -> List[float]:
@@ -143,14 +155,16 @@ class Slerp(VectorInterpolation):
 
                 w0 = weights[i]
                 w1 = weights[i + 1]
+                sum = w0 + w1
 
-                if w0 == 0 and w1 == 0:
-                    raise ValueError('Encountered two consecutive zero weights in the list of weights')
+                if sum == 0:
+                    raise ZeroSumError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                       'vectors with a sum weight of zero'.format(w0, w1))
 
                 result.append(
-                    self._slerp(vectors[i], vectors[i + 1], w1 / (w0 + w1))
+                    self._slerp(vectors[i], vectors[i + 1], w1 / sum)
                 )
-                new_weights.append((w0 + w1) / 2)
+                new_weights.append(sum / 2)
             vectors = result
             weights = new_weights
 
