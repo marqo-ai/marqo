@@ -135,9 +135,3 @@ class TestValidateSettings(unittest.TestCase):
             "here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/ "
             "(type=value_error)"
         ), "Expected validation errors did not match."
-
-    def assert_json_response_equal(self, response1: JSONResponse, response2: JSONResponse):
-        self.assertEqual(response1.status_code,
-                         response2.status_code, "Status codes differ")
-        self.assertEqual(response1.body, response2.body,
-                         "Response bodies differ")
