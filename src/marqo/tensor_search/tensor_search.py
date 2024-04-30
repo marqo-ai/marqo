@@ -1706,13 +1706,73 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
     raise not_found_error
 
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
-    Qidx, List[float]]:
+def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
+    """
+    Makes a new list of queries
+    Adds prefix to the q of all BulkSearchQueryEntity objects in the list.
+    Determines prefix with defaults from index_info textQueryPrefix (per query).
+    Only adds prefix to text queries (not images)
+    """
+    prefixed_queries = []
+    for q in queries:
+        # Determine what prefix to use
+        text_query_prefix = determine_text_prefix(q.text_query_prefix, q.index, "text_query_prefix")
+
+        # Add prefix to q if applicable
+        if q.q is None:
+            prefixed_q = q.q
+        elif isinstance(q.q, str):
+            if q.index.treat_urls_and_pointers_as_images and _is_image(q.q):
+                # Images get no prefix
+                prefixed_q = q.q
+            else:
+                # Single text query: add prefix
+                prefixed_q = f"{text_query_prefix}{q.q}"
+        else:  # is dict
+            ordered_queries = list(q.q.items())
+            if q.index.treat_urls_and_pointers_as_images:
+                prefixed_q = {}
+                for key, value in ordered_queries:
+                    if _is_image(key):
+                        prefixed_q[key] = value  # Do nothing with images
+                    else:
+                        # Add prefix to all inner text queries
+                        prefixed_q[f"{text_query_prefix}{key}"] = value
+            else:
+                # Treat all queries as plaintext. Add prefix to all.
+                prefixed_q = {f"{text_query_prefix}{key}": value for key, value in ordered_queries}
+
+        new_query_object = BulkSearchQueryEntity(
+            q=prefixed_q,  # Everything is the same except the query
+            searchableAttributes=q.searchableAttributes,
+            searchMethod=q.searchMethod,
+            limit=q.limit,
+            offset=q.offset,
+            showHighlights=q.showHighlights,
+            filter=q.filter,
+            attributesToRetrieve=q.attributesToRetrieve,
+            boost=q.boost,
+            image_download_headers=q.image_download_headers,
+            context=q.context,
+            scoreModifiers=q.scoreModifiers,
+            index=q.index,
+            modelAuth=q.modelAuth,
+            text_query_prefix=q.text_query_prefix
+        )
+        prefixed_queries.append(new_query_object)
+
+    return prefixed_queries
+
+
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """Run the query vectorisation process"""
+    # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
+    prefixed_queries = add_prefix_to_queries(queries)
+
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
     vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(
-        queries, config, device)
+        prefixed_queries, config, device)
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -1723,7 +1783,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
     # 3. For each query, get associated vectors
     qidx_to_vectors: Dict[Qidx, List[float]] = get_query_vectors_from_jobs(
-        queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
+        prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
     return qidx_to_vectors
 
