@@ -13,6 +13,10 @@ class ZeroSumWeightsError(InvalidArgumentError):
     pass
 
 
+class ZeroLengthVectorError(InvalidArgumentError):
+    pass
+
+
 class VectorInterpolation(abc.ABC):
     @abc.abstractmethod
     def interpolate(self, vectors: List[List[float]], weights: List[float], prenormalized: bool = False) -> List[float]:
@@ -69,11 +73,17 @@ class Lerp(VectorInterpolation):
         return result
 
 
-class Nlerp(VectorInterpolation):
+class Nlerp(Lerp):
     def interpolate(self, vectors: List[List[float]], weights: List[float],
                     prenormalized: bool = False) -> List[float]:
-        lerp_result = Lerp().interpolate(vectors, weights)
+        lerp_result = super().interpolate(vectors, weights)
         length = math.sqrt(sum(x ** 2 for x in lerp_result))
+
+        if length == 0:
+            raise ZeroLengthVectorError(
+                'Interpolated vector has zero magnitude. Cannot normalize a vector with zero magnitude'
+            )
+
         return [x / length for x in lerp_result]
 
 

@@ -68,6 +68,8 @@ class Recommender:
         if documents is None or len(documents) == 0:
             raise InvalidArgumentError('No document IDs provided')
 
+        # remove docs with 0 weight, error out if all zero weight
+
         marqo_index = index_meta_cache.get_index(config.Config(self.vespa_client), index_name=index_name)
 
         if interpolation_method is None:
@@ -135,6 +137,7 @@ class Recommender:
             vectors.extend(vector_list)
             weights.extend([weight] * len(vector_list))
 
+        # Handle ZeroSumWeightsError and ZeroLengthVectorError
         interpolated_vector = vector_interpolation.interpolate(
             vectors, weights
         )
