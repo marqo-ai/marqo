@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp, ZeroSumError
+from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp, ZeroSumWeightsError
 from marqo.exceptions import InternalError
 from tests.marqo_test import MarqoTestCase
 
@@ -16,10 +16,11 @@ class TestLerp(unittest.TestCase):
                 [
                     [1, 0, 0],
                     [0, 1, 0],
+                    [0, 0, 1],
                     [0, 0, 1]
                 ],
-                [1, 1, 1],
-                [1 / 3, 1 / 3, 1 / 3],
+                [1, 1, 1, 1],
+                [1 / 4, 1 / 4, 1 / 2],
                 'Equal weights'
             ),
             (
@@ -72,6 +73,26 @@ class TestLerp(unittest.TestCase):
                 [math.sqrt(0.5), math.sqrt(0.5), 0],
                 'Same vector * 5'
             ),
+            (
+                [
+                    [1, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 1]
+                ],
+                [1, 1, 1],
+                [1 / 3, 0, 1 / 3],
+                'Zero vector'
+            ),
+            (
+                [
+                    [0, 0, 0],
+                    [0, 0, 0],
+                    [0, 0, 0]
+                ],
+                [1, 1, 1],
+                [0, 0, 0],
+                'All zero vectors'
+            ),
         ]
 
         lerp = Lerp()
@@ -81,9 +102,9 @@ class TestLerp(unittest.TestCase):
                 result = lerp.interpolate(vectors, weights)
                 np.testing.assert_array_almost_equal(result, expected, decimal=5)
 
-    def test_interpolate_allZeroWeights_failure(self):
+    def test_interpolate_zeroSumWeights_failure(self):
         """
-        Test interpolating all zero weights fails
+        Test interpolating weights that sum to zero fails
         """
         vectors = [
             [1, 0, 0],
@@ -91,26 +112,12 @@ class TestLerp(unittest.TestCase):
             [0, 0, 1],
             [1, 1, 1]
         ]
-        weights = [0, 0, 0, 0]
+        weights = [0, 1, 2, -3]
 
         lerp = Lerp()
-        with self.assertRaises(ValueError) as ex:
+        with self.assertRaises(ZeroSumWeightsError) as ex:
             lerp.interpolate(vectors, weights)
-        self.assertIn('zero weights', str(ex.exception))
-
-    def test_interpolate_zeroVector_failure(self):
-        vectors = [
-            [1, 0, 0],
-            [0, 0, 0],  # Zero vector
-            [0, 0, 1],
-            [1, 1, 1]
-        ]
-        weights = [1, 1, 1, 1]
-
-        lerp = Lerp()
-        with self.assertRaises(ValueError) as ex:
-            lerp.interpolate(vectors, weights)
-        self.assertIn('zero length', str(ex.exception))
+        self.assertIn('Sum of weights', str(ex.exception))
 
     def test_interpolate_emptyVectors_failure(self):
         lerp = Lerp()
@@ -410,7 +417,7 @@ class TestSlerp(MarqoTestCase):
         for method in [Slerp.Method.Sequential, Slerp.Method.Hierarchical]:
             with self.subTest(method=method):
                 slerp = Slerp(method)
-                with self.assertRaisesStrict(ZeroSumError) as ex:
+                with self.assertRaisesStrict(ZeroSumWeightsError) as ex:
                     slerp.interpolate(vectors, weights)
                 self.assertIn('Sum of weights', str(ex.exception))
 

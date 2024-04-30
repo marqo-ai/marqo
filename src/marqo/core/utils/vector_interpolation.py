@@ -9,7 +9,7 @@ from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.exceptions import InternalError, InvalidArgumentError
 
 
-class ZeroSumError(InvalidArgumentError):
+class ZeroSumWeightsError(InvalidArgumentError):
     pass
 
 
@@ -47,13 +47,23 @@ class Lerp(VectorInterpolation):
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
 
+        if len(vectors) != len(weights):
+            raise ValueError('Vectors and weights must have the same length')
+
         weight_sum = sum(weights)
 
         if weight_sum == 0:
-            raise ValueError('Sum of weights is zero. LERP cannot interpolate vectors with zero sum of weights')
+            raise ZeroSumWeightsError(
+                'Sum of weights is zero. LERP cannot interpolate vectors with zero sum of weights'
+            )
 
         result = [0] * len(vectors[0])
+        current_length = len(vectors[0])
         for vector, weight in zip(vectors, weights):
+            if len(vector) != current_length:
+                raise ValueError('Vectors must have the same length')
+            current_length = len(vector)
+
             for i, value in enumerate(vector):
                 result[i] += (weight / weight_sum) * value
         return result
@@ -135,8 +145,8 @@ class Slerp(VectorInterpolation):
             sum = w0 + w1
 
             if sum == 0:
-                raise ZeroSumError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
-                                   'vectors with a sum weight of zero'.format(w0, w1))
+                raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                          'vectors with a sum weight of zero'.format(w0, w1))
 
             result = self._slerp(result, vectors[i], w1 / sum)
             weights_copy[i] = sum / 2
@@ -158,8 +168,8 @@ class Slerp(VectorInterpolation):
                 sum = w0 + w1
 
                 if sum == 0:
-                    raise ZeroSumError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
-                                       'vectors with a sum weight of zero'.format(w0, w1))
+                    raise ZeroSumWeightsError('Sum of weights {} and {} is zero. SLERP cannot interpolate '
+                                              'vectors with a sum weight of zero'.format(w0, w1))
 
                 result.append(
                     self._slerp(vectors[i], vectors[i + 1], w1 / sum)
