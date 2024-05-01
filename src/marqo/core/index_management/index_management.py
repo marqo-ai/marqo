@@ -2,7 +2,7 @@ import os
 import textwrap
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 
 from pydantic import ValidationError
 
@@ -116,7 +116,7 @@ class IndexManagement:
         return marqo_index
 
     @staticmethod
-    def validate_index_settings(index_name: str, settings_dict: dict) -> None:
+    def validate_index_settings(index_name: str, settings_dict: dict) -> Tuple[bool, str]:
         """
         Validates index settings using the IndexSettings model.
 
@@ -134,9 +134,9 @@ class IndexManagement:
         try:
             index_settings = IndexSettings(**settings_dict)
             index_settings.to_marqo_index_request(index_name)
+            return (True, None)
         except ValidationError as e:
-            logger.debug(f'Validation error for index {index_name}: {e}')
-            raise
+            return (False, str(e))
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
