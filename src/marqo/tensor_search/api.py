@@ -20,6 +20,7 @@ from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
@@ -28,7 +29,6 @@ from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
-from marqo.core.index_management.validation import validate_settings_object
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
@@ -198,7 +198,7 @@ def memory():
 def schema_validation(index_name: str, settings: str):
     try:
         settings_json = json.loads(settings)
-        validate_settings_object(index_name, settings_json)
+        IndexManagement.validate_index_settings(index_name, settings_json)
         return JSONResponse(
             content={
                 "validated": True,
