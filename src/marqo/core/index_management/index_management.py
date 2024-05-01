@@ -137,9 +137,6 @@ class IndexManagement:
         except ValidationError as e:
             logger.debug(f'Validation error for index {index_name}: {e}')
             raise
-        except Exception as e:
-            logger.error(f'Exception while validating index {index_name}: {e}')
-            raise
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
