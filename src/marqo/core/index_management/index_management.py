@@ -117,7 +117,7 @@ class IndexManagement:
         return marqo_index
 
     @staticmethod
-    def validate_index_settings(index_name: str, settings_dict: dict) -> Tuple[bool, str]:
+    def validate_index_settings(index_name: str, settings_dict: dict) -> None:
         """
         Validates index settings using the IndexSettings model.
 
@@ -126,11 +126,11 @@ class IndexManagement:
             settings_dict (dict): A dictionary of settings to validate.
 
         Raises:
-            ValidationError: If the settings do not conform to the IndexSettings model.
-            Exception: If an unexpected error occurs during the validation process.
+            InValidArgumentError: If the settings are invalid.
 
         Returns:
-            None: If the validation is successful, nothing is returned.
+            None: If the validation is successful, nothing is returned,
+            else InvalidArgumentError is raised.
         """
         try:
             index_settings = IndexSettings(**settings_dict)
