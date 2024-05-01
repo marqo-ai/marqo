@@ -20,6 +20,7 @@ from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
+from marqo.core.exceptions import InvalidArgumentError
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -134,9 +135,8 @@ class IndexManagement:
         try:
             index_settings = IndexSettings(**settings_dict)
             index_settings.to_marqo_index_request(index_name)
-            return (True, None)
         except ValidationError as e:
-            return (False, str(e))
+            raise InvalidArgumentError(str(e)) from e
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """

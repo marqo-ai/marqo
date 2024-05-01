@@ -196,24 +196,14 @@ def memory():
 @app.post('/validate/index/{index_name}')
 @utils.enable_ops_api()
 def schema_validation(index_name: str, settings_object: dict):
-    (valid, error) = IndexManagement.validate_index_settings(index_name, settings_object)
-    if valid:
-        return JSONResponse(
-            content={
-                "validated": valid,
-                "index": index_name
-            },
-            status_code=200
-        )
-    else:
-        return JSONResponse(
-            content={
-                "validated": valid,
-                "validationError": error,
-                "index": index_name
-            },
-            status_code=400
-        )
+    IndexManagement.validate_index_settings(index_name, settings_object)
+
+    return JSONResponse(
+        content={
+            "validated": True,
+            "index": index_name
+        }
+    )
 
 
 @app.post("/indexes/{index_name}")
