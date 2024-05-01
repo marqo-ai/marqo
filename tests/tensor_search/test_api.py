@@ -144,9 +144,9 @@ class ValidationApiTests(MarqoTestCase):
             index_name = "test-index"
             response = self.client.post(f"/validate/index/{index_name}", json=data)
             self.assertEqual(response.status_code, 400)
-            self.assertFalse(response.json()['validated'])
-            self.assertEqual(response.json()['index'], 'test-index')
-            self.assertTrue(response.json()['validationError'].startswith('1 validation error for IndexSettings'))
+            self.assertIn("message", response.json())
+            self.assertEqual(response.json()["code"], "invalid_argument")
+            self.assertEqual(response.json()["type"], "invalid_request")
 
 
 class TestApiCustomEnvVars(MarqoTestCase):

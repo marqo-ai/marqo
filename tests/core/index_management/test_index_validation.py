@@ -80,10 +80,9 @@ class TestIndexValidateSettings(unittest.TestCase):
         # Given a valid input settings object
         input_settings = self.generate_test_input()
 
-        # When validating the input settings object should not raise any exceptions
-        (valid, error) = IndexManagement.validate_index_settings("test_index", input_settings)
-        self.assertTrue(valid)
-        self.assertIsNone(error)
+        # When validating the input settings object should not raise any exceptions but return None
+        r = IndexManagement.validate_index_settings("test_index", input_settings)
+        self.assertIsNone(r)
 
     def test_validate_index_settings_with_valid_multimodal_based_input(self):
         input_settings = self.generate_test_input(
@@ -91,10 +90,9 @@ class TestIndexValidateSettings(unittest.TestCase):
             treat_urls_and_pointers_as_images=True,
         )
 
-        # When validating the input settings object should not raise any exceptions
-        (valid, error) = IndexManagement.validate_index_settings("test_index", input_settings)
-        self.assertTrue(valid)
-        self.assertIsNone(error)
+        # When validating the input settings object should not raise any exceptions but return None
+        r = IndexManagement.validate_index_settings("test_index", input_settings)
+        self.assertIsNone(r)
 
     def test_validate_index_settings_with_invalid_index_defaults(self):
         # Given an invalid input settings object (missing a required field)
@@ -106,14 +104,9 @@ class TestIndexValidateSettings(unittest.TestCase):
         }
 
         # When validating the input settings object
-        (valid, error) = IndexManagement.validate_index_settings("test_index", input_settings)
-        self.assertFalse(valid)
-        self.assertEqual(
-            error,
-            "2 validation errors for IndexSettings\n"
-            "numberOfReplicas\n  extra fields not permitted (type=value_error.extra)\n"
-            "numberOfShards\n  extra fields not permitted (type=value_error.extra)"
-        )
+        with self.assertRaises(ValidationError) as context:
+            IndexManagement.validate_index_settings("test_index", input_settings)
+        self.assertIn("2 validation errors for IndexSettings", str(context.exception))
 
     def test_validate_index_settings_with_invalid_snake_case_input(self):
         # Given an invalid input settings object (snake case)
@@ -122,13 +115,10 @@ class TestIndexValidateSettings(unittest.TestCase):
             # other necessary fields as per your IndexSettings model
         }
 
-        # When validating the input settings object
-        (valid, error) = IndexManagement.validate_index_settings("test_index", input_settings)
-        self.assertFalse(valid)
-        self.assertEqual(
-            error, 
-            "1 validation error for IndexSettings\n"
-            "__root__\n  Invalid field name 'dependent_fields'. See Create Index API reference "
-            "here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/ "
-            "(type=value_error)"
-        )
+        with self.assertRaises(ValidationError) as context:
+            IndexManagement.validate_index_settings("test_index", input_settings)
+        self.assertIn("__root__", str(context.exception))
+        self.assertIn("Invalid field name 'dependent_fields'. See Create Index "
+                      "API reference here "
+                      "https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/ (type=value_error)",
+                      str(context.exception))
