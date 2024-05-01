@@ -2,9 +2,12 @@ import os
 import textwrap
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
+
+from pydantic import ValidationError
 
 import marqo.logging
+from marqo.tensor_search.models.index_settings import IndexSettings
 import marqo.vespa.vespa_client
 from marqo import version
 from marqo.base_model import ImmutableStrictBaseModel
@@ -17,6 +20,7 @@ from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
+from marqo.core.exceptions import InvalidArgumentError
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -111,6 +115,27 @@ class IndexManagement:
             self._save_marqo_version(version.get_version())
 
         return marqo_index
+
+    @staticmethod
+    def validate_index_settings(index_name: str, settings_dict: dict) -> None:
+        """
+        Validates index settings using the IndexSettings model.
+
+        Args:
+            index_name (str): The name of the index to validate settings for.
+            settings_dict (dict): A dictionary of settings to validate.
+
+        Raises:
+            ValidationError: If the settings are invalid in the context of the IndexSettings model.
+            api_exceptions.InvalidArgError: If several settings are invalid in the context of the Marqo API.
+            Check the errors in to_marqo_index_request method of IndexSettings model for more details.
+
+        Returns:
+            None: If the validation is successful, nothing is returned,
+            else InvalidArgumentError is raised.
+        """
+        index_settings = IndexSettings(**settings_dict)
+        index_settings.to_marqo_index_request(index_name)
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
