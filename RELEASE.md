@@ -26,7 +26,7 @@
 # Release 2.4.1
 
 ## Bug fixes and minor changes
-- Fix memory leak issue when `telemetry=False` (https://github.com/marqo-ai/marqo/pull/800). Objects created by `telemetry` are now all properly deallocated after use.
+- Improve telemetry memory management (https://github.com/marqo-ai/marqo/pull/800).
 
 # Release 2.4.0
 
