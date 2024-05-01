@@ -1,6 +1,7 @@
-from pydantic import ValidationError
-import pytest
 import unittest
+
+from pydantic import ValidationError
+
 from marqo.core.index_management.index_management import IndexManagement
 
 
