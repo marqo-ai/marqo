@@ -1,4 +1,3 @@
-import json
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -78,7 +77,7 @@ class ValidationApiTests(MarqoTestCase):
             "tensorFields": []
         }
         index_name = "test-index"
-        response = self.client.post(f"/validate/index/{index_name}?settings={data}")
+        response = self.client.post(f"/validate/index/{index_name}", json=data)
         self.assertEqual(response.status_code, 403)
 
     def test_ops_api_disabled_403(self):
@@ -93,7 +92,7 @@ class ValidationApiTests(MarqoTestCase):
                 "settings_object": {}
             }
             index_name = "test-index"
-            response = self.client.post(f"/validate/index/{index_name}?settings={data}")
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
             self.assertEqual(response.status_code, 403)
 
     def test_ops_api_200(self):
@@ -118,8 +117,7 @@ class ValidationApiTests(MarqoTestCase):
                 "type": "unstructured",
             }
             index_name = "test-index"
-            settings_json = json.dumps(data)
-            response = self.client.post(f"/validate/index/{index_name}?settings={settings_json}")
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
             self.assertEqual(response.json(), {'validated': True, 'index': 'test-index'})
 
     def test_ops_api_400(self):
@@ -144,8 +142,7 @@ class ValidationApiTests(MarqoTestCase):
                 "type": "unknown"  # invalid type
             }
             index_name = "test-index"
-            settings_json = json.dumps(data)
-            response = self.client.post(f"/validate/index/{index_name}?settings={settings_json}")
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
             self.assertEqual(response.status_code, 400)
             self.assertFalse(response.json()['validated'])
             self.assertEqual(response.json()['index'], 'test-index')
