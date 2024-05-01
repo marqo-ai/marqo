@@ -209,7 +209,6 @@ def schema_validation(index_name: str, settings_object: dict):
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
     marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
-
     return JSONResponse(
         content={
             "acknowledged": True,

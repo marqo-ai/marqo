@@ -126,17 +126,16 @@ class IndexManagement:
             settings_dict (dict): A dictionary of settings to validate.
 
         Raises:
-            InValidArgumentError: If the settings are invalid.
+            ValidationError: If the settings are invalid in the context of the IndexSettings model.
+            api_exceptions.InvalidArgError: If several settings are invalid in the context of the Marqo API.
+            Check the errors in to_marqo_index_request method of IndexSettings model for more details.
 
         Returns:
             None: If the validation is successful, nothing is returned,
             else InvalidArgumentError is raised.
         """
-        try:
-            index_settings = IndexSettings(**settings_dict)
-            index_settings.to_marqo_index_request(index_name)
-        except ValidationError as e:
-            raise InvalidArgumentError(str(e)) from e
+        index_settings = IndexSettings(**settings_dict)
+        index_settings.to_marqo_index_request(index_name)
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
