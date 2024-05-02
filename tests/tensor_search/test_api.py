@@ -37,7 +37,7 @@ class ApiTests(MarqoTestCase):
             )
             self.assertEqual(response.status_code, 200)
             mock_add_documents.assert_called_once()
-    
+
     def test_memory(self):
         """
         Test that the memory endpoint returns the expected keys when debug API is enabled.
@@ -61,7 +61,93 @@ class ApiTests(MarqoTestCase):
         with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'FALSE'}):
             response = self.client.get("/memory")
             self.assertEqual(response.status_code, 403)
-            
+
+
+class ValidationApiTests(MarqoTestCase):
+    def setUp(self):
+        self.client = TestClient(api.app)
+
+    def test_schema_validation_defaultDisabled(self):
+        """
+        Test that the schema_validation endpoint returns 403 by default.
+        """
+        data = {
+            "type": "structured",
+            "allFields": [],
+            "tensorFields": []
+        }
+        index_name = "test-index"
+        response = self.client.post(f"/validate/index/{index_name}", json=data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_ops_api_disabled_403(self):
+        """
+        Test that the ops-api endpoint returns 403 when debug API is disabled explicitly.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'FALSE'}):
+            data = {
+                "type": "structured",
+                "allFields": [],
+                "tensorFields": [],
+                "settings_object": {}
+            }
+            index_name = "test-index"
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
+            self.assertEqual(response.status_code, 403)
+
+    def test_ops_api_200(self):
+        """
+        Test that the ops-api endpoint returns 200 when debug API is enabled.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'TRUE'}):
+            data = {
+                "treatUrlsAndPointersAsImages": False,
+                "model": "hf/e5-large",
+                "normalizeEmbeddings": True,
+                "textPreprocessing": {
+                    "splitLength": 2,
+                    "splitOverlap": 0,
+                    "splitMethod": "sentence",
+                },
+                "imagePreprocessing": {"patchMethod": None},
+                "annParameters": {
+                    "spaceType": "euclidean",
+                    "parameters": {"efConstruction": 128, "m": 16},
+                },
+                "type": "unstructured",
+            }
+            index_name = "test-index"
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
+            self.assertEqual(response.json(), {'validated': True, 'index': 'test-index'})
+
+    def test_ops_api_400(self):
+        """
+        Test that the ops-api endpoint returns 400 when debug API is enabled and the input is invalid.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'TRUE'}):
+            data = {
+                "treatUrlsAndPointersAsImages": False,
+                "model": "hf/e5-large",
+                "normalizeEmbeddings": True,
+                "textPreprocessing": {
+                    "splitLength": 2,
+                    "splitOverlap": 0,
+                    "splitMethod": "sentence",
+                },
+                "imagePreprocessing": {"patchMethod": None},
+                "annParameters": {
+                    "spaceType": "euclidean",
+                    "parameters": {"efConstruction": 128, "m": 16},
+                },
+                "type": "unknown"  # invalid type
+            }
+            index_name = "test-index"
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("message", response.json())
+            self.assertEqual(response.json()["code"], "invalid_argument")
+            self.assertEqual(response.json()["type"], "invalid_request")
+
 
 class TestApiCustomEnvVars(MarqoTestCase):
     @classmethod

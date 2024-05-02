@@ -20,6 +20,7 @@ from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
@@ -34,6 +35,7 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
+from pydantic import ValidationError
 
 logger = get_logger(__name__)
 
@@ -80,7 +82,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
     Catch a base/core Marqo Error and convert to its corresponding API Marqo Error.
     The API Error will be passed to the `marqo_api_exception_handler` below.
     This ensures that raw base errors are never returned by the API.
-    
+
     Mappings are in an ordered list to allow for hierarchical resolution of errors.
     Stored as 2-tuples: (Base/Core/Vespa/Inference Error, API Error)
     """
@@ -191,10 +193,22 @@ def memory():
     return memory_profiler.get_memory_profile()
 
 
+@app.post('/validate/index/{index_name}')
+@utils.enable_ops_api()
+def schema_validation(index_name: str, settings_object: dict):
+    IndexManagement.validate_index_settings(index_name, settings_object)
+
+    return JSONResponse(
+        content={
+            "validated": True,
+            "index": index_name
+        }
+    )
+
+
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
     marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
-
     return JSONResponse(
         content={
             "acknowledged": True,
@@ -406,11 +420,11 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
 
 @app.post("/batch/indexes/create")
 @utils.enable_batch_apis()
-def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName], \
+def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName],
                          marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
 
-    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for \
+    marqo_index_requests = [settings.to_marqo_index_request(settings.indexName) for
                             settings in index_settings_with_name_list]
 
     marqo_config.index_management.batch_create_indexes(marqo_index_requests)

@@ -222,6 +222,7 @@ class MarqoTestCase(unittest.TestCase):
             return self
 
         def __exit__(self, exc_type, exc_value, tb):
+            self.exception = exc_value
             if exc_type is None:
                 raise AssertionError(f"No exception raised, expected: '{self.expected_exception.__name__}'")
             if issubclass(exc_type, self.expected_exception) and exc_type is not self.expected_exception:
