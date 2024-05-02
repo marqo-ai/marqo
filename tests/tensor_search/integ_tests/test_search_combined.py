@@ -9,6 +9,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
+from marqo import exceptions as base_exceptions
 
 
 class TestSearch(MarqoTestCase):
@@ -421,6 +422,30 @@ class TestSearch(MarqoTestCase):
                         self.assertEqual(expected_hits, len(res["hits"]))
                         if expected_ids:
                             self.assertEqual(set(expected_ids), {hit["_id"] for hit in res["hits"]})
+
+    def test_filter_unstructured_index_in_keyword_fails(self):
+        test_cases = [
+            "text_field_1 in (random1, true)",
+            "int_field_1 in (100, 200)",
+            "long_field_1 in (299, 300)",
+            "text_field_1 in (random1, true) AND int_field_1:100",
+            "text_field_1 in (random1, true) OR text_field_2:baaadd",
+            "text_field_1 in (random1, true) OR int_field_1:[90 TO 210]",
+            "text_field_1 in (random1)",
+            "NOT text_field_1 in (random1, true)",
+            "text_field_1 IN (random1, true) AND int_field_1 in (100, 200)",
+            "text_field_1 IN ()"
+        ]
+
+        for case in test_cases:
+            with self.subTest(case=case):
+                with self.assertRaises(base_exceptions.InvalidArgumentError) as cm:
+                    tensor_search.search(config=self.config, index_name=self.unstructured_default_text_index.name,
+                                             text="", filter=case)
+
+                self.assertIn("'IN' filter keyword is not yet supported for unstructured", str(cm.exception))
+
+
 
     def test_filter_id(self):
         """
