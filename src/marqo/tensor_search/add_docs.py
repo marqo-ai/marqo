@@ -237,8 +237,8 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
     else:
         raise ValueError(f"Model properties not found for model: {marqo_index.model}")
 
-    # If no prefix is found, return None
-    return None
+    # If no prefix is found, return empty string ""
+    return ""
 
 
 

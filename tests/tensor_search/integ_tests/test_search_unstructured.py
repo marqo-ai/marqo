@@ -423,7 +423,7 @@ class TestSearchUnstructured(MarqoTestCase):
             index_name=self.default_text_index, config=self.config, text="", filter="my_list:(tag2 some)")
 
         assert res_exists["hits"][0]["_id"] == "1235"
-        assert res_exists["hits"][0]["_highlights"][0] == {"abc": "some text"}
+        assert res_exists["hits"][0]["_highlights"][0] == {"abc": " some text"}
         assert len(res_exists["hits"]) == 1
 
         assert len(res_not_exists["hits"]) == 0

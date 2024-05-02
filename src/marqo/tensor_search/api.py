@@ -275,8 +275,7 @@ def add_or_replace_documents(
         device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
-                                                             device=device, auto_refresh=refresh,
-                                                             text_chunk_prefix=body.textChunkPrefix)
+                                                             device=device, auto_refresh=refresh)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(

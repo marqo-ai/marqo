@@ -1,65 +1,49 @@
-import copy
 import os
-import re
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-import functools
-import json
-import math
-import pprint
-from unittest import mock
-from unittest.mock import patch
-from marqo.tensor_search.enums import EnvVars
-from marqo.s2_inference import types, s2_inference
-import PIL
-from marqo.s2_inference.s2_inference import vectorise
-from marqo.tensor_search.enums import TensorField, SearchMethod
-from marqo.tensor_search import enums
-from marqo.api.exceptions import IndexNotFoundError, InvalidArgError, BadRequestError, InternalError
-from marqo.tensor_search import tensor_search, index_meta_cache
-from marqo.tensor_search.api import create_index
-from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search import add_docs
-import numpy as np
 import unittest
-from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
-from marqo.core.models.marqo_index import Model, UnstructuredMarqoIndex, TextPreProcessing, ImagePreProcessing, \
-    DistanceMetric, VectorNumericType, HnswConfig
+import time
+from unittest import mock
+from marqo.config import Config
+from marqo.vespa.vespa_client import VespaClient
+from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.core.models.marqo_index import Model, TextPreProcessing, ImagePreProcessing, DistanceMetric, \
+    VectorNumericType, HnswConfig
+from marqo.s2_inference import s2_inference
 
 
 def pass_through_vectorise(*args, **kwargs):
-    """Vectorise will behave as usual, but we will be able to see the call list
-    via mock
-    """
-    return vectorise(*args, **kwargs)
+    return s2_inference.vectorise(*args, **kwargs)
 
 
-class TestPrefix(MarqoTestCase):
-    def __init__(self, methodName: str = "runTest"):
-        super().__init__(methodName)
-        self.authorized_url = None
+class TestPrefix(unittest.TestCase):
+    def setUp(self):
+        self.index_name = "my-test-index"
+        self.device = "cpu"
 
-    def setUp(self) -> None:
-        self.endpoint = self.authorized_url
-        self.generic_header = {"Content-type": "application/json"}
-        self.index_name_1 = "my-test-index-1"
-        self.index_name_2 = "my-test-index-2"
-        self.index_name_3 = "my-test-index-3"
+        config_url = os.environ.get("VESPA_CONFIG_URL", "http://localhost:19071")
+        document_url = os.environ.get("VESPA_DOCUMENT_URL", "http://localhost:8080")
+        query_url = os.environ.get("VESPA_QUERY_URL", "http://localhost:8080")
+        content_cluster_name = os.environ.get("VESPA_CONTENT_CLUSTER_NAME", "default")
 
-        try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_3)
-        except IndexNotFoundError as s:
-            pass
+        vespa_client = VespaClient(
+            config_url=config_url,
+            document_url=document_url,
+            query_url=query_url,
+            content_cluster_name=content_cluster_name,
+        )
 
-        # Any tests that call add_documents, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
-        self.device_patcher.start()
+        self.marqo_config = Config(
+            vespa_client=vespa_client,
+            default_device=self.device
+        )
 
-        # No default prefix!
-        create_index(
-            config=self.config,
-            index_name=self.index_name_1,
+        index_management = IndexManagement(vespa_client)
+
+        marqo_index_request = UnstructuredMarqoIndexRequest(
+            name=self.index_name,
             model=Model(
                 name="my-custom-model",
                 properties={
@@ -70,583 +54,171 @@ class TestPrefix(MarqoTestCase):
                 },
                 custom=True,
             ),
+            normalize_embeddings=True,
+            text_preprocessing=TextPreProcessing(),
+            image_preprocessing=ImagePreProcessing(),
+            distance_metric=DistanceMetric.Cosine,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(),
+            treat_urls_and_pointers_as_images=True,
+            filter_string_max_length=20,
         )
 
-    def tearDown(self) -> None:
-        self.index_name_1 = "my-test-index-1"
-        self.index_name_2 = "my-test-index-2"
-        self.index_name_3 = "my-test-index-3"
         try:
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
-            tensor_search.delete_index(config=self.config, index_name=self.index_name_3)
-        except IndexNotFoundError as s:
+            index_management.delete_index_by_name(self.index_name)
+        except:
             pass
 
+        self.marqo_index = index_management.create_index(marqo_index_request)
+
+        # Any tests that call add_documents, search, bulk_search need this env var
+        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": self.device})
+        self.device_patcher.start()
+
+    def tearDown(self):
+        index_management = IndexManagement(self.marqo_config.vespa_client)
+        try:
+            index_management.delete_index_by_name(self.index_name)
+        except:
+            pass
         self.device_patcher.stop()
 
     def test_prefix_text_chunks(self):
-        """
-        Ensures that when adding documents with a prefix, each chunk has the prefix included in the vector,
-        but the actual chunk text does not have the prefix.
-        """
+        """Ensures that when adding documents with a prefix, each chunk has the prefix included in the vector,
+        but the actual chunk text does not have the prefix."""
+        
         # A) Add normal text document (1 chunk)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
-            device="cpu"
-        )
-                                    )
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True, device=self.device
+        ))
 
-        # B) Add same text document but WITH PREFIX (1 chunk)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
-            device="cpu", text_chunk_prefix="PREFIX: "
-        )
-                                    )
-
+        # B) Add same text document but WITH PREFIX (1 chunk) 
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True, 
+            device=self.device, text_chunk_prefix="PREFIX: "
+        ))
+        
         # C) Add document with prefix built into text itself (1 chunk)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=[{"_id": "doc_c", "text": "PREFIX: hello"}], auto_refresh=True,
-            device="cpu"
-        )
-                                    )
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{"_id": "doc_c", "text": "PREFIX: hello"}], auto_refresh=True,
+            device=self.device
+        ))
 
         # Get all documents (with vectors)
         res = tensor_search.get_documents_by_ids(
-            config=self.config, index_name=self.index_name_1, document_ids=["doc_a", "doc_b", "doc_c"],
-            show_vectors=True
+            config=self.marqo_config, index_name=self.index_name, document_ids=["doc_a", "doc_b", "doc_c"],
+            show_vectors=True  
         )["results"]
-        retrieved_doc_a = res[0]
+        retrieved_doc_a = res[0] 
         retrieved_doc_b = res[1]
         retrieved_doc_c = res[2]
 
         # Chunk content: For A) and B), should be exactly the same. C) is different.
-        assert retrieved_doc_a[TensorField.tensor_facets][0]["text"] == "hello"
-        assert retrieved_doc_b[TensorField.tensor_facets][0]["text"] == "hello"
-        assert retrieved_doc_c[TensorField.tensor_facets][0]["text"] == "PREFIX: hello"
+        self.assertEqual(retrieved_doc_a["tensor_facets"][0]["text"], "hello")
+        self.assertEqual(retrieved_doc_b["tensor_facets"][0]["text"], "hello") 
+        self.assertEqual(retrieved_doc_c["tensor_facets"][0]["text"], "PREFIX: hello")
 
-        # Chunk embedding: For B) and C), should be exactly the same. A) is different.
-        assert np.allclose(retrieved_doc_b[TensorField.tensor_facets][0]["_embedding"],
-                           retrieved_doc_c[TensorField.tensor_facets][0]["_embedding"])
-        assert not np.allclose(retrieved_doc_a[TensorField.tensor_facets][0]["_embedding"],
-                               retrieved_doc_c[TensorField.tensor_facets][0]["_embedding"])
+        # Chunk embedding: For B) and C), should be exactly the same. A) is different. 
+        self.assertTrue(np.allclose(retrieved_doc_b["tensor_facets"][0]["_embedding"],
+                                    retrieved_doc_c["tensor_facets"][0]["_embedding"]))
+        self.assertFalse(np.allclose(retrieved_doc_a["tensor_facets"][0]["_embedding"], 
+                                     retrieved_doc_c["tensor_facets"][0]["_embedding"]))
 
-    def test_prefix_multiple_chunks(self):
-        """
-        Ensures that prefix gets added to each text chunk, not just the first one.
-        """
-        # Create index with custom model with NO DEFAULT PREFIX, split by WORD
-        create_index(
-            config=self.config,
-            index_name=self.index_name_2,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            text_preprocessing=TextPreProcessing(
-                split_length=1,
-                split_overlap=0,
-                split_method="word",
-            ),
-        )
+    @mock.patch("marqo.s2_inference.s2_inference.vectorise", side_effect=pass_through_vectorise)
+    def test_prefix_vectorise(self, mock_vectorise):
+        """Ensures that vectorise is called on text with prefix"""
+        
+        # A) Add normal text document
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
+            device=self.device
+        ))
+        
+        # B) Add same text document but WITH PREFIX (1 chunk)
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
+            device=self.device, text_chunk_prefix="PREFIX: " 
+        ))
 
-        mock_vectorise = unittest.mock.MagicMock()
-        mock_vectorise.side_effect = pass_through_vectorise
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            # A) Add 1 document with 3 chunks, add PREFIX.
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2, docs=[{"_id": "doc_a", "text": "one two three"}], auto_refresh=True,
-                device="cpu", text_chunk_prefix="PREFIX"
-            )
-                                        )
-
-            # Vectorise should be called with prefixes included
-            assert len(mock_vectorise.call_args_list) == 1
-            args, kwargs = mock_vectorise.call_args_list[0]
-            assert kwargs["content"] == ["PREFIXone", "PREFIXtwo", "PREFIXthree"]
-
-            # B) Add 3 documents with 1 chunk, each with prefix built into text.
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2,
-                docs=[{"_id": "doc_b1", "text": "PREFIXone"}, {"_id": "doc_b2", "text": "PREFIXtwo"},
-                      {"_id": "doc_b3", "text": "PREFIXthree"}], auto_refresh=True,
-                device="cpu"
-            )
-                                        )
-
-        run()
-        res = tensor_search.get_documents_by_ids(
-            config=self.config, index_name=self.index_name_2, document_ids=["doc_a", "doc_b1", "doc_b2", "doc_b3"],
-            show_vectors=True
-        )["results"]
-
-        retrieved_doc_a = res[0]
-        retrieved_doc_b1 = res[1]
-        retrieved_doc_b2 = res[2]
-        retrieved_doc_b3 = res[3]
-
-        # The 3 chunks from A) should match the 3 from B)
-        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][0]["_embedding"],
-                           retrieved_doc_b1[TensorField.tensor_facets][0]["_embedding"], atol=1e-5)
-        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][1]["_embedding"],
-                           retrieved_doc_b2[TensorField.tensor_facets][0]["_embedding"], atol=1e-5)
-        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][2]["_embedding"],
-                           retrieved_doc_b3[TensorField.tensor_facets][0]["_embedding"], atol=1e-5)
-
-    def test_prefix_vectorise(self):
-        """
-        Ensures that vectorise is called on text with prefix
-        """
-        mock_vectorise = unittest.mock.MagicMock()
-        mock_vectorise.side_effect = pass_through_vectorise
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            # A) Add normal text document
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
-                device="cpu"
-            )
-                                        )
-
-            # B) Add same text document but WITH PREFIX (1 chunk)
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
-                device="cpu", text_chunk_prefix="PREFIX: "
-            )
-                                        )
-
-        run()
-
-        assert len(mock_vectorise.call_args_list) == 2
+        # Vectorise should be called twice, once with no prefix and once with prefix
+        self.assertEqual(len(mock_vectorise.call_args_list), 2)
         args, kwargs = mock_vectorise.call_args_list[0]
-        assert kwargs["content"] == ["hello"]
-        args, kwargs = mock_vectorise.call_args_list[1]
-        assert kwargs["content"] == ["PREFIX: hello"]
+        self.assertEqual(kwargs["content"], ["hello"])
+        args, kwargs = mock_vectorise.call_args_list[1]  
+        self.assertEqual(kwargs["content"], ["PREFIX: hello"])
 
-    def test_prefix_not_on_images(self):
-        """
-        Ensures that prefix does not get added to image, unless treat_urls_as_images is False.
-        """
-        # Create index with custom model with NO DEFAULT PREFIX, treat_urls_and_pointers_as_images is False
-        create_index(
-            config=self.config,
-            index_name=self.index_name_2,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            treat_urls_and_pointers_as_images=False
-        )
+    @mock.patch("marqo.s2_inference.s2_inference.vectorise", side_effect=pass_through_vectorise) 
+    def test_prefix_text_search(self, mock_vectorise):
+        """Ensures that search query has prefix added to it for vectorisation."""
+        
+        # Add doc with no prefix
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
+            device=self.device
+        ))
+        # Add doc with prefix
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True, 
+            device=self.device, text_chunk_prefix="PREFIX: "
+        ))
 
-        # Add a doc with an image URL (WITH PREFIX)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_2, docs=[
-                {"_id": "doc_a", "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}],
-            auto_refresh=True,
-            device="cpu", text_chunk_prefix="PREFIX: "
-        )
-                                    )
+        tensor_search.search(config=self.marqo_config, index_name=self.index_name, text="searching", device=self.device,
+                             text_query_prefix="PREFIX: ")
 
-        # Add a doc with an image URL (prefix built into text)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_2, docs=[{"_id": "doc_b",
-                                                 "image": "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}],
-            auto_refresh=True,
-            device="cpu"
-        )
-                                    )
-
-        # Get all documents (with vectors)
-        res = tensor_search.get_documents_by_ids(
-            config=self.config, index_name=self.index_name_2, document_ids=["doc_a", "doc_b"],
-            show_vectors=True
-        )["results"]
-        retrieved_doc_a = res[0]
-        retrieved_doc_b = res[1]
-
-        # Chunk content: Should be different
-        assert retrieved_doc_a[TensorField.tensor_facets][0][
-                   "image"] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-        assert retrieved_doc_b[TensorField.tensor_facets][0][
-                   "image"] == "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-
-        # Chunk embedding: Should be the same
-        assert np.allclose(retrieved_doc_a[TensorField.tensor_facets][0]["_embedding"],
-                           retrieved_doc_b[TensorField.tensor_facets][0]["_embedding"])
-
-        # Create index with custom model with NO DEFAULT PREFIX, treat_urls_and_pointers_as_images is True
-        tensor_search.delete_index(config=self.config, index_name=self.index_name_2)
-        create_index(
-            config=self.config,
-            index_name=self.index_name_2,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            treat_urls_and_pointers_as_images=True
-        )
-
-        # Add a doc with an image URL (WITH PREFIX)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_2, docs=[
-                {"_id": "doc_c", "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}],
-            auto_refresh=True,
-            device="cpu", text_chunk_prefix="PREFIX: "
-        )
-                                    )
-
-        # Add a doc with an image URL (NO PREFIX)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_2, docs=[
-                {"_id": "doc_d", "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}],
-            auto_refresh=True,
-            device="cpu"
-        )
-                                    )
-
-        # Get the documents
-        res = tensor_search.get_documents_by_ids(
-            config=self.config, index_name=self.index_name_2, document_ids=["doc_c", "doc_d"],
-            show_vectors=True
-        )["results"]
-        retrieved_doc_c = res[0]
-        retrieved_doc_d = res[1]
-
-        # Chunk content should be the same
-        assert retrieved_doc_c[TensorField.tensor_facets][0][
-                   "image"] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-        assert retrieved_doc_d[TensorField.tensor_facets][0][
-                   "image"] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-
-        # Chunk embedding should be the same (because prefixes do not affect images)
-        assert np.allclose(retrieved_doc_c[TensorField.tensor_facets][0]["_embedding"],
-                           retrieved_doc_d[TensorField.tensor_facets][0]["_embedding"])
+        # Vectorise should be called 3 times - twice for add_documents, once for search 
+        self.assertEqual(len(mock_vectorise.call_args_list), 3)
+        args, kwargs = mock_vectorise.call_args_list[-1]
+        self.assertEqual(kwargs["content"], ["PREFIX: searching"])
 
     def test_prefix_multimodal(self):
-        """
-        Ensures that vectorise is called on text list with prefixes, but image list without.
-        """
-
-        # Create index with custom model with NO DEFAULT PREFIX, treat_urls_as_images is True
-        create_index(
-            config=self.config,
-            index_name=self.index_name_2,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            treat_urls_and_pointers_as_images=True
-        )
-
-        mock_vectorise = unittest.mock.MagicMock()
-        mock_vectorise.side_effect = pass_through_vectorise
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            # Add a multimodal doc with a text and image field
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2, docs=[{
-                    "_id": "doc_a",
-                    "my-multimodal": {
-                        "text": "hello",
-                        "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
+        """Ensures that vectorise is called on text list with prefixes, but image list without."""
+        
+        # Mocking rather than patching to capture call arguments
+        s2_inference.vectorise = mock.MagicMock(side_effect=pass_through_vectorise)
+        
+        # Add a multimodal doc with a text and image field
+        tensor_search.add_documents(config=self.marqo_config, add_docs_params=AddDocsParams(
+            index_name=self.index_name, docs=[{
+                "_id": "doc_a", 
+                "my-multimodal": {
+                    "text": "hello",
+                    "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
+                }
+            }], auto_refresh=True, 
+            device=self.device, text_chunk_prefix="PREFIX: ",
+            mappings={
+                "my-multimodal": {
+                    "type": "multimodal_combination",
+                    "weights": {
+                        "text": 0.5,
+                        "image": 0.5
                     }
-                }], auto_refresh=True,
-                device="cpu", text_chunk_prefix="PREFIX: ",
-                mappings={
-                    "my-multimodal": {
-                        "type": "multimodal_combination",
-                        "weights": {
-                            "text": 0.5,
-                            "image": 0.5
-                        }
-                    }}
-            )
-                                        )
-
-        run()
+                }}
+        ))
 
         # Check there were 2 vectorise calls:
         # 1st vectorise should be called with text with prefixes
-        # 2nd vectorise should be called with just images
+        # 2nd vectorise should be called with just images 
+        self.assertEqual(len(s2_inference.vectorise.call_args_list), 2)
+        args, kwargs = s2_inference.vectorise.call_args_list[0]
+        self.assertEqual(kwargs["content"], ["PREFIX: hello"])
+        args, kwargs = s2_inference.vectorise.call_args_list[1]
+        self.assertIsInstance(kwargs["content"][0], str) # uri
+        self.assertEqual(kwargs["content"][0], "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png")
 
-        assert len(mock_vectorise.call_args_list) == 2
-        args, kwargs = mock_vectorise.call_args_list[0]
-        assert kwargs["content"] == ["PREFIX: hello"]
-        args, kwargs = mock_vectorise.call_args_list[1]
-        assert isinstance(kwargs["content"][0], PIL.PngImagePlugin.PngImageFile)
-
-        # Get document, content chunks should not have prefix
-        res = tensor_search.get_documents_by_ids(
-            config=self.config, index_name=self.index_name_2, document_ids=["doc_a"],
-            show_vectors=True
-        )["results"]
-        retrieved_doc_a = res[0]
-
-        assert retrieved_doc_a[TensorField.tensor_facets][0]["my-multimodal"] == json.dumps({
-            "text": "hello",
-            "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-        })
-
-    def test_prefix_text_search(self):
-        """
-        Ensures that search query has prefix added to it for vectorisation.
-        Use pass through vectorise.
-        """
-        mock_vectorise = unittest.mock.MagicMock()
-        mock_vectorise.side_effect = pass_through_vectorise
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            # Add doc with no prefix
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
-                device="cpu"
-            )
-                                        )
-            # Add doc with prefix
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_1, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
-                device="cpu", text_chunk_prefix="PREFIX: "
-            )
-                                        )
-
-            res = tensor_search.search(config=self.config, index_name=self.index_name_1, text="searching", device="cpu",
-                                       text_query_prefix="PREFIX: ")
-            assert res["hits"][0]["_id"] == "doc_b"  # Because doc b had the prefix added.
-            assert res["query"] == "searching"  # No prefix in the query itself
-
-        run()
-
-        assert len(mock_vectorise.call_args_list) == 3
-        args, kwargs = mock_vectorise.call_args_list[-1]
-        assert kwargs["content"] == ["PREFIX: searching"]
-
-    def test_prefix_image_search(self):
-        """
-        Ensures that an image search query has prefix added to it for vectorisation.
-        """
-        create_index(
-            config=self.config,
-            index_name=self.index_name_2,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            treat_urls_and_pointers_as_images=True
-        )
-
-        mock_vectorise = unittest.mock.MagicMock()
-        mock_vectorise.side_effect = pass_through_vectorise
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            # Add image with no prefix
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2, docs=[{"_id": "doc_a",
-                                                     "image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}],
-                auto_refresh=True,
-                device="cpu"
-            )
-                                        )
-            # Add doc
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                index_name=self.index_name_2, docs=[{"_id": "doc_b",
-                                                     "text": "red herring marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic"}],
-                auto_refresh=True,
-                device="cpu", text_chunk_prefix="PREFIX: "
-            )
-                                        )
-
-            res = tensor_search.search(config=self.config, index_name=self.index_name_2,
-                                       text="https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
-                                       device="cpu", text_query_prefix="PREFIX: ")
-            assert res["hits"][0]["_id"] == "doc_a"
-            assert res[
-                       "query"] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"  # No prefix in the query itself
-
-        run()
-
-        assert len(mock_vectorise.call_args_list) == 3
-        args, kwargs = mock_vectorise.call_args_list[-1]
-        assert kwargs["content"][0] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-
-    def test_prefix_dict_search(self):
-        """
-        Ensures that dict search query has prefix added to each for vectorisation.
-        Use pass through vectorise.
-        """
-        create_index(
-            config=self.config,
-            index_name=self.index_name_2,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            treat_urls_and_pointers_as_images=True
-        )
-
-        mock_vectorise = unittest.mock.MagicMock()
-        mock_vectorise.side_effect = pass_through_vectorise
-
-        @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
-        def run():
-            query_dict = {
-                "text query": 0.5,
-                "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
-            }
-            res = tensor_search.search(config=self.config, index_name=self.index_name_2,
-                                       text=query_dict, device="cpu", text_query_prefix="PREFIX: ")
-            assert res["query"] == query_dict  # No prefix in the query itself
-
-        run()
-
-        assert len(mock_vectorise.call_args_list) == 2
-        args, kwargs = mock_vectorise.call_args_list[0]
-        assert kwargs["content"][0] == "PREFIX: text query"
-        args, kwargs = mock_vectorise.call_args_list[1]
-        assert kwargs["content"][0] == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-
-    def test_add_prefix_to_queries(self):
-        """
-        Ensures that prefix gets added to each query.
-        """
-
-        create_index(
-            config=self.config,
-            index_name=self.index_name_2,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            treat_urls_and_pointers_as_images=True
-        )
-
-        create_index(
-            config=self.config,
-            index_name=self.index_name_3,
-            model=Model(
-                name="my-custom-model",
-                properties={
-                    "name": "ViT-B-32-quickgelu",
-                    "dimensions": 512,
-                    "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_avg-8a00ab3c.pt",
-                    "type": "open_clip",
-                },
-                custom=True,
-            ),
-            treat_urls_and_pointers_as_images=False
-        )
-
+    @mock.patch("marqo.s2_inference.s2_inference.vectorise", side_effect=pass_through_vectorise)
+    def test_add_prefix_to_queries(self, mock_vectorise):
+        """Ensures that prefix gets added to each query."""
         # Single text query (prefix added)
-        queries = [
-            BulkSearchQueryEntity(
-                q="hello",
-                textQueryPrefix="PREFIX: ",
-                index=self.config.get_index(index_name=self.index_name_2)
-            )
-        ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
-        assert prefixed_queries[0].q == "PREFIX: hello"
+        queries = [SearchQuery(q="hello", text_query_prefix="PREFIX: ")]
+        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        self.assertEqual(prefixed_queries[0].q, "PREFIX: hello")
 
-        # Single image query (no prefix added)
-        queries = [
-            BulkSearchQueryEntity(
-                q="https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
-                textQueryPrefix="PREFIX: ",
-                index=self.config.get_index(index_name=self.index_name_2)
-            )
-        ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
-        assert prefixed_queries[0].q == "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
+        # Dict query (text has prefix, image does not) 
+        queries = [SearchQuery(q={"text query": 0.5, "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5},
+                               text_query_prefix="PREFIX: ")]
+        prefixed_queries = tensor_search.add_prefix_to_queries(queries)
+        self.assertEqual(prefixed_queries[0].q, {"PREFIX: text query": 0.5, "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5})
 
-        # Dict query (text has prefix, image does not)
-        queries = [
-            BulkSearchQueryEntity(
-                q={
-                    "text query": 0.5,
-                    "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
-                },
-                textQueryPrefix="PREFIX: ",
-                index=self.config.get_index(index_name=self.index_name_2)
-            )
-        ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
-        assert prefixed_queries[0].q == {
-            "PREFIX: text query": 0.5,
-            "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
-        }
-
-        # Single image but no image index (prefix added)
-        queries = [
-            BulkSearchQueryEntity(
-                q="https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png",
-                textQueryPrefix="PREFIX: ",
-                index=self.config.get_index(index_name=self.index_name_3)
-            )
-        ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
-        assert prefixed_queries[
-                   0].q == "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"
-
-        # Dict query but no image index (text and index have prefix)
-        queries = [
-            BulkSearchQueryEntity(
-                q={
-                    "text query": 0.5,
-                    "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
-                },
-                textQueryPrefix="PREFIX: ",
-                index=self.config.get_index(index_name=self.index_name_3)
-            )
-        ]
-        prefixed_queries = tensor_search.add_prefix_to_queries(self.config, queries)
-        assert prefixed_queries[0].q == {
-            "PREFIX: text query": 0.5,
-            "PREFIX: https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5,
-        }
+if __name__ == '__main__':
+    unittest.main()

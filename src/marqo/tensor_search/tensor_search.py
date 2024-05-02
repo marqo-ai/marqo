@@ -1705,28 +1705,19 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
                 raise not_found_error
     raise not_found_error
 
-
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
-    """
-    Makes a new list of queries
-    Adds prefix to the q of all BulkSearchQueryEntity objects in the list.
-    Determines prefix with defaults from index_info textQueryPrefix (per query).
-    Only adds prefix to text queries (not images)
-    """
     prefixed_queries = []
     for q in queries:
-        # Determine what prefix to use
         text_query_prefix = determine_text_prefix(q.text_query_prefix, q.index, "text_query_prefix")
 
-        # Add prefix to q if applicable
         if q.q is None:
             prefixed_q = q.q
         elif isinstance(q.q, str):
-            if isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images and _is_image(q.q):
-                # Images get no prefix for unstructured indexes
+            if ((isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images) or 
+                (isinstance(q.index, StructuredMarqoIndex) and q.q in [field.name for field in q.index.field_map_by_type[FieldType.ImagePointer]])
+            ):
                 prefixed_q = q.q
             else:
-                # Single text query: add prefix
                 prefixed_q = f"{text_query_prefix}{q.q}"
         else:  # is dict
             ordered_queries = list(q.q.items())
@@ -1734,17 +1725,19 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
                 prefixed_q = {}
                 for key, value in ordered_queries:
                     if _is_image(key):
-                        prefixed_q[key] = value  # Do nothing with images
+                        prefixed_q[key] = value
                     else:
-                        # Add prefix to all inner text queries
                         prefixed_q[f"{text_query_prefix}{key}"] = value
             else:
-                # if StructuredIndex Treat all queries as plaintext. Add prefix to all.
-                # TODO: check whether this is the correct behavior for StructuredIndexes
-                prefixed_q = {f"{text_query_prefix}{key}": value for key, value in ordered_queries}
+                prefixed_q = {}
+                for key, value in ordered_queries:
+                    if isinstance(key, str) and _is_image(key) and key in [field.name for field in q.index.field_map_by_type[FieldType.ImagePointer]]:
+                        prefixed_q[key] = value
+                    else:
+                        prefixed_q[f"{text_query_prefix}{key}"] = value
 
         new_query_object = BulkSearchQueryEntity(
-            q=prefixed_q,  # Everything is the same except the query
+            q=prefixed_q,
             searchableAttributes=q.searchableAttributes,
             searchMethod=q.searchMethod,
             limit=q.limit,
@@ -1763,7 +1756,6 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
         prefixed_queries.append(new_query_object)
 
     return prefixed_queries
-
 
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """Run the query vectorisation process"""
