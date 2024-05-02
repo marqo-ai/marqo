@@ -1221,6 +1221,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
     Returns:
 
     """
+    print(f"From the search function, text_query_prefix is {text_query_prefix}")
 
     # Validation for: result_count (limit) & offset
     # Validate neither is negative
@@ -1547,6 +1548,7 @@ def assign_query_to_vector_job(
 
 def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, device: str) -> Tuple[
     Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]]:
+    print(f"from the create_vector_jobs function, queries is {queries}")
     """
         For each query:
             - Find what needs to be vectorised
@@ -1563,6 +1565,7 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
         q = queries[i]
         # split images from text:
         to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
+        print(f"from the create_vector_jobs function, to_be_vectorised is {to_be_vectorised}")
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, q.index, device)
 
     return qidx_to_job, jobs
@@ -1708,15 +1711,18 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
     prefixed_queries = []
     for q in queries:
-        text_query_prefix = determine_text_prefix(q.textQueryPrefix, q.index, "text_query_prefix")
+        text_query_prefix = determine_text_prefix(q.text_query_prefix, q.index, "text_query_prefix")
 
         if q.q is None:
             prefixed_q = q.q
         elif isinstance(q.q, str):
+            print(f"from the add_prefix_to_queries function, q.q is str")
             if _is_image(q.q) and ((isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images) or
                 (isinstance(q.index, StructuredMarqoIndex))):
+                print(f"from the add_prefix_to_queries function, q.q is image")
                 prefixed_q = q.q
             else:
+                print(f"from the add_prefix_to_queries function, q.q is not image, adding prefix: {text_query_prefix}{q.q}")
                 prefixed_q = f"{text_query_prefix}{q.q}"
         else:  # q.q is dict
             prefixed_q = {}
@@ -1746,14 +1752,20 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
             text_query_prefix=q.text_query_prefix
         )
         prefixed_queries.append(new_query_object)
+    
+    print(f"from the add_prefix_to_queries function, prefixed_queries is {prefixed_queries}")
 
     return prefixed_queries
 
 
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """Run the query vectorisation process"""
+
+    print(f"from the run_vectorise_pipeline function, queries is {queries}")
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
     prefixed_queries = add_prefix_to_queries(queries)
+
+    print(f"from the run_vectorise_pipeline function, prefixed_queries is {prefixed_queries}")
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
@@ -1822,6 +1834,7 @@ def _vector_text_search(
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
     """
+    print(f"from the _vector_text_search function, text_query_prefix is {text_query_prefix}")
     # # SEARCH TIMER-LOGGER (pre-processing)
     if not device:
         raise api_exceptions.InternalError("_vector_text_search cannot be called without `device`!")
@@ -1839,6 +1852,8 @@ def _vector_text_search(
         boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
         index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
     )]
+    print(f"from the _vector_text_search function, list[BulkSearchQueryEntity] is {queries}")
+
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]

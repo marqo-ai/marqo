@@ -173,6 +173,52 @@ class TestEmbed(MarqoTestCase):
                 self.assertEqual(embed_res["content"], ["I am the GOAT."])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], get_docs_embedding))
 
+    def test_embed_equivalent_to_add_docs_with_prefix(self):
+        """
+        Ensure that the embedding returned by embed endpoint with hardcoded prefix matches the one created by
+        add_docs with prefix set.
+        Embedding from add_docs is retrieved using get_document_by_id with show_vectors=True.
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                add_docs_res = tensor_search.add_documents(
+                    config=self.config, add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {
+                                "_id": "0",
+                                "text_field_1": "I am the GOAT."
+                            }
+                        ],
+                        device="cpu",
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                        text_chunk_prefix="PREFIX: "
+                    )
+                )
+
+                # Get the added document embedding
+                get_docs_res = tensor_search.get_document_by_id(
+                    config=self.config, index_name=index.name,
+                    document_id="0", show_vectors=True)
+
+                self.assertEqual(get_docs_res["_id"], "0")
+                self.assertEqual(len(get_docs_res[enums.TensorField.tensor_facets]), 1)
+
+                get_docs_embedding = get_docs_res[enums.TensorField.tensor_facets][0][enums.TensorField.embedding]
+
+                # Embed request the same text
+                embed_res = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["PREFIX: I am the GOAT."]
+                    ),
+                    device="cpu"
+                )
+
+                # Assert vectors are equal
+                self.assertEqual(embed_res["content"], ["PREFIX: I am the GOAT."])
+                self.assertTrue(np.allclose(embed_res["embeddings"][0], get_docs_embedding))
+
     def test_embed_equivalent_to_search_text(self):
         """
             Ensure that the embedding returned by embed endpoint matches the one created by search.
@@ -217,6 +263,52 @@ class TestEmbed(MarqoTestCase):
 
                 # Assert vectors are equal
                 self.assertEqual(embed_res["content"], ["I am the GOAT."])
+                self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
+    
+    def test_embed_equivalent_to_search_text_with_prefix(self):
+        """
+            Ensure that the embedding returned by embed endpoint matches the one created by search.
+            Embedding from search is retrieved using mock on query.
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                original_query = self.config.vespa_client.query
+                def pass_through_query(*arg, **kwargs):
+                    return original_query(*arg, **kwargs)
+
+                mock_vespa_client_query = unittest.mock.MagicMock()
+                mock_vespa_client_query.side_effect = pass_through_query
+
+                @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                def run():
+                    tensor_search.search(
+                        config=self.config, index_name=index.name, text="I am the GOAT.",
+                        search_method=enums.SearchMethod.TENSOR, text_query_prefix="PREFIX: "
+                    )
+                    return True
+                self.assertTrue(run())
+
+                call_args = mock_vespa_client_query.call_args_list
+                self.assertEqual(len(call_args), 1)
+
+                vespa_query_kwargs = call_args[0].kwargs
+                if isinstance(index, UnstructuredMarqoIndex):
+                    embedding_key = "embedding_query"
+                elif isinstance(index, StructuredMarqoIndex):
+                    embedding_key = "marqo__query_embedding"
+                search_query_embedding = vespa_query_kwargs["query_features"][embedding_key]
+
+                # Embed request the same text
+                embed_res = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["PREFIX: I am the GOAT."]
+                    ),
+                    device="cpu"
+                )
+
+                # Assert vectors are equal
+                self.assertEqual(embed_res["content"], ["PREFIX: I am the GOAT."])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
 
     def test_embed_equivalent_to_search_image(self):

@@ -128,14 +128,14 @@ class TestPrefix(MarqoTestCase):
     def test_add_prefix_to_queries(self, mock_vectorise):
         """Ensures that prefix gets added to each query."""
         # Single text query (prefix added)
-        queries = [BulkSearchQueryEntity(q="hello", textQueryPrefix="PREFIX: ", index=self.marqo_index)]
+        queries = [BulkSearchQueryEntity(q="hello", text_query_prefix="PREFIX: ", index=self.marqo_index)]
         prefixed_queries = tensor_search.add_prefix_to_queries(queries)
         self.assertEqual(prefixed_queries[0].q, "PREFIX: hello")
 
         # Dict query (text has prefix, image does not)
         queries = [BulkSearchQueryEntity(
             q={"text query": 0.5, "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5},
-            textQueryPrefix="PREFIX: ",
+            text_query_prefix="PREFIX: ",
             index=self.marqo_index
         )]
 
