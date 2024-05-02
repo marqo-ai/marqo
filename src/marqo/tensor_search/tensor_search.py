@@ -1722,29 +1722,26 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
         if q.q is None:
             prefixed_q = q.q
         elif isinstance(q.q, str):
-            if _is_image(q.q):
-                if isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images:
-                    # Images get no prefix for unstructured indexes
-                    prefixed_q = q.q
-                else:
-                    # Images in structured indexes get prefix
-                    prefixed_q = f"{text_query_prefix}{q.q}"
+            if isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images and _is_image(q.q):
+                # Images get no prefix for unstructured indexes
+                prefixed_q = q.q
             else:
                 # Single text query: add prefix
                 prefixed_q = f"{text_query_prefix}{q.q}"
         else:  # is dict
             ordered_queries = list(q.q.items())
-            prefixed_q = {}
-            for key, value in ordered_queries:
-                if _is_image(key):
-                    if isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images:
-                        prefixed_q[key] = value  # Do nothing with images for unstructured indexes
+            if isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images:
+                prefixed_q = {}
+                for key, value in ordered_queries:
+                    if _is_image(key):
+                        prefixed_q[key] = value  # Do nothing with images
                     else:
-                        # Add prefix to image queries in structured indexes
+                        # Add prefix to all inner text queries
                         prefixed_q[f"{text_query_prefix}{key}"] = value
-                else:
-                    # Add prefix to all inner text queries
-                    prefixed_q[f"{text_query_prefix}{key}"] = value
+            else:
+                # if StructuredIndex Treat all queries as plaintext. Add prefix to all.
+                # TODO: check whether this is the correct behavior for StructuredIndexes
+                prefixed_q = {f"{text_query_prefix}{key}": value for key, value in ordered_queries}
 
         new_query_object = BulkSearchQueryEntity(
             q=prefixed_q,  # Everything is the same except the query
