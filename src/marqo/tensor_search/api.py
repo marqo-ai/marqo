@@ -293,7 +293,7 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
             index_name=index_name, device=device,
             image_download_headers=embedding_request.image_download_headers,
             model_auth=embedding_request.modelAuth,
-            text_query_prefix=embedding_request.text_query_prefix
+            content_type=embedding_request.content_type
         )
 
 

@@ -210,13 +210,14 @@ class TestEmbed(MarqoTestCase):
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
                     embedding_request=EmbedRequest(
-                        content=["PREFIX: I am the GOAT."]
+                        content=["I am the GOAT."],
+                        content_type="PREFIX: "
                     ),
                     device="cpu"
                 )
 
                 # Assert vectors are equal
-                self.assertEqual(embed_res["content"], ["PREFIX: I am the GOAT."])
+                self.assertEqual(embed_res["content"], ["I am the GOAT."])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], get_docs_embedding))
 
     def test_embed_equivalent_to_search_text(self):
@@ -302,13 +303,14 @@ class TestEmbed(MarqoTestCase):
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
                     embedding_request=EmbedRequest(
-                        content=["PREFIX: I am the GOAT."]
+                        content=["I am the GOAT."],
+                        content_type="PREFIX: "
                     ),
                     device="cpu"
                 )
 
                 # Assert vectors are equal
-                self.assertEqual(embed_res["content"], ["PREFIX: I am the GOAT."])
+                self.assertEqual(embed_res["content"], ["I am the GOAT."])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
 
     def test_embed_equivalent_to_search_image(self):

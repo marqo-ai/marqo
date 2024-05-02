@@ -22,7 +22,7 @@ class EmbedRequest(BaseMarqoModel):
     content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
     image_download_headers: Optional[Dict] = None
     modelAuth: Optional[ModelAuth] = None
-    text_query_prefix: Optional[str] = None
+    content_type: Optional[str] = None
 
     @pydantic.validator('content')
     def validate_content(cls, value):

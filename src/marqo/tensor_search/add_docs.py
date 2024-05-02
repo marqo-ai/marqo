@@ -200,7 +200,6 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
         return None
     
 
-
 def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, prefix_type: str) -> str:
     """
     Determines the text prefix to be used for chunking text fields or search queries.

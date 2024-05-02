@@ -10,6 +10,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.tensor_search.add_docs import determine_text_prefix
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
@@ -31,7 +32,7 @@ class Embed:
                     self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
                     index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None,
-                    text_query_prefix: Optional[str] = None
+                    content_type: str = "query"
                     ) -> Dict:
         """
         Use the index's model to embed the content
@@ -39,6 +40,13 @@ class Embed:
         Returns:
                 List of embeddings corresponding to the content. If content is a list, the return list will be in the same order.
                 If content is a string, the return list will only have 1 item.
+        """
+        """
+        NOTE: PARAMETER: content_type
+        3 Options: ‘query’, ‘document’, None. Defaults to ‘query’.
+        1. If the user wants to use the default text_query_prefix, leave it as ‘query’.
+        2. If the user wants to use the default text_chunk_prefix, leave it as ‘document’.
+        3. If the user wants a custom prefix, they must put it in the content itself.
         """
 
         # TODO: Remove this config constructor once vectorise pipeline doesn't need it. Just pass the vespa client
@@ -68,6 +76,14 @@ class Embed:
         else:
             raise base_exceptions.InternalError(f"Content type {type(content)} is not supported for embed endpoint.")
 
+        # Decide on the prefix
+        if content_type == "query":
+            prefix = determine_text_prefix(None, marqo_index, "text_query_prefix")
+        elif content_type == "document":
+            prefix = determine_text_prefix(None, marqo_index, "text_chunk_prefix")
+        else:
+            prefix = determine_text_prefix(content_type, marqo_index, "text_query_prefix")
+        
         queries = []
         for content_entry in content_list:
             queries.append(
@@ -77,7 +93,7 @@ class Embed:
                     index=marqo_index,
                     image_download_headers=image_download_headers,
                     modelAuth=model_auth,
-                    text_query_prefix=text_query_prefix
+                    text_query_prefix=prefix
                     # TODO: Check if it's fine that we leave out the other parameters
                 )
             )
