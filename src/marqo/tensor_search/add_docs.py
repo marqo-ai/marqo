@@ -10,6 +10,7 @@ import PIL
 from PIL.ImageFile import ImageFile
 
 from marqo.s2_inference import clip_utils
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 from marqo.tensor_search import enums
 from marqo.tensor_search import constants
@@ -229,14 +230,18 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
         return marqo_index.override_text_chunk_prefix
 
     # Fallback to model_properties defined prefix
-    model_properties = get_model_properties_from_registry(marqo_index.model.name)
-    if model_properties is not None:
-        default_prefixes = model_properties.get(prefix_type)
-        if default_prefixes is not None:
-            return default_prefixes
-    else:
-        raise ValueError(f"Model properties not found for model: {marqo_index.model}")
+    try:
+        model_properties = get_model_properties_from_registry(marqo_index.model.name)
 
+        if model_properties is not None:
+            default_prefixes = model_properties.get(prefix_type)
+            if default_prefixes is not None:
+                return default_prefixes
+        else:
+            raise ValueError(f"Model properties not found for model: {marqo_index.model}")
+    except InvalidModelPropertiesError as e:
+        pass
+    
     # If no prefix is found, return empty string ""
     return ""
 
