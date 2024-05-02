@@ -6,7 +6,8 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models import MarqoIndex
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.core.models.marqo_index import IndexType
-from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, ZeroMagnitudeVectorError
+from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, \
+    ZeroMagnitudeVectorError
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
@@ -70,6 +71,11 @@ class Recommender:
         original_documents = documents
         if isinstance(documents, dict):
             documents = {k: v for k, v in documents.items() if v != 0}
+            document_ids = list(documents.keys())
+            all_document_ids = list(original_documents.keys())
+        else:
+            document_ids = documents
+            all_document_ids = original_documents
 
         if len(documents) == 0:
             raise InvalidArgumentError('No documents with non-zero weight provided')
@@ -89,13 +95,6 @@ class Recommender:
                     if tensor_field not in valid_tensor_fields:
                         raise InvalidFieldNameError(f'Tensor field "{tensor_field}" not found in index "{index_name}". '
                                                     f'Available tensor fields: {", ".join(valid_tensor_fields)}')
-
-        if isinstance(documents, dict):
-            document_ids = list(documents.keys())
-            all_document_ids = list(original_documents.keys())
-        else:
-            document_ids = documents
-            all_document_ids = original_documents
 
         t0 = timer()
 

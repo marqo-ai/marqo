@@ -24,13 +24,13 @@ class VectorInterpolation(abc.ABC):
         Interpolates a list of vectors using the given weights.
 
         Args:
-            vectors: A list of vectors to interpolate.
+            vectors: A list of vectors to interpolate
             weights: A list of weights to use for the interpolation. If None, the interpolation will be done using
-            euqual weights for all vectors.
+            equal weights for all vectors
             prenormalized: If True, the vectors are assumed to be normalized
 
         Returns:
-            The interpolated vector.
+            The interpolated vector
         """
         pass
 
@@ -48,6 +48,21 @@ def from_interpolation_method(method: InterpolationMethod):
 
 class Lerp(VectorInterpolation):
     def interpolate(self, vectors: List[List[float]], weights: List[float], prenormalized: bool = False) -> List[float]:
+        """
+        Interpolates a list of vectors using the given weights.
+
+        Args:
+            vectors: A list of vectors to interpolate
+            weights: A list of weights to use for the interpolation. If None, the interpolation will be done using
+            equal weights for all vectors
+            prenormalized: Ignored for LERP
+
+        Returns:
+            The interpolated vector
+
+        Raises:
+            ZeroSumWeightsError: If the sum of the weights is zero
+        """
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
 
@@ -76,6 +91,22 @@ class Lerp(VectorInterpolation):
 class Nlerp(Lerp):
     def interpolate(self, vectors: List[List[float]], weights: List[float],
                     prenormalized: bool = False) -> List[float]:
+        """
+        Interpolates a list of vectors using the given weights.
+
+        Args:
+            vectors: A list of vectors to interpolate
+            weights: A list of weights to use for the interpolation. If None, the interpolation will be done using
+            equal weights for all vectors
+            prenormalized: Ignored for LERP
+
+        Returns:
+            The interpolated vector
+
+        Raises:
+            ZeroSumWeightsError: If the sum of the weights is zero
+            ZeroMagnitudeVectorError: If the interpolated vector has zero magnitude
+        """
         lerp_result = super().interpolate(vectors, weights)
         length = math.sqrt(sum(x ** 2 for x in lerp_result))
 
@@ -96,6 +127,21 @@ class Slerp(VectorInterpolation):
         self.method = method
 
     def interpolate(self, vectors: List[List[float]], weights: List[float], prenormalized: bool = False) -> List[float]:
+        """
+        Interpolates a list of vectors using the given weights.
+
+        Args:
+            vectors: A list of vectors to interpolate
+            weights: A list of weights to use for the interpolation. If None, the interpolation will be done using
+            equal weights for all vectors
+            prenormalized: If True, the vectors are assumed to be normalized
+
+        Returns:
+            The interpolated vector
+
+        Raises:
+            ZeroSumWeightsError: If the sum of a consecutive pair of weights is zero
+        """
         if len(vectors) < 1:
             raise ValueError('Cannot interpolate an empty list of vectors')
 
