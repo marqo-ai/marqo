@@ -209,7 +209,7 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
     1. Prioritize request-level prefix
     2. If not provided, use settings based on prefix_type
     3. If still not provided, use model_properties defined prefix
-    4. Return None if no prefix is found, handling is expected by the caller
+    4. Return "" if no prefix is found, handling is expected by the caller
 
     Args:
         request_level_prefix (str): The prefix provided in the request

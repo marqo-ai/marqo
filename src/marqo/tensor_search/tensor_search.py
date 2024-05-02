@@ -139,6 +139,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
+    text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
@@ -296,7 +297,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
-                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
                             content_chunks: List[str] = text_processor.split_text(field_content, split_by=split_by,
                                                                                   split_length=split_length,
                                                                                   split_overlap=split_overlap,
@@ -436,13 +436,14 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                     # Use_existing tensor does not apply, or we didn't find it, then we vectorise
                     if combo_chunk is None:
+                        
                         if field_content:  # Check if the subfields are present
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                              unsuccessful_doc_to_append,
                              combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
                                 field_name,
                                 field_content, i, doc_id, add_docs_params.device, marqo_index,
-                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth)
+                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth, text_chunk_prefix=text_chunk_prefix)
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                             if combo_document_is_valid is False:
@@ -561,6 +562,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)  # use length before deduplication
     image_repo = {}
+    text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
 
     # Deduplicate docs, keep the latest
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
@@ -729,8 +731,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
-                            #index_settings = config.index_management.get_index(add_docs_params.index_name) 
-                            text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
                             content_chunks = text_processor.split_text(field_content, split_by=split_by,
                                                                        split_length=split_length,
                                                                        split_overlap=split_overlap,
@@ -898,7 +898,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                              unsuccessful_doc_to_append,
                              combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
                                 field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
-                                image_repo, mappings, model_auth=add_docs_params.model_auth)
+                                image_repo, mappings, model_auth=add_docs_params.model_auth, text_chunk_prefix=text_chunk_prefix)
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
 
@@ -1708,33 +1708,25 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
     prefixed_queries = []
     for q in queries:
-        text_query_prefix = determine_text_prefix(q.text_query_prefix, q.index, "text_query_prefix")
+        text_query_prefix = determine_text_prefix(q.textQueryPrefix, q.index, "text_query_prefix")
 
         if q.q is None:
             prefixed_q = q.q
         elif isinstance(q.q, str):
-            if ((isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images) or 
-                (isinstance(q.index, StructuredMarqoIndex) and q.q in [field.name for field in q.index.field_map_by_type[FieldType.ImagePointer]])
-            ):
+            if _is_image(q.q) and ((isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images) or
+                (isinstance(q.index, StructuredMarqoIndex))):
                 prefixed_q = q.q
             else:
                 prefixed_q = f"{text_query_prefix}{q.q}"
-        else:  # is dict
-            ordered_queries = list(q.q.items())
-            if isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images:
-                prefixed_q = {}
-                for key, value in ordered_queries:
-                    if _is_image(key):
-                        prefixed_q[key] = value
-                    else:
-                        prefixed_q[f"{text_query_prefix}{key}"] = value
-            else:
-                prefixed_q = {}
-                for key, value in ordered_queries:
-                    if isinstance(key, str) and _is_image(key) and key in [field.name for field in q.index.field_map_by_type[FieldType.ImagePointer]]:
-                        prefixed_q[key] = value
-                    else:
-                        prefixed_q[f"{text_query_prefix}{key}"] = value
+        else:  # q.q is dict
+            prefixed_q = {}
+            for key, value in q.q.items():
+                # Apply prefix if key is not an image or if index does not treat URLs and pointers as images
+                if _is_image(key) and ((isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images) or
+                    (isinstance(q.index, StructuredMarqoIndex))):
+                    prefixed_q[key] = value
+                else:
+                    prefixed_q[f"{text_query_prefix}{key}"] = value
 
         new_query_object = BulkSearchQueryEntity(
             q=prefixed_q,
@@ -1756,6 +1748,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
         prefixed_queries.append(new_query_object)
 
     return prefixed_queries
+
 
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
     """Run the query vectorisation process"""
@@ -2173,6 +2166,7 @@ def vectorise_multimodal_combination_field_structured(
         start_time = timer()
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
+            
             with RequestMetricsStore.for_request().time(f"create_vectors"):
                 prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(

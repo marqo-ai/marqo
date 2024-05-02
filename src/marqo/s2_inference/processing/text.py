@@ -152,7 +152,7 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
 
     # Add prefix to each text split if provided
     if prefix is not None:
-        text_splits = [f"{prefix} {split}" for split in text_splits]
+        text_splits = [f"{prefix}{split}" for split in text_splits]
 
 
     return text_splits
