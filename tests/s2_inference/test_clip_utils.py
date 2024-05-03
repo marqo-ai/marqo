@@ -4,11 +4,15 @@ import itertools
 import os
 
 import PIL
+import PIL.Image
 import requests.exceptions
 from marqo.s2_inference import clip_utils, types
 import unittest
 from unittest import mock
 import requests
+import pycurl
+import certifi
+from io import BytesIO
 from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
 
 from marqo.tensor_search.enums import ModelProperties
@@ -37,68 +41,67 @@ class TestEncoding(unittest.TestCase):
 
     def test_load_image_from_path_all_req_errors(self):
         """Do we catch other download errors?
-        The errors tested inherit from requests.exceptions.RequestException
+        PyCurl only raises pycurl.error.
         """
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         # it should be fine normally
         clip_utils.load_image_from_path(good_url, {})
 
-        for err in [requests.exceptions.ReadTimeout, requests.exceptions.HTTPError]:
-            mock_get = mock.MagicMock()
-            mock_get.side_effect = err
+        for err in [pycurl.error]:
+            with mock.patch('pycurl.Curl') as MockCurl:
+                mock_curl = MockCurl.return_value
+                mock_curl.perform.side_effect = err  
 
-            @mock.patch('requests.get', mock_get)
-            def run():
-                try:
+                with pytest.raises(PIL.UnidentifiedImageError):
                     clip_utils.load_image_from_path(good_url, {})
-                    raise AssertionError
-                except PIL.UnidentifiedImageError:
-                    pass
-                return True
-
-            run()
 
     def test_load_image_from_path_http_error(self):
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         # it should be fine normally
         clip_utils.load_image_from_path(good_url, {})
-        #
-        normal_response = requests.get(good_url)
+        
+        buffer = BytesIO()
+        c = pycurl.Curl()
+        c.setopt(c.URL, good_url)
+        c.setopt(c.CAINFO, certifi.where())
+        c.setopt(c.WRITEDATA, buffer)
+        c.perform()
+        normal_response = c.getinfo(c.RESPONSE_CODE)
+        c.close()
         assert normal_response.status_code == 200
 
         for status_code in itertools.chain(range(400, 452), range(500, 512)):
-            mock_get = mock.MagicMock()
-            bad_response = copy.deepcopy(normal_response)
-            bad_response.status_code = status_code
-            mock_get.return_value = bad_response
+            with mock.patch('pycurl.Curl') as MockCurl:
+                mock_curl = MockCurl.return_value
+                mock_curl.getinfo.return_value = status_code
 
-            @mock.patch('requests.get', mock_get)
-            def run():
-                try:
+                with pytest.raises(PIL.UnidentifiedImageError) as exc_info:
                     clip_utils.load_image_from_path(good_url, {})
-                    raise AssertionError
-                except PIL.UnidentifiedImageError as e:
-                    assert str(status_code) in str(e)
-                return True
-
-            run()
+                
+                assert str(status_code) in str(exc_info.value)
 
     def test_load_image_from_path_closes_response(self):
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+    
+        mock_image_data = BytesIO()
+        PIL.Image.new('RGB', (10, 10)).save(mock_image_data, format='PNG')
+        mock_image_data.seek(0)
 
-        mock_resp = mock.MagicMock()
-        mock_resp.ok = True
+        with mock.patch('pycurl.Curl') as MockCurl:
+            mock_curl = MockCurl.return_value
+            mock_curl.getinfo.return_value = 200 
+            mock_curl.WRITEDATA.write(mock_image_data.getvalue()) 
 
-        with mock.patch('requests.get', return_value=mock_resp) as mock_get:
             with mock.patch('PIL.Image.open') as mock_open:
                 mock_open.side_effect = Exception()
 
                 with pytest.raises(Exception):
                     clip_utils.load_image_from_path(good_url, {})
+                
+                mock_curl.close.assert_called_once()
 
-                mock_get.assert_called_once()
-                mock_open.assert_called_once()
-                mock_resp.__exit__.assert_called_once()
+                mock_curl.setopt.assert_called()
+                mock_curl.perform.assert_called_once()
 
 
 class TestDownloadFromRepo(unittest.TestCase):

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import PIL
 import pytest
-import requests
+import pycurl
 
 from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
@@ -879,25 +879,29 @@ class TestAddDocumentsStructured(MarqoTestCase):
             self.assertFalse(res1['errors'])
             self.assertTrue(_check_get_docs(doc_count=c, title_value='blah'))
 
-    def test_image_download_timeout(self):
-        mock_get = mock.MagicMock()
-        mock_get.side_effect = requests.exceptions.RequestException
+    def test_image_download_timeout():
+        # Set up the PyCurl mock
+        with mock.patch('pycurl.Curl') as MockCurl:
+            mock_curl = MockCurl.return_value
+            # Simulate a timeout error using pycurl.error
+            mock_curl.perform.side_effect = pycurl.error('Timeout')
 
-        @mock.patch('requests.get', mock_get)
-        def run():
-            image_repo = dict()
-            add_docs.threaded_download_images(
-                allocated_docs=[
-                    {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
-                image_repo=image_repo,
-                tensor_fields=['Title', 'Desc', 'Loc'],
-                image_download_headers={}
-            )
-            assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
-            assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
-            return True
+            def run():
+                image_repo = dict()
+                add_docs.threaded_download_images(
+                    allocated_docs=[
+                        {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
+                    image_repo=image_repo,
+                    tensor_fields=['Title', 'Desc', 'Loc'],
+                    image_download_headers={}
+                )
+                # Validate that the image URL is captured in the repo with the corresponding error
+                assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
+                # Assuming the error is stored in the repo, check its type
+                assert isinstance(image_repo['https://google.com/my_dog.png'], UnidentifiedImageError)
+                return True
 
-        assert run()
+            assert run()
 
     def test_image_download(self):
         image_repo = dict()

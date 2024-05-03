@@ -64,31 +64,34 @@ class TestImageDownloadHeaders(MarqoTestCase):
         )
         image_download_headers = {"Authorization": "some secret key blah"}
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-            index_name=self.index_name_1, docs=[
-                {"_id": "1", "image": self.real_img_url}],
+            index_name=self.index_name_1, docs=[{"_id": "1", "image": self.real_img_url}],
             auto_refresh=True, image_download_headers=image_download_headers, device="cpu"))
 
-        def pass_through_requests_get(url, *args, **kwargs):
-            return requests_get(url, *args, **kwargs)
+        # Setup PyCurl mocking
+        with mock.patch('pycurl.Curl') as MockCurl:
+            # Set up PyCurl for expected behavior
+            mock_curl = MockCurl.return_value
+            mock_curl.getinfo.return_value = 200  # Simulating a successful HTTP status
+            
+            # Capture headers set in PyCurl
+            def check_headers(headers):
+                # Convert list to dict for easier comparison
+                header_dict = {k: v for k, v in (h.split(': ') for h in headers)}
+                return header_dict == image_download_headers
 
-        mock_get = unittest.mock.MagicMock()
-        mock_get.side_effect = pass_through_requests_get
+            mock_curl.setopt.side_effect = lambda option, value: check_headers(value) if option == pycurl.HTTPHEADER else None
 
-        # Mock the requests.get method to check if the headers are passed correctly
-        with mock.patch("requests.get", mock_get):
-            with mock.patch('marqo._httprequests.ALLOWED_OPERATIONS', {mock_get, requests.post, requests.put}):
-                # Perform a vector search
-                search_res = tensor_search._vector_text_search(
-                    config=self.config, index_name=self.index_name_1,
-                    result_count=1, query=self.real_img_url, image_download_headers=image_download_headers, device="cpu"
-                )
-                # Check if the image URL was called at least once with the correct headers
-                image_url_called = any(
-                    call_args[0] == self.real_img_url and call_kwargs.get('headers', None) == image_download_headers
-                    for call_args, call_kwargs in mock_get.call_args_list
-                )
-                assert image_url_called, "Image URL not called with the correct headers"
+            # Perform a vector search
+            search_res = tensor_search._vector_text_search(
+                config=self.config, index_name=self.index_name_1,
+                result_count=1, query=self.real_img_url, image_download_headers=image_download_headers, device="cpu"
+            )
 
+            # Check if the image URL was called with the correct headers
+            assert mock_curl.setopt.called, "Image URL not called with the correct headers"
+            headers_passed = check_headers([f"{k}: {v}" for k, v in image_download_headers.items()])
+            assert headers_passed, "Headers were not set correctly in PyCurl"
+    
     def test_img_download_add_docs(self):
 
         tensor_search.create_vector_index(
