@@ -228,6 +228,7 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
     elif prefix_type == "text_chunk_prefix" and marqo_index.override_text_chunk_prefix is not None:
         return marqo_index.override_text_chunk_prefix
 
+
     # Fallback to model_properties defined prefix
     try:
         model_properties = get_model_properties_from_registry(marqo_index.model.name)
