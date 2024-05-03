@@ -220,7 +220,6 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
         str: The determined prefix, or None if no prefix is found
     """
     if request_level_prefix is not None:
-        print(f"from the determine_text_prefix function, request_level_prefix is {request_level_prefix}")
         return request_level_prefix
 
     # Check for the presence of the textChunkPrefix or textQueryPrefix in the MarqoIndex object.
