@@ -2,7 +2,6 @@ import os
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 import validators
-# import requests
 import pycurl
 import certifi
 from io import BytesIO
@@ -154,8 +153,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
             raise UnidentifiedImageError(
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "
                 f"Timeout threshold is set to {timeout} seconds."
-                f"\nConnection error type: `{e.__class__.__name__}`"
-                f"\n{e}")
+                f"\nConnection error type: `{e.__class__.__name__}`")
     else:
         raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 
