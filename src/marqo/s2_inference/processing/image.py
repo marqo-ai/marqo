@@ -5,8 +5,7 @@ import PIL
 import numpy as np
 import torch
 import torchvision
-from marqo.s2_inference.s2_inference import available_models,_create_model_cache_key
-from marqo.s2_inference.s2_inference import get_logger
+from marqo.s2_inference.s2_inference import get_available_models, _create_model_cache_key, get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
 from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
 from marqo.s2_inference.errors import ChunkerError
@@ -207,7 +206,7 @@ class PatchifyModel:
         model_type = (self.model_name, self.device)
         model_cache_key = _create_model_cache_key(self.model_name, self.device)
 
-        if model_cache_key not in available_models:
+        if model_cache_key not in get_available_models():
             logger.info(f"loading model {model_type}")
             if model_type[0] in self.allowed_model_types:
                 func = self.model_load_function
@@ -216,11 +215,11 @@ class PatchifyModel:
 
             self.model, self.preprocess = func(self.model_name, self.device)
 
-            available_models[model_cache_key] = {AvailableModelsKey.model: (self.model, self.preprocess),
+            get_available_models()[model_cache_key] = {AvailableModelsKey.model: (self.model, self.preprocess),
                                                  AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
 
         else:
-            self.model, self.preprocess = available_models[model_cache_key][AvailableModelsKey.model]
+            self.model, self.preprocess = get_available_models()[model_cache_key][AvailableModelsKey.model]
 
     def _load_image(self, image):
         self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)

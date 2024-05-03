@@ -249,6 +249,29 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                     yql="select * from sources * where title contains 'Title 1';"
                 )
 
+    def test_default_search_timeout_fails(self):
+        """
+        VespaTimeoutError error is raised when VespaClient is created with a default timeout of 1ms.
+        This will fail even if query 'timeout' isn't set, since the default timeout will be used.
+        """
+        query_client = VespaClient("http://localhost:8080", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default",
+                                   default_search_timeout_ms=1)
+
+        def pass_through_post(*args, **kwargs):
+            return httpx.post(*args, **kwargs)
+
+        with patch.object(
+                httpx.Client, "post",
+                wraps=pass_through_post
+        ) as mock_post:
+            with self.assertRaisesStrict(VespaTimeoutError):
+                query_client.query(
+                    yql="select * from sources * where title contains 'Title 1';"
+                )
+            # Ensure that post was called with correct timeout
+            self.assertEqual(mock_post.call_args.kwargs['json']['timeout'], '1ms')
+
     def test_query_softDoom_fails(self):
         """
         VespaTimeoutError error is raised when Vespa responds with a soft doom error.

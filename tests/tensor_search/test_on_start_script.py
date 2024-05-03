@@ -2,10 +2,9 @@ import json
 
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
-from marqo.tensor_search import enums, configs
+from marqo.tensor_search import enums
 from marqo.tensor_search import on_start_script
-from marqo.s2_inference import s2_inference
-from marqo.api import exceptions
+from marqo.api import exceptions, configs
 import os
 
 

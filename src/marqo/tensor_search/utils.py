@@ -12,9 +12,9 @@ from typing import (
 import torch
 from fastapi import HTTPException
 
-from marqo.api import exceptions
+from marqo.api import exceptions, configs
 from marqo.marqo_logging import logger
-from marqo.tensor_search import enums, configs
+from marqo.tensor_search import enums
 from marqo.tensor_search.enums import EnvVars
 
 
@@ -404,6 +404,20 @@ def enable_debug_apis():
             if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_DEBUG_API).lower() != 'true':
                 raise HTTPException(status_code=403,
                                     detail="This API endpoint is disabled. Please set MARQO_ENABLE_DEBUG_API to true to enable it.")
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator_function
+
+
+def enable_ops_api():
+    def decorator_function(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_OPS_API).lower() != 'true':
+                raise HTTPException(status_code=403,
+                                    detail="This API endpoint is disabled. Please set MARQO_ENABLE_OPS_API to true to enable it.")
             return func(*args, **kwargs)
 
         return wrapper
