@@ -233,9 +233,9 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
         model_properties = get_model_properties_from_registry(marqo_index.model.name)
 
         if model_properties is not None:
-            default_prefixes = model_properties.get(prefix_type)
-            if default_prefixes is not None:
-                return default_prefixes
+            default_prefix = model_properties.get(prefix_type)
+            if default_prefix is not None:
+                return default_prefix
             else:
                 return ""
         else:
