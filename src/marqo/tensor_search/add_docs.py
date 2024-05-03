@@ -236,6 +236,8 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
             default_prefixes = model_properties.get(prefix_type)
             if default_prefixes is not None:
                 return default_prefixes
+            else:
+                return ""
         else:
             raise ValueError(f"Model properties not found for model: {marqo_index.model}")
     except InvalidModelPropertiesError as e:
