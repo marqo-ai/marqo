@@ -15,6 +15,7 @@ from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.tensor_search.models.api_models import BaseMarqoModel
 from marqo.api.exceptions import InvalidArgError
 from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.embed.embed import EmbedContentType
 
 
 class EmbedRequest(BaseMarqoModel):
@@ -22,7 +23,7 @@ class EmbedRequest(BaseMarqoModel):
     content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
     image_download_headers: Optional[Dict] = None
     modelAuth: Optional[ModelAuth] = None
-    content_type: Optional[str] = None
+    content_type: Optional[EmbedContentType] = EmbedContentType.Query
 
     @pydantic.validator('content')
     def validate_content(cls, value):

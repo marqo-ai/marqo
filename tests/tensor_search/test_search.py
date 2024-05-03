@@ -20,7 +20,7 @@ from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from tests.utils.transition import add_docs_caller
-from marqo.tensor_search.add_docs import determine_text_prefix
+from marqo.core.utils.prefix import determine_text_prefix
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
     ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod
 

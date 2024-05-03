@@ -83,7 +83,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
-from marqo.tensor_search.add_docs import determine_text_prefix
+from marqo.core.utils.prefix import determine_text_prefix
 
 logger = get_logger(__name__)
 
@@ -299,9 +299,9 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             split_overlap = marqo_index.text_preprocessing.split_overlap
                             content_chunks: List[str] = text_processor.split_text(field_content, split_by=split_by,
                                                                                   split_length=split_length,
-                                                                                  split_overlap=split_overlap,
-                                                                                  prefix=text_chunk_prefix)
+                                                                                  split_overlap=split_overlap)
                             text_chunks = content_chunks
+                            content_chunks = text_processor.prefix_text_chunks(content_chunks, text_chunk_prefix)
                         else:
                             # TODO put the logic for getting field parameters into a function and add per field options
                             image_method = marqo_index.image_preprocessing.patch_method
@@ -733,9 +733,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             split_overlap = marqo_index.text_preprocessing.split_overlap
                             content_chunks = text_processor.split_text(field_content, split_by=split_by,
                                                                        split_length=split_length,
-                                                                       split_overlap=split_overlap,
-                                                                       prefix=text_chunk_prefix)
+                                                                       split_overlap=split_overlap)
                             text_chunks = content_chunks
+                            content_chunks = text_processor.prefix_text_chunks(content_chunks, text_chunk_prefix)
                         else:
                             # TODO put the logic for getting field parameters into a function and add per field options
                             image_method = marqo_index.image_preprocessing.patch_method
@@ -1755,6 +1755,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
     prefixed_queries = add_prefix_to_queries(queries)
+    print(f"from the run_vectorise_pipeline function, prefixed_queries is {prefixed_queries}")
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different

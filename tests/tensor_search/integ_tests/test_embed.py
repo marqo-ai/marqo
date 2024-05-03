@@ -12,6 +12,7 @@ import json
 from unittest import mock
 from unittest.mock import patch
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.embed.embed import EmbedContentType
 from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
@@ -62,6 +63,11 @@ class TestEmbed(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
+        unstructured_image_index_with_e5_small = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/e5-small'),
+            treat_urls_and_pointers_as_images=True
+        )
+
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
             model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
@@ -102,22 +108,38 @@ class TestEmbed(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
         )
 
+        structured_image_index_with_e5_small = cls.structured_marqo_index_request(
+            model=Model(name='hf/e5-small'),
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field_2", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer)
+            ],
+            tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
             unstructured_image_index_with_random_model,
+            unstructured_image_index_with_e5_small,
             structured_default_text_index,
             structured_default_image_index,
-            structured_image_index_with_random_model
+            structured_image_index_with_random_model,
+            structured_image_index_with_e5_small
         ])
 
         # Assign to objects so they can be used in tests
         cls.unstructured_default_text_index = cls.indexes[0]
         cls.unstructured_default_image_index = cls.indexes[1]
         cls.unstructured_image_index_with_random_model = cls.indexes[2]
-        cls.structured_default_text_index = cls.indexes[3]
-        cls.structured_default_image_index = cls.indexes[4]
-        cls.structured_image_index_with_random_model = cls.indexes[5]
+        cls.unstructured_image_index_with_e5_small = cls.indexes[3]
+        cls.structured_default_text_index = cls.indexes[4]
+        cls.structured_default_image_index = cls.indexes[5]
+        cls.structured_image_index_with_random_model = cls.indexes[6]
+        cls.structured_image_index_with_e5_small = cls.indexes[7]
 
     def setUp(self) -> None:
         super().setUp()
@@ -210,14 +232,13 @@ class TestEmbed(MarqoTestCase):
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
                     embedding_request=EmbedRequest(
-                        content=["I am the GOAT."],
-                        content_type="PREFIX: "
+                        content=["PREFIX: I am the GOAT."],
                     ),
                     device="cpu"
                 )
 
                 # Assert vectors are equal
-                self.assertEqual(embed_res["content"], ["I am the GOAT."])
+                self.assertEqual(embed_res["content"], ["PREFIX: I am the GOAT."])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], get_docs_embedding))
 
     def test_embed_equivalent_to_search_text(self):
@@ -303,14 +324,13 @@ class TestEmbed(MarqoTestCase):
                 embed_res = embed(
                     marqo_config=self.config, index_name=index.name,
                     embedding_request=EmbedRequest(
-                        content=["I am the GOAT."],
-                        content_type="PREFIX: "
+                        content=["PREFIX: I am the GOAT."],
                     ),
                     device="cpu"
                 )
 
                 # Assert vectors are equal
-                self.assertEqual(embed_res["content"], ["I am the GOAT."])
+                self.assertEqual(embed_res["content"], ["PREFIX: I am the GOAT."])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
 
     def test_embed_equivalent_to_search_image(self):
@@ -547,3 +567,59 @@ class TestEmbed(MarqoTestCase):
                                 device="cpu"
                             )
                     self.assertIn(error_message, str(e.exception))
+
+    def test_embed_prefix_content_type(self):
+        """
+        Ensure that the embedding returned by embed endpoint with hardcoded prefix matches the one created by
+        add_docs with prefix set.
+        Embedding from add_docs is retrieved using get_document_by_id with show_vectors=True.
+        """
+        for index in [self.unstructured_image_index_with_e5_small, self.structured_image_index_with_e5_small]:
+            with self.subTest(index=index.type):
+                # Embed request with hardcoded prefix
+                embed_res_hardcoded = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["query: I am the GOAT."],
+                        content_type=None,
+                    ),
+                    device="cpu"
+                )
+
+                # Embed request with prefix set
+                embed_res_prefix_query = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["I am the GOAT."],
+                        content_type=EmbedContentType.Query
+                    ),
+                    device="cpu"
+                )
+
+                # Assert vectors are equal
+                self.assertEqual(embed_res_hardcoded["content"], ["query: I am the GOAT."])
+                self.assertTrue(np.allclose(embed_res_hardcoded["embeddings"][0], embed_res_prefix_query["embeddings"][0]))
+
+                # Embed request with hardcoded prefix
+                embed_res_hardcoded = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["passage: I am the GOAT."],
+                        content_type=None
+                    ),
+                    device="cpu"
+                )
+
+                # Embed request with prefix set
+                embed_res_prefix_query = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["I am the GOAT."],
+                        content_type=EmbedContentType.Document
+                    ),
+                    device="cpu"
+                )
+
+                # Assert vectors are equal
+                self.assertEqual(embed_res_hardcoded["content"], ["passage: I am the GOAT."])
+                self.assertTrue(np.allclose(embed_res_hardcoded["embeddings"][0], embed_res_prefix_query["embeddings"][0]))

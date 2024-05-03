@@ -1,5 +1,6 @@
 from timeit import default_timer as timer
 from typing import List, Optional, Union, Dict
+from enum import Enum
 
 import pydantic
 
@@ -10,11 +11,14 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.tensor_search.add_docs import determine_text_prefix
+from marqo.core.utils.prefix import determine_text_prefix
 from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
 
+class EmbedContentType(Enum):
+    Query = "query"
+    Document = "document"
 
 class Embed:
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, default_device: str):
@@ -32,7 +36,7 @@ class Embed:
                     self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
                     index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None,
-                    content_type: str = "query"
+                    content_type: Optional[EmbedContentType] = EmbedContentType.Query
                     ) -> Dict:
         """
         Use the index's model to embed the content
@@ -49,6 +53,9 @@ class Embed:
         3. If the user wants a custom prefix, they must put it in the content itself.
         """
 
+        print(f"from the embed.py file, index_name is {index_name}")
+
+
         # TODO: Remove this config constructor once vectorise pipeline doesn't need it. Just pass the vespa client
         # and index management objects.
         from marqo import config
@@ -61,12 +68,15 @@ class Embed:
         if device is None:
             device = self.default_device
 
+
         # Content validation is done in API model layer
         t0 = timer()
 
         # Generate input for the vectorise pipeline (Preprocessing)
         RequestMetricsStore.for_request().start("embed.query_preprocessing")
         marqo_index = index_meta_cache.get_index(config=temp_config, index_name=index_name)
+
+        print(f"from the embed.py file, marqo_index is {marqo_index}")
 
         # Transform content to list if it is not already
         if isinstance(content, List):
@@ -76,13 +86,18 @@ class Embed:
         else:
             raise base_exceptions.InternalError(f"Content type {type(content)} is not supported for embed endpoint.")
 
-        # Decide on the prefix
-        if content_type == "query":
+        # Decide on the prefix 
+        if content_type == EmbedContentType.Query:
             prefix = determine_text_prefix(None, marqo_index, "text_query_prefix")
-        elif content_type == "document":
+            print(f"from the embed.py file, prefix is {prefix}")
+        elif content_type == EmbedContentType.Document:
             prefix = determine_text_prefix(None, marqo_index, "text_chunk_prefix")
+            print(f"from the embed.py file, prefix is {prefix}")
+        elif content_type is None:
+            prefix = ""
+            print(f"from the embed.py file, prefix is {prefix}")
         else:
-            prefix = determine_text_prefix(content_type, marqo_index, "text_query_prefix")
+            raise ValueError(f"Invalid content_type: {content_type}. Must be EmbedContentType.Query, EmbedContentType.Document, or None.")
         
         queries = []
         for content_entry in content_list:

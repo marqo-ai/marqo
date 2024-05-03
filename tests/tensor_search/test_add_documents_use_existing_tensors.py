@@ -4,13 +4,11 @@ import unittest
 from unittest import mock
 import time
 
-from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
-    ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod
+from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.add_docs import determine_text_prefix
 
 
 class TestAddDocumentsUseExistingTensors(MarqoTestCase):
@@ -353,77 +351,6 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                     self.assertEqual(1, len(get_doc_res["_tensor_facets"]))
                     self.assertEqual('{"text_field_1": "content 1", "text_field_2": "content 2-updated"}',
                                      get_doc_res["_tensor_facets"][0]["multimodal_field"])
-
-    def test_determine_text_chunk_prefix(self):
-        """
-        Ensures proper priority order is followed when determining the chunk prefix.
-        add docs request-level > index override-level > model default level
-        """
-
-        marqo_index_with_model_default = UnstructuredMarqoIndex(
-            name="test_index",
-            schema_name="test_schema",
-            model=Model(name="test_prefix"),
-            normalize_embeddings=True,
-            text_preprocessing=TextPreProcessing(
-                split_length=10,
-                split_overlap=0,
-                split_method=TextSplitMethod.Sentence
-            ),
-            image_preprocessing=ImagePreProcessing(),
-            distance_metric=DistanceMetric.Euclidean,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(
-                ef_construction=100,
-                m=16
-            ),
-            marqo_version="0.0.1",
-            created_at=int(time.time()),
-            updated_at=int(time.time()),
-            treat_urls_and_pointers_as_images=False,
-            filter_string_max_length=20
-        )
-
-        marqo_index_with_override = UnstructuredMarqoIndex(
-            name="test_index",
-            schema_name="test_schema",
-            model=Model(name="test_prefix"),
-            normalize_embeddings=True,
-            text_preprocessing=TextPreProcessing(
-                split_length=10,
-                split_overlap=0,
-                split_method=TextSplitMethod.Sentence
-            ),
-            image_preprocessing=ImagePreProcessing(),
-            distance_metric=DistanceMetric.Euclidean,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(
-                ef_construction=100,
-                m=16
-            ),
-            marqo_version="0.0.1",
-            created_at=int(time.time()),
-            updated_at=int(time.time()),
-            treat_urls_and_pointers_as_images=False,
-            filter_string_max_length=20,
-            override_text_chunk_prefix="index-override"
-        )
-
-        with self.subTest("All prefixes on (request level chosen)"):
-            result = determine_text_prefix("request-level", marqo_index_with_override, "text_chunk_prefix")
-            self.assertEqual(result, "request-level")
-
-        with self.subTest("Request and model default on (request level chosen)"):
-            result = determine_text_prefix("request-level", marqo_index_with_model_default, "text_chunk_prefix")
-            self.assertEqual(result, "request-level")
-
-        with self.subTest("Index override and model default on (index override chosen)"):
-            result = determine_text_prefix(None, marqo_index_with_override, "text_chunk_prefix")
-            self.assertEqual(result, "index-override")
-
-        with self.subTest("Only model default on (model default chosen)"):
-            result = determine_text_prefix(None, marqo_index_with_model_default, "text_chunk_prefix")
-            self.assertEqual(result, "test passage: ")
 
     @unittest.skip
     def test_use_existing_tensors_resilience(self):

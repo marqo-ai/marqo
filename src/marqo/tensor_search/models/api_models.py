@@ -82,7 +82,6 @@ class BulkSearchQueryEntity(SearchQuery):
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
     text_query_prefix: Optional[str] = None
-    #text_chunk_prefix: Optional[str] = None
 
     def to_search_query(self):
         return SearchQuery(**self.dict())
