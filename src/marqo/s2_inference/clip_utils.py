@@ -11,7 +11,7 @@ from PIL import Image, UnidentifiedImageError
 from multilingual_clip import pt_multilingual_clip
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from torchvision.transforms import InterpolationMode
-from urllib3.exceptions import ProtocolError
+from urllib3.exceptions import HTTPError as urllib3_HTTPError
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
@@ -117,7 +117,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
                 metrics_obj.stop(f"image_download.{image_path}")
 
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException, ConnectionResetError, ProtocolError
+                requests.exceptions.RequestException, ConnectionError, urllib3_HTTPError
                 ) as e:
             raise UnidentifiedImageError(
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "

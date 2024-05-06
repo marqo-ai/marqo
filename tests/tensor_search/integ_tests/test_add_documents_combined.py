@@ -107,7 +107,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                                                                "vectorise for add_documents")
                 mock_vectorise.reset_mock()
 
-    def test_connectionResetErrorHandled_successfully(self):
+    def test_imageRepoHandleConnectionError_successfully(self):
         """Ensure ConnectionResetError is not causing 500 error, but 400 for the document in add_documents."""
         documents = [
             {
@@ -133,3 +133,27 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     self.assertEqual(1, len(r["items"]))
                     self.assertEqual(400, r["items"][0]["status"])
                     self.assertIn(str(error.__name__), r["items"][0]["error"])
+
+    def test_imageRepoHandleThreadHandleError_successfully(self):
+        """Ensure image_repo can catch an unexpected error right in thread."""
+        documents = [
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/"
+                                 "marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "_id": "1"
+            }
+        ]
+
+        for index_name in [self.unstructured_marqo_index_name, self.structured_marqo_index_name]:
+            error = Exception("Unexpected error during image download")
+            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+                else None
+            with (self.subTest(f"{index_name}-{error}")):
+                with patch("marqo.s2_inference.clip_utils.requests.get", side_effect=error) \
+                        as mock_requests_get:
+                    with self.assertRaises(Exception) as e:
+                        r = tensor_search.add_documents(config=self.config,
+                                                        add_docs_params=AddDocsParams(index_name=index_name,
+                                                                                      docs=documents,
+                                                                                      tensor_fields=tensor_fields))
+                        self.assertIn("Unexpected error during image download", str(e.exception))
