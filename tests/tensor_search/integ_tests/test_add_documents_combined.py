@@ -108,7 +108,6 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
     def test_connectionResetErrorHandled_successfully(self):
         """Ensure ConnectionResetError is not causing 500 error, but 400 for the document in add_documents."""
-        """Ensure vectorise does not receive enable_cache when calling add_documents."""
         documents = [
             {
                 "image_field_1": "https://raw.githubusercontent.com/marqo-ai/"
