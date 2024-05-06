@@ -6,7 +6,7 @@ import numpy as np
 from unittest import mock
 from unittest.mock import Mock, patch
 from marqo.core.embed.embed import Embed
-from marqo.core.utils.prefix import determine_text_prefix
+from marqo.core.utils.prefix import determine_text_prefix, DeterminePrefixContentType
 from marqo.api.models.embed_request import EmbedRequest
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
@@ -16,7 +16,6 @@ from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.core.models.marqo_index import StructuredMarqoIndex, FieldFeature, FieldType, Model
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
     ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod
-from marqo.core.embed.embed import EmbedContentType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference import s2_inference
 from tests.marqo_test import MarqoTestCase
@@ -49,6 +48,17 @@ class TestPrefix(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
+        unstructured_index_with_model_default = cls.unstructured_marqo_index_request(
+            model=Model(name="test_prefix"),
+            treat_urls_and_pointers_as_images=False,
+        )
+
+        unstructured_index_with_override = cls.unstructured_marqo_index_request(
+            model=Model(name="test_prefix"),
+            treat_urls_and_pointers_as_images=True,
+            override_text_chunk_prefix="index-override: "
+        )
+
         # STRUCTURED indexes
         structured_text_index = cls.structured_marqo_index_request(
             model=Model(name="random/small"),
@@ -77,6 +87,8 @@ class TestPrefix(MarqoTestCase):
             unstructured_index_1,
             unstructured_index_e5,
             unstructured_index_multimodal,
+            unstructured_index_with_model_default,
+            unstructured_index_with_override,
             structured_text_index,
             structured_multimodal_index
         ])
@@ -85,8 +97,10 @@ class TestPrefix(MarqoTestCase):
         cls.unstructured_index_1 = cls.indexes[0]
         cls.unstructured_index_e5 = cls.indexes[1]
         cls.unstructured_index_multimodal = cls.indexes[2]
-        cls.structured_text_index = cls.indexes[3]
-        cls.structured_multimodal_index = cls.indexes[4]
+        cls.unstructured_index_with_model_default = cls.indexes[3]
+        cls.unstructured_index_with_override = cls.indexes[4]
+        cls.structured_text_index = cls.indexes[5]
+        cls.structured_multimodal_index = cls.indexes[6]
 
     def setUp(self) -> None:
         super().setUp()
@@ -198,7 +212,7 @@ class TestPrefix(MarqoTestCase):
                     marqo_config=self.config, index_name=index.name,
                     embedding_request=EmbedRequest(
                         content=["hello"],
-                        content_type=EmbedContentType.Document
+                        content_type="document"
                     ),
                     device="cpu"
                 )
@@ -323,70 +337,51 @@ class TestPrefix(MarqoTestCase):
         add docs request-level > index override-level > model default level
         """
 
-        marqo_index_with_model_default = UnstructuredMarqoIndex(
-            name="test_index",
-            schema_name="test_schema",
-            model=Model(name="test_prefix"),
-            normalize_embeddings=True,
-            text_preprocessing=TextPreProcessing(
-                split_length=10,
-                split_overlap=0,
-                split_method=TextSplitMethod.Sentence
-            ),
-            image_preprocessing=ImagePreProcessing(),
-            distance_metric=DistanceMetric.Euclidean,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(
-                ef_construction=100,
-                m=16
-            ),
-            marqo_version="0.0.1",
-            created_at=int(time.time()),
-            updated_at=int(time.time()),
-            treat_urls_and_pointers_as_images=False,
-            filter_string_max_length=20
-        )
-
-        marqo_index_with_override = UnstructuredMarqoIndex(
-            name="test_index",
-            schema_name="test_schema",
-            model=Model(name="test_prefix"),
-            normalize_embeddings=True,
-            text_preprocessing=TextPreProcessing(
-                split_length=10,
-                split_overlap=0,
-                split_method=TextSplitMethod.Sentence
-            ),
-            image_preprocessing=ImagePreProcessing(),
-            distance_metric=DistanceMetric.Euclidean,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(
-                ef_construction=100,
-                m=16
-            ),
-            marqo_version="0.0.1",
-            created_at=int(time.time()),
-            updated_at=int(time.time()),
-            treat_urls_and_pointers_as_images=False,
-            filter_string_max_length=20,
-            override_text_chunk_prefix="index-override"
-        )
-
         with self.subTest("All prefixes on (request level chosen)"):
-            result = determine_text_prefix("request-level", marqo_index_with_override, "text_chunk_prefix")
+            result = determine_text_prefix("request-level", self.unstructured_index_with_override, DeterminePrefixContentType.TextChunk)
             self.assertEqual(result, "request-level")
 
         with self.subTest("Request and model default on (request level chosen)"):
-            result = determine_text_prefix("request-level", marqo_index_with_model_default, "text_chunk_prefix")
+            result = determine_text_prefix("request-level", self.unstructured_index_with_model_default, DeterminePrefixContentType.TextChunk)
             self.assertEqual(result, "request-level")
 
         with self.subTest("Index override and model default on (index override chosen)"):
-            result = determine_text_prefix(None, marqo_index_with_override, "text_chunk_prefix")
-            self.assertEqual(result, "index-override")
+            result = determine_text_prefix(None, self.unstructured_index_with_override, DeterminePrefixContentType.TextChunk)
+            self.assertEqual(result, "index-override: ")
 
         with self.subTest("Only model default on (model default chosen)"):
-            result = determine_text_prefix(None, marqo_index_with_model_default, "text_chunk_prefix")
+            result = determine_text_prefix(None, self.unstructured_index_with_model_default, DeterminePrefixContentType.TextChunk)
             self.assertEqual(result, "test passage: ")
+
+        # doc_a should default to the override prefix
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.unstructured_index_with_override.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
+            device=self.config.default_device,
+            tensor_fields=["text"] if isinstance(self.unstructured_index_with_override, UnstructuredMarqoIndex) else None
+        ))
+
+        # Get all documents (with vectors)
+        res = tensor_search.get_documents_by_ids(
+            config=self.config, index_name=self.unstructured_index_with_override.name, document_ids=["doc_a"],
+            show_vectors=True
+        )
+
+        # we hardcode the prefix into the text chunk and embed
+        embed_res = embed(
+            marqo_config=self.config, index_name=self.unstructured_index_with_override.name,
+            embedding_request=EmbedRequest(
+                content=["index-override: hello"],
+                content_type=None
+            ),
+            device="cpu"
+        )
+
+        print(f"embed_res['embeddings'][0]: {embed_res['embeddings'][0]}")
+        print(f"res['results'][0]['_tensor_facets'][0]['_embedding']: {res['results'][0]['_tensor_facets'][0]['_embedding']}")
+
+        # We assert that the embeddings are equal
+        with self.subTest("Embeddings are equal between overriden doc and direct embed"):
+            self.assertTrue(np.allclose(embed_res["embeddings"][0], res["results"][0]["_tensor_facets"][0]["_embedding"]))
 
 
     def test_prefix_text_search(self):

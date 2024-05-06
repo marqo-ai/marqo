@@ -3,8 +3,11 @@ from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 
+class DeterminePrefixContentType(Enum):
+    TextChunk = "text_chunk_prefix"
+    TextQuery = "text_query_prefix"
 
-def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, prefix_type: str) -> str:
+def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, prefix_type: DeterminePrefixContentType) -> str:
     """
     Determines the text prefix to be used for chunking text fields or search queries.
     This prefix will be added before each text chunk or query to enhance processing accuracy.
@@ -28,32 +31,24 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
     
 
     # Check for the presence of the textChunkPrefix or textQueryPrefix in the MarqoIndex object.
-    if prefix_type == "text_query_prefix" and marqo_index.override_text_query_prefix is not None:
+    if prefix_type == DeterminePrefixContentType.TextQuery and marqo_index.override_text_query_prefix is not None:
         return marqo_index.override_text_query_prefix
-    elif prefix_type == "text_chunk_prefix" and marqo_index.override_text_chunk_prefix is not None:
+    elif prefix_type == DeterminePrefixContentType.TextChunk and marqo_index.override_text_chunk_prefix is not None:
         return marqo_index.override_text_chunk_prefix
 
     # Fallback to model_properties defined prefix
     try:
-        if marqo_index.model is not None:
-            model_properties = marqo_index.model.properties
-            if model_properties is not None:
-                default_prefix = model_properties.get(prefix_type)
-                if default_prefix is not None:
-                    return default_prefix
-        
-        model_properties = get_model_properties_from_registry(marqo_index.model.name)
+        model_properties = marqo_index.model.properties if marqo_index.model is not None else None
+        if model_properties is None and marqo_index.model is not None:
+            model_properties = get_model_properties_from_registry(marqo_index.model.name)
 
         if model_properties is not None:
-            default_prefix = model_properties.get(prefix_type)
-            if default_prefix is not None:
-                return default_prefix
-            else:
-                return ""
+            default_prefix = model_properties.get(prefix_type.value)
+            return default_prefix if default_prefix is not None else ""
         else:
-            raise ValueError(f"Model properties not found for model: {marqo_index.model}")
+            raise ValueError(f"Model properties not found for model: {marqo_index.model.name}")
     except InvalidModelPropertiesError as e:
-        pass
+        raise e
     
     # If no prefix is found, return empty string ""
     return ""

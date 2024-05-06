@@ -143,7 +143,9 @@ class MarqoTestCase(unittest.TestCase):
             ),
             marqo_version=version.get_version(),
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
+            override_text_chunk_prefix=None,
+            override_text_query_prefix=None
     ) -> StructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
@@ -164,7 +166,9 @@ class MarqoTestCase(unittest.TestCase):
             tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            override_text_chunk_prefix=override_text_chunk_prefix,
+            override_text_query_prefix=override_text_query_prefix
         )
 
     @classmethod
@@ -190,7 +194,9 @@ class MarqoTestCase(unittest.TestCase):
             treat_urls_and_pointers_as_images: bool = False,
             marqo_version='1.0.0',
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
+            override_text_chunk_prefix=None,
+            override_text_query_prefix=None
     ) -> UnstructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndexRequest.
@@ -211,7 +217,9 @@ class MarqoTestCase(unittest.TestCase):
             hnsw_config=hnsw_config,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            override_text_chunk_prefix=override_text_chunk_prefix,
+            override_text_query_prefix=override_text_query_prefix
         )
 
     class _AssertRaisesContext:

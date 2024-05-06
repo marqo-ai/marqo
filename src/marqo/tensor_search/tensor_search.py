@@ -83,7 +83,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
-from marqo.core.utils.prefix import determine_text_prefix
+from marqo.core.utils.prefix import determine_text_prefix, DeterminePrefixContentType
 
 logger = get_logger(__name__)
 
@@ -139,7 +139,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
-    text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
+    text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, DeterminePrefixContentType.TextChunk)
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
@@ -562,7 +562,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)  # use length before deduplication
     image_repo = {}
-    text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, "text_chunk_prefix")
+    text_chunk_prefix = determine_text_prefix(add_docs_params.text_chunk_prefix, marqo_index, DeterminePrefixContentType.TextChunk)
 
     # Deduplicate docs, keep the latest
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
@@ -1708,7 +1708,7 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
     prefixed_queries = []
     for q in queries:
-        text_query_prefix = determine_text_prefix(q.text_query_prefix, q.index, "text_query_prefix")
+        text_query_prefix = determine_text_prefix(q.text_query_prefix, q.index, DeterminePrefixContentType.TextQuery)
 
         if q.q is None:
             prefixed_q = q.q
@@ -1830,7 +1830,7 @@ def _vector_text_search(
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     # Determine the text query prefix
-    text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index, "text_query_prefix")
+    text_query_prefix = determine_text_prefix(text_query_prefix, marqo_index, DeterminePrefixContentType.TextQuery)
 
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
@@ -2085,7 +2085,8 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
         doc_id: str, device: str, marqo_index: StructuredMarqoIndex, image_repo, field_map: dict,
-        model_auth: Optional[ModelAuth] = None, text_chunk_prefix: str = ""
+        model_auth: Optional[ModelAuth] = None, 
+        text_chunk_prefix: str = None
 ):
     """
     This function is used to vectorise multimodal combination field. The field content should
