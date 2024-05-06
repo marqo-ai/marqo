@@ -1713,8 +1713,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
         if q.q is None:
             prefixed_q = q.q
         elif isinstance(q.q, str):
-            if _is_image(q.q) and ((isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images) or
-                (isinstance(q.index, StructuredMarqoIndex))):
+            if _is_image(q.q):
                 prefixed_q = q.q
             else:
                 prefixed_q = f"{text_query_prefix}{q.q}"
@@ -1722,8 +1721,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
             prefixed_q = {}
             for key, value in q.q.items():
                 # Apply prefix if key is not an image or if index does not treat URLs and pointers as images
-                if _is_image(key) and ((isinstance(q.index, UnstructuredMarqoIndex) and q.index.treat_urls_and_pointers_as_images) or
-                    (isinstance(q.index, StructuredMarqoIndex))):
+                if _is_image(key):
                     prefixed_q[key] = value
                 else:
                     prefixed_q[f"{text_query_prefix}{key}"] = value
