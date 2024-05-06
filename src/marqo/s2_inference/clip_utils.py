@@ -1,24 +1,27 @@
 import os
-from marqo.tensor_search.enums import ModelProperties, InferenceParams
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
-import validators
-import requests
-import numpy as np
+
 import clip
-import torch
-from PIL import Image, UnidentifiedImageError
+import numpy as np
 import open_clip
-from multilingual_clip import pt_multilingual_clip
+import requests
+import torch
 import transformers
-from marqo.s2_inference.types import *
-from marqo.s2_inference.logger import get_logger
-from marqo.s2_inference.errors import IncompatibleModelDeviceError, InvalidModelPropertiesError
+import validators
+from PIL import Image, UnidentifiedImageError
+from multilingual_clip import pt_multilingual_clip
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from torchvision.transforms import InterpolationMode
-from marqo.s2_inference.configs import ModelCache
+from urllib3.exceptions import HTTPError as urllib3_HTTPError
+
 from marqo.api.exceptions import InternalError
-from marqo.tensor_search.telemetry import RequestMetrics, RequestMetricsStore
+from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.logger import get_logger
+from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
+from marqo.s2_inference.types import *
+from marqo.tensor_search.enums import ModelProperties, InferenceParams
+from marqo.tensor_search.models.private_models import ModelLocation
+from marqo.tensor_search.telemetry import RequestMetrics
 
 logger = get_logger(__name__)
 
@@ -114,7 +117,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
                 metrics_obj.stop(f"image_download.{image_path}")
 
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException
+                requests.exceptions.RequestException, ConnectionError, urllib3_HTTPError
                 ) as e:
             raise UnidentifiedImageError(
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "
