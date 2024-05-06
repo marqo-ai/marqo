@@ -1755,7 +1755,6 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
     prefixed_queries = add_prefix_to_queries(queries)
-    print(f"from the run_vectorise_pipeline function, prefixed_queries is {prefixed_queries}")
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different

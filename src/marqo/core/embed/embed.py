@@ -53,8 +53,6 @@ class Embed:
         3. If the user wants a custom prefix, they must put it in the content itself.
         """
 
-        print(f"from the embed.py file, index_name is {index_name}")
-
 
         # TODO: Remove this config constructor once vectorise pipeline doesn't need it. Just pass the vespa client
         # and index management objects.
@@ -76,8 +74,6 @@ class Embed:
         RequestMetricsStore.for_request().start("embed.query_preprocessing")
         marqo_index = index_meta_cache.get_index(config=temp_config, index_name=index_name)
 
-        print(f"from the embed.py file, marqo_index is {marqo_index}")
-
         # Transform content to list if it is not already
         if isinstance(content, List):
             content_list = content
@@ -89,13 +85,10 @@ class Embed:
         # Decide on the prefix 
         if content_type == EmbedContentType.Query:
             prefix = determine_text_prefix(None, marqo_index, "text_query_prefix")
-            print(f"from the embed.py file, prefix is {prefix}")
         elif content_type == EmbedContentType.Document:
             prefix = determine_text_prefix(None, marqo_index, "text_chunk_prefix")
-            print(f"from the embed.py file, prefix is {prefix}")
         elif content_type is None:
             prefix = ""
-            print(f"from the embed.py file, prefix is {prefix}")
         else:
             raise ValueError(f"Invalid content_type: {content_type}. Must be EmbedContentType.Query, EmbedContentType.Document, or None.")
         
