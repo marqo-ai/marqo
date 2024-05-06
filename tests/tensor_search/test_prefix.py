@@ -40,6 +40,10 @@ class TestPrefix(MarqoTestCase):
             model=Model(name='random/small'),
             treat_urls_and_pointers_as_images=True
         )
+        unstructured_index_e5 = cls.unstructured_marqo_index_request(
+            model=Model(name='hf/e5-small'),
+            treat_urls_and_pointers_as_images=True
+        )
         unstructured_index_multimodal = cls.unstructured_marqo_index_request(
             model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             treat_urls_and_pointers_as_images=True
@@ -71,6 +75,7 @@ class TestPrefix(MarqoTestCase):
 
         cls.indexes = cls.create_indexes([
             unstructured_index_1,
+            unstructured_index_e5,
             unstructured_index_multimodal,
             structured_text_index,
             structured_multimodal_index
@@ -78,9 +83,10 @@ class TestPrefix(MarqoTestCase):
 
         # Assign to objects so they can be used in tests
         cls.unstructured_index_1 = cls.indexes[0]
-        cls.unstructured_index_multimodal = cls.indexes[1]
-        cls.structured_text_index = cls.indexes[2]
-        cls.structured_multimodal_index = cls.indexes[3]
+        cls.unstructured_index_e5 = cls.indexes[1]
+        cls.unstructured_index_multimodal = cls.indexes[2]
+        cls.structured_text_index = cls.indexes[3]
+        cls.structured_multimodal_index = cls.indexes[4]
 
     def setUp(self) -> None:
         super().setUp()
@@ -128,6 +134,15 @@ class TestPrefix(MarqoTestCase):
                 retrieved_doc_b = res[1]
                 retrieved_doc_c = res[2]
 
+                embed_res = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["hello"],
+                        content_type=None
+                    ),
+                    device="cpu"
+                )
+
                 # Chunk content: For A) and B), should be exactly the same. C) is different.
                 self.assertEqual(retrieved_doc_a["text"], "hello")
                 self.assertEqual(retrieved_doc_b["text"], "hello")
@@ -138,6 +153,74 @@ class TestPrefix(MarqoTestCase):
                                             retrieved_doc_c["_tensor_facets"][0]["_embedding"]))
                 self.assertFalse(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"],
                                              retrieved_doc_c["_tensor_facets"][0]["_embedding"]))
+                
+                # embedding in document_b should be the same as direct embedding with no prefix
+                self.assertTrue(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"],
+                                            embed_res["embeddings"][0]))
+                
+    def test_prefix_text_chunks_e5(self):
+        """Ensures that the default prefix and the request level prefix are applied correctly.
+        for the e5-small model."""
+
+        for index in [self.unstructured_index_e5]:
+            with self.subTest(index=index.type):
+                # A) prefix should default to "passage: " with the e5-small model
+                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
+                    device=self.config.default_device,
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # B) manually set prefix at the request level
+                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_b", "text": "hello"}], auto_refresh=True,
+                    device=self.config.default_device, text_chunk_prefix="passage: ",
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # C) Set no prefix 
+                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    index_name=index.name, docs=[{"_id": "doc_c", "text": "hello"}], auto_refresh=True,
+                    device=self.config.default_device, text_chunk_prefix="custom_prefix: ",
+                    tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+                ))
+
+                # Get all documents (with vectors)
+                res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index.name, document_ids=["doc_a", "doc_b", "doc_c"],
+                    show_vectors=True
+                )["results"]
+                retrieved_doc_a = res[0]
+                retrieved_doc_b = res[1]
+                retrieved_doc_c = res[2]
+
+                embed_res_document_prefix = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["hello"],
+                        content_type=EmbedContentType.Document
+                    ),
+                    device="cpu"
+                )
+
+                embed_res_no_prefix = embed(
+                    marqo_config=self.config, index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=["custom_prefix: hello"],
+                        content_type=None
+                    ),
+                    device="cpu"
+                )
+
+                # Assert that the embedding in document_a is the same as embed_res_document_prefix with the prefix
+                self.assertTrue(np.allclose(embed_res_document_prefix["embeddings"][0], retrieved_doc_a["_tensor_facets"][0]["_embedding"]))
+                
+                # Assert that the embedding in document_b is the same as the embedding in document_a
+                self.assertTrue(np.allclose(retrieved_doc_a["_tensor_facets"][0]["_embedding"], retrieved_doc_b["_tensor_facets"][0]["_embedding"]))
+                
+                # Assert that the embedding in document_c is the same as the embedding with no prefix
+                self.assertTrue(np.allclose(embed_res_no_prefix["embeddings"][0], retrieved_doc_c["_tensor_facets"][0]["_embedding"]))
+                
 
     def test_prefix_multimodal(self):
         """Ensures that vectorise is called on text list with prefixes, but image list without."""

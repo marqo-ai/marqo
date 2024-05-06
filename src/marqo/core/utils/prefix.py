@@ -25,6 +25,7 @@ def determine_text_prefix(request_level_prefix: str, marqo_index: MarqoIndex, pr
     """
     if request_level_prefix is not None:
         return request_level_prefix
+    
 
     # Check for the presence of the textChunkPrefix or textQueryPrefix in the MarqoIndex object.
     if prefix_type == "text_query_prefix" and marqo_index.override_text_query_prefix is not None:
