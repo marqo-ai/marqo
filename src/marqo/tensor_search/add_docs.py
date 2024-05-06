@@ -5,6 +5,7 @@ import random
 import threading
 from contextlib import contextmanager
 from typing import List, Optional, Tuple, ContextManager, Union
+import concurrent
 
 import PIL
 from PIL.ImageFile import ImageFile
@@ -17,10 +18,8 @@ from marqo.tensor_search import constants
 import marqo.core.exceptions as core_exceptions
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
-from marqo.tensor_search.models import IndexInfo
-from marqo.tensor_search.models.index_settings import IndexSettings
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 
+from concurrent.futures import ThreadPoolExecutor
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
@@ -116,16 +115,15 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str
     try:
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-        threads = [threading.Thread(target=threaded_download_images, args=(allocation, image_repo,
-                                                                           tensor_fields,
-                                                                           image_download_headers, m[i]))
-                   for i, allocation in enumerate(thread_allocated_docs)]
+        with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
+            futures = [executor.submit(threaded_download_images, allocation, image_repo, tensor_fields,
+                                       image_download_headers, m[i])
+                       for i, allocation in enumerate(thread_allocated_docs)]
 
-        for th in threads:
-            th.start()
-
-        for th in threads:
-            th.join()
+            # Unhandled exceptions will be raised here.
+            # We only raise the first exception if there are multiple exceptions
+            for future in concurrent.futures.as_completed(futures):
+                _ = future.result()
 
         # Fix up metric_obj to make it not mention thread-ids
         metric_obj = RequestMetricsStore.for_request()
