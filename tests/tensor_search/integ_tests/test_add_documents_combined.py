@@ -90,7 +90,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 "_id": "1"
             }
         ]
-        dummy_return = [[1.0,] * 512, ]
+        dummy_return = [[1.0, ] * 512, ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
             tensor_fields = ["text_field_1"] if index_name == self.unstructured_marqo_index_name \
                 else None
@@ -105,3 +105,30 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     self.assertFalse("enable_cache" in kwargs, "enable_cache should not be passed to "
                                                                "vectorise for add_documents")
                 mock_vectorise.reset_mock()
+
+    def test_connectionResetErrorHandled_successfully(self):
+        """Ensure ConnectionResetError is not causing 500 error, but 400 for the document in add_documents."""
+        """Ensure vectorise does not receive enable_cache when calling add_documents."""
+        documents = [
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/"
+                                 "marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "_id": "1"
+            }
+        ]
+
+        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+                else None
+            with (self.subTest(index_name)):
+                with patch("marqo.s2_inference.clip_utils.requests.get", side_effect=ConnectionResetError) \
+                        as mock_requests_get:
+                    r = tensor_search.add_documents(config=self.config,
+                                                    add_docs_params=AddDocsParams(index_name=index_name,
+                                                                                  docs=documents,
+                                                                                  tensor_fields=tensor_fields))
+                mock_requests_get.assert_called_once()
+                self.assertEqual(True, r["errors"])
+                self.assertEqual(1, len(r["items"]))
+                self.assertEqual(400, r["items"][0]["status"])
+                self.assertIn("ConnectionResetError", r["items"][0]["error"])

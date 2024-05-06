@@ -114,7 +114,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
                 metrics_obj.stop(f"image_download.{image_path}")
 
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException
+                requests.exceptions.RequestException, ConnectionResetError
                 ) as e:
             raise UnidentifiedImageError(
                 f"image url `{image_path}` is unreachable, perhaps due to timeout. "
