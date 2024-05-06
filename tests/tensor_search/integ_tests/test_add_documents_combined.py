@@ -8,6 +8,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
+from urllib3.exceptions import ProtocolError
 
 
 class TestAddDocumentsStructured(MarqoTestCase):
@@ -117,17 +118,18 @@ class TestAddDocumentsStructured(MarqoTestCase):
         ]
 
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
-                else None
-            with (self.subTest(index_name)):
-                with patch("marqo.s2_inference.clip_utils.requests.get", side_effect=ConnectionResetError) \
-                        as mock_requests_get:
-                    r = tensor_search.add_documents(config=self.config,
-                                                    add_docs_params=AddDocsParams(index_name=index_name,
-                                                                                  docs=documents,
-                                                                                  tensor_fields=tensor_fields))
-                mock_requests_get.assert_called_once()
-                self.assertEqual(True, r["errors"])
-                self.assertEqual(1, len(r["items"]))
-                self.assertEqual(400, r["items"][0]["status"])
-                self.assertIn("ConnectionResetError", r["items"][0]["error"])
+            for error in (ConnectionResetError, ProtocolError):
+                tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+                    else None
+                with (self.subTest(f"{index_name}-{error}")):
+                    with patch("marqo.s2_inference.clip_utils.requests.get", side_effect=error) \
+                            as mock_requests_get:
+                        r = tensor_search.add_documents(config=self.config,
+                                                        add_docs_params=AddDocsParams(index_name=index_name,
+                                                                                      docs=documents,
+                                                                                      tensor_fields=tensor_fields))
+                    mock_requests_get.assert_called_once()
+                    self.assertEqual(True, r["errors"])
+                    self.assertEqual(1, len(r["items"]))
+                    self.assertEqual(400, r["items"][0]["status"])
+                    self.assertIn(str(error.__name__), r["items"][0]["error"])
