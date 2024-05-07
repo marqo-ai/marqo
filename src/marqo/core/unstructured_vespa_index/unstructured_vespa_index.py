@@ -10,7 +10,7 @@ from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, 
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.core.vespa_index import VespaIndex
-from marqo.exceptions import InternalError
+from marqo.exceptions import InternalError, InvalidArgumentError
 
 
 class UnstructuredVespaIndex(VespaIndex):
@@ -92,7 +92,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
         if not marqo_query.approximate:
             query['ranking.softtimeout.enable'] = False
-            query['timeout'] = '300s'
+            query['timeout'] = 300 * 1000  # 5 minutes
 
         return query
 
@@ -203,6 +203,8 @@ class UnstructuredVespaIndex(VespaIndex):
                     return generate_equality_filter_string(node)
                 elif isinstance(node, search_filter.RangeTerm):
                     return generate_range_filter_string(node)
+                elif isinstance(node, search_filter.InTerm):
+                    raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
             raise InternalError(f'Unknown node type {type(node)}')
 
         if marqo_query.filter is not None:

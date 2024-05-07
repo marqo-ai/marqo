@@ -1,22 +1,15 @@
-import math
 import os
-import random
 import uuid
 from unittest import mock
 
-import requests
-
 import marqo.core.exceptions as core_exceptions
-from marqo.api import exceptions as errors
-from marqo.api.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
+from marqo import exceptions as base_exceptions
 
 
 class TestSearch(MarqoTestCase):
@@ -24,6 +17,7 @@ class TestSearch(MarqoTestCase):
     Combined tests for unstructured and structured search.
     Currently only supports filtering tests.
     """
+
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -38,12 +32,12 @@ class TestSearch(MarqoTestCase):
         )
 
         unstructured_default_image_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),   # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
             treat_urls_and_pointers_as_images=True
         )
 
         unstructured_image_index_with_chunking = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),   # Used to be ViT-B/32 in old structured tests
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
             treat_urls_and_pointers_as_images=True
         )
@@ -204,10 +198,10 @@ class TestSearch(MarqoTestCase):
                         # As long as at least 1 tag in the list overlaps, it's a success.
                         ("list_field_1 in (tag1, tag5)", 1, "1235", True),
                         ("list_field_1 in ((tag2 some), random)", 1, "1235", True),
-                        ("list_field_1 in (tag2, random)", 0, None, False),         # incomplete match for "tag2 some"
+                        ("list_field_1 in (tag2, random)", 0, None, False),  # incomplete match for "tag2 some"
                         ("text_field_3 in (b, c)", 1, "5678", True),
                         ("text_field_3 in (a, c, (b but wrong))", 0, None, False),  # incomplete match for "b"
-                        ("int_field_1 in (1, 2, 3)", 1, "1234", True)               # int
+                        ("int_field_1 in (1, 2, 3)", 1, "1234", True)  # int
                     ]
 
                 for filter_query, expected_count, expected_id, highlight_exists in test_cases:
@@ -253,7 +247,7 @@ class TestSearch(MarqoTestCase):
                         ("list_field_1 in (tag2, random)", 0, None),  # incomplete match for "tag2 some"
                         ("text_field_3 in (b, c)", 1, "5678"),
                         ("text_field_3 in (a, c, (b but wrong))", 0, None),  # incomplete match for "b"
-                        ("int_field_1 in (1, 2, 3, 4)", 1, "1234")               # int
+                        ("int_field_1 in (1, 2, 3, 4)", 1, "1234")  # int
                     ]
 
                 for filter_string, expected_hits, expected_id in test_cases:
@@ -276,9 +270,11 @@ class TestSearch(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
-                            {"image_field_1": hippo_img, "text_field_1": "some text", "text_field_2": "baaadd", "_id": "5678",
+                            {"image_field_1": hippo_img, "text_field_1": "some text", "text_field_2": "baaadd",
+                             "_id": "5678",
                              "text_field_3": "b"},
-                            {"image_field_1": hippo_img, "text_field_1": "some text", "text_field_2": "Close match hehehe",
+                            {"image_field_1": hippo_img, "text_field_1": "some text",
+                             "text_field_2": "Close match hehehe",
                              "_id": "1234", "int_field_1": 2},
                             {"image_field_1": hippo_img, "text_field_1": "some text", "_id": "1235",
                              "list_field_1": ["tag1", "tag2 some"]}
@@ -393,7 +389,8 @@ class TestSearch(MarqoTestCase):
                         # normal custom vector in
                         ("custom_vector_field_1 in ((custom vector text!))", 1, ["in2"]),
                         # multimodal subfield in
-                        ("text_field_7 in ((multimodal correct)) AND text_field_8 in ((multimodal correct))", 1, ["in2"]),
+                        ("text_field_7 in ((multimodal correct)) AND text_field_8 in ((multimodal correct))", 1,
+                         ["in2"]),
                         # in with AND
                         ("text_field_1 in (random1, true) AND int_field_1:100", 1, ["in1"]),
                         # in with OR
@@ -426,6 +423,30 @@ class TestSearch(MarqoTestCase):
                         if expected_ids:
                             self.assertEqual(set(expected_ids), {hit["_id"] for hit in res["hits"]})
 
+    def test_filter_unstructured_index_in_keyword_fails(self):
+        test_cases = [
+            "text_field_1 in (random1, true)",
+            "int_field_1 in (100, 200)",
+            "long_field_1 in (299, 300)",
+            "text_field_1 in (random1, true) AND int_field_1:100",
+            "text_field_1 in (random1, true) OR text_field_2:baaadd",
+            "text_field_1 in (random1, true) OR int_field_1:[90 TO 210]",
+            "text_field_1 in (random1)",
+            "NOT text_field_1 in (random1, true)",
+            "text_field_1 IN (random1, true) AND int_field_1 in (100, 200)",
+            "text_field_1 IN ()"
+        ]
+
+        for case in test_cases:
+            with self.subTest(case=case):
+                with self.assertRaises(base_exceptions.InvalidArgumentError) as cm:
+                    tensor_search.search(config=self.config, index_name=self.unstructured_default_text_index.name,
+                                             text="", filter=case)
+
+                self.assertIn("'IN' filter keyword is not yet supported for unstructured", str(cm.exception))
+
+
+
     def test_filter_id(self):
         """
         Test filtering by _id
@@ -452,7 +473,8 @@ class TestSearch(MarqoTestCase):
                     ("_id:51", 0, None),
                     ("_id:1 OR _id:doc1", 2, ["1", "doc1"]),  # or condition
                     ("_id:1 OR _id:doc1 OR _id:50", 3, ["1", "doc1", "50"]),  # or condition, longer
-                    ("_id:1 OR _id:doc1 OR _id:50 OR _id:51", 3, ["1", "doc1", "50"]),  # or condition with non-existent id
+                    ("_id:1 OR _id:doc1 OR _id:50 OR _id:51", 3, ["1", "doc1", "50"]),
+                    # or condition with non-existent id
                     ("_id:1 AND _id:doc1", 0, None),  # and condition
                 ]
 
@@ -461,11 +483,11 @@ class TestSearch(MarqoTestCase):
                     test_cases += [
                         ("_id in (1)", 1, ["1"]),
                         ("_id in (doc1, (random garbage id))", 1, ["doc1"]),
-                        ("_id in (51)", 0, None),       # non-existent doc
+                        ("_id in (51)", 0, None),  # non-existent doc
                         ("_id in (1, doc1)", 2, ["1", "doc1"]),
                         ("_id in (1, doc1, 50)", 3, ["1", "doc1", "50"]),
                         ("_id in (1, doc1, 50, (random id))", 3, ["1", "doc1", "50"]),
-                        ("_id in (1, doc1) OR _id:doc5", 3, ["1", "doc1", "doc5"]),     # combine in and equality
+                        ("_id in (1, doc1) OR _id:doc5", 3, ["1", "doc1", "doc5"]),  # combine in and equality
                         ("_id in (1) AND _id in (doc1)", 0, None),  # and condition
                     ]
 
@@ -609,3 +631,16 @@ class TestSearch(MarqoTestCase):
                             )
 
                         self.assertIn(error_message, str(cm.exception))
+
+    def test_search_vectoriseIsCalledWithEnableCacheTrue(self):
+        """Ensure vectorise is called with enable_cache=True when calling search."""
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            dummy_return = [[1.0, ] * 384, ]
+            with (self.subTest(index=index)):
+                with mock.patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as \
+                        mock_vectorise:
+                    tensor_search.search(text="some text", index_name=index.name, config=self.config)
+                    mock_vectorise.assert_called_once()
+                    args, kwargs = mock_vectorise.call_args
+                    self.assertTrue(kwargs["enable_cache"])
+                mock_vectorise.reset_mock()

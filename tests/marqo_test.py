@@ -47,7 +47,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.vespa_client = vespa_client
         cls.index_management = IndexManagement(cls.vespa_client)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
-        cls.config = config.Config(vespa_client=vespa_client, index_management=cls.index_management)
+        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu")
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
         cls.CONTENT_CLUSTER = 'content_default'
@@ -143,7 +143,9 @@ class MarqoTestCase(unittest.TestCase):
             ),
             marqo_version=version.get_version(),
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
+            override_text_chunk_prefix=None,
+            override_text_query_prefix=None
     ) -> StructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
@@ -164,7 +166,9 @@ class MarqoTestCase(unittest.TestCase):
             tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            override_text_chunk_prefix=override_text_chunk_prefix,
+            override_text_query_prefix=override_text_query_prefix
         )
 
     @classmethod
@@ -190,7 +194,9 @@ class MarqoTestCase(unittest.TestCase):
             treat_urls_and_pointers_as_images: bool = False,
             marqo_version='1.0.0',
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
+            override_text_chunk_prefix=None,
+            override_text_query_prefix=None
     ) -> UnstructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndexRequest.
@@ -211,7 +217,9 @@ class MarqoTestCase(unittest.TestCase):
             hnsw_config=hnsw_config,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            override_text_chunk_prefix=override_text_chunk_prefix,
+            override_text_query_prefix=override_text_query_prefix
         )
 
     class _AssertRaisesContext:
@@ -222,6 +230,7 @@ class MarqoTestCase(unittest.TestCase):
             return self
 
         def __exit__(self, exc_type, exc_value, tb):
+            self.exception = exc_value
             if exc_type is None:
                 raise AssertionError(f"No exception raised, expected: '{self.expected_exception.__name__}'")
             if issubclass(exc_type, self.expected_exception) and exc_type is not self.expected_exception:

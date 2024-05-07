@@ -156,7 +156,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars = mock.MagicMock()
             mock_default_env_vars.return_value = default_vars
 
-            @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
+            @mock.patch("marqo.api.configs.default_env_vars", mock_default_env_vars)
             @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 assert expected == utils.read_env_vars_and_defaults(var=key)
@@ -184,7 +184,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars = mock.MagicMock()
             mock_default_env_vars.return_value = default_vars
 
-            @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
+            @mock.patch("marqo.api.configs.default_env_vars", mock_default_env_vars)
             @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 result = utils.read_env_vars_and_defaults_ints(var=key)
@@ -204,7 +204,7 @@ class TestUtils(unittest.TestCase):
             mock_default_env_vars = mock.MagicMock()
             mock_default_env_vars.return_value = default_vars
 
-            @mock.patch("marqo.tensor_search.configs.default_env_vars", mock_default_env_vars)
+            @mock.patch("marqo.api.configs.default_env_vars", mock_default_env_vars)
             @mock.patch.dict(os.environ, mock_real_environ)
             def run():
                 with self.assertRaises(exceptions.ConfigurationError):

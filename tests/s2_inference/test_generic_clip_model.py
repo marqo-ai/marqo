@@ -106,7 +106,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
 
         # Step3 - Search
-        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah", result_count=1)
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text="content 2. blah blah blah", result_count=1)
         assert len(search_res['hits']) == 1
         assert search_res["hits"][0]["_score"] > score_threshold
         assert search_res["hits"][0]["_id"] == "123"
@@ -235,7 +235,7 @@ class TestGenericModelSupport(MarqoTestCase):
                }
 
         # Step3 - Search
-        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah", result_count=1)
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text="content 2. blah blah blah", result_count=1)
         assert len(search_res['hits']) == 1
         assert search_res["hits"][0]["_score"] > score_threshold
         assert search_res["hits"][0]["_id"] == "123"

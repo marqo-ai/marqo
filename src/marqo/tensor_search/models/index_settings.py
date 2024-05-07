@@ -41,6 +41,8 @@ class IndexSettings(StrictBaseModel):
             m=16
         )
     )
+    overrideTextQueryPrefix: Optional[str] = None
+    overrideTextChunkPrefix: Optional[str] = None
 
     @root_validator(pre=True)
     def validate_field_names(cls, values):
@@ -101,7 +103,9 @@ class IndexSettings(StrictBaseModel):
                 tensor_fields=self.tensorFields,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
-                updated_at=time.time()
+                updated_at=time.time(),
+                override_text_query_prefix=self.overrideTextQueryPrefix,
+                override_text_chunk_prefix=self.overrideTextChunkPrefix
             )
         elif self.type == core.IndexType.Unstructured:
             if self.allFields is not None:
@@ -138,6 +142,8 @@ class IndexSettings(StrictBaseModel):
                 hnsw_config=self.annParameters.parameters,
                 treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
                 filter_string_max_length=self.filterStringMaxLength,
+                override_text_query_prefix=self.overrideTextQueryPrefix,
+                override_text_chunk_prefix=self.overrideTextChunkPrefix,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time()

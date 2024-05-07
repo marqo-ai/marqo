@@ -205,6 +205,8 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
+    override_text_query_prefix: Optional[str]
+    override_text_chunk_prefix: Optional[str]
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
     _cache: Dict[str, Any] = PrivateAttr()
@@ -262,7 +264,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
             else:
                 raise ValidationError(f"Invalid index type {obj['type']}")
 
-        raise ValidationError(f"Index type not found in {obj}")
+            raise ValidationError(f"Index type not found in {obj}")
 
     def _cache_or_get(self, key: str, func):
         if key not in self._cache:
@@ -274,6 +276,7 @@ class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
     filter_string_max_length: int
+    
 
     @classmethod
     def _valid_type(cls) -> IndexType:
@@ -284,6 +287,7 @@ class StructuredMarqoIndex(MarqoIndex):
     type = IndexType.Structured
     fields: List[Field]  # all fields, including tensor fields
     tensor_fields: List[TensorField]
+   
 
     def __init__(self, **data):
         super().__init__(**data)

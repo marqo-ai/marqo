@@ -7,7 +7,7 @@ from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelE
 from marqo.tensor_search import tensor_search
 from marqo.s2_inference.s2_inference import clear_loaded_models
 from marqo.s2_inference.s2_inference import (
-    available_models,
+    _available_models,
     vectorise,
     validate_model_properties,
     _update_available_models
@@ -215,7 +215,7 @@ class TestGenericModelSupport(MarqoTestCase):
         # self.assertEqual(np.array(res_default).shape[-1], np.array(res_custom).shape[-1])
 
     def test_modification_of_model_properties(self):
-        """available_models should get updated if the model_properties are modified
+        """_available_models should get updated if the model_properties are modified
             and model_name is unchanged
         """
         model_name = 'test-model-in-registry'
@@ -237,7 +237,7 @@ class TestGenericModelSupport(MarqoTestCase):
         vectorise(model_name=model_name, model_properties=model_properties, content="some string", device="cpu")
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
 
-        old_num_of_available_models = len(available_models)
+        old_num_of_available_models = len(_available_models)
         model_properties['tokens'] = 256
 
         tensor_search.create_vector_index(index_name=self.index_name_1,
@@ -245,6 +245,6 @@ class TestGenericModelSupport(MarqoTestCase):
         )
         vectorise(model_name=model_name, model_properties=model_properties, content="some string", device="cpu")
 
-        new_num_of_available_models = len(available_models)
+        new_num_of_available_models = len(_available_models)
 
         self.assertEqual(new_num_of_available_models, old_num_of_available_models + 1)

@@ -166,13 +166,13 @@ class TestScoreModifiersSearch(MarqoTestCase):
 
 
         normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
-                                             text = "what is the rider doing?", score_modifiers=None, result_count=10)
+                                          text="what is the rider doing?", score_modifiers=None, result_count=10)
 
         normal_score = normal_res["hits"][0]["_score"]
 
         modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
-                                                text = "what is the rider doing?",
-                                                score_modifiers=ScoreModifier(**{
+                                            text="what is the rider doing?",
+                                            score_modifiers=ScoreModifier(**{
                                                     "multiply_score_by":
                                                         [{"field_name": "multiply_1",
                                                           "weight": 1,},
@@ -220,8 +220,8 @@ class TestScoreModifiersSearch(MarqoTestCase):
         score_modifiers_list = self.test_valid_score_modifiers_list
         for score_modifiers in score_modifiers_list:
             modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
-                                                    text = "what is the rider doing?",
-                                                    score_modifiers=score_modifiers, result_count=10)
+                                                text="what is the rider doing?",
+                                                score_modifiers=score_modifiers, result_count=10)
 
             assert len(modifier_res["hits"]) == len(documents)
             for result in modifier_res["hits"]:
@@ -300,7 +300,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
-                                          text="what is the rider doing?", score_modifiers=None, result_count=10,)
+                                          text="what is the rider doing?", score_modifiers=None, result_count=10, )
         normal_score = normal_res["hits"][0]["_score"]
 
         epsilon = 1e-5
@@ -386,8 +386,8 @@ class TestScoreModifiersSearch(MarqoTestCase):
         score_modifiers_list = self.test_valid_score_modifiers_list
         for score_modifiers in score_modifiers_list:
             modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
-                                                    text = "what is the rider doing?",
-                                                    score_modifiers=score_modifiers, result_count=10)
+                                                text="what is the rider doing?",
+                                                score_modifiers=score_modifiers, result_count=10)
 
             assert len(modifier_res["hits"]) == len(documents)
             for result in modifier_res["hits"]:
@@ -546,7 +546,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
         @mock.patch("marqo.tensor_search.tensor_search._create_normal_tensor_search_query", mock_create_normal_tensor_search_query)
         def run():
             tensor_search.search(config=self.config, index_name=self.index_name,
-                                              text="what is the rider doing?", score_modifiers=None, result_count=10)
+                                 text="what is the rider doing?", score_modifiers=None, result_count=10)
             mock_create_normal_tensor_search_query.assert_called()
 
             return True
@@ -894,7 +894,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
                                     non_tensor_fields=["multiply_1", "multiply_2", "add_1", "add_2",
                                                        "filter"], auto_refresh=True)
         normal_res = tensor_search.search(config=self.config, index_name=self.index_name,
-                                          text="what is the rider doing?", score_modifiers=None, result_count=10,)
+                                          text="what is the rider doing?", score_modifiers=None, result_count=10, )
         normal_score = normal_res["hits"][0]["_score"]
 
         epsilon = 1e-5

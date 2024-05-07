@@ -3,7 +3,7 @@ import unittest
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise, 
     _convert_vectorized_output, 
-    available_models,
+    get_available_models,
     clear_loaded_models,
     _create_model_cache_key,
     get_model_properties_from_registry
@@ -51,7 +51,7 @@ class TestOutputs(unittest.TestCase):
         # tests clearing the model cache
         clear_loaded_models()
         device = 'cpu'
-        assert available_models == dict()
+        assert get_available_models() == dict()
 
         names = ['RN50', "sentence-transformers/all-MiniLM-L6-v1", "hf/all-MiniLM-L6-v1"]
 
@@ -61,19 +61,19 @@ class TestOutputs(unittest.TestCase):
             key = _create_model_cache_key(name, device, get_model_properties_from_registry(name))
             keys.append(key)
 
-        print(sorted(set(available_models.keys())), sorted(set(keys)))
-        assert sorted(set(available_models.keys())) == sorted(set(keys))
+        print(sorted(set(get_available_models().keys())), sorted(set(keys)))
+        assert sorted(set(get_available_models().keys())) == sorted(set(keys))
 
         clear_loaded_models()
 
-        assert available_models == dict()
+        assert get_available_models() == dict()
 
     def test_model_is_getting_cached(self):
         # test the model is cached on subsequent calls
         clear_loaded_models()
 
         device = 'cpu'
-        assert available_models == dict()
+        assert get_available_models() == dict()
 
         names = ['RN50', "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
 
@@ -81,9 +81,9 @@ class TestOutputs(unittest.TestCase):
         for name in names:
 
             key = _create_model_cache_key(name, device, get_model_properties_from_registry(name))
-            assert key not in list(available_models.keys())
+            assert key not in list(get_available_models().keys())
             _ = vectorise(name, 'hello', device=device)
-            assert key in list(available_models.keys())
+            assert key in list(get_available_models().keys())
 
         clear_loaded_models()
 
@@ -92,14 +92,14 @@ class TestOutputs(unittest.TestCase):
         clear_loaded_models()
 
         device = 'cpu'
-        assert available_models == dict()
+        assert get_available_models() == dict()
 
         names = ["RN50", "sentence-transformers/all-MiniLM-L6-v1", "all-MiniLM-L6-v1"]
 
         for name in names:
             model_properties = get_model_properties_from_registry(name)
             key = _create_model_cache_key(name, device, model_properties)
-            assert key not in list(available_models.keys())
+            assert key not in list(get_available_models().keys())
             t0 = time.time()
             _ = vectorise(name, 'hello', device=device)
             t1 = time.time()
