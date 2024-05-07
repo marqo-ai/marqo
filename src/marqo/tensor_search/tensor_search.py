@@ -160,7 +160,9 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     add_docs.download_images(docs=docs,
                                              thread_count=add_docs_params.image_download_thread_count,
                                              tensor_fields=tensor_fields_and_multimodal_subfields,
-                                             image_download_headers=add_docs_params.image_download_headers)
+                                             image_download_headers=add_docs_params.image_download_headers,
+                                             device = add_docs_params.device,
+                                             enable_preprocess=add_docs_params.enable_preprocess)
                 )
 
         if add_docs_params.use_existing_tensors:

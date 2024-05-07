@@ -18,11 +18,15 @@ import marqo.core.exceptions as core_exceptions
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from concurrent.futures import ThreadPoolExecutor
+from torchvision.transforms import Compose
+from marqo.s2_inference.onnx_clip_utils import _get_transform
 
 
 def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
                              image_download_headers: dict,
-                             metric_obj: Optional[RequestMetrics] = None) -> None:
+                             device: str,
+                             metric_obj: Optional[RequestMetrics] = None,
+                             preprocess: Optional[Compose] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -69,6 +73,9 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
                         image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
                                                                                  timeout=TIMEOUT_SECONDS,
                                                                                  metrics_obj=metric_obj)
+                        if preprocess:
+                            image_repo[doc[field]] = preprocess(image_repo[doc[field]]).to(device)
+
                     except PIL.UnidentifiedImageError as e:
                         image_repo[doc[field]] = e
                         metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
@@ -94,7 +101,8 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
 
 @contextmanager
 def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                    image_download_headers: dict) -> ContextManager[dict]:
+                    image_download_headers: dict, device: str,
+                    enable_preprocess: bool = False) -> ContextManager[dict]:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
@@ -110,12 +118,18 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str
     copied = copy.deepcopy(docs)
     image_repo = dict()
 
+    if enable_preprocess is True:
+        preprocess = _get_transform(224)
+    else:
+        preprocess = None
+
+
     try:
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
         with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
             futures = [executor.submit(threaded_download_images, allocation, image_repo, tensor_fields,
-                                       image_download_headers, m[i])
+                                       image_download_headers, device, m[i], preprocess)
                        for i, allocation in enumerate(thread_allocated_docs)]
 
             # Unhandled exceptions will be raised here.

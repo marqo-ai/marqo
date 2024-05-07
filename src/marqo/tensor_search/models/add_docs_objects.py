@@ -30,6 +30,7 @@ class AddDocsBodyParams(BaseModel):
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
     imageDownloadThreadCount: int = 20
+    enablePreprocess: bool = False
 
 
 class AddDocsParams(BaseModel):
@@ -64,6 +65,7 @@ class AddDocsParams(BaseModel):
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
+    enable_preprocess: bool = False
 
     def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device

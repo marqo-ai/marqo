@@ -137,5 +137,5 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         device=device, tensor_fields=tensor_fields,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
         image_download_thread_count=image_download_thread_count,
-        mappings=mappings, model_auth=model_auth
+        mappings=mappings, model_auth=model_auth, enable_preprocess=body.enablePreprocess
     )

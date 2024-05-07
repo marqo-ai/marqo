@@ -39,7 +39,7 @@ def _convert_image_to_rgb(image: ImageType) -> ImageType:
     return image.convert("RGB")
 
 
-def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[float] = None) -> torch.Tensor:
+def _get_transform(n_px: int, image_mean: List[float] = None, image_std: List[float] = None) -> torch.Tensor:
     '''This function returns a transform to preprocess the image. The processed image will be passed into
     clip model for inference.
     Args:
@@ -147,7 +147,8 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType], image_down
         img = load_image_from_path(image, image_download_headers)
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
-
+    elif isinstance(image, torch.Tensor):
+        img = image
     elif isinstance(image, ImageType):
         img = image
     else:
@@ -196,6 +197,8 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
 
     # if it is an array, then it is an image
     elif isinstance(thing, (ImageType, ndarray)):
+        return True
+    elif isinstance(thing, (torch.Tensor)):
         return True
     else:
         raise UnidentifiedImageError(f"expected type Image or str for inputs but received type {type(thing)}")
@@ -521,7 +524,9 @@ class OPEN_CLIP(CLIP):
         else:
             image_input = [format_and_load_CLIP_image(images, image_download_headers)]
 
-        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
+        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) \
+                                                  if not isinstance(_img, torch.Tensor) else _img \
+                                                  for _img in image_input])
 
         with torch.no_grad():
             if self.device.startswith("cuda"):

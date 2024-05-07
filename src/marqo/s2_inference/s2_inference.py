@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from PIL import UnidentifiedImageError
 from PIL.Image import Image
+from torch import Tensor
 
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
@@ -129,6 +130,11 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
             vectorised = _available_models[model_cache_key][AvailableModelsKey.model].encode(content,
                                                                                              normalize=normalize_embeddings,
                                                                                              **kwargs)
+        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
+            vectorised = _available_models[model_cache_key][AvailableModelsKey.model].encode(content,
+                                                                                             normalize=normalize_embeddings,
+                                                                                             **kwargs)
+
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
