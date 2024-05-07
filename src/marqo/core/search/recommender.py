@@ -171,7 +171,7 @@ class Recommender:
 
         if exclude_input_documents:
             # Make sure to include zero-weight documents in this filter
-            recommend_filter = self._get_exclusion_filter(all_document_ids, filter)
+            recommend_filter = self._get_exclusion_filter(marqo_index, all_document_ids, filter)
         else:
             recommend_filter = filter
 
@@ -202,8 +202,11 @@ class Recommender:
         else:
             return InterpolationMethod.LERP
 
-    def _get_exclusion_filter(self, documents: List[str], user_filter: Optional[str]) -> str:
-        not_in = 'NOT (' + ' OR '.join([f'_id:({doc})' for doc in documents]) + ')'
+    def _get_exclusion_filter(self, marqo_index: MarqoIndex, documents: List[str], user_filter: Optional[str]) -> str:
+        if marqo_index.type == IndexType.Structured:
+            not_in = 'NOT _id IN (' + ', '.join([f'{doc}' for doc in documents]) + ')'
+        else:
+            not_in = 'NOT (' + ' OR '.join([f'_id:({doc})' for doc in documents]) + ')'
 
         if user_filter is not None and user_filter.strip() != '':
             return f'({user_filter}) AND {not_in}'

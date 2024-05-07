@@ -175,7 +175,7 @@ nvidia-smi
 in a terminal. If there is not output then there may be something wrong with the GPU setup and installing or updating drivers may be necessary.  
 
 ##### CUDA 
-Aside from having the correct drivers installed, a matching version of CUDA is required. The marqo Dockerfile comes setup to use CUDA 11.4.2 by default. The Dockerfile can be easily modified to support different versions of CUDA. Note, ONNX requires the system CUDA while pytorch relies on its own version of CUDA. 
+Aside from having the correct drivers installed, a matching version of CUDA is required. The marqo Dockerfile comes setup to use CUDA 11.4.2 by default. The Dockerfile can be easily modified to support different versions of CUDA. 
 
 ##### Checking the status of your GPU and CUDA
 To see if a GPU is available when using pytorch, the following can be used to check (from python);
