@@ -9,8 +9,12 @@ from marqo import exceptions as base_exceptions
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
+import importlib
+import sys
+import os
 
 
 class ApiTests(MarqoTestCase):
@@ -34,6 +38,153 @@ class ApiTests(MarqoTestCase):
             self.assertEqual(response.status_code, 200)
             mock_add_documents.assert_called_once()
 
+    def test_memory(self):
+        """
+        Test that the memory endpoint returns the expected keys when debug API is enabled.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'TRUE'}):
+            response = self.client.get("/memory")
+            data = response.json()
+            assert set(data.keys()) == {"memory_used", "stats"}
+
+    def test_memory_defaultDisabled(self):
+        """
+        Test that the memory endpoint returns 403 by default.
+        """
+        response = self.client.get("/memory")
+        self.assertEqual(response.status_code, 403)
+
+    def test_memory_disabled_403(self):
+        """
+        Test that the memory endpoint returns 403 when debug API is disabled explicitly.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'FALSE'}):
+            response = self.client.get("/memory")
+            self.assertEqual(response.status_code, 403)
+
+
+class ValidationApiTests(MarqoTestCase):
+    def setUp(self):
+        self.client = TestClient(api.app)
+
+    def test_schema_validation_defaultDisabled(self):
+        """
+        Test that the schema_validation endpoint returns 403 by default.
+        """
+        data = {
+            "type": "structured",
+            "allFields": [],
+            "tensorFields": []
+        }
+        index_name = "test-index"
+        response = self.client.post(f"/validate/index/{index_name}", json=data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_ops_api_disabled_403(self):
+        """
+        Test that the ops-api endpoint returns 403 when debug API is disabled explicitly.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'FALSE'}):
+            data = {
+                "type": "structured",
+                "allFields": [],
+                "tensorFields": [],
+                "settings_object": {}
+            }
+            index_name = "test-index"
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
+            self.assertEqual(response.status_code, 403)
+
+    def test_ops_api_200(self):
+        """
+        Test that the ops-api endpoint returns 200 when debug API is enabled.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'TRUE'}):
+            data = {
+                "treatUrlsAndPointersAsImages": False,
+                "model": "hf/e5-large",
+                "normalizeEmbeddings": True,
+                "textPreprocessing": {
+                    "splitLength": 2,
+                    "splitOverlap": 0,
+                    "splitMethod": "sentence",
+                },
+                "imagePreprocessing": {"patchMethod": None},
+                "annParameters": {
+                    "spaceType": "euclidean",
+                    "parameters": {"efConstruction": 128, "m": 16},
+                },
+                "type": "unstructured",
+            }
+            index_name = "test-index"
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
+            self.assertEqual(response.json(), {'validated': True, 'index': 'test-index'})
+
+    def test_ops_api_400(self):
+        """
+        Test that the ops-api endpoint returns 400 when debug API is enabled and the input is invalid.
+        """
+        with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_OPS_API: 'TRUE'}):
+            data = {
+                "treatUrlsAndPointersAsImages": False,
+                "model": "hf/e5-large",
+                "normalizeEmbeddings": True,
+                "textPreprocessing": {
+                    "splitLength": 2,
+                    "splitOverlap": 0,
+                    "splitMethod": "sentence",
+                },
+                "imagePreprocessing": {"patchMethod": None},
+                "annParameters": {
+                    "spaceType": "euclidean",
+                    "parameters": {"efConstruction": 128, "m": 16},
+                },
+                "type": "unknown"  # invalid type
+            }
+            index_name = "test-index"
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("message", response.json())
+            self.assertEqual(response.json()["code"], "invalid_argument")
+            self.assertEqual(response.json()["type"], "invalid_request")
+
+
+class TestApiCustomEnvVars(MarqoTestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        unstructured_index_request = cls.unstructured_marqo_index_request()
+        structured_index_request = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name='field1', type=FieldType.Text),
+                FieldRequest(name='field2', type=FieldType.Text)
+            ],
+            tensor_fields=['field1']
+        )
+
+        cls.indexes = cls.create_indexes([unstructured_index_request, structured_index_request])
+
+        cls.unstructured_index = cls.indexes[0]
+        cls.structured_index = cls.indexes[1]
+
+    def test_search_timeout_short_timer_fails(self):
+        # Set up the test API client with the correct env vars set
+        with mock.patch.dict(os.environ, {"VESPA_SEARCH_TIMEOUT_MS": "1"}):
+            importlib.reload(sys.modules['marqo.tensor_search.api'])
+            # VespaClient will be created with default timeout of 1ms
+            self.client = TestClient(api.app)
+
+        for index in [self.unstructured_index, self.structured_index]:
+            with self.subTest(index=index.name):
+                res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                    "q": "irrelevant"
+                })
+                # The search request must timeout, since the timeout is set to 1ms
+                self.assertEqual(res.status_code, 504)
+                self.assertEqual(res.json()["code"], "vector_store_timeout")
+                self.assertEqual(res.json()["type"], "invalid_request")
+
 
 class TestApiErrors(MarqoTestCase):
     """
@@ -47,6 +198,7 @@ class TestApiErrors(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
+        unstructured_index_request = cls.unstructured_marqo_index_request()
         structured_index_request = cls.structured_marqo_index_request(
             fields=[
                 FieldRequest(name='field1', type=FieldType.Text),
@@ -55,9 +207,10 @@ class TestApiErrors(MarqoTestCase):
             tensor_fields=['field1']
         )
 
-        cls.indexes = cls.create_indexes([structured_index_request])
+        cls.indexes = cls.create_indexes([unstructured_index_request, structured_index_request])
 
-        cls.structured_index = cls.indexes[0]
+        cls.unstructured_index = cls.indexes[0]
+        cls.structured_index = cls.indexes[1]
 
     def setUp(self):
         self.client = TestClient(api.app)

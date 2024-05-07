@@ -15,7 +15,7 @@ from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
-from marqo.s2_inference.errors import UnknownModelError
+from marqo.s2_inference.errors import UnknownModelError, InvalidModelPropertiesError
 
 logger = get_logger(__name__)
 
@@ -123,6 +123,24 @@ class Model(StrictBaseModel):
     properties: Optional[Dict[str, Any]]
     custom: bool = False
 
+    @root_validator(pre=False)
+    def validate_custom_properties(cls, values):
+        """Validate custom model properties.
+
+        Raises:
+            InvalidArgumentError: If model properties are invalid.
+        """
+        model_name = values.get('name')
+        properties = values.get('properties')
+        custom = values.get('custom')
+        if properties and custom:
+            try:
+                s2_inference.validate_model_properties(model_name, properties)
+            except InvalidModelPropertiesError as e:
+                raise ValueError(
+                    f'Invalid model properties for model={model_name}. Reason: {e}.')
+        return values
+
     def dict(self, *args, **kwargs):
         """
         Custom dict method that removes the properties field if the model is not custom. This ensures we don't store
@@ -166,6 +184,10 @@ class Model(StrictBaseModel):
                     f'Could not find model properties for model={model_name}. '
                     f'Please check that the model name is correct. '
                     f'Please provide model_properties if the model is a custom model and is not supported by default')
+            except InvalidModelPropertiesError as e:
+                raise InvalidArgumentError(
+                    f'Invalid model properties for model={model_name}. Reason: {e}.'
+                )
 
 
 class MarqoIndex(ImmutableStrictBaseModel, ABC):

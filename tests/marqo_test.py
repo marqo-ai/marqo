@@ -47,7 +47,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.vespa_client = vespa_client
         cls.index_management = IndexManagement(cls.vespa_client)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
-        cls.config = config.Config(vespa_client=vespa_client, index_management=cls.index_management)
+        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu")
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
         cls.CONTENT_CLUSTER = 'content_default'
@@ -222,6 +222,7 @@ class MarqoTestCase(unittest.TestCase):
             return self
 
         def __exit__(self, exc_type, exc_value, tb):
+            self.exception = exc_value
             if exc_type is None:
                 raise AssertionError(f"No exception raised, expected: '{self.expected_exception.__name__}'")
             if issubclass(exc_type, self.expected_exception) and exc_type is not self.expected_exception:

@@ -1,3 +1,53 @@
+# Release 2.5.0
+## New features
+- New ‘embed’ endpoint (`POST /indexes/{index_name}/embed`) (https://github.com/marqo-ai/marqo/pull/803). Marqo can now perform inference and return the embeddings for a single piece or list of content, where content can be either a string or weighted dictionary of strings. See usage [here](https://docs.marqo.ai/2.5.0/API-Reference/Embed/embed/). 
+- New ‘recommend’ endpoint (`POST /indexes/{index_name}/recommend`) (https://github.com/marqo-ai/marqo/pull/816). Given a list of existing document IDs, Marqo can now recommend similar documents by performing a search on interpolated vectors from the documents. See usage [here](https://docs.marqo.ai/2.5.0/API-Reference/Search/recommend/). 
+- Add Inference Cache to speed up frequent search and embed requests (https://github.com/marqo-ai/marqo/pull/802). Marqo now caches embeddings generated during inference. The cache size and type can be configured with `MARQO_INFERENCE_CACHE_SIZE` and `MARQO_INFERENCE_CACHE_TYPE`. See configuration instructions [here](https://docs.marqo.ai/2.5.0/Guides/Advanced-Usage/configuration/#configuring-cache). 
+- Add configurable search timeout (https://github.com/marqo-ai/marqo/pull/813). Backend timeout now defaults to 1s, but can be configured with the environment variable `VESPA_SEARCH_TIMEOUT_MS`. See configuration instructions [here](https://docs.marqo.ai/2.5.0/Guides/Advanced-Usage/configuration/#configuring-usage-limits). 
+- More informative `get_cuda_info` response (https://github.com/marqo-ai/marqo/pull/811). New keys: `utilization` `memory_used_percent` have been added for easier tracking of cuda device status. See [here](https://docs.marqo.ai/2.5.0/API-Reference/Device/get_cuda_information/) for more information.
+
+## Bug fixes and minor changes
+- Upgraded `open_clip_torch`, `timm`, and `safetensors` for access to new models (https://github.com/marqo-ai/marqo/pull/810) 
+
+## Contributor shout-outs
+- Shoutout to all our 4.1k stargazers! Thanks for continuing to use our product and helping Marqo grow.
+- Keep on sharing your questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+
+# Release 2.4.3
+
+## Bug fixes and minor changes
+- Fix incorrect Marqo version number (https://github.com/marqo-ai/marqo/pull/805). Version number updated from 2.4.1 to 2.4.3
+
+# Release 2.4.2
+
+## Bug fixes and minor changes
+- Better response for truncated images in `add_documents` (https://github.com/marqo-ai/marqo/pull/797). Truncated images no longer cause a 500 error. The individual document will fail and return a 400 error in add docs response (full response will be a 200).
+
+# Release 2.4.1
+
+## Bug fixes and minor changes
+- Improve telemetry memory management (https://github.com/marqo-ai/marqo/pull/800).
+
+# Release 2.4.0
+
+## New features
+- Add `IN` operator to the query filter string DSL (https://github.com/marqo-ai/marqo/pull/790, https://github.com/marqo-ai/marqo/pull/793, & https://github.com/marqo-ai/marqo/pull/795). 
+For structured indexes, you can now use the `IN` keyword to restrict text and integer fields to be within a list of values. See usage [here](https://docs.marqo.ai/2.4.0/Guides/query_dsl/#in-queries). 
+ 
+- Add `no_model` option for index creation (https://github.com/marqo-ai/marqo/pull/789). This allows for indexes that do no vectorisation, 
+providing easy use of custom vectors with no risk of accidentally mixing them up with Marqo-generated vectors. See usage [here](https://docs.marqo.ai/2.4.0/Guides/Models-Reference/list_of_models/#no-model). 
+- Optional `q` parameter for the search endpoint if context vectors are provided. (https://github.com/marqo-ai/marqo/pull/789). 
+This is particularly useful when using context vectors to search across your documents that have custom vector fields. See usage [here](https://docs.marqo.ai/2.4.0/API-Reference/Search/search/#query-q).
+
+## Bug fixes and minor changes
+- Improve error message for defining `tensorFields` when adding documents to a structured index (https://github.com/marqo-ai/marqo/pull/788). 
+
+## Contributor shout-outs
+- A huge thank you to all our 4.1k stargazers! We appreciate all of you continuing to use our product and helping Marqo grow.
+- Thanks for sharing your questions and feedback on our [forum](https://community.marqo.ai/) and 
+[Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! 
+If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+
 # Release 2.3.0
 
 ## New features

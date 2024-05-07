@@ -1,25 +1,19 @@
 import datetime
-import unittest
-from copy import deepcopy, copy
+from copy import copy
 import marqo.tensor_search.delete_docs
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest, MqDeleteDocsResponse
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 import marqo.tensor_search.tensor_search
-from marqo.core.index_management import index_management
-from marqo.core.models.marqo_index import Model
 from marqo.tensor_search import tensor_search, delete_docs
 from tests.marqo_test import MarqoTestCase
-import requests
 from unittest.mock import patch
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core import exceptions as core_exceptions
 from marqo.api import exceptions as api_exceptions
 from marqo.tensor_search import enums
-from tests.utils.transition import add_docs_caller, add_docs_batched
+from tests.utils.transition import add_docs_batched
 import os
 from marqo.vespa.models.delete_document_response import DeleteBatchDocumentResponse, DeleteBatchResponse
-from marqo.tensor_search.configs import default_env_vars
 
 
 class TestDeleteDocuments(MarqoTestCase):

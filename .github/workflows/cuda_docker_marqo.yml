@@ -7,11 +7,12 @@ on:
     inputs:
       py_marqo_branch:
         required: false
-        default: marqo
+        default: mainline
         description: >
           The "py-marqo" branch this test is running against.
-          This is optional. If left as the default value "marqo", we run the test based on the  
-          latest release of py-marqo on pypi. Otherwise, the specified branch is tested. For example "mainline"
+          This is optional. If left as the default value "mainline", we run the test based on the "mainline" branch of
+          py-marqo. Otherwise, the specified branch is tested. For example "li/test-xx". You can also use "marqo" and 
+          it will use the latest pypi release.
       api_tests_branch:
         required: false
         default: mainline
@@ -88,11 +89,12 @@ jobs:
           pip install tox==3.26
           pip install flake8
       
-      # TODO: linting here
       - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
-          if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]] || [[ "${{ inputs.py_marqo_branch }}" == "" ]]; then
+          if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]]; then
             echo "MQ_PY_MARQO_BRANCH=marqo" >> $GITHUB_ENV
+          elif [[ "${{ inputs.py_marqo_branch }}" == "" ]]; then
+            echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@mainline" >> $GITHUB_ENV
           else
             echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
           fi

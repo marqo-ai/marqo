@@ -1,11 +1,16 @@
+import semver
+
 import marqo.version
 
 version = marqo.version.get_version()
 base_url = 'https://docs.marqo.ai'
 
+parsed_version = semver.VersionInfo.parse(version, optional_minor_and_patch=True)
+docs_version = f'{parsed_version.major}.{parsed_version.minor}'
+
 
 def _build_url(path):
-    return f'{base_url}/{version}/{path}'
+    return f'{base_url}/{docs_version}/{path}'
 
 
 def configuring_marqo():
@@ -35,3 +40,10 @@ def list_of_models():
 def search_context():
     return _build_url('API-Reference/Search/search/#context')
 
+
+def configuring_preloaded_models():
+    return _build_url('Guides/Advanced-Usage/configuration/#configuring-preloaded-models')
+
+
+def bring_your_own_model():
+    return _build_url('Guides/Models-Reference/bring_your_own_model/')

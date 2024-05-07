@@ -10,7 +10,7 @@ from marqo.s2_inference.processing.custom_clip_utils import download_pretrained_
 from marqo.s2_inference.s2_inference import clear_loaded_models
 from marqo.s2_inference.s2_inference import (
     vectorise,
-    _validate_model_properties
+    validate_model_properties
 )
 
 from tests.marqo_test import MarqoTestCase
@@ -107,7 +107,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
 
         # Step3 - Search
-        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah", result_count=1)
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text="content 2. blah blah blah", result_count=1)
         assert len(search_res['hits']) == 1
         assert search_res["hits"][0]["_score"] > score_threshold
         assert search_res["hits"][0]["_id"] == "123"
@@ -238,7 +238,7 @@ class TestGenericModelSupport(MarqoTestCase):
                }
 
         # Step3 - Search
-        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text = "content 2. blah blah blah", result_count=1)
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text="content 2. blah blah blah", result_count=1)
         assert len(search_res['hits']) == 1
         assert search_res["hits"][0]["_score"] > score_threshold
         assert search_res["hits"][0]["_id"] == "123"
@@ -354,7 +354,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
 
     def test_vectorise_without_clip_type(self):
-        """_validate_model_properties should throw an exception if required keys are not given.
+        """validate_model_properties should throw an exception if required keys are not given.
         """
         content = ["test test"]
         model_name = "test-model"
