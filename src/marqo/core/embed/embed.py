@@ -16,6 +16,9 @@ from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
 
+class EmbedContentType(str, Enum):
+    Query = "query"
+    Document = "document"
 
 class Embed:
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, default_device: str):
@@ -33,7 +36,7 @@ class Embed:
                     self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
                     index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None,
-                    content_type: Optional[str] = "query"
+                    content_type: Optional[EmbedContentType] = EmbedContentType.Query
                     ) -> Dict:
         """
         Use the index's model to embed the content
@@ -80,14 +83,15 @@ class Embed:
             raise base_exceptions.InternalError(f"Content type {type(content)} is not supported for embed endpoint.")
 
         # Decide on the prefix 
-        if content_type == "query":
+        if content_type == EmbedContentType.Query:
             prefix = determine_text_prefix(None, marqo_index, DeterminePrefixContentType.TextQuery)
-        elif content_type == "document":
+        elif content_type == EmbedContentType.Document:
             prefix = determine_text_prefix(None, marqo_index, DeterminePrefixContentType.TextChunk)
         elif content_type is None:
             prefix = ""
         else:
-            raise ValueError(f"Invalid content_type: {content_type}. Must be 'query', 'document', or None.")
+            # use [item.value for item in list(EmbedContentType)], but formatted not as a list
+            raise ValueError(f"Invalid content_type: {content_type}. Must be {', '.join([item.value for item in list(EmbedContentType)])}, or None.")
         
         queries = []
         for content_entry in content_list:

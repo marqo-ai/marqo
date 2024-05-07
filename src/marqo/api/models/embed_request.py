@@ -8,6 +8,7 @@ from typing import Union, List, Dict, Optional, Any
 
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.api_models import BaseMarqoModel
+from marqo.core.embed.embed import EmbedContentType
 
 
 
@@ -16,7 +17,7 @@ class EmbedRequest(BaseMarqoModel):
     content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
     image_download_headers: Optional[Dict] = None
     modelAuth: Optional[ModelAuth] = None
-    content_type: Optional[str] = "query"
+    content_type: Optional[EmbedContentType] = EmbedContentType.Query
 
     @pydantic.validator('content')
     def validate_content(cls, value):
@@ -47,9 +48,3 @@ class EmbedRequest(BaseMarqoModel):
                 raise ValueError("Embed content should be a string, a dictionary, or a list of strings or dictionaries")
 
         return value
-    
-    @pydantic.validator('content_type', pre=True, always=True)
-    def validate_content_type(cls, v):
-        if v is not None and v not in ["query", "document"]:
-            raise ValueError("content_type must be 'query', 'document', or None")
-        return v
