@@ -236,7 +236,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             image_download_headers=search_query.image_download_headers,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
-            model_auth=search_query.modelAuth
+            model_auth=search_query.modelAuth,
+            text_query_prefix=search_query.textQueryPrefix
         )
 
 
@@ -291,7 +292,8 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
             content=embedding_request.content,
             index_name=index_name, device=device,
             image_download_headers=embedding_request.image_download_headers,
-            model_auth=embedding_request.modelAuth
+            model_auth=embedding_request.modelAuth,
+            content_type=embedding_request.content_type
         )
 
 

@@ -1,6 +1,8 @@
 import os
 import unittest
+#from datetime import time
 from unittest import mock
+import time
 
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest

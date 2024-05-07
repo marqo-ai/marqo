@@ -4,17 +4,12 @@ Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
 import pydantic
-from pydantic import BaseModel, root_validator, Field
 from typing import Union, List, Dict, Optional, Any
 
-from marqo.tensor_search import validation
-from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
-from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.tensor_search.models.api_models import BaseMarqoModel
-from marqo.api.exceptions import InvalidArgError
-from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.embed.embed import EmbedContentType
+
 
 
 class EmbedRequest(BaseMarqoModel):
@@ -22,6 +17,7 @@ class EmbedRequest(BaseMarqoModel):
     content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
     image_download_headers: Optional[Dict] = None
     modelAuth: Optional[ModelAuth] = None
+    content_type: Optional[EmbedContentType] = EmbedContentType.Query
 
     @pydantic.validator('content')
     def validate_content(cls, value):
