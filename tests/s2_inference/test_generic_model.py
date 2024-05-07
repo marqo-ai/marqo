@@ -92,10 +92,9 @@ class TestGenericModelSupport(MarqoTestCase):
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah"
             }]
-        auto_refresh = True
 
         tensor_search.add_documents(config=config, add_docs_params=AddDocsParams(
-            index_name=index_name, docs=docs, auto_refresh=auto_refresh, device="cpu"))
+            index_name=index_name, docs=docs, device="cpu"))
 
     def test_validate_model_properties_missing_required_keys(self):
         """validate_model_properties should throw an exception if required keys are not given.

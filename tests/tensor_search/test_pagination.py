@@ -220,7 +220,7 @@ class TestPagination(MarqoTestCase):
                    "field_3": "a " + (" ".join(random.choices(population=vocab, k=5))),
                    "_id": str(i)
                    } for i in range(num_docs)
-                  ], auto_refresh=False
+                  ]
         )
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
 
@@ -324,7 +324,7 @@ class TestPagination(MarqoTestCase):
 
         add_docs_caller(
             config=self.config, index_name=self.index_name_1,
-            docs=docs, auto_refresh=False
+            docs=docs
         )
 
         tensor_search.refresh_index(config=self.config, index_name=self.index_name_1)
