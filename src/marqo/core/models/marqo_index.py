@@ -122,6 +122,8 @@ class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
     custom: bool = False
+    text_query_prefix: Optional[str] 
+    text_chunk_prefix: Optional[str]
 
     @root_validator(pre=False)
     def validate_custom_properties(cls, values):
@@ -188,6 +190,26 @@ class Model(StrictBaseModel):
                 raise InvalidArgumentError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.'
                 )
+            
+    def _populate_prefix_fields(self) -> None:
+        if self.text_query_prefix is None or self.text_query_prefix == "":
+            self.text_query_prefix = self._get_default_prefix("text_query_prefix")
+        else:
+            self.text_query_prefix = self.text_query_prefix
+       
+        if self.text_chunk_prefix is None or self.text_chunk_prefix == "":
+            self.text_chunk_prefix = self._get_default_prefix("text_chunk_prefix")
+        else:
+            self.text_chunk_prefix = self.text_chunk_prefix
+        
+
+    def _get_default_prefix(self, prefix_type: str) -> Optional[str]:
+        try:
+            model_properties = self.get_properties()
+            default_prefix = model_properties.get(prefix_type)
+            return default_prefix
+        except InvalidModelPropertiesError:
+            return None
 
 
 class MarqoIndex(ImmutableStrictBaseModel, ABC):
@@ -205,8 +227,6 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
     marqo_version: str
-    override_text_query_prefix: Optional[str]
-    override_text_chunk_prefix: Optional[str]
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
     _cache: Dict[str, Any] = PrivateAttr()
@@ -216,6 +236,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
 
     def __init__(self, **data: Any):
         super().__init__(**data)
+        self.model._populate_prefix_fields()
 
         self._cache = dict()
 
@@ -270,6 +291,34 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
         if key not in self._cache:
             self._cache[key] = func()
         return self._cache[key]
+    
+    def get_text_query_prefix(self, request_level_prefix: Optional[str] = None) -> str:
+        if request_level_prefix is not None:
+            return request_level_prefix
+        
+        # For backwards compatibility. Since older versions of Marqo did not have a text_query_prefix field,
+        # we need to return an empty string if the model does not have a text_query_prefix. 
+        # We know that the value of text_query_prefix is None in old indexes since the model was not populated
+        # from the registry.
+        if self.model.text_query_prefix is None:
+            return ""
+        
+        # Else return the model default as populated during initialization
+        return self.model.text_query_prefix or ""
+
+    def get_text_chunk_prefix(self, request_level_prefix: Optional[str] = None) -> str:
+        if request_level_prefix is not None:
+            return request_level_prefix
+        
+        # For backwards compatibility. Since older versions of Marqo did not have a text_chunk_prefix field,
+        # we need to return an empty string if the model does not have a text_chunk_prefix. 
+        # We know that the value of text_chunk_prefix is None in old indexes since the model was not populated
+        # from the registry.
+        if self.model.text_chunk_prefix is None:
+            return ""
+
+        # Else return the model default as populated during initialization
+        return self.model.text_chunk_prefix or ""
 
 
 class UnstructuredMarqoIndex(MarqoIndex):
