@@ -64,18 +64,6 @@ class TestPrefix(MarqoTestCase):
             treat_urls_and_pointers_as_images=True,
         )
 
-        
-        # Create an index simulating an older version without prefix fields
-        """unstructured_backward_compatible_index = cls.unstructured_marqo_index_request(
-            name="unstructured_backward_compatible_index",
-            model=Model(
-                name='hf/e5-small',
-                text_query_prefix=None,
-                text_chunk_prefix=None
-            ),
-            treat_urls_and_pointers_as_images=True,
-        )"""
-        #print(f"create index request, unstructured_backward_compatible_index: {unstructured_backward_compatible_index}")
 
         # STRUCTURED indexes
         structured_text_index = cls.structured_marqo_index_request(
@@ -101,18 +89,6 @@ class TestPrefix(MarqoTestCase):
             tensor_fields=["multimodal_fields"]
         )
 
-        structured_backward_compatible_index = cls.structured_marqo_index_request(
-            model=Model(
-                name="random/small",
-                text_query_prefix=None,
-                text_chunk_prefix=None
-            ),
-            fields=[
-                FieldRequest(name="text", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter])
-            ],
-            tensor_fields=["text"]
-        )
 
         cls.indexes = cls.create_indexes([
             unstructured_index_1,
@@ -120,10 +96,8 @@ class TestPrefix(MarqoTestCase):
             unstructured_index_multimodal,
             unstructured_index_with_model_default,
             unstructured_index_with_override,
-            #unstructured_backward_compatible_index,
             structured_text_index,
             structured_multimodal_index,
-            structured_backward_compatible_index
         ])
 
         # Assign to objects so they can be used in tests
@@ -132,13 +106,9 @@ class TestPrefix(MarqoTestCase):
         cls.unstructured_index_multimodal = cls.indexes[2]
         cls.unstructured_index_with_model_default = cls.indexes[3]
         cls.unstructured_index_with_override = cls.indexes[4]
-        #cls.unstructured_backward_compatible_index = cls.indexes[5]
         cls.structured_text_index = cls.indexes[5]
         cls.structured_multimodal_index = cls.indexes[6]
-        cls.structured_backward_compatible_index = cls.indexes[7]
 
-        print(f"created index: unstructured_index_e5: {cls.unstructured_index_e5}")
-        #print(f"created index: unstructured_backward_compatible_index: {cls.unstructured_backward_compatible_index}")
 
 
     def setUp(self) -> None:
@@ -217,8 +187,6 @@ class TestPrefix(MarqoTestCase):
 
         for index in [self.unstructured_index_e5]:
             with self.subTest(index=index.type):
-                print(f"index name: {index.name}")
-                print(f"prefixes: text_query_prefix: {index.get_text_query_prefix()}, text_chunk_prefix: {index.get_text_chunk_prefix()}")
                 # A) prefix should default to "passage: " with the e5-small model
                 tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "doc_a", "text": "hello"}], auto_refresh=True,
@@ -379,22 +347,18 @@ class TestPrefix(MarqoTestCase):
         """
 
         with self.subTest("All prefixes on (request level chosen)"):
-            #result = determine_text_prefix("request-level", self.unstructured_index_with_override, DeterminePrefixContentType.TextChunk)
             result = self.unstructured_index_with_override.get_text_chunk_prefix("request-level")
             self.assertEqual(result, "request-level")
 
         with self.subTest("Request and model default on (request level chosen)"):
-            #result = determine_text_prefix("request-level", self.unstructured_index_with_model_default, DeterminePrefixContentType.TextChunk)
             result = self.unstructured_index_with_model_default.get_text_chunk_prefix("request-level")
             self.assertEqual(result, "request-level")
 
         with self.subTest("Index override and model default on (index override chosen)"):
-            #result = determine_text_prefix(None, self.unstructured_index_with_override, DeterminePrefixContentType.TextChunk)
             result = self.unstructured_index_with_override.get_text_chunk_prefix(None)
             self.assertEqual(result, "index-override: ")
 
         with self.subTest("Only model default on (model default chosen)"):
-            #result = determine_text_prefix(None, self.unstructured_index_with_model_default, DeterminePrefixContentType.TextChunk)
             result = self.unstructured_index_with_model_default.get_text_chunk_prefix(None)
             self.assertEqual(result, "test passage: ")
 
@@ -420,9 +384,6 @@ class TestPrefix(MarqoTestCase):
             ),
             device="cpu"
         )
-
-        print(f"embed_res['embeddings'][0]: {embed_res['embeddings'][0]}")
-        print(f"res['results'][0]['_tensor_facets'][0]['_embedding']: {res['results'][0]['_tensor_facets'][0]['_embedding']}")
 
         # We assert that the embeddings are equal
         with self.subTest("Embeddings are equal between overriden doc and direct embed"):
