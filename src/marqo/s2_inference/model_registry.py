@@ -67,7 +67,6 @@ def _get_clip_properties() -> Dict:
                 "notes": "CLIP ViT-L/14@336px",
                 "type":"clip",
                 },
-
         }
     return CLIP_MODEL_PROPERTIES
 
@@ -322,26 +321,24 @@ def _get_open_clip_properties() -> Dict:
             'note': 'open_clip models',
             'type': 'open_clip',
             'pretrained': 'laion2b_s29b_b131k_ft_soup'},
-        # Comment out as they are not currently available in open_clip release 2.18.1
-        # It is discussed here https: // github.com / mlfoundations / open_clip / issues / 477
-        # 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg': {
-        #     'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg',
-        #     'dimensions': 1024,
-        #     'note': 'open_clip models',
-        #     'type': 'open_clip',
-        #     'pretrained': 'laion2b_s34b_b82k_augreg'},
-        # 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind': {
-        #     'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind',
-        #     'dimensions': 1024,
-        #     'note': 'open_clip models',
-        #     'type': 'open_clip',
-        #     'pretrained': 'laion2b_s34b_b82k_augreg_rewind'},
-        # 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup': {
-        #     'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
-        #     'dimensions': 1024,
-        #     'note': 'open_clip models',
-        #     'type': 'open_clip',
-        #     'pretrained': 'laion2b_s34b_b82k_augreg_soup'},
+        'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg': {
+            'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg',
+            'dimensions': 1024,
+            'note': 'open_clip models',
+            'type': 'open_clip',
+            'pretrained': 'laion2b_s34b_b82k_augreg'},
+        'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind': {
+            'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_rewind',
+            'dimensions': 1024,
+            'note': 'open_clip models',
+            'type': 'open_clip',
+            'pretrained': 'laion2b_s34b_b82k_augreg_rewind'},
+        'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup': {
+            'name': 'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
+            'dimensions': 1024,
+            'note': 'open_clip models',
+            'type': 'open_clip',
+            'pretrained': 'laion2b_s34b_b82k_augreg_soup'},
         'open_clip/coca_ViT-B-32/laion2b_s13b_b90k': {'name': 'open_clip/coca_ViT-B-32/laion2b_s13b_b90k',
                                                       'dimensions': 512,
                                                       'note': 'open_clip models',
@@ -363,7 +360,121 @@ def _get_open_clip_properties() -> Dict:
             'dimensions': 768,
             'note': 'open_clip models',
             'type': 'open_clip',
-            'pretrained': 'mscoco_finetuned_laion2b_s13b_b90k'}
+            'pretrained': 'mscoco_finetuned_laion2b_s13b_b90k'},
+
+        # New models: Open CLIP 2.24.0
+        "open_clip/ViT-SO400M-14-SigLIP-384/webli": {
+            "name": "open_clip/ViT-SO400M-14-SigLIP-384/webli",
+            "dimensions": 1152,
+            "note": "open_clip model: ViT-SO400M-14-SigLIP-384/webli",
+            "type": "open_clip",
+            "pretrained": "webli"
+        },
+        "open_clip/ViT-H-14-378-quickgelu/dfn5b": {
+            "name": "open_clip/ViT-H-14-378-quickgelu/dfn5b",
+            "dimensions": 1024,
+            "note": "open_clip model: ViT-H-14-378-quickgelu/dfn5b",
+            "type": "open_clip",
+            "pretrained": "dfn5b"
+        },
+        "open_clip/ViT-L-16-SigLIP-384/webli": {
+            "name": "open_clip/ViT-L-16-SigLIP-384/webli",
+            "dimensions": 1024,
+            "note": "open_clip model: ViT-L-16-SigLIP-384/webli",
+            "type": "open_clip",
+            "pretrained": "webli"
+        },
+        "open_clip/ViT-H-14-quickgelu/dfn5b": {
+            "name": "open_clip/ViT-H-14-quickgelu/dfn5b",
+            "dimensions": 1024,
+            "note": "open_clip model: ViT-H-14-quickgelu/dfn5b",
+            "type": "open_clip",
+            "pretrained": "dfn5b"
+        },
+        "open_clip/ViT-L-16-SigLIP-256/webli": {
+            "name": "open_clip/ViT-L-16-SigLIP-256/webli",
+            "dimensions": 1024,
+            "note": "open_clip model: ViT-L-16-SigLIP-256/webli",
+            "type": "open_clip",
+            "pretrained": "webli"
+        },
+        "open_clip/ViT-B-16-SigLIP-512/webli": {
+            "name": "open_clip/ViT-B-16-SigLIP-512/webli",
+            "dimensions": 768,
+            "note": "open_clip model: ViT-B-16-SigLIP-512/webli",
+            "type": "open_clip",
+            "pretrained": "webli"
+        },
+        "open_clip/ViT-B-16-SigLIP-384/webli": {
+            "name": "open_clip/ViT-B-16-SigLIP-384/webli",
+            "dimensions": 768,
+            "note": "open_clip model: ViT-B-16-SigLIP-384/webli",
+            "type": "open_clip",
+            "pretrained": "webli"
+        },
+        "open_clip/ViT-B-16-SigLIP-256/webli": {
+            "name": "open_clip/ViT-B-16-SigLIP-256/webli",
+            "dimensions": 768,
+            "note": "open_clip model: ViT-B-16-SigLIP-256/webli",
+            "type": "open_clip",
+            "pretrained": "webli"
+        },
+        "open_clip/ViT-B-16-SigLIP/webli": {
+            "name": "open_clip/ViT-B-16-SigLIP/webli",
+            "dimensions": 768,
+            "note": "open_clip model: ViT-B-16-SigLIP/webli",
+            "type": "open_clip",
+            "pretrained": "webli"
+        },
+        "open_clip/ViT-L-14-quickgelu/dfn2b": {
+            "name": "open_clip/ViT-L-14-quickgelu/dfn2b",
+            "dimensions": 768,
+            "note": "open_clip model: ViT-L-14-quickgelu/dfn2b",
+            "type": "open_clip",
+            "pretrained": "dfn2b"
+        },
+        "open_clip/EVA02-L-14-336/merged2b_s6b_b61k": {
+            "name": "open_clip/EVA02-L-14-336/merged2b_s6b_b61k",
+            "dimensions": 768,
+            "note": "open_clip model: EVA02-L-14-336/merged2b_s6b_b61k",
+            "type": "open_clip",
+            "pretrained": "merged2b_s6b_b61k"
+        },
+        "open_clip/EVA02-B-16/merged2b_s8b_b131k": {
+            "name": "open_clip/EVA02-B-16/merged2b_s8b_b131k",
+            "dimensions": 512,
+            "note": "open_clip model: EVA02-B-16/merged2b_s8b_b131k",
+            "type": "open_clip",
+            "pretrained": "merged2b_s8b_b131k"
+        },
+        "open_clip/EVA02-L-14/merged2b_s4b_b131k": {
+            "name": "open_clip/EVA02-L-14/merged2b_s4b_b131k",
+            "dimensions": 768,
+            "note": "open_clip model: EVA02-L-14/merged2b_s4b_b131k",
+            "type": "open_clip",
+            "pretrained": "merged2b_s4b_b131k"
+        },
+        "open_clip/ViT-B-16-quickgelu/metaclip_fullcc": {
+            "name": "open_clip/ViT-B-16-quickgelu/metaclip_fullcc",
+            "dimensions": 512,
+            "note": "open_clip model: ViT-B-16-quickgelu/metaclip_fullcc",
+            "type": "open_clip",
+            "pretrained": "metaclip_fullcc"
+        },
+        "open_clip/ViT-L-14-CLIPA-336/datacomp1b": {
+            "name": "open_clip/ViT-L-14-CLIPA-336/datacomp1b",
+            "dimensions": 768,
+            "note": "open_clip model: ViT-L-14-CLIPA-336/datacomp1b",
+            "type": "open_clip",
+            "pretrained": "datacomp1b"
+        },
+        "open_clip/ViT-B-32-256/datacomp_s34b_b86k": {
+            "name": "open_clip/ViT-B-32-256/datacomp_s34b_b86k",
+            "dimensions": 512,
+            "note": "open_clip model: ViT-B-32-256/datacomp_s34b_b86k",
+            "type": "open_clip",
+            "pretrained": "datacomp_s34b_b86k"
+        }
     }
     return OPEN_CLIP_MODEL_PROPERTIES
 
