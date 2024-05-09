@@ -88,9 +88,9 @@ class Embed:
         if marqo_index.model.text_query_prefix is None or marqo_index.model.text_chunk_prefix is None:
             prefix = ""
         elif content_type == EmbedContentType.Query:
-            prefix = marqo_index.get_text_query_prefix(None)
+            prefix = marqo_index.model.get_text_query_prefix()
         elif content_type == EmbedContentType.Document:
-            prefix = marqo_index.get_text_chunk_prefix(None)
+            prefix = marqo_index.model.get_text_chunk_prefix()
         elif content_type is None:
             prefix = ""
         else:

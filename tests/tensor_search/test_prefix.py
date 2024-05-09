@@ -347,19 +347,19 @@ class TestPrefix(MarqoTestCase):
         """
 
         with self.subTest("All prefixes on (request level chosen)"):
-            result = self.unstructured_index_with_override.get_text_chunk_prefix("request-level")
+            result = self.unstructured_index_with_override.model.get_text_chunk_prefix("request-level")
             self.assertEqual(result, "request-level")
 
         with self.subTest("Request and model default on (request level chosen)"):
-            result = self.unstructured_index_with_model_default.get_text_chunk_prefix("request-level")
+            result = self.unstructured_index_with_model_default.model.get_text_chunk_prefix("request-level")
             self.assertEqual(result, "request-level")
 
         with self.subTest("Index override and model default on (index override chosen)"):
-            result = self.unstructured_index_with_override.get_text_chunk_prefix(None)
+            result = self.unstructured_index_with_override.model.get_text_chunk_prefix(None)
             self.assertEqual(result, "index-override: ")
 
         with self.subTest("Only model default on (model default chosen)"):
-            result = self.unstructured_index_with_model_default.get_text_chunk_prefix(None)
+            result = self.unstructured_index_with_model_default.model.get_text_chunk_prefix(None)
             self.assertEqual(result, "test passage: ")
 
         # doc_a should default to the override prefix
@@ -474,8 +474,8 @@ class TestPrefix(MarqoTestCase):
         )
 
         # Assert that when we attempt to get the text chunk prefix and text query prefix, it returns an empty string
-        self.assertEqual(mock_old_marqo_index.get_text_chunk_prefix(), "")
-        self.assertEqual(mock_old_marqo_index.get_text_query_prefix(), "")
+        self.assertEqual(mock_old_marqo_index.model.get_text_chunk_prefix(), "")
+        self.assertEqual(mock_old_marqo_index.model.get_text_query_prefix(), "")
 
     # NOTE: For tests on the prefix functionality on the embed endpoint, see tests_embed.py under 
     # integration tests.
