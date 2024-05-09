@@ -30,7 +30,7 @@ class AddDocsBodyParams(BaseModel):
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
     imageDownloadThreadCount: int = 20
-    textChunkPrefix: Optional[str] = ""
+    textChunkPrefix: Optional[str] = None
 
 
 class AddDocsParams(BaseModel):

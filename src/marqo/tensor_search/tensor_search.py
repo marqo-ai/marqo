@@ -1944,7 +1944,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                                                         doc_id: str, device: str, marqo_index: UnstructuredMarqoIndex,
                                                         image_repo, field_map: dict,
                                                         model_auth: Optional[ModelAuth] = None,
-                                                        text_chunk_prefix: str = ""
+                                                        text_chunk_prefix: str = None
                                                         ):
     '''
     This function is used to vectorise multimodal combination field.
