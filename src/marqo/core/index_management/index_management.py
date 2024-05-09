@@ -109,8 +109,6 @@ class IndexManagement:
         vespa_schema = vespa_schema_factory(marqo_index_request)
         schema, marqo_index = vespa_schema.generate_schema()
 
-        logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
-
         self._add_schema(app, marqo_index.schema_name, schema)
         self._add_schema_to_services(app, marqo_index.schema_name)
         self.vespa_client.deploy_application(app)
@@ -180,7 +178,6 @@ class IndexManagement:
         ]
 
         for schema, marqo_index in schema_responses:
-            logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
             self._add_schema(app, marqo_index.schema_name, schema)
             self._add_schema_to_services(app, marqo_index.schema_name)
 
