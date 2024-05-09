@@ -192,12 +192,12 @@ class Model(StrictBaseModel):
                 )
 
     def _populate_prefix_fields(self) -> None:
-        if self.text_query_prefix is None or self.text_query_prefix == "":
+        if self.text_query_prefix is None:
             self.text_query_prefix = self._get_default_prefix("text_query_prefix")
         else:
             self.text_query_prefix = self.text_query_prefix
 
-        if self.text_chunk_prefix is None or self.text_chunk_prefix == "":
+        if self.text_chunk_prefix is None:
             self.text_chunk_prefix = self._get_default_prefix("text_chunk_prefix")
         else:
             self.text_chunk_prefix = self.text_chunk_prefix
@@ -284,7 +284,7 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
             else:
                 raise ValidationError(f"Invalid index type {obj['type']}")
 
-            raise ValidationError(f"Index type not found in {obj}")
+        raise ValidationError(f"Index type not found in {obj}")
 
     def _cache_or_get(self, key: str, func):
         if key not in self._cache:
