@@ -724,6 +724,88 @@ def _get_hf_properties() -> Dict:
                  "text_query_prefix": "query: ",
                  "text_chunk_prefix": "passage: ",
                  "notes": ""},
+
+            # New models
+            "hf/multilingual-e5-large-instruct":
+                {"name": 'intfloat/multilingual-e5-large-instruct',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/GIST-large-Embedding-v0":
+                {"name": 'avsolatorio/GIST-large-Embedding-v0',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/bge-small-en-v1.5":
+                {"name": 'BAAI/bge-small-en-v1.5',
+                 "dimensions": 384,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/bge-base-en-v1.5":
+                {"name": 'BAAI/bge-base-en-v1.5',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/bge-large-en-v1.5":
+                {"name": 'BAAI/bge-large-en-v1.5',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/bge-small-zh-v1.5":
+                {"name": 'BAAI/bge-small-zh-v1.5',
+                 "dimensions": 384,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/bge-base-zh-v1.5":
+                {"name": 'BAAI/bge-base-zh-v1.5',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/bge-large-zh-v1.5":
+                {"name": 'BAAI/bge-large-zh-v1.5',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/gte-base-en-v1.5":
+                {"name": 'Alibaba-NLP/gte-base-en-v1.5',
+                 "dimensions": 768,
+                 "tokens": 8192,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/gte-large-en-v1.5":
+                {"name": 'Alibaba-NLP/gte-large-en-v1.5',
+                 "dimensions": 1024,
+                 "tokens": 8192,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/snowflake-arctic-embed-m-long":
+                {"name": 'Snowflake/snowflake-arctic-embed-m-long',
+                 "dimensions": 768,
+                 "tokens": 8192,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/snowflake-arctic-embed-l":
+                {"name": 'Snowflake/snowflake-arctic-embed-l',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/ember-v1":
+                {"name": 'llmrails/ember-v1',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
     }
     return HF_MODEL_PROPERTIES
 
