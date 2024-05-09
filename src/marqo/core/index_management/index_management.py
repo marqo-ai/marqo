@@ -102,9 +102,9 @@ class IndexManagement:
 
         # Populate the prefix fields if they are None
         if marqo_index_request.model.text_query_prefix is None:
-            marqo_index_request.model.text_query_prefix = marqo_index_request.model._get_default_prefix("text_query_prefix")
+            marqo_index_request.model.text_query_prefix = marqo_index_request.model.get_default_text_query_prefix()
         if marqo_index_request.model.text_chunk_prefix is None:
-            marqo_index_request.model.text_chunk_prefix = marqo_index_request.model._get_default_prefix("text_chunk_prefix")
+            marqo_index_request.model.text_chunk_prefix = marqo_index_request.model.get_default_text_chunk_prefix()
 
         vespa_schema = vespa_schema_factory(marqo_index_request)
         schema, marqo_index = vespa_schema.generate_schema()
@@ -167,13 +167,12 @@ class IndexManagement:
                 if self.index_exists(index.name):
                     raise IndexExistsError(f"Index {index.name} already exists")
 
-
         # Populate the prefix fields if they are None
         for index in marqo_index_requests:
             if index.model.text_query_prefix is None:
-                index.model.text_query_prefix = index.model._get_default_prefix("text_query_prefix")
+                index.model.text_query_prefix = index.model.get_default_text_query_prefix()
             if index.model.text_chunk_prefix is None:
-                index.model.text_chunk_prefix = index.model._get_default_prefix("text_chunk_prefix")
+                index.model.text_chunk_prefix = index.model.get_default_text_chunk_prefix()
 
         schema_responses = [
             vespa_schema_factory(index).generate_schema()  # Tuple (schema, MarqoIndex)

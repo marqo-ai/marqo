@@ -203,7 +203,7 @@ class Model(StrictBaseModel):
             return ""
 
         # Else return the model default as populated during initialization
-        return self.text_query_prefix or ""
+        return self.text_query_prefix
 
     def get_text_chunk_prefix(self, request_level_prefix: Optional[str] = None) -> str:
         if request_level_prefix is not None:
@@ -217,7 +217,13 @@ class Model(StrictBaseModel):
             return ""
 
         # Else return the model default as populated during initialization
-        return self.text_chunk_prefix or ""
+        return self.text_chunk_prefix
+    
+    def get_default_text_query_prefix(self) -> Optional[str]:
+        return self._get_default_prefix("text_query_prefix")
+
+    def get_default_text_chunk_prefix(self) -> Optional[str]:
+        return self._get_default_prefix("text_chunk_prefix")
 
     def _get_default_prefix(self, prefix_type: str) -> Optional[str]:
         model_properties = self.get_properties()
