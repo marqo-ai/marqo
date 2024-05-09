@@ -125,7 +125,11 @@ class MarqoTestCase(unittest.TestCase):
             fields: List[FieldRequest],
             tensor_fields: List[str],
             name: Optional[str] = None,
-            model: Model = Model(name='random/small'),
+            model: Model = Model(
+                name='random/small',
+                text_query_prefix="",
+                text_chunk_prefix=""
+            ),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,
@@ -144,8 +148,6 @@ class MarqoTestCase(unittest.TestCase):
             marqo_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time(),
-            override_text_chunk_prefix=None,
-            override_text_query_prefix=None
     ) -> StructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
@@ -167,15 +169,17 @@ class MarqoTestCase(unittest.TestCase):
             marqo_version=marqo_version,
             created_at=created_at,
             updated_at=updated_at,
-            override_text_chunk_prefix=override_text_chunk_prefix,
-            override_text_query_prefix=override_text_query_prefix
         )
 
     @classmethod
     def unstructured_marqo_index_request(
             cls,
             name: Optional[str] = None,
-            model: Model = Model(name='random/small'),
+            model: Model = Model(
+                name='random/small',
+                text_query_prefix="",
+                text_chunk_prefix=""
+            ),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,
@@ -195,12 +199,11 @@ class MarqoTestCase(unittest.TestCase):
             marqo_version='1.0.0',
             created_at=time.time(),
             updated_at=time.time(),
-            override_text_chunk_prefix=None,
-            override_text_query_prefix=None
     ) -> UnstructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndexRequest.
         """
+        
         if not name:
             name = 'a' + str(uuid.uuid4()).replace('-', '')
 
@@ -218,8 +221,6 @@ class MarqoTestCase(unittest.TestCase):
             marqo_version=marqo_version,
             created_at=created_at,
             updated_at=updated_at,
-            override_text_chunk_prefix=override_text_chunk_prefix,
-            override_text_query_prefix=override_text_query_prefix
         )
 
     class _AssertRaisesContext:

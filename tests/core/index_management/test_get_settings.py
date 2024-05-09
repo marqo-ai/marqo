@@ -167,6 +167,7 @@ class TestGetSettings(MarqoTestCase):
             # Get unstructured custom settings
             retrieved_index = self.config.index_management.get_index(self.unstructured_custom_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
+            print(f"retrieved_settings: {retrieved_settings}")
             self.assertEqual(retrieved_settings, expected_unstructured_custom_settings)
         
         with self.subTest("Structured index custom settings"):
@@ -203,5 +204,6 @@ class TestGetSettings(MarqoTestCase):
             # Get unstructured default settings
             retrieved_index = self.config.index_management.get_index(self.structured_custom_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
+            print(f"retrieved_settings: {retrieved_settings}")
             self.assertEqual(retrieved_settings, expected_structured_custom_settings)
             
