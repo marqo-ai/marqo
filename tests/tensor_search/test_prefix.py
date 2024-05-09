@@ -449,8 +449,7 @@ class TestPrefix(MarqoTestCase):
             schema_name="old_index",
             type=IndexType.Unstructured,
             model=Model(
-                name="old_index", 
-                properties={"property_1": "value_1"},
+                name="hf/e5-small",
                 text_chunk_prefix=None,
                 text_query_prefix=None
             ),
