@@ -1,3 +1,11 @@
+# Release 2.5.1
+
+## Bug fixes and minor changes
+- More stable `recommend` endpoint (https://github.com/marqo-ai/marqo/pull/825).
+- Change error code when using `IN` filter operator on an unstructured index (https://github.com/marqo-ai/marqo/pull/823).
+- New index settings validation endpoint for Cloud use (https://github.com/marqo-ai/marqo/pull/809).
+
+
 # Release 2.5.0
 ## New features
 - New ‘embed’ endpoint (`POST /indexes/{index_name}/embed`) (https://github.com/marqo-ai/marqo/pull/803). Marqo can now perform inference and return the embeddings for a single piece or list of content, where content can be either a string or weighted dictionary of strings. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Embed/embed/). 
@@ -62,6 +70,11 @@ If you have any more inquiries or thoughts, please don’t hesitate to reach out
 ## Contributor shout-outs
 - A huge thank you to all our 4k stargazers! This is a new milestone for Marqo!
 - Stay connected and share your thoughts on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! Your insights, questions, and feedback are always welcome and highly appreciated.
+
+# Release 2.2.2
+
+## Bug fixes and minor changes
+- Improve telemetry memory management (https://github.com/marqo-ai/marqo/pull/804).
 
 # Release 2.2.1
 
