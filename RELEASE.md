@@ -5,7 +5,6 @@
 - Change error code when using `IN` filter operator on an unstructured index (https://github.com/marqo-ai/marqo/pull/823).
 - New index settings validation endpoint for Cloud use (https://github.com/marqo-ai/marqo/pull/809).
 
-
 # Release 2.5.0
 ## New features
 - New ‘embed’ endpoint (`POST /indexes/{index_name}/embed`) (https://github.com/marqo-ai/marqo/pull/803). Marqo can now perform inference and return the embeddings for a single piece or list of content, where content can be either a string or weighted dictionary of strings. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Embed/embed/). 
