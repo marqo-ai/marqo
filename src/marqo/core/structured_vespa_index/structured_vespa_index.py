@@ -418,7 +418,103 @@ class StructuredVespaIndex(VespaIndex):
         return query
 
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
-        raise NotImplementedError()
+        # TODO: Split out the redundant code in lexical and tensor query functions
+
+        # Tensor component
+        if marqo_query.searchable_attributes_tensor is not None:
+            for att in marqo_query.searchable_attributes_tensor:
+                if att not in self._marqo_index.tensor_field_map:
+                    raise InvalidFieldNameError(
+                        f'Index {self._marqo_index.name} has no tensor field {att}. '
+                        f'Available tensor fields are: {", ".join(self._marqo_index.tensor_field_map.keys())}'
+                    )
+
+            fields_to_search = marqo_query.searchable_attributes
+        else:
+            fields_to_search = self._marqo_index.tensor_field_map.keys()
+
+        tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
+        filter_term = self._get_filter_term(marqo_query)
+        if filter_term:
+            filter_term = f' AND {filter_term}'
+        else:
+            filter_term = ''
+        select_attributes = self._get_select_attributes(marqo_query)
+        summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
+        score_modifiers = self._get_score_modifiers(marqo_query)
+        ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
+            else common.RANK_PROFILE_EMBEDDING_SIMILARITY
+
+        query_inputs = {
+            common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+        }
+        query_inputs.update({
+            f: 1 for f in fields_to_search
+        })
+        if score_modifiers:
+            query_inputs.update(score_modifiers)
+
+        query = {
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
+            'model_restrict': self._marqo_index.schema_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'ranking': ranking
+        }
+        query = {k: v for k, v in query.items() if v is not None}
+
+        if not marqo_query.approximate:
+            query['ranking.softtimeout.enable'] = False
+            query['timeout'] = 300 * 1000  # 5 minutes
+
+        # Lexical component
+        if marqo_query.searchable_attributes is not None:
+            for att in marqo_query.searchable_attributes:
+                if att not in self._marqo_index.lexically_searchable_fields_names:
+                    raise InvalidFieldNameError(
+                        f'Index {self._marqo_index.name} has no lexically searchable field {att}. '
+                        f'Available lexically searchable fields are: '
+                        f'{", ".join(self._marqo_index.lexically_searchable_fields_names)}'
+                    )
+            fields_to_search = marqo_query.searchable_attributes
+        else:
+            fields_to_search = self._marqo_index.lexical_field_map.keys()
+
+        lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
+        filter_term = self._get_filter_term(marqo_query)
+        if filter_term:
+            filter_term = f' AND {filter_term}'
+        else:
+            filter_term = ''
+
+        select_attributes = self._get_select_attributes(marqo_query)
+        summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
+        score_modifiers = self._get_score_modifiers(marqo_query)
+        ranking = common.RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
+            else common.RANK_PROFILE_BM25
+
+        query_inputs = {}
+        query_inputs.update({
+            f: 1 for f in fields_to_search
+        })
+        if score_modifiers:
+            query_inputs.update(score_modifiers)
+
+        query = {
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'model_restrict': self._marqo_index.schema_name,
+            'hits': marqo_query.limit,
+            'offset': marqo_query.offset,
+            'query_features': query_inputs,
+            'presentation.summary': summary,
+            'ranking': ranking
+        }
+        query = {k: v for k, v in query.items() if v is not None}
+
+        return query
+
 
     def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
         if marqo_query.searchable_attributes is not None:

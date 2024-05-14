@@ -55,7 +55,8 @@ from marqo.core import exceptions as core_exceptions
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
-from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
+from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
@@ -1192,7 +1193,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            score_modifiers: Optional[ScoreModifier] = None,
            model_auth: Optional[ModelAuth] = None,
            processing_start: float = None,
-           text_query_prefix: Optional[str] = None) -> Dict:
+           text_query_prefix: Optional[str] = None,
+           hybrid_parameters: Optional[HybridParameters] = None) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1219,6 +1221,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
+        hybrid_parameters: Parameters for hybrid search
     Returns:
 
     """
@@ -1285,7 +1288,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
     else:
         selected_device = device
 
-    if search_method.upper() == SearchMethod.TENSOR:
+    if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
         if ef_search is None:
@@ -1297,14 +1300,24 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         if approximate is None:
             approximate = True
 
+        if search_method.upper() == SearchMethod.TENSOR:
+            search_result = _vector_text_search(
+                config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
+                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+                image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
+            )
+        elif search_method.upper() == SearchMethod.HYBRID:
+            search_result = _hybrid_search(
+                config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
+                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+                image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
+                hybrid_parameters=hybrid_parameters
+            )
 
-        search_result = _vector_text_search(
-            config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
-            ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
-            filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
-            image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
-            model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
-        )
     elif search_method.upper() == SearchMethod.LEXICAL:
         if ef_search is not None:
             raise errors.InvalidArgError(
@@ -1354,7 +1367,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
     logger.debug(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
 
     return search_result
-
 
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
@@ -1897,6 +1909,137 @@ def _vector_text_search(
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
         f"search (tensor) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
+        f"{len(gathered_docs)} results from Vespa."
+    )
+
+    return gathered_docs
+
+
+def _hybrid_search(
+        config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5, offset: int = 0,
+        ef_search: Optional[int] = None, approximate: bool = True,
+        searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
+        attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
+        image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
+        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
+        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
+    """
+
+    Args:
+        config:
+        index_name:
+        query: either a string query (which can be a URL or natural language text), a dict of
+            <query string>:<weight float> pairs, or None with a context
+        result_count:
+        offset:
+        searchable_attributes: Iterable of field names to search. If left as None, then all will
+            be searched
+        verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
+            objects are printed out
+        attributes_to_retrieve: if set, only returns these fields
+        image_download_headers: headers for downloading images
+        context: a dictionary to allow custom vectors in search
+        score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+        model_auth: Authorisation details for downloading a model (if required)
+        highlights: if True, highlights will be returned
+    Returns:
+
+    Note:
+        - uses multisearch, which returns k results in each attribute. Not that much of a concern unless you have a
+        ridiculous number of attributes
+        - Should not be directly called by client - the search() method should
+        be called. The search() method adds syncing
+        - device should ALWAYS be set
+
+    Output format:
+        [
+            {
+                _id: doc_id
+                doc: {# original document},
+                highlights:[{}],
+            },
+        ]
+    Future work:
+        - max result count should be in a config somewhere
+        - searching a non existent index should return a HTTP-type error
+    """
+
+    # TODO: Break out into separate modules: create_tensor_query, create_lexical query, so it can be used in both functions. No redundant code.
+    # # SEARCH TIMER-LOGGER (pre-processing)
+    if not device:
+        raise api_exceptions.InternalError("_hybrid_search cannot be called without `device`!")
+
+    RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
+
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+
+    # Determine the text query prefix
+    text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
+
+    queries = [BulkSearchQueryEntity(
+        q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID, limit=result_count,
+        offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
+        boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
+    )]
+
+    with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
+        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+    vectorised_text = list(qidx_to_vectors.values())[0]
+
+    marqo_query = MarqoHybridQuery(
+        index_name=index_name,
+        vector_query=vectorised_text,
+        filter=filter_string,
+        limit=result_count,
+        ef_search=ef_search,
+        approximate=approximate,
+        offset=offset,
+        searchable_attributes=searchable_attributes,
+        attributes_to_retrieve=attributes_to_retrieve,
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
+    )
+
+    vespa_index = vespa_index_factory(marqo_index)
+    vespa_query = vespa_index.to_vespa_query(marqo_query)
+
+    total_preprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.processing_before_vespa")
+    logger.debug(
+        f"search (hybrid) pre-processing: took {(total_preprocess_time):.3f}ms to vectorize and process query.")
+
+    # SEARCH TIMER-LOGGER (roundtrip)
+    with RequestMetricsStore.for_request().time("search.hybrid.vespa",
+                                                lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
+                                                ):
+        responses = config.vespa_client.query(**vespa_query)
+
+    if not approximate and (responses.root.coverage.coverage < 100 or responses.root.coverage.degraded is not None):
+        raise errors.InternalError(
+            f'Graceful degradation detected for non-approximate search. '
+            f'Coverage is not 100%: {responses.root.coverage}'
+            f'Degraded: {str(responses.root.coverage.degraded)}'
+        )
+
+    # SEARCH TIMER-LOGGER (post-processing)
+    RequestMetricsStore.for_request().start("search.hybrid.postprocess")
+    gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
+
+    if boost is not None:
+        raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
+        # gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
+
+    # completely_sorted = sort_chunks(gathered_docs)
+
+    # if verbose:
+    #     print("Chunk vector search, sorted result:")
+    #     if verbose == 1:
+    #         pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
+    #     elif verbose == 2:
+    #         pprint.pprint(completely_sorted)
+
+    total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
+    logger.debug(
+        f"search (hybrid) post-processing: took {(total_postprocess_time):.3f}ms to sort and format "
         f"{len(gathered_docs)} results from Vespa."
     )
 

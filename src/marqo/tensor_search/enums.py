@@ -6,6 +6,8 @@ class SearchMethod(str, Enum):
     LEXICAL = "LEXICAL"
     # chunk_embeddings
     TENSOR = "TENSOR"
+    # Mixed retrieval and/or ranking
+    HYBRID = "HYBRID"
 
 
 class TensorField:

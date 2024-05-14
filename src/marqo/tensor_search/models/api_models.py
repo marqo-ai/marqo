@@ -10,6 +10,7 @@ import pydantic
 from pydantic import BaseModel, root_validator
 
 from marqo.core.models.marqo_index import MarqoIndex
+from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -42,10 +43,11 @@ class SearchQuery(BaseMarqoModel):
     scoreModifiers: Optional[ScoreModifier] = None
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
+    hybridParameters: Optional[HybridParameters] = None
 
     @root_validator(pre=False)
     def validate_query_and_context(cls, values):
-        """Validate that one of query and context are present for tensor search, or just the query for lexical search.
+        """Validate that one of query and context are present for tensor/hybrid search, or just the query for lexical search.
 
         Raises:
             InvalidArgError: If validation fails
@@ -54,7 +56,7 @@ class SearchQuery(BaseMarqoModel):
         query = values.get('q')
         context = values.get('context')
 
-        if search_method.upper() == SearchMethod.TENSOR:
+        if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
             if query is None and context is None:
                 raise ValueError("One of Query(q) or context is required for tensor search but both are missing")
         elif search_method.upper() == SearchMethod.LEXICAL:
@@ -63,6 +65,18 @@ class SearchQuery(BaseMarqoModel):
         else:
             raise ValueError(f"Invalid search method {search_method}")
         return values
+
+    @root_validator(pre=False)
+    def validate_hybrid_parameters(cls, values):
+        """
+        Normal searchable attributes cannot be defined at the same time as hybrid parameters
+        """
+        hybrid_parameters = values.get('hybridParameters')
+        if values.get('searchableAttributes') is not None and (
+            hybrid_parameters.get('searchable_attributes_lexical') is not None or
+            hybrid_parameters.get('searchable_attributes_tensor') is not None
+        ):
+            raise ValueError("Normal searchable attributes cannot be defined at the same time as hybrid parameters")
 
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
