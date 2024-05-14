@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 import regex as re
 from typing import Union, List, Optional
 import ftfy
@@ -145,7 +147,7 @@ def download_pretrained_from_url(
     os.makedirs(cache_dir, exist_ok=True)
 
     if cache_file_name is None:
-        filename = os.path.basename(url)
+        filename = os.path.basename(urlparse(url).path)
     else:
         filename = cache_file_name
 
