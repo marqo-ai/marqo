@@ -12,6 +12,10 @@ class IndexNotFoundError(MarqoError):
     pass
 
 
+class ConflictError(MarqoError):
+    pass
+
+
 class ParsingError(MarqoError):
     pass
 

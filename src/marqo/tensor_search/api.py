@@ -1,12 +1,16 @@
 """The API entrypoint for Tensor Search"""
 import json
+import time
 from typing import List
 
 import pydantic
 import uvicorn
+from fastapi import Depends
 from fastapi import FastAPI
-from fastapi import Request, Depends
+from fastapi import Request
 from fastapi.responses import JSONResponse
+from kazoo.client import KazooClient
+from kazoo.recipe.lock import Lock
 
 from marqo import config
 from marqo import exceptions as base_exceptions
@@ -35,7 +39,6 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
-from pydantic import ValidationError
 
 logger = get_logger(__name__)
 
@@ -53,10 +56,13 @@ def generate_config() -> config.Config:
         delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
+    zookeeper_client = KazooClient(
+        hosts='127.0.0.1:2181'
+    )
     # Determine default device
     default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
 
-    return config.Config(vespa_client, default_device)
+    return config.Config(vespa_client, zookeeper_client, default_device)
 
 
 _config = generate_config()
@@ -94,6 +100,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError, None),
         (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None),
         (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None),
+        (core_exceptions.ConflictError, api_exceptions.ConflictError, None),
 
         # Vespa client exceptions
         (
