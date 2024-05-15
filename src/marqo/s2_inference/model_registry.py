@@ -760,7 +760,7 @@ def _get_hf_properties() -> Dict:
                  "notes": ""},
             "hf/bge-small-zh-v1.5":
                 {"name": 'BAAI/bge-small-zh-v1.5',
-                 "dimensions": 384,
+                 "dimensions": 512,
                  "tokens": 512,
                  "type": "hf",
                  "notes": ""},
