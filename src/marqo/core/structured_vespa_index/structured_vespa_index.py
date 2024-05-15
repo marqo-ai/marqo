@@ -56,7 +56,7 @@ class StructuredVespaIndex(VespaIndex):
     def get_vespa_id_field(self) -> str:
         return common.FIELD_ID
 
-    def to_vespa_partial_document(self, marqo_document: Dict[str,Any]) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
         score_modifiers: Dict[str, float] = dict()
@@ -744,9 +744,10 @@ class StructuredVespaIndex(VespaIndex):
             if chunk_field_name in vespa_document_fields:
                 chunk = vespa_document_fields[chunk_field_name][chunk_index]
             else:
-                logger.warn(f'Failed to extract highlights as Vespa document is missing chunk field '
-                            f'{chunk_field_name}. This can happen if attributes_to_retrieve does not include '
-                            f'all searchable tensor fields (searchable_attributes)')
+                # Note: WARN level will create verbose logs in production as this is per result
+                logger.debug(f'Failed to extract highlights as Vespa document is missing chunk field '
+                             f'{chunk_field_name}. This can happen if attributes_to_retrieve does not include '
+                             f'all searchable tensor fields (searchable_attributes)')
 
                 chunk = None
 
