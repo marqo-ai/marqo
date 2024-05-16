@@ -142,4 +142,3 @@ class TestDistributedLock(MarqoTestCase):
 
         # Ensure lock.release() was not called since acquire should have failed
         self.assertFalse(lock.lock.is_acquired)
-
