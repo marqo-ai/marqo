@@ -57,7 +57,7 @@ def generate_config() -> config.Config:
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
     zookeeper_client = KazooClient(
-        hosts='127.0.0.1:2181'
+        utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     )
     # Determine default device
     default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)

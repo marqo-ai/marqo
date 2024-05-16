@@ -196,7 +196,7 @@ class ModelNotInCacheError(__InvalidRequestError):
 
 
 class ConflictError(__InvalidRequestError):
-    code = "conflict"
+    code = "conflict_error"
     status_code = HTTPStatus.CONFLICT
 
 

@@ -20,7 +20,7 @@ class Config:
     def __init__(
             self,
             vespa_client: VespaClient,
-            zookeeper_client: KazooClient,
+            zookeeper_client: Optional[KazooClient] = None,
             default_device: Optional[str] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
@@ -59,20 +59,24 @@ class Config:
         ):
             self.cluster_is_remote = False
 
-    def _set_zookeeper(self, zookeeper_client: KazooClient) -> Optional[KazooClient]:
+    def _set_zookeeper(self, zookeeper_client: Optional[KazooClient]) -> Optional[KazooClient]:
         """Connect to Zookeeper and return the client. If connection fails, log a warning and return None.
         Args:
-            zookeeper_client: The Zookeeper client.
+            zookeeper_client: The Zookeeper client. We make it optional to allow for the case where the user does not
+                want to connect to Zookeeper.
 
         Returns:
             Optional[KazooClient]: The Zookeeper client if connection is successful, None otherwise.
         """
-        try:
-            zookeeper_client.start()
-        except KazooTimeoutError as e:
-            logger.warning(f"Failed to connect to Zookeeper due to timeout. "
-                           f"Marqo will still start but is not protected by Zookeeper. "
-                           f"Please check your Zookeeper configuration and network settings. "
-                           f"Original error message: {e}")
+        if zookeeper_client is None:
             return None
-        return zookeeper_client
+        else:
+            try:
+                zookeeper_client.start()
+            except KazooTimeoutError as e:
+                logger.warning(f"Failed to connect to Zookeeper due to timeout. "
+                               f"Marqo will still start but is not protected by Zookeeper. "
+                               f"Please check your Zookeeper configuration and network settings. "
+                               f"Original error message: {e}")
+                return None
+            return zookeeper_client
