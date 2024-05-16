@@ -23,7 +23,8 @@ class TestDistributedLock(MarqoTestCase):
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
-        cls.zookeeper_client.stop()
+        # Restart the Zookeeper client after the test class
+        cls.zookeeper_client.restart()
 
     def setUp(self):
         # Set up the Kazoo Test Harness
@@ -34,6 +35,7 @@ class TestDistributedLock(MarqoTestCase):
         self.acquire_timeout = 5  # 5 seconds to acquire the lock
 
     def tearDown(self):
+        # Stop the client after each test to release the lock
         self.zookeeper_client.stop()
 
     def test_distributed_lock_acquireAndReleaseLock(self):
