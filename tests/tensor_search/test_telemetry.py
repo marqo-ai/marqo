@@ -211,19 +211,19 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         def test_endpoint(request):
             return JSONResponse({"data": "test"})
 
-        self.client = TestClient(self.app)
+        self.zookeeper_client = TestClient(self.app)
         self.scope = {'type': 'http', }
         self.request = Request(self.scope)
 
     def test_telemetry_disabled(self):
-        response = self.client.get("/")
+        response = self.zookeeper_client.get("/")
         self.assertNotIn("telemetry", response.json())
 
-        response = self.client.get("/?telemetry=false")
+        response = self.zookeeper_client.get("/?telemetry=false")
         self.assertNotIn("telemetry", response.json())
 
     def test_telemetry_enabled(self):
-        response = self.client.get("/?telemetry=true")
+        response = self.zookeeper_client.get("/?telemetry=true")
         self.assertIn("telemetry", response.json())
 
     # @unittest.skip("Error running in GH Actions")
@@ -234,7 +234,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
             m.increment_counter("key")
             return JSONResponse({"data": "test"})
 
-        response = self.client.get("/test?telemetry=true")
+        response = self.zookeeper_client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
         self.assertIn("counter", response.json()["telemetry"])
         self.assertEqual(response.json()["telemetry"], {
@@ -250,7 +250,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
             m.stop("key")
             return JSONResponse({"data": "test"})
 
-        response = self.client.get("/test?telemetry=true")
+        response = self.zookeeper_client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
         self.assertIn("timesMs", response.json()["telemetry"])
         self.assertIn("key", response.json()["telemetry"]["timesMs"])
@@ -264,7 +264,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
                 pass
             return JSONResponse({"data": "test"})
 
-        response = self.client.get("/test?telemetry=true")
+        response = self.zookeeper_client.get("/test?telemetry=true")
         self.assertIn("telemetry", response.json())
         self.assertIn("timesMs", response.json()["telemetry"])
         self.assertIn("key", response.json()["telemetry"]["timesMs"])

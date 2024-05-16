@@ -19,7 +19,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
     TEST_CLUSTER = "content_default"
 
     def setUp(self):
-        self.client = VespaClient("http://localhost:19071", "http://localhost:8080",
+        self.zookeeper_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                   "http://localhost:8080", "content_default")
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
 
@@ -48,12 +48,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        self._base_test_feed_batch_successful(self.client.feed_batch, documents)
+        self._base_test_feed_batch_successful(self.zookeeper_client.feed_batch, documents)
 
     def test_feed_batch_emptyBatch_successful(self):
         documents = []
 
-        self._base_test_feed_batch_successful(self.client.feed_batch, documents)
+        self._base_test_feed_batch_successful(self.zookeeper_client.feed_batch, documents)
 
     def test_feed_batch_invalidDoc_successful(self):
         documents = [
@@ -61,7 +61,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"invalid_field": "Title 2"}),
         ]
 
-        batch_response = self.client.feed_batch(documents, self.TEST_SCHEMA)
+        batch_response = self.zookeeper_client.feed_batch(documents, self.TEST_SCHEMA)
 
         self.assertEqual(batch_response.errors, True)
 
@@ -91,7 +91,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
         """Test that feed_batch works when an event loop is already running and runs in a new thread"""
 
-        batch_response = self.client.feed_batch(
+        batch_response = self.zookeeper_client.feed_batch(
             [VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})],
             self.TEST_SCHEMA
         )
@@ -107,7 +107,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         @patch.object(concurrency, "_run_coroutine_in_thread", side_effect=raise_exception)
         def run(mock_executor):
-            batch_response = self.client.feed_batch(
+            batch_response = self.zookeeper_client.feed_batch(
                 [VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"})],
                 self.TEST_SCHEMA
             )
@@ -121,12 +121,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
+        self._base_test_feed_batch_successful(self.zookeeper_client.feed_batch_sync, documents)
 
     def test_feed_batch_sync_emptyBatch_successful(self):
         documents = []
 
-        self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
+        self._base_test_feed_batch_successful(self.zookeeper_client.feed_batch_sync, documents)
 
     def test_feed_batch_multithreaded_successful(self):
         documents = [
@@ -134,12 +134,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
+        self._base_test_feed_batch_successful(self.zookeeper_client.feed_batch_multithreaded, documents)
 
     def test_feed_batch_multithreaded_emptyBatch_successful(self):
         documents = []
 
-        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
+        self._base_test_feed_batch_successful(self.zookeeper_client.feed_batch_multithreaded, documents)
 
     def test_delete_document_successful(self):
         documents = [
@@ -148,7 +148,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ]
         self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
 
-        resp = self.client.delete_document("doc1", self.TEST_SCHEMA)
+        resp = self.zookeeper_client.delete_document("doc1", self.TEST_SCHEMA)
 
         self.assertEqual(resp.path_id.split("/")[-1], "doc1")
         self.assertEqual(resp.id.split("::")[-1], "doc1")
@@ -169,7 +169,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
 
         # Note it's still 200 if the document doesn't exist
-        resp = self.client.delete_document("docx", self.TEST_SCHEMA)
+        resp = self.zookeeper_client.delete_document("docx", self.TEST_SCHEMA)
 
         self.assertEqual(resp.path_id.split("/")[-1], "docx")
         self.assertEqual(resp.id.split("::")[-1], "docx")
@@ -191,7 +191,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ]
         self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
 
-        result = self.client.query(
+        result = self.zookeeper_client.query(
             yql="select * from sources * where title contains 'Title 1';",
             ranking="bm25",
             model_restrict=self.TEST_SCHEMA
@@ -212,7 +212,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ]
         self.pyvespa_client.feed_batch(documents, self.TEST_SCHEMA)
 
-        result = self.client.query(
+        result = self.zookeeper_client.query(
             yql="select * from sources * where title contains 'Title 3';",
             ranking="bm25",
             model_restrict=self.TEST_SCHEMA
@@ -333,7 +333,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
                         )
 
     def test_download_application_successful(self):
-        app = self.client.download_application()
+        app = self.zookeeper_client.download_application()
 
         self.assertTrue(os.path.exists(app), "Application root does not exist")
         self.assertTrue(os.path.isfile(os.path.join(app, "services.xml")),
@@ -355,7 +355,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         with patch.object(httpx.Client, "post", new=modified_post):
             with self.assertRaises(VespaError):
-                self.client.download_application()
+                self.zookeeper_client.download_application()
 
     def test_download_application_downloadError_fails(self):
         original_get = httpx.Client.get
@@ -367,7 +367,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
         with patch.object(httpx.Client, "get", new=modified_get):
             with self.assertRaises(VespaError):
-                self.client.download_application()
+                self.zookeeper_client.download_application()
 
     def test_deploy_application_successful(self):
         """
@@ -383,12 +383,12 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             resp = httpx.get("http://localhost:19071/application/v2/tenant/default/application/default")
             return resp.json()["generation"]
 
-        app = self.client.download_application()
+        app = self.zookeeper_client.download_application()
 
         with patch.object(httpx.Client, "post", wraps=httpx.post) as mock_post:
             generation_before = get_vespa_app_generation()
 
-            self.client.deploy_application(app)
+            self.zookeeper_client.deploy_application(app)
 
             generation_after = get_vespa_app_generation()
 
@@ -398,11 +398,11 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
     def test_deploy_application_invalidAppPath_fails(self):
         with self.assertRaises(VespaError):
-            self.client.deploy_application("/invalid/path")
+            self.zookeeper_client.deploy_application("/invalid/path")
 
     @unittest.skip
     def test_deploy_application_invalidApp_fails(self):
         with self.assertRaises(VespaError):
-            self.client.deploy_application(os.path.abspath(os.path.curdir))
+            self.zookeeper_client.deploy_application(os.path.abspath(os.path.curdir))
 
 

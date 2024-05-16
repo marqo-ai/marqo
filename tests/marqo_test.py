@@ -45,7 +45,7 @@ class MarqoTestCase(unittest.TestCase):
             content_cluster_name="content_default",
 
         )
-        zookeeper_client = KazooClient(hosts="http://localhost:2181")
+        zookeeper_client = KazooClient(hosts="localhost:2181")
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
         cls.zookeeper_client = zookeeper_client
