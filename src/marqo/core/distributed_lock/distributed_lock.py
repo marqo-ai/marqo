@@ -3,12 +3,12 @@ import time
 from contextlib import contextmanager
 from typing import Optional
 
-from kazoo.recipe.lock import Lock
-from marqo.core.exceptions import MarqoError
 from kazoo.client import KazooClient
-from marqo.logging import get_logger
 from kazoo.exceptions import LockTimeout, ConnectionClosedError
+from kazoo.recipe.lock import Lock
 
+from marqo.core.exceptions import MarqoError
+from marqo.logging import get_logger
 
 logger = get_logger(__name__)
 

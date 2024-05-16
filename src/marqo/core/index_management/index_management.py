@@ -22,7 +22,6 @@ from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
-import time
 
 logger = marqo.logging.get_logger(__name__)
 

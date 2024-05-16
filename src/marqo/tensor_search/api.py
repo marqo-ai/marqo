@@ -1,6 +1,5 @@
 """The API entrypoint for Tensor Search"""
 import json
-import time
 from typing import List
 
 import pydantic
@@ -10,7 +9,6 @@ from fastapi import FastAPI
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from kazoo.client import KazooClient
-from kazoo.recipe.lock import Lock
 
 from marqo import config
 from marqo import exceptions as base_exceptions
