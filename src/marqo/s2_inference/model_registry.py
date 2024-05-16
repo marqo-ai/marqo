@@ -362,7 +362,8 @@ def _get_open_clip_properties() -> Dict:
             'type': 'open_clip',
             'pretrained': 'mscoco_finetuned_laion2b_s13b_b90k'},
 
-        # New models: Open CLIP 2.24.0
+        # New models as of Marqo 2.7.0
+        # Added for: Open CLIP 2.24.0
         "open_clip/ViT-SO400M-14-SigLIP-384/webli": {
             "name": "open_clip/ViT-SO400M-14-SigLIP-384/webli",
             "dimensions": 1152,
@@ -725,7 +726,7 @@ def _get_hf_properties() -> Dict:
                  "text_chunk_prefix": "passage: ",
                  "notes": ""},
 
-            # New models
+            # New models as of: Marqo 2.7.0
             "hf/multilingual-e5-large-instruct":
                 {"name": 'intfloat/multilingual-e5-large-instruct',
                  "dimensions": 1024,
