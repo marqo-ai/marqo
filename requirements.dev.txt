@@ -44,6 +44,7 @@ platformdirs==3.5.0
 safetensors==0.4.1
 timm==0.9.12
 transformers==4.29.0
+einops==0.8.0
 
 flatbuffers==23.5.9
 certifi==2019.11.28
