@@ -11,6 +11,14 @@ from marqo.s2_inference.no_model_utils import NO_MODEL
 
 # we need to keep track of the embed dim and model load functions/classes
 # we can use this as a registry
+
+# These HF models need trust_remote_code=True in AutoModel.from_pretrained()
+TRUST_REMOTE_CODE_MODEL_LIST = [
+    "Alibaba-NLP/gte-large-en-v1.5",
+    "Alibaba-NLP/gte-base-en-v1.5",
+    "Snowflake/snowflake-arctic-embed-m-long"
+]
+
 def _get_clip_properties() -> Dict:
     CLIP_MODEL_PROPERTIES = {
             'RN50':

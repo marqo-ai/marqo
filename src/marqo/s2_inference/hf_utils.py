@@ -17,7 +17,6 @@ from marqo.s2_inference.processing.custom_clip_utils import download_model
 from marqo.s2_inference.configs import ModelCache
 
 
-
 logger = get_logger(__name__)
 
 
@@ -156,7 +155,11 @@ class AutoModelForSentenceEmbedding(nn.Module):
         self.normalize = normalize
         self.pooling = pooling
         try:
-            self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token, cache_dir=ModelCache.hf_cache_path)
+            from marqo.s2_inference.model_registry import TRUST_REMOTE_CODE_MODEL_LIST
+            if self.model_name in TRUST_REMOTE_CODE_MODEL_LIST:
+                self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token, cache_dir=ModelCache.hf_cache_path, trust_remote_code=True)
+            else:
+                self.model = AutoModel.from_pretrained(model_name, use_auth_token = use_auth_token, cache_dir=ModelCache.hf_cache_path)
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encounters error loading the Hugging Face model = `{self.model_path}` using AutoModel "
