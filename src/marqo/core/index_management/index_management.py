@@ -242,7 +242,6 @@ class IndexManagement:
         """
         with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
                                                               "try again later.")):
-            time.sleep(100)
             marqo_index = self.get_index(index_name)
             self.delete_index(marqo_index)
 

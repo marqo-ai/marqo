@@ -12,7 +12,10 @@ from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_fact
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
+from marqo.core.exceptions import ConflictError
 from marqo.core.distributed_lock.distributed_lock import DistributedLock
+import threading
+import time
 
 
 class TestIndexManagement(MarqoTestCase):
@@ -288,6 +291,55 @@ class TestIndexManagementWithConcurrentManagement(MarqoTestCase):
     def setUp(self):
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client)
 
-    def test_deploymentLockIsNotNone(self):
+    def test_deploymentLock(self):
         """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
         self.assertIsInstance(self.index_management.deployment_lock, DistributedLock)
+        lock = self.index_management.deployment_lock
+        self.assertEqual(lock.lock.path, '/marqo__deployment_lock')
+        self.assertEqual(lock.max_lock_period, 120)
+        self.assertEqual(lock.acquire_timeout, 1)
+        self.assertTrue(lock.watchdog_thread.is_alive())
+        self.assertFalse(lock.lock.is_acquired)
+
+    def test_createAndDeleteIndexCannotBeConcurrent(self):
+        """Test to ensure create_index and delete_index is not concurrent"""
+        index_name_1 = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request_1 = self.structured_marqo_index_request(
+            name=index_name_1,
+            model=Model(name='ViT-B/32'),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            fields=[
+                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
+            ],
+            tensor_fields=[]
+        )
+
+        index_name_2 = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request_2 = self.structured_marqo_index_request(
+            name=index_name_2,
+            model=Model(name='ViT-B/32'),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            fields=[
+                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
+            ],
+            tensor_fields=[]
+        )
+
+        def create_index(marqo_index_request):
+            self.index_management.create_index(marqo_index_request)
+
+        t_1 = threading.Thread(target=create_index, args=(marqo_index_request_1,))
+        t_1.start()
+        time.sleep(1)
+        with self.assertRaises(ConflictError):
+            self.index_management.create_index(marqo_index_request_2)
+
+        with self.assertRaises(ConflictError):
+            self.index_management.delete_index_by_name(index_name_1)
+        t_1.join()
+
+        self.index_management.delete_index_by_name(index_name_1)
