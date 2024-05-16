@@ -77,6 +77,7 @@ class Config:
                 logger.warning(f"Failed to connect to Zookeeper due to timeout. "
                                f"Marqo will still start but is not protected by Zookeeper. "
                                f"Please check your Zookeeper configuration and network settings. "
+                               f"You need to restart Marqo to connect to Zookeeper once you have fixed the issue. "
                                f"Original error message: {e}")
                 return None
             return zookeeper_client
