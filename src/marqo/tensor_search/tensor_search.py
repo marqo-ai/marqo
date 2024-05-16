@@ -1384,6 +1384,8 @@ def _lexical_search(
         raise api_exceptions.InvalidArgError(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
+    
+    logger.debug(f"from _lexical_search, query: {text} is of type: {type(text)}")
 
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
@@ -1406,6 +1408,9 @@ def _lexical_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
+
+    logger.debug(f"from _lexical_search, marqo_query is: {marqo_query}")
+    logger.debug(f"from _lexical_search, vespa_query is: {vespa_query}")
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.lexical.processing_before_vespa")
     logger.debug(f"search (lexical) pre-processing: took {(total_preprocess_time):.3f}ms to process query.")
@@ -1755,6 +1760,8 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
     prefixed_queries = add_prefix_to_queries(queries)
 
+    logger.debug(f"from run_vectorise_pipeline, prefixed queries are: {prefixed_queries}")
+
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
     vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(
@@ -1822,6 +1829,8 @@ def _vector_text_search(
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
     """
+    logger.debug(f"from _vector_text_search, query: {query} is of type: {type(query)}")
+
     # # SEARCH TIMER-LOGGER (pre-processing)
     if not device:
         raise api_exceptions.InternalError("_vector_text_search cannot be called without `device`!")
@@ -1859,6 +1868,9 @@ def _vector_text_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
+
+    logger.debug(f"from _vector_text_search, marqo_query is: {marqo_query}")
+    logger.debug(f"from _vector_text_search, vespa_query is: {vespa_query}")
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_vespa")
     logger.debug(
