@@ -472,7 +472,6 @@ class IndexManagement:
             if document.get("type") == name:
                 documents_section.remove(document)
                 deleted = True
-                break
 
         if not deleted:
             logger.warn(f"Schema {name} does not exist in services.xml, nothing to remove")
