@@ -354,7 +354,6 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 @app.delete("/indexes/{index_name}")
 def delete_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
     tensor_search.delete_index(index_name=index_name, config=marqo_config)
-
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 

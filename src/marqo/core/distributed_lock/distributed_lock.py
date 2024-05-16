@@ -7,6 +7,7 @@ from kazoo.recipe.lock import Lock
 from marqo.core.exceptions import MarqoError
 from kazoo.client import KazooClient
 from marqo.logging import get_logger
+from kazoo.exceptions import LockTimeout
 
 
 logger = get_logger(__name__)
@@ -54,7 +55,10 @@ class DistributedLock:
         Returns:
             bool: True if the lock is acquired, False otherwise.
         """
-        acquired = self.lock.acquire(timeout=self.acquire_timeout if acquire_timeout is None else acquire_timeout)
+        try:
+            acquired = self.lock.acquire(timeout=self.acquire_timeout if acquire_timeout is None else acquire_timeout)
+        except LockTimeout:
+            return False
         if acquired:
             self.lock_acquired_time = time.time()
         return acquired

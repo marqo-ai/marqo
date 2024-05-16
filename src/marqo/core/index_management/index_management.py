@@ -22,6 +22,7 @@ from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
+import time
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -221,16 +222,14 @@ class IndexManagement:
         Args:
             marqo_index: Marqo index to delete
         """
-        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
-                                                              "try again later.")):
-            app = self.vespa_client.download_application()
+        app = self.vespa_client.download_application()
 
-            self._remove_schema(app, marqo_index.schema_name)
-            self._remove_schema_from_services(app, marqo_index.schema_name)
-            self._add_schema_removal_override(app)
-            self.vespa_client.deploy_application(app)
-            self.vespa_client.wait_for_application_convergence()
-            self._delete_index_settings_by_name(marqo_index.name)
+        self._remove_schema(app, marqo_index.schema_name)
+        self._remove_schema_from_services(app, marqo_index.schema_name)
+        self._add_schema_removal_override(app)
+        self.vespa_client.deploy_application(app)
+        self.vespa_client.wait_for_application_convergence()
+        self._delete_index_settings_by_name(marqo_index.name)
 
     def delete_index_by_name(self, index_name: str) -> None:
         """
@@ -241,12 +240,17 @@ class IndexManagement:
         Raises:
             IndexNotFoundError: If index does not exist
         """
-        marqo_index = self.get_index(index_name)
-        self.delete_index(marqo_index)
+        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
+                                                              "try again later.")):
+            time.sleep(100)
+            marqo_index = self.get_index(index_name)
+            self.delete_index(marqo_index)
 
     def batch_delete_indexes_by_name(self, index_names: List[str]) -> None:
-        marqo_indexes = [self.get_index(index_name) for index_name in index_names]
-        self.batch_delete_indexes(marqo_indexes)
+        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
+                                                              "try again later.")):
+            marqo_indexes = [self.get_index(index_name) for index_name in index_names]
+            self.batch_delete_indexes(marqo_indexes)
 
     def batch_delete_indexes(self, marqo_indexes: List[MarqoIndex]) -> None:
         """
@@ -259,17 +263,15 @@ class IndexManagement:
         Args:
             marqo_indexes: List of Marqo indexes to delete
         """
-        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
-                                                              "try again later.")):
-            app = self.vespa_client.download_application()
+        app = self.vespa_client.download_application()
 
-            for marqo_index in marqo_indexes:
-                self._remove_schema(app, marqo_index.schema_name)
-                self._remove_schema_from_services(app, marqo_index.schema_name)
-            self._add_schema_removal_override(app)
-            self.vespa_client.deploy_application(app)
-            for marqo_index in marqo_indexes:
-                self._delete_index_settings_by_name(marqo_index.name)
+        for marqo_index in marqo_indexes:
+            self._remove_schema(app, marqo_index.schema_name)
+            self._remove_schema_from_services(app, marqo_index.schema_name)
+        self._add_schema_removal_override(app)
+        self.vespa_client.deploy_application(app)
+        for marqo_index in marqo_indexes:
+            self._delete_index_settings_by_name(marqo_index.name)
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         """
