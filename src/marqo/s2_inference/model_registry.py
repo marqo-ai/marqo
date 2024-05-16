@@ -777,24 +777,25 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "notes": ""},
-            "hf/gte-base-en-v1.5":
-                {"name": 'Alibaba-NLP/gte-base-en-v1.5',
-                 "dimensions": 768,
-                 "tokens": 8192,
-                 "type": "hf",
-                 "notes": ""},
-            "hf/gte-large-en-v1.5":
-                {"name": 'Alibaba-NLP/gte-large-en-v1.5',
-                 "dimensions": 1024,
-                 "tokens": 8192,
-                 "type": "hf",
-                 "notes": ""},
-            "hf/snowflake-arctic-embed-m-long":
-                {"name": 'Snowflake/snowflake-arctic-embed-m-long',
-                 "dimensions": 768,
-                 "tokens": 8192,
-                 "type": "hf",
-                 "notes": ""},
+            # Uncomment when fix is implemented.
+            #"hf/gte-base-en-v1.5":
+            #    {"name": 'Alibaba-NLP/gte-base-en-v1.5',
+            #     "dimensions": 768,
+            #     "tokens": 8192,
+            #     "type": "hf",
+            #     "notes": ""},
+            #"hf/gte-large-en-v1.5":
+            #    {"name": 'Alibaba-NLP/gte-large-en-v1.5',
+            #     "dimensions": 1024,
+            #     "tokens": 8192,
+            #     "type": "hf",
+            #     "notes": ""},
+            #"hf/snowflake-arctic-embed-m-long":
+            #    {"name": 'Snowflake/snowflake-arctic-embed-m-long',
+            #     "dimensions": 768,
+            #     "tokens": 8192,
+            #     "type": "hf",
+            #     "notes": ""},
             "hf/snowflake-arctic-embed-l":
                 {"name": 'Snowflake/snowflake-arctic-embed-l',
                  "dimensions": 1024,
