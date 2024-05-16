@@ -1,7 +1,7 @@
 import time
 from unittest.mock import patch
 
-from kazoo.exceptions import LockTimeout
+from kazoo.exceptions import LockTimeout, ConnectionClosedError
 from kazoo.handlers.threading import KazooTimeoutError
 
 from marqo.core.distributed_lock.distributed_lock import DistributedLock, acquire_lock
@@ -120,3 +120,24 @@ class TestDistributedLock(MarqoTestCase):
                                self.acquire_timeout)
         with patch.object(lock.lock, 'acquire', side_effect=LockTimeout):
             self.assertFalse(lock.acquire())
+
+    def test_distributed_lock_handleConnectionClosedGracefully(self):
+        """Test the context manager handles Zookeeper connection close gracefully."""
+        lock = DistributedLock(self.zookeeper_client, self.path, self.max_lock_period, self.watchdog_interval,
+                               self.acquire_timeout)
+
+        with patch.object(lock, 'acquire', side_effect=ConnectionClosedError), \
+                patch('marqo.core.distributed_lock.distributed_lock.logger.warning') as mock_logger:
+            # Use the context manager
+            with acquire_lock(lock, MarqoError("Failed to acquire lock")):
+                pass
+
+        # Check if the warning was logged
+        mock_logger.assert_called_once_with("Zookeeper connection closed when trying to acquire lock. "
+                                            "Skipping lock acquisition and proceeding. "
+                                            "Marqo may not be protected by Zookeeper. "
+                                            "Please check your Zookeeper configuration and network settings.")
+
+        # Ensure lock.release() was not called since acquire should have failed
+        self.assertFalse(lock.lock.is_acquired)
+

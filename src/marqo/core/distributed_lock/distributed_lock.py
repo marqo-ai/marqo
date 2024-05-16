@@ -7,7 +7,7 @@ from kazoo.recipe.lock import Lock
 from marqo.core.exceptions import MarqoError
 from kazoo.client import KazooClient
 from marqo.logging import get_logger
-from kazoo.exceptions import LockTimeout
+from kazoo.exceptions import LockTimeout, ConnectionClosedError
 
 
 logger = get_logger(__name__)
@@ -82,8 +82,15 @@ def acquire_lock(lock: Optional[DistributedLock], error: MarqoError, acquire_tim
             If None, we use the default timeout in the lock
     """
     if lock:
-        if not lock.acquire(acquire_timeout):
-            raise error
+        try:
+            if not lock.acquire(acquire_timeout):
+                raise error
+        except ConnectionClosedError:
+            logger.warning("Zookeeper connection closed when trying to acquire lock. "
+                           "Skipping lock acquisition and proceeding. "
+                           "Marqo may not be protected by Zookeeper. "
+                           "Please check your Zookeeper configuration and network settings.")
+            pass
     try:
         yield
     finally:
