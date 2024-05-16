@@ -12,6 +12,7 @@ from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_fact
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
+from marqo.core.distributed_lock.distributed_lock import DistributedLock
 
 
 class TestIndexManagement(MarqoTestCase):
@@ -250,7 +251,6 @@ class TestIndexManagement(MarqoTestCase):
 
         self.index_management.delete_index(indexes[0])
 
-        
     def test_get_marqo_version_successful(self):
         """
         get_marqo_version returns current version
@@ -276,3 +276,18 @@ class TestIndexManagement(MarqoTestCase):
             )
 
             self.assertEqual(self.index_management.get_marqo_version(), '2.0')
+
+    def test_deploymentLockIsNone(self):
+        """Test to ensure if no Zookeeper client is provided, deployment lock is None
+        """
+        self.assertIsNone(self.index_management.deployment_lock)
+
+
+class TestIndexManagementWithConcurrentManagement(MarqoTestCase):
+
+    def setUp(self):
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client)
+
+    def test_deploymentLockIsNotNone(self):
+        """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
+        self.assertIsInstance(self.index_management.deployment_lock, DistributedLock)
