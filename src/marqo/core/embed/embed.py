@@ -83,11 +83,16 @@ class Embed:
             raise base_exceptions.InternalError(f"Content type {type(content)} is not supported for embed endpoint.")
 
         # Decide on the prefix 
+
+        # For backwards compatibility
+        
         if content_type == EmbedContentType.Query:
-            prefix = determine_text_prefix(None, marqo_index, DeterminePrefixContentType.TextQuery)
+            prefix = marqo_index.model.get_text_query_prefix()
         elif content_type == EmbedContentType.Document:
-            prefix = determine_text_prefix(None, marqo_index, DeterminePrefixContentType.TextChunk)
+            prefix = marqo_index.model.get_text_chunk_prefix()
         elif content_type is None:
+            prefix = ""
+        elif marqo_index.model.text_query_prefix is None or marqo_index.model.text_chunk_prefix is None:
             prefix = ""
         else:
             # use [item.value for item in list(EmbedContentType)], but formatted not as a list

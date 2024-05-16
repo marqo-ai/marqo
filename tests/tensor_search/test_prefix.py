@@ -15,8 +15,10 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.core.models.marqo_index import StructuredMarqoIndex, FieldFeature, FieldType, Model
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
-    ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod
-from marqo.core.models.marqo_index_request import FieldRequest
+    ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod, IndexType
+from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
+                                                   FieldRequest, MarqoIndexRequest)
+
 from marqo.s2_inference import s2_inference
 from tests.marqo_test import MarqoTestCase
 
@@ -54,10 +56,14 @@ class TestPrefix(MarqoTestCase):
         )
 
         unstructured_index_with_override = cls.unstructured_marqo_index_request(
-            model=Model(name="test_prefix"),
+            model=Model(
+                name="test_prefix",
+                text_chunk_prefix="index-override: ",
+                text_query_prefix="index-override: "
+            ),
             treat_urls_and_pointers_as_images=True,
-            override_text_chunk_prefix="index-override: "
         )
+
 
         # STRUCTURED indexes
         structured_text_index = cls.structured_marqo_index_request(
@@ -83,6 +89,7 @@ class TestPrefix(MarqoTestCase):
             tensor_fields=["multimodal_fields"]
         )
 
+
         cls.indexes = cls.create_indexes([
             unstructured_index_1,
             unstructured_index_e5,
@@ -90,7 +97,7 @@ class TestPrefix(MarqoTestCase):
             unstructured_index_with_model_default,
             unstructured_index_with_override,
             structured_text_index,
-            structured_multimodal_index
+            structured_multimodal_index,
         ])
 
         # Assign to objects so they can be used in tests
@@ -101,6 +108,8 @@ class TestPrefix(MarqoTestCase):
         cls.unstructured_index_with_override = cls.indexes[4]
         cls.structured_text_index = cls.indexes[5]
         cls.structured_multimodal_index = cls.indexes[6]
+
+
 
     def setUp(self) -> None:
         super().setUp()
@@ -338,19 +347,19 @@ class TestPrefix(MarqoTestCase):
         """
 
         with self.subTest("All prefixes on (request level chosen)"):
-            result = determine_text_prefix("request-level", self.unstructured_index_with_override, DeterminePrefixContentType.TextChunk)
+            result = self.unstructured_index_with_override.model.get_text_chunk_prefix("request-level")
             self.assertEqual(result, "request-level")
 
         with self.subTest("Request and model default on (request level chosen)"):
-            result = determine_text_prefix("request-level", self.unstructured_index_with_model_default, DeterminePrefixContentType.TextChunk)
+            result = self.unstructured_index_with_model_default.model.get_text_chunk_prefix("request-level")
             self.assertEqual(result, "request-level")
 
         with self.subTest("Index override and model default on (index override chosen)"):
-            result = determine_text_prefix(None, self.unstructured_index_with_override, DeterminePrefixContentType.TextChunk)
+            result = self.unstructured_index_with_override.model.get_text_chunk_prefix(None)
             self.assertEqual(result, "index-override: ")
 
         with self.subTest("Only model default on (model default chosen)"):
-            result = determine_text_prefix(None, self.unstructured_index_with_model_default, DeterminePrefixContentType.TextChunk)
+            result = self.unstructured_index_with_model_default.model.get_text_chunk_prefix(None)
             self.assertEqual(result, "test passage: ")
 
         # doc_a should default to the override prefix
@@ -375,9 +384,6 @@ class TestPrefix(MarqoTestCase):
             ),
             device="cpu"
         )
-
-        print(f"embed_res['embeddings'][0]: {embed_res['embeddings'][0]}")
-        print(f"res['results'][0]['_tensor_facets'][0]['_embedding']: {res['results'][0]['_tensor_facets'][0]['_embedding']}")
 
         # We assert that the embeddings are equal
         with self.subTest("Embeddings are equal between overriden doc and direct embed"):
@@ -432,6 +438,44 @@ class TestPrefix(MarqoTestCase):
                 # Assert vectors are equal. That is, the explicitly embedded query is the same as the query we sent
                 # with set custom prefix
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
+
+    def test_backward_compatibility_no_prefix(self):
+        """
+        Ensures backward compatibility with older versions of Marqo that don't have prefix functionality.
+        """
+        
+        mock_old_marqo_index = UnstructuredMarqoIndex(
+            name="old_index",
+            schema_name="old_index",
+            type=IndexType.Unstructured,
+            model=Model(
+                name="hf/e5-small",
+                text_chunk_prefix=None,
+                text_query_prefix=None
+            ),
+            normalize_embeddings=True,
+            treat_urls_and_pointers_as_images=True,
+            filter_string_max_length=1000,
+            text_preprocessing=TextPreProcessing(
+                splitLength=6,
+                splitOverlap=1,
+                splitMethod=TextSplitMethod.Character
+            ),
+            image_preprocessing=ImagePreProcessing(),
+            distance_metric=DistanceMetric.DotProduct,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(
+                ef_construction=100,
+                m=42
+            ),
+            marqo_version="0.0.1",
+            created_at=1,
+            updated_at=1,
+        )
+
+        # Assert that when we attempt to get the text chunk prefix and text query prefix, it returns an empty string
+        self.assertEqual(mock_old_marqo_index.model.get_text_chunk_prefix(), "")
+        self.assertEqual(mock_old_marqo_index.model.get_text_query_prefix(), "")
 
     # NOTE: For tests on the prefix functionality on the embed endpoint, see tests_embed.py under 
     # integration tests.

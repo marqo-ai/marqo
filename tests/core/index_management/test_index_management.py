@@ -217,6 +217,40 @@ class TestIndexManagement(MarqoTestCase):
         with self.assertRaises(IndexExistsError):
             self.index_management.create_index(marqo_index_request)
 
+    def test_create_index_text_prefix_defaults_successful(self):
+        """
+        Text prefix defaults are set correctly
+        """
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.structured_marqo_index_request(
+            name=index_name,
+            model=Model(
+                name='test_prefix'
+            ),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            fields=[
+                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
+            ],
+            tensor_fields=[]
+        )
+
+        # test create_index
+        index = self.index_management.create_index(marqo_index_request)
+        self.assertEqual(index.model.text_query_prefix, "test query: ")
+        self.assertEqual(index.model.text_chunk_prefix, "test passage: ")
+
+        self.index_management.delete_index(index)
+
+        # test batch_create_index
+        indexes = self.index_management.batch_create_indexes([marqo_index_request])
+        self.assertEqual(indexes[0].model.text_query_prefix, "test query: ")
+        self.assertEqual(indexes[0].model.text_chunk_prefix, "test passage: ")
+
+        self.index_management.delete_index(indexes[0])
+
+        
     def test_get_marqo_version_successful(self):
         """
         get_marqo_version returns current version
