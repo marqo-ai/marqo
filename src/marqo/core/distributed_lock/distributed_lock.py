@@ -72,7 +72,11 @@ class DistributedLock:
 
 @contextmanager
 def acquire_lock(lock: Optional[DistributedLock], error: MarqoError, acquire_timeout: Optional[float] = None) -> None:
-    """Context manager to acquire and release a lock.
+    """Context manager to acquire and release a lock and handle exceptions.
+
+    If the lock is not acquired, we raise the given error.
+    If the lock is acquired, we release the lock after the context manager exits.
+    If the connection to Zookeeper is closed, we log a warning and proceed without acquiring the lock.
 
     Args:
         lock: The lock to acquire. If None, no lock is acquired.
