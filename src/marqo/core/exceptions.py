@@ -16,6 +16,10 @@ class ConflictError(MarqoError):
     pass
 
 
+class BackendCommunicationError(MarqoError):
+    pass
+
+
 class ParsingError(MarqoError):
     pass
 

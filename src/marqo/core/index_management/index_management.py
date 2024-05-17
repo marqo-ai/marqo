@@ -66,15 +66,17 @@ class IndexManagement:
         self.deployment_lock: Optional[DeploymentLock] = self._instantiate_deployment_lock()
 
     def _instantiate_deployment_lock(self) -> Optional[DeploymentLock]:
-        """Instantiate a DeploymentLock if zookeeper_client is configured and connected, else return None."""
-        error_message = "Another index creation/deletion is in progress. Please try again later."
-        return DeploymentLock(self.zookeeper_client,
-                              self._DEPLOYMENT_LOCK_PATH,
-                              max_lock_period=self._DEPLOYMENT_LOCK_MAX_LOCK_PERIOD,
-                              watchdog_interval=self._DEPLOYMENT_LOCK_WATCHDOG_INTERVAL,
-                              acquire_timeout=1,
-                              error_message=error_message
-                              ) if self.zookeeper_client else None
+        """Instantiate a DeploymentLock"""
+        if self.zookeeper_client is None:
+            return None
+        else:
+            error_message = "Another index creation/deletion is in progress. Please try again later."
+            return DeploymentLock(self.zookeeper_client,
+                                  self._DEPLOYMENT_LOCK_PATH,
+                                  max_lock_period=self._DEPLOYMENT_LOCK_MAX_LOCK_PERIOD,
+                                  watchdog_interval=self._DEPLOYMENT_LOCK_WATCHDOG_INTERVAL,
+                                  acquire_timeout=1,
+                                  error_message=error_message)
 
     def bootstrap_vespa(self) -> bool:
         """

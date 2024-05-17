@@ -99,6 +99,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None),
         (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None),
         (core_exceptions.ConflictError, api_exceptions.ConflictError, None),
+        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None),
 
         # Vespa client exceptions
         (

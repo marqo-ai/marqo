@@ -5,6 +5,7 @@ from kazoo.exceptions import LockTimeout, ConnectionClosedError
 from kazoo.handlers.threading import KazooTimeoutError
 
 from marqo.core.distributed_lock.deployment_lock import DeploymentLock, acquire_deployment_lock
+from marqo.core.exceptions import BackendCommunicationError
 from marqo.core.exceptions import MarqoError
 from tests.marqo_test import MarqoTestCase
 
@@ -15,7 +16,7 @@ class TestDeploymentLock(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
         try:
-            cls.zookeeper_client.start()
+            cls.zookeeper_client.start(5)
         except KazooTimeoutError as e:
             raise ConnectionError("Failed to connect to Zookeeper during the unit tests. "
                                   "Please ensure the Zookeeper is configured and published ") from e
@@ -28,7 +29,7 @@ class TestDeploymentLock(MarqoTestCase):
 
     def setUp(self):
         # Set up the Kazoo Test Harness
-        self.zookeeper_client.restart()
+        self.zookeeper_client.start()
         self.path = "/test-lock"
         self.max_lock_period = 10  # 10 seconds max lock period for testing
         self.watchdog_interval = 1  # 1 second watchdog check interval
@@ -128,17 +129,9 @@ class TestDeploymentLock(MarqoTestCase):
         lock = DeploymentLock(self.zookeeper_client, self.path, self.max_lock_period, self.watchdog_interval,
                               self.acquire_timeout)
 
-        with patch.object(lock, 'acquire', side_effect=ConnectionClosedError), \
-                patch('marqo.core.distributed_lock.deployment_lock.logger.warning') as mock_logger:
-            # Use the context manager
-            with acquire_deployment_lock(lock):
-                pass
+        with patch.object(lock, 'acquire', side_effect=ConnectionClosedError):
+            with self.assertRaises(BackendCommunicationError):
+                with acquire_deployment_lock(lock):
+                    pass
 
-        # Check if the warning was logged
-        mock_logger.assert_called_once_with("Zookeeper connection closed when trying to acquire lock. "
-                                            "Skipping lock acquisition and proceeding. "
-                                            "Marqo may not be protected by Zookeeper. "
-                                            "Please check your Zookeeper configuration and network settings.")
-
-        # Ensure lock.release() was not called since acquire should have failed
         self.assertFalse(lock.is_acquired)

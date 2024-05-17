@@ -1,13 +1,15 @@
 import time
-from contextlib import contextmanager
 from typing import Optional
 
 from kazoo.client import KazooClient
 from kazoo.exceptions import LockTimeout, ConnectionClosedError
+from contextlib import contextmanager
+from kazoo.protocol.states import KazooState
 
 from marqo.core.distributed_lock.abstract_distributed_lock import AbstractExpiringDistributedLock
-from marqo.core.exceptions import ConflictError
+from marqo.core.exceptions import ConflictError, BackendCommunicationError
 from marqo.logging import get_logger
+from kazoo.handlers.threading import KazooTimeoutError
 
 logger = get_logger(__name__)
 
@@ -52,6 +54,7 @@ class DeploymentLock(AbstractExpiringDistributedLock):
             acquire_timeout: The timeout to acquire the lock. If not provided, we use the class object's timeout.
 
         Returns:
+            bool: True if the lock is acquired, False otherwise.
         """
         try:
             acquired = self.lock.acquire(timeout=self.acquire_timeout if acquire_timeout is None else acquire_timeout)
@@ -74,31 +77,37 @@ class DeploymentLock(AbstractExpiringDistributedLock):
 
 @contextmanager
 def acquire_deployment_lock(lock: Optional[DeploymentLock] = None, acquire_timeout: Optional[float] = None,
-                            error_message: Optional[float] = None) -> None:
-    """Context manager to acquire and release a lock and handle exceptions. We use a custom context manager to handle
-    the scenario where the Zookeeper connection is closed.
-
-    If the lock is not acquired, we raise the given error.
-    If the lock is acquired, we release the lock after the context manager exits.
-    If the connection to Zookeeper is closed, we log a warning and proceed without acquiring the lock.
+                            conflict_error_message: Optional[str] = None):
+    """Acquire the deployment lock using a context manager.
 
     Args:
-        lock: The lock to acquire. If None, no lock is acquired.
-        acquire_timeout: The timeout to acquire the lock.
-            If None, we use the default timeout in the lock
-        error_message: The error message to display when the lock is not acquired.
-            If None, we use the default error from the lock.
+        lock: The deployment lock object.
+        acquire_timeout: The timeout to acquire the lock. If not provided, we use the class object's timeout.
+        conflict_error_message: The error message to display when the lock is not acquired. If not provided, we use the
+            class object's error message.
+
+    Raises:
+        BackendCommunicationError: If the Zookeeper client cannot connect to the server.
+        ConflictError: If the lock is not acquired.
     """
-    if lock:
+    if lock is None:
+        raise RuntimeError("Deployment lock is not instantiated and cannot be used for index creation/deletion")
+    elif lock.zookeeper_client.state != KazooState.CONNECTED:
+        try:
+            lock.zookeeper_client.start(5)
+        except KazooTimeoutError as e:
+            raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager. "
+                                            "Your request cannot be processed at this time. "
+                                            "Please check your network settings and try again later.") from e
+    else:
         try:
             if not lock.acquire(acquire_timeout):
-                raise ConflictError(lock.error_message if error_message is None else error_message)
+                raise ConflictError(conflict_error_message if conflict_error_message else lock.error_message)
         except ConnectionClosedError:
-            logger.warning("Zookeeper connection closed when trying to acquire lock. "
-                           "Skipping lock acquisition and proceeding. "
-                           "Marqo may not be protected by Zookeeper. "
-                           "Please check your Zookeeper configuration and network settings.")
-            pass
+            raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager "
+                                            "when acquiring the lock. "
+                                            "Your request cannot be processed at this time. "
+                                            "Please check your network settings and try again later.")
     try:
         yield
     finally:

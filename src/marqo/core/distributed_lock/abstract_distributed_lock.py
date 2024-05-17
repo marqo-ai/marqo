@@ -14,6 +14,7 @@ class AbstractExpiringDistributedLock(ABC):
 
     This lock is used to ensure that a resource is not accessed concurrently by multiple processes. It must also have a
     watchdog that releases the lock if it is held for too long.
+    The lock should also have __enter__ and __exit__ methods to be used as a context manager.
     """
 
     @abstractmethod
@@ -25,6 +26,7 @@ class AbstractExpiringDistributedLock(ABC):
             max_lock_period: The maximum period of time the lock can be held.
             watchdog_interval: The interval at which the watchdog checks the lock status.
         """
+        self.zookeeper_client = zookeeper_client
         self.lock = Lock(zookeeper_client, path)
         self.max_lock_period = max_lock_period
         self.watch_dog_interval = watchdog_interval
