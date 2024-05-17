@@ -13,7 +13,7 @@ from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import ConflictError
-from marqo.core.distributed_lock.distributed_lock import DistributedLock
+from marqo.core.distributed_lock.deployment_lock import DeploymentLock
 import threading
 import time
 
@@ -293,7 +293,7 @@ class TestIndexManagementWithConcurrentManagement(MarqoTestCase):
 
     def test_deploymentLock(self):
         """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
-        self.assertIsInstance(self.index_management.deployment_lock, DistributedLock)
+        self.assertIsInstance(self.index_management.deployment_lock, DeploymentLock)
         lock = self.index_management.deployment_lock
         self.assertEqual(lock.lock.path, '/marqo__deployment_lock')
         self.assertEqual(lock.max_lock_period, 120)

@@ -12,8 +12,8 @@ import marqo.vespa.vespa_client
 from marqo import version
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
-from marqo.core.distributed_lock.distributed_lock import DistributedLock, acquire_lock
-from marqo.core.exceptions import IndexExistsError, IndexNotFoundError, ConflictError
+from marqo.core.distributed_lock.deployment_lock import DeploymentLock, acquire_deployment_lock
+from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
@@ -63,15 +63,18 @@ class IndexManagement:
     def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[KazooClient] = None):
         self.vespa_client = vespa_client
         self.zookeeper_client = zookeeper_client
-        self.deployment_lock: Optional[DistributedLock] = self._instantiate_deployment_lock()
+        self.deployment_lock: Optional[DeploymentLock] = self._instantiate_deployment_lock()
 
-    def _instantiate_deployment_lock(self) -> Optional[DistributedLock]:
-        """Instantiate a DistributedLock if Zookeeper is configured correctly, else return None."""
-        return DistributedLock(self.zookeeper_client,
-                               self._DEPLOYMENT_LOCK_PATH,
-                               max_lock_period=self._DEPLOYMENT_LOCK_MAX_LOCK_PERIOD,
-                               watchdog_interval=self._DEPLOYMENT_LOCK_WATCHDOG_INTERVAL
-                               ) if self.zookeeper_client else None
+    def _instantiate_deployment_lock(self) -> Optional[DeploymentLock]:
+        """Instantiate a DeploymentLock if zookeeper_client is configured and connected, else return None."""
+        error_message = "Another index creation/deletion is in progress. Please try again later."
+        return DeploymentLock(self.zookeeper_client,
+                              self._DEPLOYMENT_LOCK_PATH,
+                              max_lock_period=self._DEPLOYMENT_LOCK_MAX_LOCK_PERIOD,
+                              watchdog_interval=self._DEPLOYMENT_LOCK_WATCHDOG_INTERVAL,
+                              acquire_timeout=1,
+                              error_message=error_message
+                              ) if self.zookeeper_client else None
 
     def bootstrap_vespa(self) -> bool:
         """
@@ -106,8 +109,7 @@ class IndexManagement:
             IndexExistsError: If index already exists
             InvalidVespaApplicationError: If Vespa application is invalid after applying the index
         """
-        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
-                                                              "try again later.")):
+        with acquire_deployment_lock(self.deployment_lock):
             app = self.vespa_client.download_application()
             configured = self._marqo_config_exists(app)
 
@@ -176,8 +178,7 @@ class IndexManagement:
             IndexExistsError: If an index already exists
             InvalidVespaApplicationError: If Vespa application is invalid after applying the indexes
         """
-        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
-                                                              "try again later.")):
+        with acquire_deployment_lock(self.deployment_lock):
             app = self.vespa_client.download_application()
             configured = self._add_marqo_config(app)
 
@@ -239,14 +240,12 @@ class IndexManagement:
         Raises:
             IndexNotFoundError: If index does not exist
         """
-        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
-                                                              "try again later.")):
+        with acquire_deployment_lock(self.deployment_lock):
             marqo_index = self.get_index(index_name)
             self.delete_index(marqo_index)
 
     def batch_delete_indexes_by_name(self, index_names: List[str]) -> None:
-        with acquire_lock(self.deployment_lock, ConflictError("Another index creation/deletion is in progress. Please "
-                                                              "try again later.")):
+        with acquire_deployment_lock(self.deployment_lock):
             marqo_indexes = [self.get_index(index_name) for index_name in index_names]
             self.batch_delete_indexes(marqo_indexes)
 
