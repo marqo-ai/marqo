@@ -1922,7 +1922,8 @@ def _hybrid_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
+        highlights: bool = False, text_query_prefix: Optional[str] = None,
+        hybrid_parameters: HybridParameters = None) -> Dict:
     """
 
     Args:
@@ -1987,6 +1988,8 @@ def _hybrid_search(
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
+
+    # We do not pass searchable_attributes
     marqo_query = MarqoHybridQuery(
         index_name=index_name,
         vector_query=vectorised_text,
@@ -1995,9 +1998,9 @@ def _hybrid_search(
         ef_search=ef_search,
         approximate=approximate,
         offset=offset,
-        searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        hybrid_parameters=hybrid_parameters
     )
 
     vespa_index = vespa_index_factory(marqo_index)

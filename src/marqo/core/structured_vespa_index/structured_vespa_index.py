@@ -4,6 +4,7 @@ from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, 
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
+from marqo.core.models.hybrid_parameters import HybridParameters, FusionMethod, RetrievalMethod
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
@@ -420,90 +421,81 @@ class StructuredVespaIndex(VespaIndex):
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         # TODO: Split out the redundant code in lexical and tensor query functions
 
-        # Tensor component
-        if marqo_query.searchable_attributes_tensor is not None:
-            for att in marqo_query.searchable_attributes_tensor:
+        # Tensor term
+        if marqo_query.hybrid_parameters.searchable_attributes_tensor is not None:
+            for att in marqo_query.hybrid_parameters.searchable_attributes_tensor:
                 if att not in self._marqo_index.tensor_field_map:
                     raise InvalidFieldNameError(
                         f'Index {self._marqo_index.name} has no tensor field {att}. '
                         f'Available tensor fields are: {", ".join(self._marqo_index.tensor_field_map.keys())}'
                     )
 
-            fields_to_search = marqo_query.searchable_attributes
+            fields_to_search = marqo_query.hybrid_parameters.searchable_attributes_tensor
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
-        filter_term = self._get_filter_term(marqo_query)
-        if filter_term:
-            filter_term = f' AND {filter_term}'
-        else:
-            filter_term = ''
-        select_attributes = self._get_select_attributes(marqo_query)
-        summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
-        score_modifiers = self._get_score_modifiers(marqo_query)
-        ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
-            else common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
-        query_inputs = {
-            common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
-        }
-        query_inputs.update({
-            f: 1 for f in fields_to_search
-        })
-        if score_modifiers:
-            query_inputs.update(score_modifiers)
-
-        query = {
-            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
-            'model_restrict': self._marqo_index.schema_name,
-            'hits': marqo_query.limit,
-            'offset': marqo_query.offset,
-            'query_features': query_inputs,
-            'presentation.summary': summary,
-            'ranking': ranking
-        }
-        query = {k: v for k, v in query.items() if v is not None}
-
-        if not marqo_query.approximate:
-            query['ranking.softtimeout.enable'] = False
-            query['timeout'] = 300 * 1000  # 5 minutes
-
-        # Lexical component
-        if marqo_query.searchable_attributes is not None:
-            for att in marqo_query.searchable_attributes:
+        # Lexical term
+        if marqo_query.hybrid_parameters.searchable_attributes_lexical is not None:
+            for att in marqo_query.hybrid_parameters.searchable_attributes_lexical:
                 if att not in self._marqo_index.lexically_searchable_fields_names:
                     raise InvalidFieldNameError(
                         f'Index {self._marqo_index.name} has no lexically searchable field {att}. '
                         f'Available lexically searchable fields are: '
                         f'{", ".join(self._marqo_index.lexically_searchable_fields_names)}'
                     )
-            fields_to_search = marqo_query.searchable_attributes
+            fields_to_search = marqo_query.hybrid_parameters.searchable_attributes_lexical
         else:
             fields_to_search = self._marqo_index.lexical_field_map.keys()
 
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
+
+        # Hybrid term is combination of tensor and lexical terms
+        if marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Disjunction:
+            hybrid_term = f'({tensor_term} OR {lexical_term})'
+        elif marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.TensorFirst:
+            hybrid_term = f'RANK({tensor_term}, {lexical_term})'
+        elif marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.LexicalFirst:
+            hybrid_term = f'RANK({lexical_term}, {tensor_term})'
+
+        # Filter term
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
             filter_term = f' AND {filter_term}'
         else:
             filter_term = ''
-
         select_attributes = self._get_select_attributes(marqo_query)
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
-        ranking = common.RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
-            else common.RANK_PROFILE_BM25
 
-        query_inputs = {}
+        # Ranking (fusion) function
+        if marqo_query.hybrid_parameters.fusion_method == FusionMethod.RRF:
+            if score_modifiers:
+                ranking = common.RANK_PROFILE_HYBRID_RRF_MODIFIERS
+            else:
+                ranking = common.RANK_PROFILE_HYBRID_RRF
+        elif marqo_query.hybrid_parameters.fusion_method == FusionMethod.NormalizeLinear:
+            if score_modifiers:
+                ranking = common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR_MODIFIERS
+            else:
+                ranking = common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR
+
+        query_inputs = {
+            common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query,
+            "alpha": marqo_query.hybrid_parameters.alpha,
+        }
         query_inputs.update({
             f: 1 for f in fields_to_search
         })
         if score_modifiers:
             query_inputs.update(score_modifiers)
 
+        if marqo_query.hybrid_parameters.fusion_method == FusionMethod.RRF:
+            query_inputs["rrf_k"] = marqo_query.hybrid_parameters.k
+
         query = {
-            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {hybrid_term}{filter_term}',
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,

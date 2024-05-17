@@ -6,6 +6,7 @@ from pydantic import validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
+from marqo.core.models.hybrid_parameters import HybridParameters
 
 
 class ScoreModifierType(Enum):
@@ -66,6 +67,4 @@ class MarqoLexicalQuery(MarqoQuery):
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
-    searchable_attributes_tensor: Optional[List[str]] = None
-    searchable_attributes_lexical: Optional[List[str]] = None
-    # TODO - implement
+    hybrid_parameters: HybridParameters

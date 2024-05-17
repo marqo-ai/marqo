@@ -198,6 +198,16 @@ class StructuredVespaSchema(VespaSchema):
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
                     f'{self._generate_max_similarity_expression(tensor_fields[1:])})')
 
+    def _generate_rrf_expression(self, embedding_similarity_expression, bm25_expression) -> str:
+        # TODO: move this to vespa_schema, if shared by unstructured
+        return (f"query(alpha) * reciprocal_rank({embedding_similarity_expression}, query(rrf_k)) + "
+                f"(1-query(alpha)) * reciprocal_rank({bm25_expression}, query(rrf_k))")
+
+    def _generate_normalize_linear_expression(self, embedding_similarity_expression, bm25_expression) -> str:
+        # TODO: move this to vespa_schema, if shared by unstructured
+        return (f"query(alpha) * normalize_linear({embedding_similarity_expression}) + "
+                f"(1-query(alpha)) * normalize_linear({bm25_expression})")
+
     def _generate_rank_profiles(self, marqo_index: StructuredMarqoIndex) -> List[str]:
         rank_profiles: List[str] = list()
 
@@ -244,6 +254,53 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
+
+        # Hybrid search
+        if lexical_fields and tensor_fields:
+            # RRF Normal
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_RRF} inherits default {{')
+
+            # Input parameters
+            rank_profiles.append('inputs {')
+            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
+            rank_profiles.append(f'query(alpha): float')  # TODO check if this should be type
+            rank_profiles.append(f'query(rrf_k): int')    # TODO check if this should be type
+            for field in tensor_fields:
+                rank_profiles.append(f'query({field.name}): 0')
+            rank_profiles.append('}')
+
+            rank_profiles.append('first-phase {')
+            rank_profiles.append(f'expression: {embedding_similarity_expression}')      # TODO, how to combine lexical and tensor here?
+            rank_profiles.append('}')
+            rank_profiles.append('global-phase {')
+            rank_profiles.append(f'expression: {self._generate_rrf_expression(embedding_similarity_expression, bm25_expression)}')
+            rank_profiles.append('}')
+            rank_profiles.append(embedding_match_features_expression)   # TODO should we add both tensor and lexical match features?
+            rank_profiles.append('}')
+
+            # Normalized Linear Normal
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_RRF} inherits default {{')
+
+            # Input parameters
+            rank_profiles.append('inputs {')
+            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
+            rank_profiles.append(f'query(alpha): float')  # TODO check if this should be type
+            rank_profiles.append(f'query(rrf_k): int')  # TODO check if this should be type
+            for field in tensor_fields:
+                rank_profiles.append(f'query({field.name}): 0')
+            rank_profiles.append('}')
+
+            rank_profiles.append('first-phase {')
+            rank_profiles.append(
+                f'expression: {embedding_similarity_expression}')  # TODO, how to combine lexical and tensor here?
+            rank_profiles.append('}')
+            rank_profiles.append('global-phase {')
+            rank_profiles.append(
+                f'expression: {self._generate_rrf_expression(embedding_similarity_expression, bm25_expression)}')
+            rank_profiles.append('}')
+            rank_profiles.append(embedding_match_features_expression)  # TODO should we add both tensor and lexical match features?
+            rank_profiles.append('}')
+
 
         if score_modifier_fields_names:
             expression = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' \
