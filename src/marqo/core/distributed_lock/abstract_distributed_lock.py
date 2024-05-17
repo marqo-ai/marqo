@@ -47,6 +47,7 @@ class AbstractExpiringDistributedLock(ABC):
         """Release the lock."""
         pass
 
+    @property
     @abstractmethod
     def is_acquired(self) -> bool:
         """Check if the lock is acquired."""

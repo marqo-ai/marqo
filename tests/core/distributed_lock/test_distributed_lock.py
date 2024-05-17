@@ -28,7 +28,7 @@ class TestDeploymentLock(MarqoTestCase):
 
     def setUp(self):
         # Set up the Kazoo Test Harness
-        self.zookeeper_client.start()
+        self.zookeeper_client.restart()
         self.path = "/test-lock"
         self.max_lock_period = 10  # 10 seconds max lock period for testing
         self.watchdog_interval = 1  # 1 second watchdog check interval
@@ -43,16 +43,16 @@ class TestDeploymentLock(MarqoTestCase):
         lock = DeploymentLock(self.zookeeper_client, self.path, self.max_lock_period, self.watchdog_interval,
                               self.acquire_timeout)
         self.assertTrue(lock.acquire())
-        self.assertTrue(lock.lock.is_acquired)
+        self.assertTrue(lock.is_acquired)
         lock.release()
-        self.assertFalse(lock.lock.is_acquired)
+        self.assertFalse(lock.is_acquired)
 
     def test_distributed_lock_lockExpiration(self):
         """Test that the lock expires and is released by the watchdog after the maximum lock period."""
         lock = DeploymentLock(self.zookeeper_client, self.path, 2, 1, self.acquire_timeout)
         self.assertTrue(lock.acquire())
         time.sleep(5)  # Wait for the lock to expire
-        self.assertFalse(lock.lock.is_acquired)
+        self.assertFalse(lock.is_acquired)
 
     def test_distributed_lock_concurrentLockAcquisition(self):
         """Test that a second lock cannot be acquired concurrently with the first lock."""
@@ -81,16 +81,16 @@ class TestDeploymentLock(MarqoTestCase):
         self.assertTrue(lock.acquire())
         with self.assertRaises(MarqoError):
             with acquire_deployment_lock(lock, self.acquire_timeout):
-                self.assertTrue(lock.lock.is_acquired)
+                self.assertTrue(lock.is_acquired)
 
     def test_distributed_lock_repeatedAcquireRelease(self):
         """Test acquiring and releasing the lock repeatedly."""
         lock = DeploymentLock(self.zookeeper_client, self.path, self.max_lock_period)
         for _ in range(5):
             self.assertTrue(lock.acquire())
-            self.assertTrue(lock.lock.is_acquired)
+            self.assertTrue(lock.is_acquired)
             lock.release()
-            self.assertFalse(lock.lock.is_acquired)
+            self.assertFalse(lock.is_acquired)
 
     def test_distributed_lock_independentLocks(self):
         """Test that multiple locks on different paths do not interfere with each other."""
@@ -106,7 +106,7 @@ class TestDeploymentLock(MarqoTestCase):
         lock = DeploymentLock(self.zookeeper_client, self.path, 2, 1, self.acquire_timeout)
         self.assertTrue(lock.acquire())
         time.sleep(5)  # Expire the lock
-        self.assertFalse(lock.lock.is_acquired)
+        self.assertFalse(lock.is_acquired)
         self.assertTrue(lock.acquire())  # Re-acquire the lock
         lock.release()
 
@@ -141,4 +141,4 @@ class TestDeploymentLock(MarqoTestCase):
                                             "Please check your Zookeeper configuration and network settings.")
 
         # Ensure lock.release() was not called since acquire should have failed
-        self.assertFalse(lock.lock.is_acquired)
+        self.assertFalse(lock.is_acquired)

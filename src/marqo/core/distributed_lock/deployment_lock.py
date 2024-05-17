@@ -63,10 +63,11 @@ class DeploymentLock(AbstractExpiringDistributedLock):
 
     def release(self):
         """Release the lock and reset the lock acquired time."""
-        if self.lock.is_acquired:
+        if self.is_acquired:
             self.lock.release()
         self.lock_acquired_time = None
 
+    @property
     def is_acquired(self) -> bool:
         return self.lock.is_acquired
 
