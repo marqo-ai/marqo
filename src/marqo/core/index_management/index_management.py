@@ -62,16 +62,16 @@ class IndexManagement:
 
     def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[KazooClient] = None):
         self.vespa_client = vespa_client
-        self.zookeeper = zookeeper_client
+        self.zookeeper_client = zookeeper_client
         self.deployment_lock: Optional[DistributedLock] = self._instantiate_deployment_lock()
 
     def _instantiate_deployment_lock(self) -> Optional[DistributedLock]:
         """Instantiate a DistributedLock if Zookeeper is configured correctly, else return None."""
-        return DistributedLock(self.zookeeper,
+        return DistributedLock(self.zookeeper_client,
                                self._DEPLOYMENT_LOCK_PATH,
                                max_lock_period=self._DEPLOYMENT_LOCK_MAX_LOCK_PERIOD,
                                watchdog_interval=self._DEPLOYMENT_LOCK_WATCHDOG_INTERVAL
-                               ) if self.zookeeper else None
+                               ) if self.zookeeper_client else None
 
     def bootstrap_vespa(self) -> bool:
         """
