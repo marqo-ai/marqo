@@ -178,7 +178,6 @@ class VespaClient:
             **query_features_list,
             **kwargs
         }
-        logger.debug(f"From vespa_client query function: {query}")
 
         # Use default timeout if not already set.
         if timeout:
