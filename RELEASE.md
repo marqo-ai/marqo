@@ -1,6 +1,6 @@
 # Release 2.6.0
 
-## New features
+## New features 
 - Support for custom and default prefixes ([#821](https://github.com/marqo-ai/marqo/pull/821) and [#832](https://github.com/marqo-ai/marqo/pull/832)) in the index creation, adding documents, search, and embed endpoints. See usage for index creation [here](https://docs.marqo.ai/2.6/API-Reference/Indexes/create_index), adding documents [here](https://docs.marqo.ai/2.6/API-Reference/Documents/add_or_replace_documents), search [here](https://docs.marqo.ai/2.6/API-Reference/Search/search), and embed [here](https://docs.marqo.ai/2.6/API-Reference/Embed/embed).
 
 ## Bug fixes and minor changes
