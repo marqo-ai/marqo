@@ -12,6 +12,7 @@
 - Keep on sharing your questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
 
 # Release 2.5.0
+
 ## New features
 - New ‘embed’ endpoint (`POST /indexes/{index_name}/embed`) (https://github.com/marqo-ai/marqo/pull/803). Marqo can now perform inference and return the embeddings for a single piece or list of content, where content can be either a string or weighted dictionary of strings. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Embed/embed/). 
 - New ‘recommend’ endpoint (`POST /indexes/{index_name}/recommend`) (https://github.com/marqo-ai/marqo/pull/816). Given a list of existing document IDs, Marqo can now recommend similar documents by performing a search on interpolated vectors from the documents. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Search/recommend/). 
