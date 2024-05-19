@@ -5,19 +5,9 @@ from typing import List, Optional
 from pydantic import validator
 
 from marqo.base_model import StrictBaseModel
+from marqo.core.models.score_modifier import ScoreModifier
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
 from marqo.core.models.hybrid_parameters import HybridParameters
-
-
-class ScoreModifierType(Enum):
-    Multiply = 'multiply'
-    Add = 'add'
-
-
-class ScoreModifier(StrictBaseModel):
-    field: str
-    weight: float
-    type: ScoreModifierType
 
 
 class MarqoQuery(StrictBaseModel, ABC):
@@ -62,8 +52,6 @@ class MarqoLexicalQuery(MarqoQuery):
     and_phrases: List[str]
     searchable_attributes: Optional[List[str]] = None
     # TODO - validate at least one of or_phrases and and_phrases is not empty
-
-
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):

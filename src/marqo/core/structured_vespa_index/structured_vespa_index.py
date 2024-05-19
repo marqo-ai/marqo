@@ -3,8 +3,9 @@ from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, 
                                    InvalidDataRangeError, MarqoDocumentParsingError)
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import *
-from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery, ScoreModifierType
-from marqo.core.models.hybrid_parameters import HybridParameters, FusionMethod, RetrievalMethod
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
+from marqo.core.models.score_modifier import ScoreModifierType
+from marqo.core.models.hybrid_parameters import HybridParameters, RankingMethod, RetrievalMethod
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
@@ -454,9 +455,9 @@ class StructuredVespaIndex(VespaIndex):
         # Hybrid term is combination of tensor and lexical terms
         if marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Disjunction:
             hybrid_term = f'({tensor_term} OR {lexical_term})'
-        elif marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.TensorFirst:
+        elif marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Tensor:
             hybrid_term = f'RANK({tensor_term}, {lexical_term})'
-        elif marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.LexicalFirst:
+        elif marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Lexical:
             hybrid_term = f'RANK({lexical_term}, {tensor_term})'
 
         # Filter term
@@ -470,16 +471,28 @@ class StructuredVespaIndex(VespaIndex):
         score_modifiers = self._get_score_modifiers(marqo_query)
 
         # Ranking (fusion) function
-        if marqo_query.hybrid_parameters.fusion_method == FusionMethod.RRF:
+        if marqo_query.hybrid_parameters.ranking_method == RankingMethod.RRF:
+            # TODO: Implement RRF rank profiles with modifiers
             if score_modifiers:
                 ranking = common.RANK_PROFILE_HYBRID_RRF_MODIFIERS
             else:
                 ranking = common.RANK_PROFILE_HYBRID_RRF
-        elif marqo_query.hybrid_parameters.fusion_method == FusionMethod.NormalizeLinear:
+        elif marqo_query.hybrid_parameters.ranking_method == RankingMethod.NormalizeLinear:
+            # TODO: Implement Normalize Linear rank profiles with modifiers
             if score_modifiers:
                 ranking = common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR_MODIFIERS
             else:
                 ranking = common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR
+        elif marqo_query.hybrid_parameters.ranking_method == RankingMethod.Tensor:
+            if score_modifiers:
+                ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS
+            else:
+                ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY
+        elif marqo_query.hybrid_parameters.ranking_method == RankingMethod.Lexical:
+            if score_modifiers:
+                ranking = common.RANK_PROFILE_BM25_MODIFIERS
+            else:
+                ranking = common.RANK_PROFILE_BM25
 
         query_inputs = {
             common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query,
@@ -491,7 +504,7 @@ class StructuredVespaIndex(VespaIndex):
         if score_modifiers:
             query_inputs.update(score_modifiers)
 
-        if marqo_query.hybrid_parameters.fusion_method == FusionMethod.RRF:
+        if marqo_query.hybrid_parameters.ranking_method == RankingMethod.RRF:
             query_inputs["rrf_k"] = marqo_query.hybrid_parameters.k
 
         query = {

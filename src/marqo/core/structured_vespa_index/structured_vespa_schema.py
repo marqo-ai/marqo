@@ -275,7 +275,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('global-phase {')
             rank_profiles.append(f'expression: {self._generate_rrf_expression(embedding_similarity_expression, bm25_expression)}')
             rank_profiles.append('}')
-            rank_profiles.append(embedding_match_features_expression)   # TODO should we add both tensor and lexical match features?
+            rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
 
             # Normalized Linear Normal
@@ -298,7 +298,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(
                 f'expression: {self._generate_rrf_expression(embedding_similarity_expression, bm25_expression)}')
             rank_profiles.append('}')
-            rank_profiles.append(embedding_match_features_expression)  # TODO should we add both tensor and lexical match features?
+            rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
 
 
@@ -348,6 +348,10 @@ class StructuredVespaSchema(VespaSchema):
                 rank_profiles.append('}')
                 rank_profiles.append(embedding_match_features_expression)
                 rank_profiles.append('}')
+
+            # TODO: Add hybrid rank profiles with modifiers
+            # RRF with Modifiers
+            # Normalized Linear with Modifiers
 
         return rank_profiles
 

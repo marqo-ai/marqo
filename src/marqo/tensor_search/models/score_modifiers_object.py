@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 
 from pydantic import BaseModel, validator, ValidationError
 
-import marqo.core.models.marqo_query as core
+from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.api.exceptions import InvalidArgError
 
 
@@ -61,19 +61,19 @@ class ScoreModifier(BaseModel):
                                                message=f"At least one ScoreModifierOperator is required in {field.name}")
         return v
 
-    def to_marqo_score_modifiers(self) -> List[core.ScoreModifier]:
+    def to_marqo_score_modifiers(self) -> List[ScoreModifier]:
         """
         Convert this ScoreModifier to a list of marqo.core.models.marqo_query.ScoreModifier.
         """
-        mult = [core.ScoreModifier(
+        mult = [ScoreModifier(
             field=x.field_name,
             weight=x.weight,
-            type=core.ScoreModifierType.Multiply
+            type=ScoreModifierType.Multiply
         ) for x in self.multiply_score_by] if self.multiply_score_by is not None else []
-        add = [core.ScoreModifier(
+        add = [ScoreModifier(
             field=x.field_name,
             weight=x.weight,
-            type=core.ScoreModifierType.Add
+            type=ScoreModifierType.Add
         ) for x in self.add_to_score] if self.add_to_score is not None else []
 
         return mult + add

@@ -6,22 +6,24 @@ from pydantic import validator, BaseModel, root_validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
+from marqo.core.models.score_modifier import ScoreModifier
 
 
 class RetrievalMethod(str, Enum):
     Disjunction = 'disjunction'
-    TensorFirst = 'tensor_first'
-    LexicalFirst = 'lexical_first'
+    Tensor = 'tensor'
+    Lexical = 'lexical'
 
-
-class FusionMethod(str, Enum):
+class RankingMethod(str, Enum):
     RRF = 'rrf'
     NormalizeLinear = 'normalize_linear'
+    Tensor = 'tensor'
+    Lexical = 'lexical'
 
 
 class HybridParameters(StrictBaseModel):
     retrieval_method: Optional[RetrievalMethod] = RetrievalMethod.Disjunction
-    fusion_method: Optional[FusionMethod] = FusionMethod.RRF
+    ranking_method: Optional[RankingMethod] = RankingMethod.RRF
     alpha: Optional[float] = 0.5
     k: Optional[int] = 60
     searchable_attributes_lexical: Optional[List[str]] = None

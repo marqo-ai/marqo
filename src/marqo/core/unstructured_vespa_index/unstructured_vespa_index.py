@@ -5,8 +5,8 @@ import marqo.core.search.search_filter as search_filter
 from marqo.api import exceptions as errors
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex
-from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery,
-                                           ScoreModifierType)
+from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery)
+from marqo.core.models.score_modifier import ScoreModifierType
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.core.vespa_index import VespaIndex
