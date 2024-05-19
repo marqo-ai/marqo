@@ -249,6 +249,9 @@ class UnstructuredVespaIndex(VespaIndex):
             else:
                 and_terms = ''
 
+            if not or_terms and not and_terms:
+                return 'true'
+
             return f'{or_terms}{and_terms}'
 
         lexical_term = _get_lexical_search_term(marqo_query)
