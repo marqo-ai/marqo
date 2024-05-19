@@ -1,4 +1,17 @@
-# Release 2.5.0
+# Release 2.6.0
+
+ ## New features 
+ - Support for custom and default prefixes ([#821](https://github.com/marqo-ai/marqo/pull/821) and [#832](https://github.com/marqo-ai/marqo/pull/832)) in the index creation, adding documents, search, and embed endpoints. See usage for index creation [here](https://docs.marqo.ai/2.6/API-Reference/Indexes/create_index), adding documents [here](https://docs.marqo.ai/2.6/API-Reference/Documents/add_or_replace_documents), search [here](https://docs.marqo.ai/2.6/API-Reference/Search/search), and embed [here](https://docs.marqo.ai/2.6/API-Reference/Embed/embed).
+
+ ## Bug fixes and minor changes
+ - Improved recommender with structured indexes ([#830](https://github.com/marqo-ai/marqo/pull/830))
+ - Better handling of image download errors ([#829](https://github.com/marqo-ai/marqo/pull/829)). Image download errors will now return a 200 overall and log errors per document.
+
+ ## Contributor Shout-outs
+ - Shoutout to all our 4.2k stargazers! Thanks for continuing to use our product and helping Marqo grow.
+ - Keep on sharing your questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+ 
+ # Release 2.5.0
 ## New features
 - New ‘embed’ endpoint (`POST /indexes/{index_name}/embed`) (https://github.com/marqo-ai/marqo/pull/803). Marqo can now perform inference and return the embeddings for a single piece or list of content, where content can be either a string or weighted dictionary of strings. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Embed/embed/). 
 - New ‘recommend’ endpoint (`POST /indexes/{index_name}/recommend`) (https://github.com/marqo-ai/marqo/pull/816). Given a list of existing document IDs, Marqo can now recommend similar documents by performing a search on interpolated vectors from the documents. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Search/recommend/). 
