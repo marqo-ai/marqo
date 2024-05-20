@@ -4,9 +4,7 @@ from typing import List
 
 import pydantic
 import uvicorn
-from fastapi import Depends
-from fastapi import FastAPI
-from fastapi import Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from marqo import config
