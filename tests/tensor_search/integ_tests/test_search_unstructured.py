@@ -1375,20 +1375,26 @@ class TestSearchUnstructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)
-                    
+                                                    
     def test_empty_lexical_query(self):
         tensor_search.add_documents(config=self.config,
                                             add_docs_params=AddDocsParams(
                                                 index_name=self.default_text_index,
                                                 docs=[
-                                                    {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
-                                                     "_id": "5678", "finally": "some field efgh "},
+                                                    {"_id": "1", "text": "document_1"},
+                                                    {"_id": "2", "text": "document_2"},
+                                                    {"_id": "3", "text": "document_3"},
+                                                    {"_id": "4", "text": "document_4"},
+                                                    {"_id": "5", "text": "document_5"},
+                                                    {"_id": "6", "text": "document_6"},
+                                                    {"_id": "7", "text": "document_7"},
+                                                    {"_id": "8", "text": "document_8"},
+                                                    {"_id": "9", "text": "document_9"},
                                                 ],
-                                                tensor_fields=["abc", "other_field", "finally"],
+                                                tensor_fields=["text"],
                                             )
                                             )
         res = tensor_search.search(text="", config=self.config, index_name=self.default_text_index,
-                                   search_method=SearchMethod.LEXICAL)
+                                   search_method=SearchMethod.LEXICAL, result_count=10)
         self.assertIn("hits", res)
-        self.assertEqual(1, len(res['hits']))
-        self.assertEqual("5678", res['hits'][0]['_id'])
+        self.assertEqual(9, len(res['hits']))
