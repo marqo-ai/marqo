@@ -87,6 +87,7 @@ def acquire_deployment_lock(lock: Optional[DeploymentLock] = None, acquire_timeo
             class object's error message.
 
     Raises:
+        RuntimeError: If the lock is not instantiated and called.
         BackendCommunicationError: If the Zookeeper client cannot connect to the server.
         ConflictError: If the lock is not acquired.
     """
