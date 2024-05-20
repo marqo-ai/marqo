@@ -19,11 +19,11 @@ import os
 
 class ApiTests(MarqoTestCase):
     def setUp(self):
-        self.zookeeper_client = TestClient(api.app)
+        self.client = TestClient(api.app)
 
     def test_add_or_replace_documents_tensor_fields(self):
         with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
-            response = self.zookeeper_client.post(
+            response = self.client.post(
                 "/indexes/index1/documents?device=cpu",
                 json={
                     "documents": [
@@ -43,7 +43,7 @@ class ApiTests(MarqoTestCase):
         Test that the memory endpoint returns the expected keys when debug API is enabled.
         """
         with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'TRUE'}):
-            response = self.zookeeper_client.get("/memory")
+            response = self.client.get("/memory")
             data = response.json()
             assert set(data.keys()) == {"memory_used", "stats"}
 
@@ -51,7 +51,7 @@ class ApiTests(MarqoTestCase):
         """
         Test that the memory endpoint returns 403 by default.
         """
-        response = self.zookeeper_client.get("/memory")
+        response = self.client.get("/memory")
         self.assertEqual(response.status_code, 403)
 
     def test_memory_disabled_403(self):
@@ -59,13 +59,13 @@ class ApiTests(MarqoTestCase):
         Test that the memory endpoint returns 403 when debug API is disabled explicitly.
         """
         with patch.dict('os.environ', {EnvVars.MARQO_ENABLE_DEBUG_API: 'FALSE'}):
-            response = self.zookeeper_client.get("/memory")
+            response = self.client.get("/memory")
             self.assertEqual(response.status_code, 403)
 
 
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):
-        self.zookeeper_client = TestClient(api.app)
+        self.client = TestClient(api.app)
 
     def test_schema_validation_defaultDisabled(self):
         """
@@ -77,7 +77,7 @@ class ValidationApiTests(MarqoTestCase):
             "tensorFields": []
         }
         index_name = "test-index"
-        response = self.zookeeper_client.post(f"/validate/index/{index_name}", json=data)
+        response = self.client.post(f"/validate/index/{index_name}", json=data)
         self.assertEqual(response.status_code, 403)
 
     def test_ops_api_disabled_403(self):
@@ -92,7 +92,7 @@ class ValidationApiTests(MarqoTestCase):
                 "settings_object": {}
             }
             index_name = "test-index"
-            response = self.zookeeper_client.post(f"/validate/index/{index_name}", json=data)
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
             self.assertEqual(response.status_code, 403)
 
     def test_ops_api_200(self):
@@ -117,7 +117,7 @@ class ValidationApiTests(MarqoTestCase):
                 "type": "unstructured",
             }
             index_name = "test-index"
-            response = self.zookeeper_client.post(f"/validate/index/{index_name}", json=data)
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
             self.assertEqual(response.json(), {'validated': True, 'index': 'test-index'})
 
     def test_ops_api_400(self):
@@ -142,7 +142,7 @@ class ValidationApiTests(MarqoTestCase):
                 "type": "unknown"  # invalid type
             }
             index_name = "test-index"
-            response = self.zookeeper_client.post(f"/validate/index/{index_name}", json=data)
+            response = self.client.post(f"/validate/index/{index_name}", json=data)
             self.assertEqual(response.status_code, 400)
             self.assertIn("message", response.json())
             self.assertEqual(response.json()["code"], "invalid_argument")
@@ -173,11 +173,11 @@ class TestApiCustomEnvVars(MarqoTestCase):
         with mock.patch.dict(os.environ, {"VESPA_SEARCH_TIMEOUT_MS": "1"}):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
             # VespaClient will be created with default timeout of 1ms
-            self.zookeeper_client = TestClient(api.app)
+            self.client = TestClient(api.app)
 
         for index in [self.unstructured_index, self.structured_index]:
             with self.subTest(index=index.name):
-                res = self.zookeeper_client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
                     "q": "irrelevant"
                 })
                 # The search request must timeout, since the timeout is set to 1ms
@@ -213,19 +213,19 @@ class TestApiErrors(MarqoTestCase):
         cls.structured_index = cls.indexes[1]
 
     def setUp(self):
-        self.zookeeper_client = TestClient(api.app)
+        self.client = TestClient(api.app)
 
     def test_index_not_found_error(self):
         index_name = self.random_index_name()
 
-        response = self.zookeeper_client.delete("/indexes/" + index_name)
+        response = self.client.delete("/indexes/" + index_name)
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["code"], "index_not_found")
         self.assertEqual(response.json()["type"], "invalid_request")
         assert "not found" in response.json()["message"] and index_name in response.json()["message"]
 
     def test_index_already_exists(self):
-        response = self.zookeeper_client.post("/indexes/" + self.structured_index.name, json={
+        response = self.client.post("/indexes/" + self.structured_index.name, json={
             "type": "structured",
             "allFields": [],
             "tensorFields": []
@@ -239,7 +239,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_invalid_field_name(self):
         # use attributesToRetrieve on a non-existent field
-        response = self.zookeeper_client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
             "q": "test",
             "attributesToRetrieve": ["non_existent_field"]
         })
@@ -252,7 +252,7 @@ class TestApiErrors(MarqoTestCase):
     def test_invalid_data_type(self):
         """Test that invalid data types only reject the document with the invalid data type, not the whole request"""
         # Add a document to field1 of the wrong type
-        response = self.zookeeper_client.post("/indexes/" + self.structured_index.name + "/documents?device=cpu", json={
+        response = self.client.post("/indexes/" + self.structured_index.name + "/documents?device=cpu", json={
             "documents": [
                 {
                     "field2": 123
@@ -264,7 +264,7 @@ class TestApiErrors(MarqoTestCase):
         self.assertIn("Expected a value of type", response.json()["items"][0]["error"])
 
     def test_filter_string_parsing_error(self):
-        response = self.zookeeper_client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+        response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
             "q": "test",
             "filter": ""
         })
@@ -277,7 +277,7 @@ class TestApiErrors(MarqoTestCase):
     def test_vespa_timeout_error(self):
         error = vespa_exceptions.VespaTimeoutError('timeout_msg')
         with patch("marqo.tensor_search.tensor_search.search", side_effect=error):
-            response = self.zookeeper_client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
+            response = self.client.post("/indexes/" + self.structured_index.name + "/search?device=cpu", json={
                 "q": "test",
                 "filter": ""
             })
@@ -289,7 +289,7 @@ class TestApiErrors(MarqoTestCase):
 
     def test_invalid_argument_error(self):
         # Try to create index with invalid model (should raise 400)
-        response = self.zookeeper_client.post("/indexes/" + self.random_index_name(), json={
+        response = self.client.post("/indexes/" + self.random_index_name(), json={
             "type": "structured",
             "allFields": [{"name": "field1", "type": "text"}],
             "tensorFields": [],
@@ -380,7 +380,7 @@ class TestApiErrors(MarqoTestCase):
 
         for test_case, field, test_name in test_cases_fail:
             with self.subTest(test_name):
-                response = self.zookeeper_client.post(
+                response = self.client.post(
                     "/indexes/my_index",
                     json=test_case
                 )
@@ -391,7 +391,7 @@ class TestApiErrors(MarqoTestCase):
         for test_case, test_name in test_cases_pass:
             with self.subTest(test_name):
                 index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-                response = self.zookeeper_client.post(
+                response = self.client.post(
                     f"/indexes/{index_name}",
                     json=test_case
                 )
@@ -419,7 +419,7 @@ class TestApiErrors(MarqoTestCase):
             test_settings["allFields"][0]["type"] = test_case
             with self.subTest(test_name):
                 index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-                response = self.zookeeper_client.post(
+                response = self.client.post(
                     f"/indexes/{index_name}",
                     json=test_settings
                 )
@@ -447,7 +447,7 @@ class TestApiErrors(MarqoTestCase):
             test_settings["allFields"][0]["features"] = test_case
             with self.subTest(test_name):
                 index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-                response = self.zookeeper_client.post(
+                response = self.client.post(
                     f"/indexes/{index_name}",
                     json=test_settings
                 )
@@ -461,7 +461,7 @@ class TestApiErrors(MarqoTestCase):
         with patch('marqo.api.route.logger.error') as mock_logger_error:
             with patch("marqo.core.index_management.index_management.IndexManagement.create_index",
                        side_effect=raised_error):
-                response = self.zookeeper_client.post("/indexes/" + self.structured_index.name, json={
+                response = self.client.post("/indexes/" + self.structured_index.name, json={
                     "type": "structured",
                     "allFields": [{"name": "field1", "type": "text"}],
                     "tensorFields": [],
@@ -474,7 +474,7 @@ class TestApiErrors(MarqoTestCase):
         raised_error = base_exceptions.InvalidArgumentError("invalid_arg_msg")
         with patch('marqo.api.route.logger.error') as mock_logger_error:
             with patch("marqo.tensor_search.tensor_search.search", side_effect=raised_error):
-                response = self.zookeeper_client.post(f"/indexes/test_index/search", json={
+                response = self.client.post(f"/indexes/test_index/search", json={
                     "q": "test"
                 })
             mock_logger_error.assert_called_once()
@@ -485,7 +485,7 @@ class TestApiErrors(MarqoTestCase):
         raised_error = base_exceptions.InternalError("internal_error_msg")
         with patch('marqo.api.route.logger.error') as mock_logger_error:
             with patch("marqo.tensor_search.tensor_search.get_document_by_id", side_effect=raised_error):
-                response = self.zookeeper_client.get(f"/indexes/test_index/documents/1")
+                response = self.client.get(f"/indexes/test_index/documents/1")
             mock_logger_error.assert_called_once()
             self.assertIn("internal_error_msg", str(mock_logger_error.call_args))
 

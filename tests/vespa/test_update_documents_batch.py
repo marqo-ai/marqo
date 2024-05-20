@@ -14,7 +14,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
     TEST_CLUSTER = "content_default"
 
     def setUp(self):
-        self.zookeeper_client = VespaClient("http://localhost:19071", "http://localhost:8080",
+        self.client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                   "http://localhost:8080", "content_default")
         self.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
 
@@ -42,19 +42,19 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2", "marqo__id": "doc2"}),
         ]
         # we need to feed the original documents first
-        r = self.zookeeper_client.feed_batch(original_documents, self.TEST_SCHEMA)
+        r = self.client.feed_batch(original_documents, self.TEST_SCHEMA)
 
         update_documents = [
             VespaDocument(id="doc1", fields={"title": {"assign": "Title 1 update"}}),
             VespaDocument(id="doc2", fields={"title": {"assign": "Title 2 updated"}}),
         ]
 
-        self._base_test_update_documents_batch_successful(self.zookeeper_client.update_documents_batch, update_documents)
+        self._base_test_update_documents_batch_successful(self.client.update_documents_batch, update_documents)
 
     def test_update_documents_batch_emptyBatch_successful(self):
         documents = []
 
-        self._base_test_update_documents_batch_successful(self.zookeeper_client.feed_batch, documents)
+        self._base_test_update_documents_batch_successful(self.client.feed_batch, documents)
 
     def test_feed_batch_documents_do_not_exists(self):
         update_documents = [
@@ -62,7 +62,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": {"assign": "Title 2 updated"}}),
         ]
 
-        batch_response = self.zookeeper_client.update_documents_batch(update_documents, self.TEST_SCHEMA)
+        batch_response = self.client.update_documents_batch(update_documents, self.TEST_SCHEMA)
 
         statuses = [response.status for response in batch_response.responses]
         path_ids = [response.path_id.split("/")[-1] for response in batch_response.responses]
@@ -81,14 +81,14 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2", "marqo__id": "doc2"}),
         ]
         # we need to feed the original documents first
-        r = self.zookeeper_client.feed_batch(original_documents, self.TEST_SCHEMA)
+        r = self.client.feed_batch(original_documents, self.TEST_SCHEMA)
 
         update_documents = [
             VespaDocument(id="doc1", fields={"title": {"assign": "Title 1 update"}}),
             VespaDocument(id="doc2", fields={"title": {"assign": [1, 2, 3]}}), # Invalid list value for string field
         ]
 
-        batch_response = self.zookeeper_client.update_documents_batch(update_documents, self.TEST_SCHEMA)
+        batch_response = self.client.update_documents_batch(update_documents, self.TEST_SCHEMA)
 
         statuses = [response.status for response in batch_response.responses]
         path_ids = [response.path_id.split("/")[-1] for response in batch_response.responses]
@@ -108,5 +108,5 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ]
 
         with self.assertRaises(VespaError) as context:
-            self.zookeeper_client.update_documents_batch(update_documents, self.TEST_SCHEMA)
+            self.client.update_documents_batch(update_documents, self.TEST_SCHEMA)
         self.assertIn("Network failure", str(context.exception))
