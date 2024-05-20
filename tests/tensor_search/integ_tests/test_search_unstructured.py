@@ -1389,12 +1389,28 @@ class TestSearchUnstructured(MarqoTestCase):
                                                     {"_id": "6", "text": "document_6"},
                                                     {"_id": "7", "text": "document_7"},
                                                     {"_id": "8", "text": "document_8"},
-                                                    {"_id": "9", "text": "document_9"},
+                                                    {"_id": "9", "text": "document_9", "my_list": ["tag1", "tag2 some"]},
                                                 ],
                                                 tensor_fields=["text"],
                                             )
                                             )
+        
+        # First assert that no documents are returned for an empty query
         res = tensor_search.search(text="", config=self.config, index_name=self.default_text_index,
                                    search_method=SearchMethod.LEXICAL, result_count=10)
         self.assertIn("hits", res)
+        self.assertEqual(0, len(res['hits']))
+
+        # Then assert that all documents are returned for a wildcard query
+        res = tensor_search.search(text="*", config=self.config, index_name=self.default_text_index,
+                                   search_method=SearchMethod.LEXICAL, result_count=10)
+        self.assertIn("hits", res)
         self.assertEqual(9, len(res['hits']))
+
+        # Then assert that only one document is returned for a wildcard query with a filter
+        res = tensor_search.search(text="*", config=self.config, index_name=self.default_text_index,
+                                   search_method=SearchMethod.LEXICAL, result_count=10, filter="my_list:tag1")
+        self.assertIn("hits", res)
+        self.assertEqual(1, len(res['hits']))
+        self.assertEqual("9", res['hits'][0]['_id'])
+
