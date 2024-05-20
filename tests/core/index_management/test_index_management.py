@@ -21,7 +21,7 @@ import time
 class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
-        self.index_management = IndexManagement(self.vespa_client)
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client)
 
     def test_bootstrap_vespa_doesNotExist_successful(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
@@ -285,12 +285,6 @@ class TestIndexManagement(MarqoTestCase):
         """
         self.assertIsNone(self.index_management.deployment_lock)
 
-
-class TestIndexManagementWithConcurrentManagement(MarqoTestCase):
-
-    def setUp(self):
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client)
-
     def test_deploymentLock(self):
         """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
         self.assertIsInstance(self.index_management.deployment_lock, DeploymentLock)
@@ -343,3 +337,30 @@ class TestIndexManagementWithConcurrentManagement(MarqoTestCase):
         t_1.join()
 
         self.index_management.delete_index_by_name(index_name_1)
+
+    def test_createIndexFailIfNoZookeeperProvided(self):
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.structured_marqo_index_request(
+            name=index_name,
+            model=Model(name='ViT-B/32'),
+            distance_metric=DistanceMetric.PrenormalizedAngular,
+            vector_numeric_type=VectorNumericType.Float,
+            hnsw_config=HnswConfig(ef_construction=100, m=16),
+            fields=[
+                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
+            ],
+            tensor_fields=[]
+        )
+        with self.assertRaises(RuntimeError) as e:
+            self.index_management.create_index(marqo_index_request)
+        self.assertEqual(str(e.exception), 'Deployment lock is not '
+                                           'instantiated and cannot be used for index creation/deletion')
+
+    def test_deleteIndexFailIfNoZookeeperProvided(self):
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with self.assertRaises(RuntimeError) as e:
+            self.index_management.delete_index_by_name(index_name)
+        self.assertEqual(str(e.exception), 'Deployment lock is not '
+                                           'instantiated and cannot be used for index creation/deletion')

@@ -5,14 +5,13 @@ from datetime import datetime
 from typing import List
 from typing import Optional
 
-from kazoo.client import KazooClient
-
 import marqo.logging
 import marqo.vespa.vespa_client
 from marqo import version
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
 from marqo.core.distributed_lock.deployment_lock import DeploymentLock, acquire_deployment_lock
+from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
@@ -60,7 +59,7 @@ class IndexManagement:
     _DEPLOYMENT_LOCK_MAX_LOCK_PERIOD = 120
     _DEPLOYMENT_LOCK_WATCHDOG_INTERVAL = 5
 
-    def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[KazooClient] = None):
+    def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[MarqoKazooClient] = None):
         self.vespa_client = vespa_client
         self.zookeeper_client = zookeeper_client
         self.deployment_lock: Optional[DeploymentLock] = self._instantiate_deployment_lock()

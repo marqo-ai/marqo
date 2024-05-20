@@ -8,7 +8,6 @@ from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from kazoo.client import KazooClient
 
 from marqo import config
 from marqo import exceptions as base_exceptions
@@ -22,6 +21,7 @@ from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
+from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
@@ -54,9 +54,12 @@ def generate_config() -> config.Config:
         delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
-    zookeeper_client = KazooClient(
-        utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
+
+    zookeeper_client = MarqoKazooClient(
+        zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT),
+        hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     )
+
     # Determine default device
     default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
 

@@ -1,15 +1,15 @@
 import time
+from contextlib import contextmanager
 from typing import Optional
 
-from kazoo.client import KazooClient
 from kazoo.exceptions import LockTimeout, ConnectionClosedError
-from contextlib import contextmanager
+from kazoo.handlers.threading import KazooTimeoutError
 from kazoo.protocol.states import KazooState
 
 from marqo.core.distributed_lock.abstract_distributed_lock import AbstractExpiringDistributedLock
+from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
 from marqo.core.exceptions import ConflictError, BackendCommunicationError
 from marqo.logging import get_logger
-from kazoo.handlers.threading import KazooTimeoutError
 
 logger = get_logger(__name__)
 
@@ -20,7 +20,7 @@ class DeploymentLock(AbstractExpiringDistributedLock):
     This lock is used to lock the deployment process, namely the index creation and deletion process.
     """
 
-    def __init__(self, zookeeper_client: KazooClient, path: str, max_lock_period: float = 120,
+    def __init__(self, zookeeper_client: MarqoKazooClient, path: str, max_lock_period: float = 120,
                  watchdog_interval: float = 5,
                  acquire_timeout: float = 1,
                  error_message: str = "Conflict error. Another deployment is in progress."):

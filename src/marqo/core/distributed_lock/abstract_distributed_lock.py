@@ -1,9 +1,9 @@
 import threading
 from abc import ABC, abstractmethod
 
-from kazoo.client import KazooClient
 from kazoo.recipe.lock import Lock
 
+from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
 from marqo.logging import get_logger
 
 logger = get_logger(__name__)
@@ -18,7 +18,7 @@ class AbstractExpiringDistributedLock(ABC):
     """
 
     @abstractmethod
-    def __init__(self, zookeeper_client: KazooClient, path: str, max_lock_period: float, watchdog_interval: float):
+    def __init__(self, zookeeper_client: MarqoKazooClient, path: str, max_lock_period: float, watchdog_interval: float):
         """Initialize the distributed lock.
         Args:
             zookeeper_client: The Zookeeper client.

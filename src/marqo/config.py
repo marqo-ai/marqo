@@ -1,17 +1,18 @@
 from typing import Optional, Union
 
+from kazoo.handlers.threading import KazooTimeoutError
+
+from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.core.search.recommender import Recommender
+from marqo.logging import get_logger
 from marqo.tensor_search import enums
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa.vespa_client import VespaClient
-from kazoo.client import KazooClient
-from kazoo.handlers.threading import KazooTimeoutError
-from marqo.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -20,7 +21,7 @@ class Config:
     def __init__(
             self,
             vespa_client: VespaClient,
-            zookeeper_client: Optional[KazooClient] = None,
+            zookeeper_client: Optional[MarqoKazooClient] = None,
             default_device: Optional[str] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
@@ -59,7 +60,7 @@ class Config:
         ):
             self.cluster_is_remote = False
 
-    def _connect_to_zookeeper(self, zookeeper_client: Optional[KazooClient]) -> Optional[KazooClient]:
+    def _connect_to_zookeeper(self, zookeeper_client: Optional[MarqoKazooClient]) -> Optional[MarqoKazooClient]:
         """Connect to Zookeeper and return the client. If connection fails, log a warning and return None.
         Args:
             zookeeper_client: The Zookeeper client.
@@ -72,7 +73,7 @@ class Config:
             return None
         else:
             try:
-                zookeeper_client.start(5)
+                zookeeper_client.start()
             except KazooTimeoutError as e:
                 logger.warning(f"Failed to connect to Zookeeper due to timeout. "
                                f"Marqo will still start but create/delete index operations will not work. "

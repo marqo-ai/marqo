@@ -14,7 +14,7 @@ from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, 
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
-
+from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
 
 
 class MarqoTestCase(unittest.TestCase):
@@ -43,9 +43,8 @@ class MarqoTestCase(unittest.TestCase):
             "http://localhost:8080",
             "http://localhost:8080",
             content_cluster_name="content_default",
-
         )
-        zookeeper_client = KazooClient(hosts="localhost:2181")
+        zookeeper_client = MarqoKazooClient(hosts="localhost:2181", zookeeper_connection_timeout=10)
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
         cls.zookeeper_client = zookeeper_client
