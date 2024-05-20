@@ -280,11 +280,6 @@ class TestIndexManagement(MarqoTestCase):
 
             self.assertEqual(self.index_management.get_marqo_version(), '2.0')
 
-    def test_deploymentLockIsNone(self):
-        """Test to ensure if no Zookeeper client is provided, deployment lock is None
-        """
-        self.assertIsNone(self.index_management.deployment_lock)
-
     def test_deploymentLock(self):
         """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
         self.assertIsInstance(self.index_management.deployment_lock, DeploymentLock)
@@ -364,3 +359,9 @@ class TestIndexManagement(MarqoTestCase):
             self.index_management.delete_index_by_name(index_name)
         self.assertEqual(str(e.exception), 'Deployment lock is not '
                                            'instantiated and cannot be used for index creation/deletion')
+
+    def test_deploymentLockIsNone(self):
+        """Test to ensure if no Zookeeper client is provided, deployment lock is None
+        """
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
+        self.assertIsNone(self.index_management.deployment_lock)
