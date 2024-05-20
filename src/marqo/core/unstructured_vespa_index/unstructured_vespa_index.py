@@ -238,7 +238,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
             if not marqo_query.or_phrases and not marqo_query.and_phrases:
                 return 'false'
-            if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
+            if marqo_query.or_phrases == ["*"] or marqo_query.and_phrases == ["*"]:
                 return 'true'
             
             if marqo_query.or_phrases:
