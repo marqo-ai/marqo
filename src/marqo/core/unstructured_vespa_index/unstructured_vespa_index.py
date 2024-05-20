@@ -13,6 +13,7 @@ from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
 
 
+
 class UnstructuredVespaIndex(VespaIndex):
     _FILTER_STRING_BOOL_VALUES = ["true", "false"]
     _RESERVED_FIELD_SUBSTRING = "::"
@@ -234,6 +235,12 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
         def _get_lexical_search_term(marqo_query: MarqoLexicalQuery) -> str:
+
+            if not marqo_query.or_phrases and not marqo_query.and_phrases:
+                return 'false'
+            if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
+                return 'true'
+            
             if marqo_query.or_phrases:
                 or_terms = 'weakAnd(%s)' % ', '.join([
                     f'default contains "{phrase}"' for phrase in marqo_query.or_phrases
@@ -249,8 +256,6 @@ class UnstructuredVespaIndex(VespaIndex):
             else:
                 and_terms = ''
 
-            if not or_terms and not and_terms:
-                return 'true'
 
             return f'{or_terms}{and_terms}'
 
