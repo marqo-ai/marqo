@@ -541,6 +541,13 @@ class IndexManagement:
 
     @contextmanager
     def _deployment_lock_context_manager(self):
+        """A context manager for deployment lock acquisition.
+
+        Raises:
+            OperationConflictError: If another index creation/deletion operation is
+                in progress and the lock cannot be acquired
+            InternalError: If deployment lock is not instantiated
+        """
         if self._zookeeper_deployment_lock is None:
             raise InternalError("Deployment lock is not instantiated and cannot be used for index creation/deletion")
         try:
