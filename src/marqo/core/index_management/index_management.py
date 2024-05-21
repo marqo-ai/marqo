@@ -282,9 +282,9 @@ class IndexManagement:
             self._remove_schema_from_services(app, marqo_index.schema_name)
         self._add_schema_removal_override(app)
         self.vespa_client.deploy_application(app)
+        self.vespa_client.wait_for_application_convergence()
         for marqo_index in marqo_indexes:
             self._delete_index_settings_by_name(marqo_index.name)
-        self.vespa_client.wait_for_application_convergence()
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         """
