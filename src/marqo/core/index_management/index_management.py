@@ -284,6 +284,7 @@ class IndexManagement:
         self.vespa_client.deploy_application(app)
         for marqo_index in marqo_indexes:
             self._delete_index_settings_by_name(marqo_index.name)
+        self.vespa_client.wait_for_application_convergence()
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         """
