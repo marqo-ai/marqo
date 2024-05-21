@@ -237,7 +237,7 @@ class IndexManagement:
         Args:
             marqo_index: Marqo index to delete
         """
-        app = self.vespa_client.download_application()
+        app = self.vespa_client.download_application(wait_for_application_convergence=True)
 
         self._remove_schema(app, marqo_index.schema_name)
         self._remove_schema_from_services(app, marqo_index.schema_name)
@@ -302,7 +302,7 @@ class IndexManagement:
         Args:
             marqo_indexes: List of Marqo indexes to delete
         """
-        app = self.vespa_client.download_application()
+        app = self.vespa_client.download_application(wait_for_application_convergence=True)
 
         for marqo_index in marqo_indexes:
             self._remove_schema(app, marqo_index.schema_name)
