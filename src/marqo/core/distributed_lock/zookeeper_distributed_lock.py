@@ -32,7 +32,7 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
 
     def acquire(self) -> bool:
         """
-        Acquire the lock.
+        Acquire the lock. Connect to the Zookeeper server if not connected.
 
         Returns:
             bool: True if the lock is acquired, False otherwise.
