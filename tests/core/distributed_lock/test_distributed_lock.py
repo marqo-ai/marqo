@@ -107,3 +107,10 @@ class TestZookeeperDistributedLock(MarqoTestCase):
                 with lock:
                     pass
         self.assertFalse(lock.is_acquired)
+
+    def test_the_same_distributed_lock_canNotBeAcquiredTwice(self):
+        """Test that the same lock cannot be acquired twice."""
+        lock = get_deployment_lock(self.zookeeper_client, self.acquire_timeout)
+        self.assertTrue(lock.acquire())
+        with self.assertRaises(ZookeeperLockNotAcquiredError):
+            lock.acquire()
