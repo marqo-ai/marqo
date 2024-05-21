@@ -587,6 +587,11 @@ class StructuredVespaIndex(VespaIndex):
         return None
 
     def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
+        if not marqo_query.or_phrases and not marqo_query.and_phrases:
+            return 'false'
+        if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
+            return 'true'
+        
         if marqo_query.or_phrases:
             or_terms = 'weakAnd(%s)' % ', '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
