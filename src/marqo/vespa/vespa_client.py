@@ -91,9 +91,13 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-    def download_application(self) -> str:
+    def download_application(self, wait_for_application_convergence: bool = False) -> str:
         """
-        Download the Vespa application.
+        Args:
+            wait_for_application_convergence: Wait for the application to converge before downloading
+
+        Download the Vespa application. If wait_for_application_convergence is True, this method will wait for the
+        application to converge before downloading.
 
         Application download happens in two steps:
         1. Create a session
@@ -110,6 +114,9 @@ class VespaClient:
         Returns:
             Path to the downloaded application
         """
+        if wait_for_application_convergence:
+            self.wait_for_application_convergence()
+
         with httpx.Client() as httpx_client:
             session_id = self._create_deploy_session(httpx_client)
             return self._download_application(session_id, httpx_client)

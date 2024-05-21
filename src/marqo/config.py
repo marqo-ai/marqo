@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 from kazoo.handlers.threading import KazooTimeoutError
 
-from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
+from marqo.vespa.marqo_zookeeper_client import MarqoZookeeperClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
@@ -21,7 +21,7 @@ class Config:
     def __init__(
             self,
             vespa_client: VespaClient,
-            zookeeper_client: Optional[MarqoKazooClient] = None,
+            zookeeper_client: Optional[MarqoZookeeperClient] = None,
             default_device: Optional[str] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,
@@ -34,7 +34,7 @@ class Config:
         """
         self.vespa_client = vespa_client
         self.set_is_remote(vespa_client)
-        self.zookeeper_client = zookeeper_client
+        self._zookeeper_client = zookeeper_client
         self._connect_to_zookeeper()
 
         self.timeout = timeout
@@ -63,11 +63,11 @@ class Config:
 
     def _connect_to_zookeeper(self) -> None:
         """Try to connect to Zookeeper. If it fails, log a warning and continue."""
-        if self.zookeeper_client is None:
+        if self._zookeeper_client is None:
             pass
         else:
             try:
-                self.zookeeper_client.start()
+                self._zookeeper_client.start()
             except KazooTimeoutError as e:
                 logger.warning(f"Failed to connect to Zookeeper due to timeout. "
                                f"Marqo will still start but create/delete index operations will not work. "

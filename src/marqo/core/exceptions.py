@@ -12,7 +12,7 @@ class IndexNotFoundError(MarqoError):
     pass
 
 
-class ConflictError(MarqoError):
+class IndexCreationAndDeletionConflictError(MarqoError):
     pass
 
 

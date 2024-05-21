@@ -1,7 +1,7 @@
 from kazoo.client import KazooClient
 
 
-class MarqoKazooClient(KazooClient):
+class MarqoZookeeperClient(KazooClient):
     """A wrapper around the KazooClient to provide a timeout for the start method."""
 
     def __init__(self, zookeeper_connection_timeout: float, **kwargs):

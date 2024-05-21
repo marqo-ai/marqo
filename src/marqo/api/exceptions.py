@@ -195,8 +195,8 @@ class ModelNotInCacheError(__InvalidRequestError):
     status_code = HTTPStatus.NOT_FOUND
 
 
-class ConflictError(__InvalidRequestError):
-    code = "conflict_error"
+class IndexCreationAndDeletionConflictError(__InvalidRequestError):
+    code = "index_creation_and_deletion_conflict_error"
     status_code = HTTPStatus.CONFLICT
 
 

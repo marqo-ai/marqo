@@ -4,9 +4,9 @@ import uuid
 from unittest.mock import patch, Mock
 
 import vespa.application as pyvespa
-from kazoo.client import KazooClient
 
 from marqo import config, version
+from marqo.vespa.marqo_zookeeper_client import MarqoZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
@@ -14,7 +14,6 @@ from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, 
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
-from marqo.core.distributed_lock.marqo_kazoo_client import MarqoKazooClient
 
 
 class MarqoTestCase(unittest.TestCase):
@@ -44,7 +43,7 @@ class MarqoTestCase(unittest.TestCase):
             "http://localhost:8080",
             content_cluster_name="content_default",
         )
-        zookeeper_client = MarqoKazooClient(hosts="localhost:2181", zookeeper_connection_timeout=10)
+        zookeeper_client = MarqoZookeeperClient(hosts="localhost:2181", zookeeper_connection_timeout=10)
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
         cls.zookeeper_client = zookeeper_client

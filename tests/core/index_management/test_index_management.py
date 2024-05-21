@@ -12,8 +12,8 @@ from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_fact
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import ConflictError
-from marqo.core.distributed_lock.deployment_lock import DeploymentLock
+from marqo.core.exceptions import IndexCreationAndDeletionConflictError
+from marqo.core.distributed_lock.zookeeper_distributed_lock import DeploymentLock
 import threading
 import time
 
@@ -282,8 +282,8 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_deploymentLock(self):
         """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
-        self.assertIsInstance(self.index_management.deployment_lock, DeploymentLock)
-        lock = self.index_management.deployment_lock
+        self.assertIsInstance(self.index_management._zookeeper_distributed_lock, DeploymentLock)
+        lock = self.index_management._zookeeper_distributed_lock
         self.assertEqual(lock.lock.path, '/marqo__deployment_lock')
         self.assertEqual(lock.max_lock_period, 120)
         self.assertEqual(lock.acquire_timeout, 1)
@@ -324,10 +324,10 @@ class TestIndexManagement(MarqoTestCase):
         t_1 = threading.Thread(target=create_index, args=(marqo_index_request_1,))
         t_1.start()
         time.sleep(1)
-        with self.assertRaises(ConflictError):
+        with self.assertRaises(IndexCreationAndDeletionConflictError):
             self.index_management.create_index(marqo_index_request_2)
 
-        with self.assertRaises(ConflictError):
+        with self.assertRaises(IndexCreationAndDeletionConflictError):
             self.index_management.delete_index_by_name(index_name_1)
         t_1.join()
 
@@ -364,4 +364,4 @@ class TestIndexManagement(MarqoTestCase):
         """Test to ensure if no Zookeeper client is provided, deployment lock is None
         """
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
-        self.assertIsNone(self.index_management.deployment_lock)
+        self.assertIsNone(self.index_management._zookeeper_distributed_lock)
