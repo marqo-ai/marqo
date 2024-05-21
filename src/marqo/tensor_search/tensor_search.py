@@ -1384,7 +1384,7 @@ def _lexical_search(
         raise api_exceptions.InvalidArgError(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
-    
+
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
     # SEARCH TIMER-LOGGER (pre-processing)
@@ -1822,7 +1822,6 @@ def _vector_text_search(
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
     """
-
     # # SEARCH TIMER-LOGGER (pre-processing)
     if not device:
         raise api_exceptions.InternalError("_vector_text_search cannot be called without `device`!")
@@ -1860,7 +1859,6 @@ def _vector_text_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
-
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_vespa")
     logger.debug(

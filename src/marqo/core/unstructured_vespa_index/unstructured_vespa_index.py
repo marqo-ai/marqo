@@ -11,9 +11,6 @@ from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError, InvalidArgumentError
-from marqo.logging import get_logger
-
-logger = get_logger(__name__)
 
 
 class UnstructuredVespaIndex(VespaIndex):

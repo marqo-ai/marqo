@@ -644,6 +644,11 @@ class TestSearch(MarqoTestCase):
                 mock_vectorise.reset_mock()
 
     def test_empty_lexical_query(self):
+        """
+        Test that no documents are returned for an empty lexical query.
+        Expected behavior:
+        - No documents are returned for an empty query
+        """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 tensor_search.add_documents(
@@ -654,12 +659,7 @@ class TestSearch(MarqoTestCase):
                             {"_id": "1", "text": "document_1"},
                             {"_id": "2", "text": "document_2"},
                             {"_id": "3", "text": "document_3"},
-                            {"_id": "4", "text": "document_4"},
-                            {"_id": "5", "text": "document_5"},
-                            {"_id": "6", "text": "document_6"},
-                            {"_id": "7", "text": "document_7"},
-                            {"_id": "8", "text": "document_8"},
-                            {"_id": "9", "text": "document_9", "my_list": ["tag1", "tag2 some"]},
+                            {"_id": "4", "text": "document_4", "my_list": ["tag1", "tag2 some"]},
                         ],
                         tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
 
@@ -672,7 +672,12 @@ class TestSearch(MarqoTestCase):
                 self.assertIn("hits", res)
                 self.assertEqual(0, len(res['hits']))
 
-    def test_wildcard_lexical_query_structured(self):
+    def test_wildcard_lexical_query(self):
+        """
+        Test that the wildcard '*' lexical query works for both structured and unstructured indexes.
+        Expected behavior:
+        - All documents are returned for a '*' query or with filter applied if applicable
+        """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 tensor_search.add_documents(
@@ -683,12 +688,7 @@ class TestSearch(MarqoTestCase):
                             {"_id": "1", "text_field_1": "document_1"},
                             {"_id": "2", "text_field_1": "document_2"},
                             {"_id": "3", "text_field_1": "document_3"},
-                            {"_id": "4", "text_field_1": "document_4"},
-                            {"_id": "5", "text_field_1": "document_5"},
-                            {"_id": "6", "text_field_1": "document_6"},
-                            {"_id": "7", "text_field_1": "document_7"},
-                            {"_id": "8", "text_field_1": "document_8"},
-                            {"_id": "9", "text_field_1": "document_9",
+                            {"_id": "4", "text_field_1": "document_4",
                              "list_field_1": ["tag1", "tag2 some"]},
                         ],
                         tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
@@ -701,11 +701,11 @@ class TestSearch(MarqoTestCase):
                                            search_method=SearchMethod.LEXICAL, result_count=10)
 
                 self.assertIn("hits", res)
-                self.assertEqual(9, len(res['hits']))
+                self.assertEqual(4, len(res['hits']))
 
                 # Subtests for variations
                 variations = [
-                    ("*", 9, None),
+                    ("*", 4, None),
                     ("*", 1, "list_field_1:tag1"),
                     ('"*"', 0, None),
                     ('"exact" *', 0, None),
