@@ -21,7 +21,7 @@ class AbstractDistributedLock(ABC):
 
         Raises:
             marqo.core.exceptions.BackendCommunicationError: If the Zookeeper client cannot connect to the server.
-            marqo.core.exceptions.ZooKeeperLockNotAcquiredError: If the lock cannot be acquired within the timeout period.
+            marqo.core.exceptions.ZookeeperLockNotAcquiredError: If the lock cannot be acquired within the timeout period.
         """
         pass
 

@@ -13,7 +13,8 @@ import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
-from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError, VespaTimeoutError
+from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
+                                    VespaTimeoutError, VespaNotConvergedError)
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
@@ -91,10 +92,10 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-    def download_application(self, wait_for_application_convergence: bool = False) -> str:
+    def download_application(self, check_for_application_convergence: bool = False) -> str:
         """
         Args:
-            wait_for_application_convergence: Wait for the application to converge before downloading
+            check_for_application_convergence: check for the application to converge before downloading.
 
         Download the Vespa application. If wait_for_application_convergence is True, this method will wait for the
         application to converge before downloading.
@@ -114,12 +115,24 @@ class VespaClient:
         Returns:
             Path to the downloaded application
         """
-        if wait_for_application_convergence:
-            self.wait_for_application_convergence()
+        if check_for_application_convergence:
+            self.check_for_application_convergence()
 
         with httpx.Client() as httpx_client:
             session_id = self._create_deploy_session(httpx_client)
             return self._download_application(session_id, httpx_client)
+
+    def check_for_application_convergence(self, timeout=1) -> None:
+        """
+        Check if the Vespa application has converged within the given timeout.
+
+        Raises:
+            VespaNotConvergedError: If the application has not converged
+        """
+        try:
+            self.wait_for_application_convergence(timeout)
+        except VespaError as e:
+            raise VespaNotConvergedError("Vespa application has not converged. Please try again later") from e
 
     def get_application_generation(self) -> int:
         """

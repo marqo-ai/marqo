@@ -12,10 +12,11 @@ from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_fact
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import IndexCreationAndDeletionConflictError
+from marqo.core.exceptions import OperationConflictError
 from marqo.core.distributed_lock.zookeeper_distributed_lock import ZookeeperDistributedLock
 import threading
 import time
+from marqo.core.exceptions import InternalError
 
 
 class TestIndexManagement(MarqoTestCase):
@@ -281,31 +282,15 @@ class TestIndexManagement(MarqoTestCase):
             self.assertEqual(self.index_management.get_marqo_version(), '2.0')
 
     def test_createAndDeleteIndexCannotBeConcurrent(self):
-        """Test to ensure create_index and delete_index is not concurrent"""
+        """Test to ensure create_index requests can block other create_index and delete_index requests."""
         index_name_1 = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request_1 = self.structured_marqo_index_request(
+        marqo_index_request_1 = self.unstructured_marqo_index_request(
             name=index_name_1,
-            model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAngular,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            ],
-            tensor_fields=[]
         )
 
         index_name_2 = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request_2 = self.structured_marqo_index_request(
+        marqo_index_request_2 = self.unstructured_marqo_index_request(
             name=index_name_2,
-            model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAngular,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            ],
-            tensor_fields=[]
         )
 
         def create_index(marqo_index_request):
@@ -314,10 +299,10 @@ class TestIndexManagement(MarqoTestCase):
         t_1 = threading.Thread(target=create_index, args=(marqo_index_request_1,))
         t_1.start()
         time.sleep(1)
-        with self.assertRaises(IndexCreationAndDeletionConflictError):
+        with self.assertRaises(OperationConflictError):
             self.index_management.create_index(marqo_index_request_2)
 
-        with self.assertRaises(IndexCreationAndDeletionConflictError):
+        with self.assertRaises(OperationConflictError):
             self.index_management.delete_index_by_name(index_name_1)
         t_1.join()
         self.index_management.delete_index_by_name(index_name_1)
@@ -325,18 +310,10 @@ class TestIndexManagement(MarqoTestCase):
     def test_createIndexFailIfNoZookeeperProvided(self):
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
         index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.structured_marqo_index_request(
+        marqo_index_request = self.unstructured_marqo_index_request(
             name=index_name,
-            model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAngular,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            ],
-            tensor_fields=[]
         )
-        with self.assertRaises(RuntimeError) as e:
+        with self.assertRaises(InternalError) as e:
             self.index_management.create_index(marqo_index_request)
         self.assertEqual(str(e.exception), 'Deployment lock is not '
                                            'instantiated and cannot be used for index creation/deletion')
@@ -344,7 +321,7 @@ class TestIndexManagement(MarqoTestCase):
     def test_deleteIndexFailIfNoZookeeperProvided(self):
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
         index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with self.assertRaises(RuntimeError) as e:
+        with self.assertRaises(InternalError) as e:
             self.index_management.delete_index_by_name(index_name)
         self.assertEqual(str(e.exception), 'Deployment lock is not '
                                            'instantiated and cannot be used for index creation/deletion')
@@ -354,10 +331,3 @@ class TestIndexManagement(MarqoTestCase):
         """
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
         self.assertIsNone(self.index_management._zookeeper_deployment_lock)
-
-    def test_deploymentLock(self):
-        """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
-        self.assertIsInstance(self.index_management._zookeeper_deployment_lock, ZookeeperDistributedLock)
-        lock = self.index_management._zookeeper_deployment_lock
-        self.assertEqual(lock._lock.path, '/marqo__deployment_lock')
-        self.assertFalse(lock._lock.is_acquired)

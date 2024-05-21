@@ -3,11 +3,11 @@ from unittest.mock import patch
 from kazoo.exceptions import LockTimeout, ConnectionClosedError
 from kazoo.handlers.threading import KazooTimeoutError
 
-from marqo.core.distributed_lock.distributed_lock_manager import get_deployment_lock
+from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
 from marqo.core.distributed_lock.zookeeper_distributed_lock import ZookeeperDistributedLock
 from marqo.core.exceptions import BackendCommunicationError
 from tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import ZooKeeperLockNotAcquiredError
+from marqo.core.exceptions import ZookeeperLockNotAcquiredError
 
 
 class TestZookeeperDistributedLock(MarqoTestCase):
@@ -50,7 +50,7 @@ class TestZookeeperDistributedLock(MarqoTestCase):
         lock2 = get_deployment_lock(self.zookeeper_client, self.acquire_timeout)
 
         self.assertTrue(lock1.acquire())
-        with self.assertRaises(ZooKeeperLockNotAcquiredError):
+        with self.assertRaises(ZookeeperLockNotAcquiredError):
             lock2.acquire()
 
         lock1.release()
@@ -62,7 +62,7 @@ class TestZookeeperDistributedLock(MarqoTestCase):
     def test_distributed_lock_lockAcquisitionTimeout(self):
         """Test lock acquisition fails when timeout is reached."""
         lock = get_deployment_lock(self.zookeeper_client, self.acquire_timeout)  # Short timeout for the test
-        with self.assertRaises(ZooKeeperLockNotAcquiredError):
+        with self.assertRaises(ZookeeperLockNotAcquiredError):
             with patch.object(lock._lock, 'acquire', side_effect=LockTimeout):
                 self.assertFalse(lock.acquire())
 

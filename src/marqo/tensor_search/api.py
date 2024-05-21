@@ -19,7 +19,7 @@ from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
-from marqo.vespa.marqo_zookeeper_client import MarqoZookeeperClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
@@ -53,7 +53,7 @@ def generate_config() -> config.Config:
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
 
-    zookeeper_client = MarqoZookeeperClient(
+    zookeeper_client = ZookeeperClient(
         zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT),
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
     )
@@ -99,8 +99,8 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError, None),
         (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None),
         (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None),
-        (core_exceptions.IndexCreationAndDeletionConflictError,
-         api_exceptions.IndexCreationAndDeletionConflictError, None),
+        (core_exceptions.OperationConflictError,
+         api_exceptions.OperationConflictError, None),
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None),
 
         # Vespa client exceptions

@@ -2,7 +2,7 @@ from typing import Optional, Union
 
 from kazoo.handlers.threading import KazooTimeoutError
 
-from marqo.vespa.marqo_zookeeper_client import MarqoZookeeperClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
 from marqo.core.index_management.index_management import IndexManagement
@@ -21,7 +21,7 @@ class Config:
     def __init__(
             self,
             vespa_client: VespaClient,
-            zookeeper_client: Optional[MarqoZookeeperClient] = None,
+            zookeeper_client: Optional[ZookeeperClient] = None,
             default_device: Optional[str] = None,
             timeout: Optional[int] = None,
             backend: Optional[Union[enums.SearchDb, str]] = None,

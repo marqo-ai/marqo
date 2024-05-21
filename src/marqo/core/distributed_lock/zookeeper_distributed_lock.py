@@ -3,17 +3,19 @@ from kazoo.handlers.threading import KazooTimeoutError
 from kazoo.protocol.states import KazooState
 
 from marqo.core.distributed_lock.abstract_distributed_lock import AbstractDistributedLock
-from marqo.vespa.marqo_zookeeper_client import MarqoZookeeperClient
-from marqo.core.exceptions import BackendCommunicationError, ZooKeeperLockNotAcquiredError
+from marqo.core.exceptions import BackendCommunicationError, ZookeeperLockNotAcquiredError
 from marqo.logging import get_logger
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = get_logger(__name__)
+
+_DEPLOYMENT_LOCK_PATH = "/marqo__deployment_lock"
 
 
 class ZookeeperDistributedLock(AbstractDistributedLock):
     """A concrete implementation of distributed lock using Zookeeper."""
 
-    def __init__(self, zookeeper_client: MarqoZookeeperClient,
+    def __init__(self, zookeeper_client: ZookeeperClient,
                  path: str,
                  acquire_timeout: float = 1,
                  ):
@@ -38,28 +40,27 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
             bool: True if the lock is acquired, raise an exception otherwise.
         Raises:
             BackendCommunicationError: If the Zookeeper client cannot connect to the server.
-            ZooKeeperLockNotAcquiredError: If the lock cannot be acquired within the timeout period.
+            ZookeeperLockNotAcquiredError: If the lock cannot be acquired within the timeout period.
         """
         if self._zookeeper_client.state != KazooState.CONNECTED:
             try:
                 self._zookeeper_client.start()
             except KazooTimeoutError as e:
-                raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager. "
+                raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager at the moment. "
                                                 "Your request cannot be processed at this time. "
-                                                "Please check your network settings and try again later.") from e
+                                                "Please check your network settings and try again later") from e
         try:
             acquired = self._lock.acquire(timeout=self._acquire_timeout)
             if not acquired:
-                raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
+                raise ZookeeperLockNotAcquiredError("Failed to acquire the lock")
             else:
                 return True
-        except ConnectionClosedError:
-            raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager "
-                                            "when acquiring the lock. "
+        except ConnectionClosedError as e:
+            raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager at the moment. "
                                             "Your request cannot be processed at this time. "
-                                            "Please check your network settings and try again later.")
+                                            "Please check your network settings and try again later") from e
         except LockTimeout:
-            raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
+            raise ZookeeperLockNotAcquiredError("Failed to acquire the lock")
 
     def release(self):
         """Release the lock and reset the lock acquired time."""
@@ -76,3 +77,17 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit the context manager."""
         self.release()
+
+
+def get_deployment_lock(zookeeper_client: ZookeeperClient, acquire_timeout: float = 1) -> ZookeeperDistributedLock:
+    """
+    Get a deployment lock, used to lock the index creation/deletion operations.
+
+    Args:
+        zookeeper_client: The Zookeeper client.
+        acquire_timeout: The timeout to acquire the lock.
+
+    Returns:
+        ZookeeperDistributedLock: The deployment lock.
+    """
+    return ZookeeperDistributedLock(zookeeper_client, _DEPLOYMENT_LOCK_PATH, acquire_timeout)
