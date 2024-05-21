@@ -120,19 +120,17 @@ class VespaClient:
 
         with httpx.Client() as httpx_client:
             session_id = self._create_deploy_session(httpx_client)
-            return self._download_application(session_id, httpx_client)
+            return self._download_application(session_id, httpx_client)True
 
-    def check_for_application_convergence(self, timeout=1) -> None:
+    def check_for_application_convergence(self) -> None:
         """
-        Check if the Vespa application has converged within the given timeout.
+        Check if the Vespa application has converged and raise an exception if it has not.
 
         Raises:
             VespaNotConvergedError: If the application has not converged
         """
-        try:
-            self.wait_for_application_convergence(timeout)
-        except VespaError as e:
-            raise VespaNotConvergedError("Vespa application has not converged. Please try again later") from e
+        if not self.get_application_has_converged():
+            raise VespaNotConvergedError('Vespa application has not converged')
 
     def get_application_generation(self) -> int:
         """

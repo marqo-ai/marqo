@@ -555,4 +555,4 @@ class IndexManagement:
                 yield
         except ZookeeperLockNotAcquiredError:
             raise OperationConflictError("Another index creation/deletion operation is in progress. "
-                                                        "Your request is rejected. Please try again later.")
+                                         "Your request is rejected. Please try again later")
