@@ -61,7 +61,6 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
         except LockTimeout:
             raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
 
-
     def release(self):
         """Release the lock and reset the lock acquired time."""
         self._lock.release()

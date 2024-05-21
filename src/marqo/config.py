@@ -75,3 +75,9 @@ class Config:
                                f"You need to restart Marqo to connect to Zookeeper once you have fixed the issue. "
                                f"Original error message: {e}")
                 pass
+
+    def stop_and_close_zookeeper_client(self) -> None:
+        """Stop and close the Zookeeper client."""
+        if self._zookeeper_client is not None:
+            self._zookeeper_client.stop()
+            self._zookeeper_client.close()
