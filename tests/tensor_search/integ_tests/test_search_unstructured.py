@@ -1375,4 +1375,3 @@ class TestSearchUnstructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)
-                                                    
