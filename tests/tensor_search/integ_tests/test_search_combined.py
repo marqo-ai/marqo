@@ -677,6 +677,7 @@ class TestSearch(MarqoTestCase):
         Test that the wildcard '*' lexical query works for both structured and unstructured indexes.
         Expected behavior:
         - All documents are returned for a '*' query or with filter applied if applicable
+        - Other wildcards are interpreted literally and not supported
         """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
