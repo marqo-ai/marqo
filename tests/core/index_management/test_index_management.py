@@ -13,7 +13,7 @@ from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import IndexCreationAndDeletionConflictError
-from marqo.core.distributed_lock.zookeeper_distributed_lock import DeploymentLock
+from marqo.core.distributed_lock.zookeeper_distributed_lock import ZookeeperDistributedLock
 import threading
 import time
 
@@ -280,16 +280,6 @@ class TestIndexManagement(MarqoTestCase):
 
             self.assertEqual(self.index_management.get_marqo_version(), '2.0')
 
-    def test_deploymentLock(self):
-        """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
-        self.assertIsInstance(self.index_management._zookeeper_distributed_lock, DeploymentLock)
-        lock = self.index_management._zookeeper_distributed_lock
-        self.assertEqual(lock.lock.path, '/marqo__deployment_lock')
-        self.assertEqual(lock.max_lock_period, 120)
-        self.assertEqual(lock.acquire_timeout, 1)
-        self.assertTrue(lock.watchdog_thread.is_alive())
-        self.assertFalse(lock.lock.is_acquired)
-
     def test_createAndDeleteIndexCannotBeConcurrent(self):
         """Test to ensure create_index and delete_index is not concurrent"""
         index_name_1 = 'a' + str(uuid.uuid4()).replace('-', '')
@@ -330,7 +320,6 @@ class TestIndexManagement(MarqoTestCase):
         with self.assertRaises(IndexCreationAndDeletionConflictError):
             self.index_management.delete_index_by_name(index_name_1)
         t_1.join()
-
         self.index_management.delete_index_by_name(index_name_1)
 
     def test_createIndexFailIfNoZookeeperProvided(self):
@@ -364,4 +353,11 @@ class TestIndexManagement(MarqoTestCase):
         """Test to ensure if no Zookeeper client is provided, deployment lock is None
         """
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
-        self.assertIsNone(self.index_management._zookeeper_distributed_lock)
+        self.assertIsNone(self.index_management._zookeeper_deployment_lock)
+
+    def test_deploymentLock(self):
+        """Test to ensure if Zookeeper client is provided, deployment lock is not None"""
+        self.assertIsInstance(self.index_management._zookeeper_deployment_lock, ZookeeperDistributedLock)
+        lock = self.index_management._zookeeper_deployment_lock
+        self.assertEqual(lock._lock.path, '/marqo__deployment_lock')
+        self.assertFalse(lock._lock.is_acquired)

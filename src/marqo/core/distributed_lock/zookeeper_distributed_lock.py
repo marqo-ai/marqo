@@ -4,7 +4,7 @@ from kazoo.protocol.states import KazooState
 
 from marqo.core.distributed_lock.abstract_distributed_lock import AbstractDistributedLock
 from marqo.vespa.marqo_zookeeper_client import MarqoZookeeperClient
-from marqo.core.exceptions import BackendCommunicationError
+from marqo.core.exceptions import BackendCommunicationError, ZooKeeperLockNotAcquiredError
 from marqo.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,9 +35,10 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
         Acquire the lock. Connect to the Zookeeper server if not connected.
 
         Returns:
-            bool: True if the lock is acquired, False otherwise.
+            bool: True if the lock is acquired, raise an exception otherwise.
         Raises:
             BackendCommunicationError: If the Zookeeper client cannot connect to the server.
+            ZooKeeperLockNotAcquiredError: If the lock cannot be acquired within the timeout period.
         """
         if self._zookeeper_client.state != KazooState.CONNECTED:
             try:
@@ -47,20 +48,22 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
                                                 "Your request cannot be processed at this time. "
                                                 "Please check your network settings and try again later.") from e
         try:
-            self._lock.acquire(timeout=self._acquire_timeout)
+            acquired = self._lock.acquire(timeout=self._acquire_timeout)
         except ConnectionClosedError:
             raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager "
                                             "when acquiring the lock. "
                                             "Your request cannot be processed at this time. "
                                             "Please check your network settings and try again later.")
         except LockTimeout:
-            return False
-        return self._lock.is_acquired
+            raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
+
+        if not acquired:
+            raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
+        return acquired
 
     def release(self):
         """Release the lock and reset the lock acquired time."""
-        if self.is_acquired:
-            self._lock.release()
+        self._lock.release()
 
     @property
     def is_acquired(self) -> bool:
@@ -69,7 +72,6 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
     def __enter__(self):
         """Enter the context manager."""
         self.acquire()
-        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit the context manager."""

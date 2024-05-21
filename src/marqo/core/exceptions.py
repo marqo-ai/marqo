@@ -20,6 +20,10 @@ class BackendCommunicationError(MarqoError):
     pass
 
 
+class ZooKeeperLockNotAcquiredError(MarqoError):
+    pass
+
+
 class ParsingError(MarqoError):
     pass
 
