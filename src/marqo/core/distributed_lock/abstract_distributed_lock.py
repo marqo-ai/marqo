@@ -18,6 +18,10 @@ class AbstractDistributedLock(ABC):
 
         Returns:
             bool: True if the lock is acquired, False otherwise.
+
+        Raises:
+            marqo.core.exceptions.BackendCommunicationError: If the Zookeeper client cannot connect to the server.
+            marqo.core.exceptions.ZooKeeperLockNotAcquiredError: If the lock cannot be acquired within the timeout period.
         """
         pass
 
@@ -29,7 +33,8 @@ class AbstractDistributedLock(ABC):
     @property
     @abstractmethod
     def is_acquired(self) -> bool:
-        """Check if the lock is acquired."""
+        """Check if the lock is acquired.
+        """
         pass
 
     @abstractmethod
