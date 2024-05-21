@@ -92,7 +92,7 @@ class IndexManagement:
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
-        Create a Marqo index.
+        Create a Marqo index in a thread-safe manner.
 
         Args:
             marqo_index_request: Marqo index to create
@@ -103,6 +103,9 @@ class IndexManagement:
         Raises:
             IndexExistsError: If index already exists
             InvalidVespaApplicationError: If Vespa application is invalid after applying the index
+            RuntimeError: If deployment lock is not instantiated
+            IndexCreationAndDeletionConflictError: If another index creation/deletion operation is
+                in progress and the lock cannot be acquired
         """
         
         if self._zookeeper_deployment_lock is None:
@@ -166,7 +169,7 @@ class IndexManagement:
 
     def batch_create_indexes(self, marqo_index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         """
-        Create multiple Marqo indexes as a single Vespa deployment.
+        Create multiple Marqo indexes as a single Vespa deployment, in a thread-safe manner.
 
         This method is intended to facilitate testing and should not be used in production.
 
@@ -179,6 +182,9 @@ class IndexManagement:
         Raises:
             IndexExistsError: If an index already exists
             InvalidVespaApplicationError: If Vespa application is invalid after applying the indexes
+            RuntimeError: If deployment lock is not instantiated
+            IndexCreationAndDeletionConflictError: If another index creation/deletion operation is
+                in progress and the lock cannot be acquired
         """
         if self._zookeeper_deployment_lock is None:
             raise RuntimeError("Deployment lock is not instantiated and cannot be used for index creation/deletion")
@@ -224,7 +230,7 @@ class IndexManagement:
 
     def delete_index(self, marqo_index: MarqoIndex) -> None:
         """
-        Delete a Marqo index.
+        Delete a Marqo index. To make this operation thread-safe, use delete_index_by_name instead.
 
         This method is idempotent and does not raise an error if the index does not exist.
 
@@ -242,12 +248,15 @@ class IndexManagement:
 
     def delete_index_by_name(self, index_name: str) -> None:
         """
-        Delete a Marqo index by name.
+        Delete a Marqo index by name, in a thread-safe manner.
 
         Args:
             index_name: Name of Marqo index to delete
         Raises:
             IndexNotFoundError: If index does not exist
+            RuntimeError: If deployment lock is not instantiated
+            IndexCreationAndDeletionConflictError: If another index creation/deletion operation is
+                in progress and the lock cannot be acquired
         """
         if self._zookeeper_deployment_lock is None:
             raise RuntimeError("Deployment lock is not instantiated and cannot be used for index creation/deletion")
@@ -260,6 +269,16 @@ class IndexManagement:
                                                         "Your delete_index request is rejected. Please try again later.")
 
     def batch_delete_indexes_by_name(self, index_names: List[str]) -> None:
+        """
+        Delete multiple Marqo indexes by name, in a thread-safe manner.
+        Args:
+            index_names:
+        Raises:
+            IndexNotFoundError: If an index does not exist
+            RuntimeError: If deployment lock is not instantiated
+            IndexCreationAndDeletionConflictError: If another index creation/deletion operation is
+                in progress and the lock cannot be acquired
+        """
         if self._zookeeper_deployment_lock is None:
             raise RuntimeError("Deployment lock is not instantiated and cannot be used for index creation/deletion")
         try:
