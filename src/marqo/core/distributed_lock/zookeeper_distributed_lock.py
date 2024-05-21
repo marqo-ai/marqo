@@ -49,6 +49,10 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
                                                 "Please check your network settings and try again later.") from e
         try:
             acquired = self._lock.acquire(timeout=self._acquire_timeout)
+            if not acquired:
+                raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
+            else:
+                return True
         except ConnectionClosedError:
             raise BackendCommunicationError("Marqo cannot connect to backend concurrent manager "
                                             "when acquiring the lock. "
@@ -57,9 +61,6 @@ class ZookeeperDistributedLock(AbstractDistributedLock):
         except LockTimeout:
             raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
 
-        if not acquired:
-            raise ZooKeeperLockNotAcquiredError("Failed to acquire the lock.")
-        return acquired
 
     def release(self):
         """Release the lock and reset the lock acquired time."""
