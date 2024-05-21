@@ -120,7 +120,7 @@ class VespaClient:
 
         with httpx.Client() as httpx_client:
             session_id = self._create_deploy_session(httpx_client)
-            return self._download_application(session_id, httpx_client)True
+            return self._download_application(session_id, httpx_client)
 
     def check_for_application_convergence(self) -> None:
         """
