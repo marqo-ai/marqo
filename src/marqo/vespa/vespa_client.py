@@ -143,7 +143,7 @@ class VespaClient:
         raise VespaError(f"Vespa application did not converge within {timeout} seconds")
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
-              query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
+              query_features: Dict[str, Any] = None, timeout: int = None, **kwargs) -> QueryResult:
         """
         Query Vespa.
         Args:
