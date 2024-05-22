@@ -1988,6 +1988,8 @@ def _hybrid_search(
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
+    # Parse text into required and optional terms.
+    (required_terms, optional_terms) = utils.parse_lexical_query(query)
 
     # We do not pass searchable_attributes
     marqo_query = MarqoHybridQuery(
@@ -1998,6 +2000,8 @@ def _hybrid_search(
         ef_search=ef_search,
         approximate=approximate,
         offset=offset,
+        or_phrases=optional_terms,
+        and_phrases=required_terms,
         attributes_to_retrieve=attributes_to_retrieve,
         score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
         hybrid_parameters=hybrid_parameters

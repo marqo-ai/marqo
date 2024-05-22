@@ -78,6 +78,8 @@ class SearchQuery(BaseMarqoModel):
         ):
             raise ValueError("Normal searchable attributes cannot be defined at the same time as hybrid parameters")
 
+        return values
+
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
         return validation.validate_str_against_enum(

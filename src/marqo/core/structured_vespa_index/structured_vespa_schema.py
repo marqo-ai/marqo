@@ -198,15 +198,15 @@ class StructuredVespaSchema(VespaSchema):
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
                     f'{self._generate_max_similarity_expression(tensor_fields[1:])})')
 
-    def _generate_rrf_expression(self, embedding_similarity_expression, bm25_expression) -> str:
+    def _generate_rrf_expression(self) -> str:
         # TODO: move this to vespa_schema, if shared by unstructured
-        return (f"query(alpha) * reciprocal_rank({embedding_similarity_expression}, query(rrf_k)) + "
-                f"(1-query(alpha)) * reciprocal_rank({bm25_expression}, query(rrf_k))")
+        return (f"query(alpha) * reciprocal_rank(embedding_similarity_expression) + "
+                f"(1-query(alpha)) * reciprocal_rank(bm25_expression)")     # TODO: add k back somehow, maybe index creation
 
-    def _generate_normalize_linear_expression(self, embedding_similarity_expression, bm25_expression) -> str:
+    def _generate_normalize_linear_expression(self) -> str:
         # TODO: move this to vespa_schema, if shared by unstructured
-        return (f"query(alpha) * normalize_linear({embedding_similarity_expression}) + "
-                f"(1-query(alpha)) * normalize_linear({bm25_expression})")
+        return (f"query(alpha) * normalize_linear(embedding_similarity_expression) + "
+                f"(1-query(alpha)) * normalize_linear(bm25_expression)")
 
     def _generate_rank_profiles(self, marqo_index: StructuredMarqoIndex) -> List[str]:
         rank_profiles: List[str] = list()
@@ -232,6 +232,8 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BM25} inherits default {{')
 
             rank_profiles.append('inputs {')
+            # TODO: possibly separate this into a new rank-profile hybrid_bm25_ranker
+            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
             for field in lexical_fields:
                 rank_profiles.append(f'query({field.name}): 0')
             rank_profiles.append('}')
@@ -263,40 +265,51 @@ class StructuredVespaSchema(VespaSchema):
             # Input parameters
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            rank_profiles.append(f'query(alpha): float')  # TODO check if this should be type
-            rank_profiles.append(f'query(rrf_k): int')    # TODO check if this should be type
+            rank_profiles.append(f'query(alpha) float')  # TODO check if this should be type
             for field in tensor_fields:
                 rank_profiles.append(f'query({field.name}): 0')
             rank_profiles.append('}')
-
+            # Make embedding_similarity_expression and bm25_expression into functions for RRF
+            rank_profiles.append('function bm25_expression() {')
+            rank_profiles.append(f'expression: {bm25_expression}')
+            rank_profiles.append('}')
+            rank_profiles.append('function embedding_similarity_expression() {')
+            rank_profiles.append(f'expression: {embedding_similarity_expression}')
+            rank_profiles.append('}')
             rank_profiles.append('first-phase {')
-            rank_profiles.append(f'expression: {embedding_similarity_expression}')      # TODO, how to combine lexical and tensor here?
+            rank_profiles.append(f'expression: query(alpha) * {embedding_similarity_expression} + '
+                                 f'(1 - query(alpha)) * {bm25_expression}')      # TODO, how to combine lexical and tensor better here?
             rank_profiles.append('}')
             rank_profiles.append('global-phase {')
-            rank_profiles.append(f'expression: {self._generate_rrf_expression(embedding_similarity_expression, bm25_expression)}')
+            rank_profiles.append(f'expression: {self._generate_rrf_expression()}')
             rank_profiles.append('}')
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
 
             # Normalized Linear Normal
-            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_RRF} inherits default {{')
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR} inherits default {{')
 
             # Input parameters
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            rank_profiles.append(f'query(alpha): float')  # TODO check if this should be type
-            rank_profiles.append(f'query(rrf_k): int')  # TODO check if this should be type
+            rank_profiles.append(f'query(alpha) float')  # TODO check if this should be type
             for field in tensor_fields:
                 rank_profiles.append(f'query({field.name}): 0')
             rank_profiles.append('}')
-
+            # Make embedding_similarity_expression and bm25_expression into functions for Normalize Linear
+            rank_profiles.append('function bm25_expression() {')
+            rank_profiles.append(f'expression: {bm25_expression}')
+            rank_profiles.append('}')
+            rank_profiles.append('function embedding_similarity_expression() {')
+            rank_profiles.append(f'expression: {embedding_similarity_expression}')
+            rank_profiles.append('}')
             rank_profiles.append('first-phase {')
-            rank_profiles.append(
-                f'expression: {embedding_similarity_expression}')  # TODO, how to combine lexical and tensor here?
+            rank_profiles.append(f'expression: query(alpha) * {embedding_similarity_expression} + '
+                                 f'(1 - query(alpha)) * {bm25_expression}')  # TODO, how to combine lexical and tensor better here?
             rank_profiles.append('}')
             rank_profiles.append('global-phase {')
             rank_profiles.append(
-                f'expression: {self._generate_rrf_expression(embedding_similarity_expression, bm25_expression)}')
+                f'expression: {self._generate_normalize_linear_expression()}')
             rank_profiles.append('}')
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
