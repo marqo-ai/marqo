@@ -4,11 +4,27 @@ from marqo.exceptions import (
 )
 
 
+class InternalError(MarqoError):
+    pass
+
+
 class IndexExistsError(MarqoError):
     pass
 
 
 class IndexNotFoundError(MarqoError):
+    pass
+
+
+class OperationConflictError(MarqoError):
+    pass
+
+
+class BackendCommunicationError(MarqoError):
+    pass
+
+
+class ZookeeperLockNotAcquiredError(MarqoError):
     pass
 
 

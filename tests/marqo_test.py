@@ -6,6 +6,7 @@ from unittest.mock import patch, Mock
 import vespa.application as pyvespa
 
 from marqo import config, version
+from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
@@ -41,13 +42,15 @@ class MarqoTestCase(unittest.TestCase):
             "http://localhost:8080",
             "http://localhost:8080",
             content_cluster_name="content_default",
-
         )
+        zookeeper_client = ZookeeperClient(hosts="localhost:2181", zookeeper_connection_timeout=10)
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
-        cls.index_management = IndexManagement(cls.vespa_client)
+        cls.zookeeper_client = zookeeper_client
+        cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
-        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu")
+        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu",
+                                   zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
         cls.CONTENT_CLUSTER = 'content_default'
