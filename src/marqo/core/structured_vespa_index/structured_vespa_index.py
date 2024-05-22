@@ -295,7 +295,7 @@ class StructuredVespaIndex(VespaIndex):
 
         if not marqo_query.approximate:
             query['ranking.softtimeout.enable'] = False
-            query['timeout'] = '300s'
+            query['timeout'] = 300 * 1000  # 5 minutes
 
         return query
 
