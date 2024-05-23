@@ -234,6 +234,11 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
         def _get_lexical_search_term(marqo_query: MarqoLexicalQuery) -> str:
+            if not marqo_query.or_phrases and not marqo_query.and_phrases:
+                return 'false'
+            if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
+                return 'true'
+            
             if marqo_query.or_phrases:
                 or_terms = 'weakAnd(%s)' % ', '.join([
                     f'default contains "{phrase}"' for phrase in marqo_query.or_phrases
@@ -248,6 +253,7 @@ class UnstructuredVespaIndex(VespaIndex):
                     and_terms = f' AND ({and_terms})'
             else:
                 and_terms = ''
+
 
             return f'{or_terms}{and_terms}'
 

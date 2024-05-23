@@ -195,6 +195,11 @@ class ModelNotInCacheError(__InvalidRequestError):
     status_code = HTTPStatus.NOT_FOUND
 
 
+class OperationConflictError(__InvalidRequestError):
+    code = "operation_conflict_error"
+    status_code = HTTPStatus.CONFLICT
+
+
 # ---MARQO INTERNAL ERROR---
 
 
