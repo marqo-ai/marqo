@@ -441,11 +441,9 @@ class TestSearch(MarqoTestCase):
             with self.subTest(case=case):
                 with self.assertRaises(base_exceptions.InvalidArgumentError) as cm:
                     tensor_search.search(config=self.config, index_name=self.unstructured_default_text_index.name,
-                                             text="", filter=case)
+                                         text="", filter=case)
 
                 self.assertIn("'IN' filter keyword is not yet supported for unstructured", str(cm.exception))
-
-
 
     def test_filter_id(self):
         """
@@ -644,3 +642,83 @@ class TestSearch(MarqoTestCase):
                     args, kwargs = mock_vectorise.call_args
                     self.assertTrue(kwargs["enable_cache"])
                 mock_vectorise.reset_mock()
+
+    def test_empty_lexical_query(self):
+        """
+        Test that no documents are returned for an empty lexical query.
+        Expected behavior:
+        - No documents are returned for an empty query
+        """
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+            with self.subTest(index=index.type):
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text": "document_1"},
+                            {"_id": "2", "text": "document_2"},
+                            {"_id": "3", "text": "document_3"},
+                            {"_id": "4", "text": "document_4", "my_list": ["tag1", "tag2 some"]},
+                        ],
+                        tensor_fields=["text"] if isinstance(index, UnstructuredMarqoIndex) else None
+
+                    )
+                )
+
+                # Assert that no documents are returned for an empty query
+                res = tensor_search.search(text="", config=self.config, index_name=index.name,
+                                           search_method=SearchMethod.LEXICAL, result_count=10)
+                self.assertIn("hits", res)
+                self.assertEqual(0, len(res['hits']))
+
+    def test_wildcard_lexical_query(self):
+        """
+        Test that the wildcard '*' lexical query works for both structured and unstructured indexes.
+        Expected behavior:
+        - All documents are returned for a '*' query or with filter applied if applicable
+        - Other wildcards are interpreted literally and not supported
+        """
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+            with self.subTest(index=index.type):
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text_field_1": "document_1"},
+                            {"_id": "2", "text_field_1": "document_2"},
+                            {"_id": "3", "text_field_1": "document_3"},
+                            {"_id": "4", "text_field_1": "document_4",
+                             "list_field_1": ["tag1", "tag2 some"]},
+                        ],
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+
+                    )
+                )
+
+                # Assert that all documents are returned for a wildcard query
+                res = tensor_search.search(text="*", config=self.config, index_name=index.name,
+                                           search_method=SearchMethod.LEXICAL, result_count=10)
+
+                self.assertIn("hits", res)
+                self.assertEqual(4, len(res['hits']))
+
+                # Subtests for variations
+                variations = [
+                    ("*", 4, None),
+                    ("*", 1, "list_field_1:tag1"),
+                    ('"*"', 0, None),
+                    ('"exact" *', 0, None),
+                    ('"*" optional', 0, None)
+                ]
+
+                for query, expected_count, filter_term in variations:
+                    with self.subTest(query=query, filter=filter_term):
+                        res = tensor_search.search(text=query, config=self.config,
+                                                   index_name=index.name,
+                                                   search_method=SearchMethod.LEXICAL, result_count=10,
+                                                   filter=filter_term)
+                        print(res)
+                        self.assertIn("hits", res)
+                        self.assertEqual(expected_count, len(res['hits']))

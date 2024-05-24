@@ -30,7 +30,6 @@ class AddDocsBodyParams(BaseModel):
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
     imageDownloadThreadCount: int = 20
-    enablePreprocess: bool = False
 
 
 class AddDocsParams(BaseModel):
@@ -47,7 +46,7 @@ class AddDocsParams(BaseModel):
         mappings: a dictionary used to handle all the object field content in the doc,
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
-
+        text_chunk_prefix: an optional prefix to add to each text chunk
     """
 
     class Config:
@@ -65,7 +64,7 @@ class AddDocsParams(BaseModel):
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
-    enable_preprocess: bool = False
+    text_chunk_prefix: Optional[str] = None
 
     def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device

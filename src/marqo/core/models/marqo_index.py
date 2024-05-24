@@ -122,6 +122,8 @@ class Model(StrictBaseModel):
     name: str
     properties: Optional[Dict[str, Any]]
     custom: bool = False
+    text_query_prefix: Optional[str]
+    text_chunk_prefix: Optional[str]
 
     @root_validator(pre=False)
     def validate_custom_properties(cls, values):
@@ -188,6 +190,45 @@ class Model(StrictBaseModel):
                 raise InvalidArgumentError(
                     f'Invalid model properties for model={model_name}. Reason: {e}.'
                 )
+            
+    def get_text_query_prefix(self, request_level_prefix: Optional[str] = None) -> str:
+        if request_level_prefix is not None:
+            return request_level_prefix
+
+        # For backwards compatibility. Since older versions of Marqo did not have a text_query_prefix field,
+        # we need to return an empty string if the model does not have a text_query_prefix. 
+        # We know that the value of text_query_prefix is None in old indexes since the model was not populated
+        # from the registry.
+        if self.text_query_prefix is None:
+            return ""
+
+        # Else return the model default as populated during initialization
+        return self.text_query_prefix
+
+    def get_text_chunk_prefix(self, request_level_prefix: Optional[str] = None) -> str:
+        if request_level_prefix is not None:
+            return request_level_prefix
+
+        # For backwards compatibility. Since older versions of Marqo did not have a text_chunk_prefix field,
+        # we need to return an empty string if the model does not have a text_chunk_prefix. 
+        # We know that the value of text_chunk_prefix is None in old indexes since the model was not populated
+        # from the registry.
+        if self.text_chunk_prefix is None:
+            return ""
+
+        # Else return the model default as populated during initialization
+        return self.text_chunk_prefix
+    
+    def get_default_text_query_prefix(self) -> Optional[str]:
+        return self._get_default_prefix("text_query_prefix")
+
+    def get_default_text_chunk_prefix(self) -> Optional[str]:
+        return self._get_default_prefix("text_chunk_prefix")
+
+    def _get_default_prefix(self, prefix_type: str) -> Optional[str]:
+        model_properties = self.get_properties()
+        default_prefix = model_properties.get(prefix_type)
+        return default_prefix
 
 
 class MarqoIndex(ImmutableStrictBaseModel, ABC):
@@ -269,11 +310,16 @@ class MarqoIndex(ImmutableStrictBaseModel, ABC):
             self._cache[key] = func()
         return self._cache[key]
 
+    
+
 
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
     filter_string_max_length: int
+
+    def __init__(self, **data):
+        super().__init__(**data)
 
     @classmethod
     def _valid_type(cls) -> IndexType:
@@ -495,7 +541,8 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.MultimodalCombination.value}'
         )
 
-    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText, FieldType.CustomVector]:
+    if FieldFeature.LexicalSearch in features and type not in [FieldType.Text, FieldType.ArrayText,
+                                                               FieldType.CustomVector]:
         raise ValueError(
             f'{name}: Field with {FieldFeature.LexicalSearch.value} feature must be of type '
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'

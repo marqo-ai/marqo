@@ -132,7 +132,7 @@ class TestBoostFieldScoresComparison(MarqoTestCase):
                 "Description": "A history of household pets",
                 "_id": "d2"
             }
-        ], auto_refresh=True)
+        ])
 
         q = "What are the best pets"
 

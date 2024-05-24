@@ -74,6 +74,8 @@ class EnvVars:
     MARQO_MAX_DOCUMENTS_BATCH_SIZE = "MARQO_MAX_DOCUMENTS_BATCH_SIZE"
     MARQO_INFERENCE_CACHE_SIZE = "MARQO_INFERENCE_CACHE_SIZE"
     MARQO_INFERENCE_CACHE_TYPE = "MARQO_INFERENCE_CACHE_TYPE"
+    ZOOKEEPER_HOSTS = "ZOOKEEPER_HOSTS"
+    ZOOKEEPER_CONNECTION_TIMEOUT = "ZOOKEEPER_CONNECTION_TIMEOUT"
 
 
 class RequestType:
@@ -107,6 +109,8 @@ class ObjectStores:
 class ModelProperties:
     auth_required = 'auth_required'
     model_location = 'model_location'
+    text_chunk_prefix = 'text_chunk_prefix'
+    text_query_prefix = 'text_query_prefix'
 
 
 class InferenceParams:

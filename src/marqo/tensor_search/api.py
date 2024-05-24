@@ -4,8 +4,7 @@ from typing import List
 
 import pydantic
 import uvicorn
-from fastapi import FastAPI
-from fastapi import Request, Depends
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from marqo import config
@@ -20,6 +19,7 @@ from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
+from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
@@ -35,7 +35,6 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
-from pydantic import ValidationError
 
 logger = get_logger(__name__)
 
@@ -53,10 +52,16 @@ def generate_config() -> config.Config:
         delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
+
+    zookeeper_client = ZookeeperClient(
+        zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT),
+        hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
+    )
+
     # Determine default device
     default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
 
-    return config.Config(vespa_client, default_device)
+    return config.Config(vespa_client, zookeeper_client, default_device)
 
 
 _config = generate_config()
@@ -94,6 +99,9 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError, None),
         (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None),
         (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None),
+        (core_exceptions.OperationConflictError,
+         api_exceptions.OperationConflictError, None),
+        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None),
 
         # Vespa client exceptions
         (
@@ -181,6 +189,12 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
         return JSONResponse(content=body, status_code=500)
 
 
+@app.on_event("shutdown")
+def shutdown_event(marqo_config: config.Config = Depends(get_config)):
+    """Close the Zookeeper client on shutdown."""
+    marqo_config.stop_and_close_zookeeper_client()
+
+
 @app.get("/")
 def root():
     return {"message": "Welcome to Marqo",
@@ -236,7 +250,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             image_download_headers=search_query.image_download_headers,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
-            model_auth=search_query.modelAuth
+            model_auth=search_query.modelAuth,
+            text_query_prefix=search_query.textQueryPrefix
         )
 
 
@@ -269,12 +284,11 @@ def recommend(query: RecommendQuery, index_name: str,
 def add_or_replace_documents(
         body: AddDocsBodyParams,
         index_name: str,
-        refresh: bool = True,
         marqo_config: config.Config = Depends(get_config),
         device: str = Depends(api_validation.validate_device)):
     """add_documents endpoint (replace existing docs with the same id)"""
     add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
-                                                             device=device, auto_refresh=refresh)
+                                                             device=device)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
         return tensor_search.add_documents(
@@ -291,7 +305,8 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
             content=embedding_request.content,
             index_name=index_name, device=device,
             image_download_headers=embedding_request.image_download_headers,
-            model_auth=embedding_request.modelAuth
+            model_auth=embedding_request.modelAuth,
+            content_type=embedding_request.content_type
         )
 
 
@@ -346,7 +361,6 @@ def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_c
 @app.delete("/indexes/{index_name}")
 def delete_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
     tensor_search.delete_index(index_name=index_name, config=marqo_config)
-
     return JSONResponse(content={"acknowledged": True}, status_code=200)
 
 

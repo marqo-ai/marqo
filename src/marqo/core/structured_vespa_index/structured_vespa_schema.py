@@ -164,7 +164,7 @@ class StructuredVespaSchema(VespaSchema):
             created_at=self._index_request.created_at,
             updated_at=self._index_request.updated_at,
             fields=fields,
-            tensor_fields=tensor_fields
+            tensor_fields=tensor_fields,
         )
 
         return document, marqo_index

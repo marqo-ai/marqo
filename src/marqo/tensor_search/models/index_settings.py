@@ -24,6 +24,8 @@ class IndexSettings(StrictBaseModel):
     filterStringMaxLength: Optional[int]
     model: str = 'hf/e5-base-v2'
     modelProperties: Optional[Dict[str, Any]]
+    textQueryPrefix: Optional[str] = None
+    textChunkPrefix: Optional[str] = None
     normalizeEmbeddings: bool = True
     textPreprocessing: core.TextPreProcessing = core.TextPreProcessing(
         splitLength=2,
@@ -41,6 +43,7 @@ class IndexSettings(StrictBaseModel):
             m=16
         )
     )
+    
 
     @root_validator(pre=True)
     def validate_field_names(cls, values):
@@ -89,7 +92,9 @@ class IndexSettings(StrictBaseModel):
                 model=core.Model(
                     name=self.model,
                     properties=self.modelProperties,
-                    custom=self.modelProperties is not None
+                    custom=self.modelProperties is not None,
+                    text_query_prefix=self.textQueryPrefix,
+                    text_chunk_prefix=self.textChunkPrefix
                 ),
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,
@@ -101,7 +106,7 @@ class IndexSettings(StrictBaseModel):
                 tensor_fields=self.tensorFields,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
-                updated_at=time.time()
+                updated_at=time.time(),
             )
         elif self.type == core.IndexType.Unstructured:
             if self.allFields is not None:
@@ -128,7 +133,9 @@ class IndexSettings(StrictBaseModel):
                 model=core.Model(
                     name=self.model,
                     properties=self.modelProperties,
-                    custom=self.modelProperties is not None
+                    custom=self.modelProperties is not None,
+                    text_query_prefix=self.textQueryPrefix,
+                    text_chunk_prefix=self.textChunkPrefix
                 ),
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,

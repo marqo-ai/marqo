@@ -6,6 +6,7 @@ from unittest.mock import patch, Mock
 import vespa.application as pyvespa
 
 from marqo import config, version
+from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
@@ -41,13 +42,15 @@ class MarqoTestCase(unittest.TestCase):
             "http://localhost:8080",
             "http://localhost:8080",
             content_cluster_name="content_default",
-
         )
+        zookeeper_client = ZookeeperClient(hosts="localhost:2181", zookeeper_connection_timeout=10)
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
-        cls.index_management = IndexManagement(cls.vespa_client)
+        cls.zookeeper_client = zookeeper_client
+        cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
-        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu")
+        cls.config = config.Config(vespa_client=vespa_client, default_device="cpu",
+                                   zookeeper_client=cls.zookeeper_client)
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
         cls.CONTENT_CLUSTER = 'content_default'
@@ -125,7 +128,11 @@ class MarqoTestCase(unittest.TestCase):
             fields: List[FieldRequest],
             tensor_fields: List[str],
             name: Optional[str] = None,
-            model: Model = Model(name='random/small'),
+            model: Model = Model(
+                name='random/small',
+                text_query_prefix="",
+                text_chunk_prefix=""
+            ),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,
@@ -143,7 +150,7 @@ class MarqoTestCase(unittest.TestCase):
             ),
             marqo_version=version.get_version(),
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
     ) -> StructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndexRequest.
@@ -164,14 +171,18 @@ class MarqoTestCase(unittest.TestCase):
             tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
         )
 
     @classmethod
     def unstructured_marqo_index_request(
             cls,
             name: Optional[str] = None,
-            model: Model = Model(name='random/small'),
+            model: Model = Model(
+                name='random/small',
+                text_query_prefix="",
+                text_chunk_prefix=""
+            ),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
                 split_length=2,
@@ -190,11 +201,12 @@ class MarqoTestCase(unittest.TestCase):
             treat_urls_and_pointers_as_images: bool = False,
             marqo_version='1.0.0',
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
     ) -> UnstructuredMarqoIndexRequest:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndexRequest.
         """
+        
         if not name:
             name = 'a' + str(uuid.uuid4()).replace('-', '')
 
@@ -211,7 +223,7 @@ class MarqoTestCase(unittest.TestCase):
             hnsw_config=hnsw_config,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
         )
 
     class _AssertRaisesContext:

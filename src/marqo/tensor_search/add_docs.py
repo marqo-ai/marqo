@@ -11,12 +11,14 @@ import PIL
 from PIL.ImageFile import ImageFile
 
 from marqo.s2_inference import clip_utils
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 from marqo.tensor_search import enums
 from marqo.tensor_search import constants
 import marqo.core.exceptions as core_exceptions
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
+
 from concurrent.futures import ThreadPoolExecutor
 from torchvision.transforms import Compose
 from marqo.s2_inference.onnx_clip_utils import _get_transform

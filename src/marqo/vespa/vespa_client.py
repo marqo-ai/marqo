@@ -13,7 +13,8 @@ import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
-from marqo.vespa.exceptions import VespaStatusError, VespaError, InvalidVespaApplicationError, VespaTimeoutError
+from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
+                                    VespaTimeoutError, VespaNotConvergedError)
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
@@ -91,9 +92,13 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-    def download_application(self) -> str:
+    def download_application(self, check_for_application_convergence: bool = False) -> str:
         """
-        Download the Vespa application.
+        Args:
+            check_for_application_convergence: check for the application to converge before downloading.
+
+        Download the Vespa application. If wait_for_application_convergence is True, this method will wait for the
+        application to converge before downloading.
 
         Application download happens in two steps:
         1. Create a session
@@ -110,9 +115,22 @@ class VespaClient:
         Returns:
             Path to the downloaded application
         """
+        if check_for_application_convergence:
+            self.check_for_application_convergence()
+
         with httpx.Client() as httpx_client:
             session_id = self._create_deploy_session(httpx_client)
             return self._download_application(session_id, httpx_client)
+
+    def check_for_application_convergence(self) -> None:
+        """
+        Check if the Vespa application has converged and raise an exception if it has not.
+
+        Raises:
+            VespaNotConvergedError: If the application has not converged
+        """
+        if not self.get_application_has_converged():
+            raise VespaNotConvergedError('Vespa application has not converged')
 
     def get_application_generation(self) -> int:
         """

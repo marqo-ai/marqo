@@ -41,6 +41,7 @@ class SearchQuery(BaseMarqoModel):
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
     modelAuth: Optional[ModelAuth] = None
+    textQueryPrefix: Optional[str] = None
 
     @root_validator(pre=False)
     def validate_query_and_context(cls, values):
@@ -80,6 +81,7 @@ class BulkSearchQueryEntity(SearchQuery):
 
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifier] = None
+    text_query_prefix: Optional[str] = None
 
     def to_search_query(self):
         return SearchQuery(**self.dict())

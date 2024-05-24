@@ -28,5 +28,15 @@ class VespaTimeoutError(VespaStatusError):
     pass
 
 
+class VespaNotConvergedError(VespaStatusError):
+    """
+    Raised when Vespa responds with a not converged error.
+    """
+    pass
+
+
 class InvalidVespaApplicationError(VespaError):
     pass
+
+
+

@@ -150,5 +150,22 @@ def split_text(text: str, split_by: str = 'sentence', split_length: int = 2, spl
     # assume a uniform seperator when reconstructing the sentences
     text_splits = _reconstruct_multi_list(segments, seperator)
 
+
     return text_splits
+
+def prefix_text_chunks(text_splits: List[str], text_chunk_prefix: str) -> List[str]:
+    """
+    Args:
+        text_splits (List[str]): Chunk list without prefixes
+        text_chunk_prefix (str): Prefix to add before each text chunk
+    Returns:
+        List[str]: Text splits with prefix prepended to each
+    """
+    if not text_chunk_prefix:
+        return text_splits
+    
+    # Note that with this we directly concatenate the prefix to the text chunk
+    # So we should make sure that there is a space between the prefix and the text
+    # In text_chunk_prefix
+    return [text_chunk_prefix + text for text in text_splits]
 

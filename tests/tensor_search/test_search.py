@@ -6,6 +6,7 @@ import sys
 import typing
 import unittest
 from unittest import mock
+import time
 
 import numpy as np
 import requests
@@ -19,6 +20,9 @@ from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from tests.utils.transition import add_docs_caller
+from marqo.core.utils.prefix import determine_text_prefix
+from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
+    ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod
 
 
 @unittest.skip
@@ -71,7 +75,7 @@ class TestVectorSearch(MarqoTestCase):
                  "_id": "5678", "finally": "some field efgh "},
                 {"abc": "shouldn't really match ", "other field": "Nope.....",
                  "_id": "1234", "finally": "Random text here efgh "},
-            ], auto_refresh=True)
+            ])
         search_res = tensor_search._vector_text_search(
             config=self.config, index_name=self.index_name_1, query=" efgh ", result_count=10, device="cpu"
         )

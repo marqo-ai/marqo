@@ -1,10 +1,30 @@
+# Release 2.6.0
+
+## New features 
+- Support for custom and default prefixes ([#821](https://github.com/marqo-ai/marqo/pull/821) and [#832](https://github.com/marqo-ai/marqo/pull/832)) in the index creation, adding documents, search, and embed endpoints. See usage for index creation [here](https://docs.marqo.ai/2.6/API-Reference/Indexes/create_index), adding documents [here](https://docs.marqo.ai/2.6/API-Reference/Documents/add_or_replace_documents), search [here](https://docs.marqo.ai/2.6/API-Reference/Search/search), and embed [here](https://docs.marqo.ai/2.6/API-Reference/Embed/embed).
+
+## Bug fixes and minor changes
+- Improved recommender with structured indexes ([#830](https://github.com/marqo-ai/marqo/pull/830))
+- Better handling of image download errors ([#829](https://github.com/marqo-ai/marqo/pull/829)). Image download errors will now return a 200 overall and log errors per document.
+
+## Contributor Shout-outs
+- Shoutout to all our 4.2k stargazers! Thanks for continuing to use our product and helping Marqo grow.
+- Keep on sharing your questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+ 
+# Release 2.5.1
+
+## Bug fixes and minor changes
+- More stable `recommend` endpoint (https://github.com/marqo-ai/marqo/pull/825).
+- Change error code when using `IN` filter operator on an unstructured index (https://github.com/marqo-ai/marqo/pull/823).
+- New index settings validation endpoint for Cloud use (https://github.com/marqo-ai/marqo/pull/809).
+
 # Release 2.5.0
 ## New features
-- New ‘embed’ endpoint (`POST /indexes/{index_name}/embed`) (https://github.com/marqo-ai/marqo/pull/803). Marqo can now perform inference and return the embeddings for a single piece or list of content, where content can be either a string or weighted dictionary of strings. See usage [here](https://docs.marqo.ai/2.5.0/API-Reference/Embed/embed/). 
-- New ‘recommend’ endpoint (`POST /indexes/{index_name}/recommend`) (https://github.com/marqo-ai/marqo/pull/816). Given a list of existing document IDs, Marqo can now recommend similar documents by performing a search on interpolated vectors from the documents. See usage [here](https://docs.marqo.ai/2.5.0/API-Reference/Search/recommend/). 
-- Add Inference Cache to speed up frequent search and embed requests (https://github.com/marqo-ai/marqo/pull/802). Marqo now caches embeddings generated during inference. The cache size and type can be configured with `MARQO_INFERENCE_CACHE_SIZE` and `MARQO_INFERENCE_CACHE_TYPE`. See configuration instructions [here](https://docs.marqo.ai/2.5.0/Guides/Advanced-Usage/configuration/#configuring-cache). 
-- Add configurable search timeout (https://github.com/marqo-ai/marqo/pull/813). Backend timeout now defaults to 1s, but can be configured with the environment variable `VESPA_SEARCH_TIMEOUT_MS`. See configuration instructions [here](https://docs.marqo.ai/2.5.0/Guides/Advanced-Usage/configuration/#configuring-usage-limits). 
-- More informative `get_cuda_info` response (https://github.com/marqo-ai/marqo/pull/811). New keys: `utilization` `memory_used_percent` have been added for easier tracking of cuda device status. See [here](https://docs.marqo.ai/2.5.0/API-Reference/Device/get_cuda_information/) for more information.
+- New ‘embed’ endpoint (`POST /indexes/{index_name}/embed`) (https://github.com/marqo-ai/marqo/pull/803). Marqo can now perform inference and return the embeddings for a single piece or list of content, where content can be either a string or weighted dictionary of strings. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Embed/embed/). 
+- New ‘recommend’ endpoint (`POST /indexes/{index_name}/recommend`) (https://github.com/marqo-ai/marqo/pull/816). Given a list of existing document IDs, Marqo can now recommend similar documents by performing a search on interpolated vectors from the documents. See usage [here](https://docs.marqo.ai/2.5/API-Reference/Search/recommend/). 
+- Add Inference Cache to speed up frequent search and embed requests (https://github.com/marqo-ai/marqo/pull/802). Marqo now caches embeddings generated during inference. The cache size and type can be configured with `MARQO_INFERENCE_CACHE_SIZE` and `MARQO_INFERENCE_CACHE_TYPE`. See configuration instructions [here](https://docs.marqo.ai/2.5/Guides/Advanced-Usage/configuration/#configuring-cache). 
+- Add configurable search timeout (https://github.com/marqo-ai/marqo/pull/813). Backend timeout now defaults to 1s, but can be configured with the environment variable `VESPA_SEARCH_TIMEOUT_MS`. See configuration instructions [here](https://docs.marqo.ai/2.5/Guides/Advanced-Usage/configuration/#configuring-usage-limits). 
+- More informative `get_cuda_info` response (https://github.com/marqo-ai/marqo/pull/811). New keys: `utilization` `memory_used_percent` have been added for easier tracking of cuda device status. See [here](https://docs.marqo.ai/2.5/API-Reference/Device/get_cuda_information/) for more information.
 
 ## Bug fixes and minor changes
 - Upgraded `open_clip_torch`, `timm`, and `safetensors` for access to new models (https://github.com/marqo-ai/marqo/pull/810) 
@@ -62,6 +82,11 @@ If you have any more inquiries or thoughts, please don’t hesitate to reach out
 ## Contributor shout-outs
 - A huge thank you to all our 4k stargazers! This is a new milestone for Marqo!
 - Stay connected and share your thoughts on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! Your insights, questions, and feedback are always welcome and highly appreciated.
+
+# Release 2.2.2
+
+## Bug fixes and minor changes
+- Improve telemetry memory management (https://github.com/marqo-ai/marqo/pull/804).
 
 # Release 2.2.1
 
