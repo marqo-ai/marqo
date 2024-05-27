@@ -1,3 +1,20 @@
+# Release 2.7.9
+
+## New features
+- Update Open CLIP version and support new families of models, e.g., `MetaCLIP`, `DatacompCLIP`  ([#833](https://github.com/marqo-ai/marqo/pull/833)). Update the Open CLIP version to `2.24.0`  which includes new and state-of-the-art multimodal models. You can choose these models to build your index. Check [here](https://github.com/marqo-ai/marqo/releases/%5B%3Chttps://docs.marqo.ai/2.7/Guides/Models-Reference/list_of_models/#open-clip%3E%5D(%3Chttps://docs.marqo.ai/2.6/Guides/Models-Reference/list_of_models/#open-clip%3E)) for the available models.
+- Support lexical search with only a filter (https://github.com/marqo-ai/marqo/pull/840). Marqo now supports a match-all query (`"*"`) with a filter in lexical search. This allows you to search your documents solely based on the filter content without considering the relevance. This is a community-requested feature (https://github.com/marqo-ai/marqo/issues/770, https://github.com/marqo-ai/marqo/issues/771) and we love to hear from our users.
+
+## Bug fixes and minor changes
+- Improve the thread safety of index creation and deletion operations (https://github.com/marqo-ai/marqo/pull/838). Marqo now returns an `operation_conflict_error(409)` if users try to delete or create an index when there is another index creation or deletion in progress.
+- Fix a bug that an empty string lexical search query (`""`) returns a 500 error (https://github.com/marqo-ai/marqo/pull/840). Marqo now returns an empty search result for such a query.
+- Address verbose logging at the `WARNING` level when `attributes_to_retrieve` excludes fields required to build highlights. (https://github.com/marqo-ai/marqo/pull/837)
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.2k stargazers!
+- Thanks [@jesse-lord](https://github.com/jess-lord) and [@afroozsheikh](https://github.com/afroozsheikh) for requesting valuable features to improve Marqo!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+
 # Release 2.6.0
 
 ## New features 
