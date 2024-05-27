@@ -195,6 +195,59 @@ class TestOnStartScript(MarqoTestCase):
             mock_preload.assert_not_called()  # The preloading function should never be called for no_model
 
         run()
+    
+    def test_preload_patch_models(self):
+        valid_patch_models = ['simple', 'overlap', 'fastercnn', 'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2', 'dino/v1', 'dino/v2']
+        mock_chunk_image = mock.MagicMock()
+
+        for model in valid_patch_models:
+            mock_environ = {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps([model])}
+            expected = [model]
+
+            @mock.patch.dict(os.environ, mock_environ)
+            @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
+            def run():
+                mock_chunk_image.reset_mock()
+                model_caching_script = on_start_script.PrewarmPatchModels()
+                model_caching_script.run()
+                loaded_models = {kwargs["method"] for args, kwargs in mock_chunk_image.call_args_list}
+                assert loaded_models == set(expected)
+                return True
+
+            assert run()
+
+    def test_preload_invalid_patch_model(self):
+        invalid_patch_model = "invalid_model"
+        mock_chunk_image = mock.MagicMock()
+
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps([invalid_patch_model])})
+        @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
+        def run():
+            try:
+                model_caching_script = on_start_script.PrewarmPatchModels()
+                model_caching_script.run()
+                raise AssertionError("Expected EnvVarError not raised")
+            except exceptions.EnvVarError as e:
+                print(str(e))
+                return True
+
+        assert run()
+
+
+    def test_concurrent_model_loading(self):
+        valid_patch_models = ['dino-v1', 'dino-v2']
+        mock_chunk_image = mock.MagicMock()
+
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps(valid_patch_models)})
+        @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
+        def run():
+            model_caching_script = on_start_script.PrewarmPatchModels()
+            model_caching_script.run()
+            loaded_models = {kwargs["method"] for args, kwargs in mock_chunk_image.call_args_list}
+            assert loaded_models == set(valid_patch_models)
+            return True
+
+        assert run()
 
 
 

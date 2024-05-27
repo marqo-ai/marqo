@@ -215,10 +215,18 @@ class PrewarmPatchModels:
             raise exceptions.EnvVarError(
                 f"Environment variable `{EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD}` should be a list of strings."
             )
+        
+        for model in self.models:
+            if model not in ['simple', 'overlap', 'fastercnn', 'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2', 'dino/v1', 'dino/v2']:
+                raise exceptions.EnvVarError(
+                    f"Invalid model: {model}. Please ensure that this is a valid model."
+                )
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
 
     def run(self):
+        N = 10
+        messages = []
         test_image = torch.zeros((3, 224, 224))  # Dummy image tensor
         test_image_pil = Image.fromarray(test_image.numpy().astype('uint8').transpose(1, 2, 0))  # Convert to PIL image
         for model in self.models:
@@ -226,10 +234,29 @@ class PrewarmPatchModels:
                 self.logger.debug(f"Prewarming model: {model} on device: {device}")
                 with self.lock:
                     try:
-                        chunk_image(test_image_pil, device=device, method=model)
+                        # Warm it up
+                        chunks = chunk_image(test_image_pil, device=device, method=model)
+
+                        t = 0
+                        for n in range(N):
+                            t0 = time.time()
+                            chunks = chunk_image(test_image_pil, device=device, method=model)
+                            t1 = time.time()
+                            t += (t1 - t0)
+                        message = f"{(t) / float((N))} for {model} and {device}"
+                        messages.append(message)
+                        self.logger.debug(f"{model} {device} ran chunking {N} times.")
+                        self.logger.info(f"{model} {device} chunking run succesfully!")
+
                     except Exception as e:
                         self.logger.error(f"Failed to prewarm model: {model} on device: {device}. Error: {e}")
+
                 self.logger.info(f"Prewarmed model: {model} on device: {device}")
+            
+        for message in messages:
+            self.logger.info(message)
+        self.logger.info("completed prewarming patch models")
+            
 
 def _preload_model(model, content, device):
     """
