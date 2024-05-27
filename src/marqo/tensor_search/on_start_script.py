@@ -4,16 +4,21 @@ import time
 
 import torch
 
+from threading import Lock
+from PIL import Image
+
 from marqo import config, marqo_docs, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
+from marqo.s2_inference.processing.image import chunk_image
 # we need to import backend before index_meta_cache to prevent circular import error:
 from marqo.tensor_search import constants
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
+
 
 
 logger = get_logger(__name__)
@@ -28,6 +33,7 @@ def on_start(config: config.Config):
         SetBestAvailableDevice(),
         ModelsForCacheing(),
         InitializeRedis("localhost", 6379),
+        PrewarmPatchModels(),
         DownloadFinishText(),
         PrintVersion(),
         MarqoWelcome(),
@@ -185,6 +191,45 @@ class ModelsForCacheing:
             self.logger.info(message)
         self.logger.info("completed loading models")
 
+class PrewarmPatchModels:
+    """Prewarm patch models"""
+
+    logger = get_logger('PrewarmPatchModels')
+    lock = Lock()
+
+    def __init__(self):
+        warmed_models = utils.read_env_vars_and_defaults(EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD)
+        if warmed_models is None:
+            self.models = []
+        elif isinstance(warmed_models, str):
+            try:
+                self.models = json.loads(warmed_models)
+            except json.JSONDecodeError as e:
+                raise exceptions.EnvVarError(
+                    f"Could not parse environment variable `{EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD}`. "
+                    f"Please ensure that this is a JSON-encoded list of strings."
+                ) from e
+        elif isinstance(warmed_models, list):
+            self.models = warmed_models
+        else:
+            raise exceptions.EnvVarError(
+                f"Environment variable `{EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD}` should be a list of strings."
+            )
+
+        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
+
+    def run(self):
+        test_image = torch.zeros((3, 224, 224))  # Dummy image tensor
+        test_image_pil = Image.fromarray(test_image.numpy().astype('uint8').transpose(1, 2, 0))  # Convert to PIL image
+        for model in self.models:
+            for device in self.default_devices:
+                self.logger.debug(f"Prewarming model: {model} on device: {device}")
+                with self.lock:
+                    try:
+                        chunk_image(test_image_pil, device=device, method=model)
+                    except Exception as e:
+                        self.logger.error(f"Failed to prewarm model: {model} on device: {device}. Error: {e}")
+                self.logger.info(f"Prewarmed model: {model} on device: {device}")
 
 def _preload_model(model, content, device):
     """
