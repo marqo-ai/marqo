@@ -47,7 +47,7 @@ class MarqoTestCase(unittest.TestCase):
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
         cls.zookeeper_client = zookeeper_client
-        cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client)
+        cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client, enable_index_operations=True)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client, default_device="cpu",
                                    zookeeper_client=cls.zookeeper_client)
