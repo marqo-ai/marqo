@@ -1,4 +1,4 @@
-# Release 2.7.9
+# Release 2.7.0
 
 ## New features
 - Update Open CLIP version and support new families of models, e.g., `MetaCLIP`, `DatacompCLIP`  ([#833](https://github.com/marqo-ai/marqo/pull/833)). Update the Open CLIP version to `2.24.0`  which includes new and state-of-the-art multimodal models. You can choose these models to build your index. Check [here](https://github.com/marqo-ai/marqo/releases/%5B%3Chttps://docs.marqo.ai/2.7/Guides/Models-Reference/list_of_models/#open-clip%3E%5D(%3Chttps://docs.marqo.ai/2.6/Guides/Models-Reference/list_of_models/#open-clip%3E)) for the available models.
