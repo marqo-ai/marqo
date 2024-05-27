@@ -5,6 +5,7 @@ import PIL
 import numpy as np
 import torch
 import torchvision
+import threading
 from marqo.s2_inference.s2_inference import get_available_models, _create_model_cache_key, get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
 from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
@@ -40,6 +41,7 @@ from marqo.api.exceptions import InternalError
 
 logger = get_logger(__name__)
 
+load_model_lock = threading.Lock()
 
 def chunk_image(image: Union[str, ImageType], device: str, 
                         method: Literal[ 'simple', 'overlap',  'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2'],
@@ -206,20 +208,21 @@ class PatchifyModel:
         model_type = (self.model_name, self.device)
         model_cache_key = _create_model_cache_key(self.model_name, self.device)
 
-        if model_cache_key not in get_available_models():
-            logger.info(f"loading model {model_type}")
-            if model_type[0] in self.allowed_model_types:
-                func = self.model_load_function
+        with load_model_lock:
+            if model_cache_key not in get_available_models():
+                logger.info(f"loading model {model_type}")
+                if model_type[0] in self.allowed_model_types:
+                    func = self.model_load_function
+                else:
+                    raise TypeError(f"wrong model for {model_type}")
+
+                self.model, self.preprocess = func(self.model_name, self.device)
+
+                get_available_models()[model_cache_key] = {AvailableModelsKey.model: (self.model, self.preprocess),
+                                                    AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
+
             else:
-                raise TypeError(f"wrong model for {model_type}")
-
-            self.model, self.preprocess = func(self.model_name, self.device)
-
-            get_available_models()[model_cache_key] = {AvailableModelsKey.model: (self.model, self.preprocess),
-                                                 AvailableModelsKey.most_recently_used_time : datetime.datetime.now()}
-
-        else:
-            self.model, self.preprocess = get_available_models()[model_cache_key][AvailableModelsKey.model]
+                self.model, self.preprocess = get_available_models()[model_cache_key][AvailableModelsKey.model]
 
     def _load_image(self, image):
         self.image, self.image_pt, self.original_size = load_rcnn_image(image, size=self.size)
