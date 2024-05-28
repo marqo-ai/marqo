@@ -329,9 +329,17 @@ class CLIP:
 
         return self._convert_output(outputs)
 
-    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                    normalize = True, image_download_headers: Optional[Dict] = None) -> FloatTensor:
-        
+    def _preprocess_images(self, images: Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor],
+                           image_download_headers: Optional[Dict] = None) -> Tensor:
+        """Preprocess the input image to be ready for the model.
+
+        Args:
+            images (Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor]): input image,
+            can be a str(url), a PIL image, or a tensor, or a list of them
+            image_download_headers (Optional[Dict]): headers for the image download
+        Return:
+            Tensor: the processed image tensor with shape (batch_size, channel, n_px, n_px)
+        """
         if self.model is None:
             self.load()
         if image_download_headers is None:
@@ -339,12 +347,29 @@ class CLIP:
 
         # default to batch encoding
         if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images, image_download_headers)
+            image_input: List[Union[ImageType, Tensor]] \
+                = format_and_load_CLIP_images(images, image_download_headers)
         else:
-            image_input = [format_and_load_CLIP_image(images, image_download_headers)]
+            image_input: List[Union[ImageType, Tensor]] = [format_and_load_CLIP_image(images, image_download_headers)]
 
-        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
-    
+        image_input_processed: Tensor = torch.stack([self.preprocess(_img).to(self.device) \
+                                                                    if not isinstance(_img, torch.Tensor) else _img \
+                                                                for _img in image_input])
+        return image_input_processed
+
+    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor],
+                    normalize = True, image_download_headers: Optional[Dict] = None) -> FloatTensor:
+        """Encode the input image to a tensor representation.
+
+        Args:
+            images (Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor]): input image,
+            can be a str(url), a PIL image, or a tensor, or a list of them
+            normalize (bool): whether to normalize the output tensor
+            image_download_headers (Optional[Dict]): headers for the image download
+        Return:
+            FloatTensor: the encoded image tensor with shape (batch_size, embedding_dim)
+        """
+        self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
 
@@ -509,24 +534,11 @@ class OPEN_CLIP(CLIP):
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(tokenizer_name)
 
-
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
                      image_download_headers: Optional[Dict] = None,
                      normalize=True) -> FloatTensor:
 
-        if self.model is None:
-            self.load()
-        if image_download_headers is None:
-            image_download_headers = dict()
-        # default to batch encoding
-        if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images, image_download_headers)
-        else:
-            image_input = [format_and_load_CLIP_image(images, image_download_headers)]
-
-        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) \
-                                                  if not isinstance(_img, torch.Tensor) else _img \
-                                                  for _img in image_input])
+        self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
@@ -534,7 +546,6 @@ class OPEN_CLIP(CLIP):
                     outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
             else:
                 outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
-
 
         if normalize:
             _shape_before = outputs.shape
