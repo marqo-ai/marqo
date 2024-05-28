@@ -53,10 +53,11 @@ def generate_config() -> config.Config:
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
 
+    # Zookeeper is only instantiated if the hosts are provided
     zookeeper_client = ZookeeperClient(
         zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT),
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
-    )
+    ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
     # Determine default device
     default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)

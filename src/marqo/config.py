@@ -43,7 +43,7 @@ class Config:
             utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE))
 
         # Initialize Core layer dependencies
-        self.index_management = IndexManagement(vespa_client, zookeeper_client)
+        self.index_management = IndexManagement(vespa_client, zookeeper_client, enable_index_operations=True)
         self.monitoring = Monitoring(vespa_client, self.index_management)
         self.document = Document(vespa_client, self.index_management)
         self.recommender = Recommender(vespa_client, self.index_management)

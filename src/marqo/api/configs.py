@@ -10,7 +10,7 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
         EnvVars.VESPA_QUERY_URL: "http://localhost:8080",
         EnvVars.VESPA_DOCUMENT_URL: "http://localhost:8080",
-        EnvVars.ZOOKEEPER_HOSTS: "localhost:2181",
+        EnvVars.ZOOKEEPER_HOSTS: None,
         EnvVars.VESPA_CONTENT_CLUSTER_NAME: "content_default",
         EnvVars.VESPA_POOL_SIZE: 10,
         EnvVars.VESPA_FEED_POOL_SIZE: 10,
