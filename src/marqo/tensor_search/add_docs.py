@@ -5,6 +5,7 @@ import random
 import threading
 from contextlib import contextmanager
 from typing import List, Optional, Tuple, ContextManager, Union
+from torchvision.transforms import Compose
 import concurrent
 
 import PIL
@@ -16,19 +17,21 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 from marqo.tensor_search import enums
 from marqo.tensor_search import constants
 import marqo.core.exceptions as core_exceptions
+from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_image_preprocessor
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
+from marqo.tensor_search.models.private_models import ModelAuth
 
 from concurrent.futures import ThreadPoolExecutor
 from torchvision.transforms import Compose
 from marqo.s2_inference.onnx_clip_utils import _get_transform
 
 
-def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
+def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
                              image_download_headers: dict,
                              device: str,
                              metric_obj: Optional[RequestMetrics] = None,
-                             preprocess: Optional[Compose] = None) -> None:
+                             preprocessor: Optional[Compose] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -75,13 +78,13 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
                         image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
                                                                                  timeout=TIMEOUT_SECONDS,
                                                                                  metrics_obj=metric_obj)
-                        if preprocess:
-                            image_repo[doc[field]] = preprocess(image_repo[doc[field]]).to(device)
-
                     except PIL.UnidentifiedImageError as e:
                         image_repo[doc[field]] = e
                         metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                         continue
+                    # preprocess image to tensor
+                    if preprocessor:
+                        image_repo[doc[field]] = preprocessor(image_repo[doc[field]]).to(device)
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
                     for sub_field in list(doc[field].values()):
@@ -102,9 +105,14 @@ def threaded_download_images(allocated_docs: List[dict], image_repo: dict, tenso
 
 
 @contextmanager
-def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                    image_download_headers: dict, device: str,
-                    enable_preprocess: bool = False) -> ContextManager[dict]:
+def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_fields: List[str],
+                    image_download_headers: dict,
+                    model_name: str,
+                    normalize_embeddings: bool,
+                    model_properties: Optional[Dict] = None,
+                    model_auth: Optional[ModelAuth] = None,
+                    device: Optional[str] = None,
+                    ) -> ContextManager[dict]:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
@@ -120,18 +128,21 @@ def download_images(docs: List[dict], thread_count: int, tensor_fields: List[str
     copied = copy.deepcopy(docs)
     image_repo = dict()
 
-    if enable_preprocess is True:
-        preprocess = _get_transform(224)
-    else:
-        preprocess = None
-
+    preprocessor = None
+    if is_preprocess_image_model(model_name, model_properties):
+        preprocessor = load_multimodal_model_and_get_image_preprocessor(model_name=model_name,
+                                                                        model_properties=model_properties,
+                                                                        device=device,
+                                                                        model_auth=model_auth,
+                                                                        normalize_embeddings=normalize_embeddings)
 
     try:
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
         with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
-            futures = [executor.submit(threaded_download_images, allocation, image_repo, tensor_fields,
-                                       image_download_headers, device, m[i], preprocess)
+            futures = [executor.submit(threaded_download_and_preprocess_images,
+                                       allocation, image_repo, tensor_fields,
+                                       image_download_headers, device, m[i], preprocessor)
                        for i, allocation in enumerate(thread_allocated_docs)]
 
             # Unhandled exceptions will be raised here.

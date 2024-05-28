@@ -9,6 +9,7 @@ import torch
 from PIL import UnidentifiedImageError
 from PIL.Image import Image
 from torch import Tensor
+from torchvision.transforms import Compose
 
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
@@ -164,6 +165,52 @@ def get_available_models() -> Dict:
 def get_marqo_inference_cache() -> MarqoInferenceCache:
     """Returns the _marqo_inference_cache object"""
     return _marqo_inference_cache
+
+
+def is_preprocess_image_model(model_name: str, model_properties: dict = None) -> bool:
+    """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module"""
+
+    validated_model_properties = validate_model_properties(model_name, model_properties)
+    model_type = validated_model_properties.get("type", None)
+
+    return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
+
+
+def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_properties: Optional[dict] = None,
+                                                     device: Optional[str] = None,
+                                                     model_auth: Optional[ModelAuth] = None,
+                                                     normalize_embeddings: bool = get_default_normalization()) \
+        -> Optional[Compose]:
+    """Load the multimodal model and return the image preprocessor.
+    Args:
+        model_name (str): The name of the multimodal model to load.
+        model_properties (dict): The properties of the multimodal model.
+        device (str): The device to load the model on.
+        model_auth: Authorisation details for downloading a model (if required)
+        normalize_embeddings (bool): Whether to normalize the embeddings.
+
+    Returns:
+        Optional[Compose]: The image preprocessor in the loaded model. If not found, returns None.
+
+    Raises:
+        InternalError: If the device is not set.
+        InternalError: If the model is not a model that requires preload image preprocessor.
+    """
+    if not device:
+        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
+
+    if not is_preprocess_image_model(model_name, model_properties):
+        raise InternalError(message=f"Model {model_name} is not a model that requires preload image preprocessor.")
+
+    validated_model_properties = validate_model_properties(model_name, model_properties)
+    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
+
+    _update_available_models(
+        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
+        model_auth=model_auth
+    )
+
+    return _available_models[model_cache_key][AvailableModelsKey.model].getattr("preprocess", None)
 
 
 def _get_max_vectorise_batch_size() -> int:
