@@ -191,8 +191,9 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
 
 
 @app.on_event("shutdown")
-def shutdown_event(marqo_config: config.Config = Depends(get_config)):
+def shutdown_event():
     """Close the Zookeeper client on shutdown."""
+    marqo_config = get_config()
     marqo_config.stop_and_close_zookeeper_client()
 
 
