@@ -216,10 +216,8 @@ class TestOnStartScript(MarqoTestCase):
 
             assert run()
 
-    def test_preload_invalid_and_empty_patch_models(self):
+    def test_preload_invalid_and_valid_patchmodels(self):
         invalid_patch_models = ["invalid_model", "simple"]
-        empty_patch_models = []
-
         mock_chunk_image = mock.MagicMock()
 
         # Test with invalid patch models
@@ -235,6 +233,10 @@ class TestOnStartScript(MarqoTestCase):
                 return True
 
         assert run_invalid()
+
+    def test_preload_empty_patchmodel(self):
+        empty_patch_models = []
+        mock_chunk_image = mock.MagicMock()
 
         # Test with empty patch models
         @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps(empty_patch_models)})
