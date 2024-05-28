@@ -13,7 +13,7 @@ from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 from marqo.core.exceptions import OperationConflictError
-from marqo.core.distributed_lock.zookeeper_distributed_lock import ZookeeperDistributedLock
+from unittest.mock import patch
 import threading
 import time
 from marqo.core.exceptions import InternalError
@@ -22,7 +22,8 @@ from marqo.core.exceptions import InternalError
 class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client)
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client,
+                                                enable_index_operations=True)
 
     def test_bootstrap_vespa_doesNotExist_successful(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
@@ -307,7 +308,7 @@ class TestIndexManagement(MarqoTestCase):
         t_1.join()
         self.index_management.delete_index_by_name(index_name_1)
 
-    def test_createIndexFailIfNoZookeeperProvided(self):
+    def test_createIndexFailIfEnableIndexCreationIsFalse(self):
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
         index_name = 'a' + str(uuid.uuid4()).replace('-', '')
         marqo_index_request = self.unstructured_marqo_index_request(
@@ -315,16 +316,28 @@ class TestIndexManagement(MarqoTestCase):
         )
         with self.assertRaises(InternalError) as e:
             self.index_management.create_index(marqo_index_request)
-        self.assertEqual(str(e.exception), 'Deployment lock is not '
-                                           'instantiated and cannot be used for index creation/deletion')
+        self.assertIn("You index_management object is not enabled for index operations. ",
+                      str(e.exception))
 
-    def test_deleteIndexFailIfNoZookeeperProvided(self):
+    def test_deleteIndexFailIfEnableIndexCreationIsFalse(self):
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
         index_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with self.assertRaises(InternalError) as e:
             self.index_management.delete_index_by_name(index_name)
-        self.assertEqual(str(e.exception), 'Deployment lock is not '
-                                           'instantiated and cannot be used for index creation/deletion')
+        self.assertIn("You index_management object is not enabled for index operations. ",
+                      str(e.exception))
+
+    def test_createIndexWithoutZookeeperClient_success(self):
+        """Test to ensure create_index requests can be made without Zookeeper client with a warning logged."""
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None, enable_index_operations=True)
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        try:
+            with patch("marqo.core.index_management.index_management.logger.warning") as mock_logger_warning:
+                self.index_management.create_index(self.unstructured_marqo_index_request(name=index_name))
+            mock_logger_warning.assert_called_once()
+
+        finally:
+            self.index_management.delete_index_by_name(index_name)
 
     def test_deploymentLockIsNone(self):
         """Test to ensure if no Zookeeper client is provided, deployment lock is None
