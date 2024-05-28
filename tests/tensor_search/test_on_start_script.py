@@ -216,13 +216,16 @@ class TestOnStartScript(MarqoTestCase):
 
             assert run()
 
-    def test_preload_invalid_patch_model(self):
-        invalid_patch_model = "invalid_model"
+    def test_preload_invalid_and_empty_patch_models(self):
+        invalid_patch_models = ["invalid_model", "simple"]
+        empty_patch_models = []
+
         mock_chunk_image = mock.MagicMock()
 
-        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps([invalid_patch_model])})
+        # Test with invalid patch models
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps(invalid_patch_models)})
         @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
-        def run():
+        def run_invalid():
             try:
                 model_caching_script = on_start_script.PrewarmPatchModels()
                 model_caching_script.run()
@@ -231,7 +234,22 @@ class TestOnStartScript(MarqoTestCase):
                 print(str(e))
                 return True
 
-        assert run()
+        assert run_invalid()
+
+        # Test with empty patch models
+        @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps(empty_patch_models)})
+        @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
+        def run_empty():
+            try:
+                model_caching_script = on_start_script.PrewarmPatchModels()
+                model_caching_script.run()
+                # No exception should be raised for an empty list
+                return True
+            except exceptions.EnvVarError as e:
+                print(str(e))
+                return False
+
+        assert run_empty()
 
 
     def test_concurrent_model_loading(self):

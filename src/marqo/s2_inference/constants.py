@@ -23,3 +23,6 @@ MODEL_NAME_SIZE_MAPPING = {
 # Set this to be a special number so we can tell the model size is from default
 DEFAULT_MODEL_SIZE = 0.66
 
+PATCH_MODELS = {
+    'simple', 'overlap', 'fastercnn', 'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2', 'dino/v1', 'dino/v2'
+}

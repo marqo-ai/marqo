@@ -12,6 +12,7 @@ from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.s2_inference.processing.image import chunk_image
+from marqo.s2_inference.constants import PATCH_MODELS
 # we need to import backend before index_meta_cache to prevent circular import error:
 from marqo.tensor_search import constants
 from marqo.tensor_search import index_meta_cache, utils
@@ -217,9 +218,9 @@ class PrewarmPatchModels:
             )
         
         for model in self.models:
-            if model not in ['simple', 'overlap', 'fastercnn', 'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2', 'dino/v1', 'dino/v2']:
+            if model not in PATCH_MODELS:
                 raise exceptions.EnvVarError(
-                    f"Invalid model: {model}. Please ensure that this is a valid model."
+                    f"Invalid patch model: {model}. Please ensure that this is a valid patch model."
                 )
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
