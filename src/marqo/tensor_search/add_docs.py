@@ -1,35 +1,28 @@
 """Functions used to fulfill the add_documents endpoint"""
+import concurrent
 import copy
 import math
 import random
-import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-from typing import List, Optional, Tuple, ContextManager, Union
-from torchvision.transforms import Compose
-import concurrent
+from typing import ContextManager
 
 import PIL
 from PIL.ImageFile import ImageFile
+from torchvision.transforms import Compose
 
-from marqo.s2_inference import clip_utils
-from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
-from marqo.tensor_search import enums
-from marqo.tensor_search import constants
-import marqo.core.exceptions as core_exceptions
-from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_image_preprocessor
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
+from marqo.s2_inference import clip_utils
+from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_image_preprocessor
+from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
-
-from concurrent.futures import ThreadPoolExecutor
-from torchvision.transforms import Compose
-from marqo.s2_inference.onnx_clip_utils import _get_transform
+from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 
 def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
                              image_download_headers: dict,
-                             device: str,
+                             device: str = None,
                              metric_obj: Optional[RequestMetrics] = None,
                              preprocessor: Optional[Compose] = None) -> None:
     """A thread calls this function to download images for its allocated documents
@@ -84,7 +77,17 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
                         continue
                     # preprocess image to tensor
                     if preprocessor:
-                        image_repo[doc[field]] = preprocessor(image_repo[doc[field]]).to(device)
+                        if not device:
+                            raise ValueError("Device must be provided for preprocessing images")
+                        try:
+                            image_repo[doc[field]] = preprocessor(image_repo[doc[field]]).to(device)
+                        except OSError as e:
+                            if "image file is truncated" in str(e):
+                                image_repo[doc[field]] = e
+                                metric_obj.increment_counter(f"{doc.get(field, '')}.OSError")
+                                continue
+                            else:
+                                raise e
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
                     for sub_field in list(doc[field].values()):

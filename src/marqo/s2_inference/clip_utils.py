@@ -129,18 +129,21 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
     return img
 
 
-def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType], image_download_headers: dict) -> ImageType:
+def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
+                               image_download_headers: dict) -> Union[ImageType, Tensor]:
     """standardizes the input to be a PIL image
 
     Args:
-        image (Union[str, np.ndarray, ImageType]): can be a local file, url or array
+        image (Union[str, np.ndarray, ImageType, Tensor]): can be a local file, url, array or a tensor
 
     Raises:
         ValueError: _description_
         TypeError: _description_
 
     Returns:
-        ImageType: PIL image
+        standardized the image:
+            ImageType: PIL image if input is a string, an array or a PIL image
+            Tensor: torch tensor if input is a torch tensor
     """
     # check for the input type
     if isinstance(image, str):
@@ -152,7 +155,8 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType], image_down
     elif isinstance(image, ImageType):
         img = image
     else:
-        raise UnidentifiedImageError(f"input of type {type(image)} did not match allowed types of str, np.ndarray, ImageType")
+        raise UnidentifiedImageError(f"input of type {type(image)} "
+                                     f"did not match allowed types of str, np.ndarray, ImageType, Tensor")
 
     return img
 
@@ -196,9 +200,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
                 False
 
     # if it is an array, then it is an image
-    elif isinstance(thing, (ImageType, ndarray)):
-        return True
-    elif isinstance(thing, (torch.Tensor)):
+    elif isinstance(thing, (ImageType, ndarray, Tensor)):
         return True
     else:
         raise UnidentifiedImageError(f"expected type Image or str for inputs but received type {type(thing)}")

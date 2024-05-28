@@ -3,15 +3,13 @@ import math
 import os
 import uuid
 from unittest import mock
-from unittest.mock import patch
 
 import PIL
 import pytest
-import requests
+from torch import Tensor
 
 from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
-from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
@@ -379,47 +377,6 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         except BadRequestError:
             pass
 
-    def test_resilient_add_images(self):
-        """
-        Various image URLs are handled correctly
-        """
-        image_indexs = [self.default_image_index, self.image_index_with_chunking]
-
-        docs_results = [
-            ([{"_id": "123",
-               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
-              {"_id": "789",
-               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
-              {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
-             [("123", 200), ("789", 200), ("456", 400)]
-             ),
-            ([{"_id": "123",
-               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
-              {"_id": "789",
-               "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
-              {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
-              {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
-             [("123", 200), ("789", 200), ("456", 400), ("111", 400)]
-             ),
-            ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist3.png"},
-              {"_id": "456", "image_field": "https://www.marqo.ai/this/image/doesnt/exist.png"},
-              {"_id": "111", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
-             [("505", 400), ("456", 400), ("111", 400)]
-             ),
-            ([{"_id": "505", "image_field": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
-             [("505", 400)]
-             ),
-        ]
-        for image_index in image_indexs:
-            for docs, expected_results in docs_results:
-                with self.subTest(f'{expected_results} - {image_index}'):
-                    add_res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                        index_name=self.default_image_index, docs=docs, device="cpu", tensor_fields=["image_field"]))
-                    assert len(add_res['items']) == len(expected_results)
-                    for i, res_dict in enumerate(add_res['items']):
-                        assert res_dict["_id"] == expected_results[i][0]
-                        assert res_dict['status'] == expected_results[i][1]
-
     def test_add_documents_id_image_url(self):
         """
         Image URL as ID is not downloaded
@@ -728,85 +685,6 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
             self.assertFalse(res1['errors'])
             self.assertTrue(_check_get_docs(doc_count=c, title_value='blah'))
 
-    def test_image_download_timeout(self):
-        mock_get = mock.MagicMock()
-        mock_get.side_effect = requests.exceptions.RequestException
-
-        @mock.patch('requests.get', mock_get)
-        def run():
-            image_repo = dict()
-            add_docs.threaded_download_images(
-                allocated_docs=[
-                    {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
-                image_repo=image_repo,
-                tensor_fields=['Title', 'Desc', 'Loc'],
-                image_download_headers={}
-            )
-            assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
-            assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
-            return True
-
-        assert run()
-
-    def test_image_download(self):
-        image_repo = dict()
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-        test_doc = {
-            'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
-            'field_2': good_url
-        }
-
-        add_docs.threaded_download_images(
-            allocated_docs=[test_doc],
-            image_repo=image_repo,
-            tensor_fields=['field_1', 'field_2'],
-            image_download_headers={}
-        )
-        assert len(image_repo) == 2
-        assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
-        assert isinstance(image_repo[good_url], types.ImageType)
-
-    def test_threaded_download_images_non_tensor_field(self):
-        """Tests add_docs.threaded_download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-        bad_url = 'https://google.com/my_dog.png'
-        examples = [
-            ([{
-                'field_1': bad_url,
-                'field_2': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-                 good_url: types.ImageType
-             }),
-            ([{
-                'nt_1': bad_url,
-                'nt_2': good_url
-            }], {}),
-            ([{
-                'field_1': bad_url,
-                'nt_1': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-             }),
-            ([{
-                'nt_2': bad_url,
-                'field_2': good_url
-            }], {
-                 good_url: types.ImageType
-             }),
-        ]
-        for docs, expected_repo_structure in examples:
-            image_repo = dict()
-            add_docs.threaded_download_images(
-                allocated_docs=docs,
-                image_repo=image_repo,
-                tensor_fields=['field_1', 'field_2'],
-                image_download_headers={}
-            )
-            assert len(expected_repo_structure) == len(image_repo)
-            for k in expected_repo_structure:
-                assert isinstance(image_repo[k], expected_repo_structure[k])
-
     def test_download_images_non_tensor_field(self):
         """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
@@ -817,7 +695,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 'field_2': good_url
             }], {
                  bad_url: PIL.UnidentifiedImageError,
-                 good_url: types.ImageType
+                 good_url: Tensor
              }),
             ([{
                 'nt_1': bad_url,
@@ -833,23 +711,27 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 'nt_2': bad_url,
                 'field_2': good_url
             }], {
-                 good_url: types.ImageType
+                 good_url: Tensor
              }),
         ]
         with mock.patch('PIL.Image.Image.close') as mock_close:
             for docs, expected_repo_structure in examples:
-                with add_docs.download_images(
-                        docs=docs,
-                        thread_count=20,
-                        tensor_fields=['field_1', 'field_2'],
-                        image_download_headers={},
+                with add_docs.download_and_preprocess_images(
+                    docs=docs,
+                    thread_count=20,
+                    tensor_fields=['field_1', 'field_2'],
+                    image_download_headers={},
+                    model_name="ViT-B/32",
+                    normalize_embeddings=True,
+                    model_properties=None,
+                    device="cpu"
                 ) as image_repo:
-                    assert len(expected_repo_structure) == len(image_repo)
+                    self.assertEqual(len(expected_repo_structure), len(image_repo))
                     for k in expected_repo_structure:
-                        assert isinstance(image_repo[k], expected_repo_structure[k])
+                        self.assertIsInstance(image_repo[k], expected_repo_structure[k])
 
-            # Context manager must have closed all valid images
-            assert mock_close.call_count == 2
+            # Images should not be closed as they are Tensor instead of ImageType
+            mock_close.assert_not_called()
 
     def test_bad_tensor_fields(self):
         test_cases = [
@@ -865,30 +747,6 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         add_docs_params=AddDocsParams(index_name=self.default_text_index,
                                                       docs=[{"some": "data"}], **tensor_fields))
                 self.assertIn(error_message, e.exception.message)
-
-    def test_download_images_thread_count(self):
-        """
-        Test that image download thread count is respected
-        """
-        docs = [
-            {"_id": str(i),
-             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/"
-                            "assets/ai_hippo_realistic.png"
-             } for i in range(10)
-        ]
-
-        for thread_count in [2, 5]:
-            with patch.object(
-                    add_docs, 'threaded_download_images', wraps=add_docs.threaded_download_images
-            ) as mock_download_images:
-                tensor_search.add_documents(
-                    config=self.config, add_docs_params=AddDocsParams(
-                        index_name=self.default_image_index, docs=docs, device="cpu",
-                        image_download_thread_count=thread_count, tensor_fields=["image_field"]
-                    )
-                )
-
-                self.assertEqual(thread_count, mock_download_images.call_count)
 
     def test_supported_large_integer_and_float_number(self):
         """Test to ensure large integer and float numbers are handled correctly for long and double data types
