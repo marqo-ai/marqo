@@ -210,7 +210,7 @@ def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_prop
         model_auth=model_auth
     )
 
-    return _available_models[model_cache_key][AvailableModelsKey.model].getattr("preprocess", None)
+    return getattr(_available_models[model_cache_key][AvailableModelsKey.model], "preprocess", None)
 
 
 def _get_max_vectorise_batch_size() -> int:
