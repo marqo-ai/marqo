@@ -66,7 +66,8 @@ class IndexManagement:
         Args:
             vespa_client: VespaClient object
             zookeeper_client: ZookeeperClient object
-            enable_index_operations: Flag to enable index operations
+            enable_index_operations: A flag to enable index operations. If set to True,
+                the object can create/delete indexes, otherwise, it raises an InternalError during index operations.
         """
         self.vespa_client = vespa_client
         self._zookeeper_client = zookeeper_client
@@ -566,11 +567,8 @@ class IndexManagement:
         """
         if self._enable_index_operations:
             if self._zookeeper_deployment_lock is None:
-                logger.warning(f"You are trying to perform an index operation without setting a Zookeeper client. "
-                               f"Your operation will proceed without locking. "
-                               f"This may lead to conflicts if multiple operations are performed simultaneously. "
-                               f"Please set a Zookeeper client to enable locking "
-                               f"by setting the '{EnvVars.ZOOKEEPER_HOSTS}' environment variable")
+                logger.warning(f"No Zookeeper client provided. "
+                               f"Concurrent index operations may result in race conditions. ")
                 yield  # No lock, proceed without locking
             else:
                 try:
