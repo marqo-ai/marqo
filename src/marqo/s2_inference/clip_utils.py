@@ -87,14 +87,14 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     return results
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3,
+def load_image_from_path(image_path: str, image_download_headers: dict, timeout_ms=3000,
                          metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
         image_path (str): Local or remote path to image.
         image_download_headers (dict): header for the image download
-        timeout (number): timeout (in seconds)
+        timeout_ms (int): timeout (in milliseconds), for the whole request
     Raises:
         ValueError: If the local path is invalid, and is not a url
         UnidentifiedImageError: If the image is irretrievable or unprocessable.
@@ -108,7 +108,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
         if metrics_obj is not None:
             metrics_obj.start(f"image_download.{image_path}")
         try:
-            img_io: BytesIO = download_image_from_url(image_path, image_download_headers, timeout)
+            img_io: BytesIO = download_image_from_url(image_path, image_download_headers, timeout_ms)
             img = Image.open(img_io)
         except ImageDownloadError as e:
             raise UnidentifiedImageError(str(e)) from e
@@ -121,13 +121,13 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
     return img
 
 
-def download_image_from_url(image_path: str, image_download_headers: dict, timeout: float = 3.0) -> BytesIO:
+def download_image_from_url(image_path: str, image_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
     """Download an image from a URL and return a PIL image using pycurl.
 
     Args:
         image_path (str): URL to the image.
         image_download_headers (dict): Headers for the image download.
-        timeout (float): Timeout in seconds.
+        timeout_ms (int): Timeout in milliseconds, for the whole request.
 
     Returns:
         buffer (BytesIO): The image as a BytesIO object.
@@ -135,12 +135,16 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     Raises:
         ImageDownloadError: If the image download fails.
     """
+
+    if not isinstance(timeout_ms, int):
+        raise InternalError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
+
     buffer = BytesIO()
     c = pycurl.Curl()
     c.setopt(c.CAINFO, certifi.where())
     c.setopt(c.URL, image_path)
     c.setopt(c.WRITEDATA, buffer)
-    c.setopt(c.TIMEOUT, timeout)
+    c.setopt(c.TIMEOUT_MS, timeout_ms)
     c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in image_download_headers.items()])
 
     try:
