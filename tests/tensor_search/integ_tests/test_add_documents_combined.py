@@ -18,7 +18,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 
 
-class TestAddDocumentsStructured(MarqoTestCase):
+class TestAddDocumentsCombined(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -360,3 +360,51 @@ class TestAddDocumentsStructured(MarqoTestCase):
             assert len(expected_repo_structure) == len(image_repo)
             for k in expected_repo_structure:
                 assert isinstance(image_repo[k], expected_repo_structure[k])
+
+    def test_download_images_non_tensor_field(self):
+        """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
+        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        bad_url = 'https://google.com/my_dog.png'
+        examples = [
+            ([{
+                'field_1': bad_url,
+                'field_2': good_url
+            }], {
+                 bad_url: PIL.UnidentifiedImageError,
+                 good_url: Tensor
+             }),
+            ([{
+                'nt_1': bad_url,
+                'nt_2': good_url
+            }], {}),
+            ([{
+                'field_1': bad_url,
+                'nt_1': good_url
+            }], {
+                 bad_url: PIL.UnidentifiedImageError,
+             }),
+            ([{
+                'nt_2': bad_url,
+                'field_2': good_url
+            }], {
+                 good_url: Tensor
+             }),
+        ]
+        for docs, expected_repo_structure in examples:
+            with mock.patch('PIL.Image.Image.close') as mock_close:
+                with add_docs.download_and_preprocess_images(
+                    docs=docs,
+                    thread_count=20,
+                    tensor_fields=['field_1', 'field_2'],
+                    image_download_headers={},
+                    model_name="ViT-B/32",
+                    normalize_embeddings=True,
+                    model_properties=None,
+                    device="cpu"
+                ) as image_repo:
+                    self.assertEqual(len(expected_repo_structure), len(image_repo))
+                    for k in expected_repo_structure:
+                        self.assertIsInstance(image_repo[k], expected_repo_structure[k])
+
+            # Images should not be closed as they are Tensor instead of ImageType
+            mock_close.assert_not_called()

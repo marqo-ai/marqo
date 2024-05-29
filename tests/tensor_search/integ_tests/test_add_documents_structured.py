@@ -836,50 +836,6 @@ class TestAddDocumentsStructured(MarqoTestCase):
             self.assertFalse(res1['errors'])
             self.assertTrue(_check_get_docs(doc_count=c, title_value='blah'))
 
-    def test_download_images_non_tensor_field(self):
-        """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
-        bad_url = 'https://google.com/my_dog.png'
-        examples = [
-            ([{
-                'field_1': bad_url,
-                'field_2': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-                 good_url: types.ImageType
-             }),
-            ([{
-                'nt_1': bad_url,
-                'nt_2': good_url
-            }], {}),
-            ([{
-                'field_1': bad_url,
-                'nt_1': good_url
-            }], {
-                 bad_url: PIL.UnidentifiedImageError,
-             }),
-            ([{
-                'nt_2': bad_url,
-                'field_2': good_url
-            }], {
-                 good_url: types.ImageType
-             }),
-        ]
-        with mock.patch('PIL.Image.Image.close') as mock_close:
-            for docs, expected_repo_structure in examples:
-                with add_docs.download_images(
-                        docs=docs,
-                        thread_count=20,
-                        tensor_fields=['field_1', 'field_2'],
-                        image_download_headers={},
-                ) as image_repo:
-                    assert len(expected_repo_structure) == len(image_repo)
-                    for k in expected_repo_structure:
-                        assert isinstance(image_repo[k], expected_repo_structure[k])
-
-            # Context manager must have closed all valid images
-            assert mock_close.call_count == 2
-
     def test_add_long_double_numeric_values(self):
         """Test to ensure large integer and float numbers are handled correctly for long and double fields"""
         test_case = [
