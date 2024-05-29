@@ -1,33 +1,24 @@
-import copy
-import io
-import itertools
-import os
-
-import PIL
-import requests.exceptions
-from marqo.s2_inference import clip_utils, types
 import unittest
 from unittest import mock
-import pycurl
-import certifi
-from io import BytesIO
-import requests
-from marqo.s2_inference.clip_utils import CLIP, download_model, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
-from marqo.s2_inference.errors import ImageDownloadError
-
-from marqo.tensor_search.enums import ModelProperties
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
 from unittest.mock import patch
+
+import PIL
+import pycurl
 import pytest
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
-from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
-from marqo.s2_inference.configs import ModelCache
+
 from marqo.api.exceptions import InternalError
+from marqo.s2_inference import clip_utils, types
+from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
+from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.errors import ImageDownloadError
+from marqo.tensor_search.enums import ModelProperties
+from marqo.tensor_search.models.private_models import ModelLocation
+from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
 
 
 class TestImageDownloading(unittest.TestCase):
 
-    def test_load_image_from_path_timeout(self):
+    def test_loadImageFromPathTimeout(self):
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         # should be fine on regular timeout:
         img = clip_utils.load_image_from_path(good_url, {})
@@ -37,7 +28,7 @@ class TestImageDownloading(unittest.TestCase):
             clip_utils.load_image_from_path(good_url, {}, timeout_ms=1)
 
 
-    def test_load_image_from_path_all_req_errors(self):
+    def test_loadImageFromPathAllRequestErrors(self):
         """Do we catch other download errors?
         The errors tested inherit from requests.exceptions.RequestException
         """
@@ -51,7 +42,7 @@ class TestImageDownloading(unittest.TestCase):
                     clip_utils.load_image_from_path(good_url, {})
 
     @patch('pycurl.Curl')
-    def test_download_image_from_url_close_called(self, MockCurl):
+    def test_downloadImageFromRrlCloseCalled(self, MockCurl):
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
 
         mock_curl_instance = MockCurl.return_value
