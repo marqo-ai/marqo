@@ -13,6 +13,8 @@ semver==3.0.2
 memory-profiler==0.61.0
 pynvml==11.5.0
 kazoo==2.10.0
+pycurl==7.45.3
+certifi==2019.11.28
 
 # s2_inference:
 more_itertools

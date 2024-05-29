@@ -1,8 +1,11 @@
 import os
+from io import BytesIO
 
+import certifi
 import clip
 import numpy as np
 import open_clip
+import pycurl
 import requests
 import torch
 import transformers
@@ -15,7 +18,7 @@ from urllib3.exceptions import HTTPError as urllib3_HTTPError
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
-from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from marqo.s2_inference.types import *
@@ -102,31 +105,55 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
     if os.path.isfile(image_path):
         img = Image.open(image_path)
     elif validators.url(image_path):
+        if metrics_obj is not None:
+            metrics_obj.start(f"image_download.{image_path}")
         try:
-            if metrics_obj is not None:
-                metrics_obj.start(f"image_download.{image_path}")
-
-            with requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers) as resp:
-                if not resp.ok:
-                    raise UnidentifiedImageError(
-                        f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
-
-                img = Image.open(resp.raw)
-
+            img_io: BytesIO = download_image_from_url(image_path, image_download_headers, timeout)
+            img = Image.open(img_io)
+        except ImageDownloadError as e:
+            raise UnidentifiedImageError(str(e)) from e
+        finally:
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")
-
-        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException, ConnectionError, urllib3_HTTPError
-                ) as e:
-            raise UnidentifiedImageError(
-                f"image url `{image_path}` is unreachable, perhaps due to timeout. "
-                f"Timeout threshold is set to {timeout} seconds."
-                f"\nConnection error type: `{e.__class__.__name__}`")
     else:
         raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 
     return img
+
+
+def download_image_from_url(image_path: str, image_download_headers: dict, timeout: float = 3.0) -> BytesIO:
+    """Download an image from a URL and return a PIL image using pycurl.
+
+    Args:
+        image_path (str): URL to the image.
+        image_download_headers (dict): Headers for the image download.
+        timeout (float): Timeout in seconds.
+
+    Returns:
+        buffer (BytesIO): The image as a BytesIO object.
+
+    Raises:
+        ImageDownloadError: If the image download fails.
+    """
+    buffer = BytesIO()
+    c = pycurl.Curl()
+    c.setopt(c.CAINFO, certifi.where())
+    c.setopt(c.URL, image_path)
+    c.setopt(c.WRITEDATA, buffer)
+    c.setopt(c.TIMEOUT, timeout)
+    c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in image_download_headers.items()])
+
+    try:
+        c.perform()
+        if c.getinfo(c.RESPONSE_CODE) != 200:
+            raise ImageDownloadError(f"image url `{image_path}` returned {c.getinfo(c.RESPONSE_CODE)}")
+    except pycurl.error as e:
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
+                                 f"The original error is: {e}")
+    finally:
+        c.close()
+    buffer.seek(0)
+    return buffer
 
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
