@@ -69,7 +69,7 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
                         continue
                     try:
                         image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
-                                                                                 timeout=TIMEOUT_SECONDS,
+                                                                                 timeout_ms=int(TIMEOUT_SECONDS * 1000),
                                                                                  metrics_obj=metric_obj)
                     except PIL.UnidentifiedImageError as e:
                         image_repo[doc[field]] = e
