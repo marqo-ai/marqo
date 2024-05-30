@@ -115,6 +115,7 @@ def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_f
                     model_properties: Optional[Dict] = None,
                     model_auth: Optional[ModelAuth] = None,
                     device: Optional[str] = None,
+                    patch_method_exists: bool = False
                     ) -> ContextManager[dict]:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
@@ -123,6 +124,9 @@ def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_f
         tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         image_download_headers: A dict of image download headers for authentication.
     This should be called only if treat URLs as images is True
+        patch_method_exists: If True, the patch method exists in the model. If False, the patch method does not exist.
+            We only preprocess images if the patch method DOES NOT exist.
+
 
     Returns:
          An image repo: a dict <image pointer>:<image data>
@@ -132,7 +136,7 @@ def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_f
     image_repo = dict()
 
     preprocessor = None
-    if is_preprocess_image_model(model_name, model_properties):
+    if is_preprocess_image_model(model_name, model_properties) and not patch_method_exists:
         preprocessor = load_multimodal_model_and_get_image_preprocessor(model_name=model_name,
                                                                         model_properties=model_properties,
                                                                         device=device,
