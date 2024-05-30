@@ -600,6 +600,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
+                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None
                     )
                 )
 
