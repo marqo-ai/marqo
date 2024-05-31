@@ -1,3 +1,13 @@
+# Release 2.7.2
+
+## Bug fixes and minor changes
+- Fix an issue causing an error during the Marqo shutdown process (https://github.com/marqo-ai/marqo/pull/850). Marqo now shuts down properly without encountering errors.
+
+# Release 2.7.1
+
+## Bug fixes and minor changes
+- Resolve an issue where Marqo could not create or delete an index when not connected to the Zookeeper server (https://github.com/marqo-ai/marqo/pull/848). Users can now create or delete an index without needing to connect to the Zookeeper server. However, please note that without the Zookeeper server, your request is not protected in concurrent scenarios. For guidance on configuring your Zookeeper server, refer to [this documentation](https://docs.marqo.ai/2.7/Guides/Advanced-Usage/configuration/#configure-backend-communication).
+
 # Release 2.7.0
 
 ## New features
