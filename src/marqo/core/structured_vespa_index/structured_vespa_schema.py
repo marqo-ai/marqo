@@ -343,8 +343,13 @@ class StructuredVespaSchema(VespaSchema):
                 rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BM25_MODIFIERS} '
                                      f'inherits {common.RANK_PROFILE_MODIFIERS} {{')
                 rank_profiles.append('inputs {')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
+                #rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                #rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<long>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<long>(p{{}})')
+
                 for field in lexical_fields:
                     rank_profiles.append(f'query({field.name}): 0')
                 rank_profiles.append('}')
@@ -358,8 +363,12 @@ class StructuredVespaSchema(VespaSchema):
                     f'inherits {common.RANK_PROFILE_MODIFIERS} {{')
 
                 rank_profiles.append('inputs {')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
+                #rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                #rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<long>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<long>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
                 for field in tensor_fields:
                     rank_profiles.append(f'query({field.name}): 0')
