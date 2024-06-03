@@ -167,12 +167,11 @@ def get_marqo_inference_cache() -> MarqoInferenceCache:
     return _marqo_inference_cache
 
 
-def is_preprocess_image_model(model_name: str, model_properties: dict = None) -> bool:
-    """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module"""
-
-    validated_model_properties = validate_model_properties(model_name, model_properties)
-    model_type = validated_model_properties.get("type", None)
-
+def is_preprocess_image_model(model_properties: dict = None) -> bool:
+    """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module
+        model_properties: Validated model properties. The model properties should have been validated in marqo_index
+    """
+    model_type = model_properties.get("type", None)
     return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
 
 
@@ -184,7 +183,8 @@ def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_prop
     """Load the multimodal model and return the image preprocessor.
     Args:
         model_name (str): The name of the multimodal model to load.
-        model_properties (dict): The properties of the multimodal model.
+        model_properties (dict): The validated properties of the multimodal model.
+            The model properties should have been validated in marqo_index
         device (str): The device to load the model on.
         model_auth: Authorisation details for downloading a model (if required)
         normalize_embeddings (bool): Whether to normalize the embeddings.
@@ -199,14 +199,13 @@ def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_prop
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
-    if not is_preprocess_image_model(model_name, model_properties):
+    if not is_preprocess_image_model(model_properties):
         raise InternalError(message=f"Model {model_name} is not a model that requires preload image preprocessor.")
 
-    validated_model_properties = validate_model_properties(model_name, model_properties)
-    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
+    model_cache_key = _create_model_cache_key(model_name, device, model_properties)
 
     _update_available_models(
-        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
+        model_cache_key, model_name, model_properties, device, normalize_embeddings,
         model_auth=model_auth
     )
 

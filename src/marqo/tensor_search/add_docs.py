@@ -136,7 +136,7 @@ def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_f
     image_repo = dict()
 
     preprocessor = None
-    if is_preprocess_image_model(model_name, model_properties) and not patch_method_exists:
+    if is_preprocess_image_model(model_properties) and not patch_method_exists:
         preprocessor = load_multimodal_model_and_get_image_preprocessor(model_name=model_name,
                                                                         model_properties=model_properties,
                                                                         device=device,
