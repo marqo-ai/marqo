@@ -4,16 +4,22 @@ import time
 
 import torch
 
+from threading import Lock
+from PIL import Image
+
 from marqo import config, marqo_docs, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
+from marqo.s2_inference.processing.image import chunk_image
+from marqo.s2_inference.constants import PATCH_MODELS
 # we need to import backend before index_meta_cache to prevent circular import error:
 from marqo.tensor_search import constants
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
+
 
 
 logger = get_logger(__name__)
@@ -26,8 +32,9 @@ def on_start(config: config.Config):
         DownloadStartText(),
         CUDAAvailable(),
         SetBestAvailableDevice(),
-        ModelsForCacheing(),
+        CacheModels(),
         InitializeRedis("localhost", 6379),
+        CachePatchModels(),
         DownloadFinishText(),
         PrintVersion(),
         MarqoWelcome(),
@@ -113,7 +120,7 @@ class SetBestAvailableDevice:
         self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
 
 
-class ModelsForCacheing:
+class CacheModels:
     """warms the in-memory model cache by preloading good defaults
     """
     logger = get_logger('ModelsForStartup')
@@ -185,6 +192,72 @@ class ModelsForCacheing:
             self.logger.info(message)
         self.logger.info("completed loading models")
 
+class CachePatchModels:
+    """Prewarm patch models"""
+
+    logger = get_logger('CachePatchModels')
+    lock = Lock()
+
+    def __init__(self):
+        warmed_models = utils.read_env_vars_and_defaults(EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD)
+        if warmed_models is None:
+            self.models = []
+        elif isinstance(warmed_models, str):
+            try:
+                self.models = json.loads(warmed_models)
+            except json.JSONDecodeError as e:
+                raise exceptions.EnvVarError(
+                    f"Could not parse environment variable `{EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD}`. "
+                    f"Please ensure that this is a JSON-encoded list of strings."
+                ) from e
+        elif isinstance(warmed_models, list):
+            self.models = warmed_models
+        else:
+            raise exceptions.EnvVarError(
+                f"Environment variable `{EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD}` should be a list of strings."
+            )
+        
+        for model in self.models:
+            if model not in PATCH_MODELS:
+                raise exceptions.EnvVarError(
+                    f"Invalid patch model: {model}. Please ensure that this is a valid patch model."
+                )
+
+        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
+
+    def run(self):
+        N = 10
+        messages = []
+        test_image = torch.zeros((3, 224, 224))  # Dummy image tensor
+        test_image_pil = Image.fromarray(test_image.numpy().astype('uint8').transpose(1, 2, 0))  # Convert to PIL image
+        for model in self.models:
+            for device in self.default_devices:
+                self.logger.debug(f"Prewarming model: {model} on device: {device}")
+                with self.lock:
+                    try:
+                        # Warm it up
+                        chunks = chunk_image(test_image_pil, device=device, method=model)
+
+                        t = 0
+                        for n in range(N):
+                            t0 = time.time()
+                            chunks = chunk_image(test_image_pil, device=device, method=model)
+                            t1 = time.time()
+                            t += (t1 - t0)
+                        message = f"{(t) / float((N))} for {model} and {device}"
+                        messages.append(message)
+                        self.logger.debug(f"{model} {device} ran chunking {N} times.")
+                        self.logger.info(f"{model} {device} chunking run succesfully!")
+
+                    except Exception as e:
+                        self.logger.error(f"Failed to prewarm model: {model} on device: {device}. Error: {e}")
+
+                self.logger.info(f"Prewarmed model: {model} on device: {device}")
+            
+        for message in messages:
+            self.logger.info(message)
+        self.logger.info("completed prewarming patch models")
+            
 
 def _preload_model(model, content, device):
     """
