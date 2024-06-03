@@ -22,7 +22,11 @@ class StructuredVespaSchema(VespaSchema):
         FieldType.ArrayDouble: 'array<double>',
         FieldType.ImagePointer: 'string',
         FieldType.MultimodalCombination: 'map<string, float>',
-        FieldType.CustomVector: 'string'        # Custom Vector "content" is stored as string in backend.
+        FieldType.CustomVector: 'string',        # Custom Vector "content" is stored as string in backend.
+        FieldType.MapInt: 'map<string, int>',
+        FieldType.MapLong: 'map<string, long>',
+        FieldType.MapFloat: 'map<string, float>',
+        FieldType.MapDouble: 'map<string, double>'
     }
 
     _FIELD_INDEX_PREFIX = 'marqo__lexical_'
@@ -116,7 +120,10 @@ class StructuredVespaSchema(VespaSchema):
         # score modifiers
         if any(FieldFeature.ScoreModifier in f.features for f in self._index_request.fields):
             document.append(
-                f'field {common.FIELD_SCORE_MODIFIERS} type tensor<float>(p{{}}) {{ indexing: attribute | summary }}'
+                f'field {common.FIELD_SCORE_MODIFIERS_DOUBLE} type tensor<double>(p{{}}) {{ indexing: attribute | summary }}',
+            )
+            document.append(
+                f'field {common.FIELD_SCORE_MODIFIERS_LONG} type tensor<long>(p{{}}) {{ indexing: attribute | summary }}'
             )
 
         # tensor fields
@@ -204,6 +211,7 @@ class StructuredVespaSchema(VespaSchema):
         lexical_fields = marqo_index.lexical_field_map.values()
         tensor_fields = marqo_index.tensor_fields
         score_modifier_fields_names = marqo_index.score_modifier_fields_names
+        map_score_modifier_fields_names = [field.name for field in marqo_index.fields if field.type in [FieldType.MapInt, FieldType.MapLong, FieldType.MapFloat, FieldType.MapDouble] and FieldFeature.ScoreModifier in field.features]
         model_dim = marqo_index.model.get_dimension()
 
         bm25_expression = ' + '.join([
@@ -245,6 +253,8 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
 
+        """
+        # Old score modifiers
         if score_modifier_fields_names:
             expression = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' \
                          f'reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) ' \
@@ -259,6 +269,75 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('function modify(score) {')
             rank_profiles.append(f'expression: {expression}')
             rank_profiles.append('}}')
+        """
+
+
+        if score_modifier_fields_names or map_score_modifier_fields_names:
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_MODIFIERS} inherits default {{')
+            rank_profiles.append('inputs {')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<long>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<long>(p{{}})')
+            rank_profiles.append('}')
+            
+            rank_profiles.append('function modify_score(score) {')
+            rank_profiles.append(' expression: ')
+            
+            # Regular score modifiers (double)
+            rank_profiles.append(f'  if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE})) == 0, 1, ')
+            rank_profiles.append(f'   reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), prod)')
+            rank_profiles.append(f'  ) * ')
+            rank_profiles.append(f'  (score + ')
+            rank_profiles.append(f'   reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), sum)')
+            rank_profiles.append(f'  )')
+            
+            # Regular score modifiers (long)
+            rank_profiles.append(f' * ')
+            rank_profiles.append(f'  if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG})) == 0, 1, ')
+            rank_profiles.append(f'   reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) * attribute({common.FIELD_SCORE_MODIFIERS_LONG}), prod)')
+            rank_profiles.append(f'  ) * ')
+            rank_profiles.append(f'  (score + ')
+            rank_profiles.append(f'   reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) * attribute({common.FIELD_SCORE_MODIFIERS_LONG}), sum)')
+            rank_profiles.append(f'  )')
+            
+            # Map score modifiers (double)
+            rank_profiles.append(f' * ')
+            rank_profiles.append(f'  (')
+            rank_profiles.append(f'   if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE})) == 0, 1, ')
+            rank_profiles.append(f'    sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}){{field: attribute(field), key: attribute(key), default: 0}} *')
+            rank_profiles.append(f'     attribute(field){{key: attribute(key).multiply, default: 0}}')
+            rank_profiles.append(f'    )')
+            rank_profiles.append(f'   ) * ')
+            rank_profiles.append(f'   (score + ')
+            rank_profiles.append(f'    sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}){{field: attribute(field), key: attribute(key), default: 0}} *')
+            rank_profiles.append(f'     attribute(field){{key: attribute(key).add, default: 0}}')
+            rank_profiles.append(f'    )')
+            rank_profiles.append(f'   )')
+            rank_profiles.append(f'  )')
+            
+            # Map score modifiers (long)
+            rank_profiles.append(f' * ')
+            rank_profiles.append(f'  (')
+            rank_profiles.append(f'   if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG})) == 0, 1, ')
+            rank_profiles.append(f'    sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}){{field: attribute(field), key: attribute(key), default: 0}} *')
+            rank_profiles.append(f'     attribute(field){{key: attribute(key).multiply, default: 0}}')
+            rank_profiles.append(f'    )')
+            rank_profiles.append(f'   ) * ')
+            rank_profiles.append(f'   (score + ')
+            rank_profiles.append(f'    sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}){{field: attribute(field), key: attribute(key), default: 0}} *')
+            rank_profiles.append(f'     attribute(field){{key: attribute(key).add, default: 0}}')
+            rank_profiles.append(f'    )')
+            rank_profiles.append(f'   )')
+            rank_profiles.append(f'  )')
+            
+            rank_profiles.append('}')
+            
+            rank_profiles.append('first-phase {')
+            rank_profiles.append(' expression: modify_score(score)')  
+            rank_profiles.append('}')
+            rank_profiles.append('}')
+
 
             if lexical_fields:
                 rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BM25_MODIFIERS} '

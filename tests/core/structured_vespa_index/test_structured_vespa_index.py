@@ -107,6 +107,7 @@ class TestStructuredVespaIndex(MarqoTestCase):
             'id': 'my_id',
             'fields': {
                 common.FIELD_ID: 'my_id',
+                # TODO: Modify this to use the split for double and long
                 common.FIELD_SCORE_MODIFIERS: {'price': 100.0, 'rank': 1},
                 common.FIELD_VECTOR_COUNT: 2,
                 self.marqo_index.field_map['title'].lexical_field_name: 'my title',
