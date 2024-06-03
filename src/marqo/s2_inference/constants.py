@@ -1,4 +1,5 @@
 from marqo.tensor_search.utils import read_env_vars_and_defaults
+from marqo.s2_inference.models.model_type import ModelType
 
 # Some constants to help decide the model size.
 # Priorities: MODEL_NAME > MODEL_TYPE > DEFAULT
@@ -26,3 +27,5 @@ DEFAULT_MODEL_SIZE = 0.66
 PATCH_MODELS = {
     'simple', 'overlap', 'fastercnn', 'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2', 'dino/v1', 'dino/v2'
 }
+
+PREPROCESS_IMAGE_MODEL_LIST = [ModelType.CLIP, ModelType.OpenCLIP]
