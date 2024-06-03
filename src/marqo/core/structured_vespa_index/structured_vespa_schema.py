@@ -123,7 +123,7 @@ class StructuredVespaSchema(VespaSchema):
                 f'field {common.FIELD_SCORE_MODIFIERS_DOUBLE} type tensor<double>(p{{}}) {{ indexing: attribute | summary }}',
             )
             document.append(
-                f'field {common.FIELD_SCORE_MODIFIERS_LONG} type tensor<long>(p{{}}) {{ indexing: attribute | summary }}'
+                f'field {common.FIELD_SCORE_MODIFIERS_LONG} type tensor<int8>(p{{}}) {{ indexing: attribute | summary }}'
             )
 
         # tensor fields
@@ -277,8 +277,8 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
             rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<long>(p{{}})')
-            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<long>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<int8>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<int8>(p{{}})')
             rank_profiles.append('}')
             
             rank_profiles.append('function modify_score(score) {')
@@ -347,8 +347,8 @@ class StructuredVespaSchema(VespaSchema):
                 #rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<long>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<long>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<int8>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<int8>(p{{}})')
 
                 for field in lexical_fields:
                     rank_profiles.append(f'query({field.name}): 0')
@@ -367,8 +367,8 @@ class StructuredVespaSchema(VespaSchema):
                 #rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<long>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<long>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<int8>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<int8>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
                 for field in tensor_fields:
                     rank_profiles.append(f'query({field.name}): 0')
