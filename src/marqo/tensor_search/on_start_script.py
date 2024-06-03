@@ -32,9 +32,9 @@ def on_start(config: config.Config):
         DownloadStartText(),
         CUDAAvailable(),
         SetBestAvailableDevice(),
-        ModelsForCacheing(),
+        CacheModels(),
         InitializeRedis("localhost", 6379),
-        PrewarmPatchModels(),
+        CachePatchModels(),
         DownloadFinishText(),
         PrintVersion(),
         MarqoWelcome(),
@@ -120,7 +120,7 @@ class SetBestAvailableDevice:
         self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
 
 
-class ModelsForCacheing:
+class CacheModels:
     """warms the in-memory model cache by preloading good defaults
     """
     logger = get_logger('ModelsForStartup')
@@ -192,10 +192,10 @@ class ModelsForCacheing:
             self.logger.info(message)
         self.logger.info("completed loading models")
 
-class PrewarmPatchModels:
+class CachePatchModels:
     """Prewarm patch models"""
 
-    logger = get_logger('PrewarmPatchModels')
+    logger = get_logger('CachePatchModels')
     lock = Lock()
 
     def __init__(self):

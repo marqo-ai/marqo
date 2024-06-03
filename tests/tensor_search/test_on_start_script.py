@@ -30,7 +30,7 @@ class TestOnStartScript(MarqoTestCase):
             @mock.patch("os.environ", mock_environ)
             @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
             def run():
-                model_caching_script = on_start_script.ModelsForCacheing()
+                model_caching_script = on_start_script.CacheModels()
                 model_caching_script.run()
                 loaded_models = {kwargs["model_name"] for args, kwargs in mock_vectorise.call_args_list}
                 assert loaded_models == set(expected)
@@ -41,7 +41,7 @@ class TestOnStartScript(MarqoTestCase):
         @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: "[not-good-json"})
         def run():
             try:
-                model_caching_script = on_start_script.ModelsForCacheing()
+                model_caching_script = on_start_script.CacheModels()
                 raise AssertionError
             except exceptions.EnvVarError as e:
                 print(str(e))
@@ -95,7 +95,7 @@ class TestOnStartScript(MarqoTestCase):
             @mock.patch.dict(os.environ, mock_environ)
             @mock.patch("marqo.tensor_search.on_start_script.vectorise", mock_vectorise)
             def run():
-                model_caching_script = on_start_script.ModelsForCacheing()
+                model_caching_script = on_start_script.CacheModels()
                 model_caching_script.run()
                 loaded_models = {
                     (
@@ -125,7 +125,7 @@ class TestOnStartScript(MarqoTestCase):
         @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([open_clip_model_object])})
         def run():
             try:
-                model_caching_script = on_start_script.ModelsForCacheing()
+                model_caching_script = on_start_script.CacheModels()
                 # There should be a KeyError -> EnvVarError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
@@ -142,7 +142,7 @@ class TestOnStartScript(MarqoTestCase):
         @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([open_clip_model_object])})
         def run():
             try:
-                model_caching_script = on_start_script.ModelsForCacheing()
+                model_caching_script = on_start_script.CacheModels()
                 # There should be a KeyError -> EnvVarError when attempting to call vectorise
                 model_caching_script.run()
                 raise AssertionError
@@ -190,7 +190,7 @@ class TestOnStartScript(MarqoTestCase):
         @mock.patch("marqo.tensor_search.on_start_script._preload_model", mock_preload)
         @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_MODELS_TO_PRELOAD: json.dumps([no_model_object])})
         def run():
-            model_caching_script = on_start_script.ModelsForCacheing()
+            model_caching_script = on_start_script.CacheModels()
             model_caching_script.run()
             mock_preload.assert_not_called()  # The preloading function should never be called for no_model
 
@@ -208,7 +208,7 @@ class TestOnStartScript(MarqoTestCase):
             @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
             def run():
                 mock_chunk_image.reset_mock()
-                model_caching_script = on_start_script.PrewarmPatchModels()
+                model_caching_script = on_start_script.CachePatchModels()
                 model_caching_script.run()
                 loaded_models = {kwargs["method"] for args, kwargs in mock_chunk_image.call_args_list}
                 assert loaded_models == set(expected)
@@ -225,7 +225,7 @@ class TestOnStartScript(MarqoTestCase):
         @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
         def run_invalid():
             try:
-                model_caching_script = on_start_script.PrewarmPatchModels()
+                model_caching_script = on_start_script.CachePatchModels()
                 model_caching_script.run()
                 raise AssertionError("Expected EnvVarError not raised")
             except exceptions.EnvVarError as e:
@@ -243,7 +243,7 @@ class TestOnStartScript(MarqoTestCase):
         @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
         def run_empty():
             try:
-                model_caching_script = on_start_script.PrewarmPatchModels()
+                model_caching_script = on_start_script.CachePatchModels()
                 model_caching_script.run()
                 # No exception should be raised for an empty list
                 return True
@@ -261,7 +261,7 @@ class TestOnStartScript(MarqoTestCase):
         @mock.patch.dict(os.environ, {enums.EnvVars.MARQO_PATCH_MODELS_TO_PRELOAD: json.dumps(valid_patch_models)})
         @mock.patch("marqo.tensor_search.on_start_script.chunk_image", mock_chunk_image)
         def run():
-            model_caching_script = on_start_script.PrewarmPatchModels()
+            model_caching_script = on_start_script.CachePatchModels()
             model_caching_script.run()
             loaded_models = {kwargs["method"] for args, kwargs in mock_chunk_image.call_args_list}
             assert loaded_models == set(valid_patch_models)
