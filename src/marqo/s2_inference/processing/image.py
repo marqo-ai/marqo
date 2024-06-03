@@ -9,7 +9,7 @@ import threading
 from marqo.s2_inference.s2_inference import get_available_models, _create_model_cache_key, get_logger
 from marqo.s2_inference.types import Dict, List, Union, ImageType, Tuple, ndarray, Literal
 from marqo.s2_inference.clip_utils import format_and_load_CLIP_image
-from marqo.s2_inference.errors import ChunkerError
+from marqo.s2_inference.errors import ChunkerError, ModelLoadError
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.s2_inference.processing.DINO_utils import _load_DINO_model,attention_to_bboxs,DINO_inference
 from marqo.s2_inference.processing.pytorch_utils import load_pytorch
@@ -207,6 +207,14 @@ class PatchifyModel:
     def _load_and_cache_model(self):
         model_type = (self.model_name, self.device)
         model_cache_key = _create_model_cache_key(self.model_name, self.device)
+
+        if load_model_lock.locked():
+            raise ModelLoadError(
+                "Request rejected, as this request attempted to load and cache the model, "
+                "but the lock is already held by another operation. "
+                "Please wait for a few seconds and send the request again.\n"
+                "Marqo's documentation can be found here: `https://docs.marqo.ai/latest/`"
+            )
 
         with load_model_lock:
             if model_cache_key not in get_available_models():
