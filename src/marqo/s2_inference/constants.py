@@ -1,4 +1,5 @@
 from marqo.tensor_search.utils import read_env_vars_and_defaults
+from marqo.s2_inference.models.model_type import ModelType
 
 # Some constants to help decide the model size.
 # Priorities: MODEL_NAME > MODEL_TYPE > DEFAULT
@@ -23,3 +24,4 @@ MODEL_NAME_SIZE_MAPPING = {
 # Set this to be a special number so we can tell the model size is from default
 DEFAULT_MODEL_SIZE = 0.66
 
+PREPROCESS_IMAGE_MODEL_LIST = [ModelType.CLIP, ModelType.OpenCLIP]

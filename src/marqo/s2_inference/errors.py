@@ -59,3 +59,7 @@ class IncompatibleModelDeviceError(S2InferenceError):
 
 class BatchInferenceSizeNotMatchError(S2InferenceError):
     pass
+
+
+class ImageDownloadError(S2InferenceError):
+    pass
