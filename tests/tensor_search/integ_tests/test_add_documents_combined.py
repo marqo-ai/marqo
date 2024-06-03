@@ -363,6 +363,15 @@ class TestAddDocumentsCombined(MarqoTestCase):
                  good_url: Tensor
              }),
         ]
+        model_properties = (
+            {
+                "name": "ViT-B/32",
+                "dimensions": 512,
+                "notes": "CLIP ViT-B/32",
+                "type": "clip",
+            }
+        )
+
         for docs, expected_repo_structure in examples:
             with mock.patch('PIL.Image.Image.close') as mock_close:
                 with add_docs.download_and_preprocess_images(
@@ -372,7 +381,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     image_download_headers={},
                     model_name="ViT-B/32",
                     normalize_embeddings=True,
-                    model_properties=None,
+                    model_properties=model_properties,
                     device="cpu"
                 ) as image_repo:
                     self.assertEqual(len(expected_repo_structure), len(image_repo))
