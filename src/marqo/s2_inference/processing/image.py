@@ -41,7 +41,7 @@ from marqo.api.exceptions import InternalError
 
 logger = get_logger(__name__)
 
-load_model_lock = threading.Lock()
+_load_model_lock = threading.Lock()
 
 def chunk_image(image: Union[str, ImageType], device: str, 
                         method: Literal[ 'simple', 'overlap',  'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2'],
@@ -208,7 +208,7 @@ class PatchifyModel:
         model_type = (self.model_name, self.device)
         model_cache_key = _create_model_cache_key(self.model_name, self.device)
 
-        if load_model_lock.locked():
+        if _load_model_lock.locked():
             raise ModelLoadError(
                 "Request rejected, as this request attempted to load and cache the model, "
                 "but the lock is already held by another operation. "
@@ -216,7 +216,7 @@ class PatchifyModel:
                 "Marqo's documentation can be found here: `https://docs.marqo.ai/latest/`"
             )
 
-        with load_model_lock:
+        with _load_model_lock:
             if model_cache_key not in get_available_models():
                 logger.info(f"loading model {model_type}")
                 if model_type[0] in self.allowed_model_types:
