@@ -120,10 +120,7 @@ class StructuredVespaSchema(VespaSchema):
         # score modifiers
         if any(FieldFeature.ScoreModifier in f.features for f in self._index_request.fields):
             document.append(
-                f'field {common.FIELD_SCORE_MODIFIERS_DOUBLE} type tensor<double>(p{{}}) {{ indexing: attribute | summary }}',
-            )
-            document.append(
-                f'field {common.FIELD_SCORE_MODIFIERS_LONG} type tensor<int8>(p{{}}) {{ indexing: attribute | summary }}'
+                f'field {common.FIELD_SCORE_MODIFIERS} type tensor<float>(p{{}}) {{ indexing: attribute | summary }}',
             )
 
         # tensor fields
@@ -211,7 +208,7 @@ class StructuredVespaSchema(VespaSchema):
         lexical_fields = marqo_index.lexical_field_map.values()
         tensor_fields = marqo_index.tensor_fields
         score_modifier_fields_names = marqo_index.score_modifier_fields_names
-        map_score_modifier_fields_names = [field.name for field in marqo_index.fields if field.type in [FieldType.MapInt, FieldType.MapLong, FieldType.MapFloat, FieldType.MapDouble] and FieldFeature.ScoreModifier in field.features]
+        #map_score_modifier_fields_names = [field.name for field in marqo_index.fields if field.type in [FieldType.MapInt, FieldType.MapLong, FieldType.MapFloat, FieldType.MapDouble] and FieldFeature.ScoreModifier in field.features]
         model_dim = marqo_index.model.get_dimension()
 
         bm25_expression = ' + '.join([
@@ -255,7 +252,6 @@ class StructuredVespaSchema(VespaSchema):
 
         
         # Old score modifiers
-        """
         if score_modifier_fields_names:
             expression = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' \
                          f'reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) ' \
@@ -270,76 +266,13 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('function modify(score) {')
             rank_profiles.append(f'expression: {expression}')
             rank_profiles.append('}}')
-        """
-        
-        """# Regular score modifiers (double)
-            rank_profiles.append(f'  expression: if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE})) == 0, 1.0, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), prod))')
-            rank_profiles.append(f'  expression: score + reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), sum)')
-
-            # Regular score modifiers (long)
-            rank_profiles.append(f'  expression: if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG})) == 0, 1.0, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) * attribute({common.FIELD_SCORE_MODIFIERS_LONG}), prod))')
-            rank_profiles.append(f'  expression: score + reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) * attribute({common.FIELD_SCORE_MODIFIERS_LONG}), sum)')
-
-            # Map score modifiers (double)
-            rank_profiles.append(f'  expression: if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE})) == 0, 1.0, sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}){{field: attribute(field), key: attribute(key), default: 0.0}} * attribute(field){{key: attribute(key).multiply, default: 1.0}}))')
-            rank_profiles.append(f'  expression: score + sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}){{field: attribute(field), key: attribute(key), default: 0.0}} * attribute(field){{key: attribute(key).add, default: 0.0}})')
-
-            # Map score modifiers (long)
-            rank_profiles.append(f'  expression: if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG})) == 0, 1.0, sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}){{field: attribute(field), key: attribute(key), default: 0}} * attribute(field){{key: attribute(key).multiply, default: 1}}))')
-            rank_profiles.append(f'  expression: score + sum(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}){{field: attribute(field), key: attribute(key), default: 0}} * attribute(field){{key: attribute(key).add, default: 0}})')
-
-            rank_profiles.append('}}')"""
-        
-        if score_modifier_fields_names or map_score_modifier_fields_names:
-            
-            expression = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE})) == 0, 1, ' \
-                         f'reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) ' \
-                         f'* attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), prod)) * score ' \
-                         f'+ reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) ' \
-                         f'* attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), sum)'
-            
-            
-            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_MODIFIERS} inherits default {{')    
-            rank_profiles.append('inputs {')
-            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<int8>(p{{}})')
-            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<int8>(p{{}})')
-            rank_profiles.append('}')
-
-            # score modifiers (double)
-            expression_score_modifier_double = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE})) == 0, 1, ' \
-                         f'reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) ' \
-                         f'* attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), prod)) * score ' \
-                         f'+ reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) ' \
-                         f'* attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), sum)'
-            rank_profiles.append('function score_modifier_double(score) {')
-            rank_profiles.append(f'  expression: {expression_score_modifier_double}')
-            rank_profiles.append('}')
-
-            # score modifiers (long)
-            expression_score_modifier_long = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG})) == 0, 1, ' \
-                         f'reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) ' \
-                         f'* attribute({common.FIELD_SCORE_MODIFIERS_LONG}), prod)) * score ' \
-                         f'+ reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) ' \
-                         f'* attribute({common.FIELD_SCORE_MODIFIERS_LONG}), sum)'
-            rank_profiles.append('function score_modifier_long(score) {')
-            rank_profiles.append(f'  expression: {expression_score_modifier_long}')
-            rank_profiles.append('}')
-
-            rank_profiles.append('function modify(score) {')
-            #rank_profiles.append(f'expression: score_modifier_double(score)')
-            rank_profiles.append(f'expression: {expression}')
-            rank_profiles.append('}}')
 
             if lexical_fields:
                 rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BM25_MODIFIERS} '
                                      f'inherits {common.RANK_PROFILE_MODIFIERS} {{')
                 rank_profiles.append('inputs {')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<int8>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<int8>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
 
                 for field in lexical_fields:
                     rank_profiles.append(f'query({field.name}): 0')
@@ -355,10 +288,8 @@ class StructuredVespaSchema(VespaSchema):
                     f'inherits {common.RANK_PROFILE_MODIFIERS} {{')
 
                 rank_profiles.append('inputs {')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE}) tensor<double>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG}) tensor<int8>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG}) tensor<int8>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) tensor<float>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
 
                 for field in tensor_fields:
