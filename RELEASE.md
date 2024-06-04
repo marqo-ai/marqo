@@ -1,3 +1,20 @@
+# Release 2.8.0
+
+## Bug fixes and minor changes
+- Improved add_documents memory efficiency and throughput for CLIP and Open_CLIP models when indexing documents with images ([#849](https://github.com/marqo-ai/marqo/pull/849)).
+- Replaced the requests package with pycurl for faster image downloads ([#849](https://github.com/marqo-ai/marqo/pull/849)).
+- Added support for the pre-warming patch method ([#847](https://github.com/marqo-ai/marqo/pull/847)).
+
+## Notes
+- Using the Collectable dataset on a single g4dn.xlarge instance with model open_clip/ViT-B-32/laion2b_s34b_b79k:
+  - For the 6/32/1 configuration (6 threads, 30 client batch size, 1 image per doc), the average memory usage is reduced by ~37.5% (12G to 7.5G) and throughput is increased by ~7.5% (13.  3docs/s -> 14.3docs/s).
+  - With this release, Marqo can now handle the 6/128/5 configuration when indexing documents, using only 8.5G memory.
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.2k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+
 # Release 2.7.2
 
 ## Bug fixes and minor changes
