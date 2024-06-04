@@ -450,7 +450,7 @@ class IndexManagement:
                 f.write(query_profile)
 
             return True
-        pass
+        return False
 
     def _add_schema(self, app: str, name: str, schema: str) -> None:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')

@@ -159,10 +159,17 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     if add_docs_params.tensor_fields else []
                 tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
-                    add_docs.download_images(docs=docs,
-                                             thread_count=add_docs_params.image_download_thread_count,
-                                             tensor_fields=tensor_fields_and_multimodal_subfields,
-                                             image_download_headers=add_docs_params.image_download_headers)
+                    add_docs.download_and_preprocess_images(
+                        docs=docs, thread_count=add_docs_params.image_download_thread_count,
+                        tensor_fields=tensor_fields_and_multimodal_subfields,
+                        image_download_headers=add_docs_params.image_download_headers,
+                        model_name = marqo_index.model.name,
+                        normalize_embeddings=marqo_index.normalize_embeddings,
+                        model_properties=marqo_index.model.get_properties(),
+                        device=add_docs_params.device,
+                        model_auth=add_docs_params.model_auth,
+                        patch_method_exists = marqo_index.image_preprocessing.patch_method is not None
+                    )
                 )
 
         if add_docs_params.use_existing_tensors:
@@ -584,9 +591,17 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     raise api_exceptions.BadRequestError(message="`_id` field cannot be an image pointer field.")
 
                 image_repo = exit_stack.enter_context(
-                    add_docs.download_images(docs=docs, thread_count=add_docs_params.image_download_thread_count,
-                                             tensor_fields=image_fields,
-                                             image_download_headers=add_docs_params.image_download_headers)
+                    add_docs.download_and_preprocess_images(
+                        docs=docs, thread_count=add_docs_params.image_download_thread_count,
+                        tensor_fields=image_fields,
+                        image_download_headers=add_docs_params.image_download_headers,
+                        model_name = marqo_index.model.name,
+                        normalize_embeddings=marqo_index.normalize_embeddings,
+                        model_properties=marqo_index.model.get_properties(),
+                        device=add_docs_params.device,
+                        model_auth=add_docs_params.model_auth,
+                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None
+                    )
                 )
 
         if add_docs_params.use_existing_tensors:
