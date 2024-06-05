@@ -137,7 +137,7 @@ class IndexManagement:
             schema, marqo_index = vespa_schema.generate_schema()
 
             logger.debug(f'Creating index {str(marqo_index)} with schema:\n{schema}')
-            print(f"schema: {schema}")
+
             self._add_schema(app, marqo_index.schema_name, schema)
             self._add_schema_to_services(app, marqo_index.schema_name)
             self.vespa_client.deploy_application(app)

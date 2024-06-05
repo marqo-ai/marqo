@@ -121,8 +121,10 @@ class StructuredVespaIndex(VespaIndex):
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
                         score_modifiers[f'{index_field.name}.{key}'] = value
+                        logger.debug(f"score_modifiers[{index_field.name}.{key}] = {value}")
                 else:
                     score_modifiers[index_field.name] = marqo_value
+                    logger.debug(f"score_modifiers[{index_field.name}] = {marqo_value}")
                
                 #score_modifiers[index_field.name] = marqo_value
 
@@ -135,6 +137,7 @@ class StructuredVespaIndex(VespaIndex):
                     "cells": score_modifiers
                 }
             }
+            logger.debug(f"vespa_fields[common.FIELD_SCORE_MODIFIERS] = {vespa_fields[common.FIELD_SCORE_MODIFIERS]}")
         
         
         return {"id": vespa_id, "fields": vespa_fields}
@@ -184,9 +187,10 @@ class StructuredVespaIndex(VespaIndex):
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
                         score_modifiers[f'{index_field.name}.{key}'] = value
+                        print(f"from the to_vespa_document function, score_modifiers[{index_field.name}.{key}] = {value}")
                 else:
                     score_modifiers[index_field.name] = marqo_value
-                print(f"from the to_vespa_document function, score_modifiers[{index_field.name}] = {marqo_value}")
+                    print(f"from the to_vespa_document function, score_modifiers[{index_field.name}] = {marqo_value}")
                 
                 #score_modifiers[index_field.name] = marqo_value
 
@@ -604,15 +608,10 @@ class StructuredVespaIndex(VespaIndex):
             mult_tensor = {}
             add_tensor = {}
             for modifier in marqo_query.score_modifiers:
-                if '.' in modifier.field:
-                    final_field_name = f'{modifier.field}.{modifier.weight}'
-                else:
-                    final_field_name = modifier.field
-
                 if modifier.type == ScoreModifierType.Multiply:
-                    mult_tensor[final_field_name] = modifier.weight
+                    mult_tensor[modifier.field] = modifier.weight
                 elif modifier.type == ScoreModifierType.Add:
-                    add_tensor[final_field_name] = modifier.weight
+                    add_tensor[modifier.field] = modifier.weight
                 else:
                     raise InternalError(f'Unknown score modifier type {modifier.type}')
 

@@ -5,6 +5,8 @@ from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_schema import VespaSchema
 from marqo.exceptions import InternalError
+from marqo.marqo_logging import logger
+
 
 
 class StructuredVespaSchema(VespaSchema):
@@ -208,7 +210,6 @@ class StructuredVespaSchema(VespaSchema):
         lexical_fields = marqo_index.lexical_field_map.values()
         tensor_fields = marqo_index.tensor_fields
         score_modifier_fields_names = marqo_index.score_modifier_fields_names
-        #map_score_modifier_fields_names = [field.name for field in marqo_index.fields if field.type in [FieldType.MapInt, FieldType.MapLong, FieldType.MapFloat, FieldType.MapDouble] and FieldFeature.ScoreModifier in field.features]
         model_dim = marqo_index.model.get_dimension()
 
         bm25_expression = ' + '.join([
@@ -249,8 +250,6 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
-
-        
         # Old score modifiers
         if score_modifier_fields_names:
             expression = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' \
