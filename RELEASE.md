@@ -5,7 +5,7 @@
 - Add support for pre-warming patch models ([#847](https://github.com/marqo-ai/marqo/pull/847)). See usage [here](https://docs.marqo.ai/2.8/Guides/Advanced-Usage/configuration/#configuring-preloaded-patch-models).
 
 ## Bug fixes and minor changes
-- Replace the requests package with pycurl for faster image downloads ([#814](https://github.com/marqo-ai/marqo/pull/814)). Marqo now downloads images 2-3x faster.
+- Replace the requests package with pycurl for faster image downloads ([#814](https://github.com/marqo-ai/marqo/pull/814)). Marqo now downloads images 2-3x faster in our tests and the overall add_documents throughput is increased by 7.5%
 
 ## Contributor shout-outs
 - Shoutouts to our valuable 4.2k stargazers!
