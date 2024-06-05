@@ -28,7 +28,11 @@ class StructuredVespaIndex(VespaIndex):
         FieldType.ArrayDouble: (list, (float, int)),
         FieldType.ImagePointer: str,
         FieldType.MultimodalCombination: dict,
-        FieldType.CustomVector: str
+        FieldType.CustomVector: str,
+        FieldType.CustomVector: str,
+        FieldType.MapInt: (dict, int),
+        FieldType.MapFloat: (dict, float),
+        FieldType.MapDouble: (dict, float)
     }
 
     _VESPA_DOC_ID = 'id'

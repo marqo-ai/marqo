@@ -372,6 +372,8 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
         elif mappings[field]["type"] == FieldType.CustomVector:
             field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+        elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble]:
+            field_content = validate_map_field(field_content)
         else:
             raise InvalidArgError(
                 f"The field `{field}` is of invalid type in the `mappings` parameter. The only object field type supported "
@@ -403,6 +405,42 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
 
     return field_content
 
+def validate_map_field(field_content):
+     """
+     Validates the field content if it is a map field (dict)
+     Args:
+         field_content: the field content
+         is_non_tensor_field: whether this is a non-tensor-field
+         index_model_dimensions: the `dimensions` property of the index to be added to
+     Returns:
+         field_content if the validation passes
+     """
+
+     # Validate that the field content is a dict
+     if not isinstance(field_content, dict):
+         raise InvalidArgError(
+             f"The field content `{field_content}` is of type `{type(field_content).__name__}`, which is not a valid type for a map field."
+             f"A map field must be a dictionary."
+         )
+
+     # Validate that the dict is only of one level
+     if any(isinstance(v, dict) for v in field_content.values()):
+         raise InvalidArgError(
+             "Nested dictionaries are not allowed in map fields. Each value must be a single int, float, or double."
+         )
+
+     # Validate that the values of the dict are int, float, or double
+     for key, value in field_content.items():
+         if not isinstance(key, str):
+             raise InvalidArgError(
+                 f"Key `{key}` in map field is not a string. All keys must be strings."
+             )
+         if not isinstance(value, (int, float)):
+             raise InvalidArgError(
+                 f"Value `{value}` for key `{key}` in map field is not of type int or float."
+             )
+
+     return field_content
 
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
     """
