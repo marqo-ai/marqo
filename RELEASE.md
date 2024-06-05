@@ -1,13 +1,11 @@
 # Release 2.8.0
 
 ## Bug fixes and minor changes
-- Improve add_documents memory efficiency and throughput for CLIP and Open_CLIP models when indexing documents with images (#849). The image downloading and preprocessing logic has been improved. Marqo now converts the images to tensors directly after downloading. In our tests, the memory usage has been reduced by 37.5% and the throughput has been increased by 7.5% (subject to your settings). Marqo is also more stable when indexing documents in a multi-threading scenario.- Replaced the requests package with pycurl for faster image downloads ([#849](https://github.com/marqo-ai/marqo/pull/849)).
-- Add support for the pre-warming patch method ([#847](https://github.com/marqo-ai/marqo/pull/847)).
+- Improve `add_documents` memory efficiency and throughput for CLIP and Open_CLIP models when indexing documents with images when no patch method is used ([#849](https://github.com/marqo-ai/marqo/pull/849)). The image downloading and preprocessing logic has been improved. Marqo now converts the images to tensors directly after downloading. In our tests, the memory usage has been reduced by 37.5% and the throughput has been increased by 7.5% (subject to your settings). Marqo is also more stable when indexing documents in a multi-threading scenario.
+- Add support for pre-warming patch models ([#847](https://github.com/marqo-ai/marqo/pull/847)). See usage [here](https://docs.marqo.ai/2.8/Guides/Advanced-Usage/configuration/#configuring-preloaded-patch-models).
 
-## Notes
-- Using the Collectable dataset on a single g4dn.xlarge instance with model open_clip/ViT-B-32/laion2b_s34b_b79k:
-  - For the 6/32/1 configuration (6 threads, 30 client batch size, 1 image per doc), the average memory usage is reduced by ~37.5% (12G to 7.5G) and throughput is increased by ~7.5% (13.  3docs/s -> 14.3docs/s).
-  - With this release, Marqo can now handle the 6/128/5 configuration when indexing documents, using only 8.5G memory.
+## Bug fixes and minor changes
+- Replace the requests package with pycurl for faster image downloads ([#814](https://github.com/marqo-ai/marqo/pull/814)). Marqo now downloads images 2-3x faster.
 
 ## Contributor shout-outs
 - Shoutouts to our valuable 4.2k stargazers!
