@@ -625,7 +625,7 @@ class StructuredVespaIndex(VespaIndex):
             return '*'
 
     # Old score modifiers
-    """def _get_score_modifiers(self, marqo_query: MarqoQuery) -> \
+    def _get_score_modifiers(self, marqo_query: MarqoQuery) -> \
             Optional[Dict[str, Dict[str, float]]]:
         if marqo_query.score_modifiers:
             mult_tensor = {}
@@ -644,9 +644,44 @@ class StructuredVespaIndex(VespaIndex):
                 common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS: add_tensor
             }
 
+        return None
+    
+    """def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, Union[int, float]]]]:
+        if marqo_query.score_modifiers:
+            mult_tensor_double = {}
+            add_tensor_double = {}
+            mult_tensor_long = {}
+            add_tensor_long = {}
+
+            for modifier in marqo_query.score_modifiers:
+                if isinstance(modifier.weight, int):
+                    if modifier.type == ScoreModifierType.Multiply:
+                        mult_tensor_long[modifier.field] = modifier.weight
+                    elif modifier.type == ScoreModifierType.Add:
+                        add_tensor_long[modifier.field] = modifier.weight
+                else:  # float or double
+                    if modifier.type == ScoreModifierType.Multiply:
+                        mult_tensor_double[modifier.field] = modifier.weight
+                    elif modifier.type == ScoreModifierType.Add:
+                        add_tensor_double[modifier.field] = modifier.weight
+                print(f"from the _get_score_modifiers function: modifier is {modifier}")
+                print(f"from the _get_score_modifiers function: modifier field is {modifier.field}")
+                print(f"from the _get_score_modifiers function: modifier weight is {modifier.weight}")
+                print(f"from the _get_score_modifiers function: mult_tensor_long = {mult_tensor_long}")
+                print(f"from the _get_score_modifiers function: add_tensor_long = {add_tensor_long}")
+                print(f"from the _get_score_modifiers function: mult_tensor_double = {mult_tensor_double}")
+                print(f"from the _get_score_modifiers function: add_tensor_double = {add_tensor_double}")
+
+            return {
+                common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE: mult_tensor_double,
+                common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE: add_tensor_double,
+                common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG: mult_tensor_long,
+                common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG: add_tensor_long
+            }
+
         return None"""
     
-    def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
+    """def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
         if marqo_query.score_modifiers:
             mult_tensor_double = {}
             add_tensor_double = {}
@@ -683,7 +718,7 @@ class StructuredVespaIndex(VespaIndex):
                 common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG: add_tensor_long
             }
             
-        return None
+        return None"""
 
     def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
         if not marqo_query.or_phrases and not marqo_query.and_phrases:
