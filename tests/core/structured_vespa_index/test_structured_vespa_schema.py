@@ -37,7 +37,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
 
         actual_schema, _ = StructuredVespaSchema(marqo_index_request).generate_schema()
         expected_schema = self._read_schema_from_file('test_schemas/healthy_schema_1.sd')
-
+        print(f"actual schema: {actual_schema}")
         self.assertEqual(
             self._remove_whitespace_in_schema(expected_schema),
             self._remove_whitespace_in_schema(actual_schema)
@@ -72,7 +72,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
 
         actual_schema, _ = StructuredVespaSchema(marqo_index_request).generate_schema()
         expected_schema = self._read_schema_from_file('test_schemas/one_tensor_field.sd')
-
+        print(f"actual schema: {actual_schema}")
         self.assertEqual(
             self._remove_whitespace_in_schema(expected_schema),
             self._remove_whitespace_in_schema(actual_schema)
@@ -107,7 +107,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
 
         actual_schema, _ = StructuredVespaSchema(marqo_index_request).generate_schema()
         expected_schema = self._read_schema_from_file('test_schemas/four_tensor_fields.sd')
-
+        print(f"actual schema: {actual_schema}")
         self.assertEqual(
             self._remove_whitespace_in_schema(expected_schema),
             self._remove_whitespace_in_schema(actual_schema)
@@ -133,7 +133,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
 
         actual_schema, _ = StructuredVespaSchema(marqo_index_request).generate_schema()
         expected_schema = self._read_schema_from_file('test_schemas/no_lexical_fields.sd')
-
+        print(f"actual schema: {actual_schema}")
         self.assertEqual(
             self._remove_whitespace_in_schema(expected_schema),
             self._remove_whitespace_in_schema(actual_schema)
@@ -185,7 +185,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
 
         actual_schema, _ = StructuredVespaSchema(marqo_index_request).generate_schema()
         expected_schema = self._read_schema_from_file('test_schemas/no_tensor_fields.sd')
-
+        print(f"actual schema: {actual_schema}")
         self.assertEqual(
             self._remove_whitespace_in_schema(expected_schema),
             self._remove_whitespace_in_schema(actual_schema)

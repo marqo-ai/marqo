@@ -372,8 +372,6 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
         elif mappings[field]["type"] == FieldType.CustomVector:
             field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
-        elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble]:
-            field_content = validate_map_field(field_content)
         else:
             raise InvalidArgError(
                 f"The field `{field}` is of invalid type in the `mappings` parameter. The only object field type supported "
@@ -388,6 +386,8 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                 field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
             elif structured_field_type == FieldType.CustomVector:
                 field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+            elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble]:
+                field_content = validate_map_field(field_content)
             else:
                 raise InvalidArgError(
                     f"The field {field} is of type `{structured_field_type}`, which is not a valid object field type. "

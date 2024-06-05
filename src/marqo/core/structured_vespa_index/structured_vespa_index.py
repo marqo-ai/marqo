@@ -356,7 +356,11 @@ class StructuredVespaIndex(VespaIndex):
         # Verify score modifiers, if defined
         if marqo_query.score_modifiers is not None:
             for modifier in marqo_query.score_modifiers:
-                if modifier.field not in self._marqo_index.score_modifier_fields_names:
+                if '.' in modifier.field:
+                    root_modifier_field, subfield = modifier.field.split('.')
+                else:
+                    root_modifier_field = modifier.field
+                if root_modifier_field not in self._marqo_index.score_modifier_fields_names:
                     raise InvalidFieldNameError(
                         f'Index {self._marqo_index.name} has no score modifier field {modifier.field}. '
                         f'Available score modifier fields are: {", ".join(self._marqo_index.score_modifier_fields_names)}'
