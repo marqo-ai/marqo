@@ -131,6 +131,8 @@ class StructuredVespaIndex(VespaIndex):
                             score_modifiers_long[f'{index_field.name}.{key}'] = value
                     else:
                         score_modifiers_long[index_field.name] = marqo_value
+                print(f"score_modifiers_double: {score_modifiers_double}")
+                print(f"score_modifiers_long: {score_modifiers_long}")
                 #score_modifiers[index_field.name] = marqo_value
 
         """
@@ -157,6 +159,7 @@ class StructuredVespaIndex(VespaIndex):
                     "cells": score_modifiers_long
                 }
             }
+       
         return {"id": vespa_id, "fields": vespa_fields}
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
@@ -213,6 +216,8 @@ class StructuredVespaIndex(VespaIndex):
                             score_modifiers_long[f'{index_field.name}.{key}'] = value
                     else:
                         score_modifiers_long[index_field.name] = marqo_value
+                print(f"score_modifiers_double: {score_modifiers_double}")
+                print(f"score_modifiers_long: {score_modifiers_long}")
                 #score_modifiers[index_field.name] = marqo_value
 
         # Tensors
@@ -642,6 +647,8 @@ class StructuredVespaIndex(VespaIndex):
                 else:
                     raise InternalError(f'Unknown score modifier type {modifier.type}')
 
+            print(f"mult_tensor: {mult_tensor}")
+            print(f"add_tensor: {add_tensor}")
             # Note one of these could be empty, but not both
             return {
                 common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS: mult_tensor,
