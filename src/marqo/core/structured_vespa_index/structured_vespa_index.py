@@ -152,6 +152,7 @@ class StructuredVespaIndex(VespaIndex):
                     "cells": score_modifiers_double
                 }
             }
+            print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]}")
         if len(score_modifiers_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG] = {
                 "modify": {
@@ -159,6 +160,7 @@ class StructuredVespaIndex(VespaIndex):
                     "cells": score_modifiers_long
                 }
             }
+            print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]}")
        
         return {"id": vespa_id, "fields": vespa_fields}
 
@@ -250,12 +252,17 @@ class StructuredVespaIndex(VespaIndex):
 
         if len(score_modifiers_double) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE] = score_modifiers_double
+            print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]}")
         if len(score_modifiers_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG] = score_modifiers_long
+            print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]}")
 
         vespa_doc = {
             self._VESPA_DOC_FIELDS: vespa_fields
         }
+
+        
+        
 
         if vespa_id is not None:
             vespa_doc[self._VESPA_DOC_ID] = vespa_id
