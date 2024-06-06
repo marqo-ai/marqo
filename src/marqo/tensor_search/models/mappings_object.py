@@ -58,3 +58,16 @@ custom_vector_mappings_schema = {
     "required": ["type"],
     "additionalProperties": False
 }
+
+map_score_modifiers_schema = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": [MappingsObjectType.map_score_modifiers]
+        }
+    },
+    "required": ["type"],
+    "additionalProperties": False
+}

@@ -16,7 +16,8 @@ from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.models.mappings_object import (
     mappings_schema,
     multimodal_combination_mappings_schema,
-    custom_vector_mappings_schema
+    custom_vector_mappings_schema,
+    map_score_modifiers_schema
 )
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models.custom_vector_object import CustomVector
@@ -368,10 +369,15 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
 
     # If field is declared in mappings, it overwrites the default.
     if mappings and field in mappings:
+        print(f"mappings: {mappings[field]}")
+        print(f"field_content: {field_content}")
         if mappings[field]["type"] == FieldType.MultimodalCombination:
             field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
         elif mappings[field]["type"] == FieldType.CustomVector:
             field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
+        elif mappings[field]["type"] == FieldType.MapScoreModifiers:
+            
+            field_content = validate_map_field(field_content)
         else:
             raise InvalidArgError(
                 f"The field `{field}` is of invalid type in the `mappings` parameter. The only object field type supported "
@@ -547,6 +553,8 @@ def validate_mappings_object(
             elif config["type"] == enums.MappingsObjectType.custom_vector:
                 validate_custom_vector_mappings_object(config)
                 # TODO: add validation for custom vector structured/unstructured here
+            elif config["type"] == enums.MappingsObjectType.map_score_modifiers:
+                validate_map_score_modifiers_mappings_object(config)
 
 
 
@@ -557,7 +565,18 @@ def validate_mappings_object(
             f" Read about the mappings object here: `{marqo_docs.mappings()}`"
         )
 
-
+def validate_map_score_modifiers_mappings_object(mappings_object: Dict):
+    """Validates the map score modifiers mappings object"""
+    print("Validating map score modifiers")
+    print(f"mappings_object: {mappings_object}")
+    try:
+        jsonschema.validate(instance=mappings_object, schema=map_score_modifiers_schema)
+    except jsonschema.ValidationError as e:
+        raise InvalidArgError(
+            f"Error validating map score modifiers mappings object. Reason: \n{str(e)}"
+            f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
+        )
+    
 def validate_multimodal_combination_mappings_object(mappings_object: Dict):
     """Validates the multimodal mappings object
 

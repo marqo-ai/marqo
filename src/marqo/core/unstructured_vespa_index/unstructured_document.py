@@ -93,6 +93,13 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             elif isinstance(value, float):
                 instance.fields.float_fields[key] = value
                 instance.fields.score_modifiers_fields[key] = value
+            # TODO: Fix this
+            elif isinstance(value, dict):
+                for k, v in value.items():
+                    if isinstance(v, int):
+                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                    elif isinstance(v, float):
+                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
