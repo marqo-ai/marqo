@@ -21,7 +21,9 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.INT_FIELDS)
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
-    score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
+    #score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
+    score_modifiers_double_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_DOUBLE)
+    score_modifiers_long_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_LONG)
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
@@ -89,17 +91,16 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
             elif isinstance(value, int):
                 instance.fields.int_fields[key] = value
-                instance.fields.score_modifiers_fields[key] = value
+                instance.fields.score_modifiers_long_fields[key] = value
             elif isinstance(value, float):
                 instance.fields.float_fields[key] = value
-                instance.fields.score_modifiers_fields[key] = value
-            # TODO: Fix this
+                instance.fields.score_modifiers_double_fields[key] = value
             elif isinstance(value, dict):
                 for k, v in value.items():
                     if isinstance(v, int):
-                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                        instance.fields.score_modifiers_long_fields[f"{key}.{k}"] = v
                     elif isinstance(v, float):
-                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                        instance.fields.score_modifiers_double_fields[f"{key}.{k}"] = v
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")

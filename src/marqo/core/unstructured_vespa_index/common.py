@@ -13,6 +13,8 @@ FLOAT_FIELDS = "marqo__float_fields"
 BOOL_FIELDS = "marqo__bool_fields"
 
 SCORE_MODIFIERS = "marqo__score_modifiers"
+SCORE_MODIFIERS_DOUBLE = "marqo__score_modifiers_double"
+SCORE_MODIFIERS_LONG = "marqo__score_modifiers_long"
 
 RANK_PROFILE_EMBEDDING_SIMILARITY = "embedding_similarity"
 RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = 'embedding_similarity_modifiers'
