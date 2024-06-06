@@ -308,8 +308,9 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
 
             rank_profiles.append('function modify(score) {')
-            #rank_profiles.append(f'expression: score_modifier_double(score_modifier_long(score))')
-            rank_profiles.append(f'expression: {expression}')
+            #rank_profiles.append(f'expression: score_modifier_long(score_modifier_double(score))')
+            rank_profiles.append(f'expression: score_modifier_double(score) + score_modifier_long(score)')
+            #rank_profiles.append(f'expression: {expression_score_modifier_long}')
             rank_profiles.append('}}')
 
             if lexical_fields:
