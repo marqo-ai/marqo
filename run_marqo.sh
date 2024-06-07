@@ -143,10 +143,11 @@ fi
 # set the default value to info and convert to lower case
 export MARQO_LOG_LEVEL=${MARQO_LOG_LEVEL:-info}
 MARQO_LOG_LEVEL=`echo "$MARQO_LOG_LEVEL" | tr '[:upper:]' '[:lower:]'`
+export MARQO_WORKERS=${MARQO_WORKERS:-1}
 
 # Start the tensor search web app in the background
 cd /app/src/marqo/tensor_search || exit
-uvicorn api:app --host 0.0.0.0 --port 8882 --timeout-keep-alive 75 --log-level $MARQO_LOG_LEVEL &
+uvicorn api:app --host 0.0.0.0 --port 8882 --workers $MARQO_WORKERS --timeout-keep-alive 75 --log-level $MARQO_LOG_LEVEL &
 export api_pid=$!
 wait "$api_pid"
 
