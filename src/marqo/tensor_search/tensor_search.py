@@ -42,6 +42,8 @@ from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 import numpy as np
 import psutil
 from PIL import Image
+from opensearchpy.exceptions import RequestError
+from marqo.errors import BadRequestError, InternalError, InvalidArgError
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import marqo_docs
@@ -111,6 +113,13 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
 
+
+
+
+
+
+  
+      
 def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: UnstructuredMarqoIndex):
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
@@ -142,14 +151,14 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     text_chunk_prefix = marqo_index.model.get_text_chunk_prefix(add_docs_params.text_chunk_prefix)
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
-
-    with ExitStack() as exit_stack:
-        if marqo_index.treat_urls_and_pointers_as_images:
-            with RequestMetricsStore.for_request().time(
+    try:
+        with ExitStack() as exit_stack:
+            if marqo_index.treat_urls_and_pointers_as_images:
+                with RequestMetricsStore.for_request().time(
                     "image_download.full_time",
                     lambda t: logger.debug(
-                        f"add_documents image download: took {t:.3f}ms to concurrently download "
-                        f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+                            f"add_documents image download: took {t:.3f}ms to concurrently download "
+                            f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
                     )
             ):
                 # TODO - Refactor this part to make it more readable
@@ -479,38 +488,65 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 copied[constants.MARQO_DOC_ID] = doc_id
                 bulk_parent_dicts.append(copied)
 
-    total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
-        "add_documents.processing_before_vespa")
-    logger.debug(
-        f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
-        f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
+        total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
+            "add_documents.processing_before_vespa")
+        logger.debug(
+            f"      add_documents pre-processing: took {(total_preproc_time):.3f}s total for {batch_size} docs, "
+            f"for an average of {(total_preproc_time / batch_size):.3f}s per doc.")
 
-    logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
+        logger.debug(f"          add_documents vectorise: took {(total_vectorise_time):.3f}s for {batch_size} docs, "
                  f"for an average of {(total_vectorise_time / batch_size):.3f}s per doc.")
 
-    if bulk_parent_dicts:
-        vespa_docs = [
-            VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
+        if bulk_parent_dicts:
+            vespa_docs = [
+                VespaDocument(**unstructured_vespa_index.to_vespa_document(marqo_document=doc))
             for doc in bulk_parent_dicts
         ]
-        # ADD DOCS TIMER-LOGGER (5)
-        start_time_5 = timer()
-        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.schema_name)
+            # ADD DOCS TIMER-LOGGER (5)
+            start_time_5 = timer()
+            with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
+                index_responses = vespa_client.feed_batch(vespa_docs, marqo_index.schema_name)
 
-        end_time_5 = timer()
-        total_http_time = end_time_5 - start_time_5
-        logger.debug(
-            f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} "
-            f"docs (roundtrip) to vector store, "
-            f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
-    else:
-        index_responses = None
+            end_time_5 = timer()
+            total_http_time = end_time_5 - start_time_5
+            logger.debug(
+                f"      add_documents roundtrip: took {(total_http_time):.3f}s to send {batch_size} "
+                f"docs (roundtrip) to vector store, "
+                f"for an average of {(total_http_time / batch_size):.3f}s per doc.")
+        else:
+            index_responses = None
 
-    with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-        t1 = timer()
+        with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+            t1 = timer()
+    except RequestError as e:
+        if e.status_code == 400:
+            raise BadRequestError("OpenSearch returned a 400 error.") from e
+        else:
+            raise
 
-        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
+    if len(unsuccessful_docs) > 0:
+        raise BadRequestError(
+            f"{len(unsuccessful_docs)} document(s) failed to be added. First error: "
+            f"{unsuccessful_docs[0][1]['error']}"
+        )
+
+    try:
+        if len(bulk_parent_dicts) > 0:
+            logger.info(f"Adding {len(bulk_parent_dicts)} documents")
+            unstructured_index = UnstructuredVespaIndex(marqo_index)
+            vespa_client.add_documents(unstructured_index, bulk_parent_dicts)
+
+            logger.info("Documents added successfully")
+
+            if marqo_index.is_refreshing and marqo_index.refresh_interval is not None:
+                vespa_client.refresh_index(unstructured_index)
+    except RequestError as e:
+        if e.status_code == 400:
+            raise BadRequestError("OpenSearch returned a 400 error during document addition.") from e
+        else:
+            raise
+
+    def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
             """translates Vespa response dict into Marqo dict"""
             result_dict = {}
             new_items = []
@@ -538,7 +574,23 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
             return result_dict
 
-        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
+    return translate_add_doc_response(index_responses, time_diff=t1 - t0)
+
+    
+
+       
+          
+
+       
+                           
+               
+          
+
+
+
+
+
+
 
 
 def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
