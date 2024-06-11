@@ -254,4 +254,19 @@ class TestDictScoreModifiers(MarqoTestCase):
                 updated_doc = tensor_search.get_document_by_id(self.config, index.name, "1")
                 self.assertTrue(updated_doc["_id"] == "1")
                 self.assertTrue(updated_doc["map_score_mods"]["a"] == 1.5)
+
+                # Search with score modifier
+                # 0.5 + 1.5 * 2 = 3.5
+                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "map_score_mods.a", "weight": 2}]})
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="",
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+                # Get the score of the first result.
+                score_of_first_result = res["hits"][0]["_score"]
+
+                # Assert that the first result has _id "1" and 3 <= score <= 4
+                self.assertTrue(res["hits"][0]["_id"] == "1")
+                self.assertTrue(3 <= score_of_first_result <= 4)
             

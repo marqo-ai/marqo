@@ -17,10 +17,5 @@ QUERY_INPUT_EMBEDDING = 'marqo__query_embedding'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = 'marqo__mult_weights'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = 'marqo__add_weights'
 
-#QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE = 'marqo__mult_weights_double'
-#QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE = 'marqo__add_weights_double'
-#QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG = 'marqo__mult_weights_long'
-#QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG = 'marqo__add_weights_long'
-
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
 SUMMARY_ALL_VECTOR = 'all-vector-summary'
