@@ -722,3 +722,44 @@ class TestSearch(MarqoTestCase):
                         print(res)
                         self.assertIn("hits", res)
                         self.assertEqual(expected_count, len(res['hits']))
+
+    def test_LexicalSearchResults(self):
+        docs = [
+            {"_id": "11", "text_field_1": "field_1_document_1"},
+            {"_id": "12", "text_field_1": "field_1_document_2"},
+            {"_id": "21", "text_field_2": "field_2_document_1"},
+            {"_id": "22", "text_field_2": "field_2_document_2"}
+        ]
+
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(msg = index.type):
+                tensor_fields = ["text_field_1", "text_field_2"] \
+                    if isinstance(index, UnstructuredMarqoIndex) else None
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs,
+                        tensor_fields=tensor_fields
+                    )
+                )
+
+                # Test search with text_field_1
+                res = tensor_search.search(
+                    text="field_1_document_1", config=self.config, index_name=index.name,
+                    search_method=SearchMethod.LEXICAL, result_count=10
+                )
+
+                self.assertEqual(1, len(res["hits"]))
+                self.assertEqual("11", res["hits"][0]["_id"])
+                self.assertTrue(0 < res["hits"][0]["_score"], f"score: {res['hits'][0]['_score']}")
+
+                # Test search with text_field_2
+                res = tensor_search.search(
+                    text="field_2_document_1", config=self.config, index_name=index.name,
+                    search_method=SearchMethod.LEXICAL, result_count=10
+                )
+
+                self.assertEqual(1, len(res["hits"]))
+                self.assertEqual("21", res["hits"][0]["_id"])
+                self.assertTrue(0 < res["hits"][0]["_score"], f"score: {res['hits'][0]['_score']}")
