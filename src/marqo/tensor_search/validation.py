@@ -369,8 +369,8 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
 
     # If field is declared in mappings, it overwrites the default.
     if mappings and field in mappings:
-        print(f"mappings: {mappings[field]}")
-        print(f"field_content: {field_content}")
+        #print(f"mappings: {mappings[field]}")
+        #print(f"field_content: {field_content}")
         if mappings[field]["type"] == FieldType.MultimodalCombination:
             field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
         elif mappings[field]["type"] == FieldType.CustomVector:
