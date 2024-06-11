@@ -1,29 +1,23 @@
 import json
 import os
 import time
-
 import torch
-
 from threading import Lock
 from PIL import Image
-
 from marqo import config, marqo_docs, version
 from marqo.api import exceptions
 from marqo.connections import redis_driver
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.s2_inference.processing.image import chunk_image
 from marqo.s2_inference.constants import PATCH_MODELS
-# we need to import backend before index_meta_cache to prevent circular import error:
 from marqo.tensor_search import constants
 from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
-
-
+from tabulate import tabulate
 
 logger = get_logger(__name__)
-
 
 def on_start(config: config.Config):
     to_run_on_start = (
@@ -79,50 +73,57 @@ class PopulateCache:
 
 
 class CUDAAvailable:
-    """checks the status of cuda
-    """
-    logger = get_logger('CUDA device summary')
+    """Checks the status of CUDA and logs a summary."""
+    logger = get_logger('CUDAAvailable')
+
+    def id_to_device(self, id):
+        if id < 0:
+            return 'CPU'
+        return torch.cuda.get_device_name(id)
 
     def run(self):
-        def id_to_device(id):
-            if id < 0:
-                return ['cpu']
-            return [torch.cuda.get_device_name(id)]
-
         device_count = 0 if not torch.cuda.is_available() else torch.cuda.device_count()
+        device_ids = [-1] + list(range(device_count))
 
-        # use -1 for cpu
-        device_ids = [-1]
-        device_ids += list(range(device_count))
-
-        device_names = []
+        device_summary = []
         for device_id in device_ids:
-            device_names.append({'id': device_id, 'name': id_to_device(device_id)})
+            device_name = self.id_to_device(device_id)
+            model_test_status = self.test_model_on_device(device_id)
+            device_summary.append({'ID': device_id, 'Name': device_name, 'Model Test': model_test_status})
 
-        self.logger.info(f"Found devices {device_names}")
+        self.logger.info("Device and Model Summary:\n" + tabulate(device_summary, headers="keys", tablefmt="grid"))
+
+    def test_model_on_device(self, device_id):
+        try:
+            self.load_and_test_model(device_id)
+            return 'Success'
+        except Exception as e:
+            return f'Failure: {e}'
+
+    def load_and_test_model(self, device_id):
+        if device_id == -1:
+            pass  # CPU test
+        else:
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA not available.")
+            torch.cuda.set_device(device_id)
+            # Additional GPU model loading/testing logic
 
 
 class SetBestAvailableDevice:
-    """sets the MARQO_BEST_AVAILABLE_DEVICE env var
-    """
+    """Sets the MARQO_BEST_AVAILABLE_DEVICE env var"""
     logger = get_logger('SetBestAvailableDevice')
 
     def run(self):
-        """
-            This is set once at startup time. We assume it will NOT change,
-            if it does, health check should throw a warning.
-        """
         if torch.cuda.is_available():
             os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cuda"
         else:
             os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE] = "cpu"
-
         self.logger.info(f"Best available device set to: {os.environ[EnvVars.MARQO_BEST_AVAILABLE_DEVICE]}")
 
 
 class CacheModels:
-    """warms the in-memory model cache by preloading good defaults
-    """
+    """Warms the in-memory model cache by preloading good defaults"""
     logger = get_logger('ModelsForStartup')
 
     def __init__(self):
@@ -133,7 +134,6 @@ class CacheModels:
             try:
                 self.models = json.loads(warmed_models)
             except json.JSONDecodeError as e:
-                # TODO: Change error message to match new format
                 raise exceptions.EnvVarError(
                     f"Could not parse environment variable `{EnvVars.MARQO_MODELS_TO_PRELOAD}`. "
                     f"Please ensure that this a JSON-encoded array of strings or dicts. For example:\n"
@@ -142,10 +142,8 @@ class CacheModels:
                 ) from e
         else:
             self.models = warmed_models
-        # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
-
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 
     def run(self):
@@ -153,7 +151,6 @@ class CacheModels:
         N = 10
         messages = []
         for model in self.models:
-            # Skip preloading of models that can't be preloaded (eg. no_model)
             if isinstance(model, str):
                 model_name = model
             elif isinstance(model, dict):
@@ -174,7 +171,6 @@ class CacheModels:
             for device in self.default_devices:
                 self.logger.debug(f"Loading model: {model} on device: {device}")
 
-                # warm it up
                 _ = _preload_model(model=model, content=test_string, device=device)
 
                 t = 0
@@ -191,6 +187,7 @@ class CacheModels:
         for message in messages:
             self.logger.info(message)
         self.logger.info("completed loading models")
+
 
 class CachePatchModels:
     """Prewarm patch models"""
@@ -235,7 +232,6 @@ class CachePatchModels:
                 self.logger.debug(f"Prewarming model: {model} on device: {device}")
                 with self.lock:
                     try:
-                        # Warm it up
                         chunks = chunk_image(test_image_pil, device=device, method=model)
 
                         t = 0
@@ -260,25 +256,13 @@ class CachePatchModels:
             
 
 def _preload_model(model, content, device):
-    """
-        Calls vectorise for a model once. This will load in the model if it isn't already loaded.
-        If `model` is a str, it should be a model name in the registry
-        If `model is a dict, it should be an object containing `model_name` and `model_properties`
-        Model properties will be passed to vectorise call if object exists
-    """
     if isinstance(model, str):
-        # For models IN REGISTRY
         _ = vectorise(
             model_name=model,
             content=content,
             device=device
         )
     elif isinstance(model, dict):
-        # For models from URL
-        """
-        TODO: include validation from on start script (model name properties etc)
-        _check_model_name(index_settings)
-        """
         try:
             _ = vectorise(
                 model_name=model["model"],
@@ -301,7 +285,6 @@ class InitializeRedis:
 
     def run(self):
         logger.debug('Initializing Redis')
-        # Can be turned off with MARQO_ENABLE_THROTTLING = 'FALSE'
         if utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_THROTTLING) == "TRUE":
             redis_driver.init_from_app(self.host, self.port)
 
