@@ -266,3 +266,58 @@ class TestHybridSearch(MarqoTestCase):
                             self.assertGreater(len(res["hits"]), 0)
 
 
+    def test_hybrid_search_custom_searcher(self):
+        """
+        Test all hybrid search methods calls the custom searcher
+        """
+
+        for index in [self.structured_text_index_single_field]:
+            with self.subTest(index=index.name):
+                # Add documents
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc1", "text_field_1": "dogs"},
+                            {"_id": "doc2", "text_field_1": "puppies"},     # similar semantics to dogs
+                            {"_id": "doc3", "text_field_1": "canines"},     # similar semantics to dogs
+                            {"_id": "doc4", "text_field_1": "hot dogs"},    # shares lexical token with dogs
+                            {"_id": "doc5", "text_field_1": "dogs is a word"},
+                        ],
+                    )
+                )
+
+                for retrieval_method in {RetrievalMethod.Disjunction}:
+                    for ranking_method in {RankingMethod.RRF}:
+                        with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                            original_query = self.config.vespa_client.query
+                            def pass_through_query(*arg, **kwargs):
+                                return original_query(*arg, **kwargs)
+
+                            mock_vespa_client_query = unittest.mock.MagicMock()
+                            mock_vespa_client_query.side_effect = pass_through_query
+
+                            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                            def run():
+                                res = tensor_search.search(
+                                    config=self.config,
+                                    index_name=index.name,
+                                    text="dogs",
+                                    search_method="HYBRID",
+                                    hybrid_parameters=HybridParameters(
+                                        retrieval_method=retrieval_method,
+                                        ranking_method=ranking_method,
+                                        alpha=0.6,
+                                    )
+                                )
+                                return res
+
+                            res = run()
+
+                            call_args = mock_vespa_client_query.call_args_list
+                            self.assertEqual(len(call_args), 1)
+
+                            # Make sure results are retrieved
+                            self.assertIn("hits", res)
+                            self.assertGreater(len(res["hits"]), 0)

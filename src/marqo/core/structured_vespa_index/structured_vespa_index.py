@@ -454,6 +454,7 @@ class StructuredVespaIndex(VespaIndex):
 
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
 
+        # TODO: remove
         # Hybrid term is combination of tensor and lexical terms
         if marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Disjunction:
             hybrid_term = f'({tensor_term} OR {lexical_term})'
@@ -514,15 +515,29 @@ class StructuredVespaIndex(VespaIndex):
         #    query_inputs[common.QUERY_INPUT_EMBEDDING] = marqo_query.vector_query
 
         query = {
+            'searchChain': 'hybrid-chain',
+            # TODO: remove yql or put a dummy
             'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {hybrid_term}{filter_term}',
+            'yql.tensor': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
+            'yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
+            'hybrid.rankingMethod': marqo_query.hybrid_parameters.ranking_method,
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking
+            'ranking': ranking,
+            'ranking.scoreModifiersLexical': common.RANK_PROFILE_BM25_MODIFIERS,
+            'ranking.scoreModifiersTensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS
         }
         query = {k: v for k, v in query.items() if v is not None}
+
+        if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF, RankingMethod.NormalizeLinear}:
+            query["hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
+
+        if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF}:
+            query["hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrf_k
 
         return query
 

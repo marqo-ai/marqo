@@ -199,12 +199,10 @@ class StructuredVespaSchema(VespaSchema):
                     f'{self._generate_max_similarity_expression(tensor_fields[1:])})')
 
     def _generate_rrf_expression(self) -> str:
-        # TODO: move this to vespa_schema, if shared by unstructured
         return (f"query(alpha) * reciprocal_rank(embedding_similarity_expression) + "
                 f"(1-query(alpha)) * reciprocal_rank(bm25_expression)")     # TODO: add k back somehow, maybe index creation
 
     def _generate_normalize_linear_expression(self) -> str:
-        # TODO: move this to vespa_schema, if shared by unstructured
         return (f"query(alpha) * normalize_linear(embedding_similarity_expression) + "
                 f"(1-query(alpha)) * normalize_linear(bm25_expression)")
 
@@ -265,7 +263,7 @@ class StructuredVespaSchema(VespaSchema):
             # Input parameters
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            rank_profiles.append(f'query(alpha) float')  # TODO check if this should be type
+            rank_profiles.append(f'query(alpha) double')  # TODO check if this works
             for field in tensor_fields:
                 rank_profiles.append(f'query({field.name}): 0')
             rank_profiles.append('}')
@@ -292,7 +290,7 @@ class StructuredVespaSchema(VespaSchema):
             # Input parameters
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            rank_profiles.append(f'query(alpha) float')  # TODO check if this should be type
+            rank_profiles.append(f'query(alpha) double')    # TODO check if this works
             for field in tensor_fields:
                 rank_profiles.append(f'query({field.name}): 0')
             rank_profiles.append('}')

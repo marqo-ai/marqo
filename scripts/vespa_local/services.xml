@@ -3,7 +3,12 @@
 <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
     <container id="default" version="1.0">
         <document-api/>
-        <search/>
+        <search>
+            <chain id="hybrid-chain" inherits="vespa">
+                <searcher id="com.yahoo.search.example.HybridSearcher"
+                          bundle="hybrid-searcher" />
+            </chain>
+        </search>
         <nodes>
             <node hostalias="node1"/>
         </nodes>

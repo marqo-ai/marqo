@@ -166,7 +166,7 @@ class UnstructuredVespaSchema(VespaSchema):
                 fieldset default {{
                     fields: {cls._STRINGS}
                 }}
-
+                
                 rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY} inherits default {{
                     inputs {{
                         query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
@@ -178,9 +178,40 @@ class UnstructuredVespaSchema(VespaSchema):
                 }}
 
                 rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits default {{
-                    first-phase {{
-                    expression: bm25({cls._STRINGS})
+                    inputs {{
+                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
                     }}
+                    first-phase {{
+                        expression: bm25({cls._STRINGS})
+                    }}
+                }}
+                
+                rank-profile {unstructured_common.RANK_PROFILE_HYBRID_RRF} inherits default {{
+                    inputs {{
+                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
+                        query(alpha) double
+                    }}
+                    first-phase {{
+                        expression: query(alpha) * closeness(field, {cls._EMBEDDINGS}) + (1-query(alpha)) * bm25({cls._STRINGS})
+                    }}
+                    global-phase {{
+                        expression: query(alpha) * reciprocal_rank(closeness(field, {cls._EMBEDDINGS})) + (1-query(alpha)) * reciprocal_rank(bm25({cls._STRINGS}))
+                    }}
+                    match-features: closest({cls._EMBEDDINGS})
+                }}
+                
+                rank-profile {unstructured_common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR} inherits default {{
+                    inputs {{
+                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
+                        query(alpha) double
+                    }}
+                    first-phase {{
+                        expression: query(alpha) * closeness(field, {cls._EMBEDDINGS}) + (1-query(alpha)) * bm25({cls._STRINGS})
+                    }}
+                    global-phase {{
+                        expression: query(alpha) * normalize_linear(closeness(field, {cls._EMBEDDINGS})) + (1-query(alpha)) * normalize_linear(bm25({cls._STRINGS}))
+                    }}
+                    match-features: closest({cls._EMBEDDINGS})
                 }}
                 
                 rank-profile modifiers inherits default {{

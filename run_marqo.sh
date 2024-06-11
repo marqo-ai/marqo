@@ -45,6 +45,12 @@ See https://docs.marqo.ai/2.0.0/Guides/Advanced-Usage/configuration/ for more in
   exit 1
 
 elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_CONFIG_URL" ]; then
+  # Build Hybrid Searcher Jar
+  echo "Building hybrid searcher jar"
+  cd /app/scripts/vespa_local/components
+  apt-get install -y mvn
+  mvn install
+
   # Start local vespa
   echo "External vector store not configured. Using local vector store"
   tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"

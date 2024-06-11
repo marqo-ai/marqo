@@ -72,7 +72,7 @@ instance/
 docs/_build/
 
 # PyBuilder
-target/
+scripts/vespa_local/target/
 
 # Jupyter Notebook
 .ipynb_checkpoints

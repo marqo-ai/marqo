@@ -19,6 +19,12 @@ RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = 'embedding_similarity_modifiers'
 RANK_PROFILE_BM25 = "bm25"
 RANK_PROFILE_BM25_MODIFIERS = "bm25_modifiers"
 
+# For hybrid search
+RANK_PROFILE_HYBRID_RRF = 'hybrid_rrf'
+RANK_PROFILE_HYBRID_RRF_MODIFIERS = 'hybrid_rrf_modifiers'
+RANK_PROFILE_HYBRID_NORMALIZE_LINEAR = 'hybrid_normalize_linear'
+RANK_PROFILE_HYBRID_NORMALIZE_LINEAR_MODIFIERS = 'hybrid_normalize_linear_modifiers'
+
 QUERY_INPUT_EMBEDDING = "embedding_query"
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = 'marqo__mult_weights'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = 'marqo__add_weights'

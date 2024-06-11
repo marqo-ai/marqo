@@ -193,6 +193,11 @@ class VespaClient:
             'hits': hits,
             'ranking': ranking,
             'model.restrict': model_restrict,
+            # TODO: remove trace
+            'trace.level': 4,
+            'trace.profiling.matching.depth': 4,
+            'trace.profiling.firstPhaseRanking.depth': 4,
+            'trace.profiling.secondPhaseRanking.depth': 4,
             **query_features_list,
             **kwargs
         }

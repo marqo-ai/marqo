@@ -25,6 +25,7 @@ class HybridParameters(StrictBaseModel):
     retrieval_method: Optional[RetrievalMethod] = RetrievalMethod.Disjunction
     ranking_method: Optional[RankingMethod] = RankingMethod.RRF
     alpha: Optional[float] = 0.5
+    rrf_k: Optional[int] = 60
     searchable_attributes_lexical: Optional[List[str]] = None
     searchable_attributes_tensor: Optional[List[str]] = None
 
