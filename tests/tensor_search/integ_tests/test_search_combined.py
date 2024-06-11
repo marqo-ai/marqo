@@ -723,7 +723,8 @@ class TestSearch(MarqoTestCase):
                         self.assertIn("hits", res)
                         self.assertEqual(expected_count, len(res['hits']))
 
-    def test_LexicalSearchResults(self):
+    def test_LexicalSearchResultsScore(self):
+        """A test to ensure that the score is returned for lexical search results and the scores are greater than 0."""
         docs = [
             {"_id": "11", "text_field_1": "field_1_document_1"},
             {"_id": "12", "text_field_1": "field_1_document_2"},
