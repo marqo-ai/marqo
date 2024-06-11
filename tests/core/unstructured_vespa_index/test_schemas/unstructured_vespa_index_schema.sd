@@ -66,7 +66,11 @@ schema marqo__test_00unstructured_00schema {
                                rank: filter }
         }
 
-        field marqo__score_modifiers type tensor<float>(p{}) {
+        field marqo__score_modifiers_double type tensor<float>(p{}) {
+            indexing: attribute | summary
+        }
+
+        field marqo__score_modifiers_long type tensor<int8>(p{}) {
             indexing: attribute | summary
         }
 
@@ -118,7 +122,7 @@ schema marqo__test_00unstructured_00schema {
             query(marqo__add_weights) tensor<float>(p{})
         }
         function modify(score) {
-            expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
+            expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double), prod)) * if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_long)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_long), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double), sum) + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_long), sum)
        }
     }
 
