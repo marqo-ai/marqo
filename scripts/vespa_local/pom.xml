@@ -9,12 +9,30 @@
     <artifactId>hybrid-searcher</artifactId>  <!-- Note: When changing this, also change bundle names in services.xml -->
     <version>1.0.0</version>
     <packaging>container-plugin</packaging>
+    <dependencies>                          <!-- For unit testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.8.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.2</version>
+            </plugin>
+        </plugins>
+    </build>
     <parent>
         <groupId>com.yahoo.vespa</groupId>
         <artifactId>cloud-tenant-base</artifactId>
         <version>[8,9)</version>  <!-- Use the latest Vespa release on each build -->
         <relativePath/>
     </parent>
+    
     <properties>
         <bundle-plugin.failOnWarnings>true</bundle-plugin.failOnWarnings>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
