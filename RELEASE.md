@@ -1,3 +1,17 @@
+# Release 2.8.0
+
+## Bug fixes and minor changes
+- Improve `add_documents` memory efficiency and throughput for CLIP and Open_CLIP models when indexing documents with images when no patch method is used ([#849](https://github.com/marqo-ai/marqo/pull/849)). The image downloading and preprocessing logic has been improved. Marqo now converts the images to tensors directly after downloading. In our tests, the memory usage has been reduced by 37.5% and the throughput has been increased by 7.5% (subject to your settings). Marqo is also more stable when indexing documents in a multi-threading scenario.
+- Add support for pre-warming patch models ([#847](https://github.com/marqo-ai/marqo/pull/847)). See usage [here](https://docs.marqo.ai/2.8/Guides/Advanced-Usage/configuration/#configuring-preloaded-patch-models).
+
+## Bug fixes and minor changes
+- Replace the requests package with pycurl for faster image downloads ([#814](https://github.com/marqo-ai/marqo/pull/814)). Marqo now downloads images 2-3x faster in our tests and the overall `add_documents` throughput is increased by 7.5%
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.2k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+
 # Release 2.7.2
 
 ## Bug fixes and minor changes
