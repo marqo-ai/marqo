@@ -28,7 +28,6 @@ def validate_mappings_object_format(mappings: Dict) -> None:
                 # Add any other custom_vector field name validations if needed.
                 _validate_custom_vector_configuration_format(configuration)
             elif configuration["type"] == enums.MappingsObjectType.map_score_modifiers:
-                #print("Validating map score modifiers")
                 _validate_map_score_modifiers_configuration_format(configuration)
 
     except jsonschema.ValidationError as e:
@@ -39,10 +38,8 @@ def validate_mappings_object_format(mappings: Dict) -> None:
 
 def _validate_map_score_modifiers_configuration_format(configuration: Dict):
     try:
-        #print("Validating map score modifiers")
         jsonschema.validate(instance=configuration, schema=map_score_modifiers_schema)
     except jsonschema.ValidationError as e:
-        #print("Error validating map score modifiers")
         raise errors.InvalidArgError(
             f"Error validating map score modifiers mappings object. Reason: \n{str(e)}"
             f"\n Read about the mappings object here: {marqo_docs.mappings()}"
