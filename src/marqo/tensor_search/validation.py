@@ -369,8 +369,6 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
 
     # If field is declared in mappings, it overwrites the default.
     if mappings and field in mappings:
-        #print(f"mappings: {mappings[field]}")
-        #print(f"field_content: {field_content}")
         if mappings[field]["type"] == FieldType.MultimodalCombination:
             field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
         elif mappings[field]["type"] == FieldType.CustomVector:
@@ -567,8 +565,6 @@ def validate_mappings_object(
 
 def validate_map_score_modifiers_mappings_object(mappings_object: Dict):
     """Validates the map score modifiers mappings object"""
-    print("Validating map score modifiers")
-    print(f"mappings_object: {mappings_object}")
     try:
         jsonschema.validate(instance=mappings_object, schema=map_score_modifiers_schema)
     except jsonschema.ValidationError as e:

@@ -131,20 +131,7 @@ class StructuredVespaIndex(VespaIndex):
                             score_modifiers_long[f'{index_field.name}.{key}'] = value
                     else:
                         score_modifiers_long[index_field.name] = marqo_value
-                #print(f"score_modifiers_double: {score_modifiers_double}")
-                #print(f"score_modifiers_long: {score_modifiers_long}")
-                #score_modifiers[index_field.name] = marqo_value
-
-        """
-        if len(score_modifiers) > 0:
-            # TODO: Modify this to use the split for double and long
-            vespa_fields[common.FIELD_SCORE_MODIFIERS] = {
-                "modify": {
-                    "operation": "replace",
-                    "cells": score_modifiers
-                }
-            }
-        """
+               
         if len(score_modifiers_double) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE] = {
                 "modify": {
@@ -152,7 +139,7 @@ class StructuredVespaIndex(VespaIndex):
                     "cells": score_modifiers_double
                 }
             }
-            #print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]}")
+
         if len(score_modifiers_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG] = {
                 "modify": {
@@ -160,7 +147,6 @@ class StructuredVespaIndex(VespaIndex):
                     "cells": score_modifiers_long
                 }
             }
-            #print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]}")
        
         return {"id": vespa_id, "fields": vespa_fields}
 
@@ -218,9 +204,6 @@ class StructuredVespaIndex(VespaIndex):
                             score_modifiers_long[f'{index_field.name}.{key}'] = value
                     else:
                         score_modifiers_long[index_field.name] = marqo_value
-                #print(f"score_modifiers_double: {score_modifiers_double}")
-                #print(f"score_modifiers_long: {score_modifiers_long}")
-                #score_modifiers[index_field.name] = marqo_value
 
         # Tensors
         vector_count = 0
@@ -244,18 +227,11 @@ class StructuredVespaIndex(VespaIndex):
 
         vespa_fields[common.FIELD_VECTOR_COUNT] = vector_count
 
-        """
-        if len(score_modifiers) > 0:
-            # TODO: Modify this to use the split for double and long
-            vespa_fields[common.FIELD_SCORE_MODIFIERS] = score_modifiers
-        """
 
         if len(score_modifiers_double) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE] = score_modifiers_double
-            #print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE]}")
         if len(score_modifiers_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG] = score_modifiers_long
-            #print(f"vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]: {vespa_fields[common.FIELD_SCORE_MODIFIERS_LONG]}")
 
         vespa_doc = {
             self._VESPA_DOC_FIELDS: vespa_fields
@@ -654,89 +630,12 @@ class StructuredVespaIndex(VespaIndex):
                 else:
                     raise InternalError(f'Unknown score modifier type {modifier.type}')
 
-            #print(f"mult_tensor: {mult_tensor}")
-            #print(f"add_tensor: {add_tensor}")
-            # Note one of these could be empty, but not both
             return {
                 common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS: mult_tensor,
                 common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS: add_tensor
             }
 
         return None
-    
-    """def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, Union[int, float]]]]:
-        if marqo_query.score_modifiers:
-            mult_tensor_double = {}
-            add_tensor_double = {}
-            mult_tensor_long = {}
-            add_tensor_long = {}
-
-            for modifier in marqo_query.score_modifiers:
-                if isinstance(modifier.weight, int):
-                    if modifier.type == ScoreModifierType.Multiply:
-                        mult_tensor_long[modifier.field] = modifier.weight
-                    elif modifier.type == ScoreModifierType.Add:
-                        add_tensor_long[modifier.field] = modifier.weight
-                else:  # float or double
-                    if modifier.type == ScoreModifierType.Multiply:
-                        mult_tensor_double[modifier.field] = modifier.weight
-                    elif modifier.type == ScoreModifierType.Add:
-                        add_tensor_double[modifier.field] = modifier.weight
-                print(f"from the _get_score_modifiers function: modifier is {modifier}")
-                print(f"from the _get_score_modifiers function: modifier field is {modifier.field}")
-                print(f"from the _get_score_modifiers function: modifier weight is {modifier.weight}")
-                print(f"from the _get_score_modifiers function: mult_tensor_long = {mult_tensor_long}")
-                print(f"from the _get_score_modifiers function: add_tensor_long = {add_tensor_long}")
-                print(f"from the _get_score_modifiers function: mult_tensor_double = {mult_tensor_double}")
-                print(f"from the _get_score_modifiers function: add_tensor_double = {add_tensor_double}")
-
-            return {
-                common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE: mult_tensor_double,
-                common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE: add_tensor_double,
-                common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG: mult_tensor_long,
-                common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG: add_tensor_long
-            }
-
-        return None"""
-    
-    """def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
-        if marqo_query.score_modifiers:
-            mult_tensor_double = {}
-            add_tensor_double = {}
-            mult_tensor_long = {}
-            add_tensor_long = {}
-            
-            for modifier in marqo_query.score_modifiers:
-                if '.' in modifier.field:
-                    field_name, key = modifier.field.split('.', 1)
-                    field_type = self._get_field_type(field_name)
-                    
-                    if field_type in [FieldType.MapInt, FieldType.MapLong]:
-                        value = int(marqo_query.score_modifiers[modifier.field])
-                        if modifier.type == ScoreModifierType.Multiply:
-                            mult_tensor_long[f'{field_name}.{key}'] = value
-                        elif modifier.type == ScoreModifierType.Add:
-                            add_tensor_long[f'{field_name}.{key}'] = value
-                    else:  # FieldType.MapFloat, FieldType.MapDouble
-                        value = float(marqo_query.score_modifiers[modifier.field])
-                        if modifier.type == ScoreModifierType.Multiply:
-                            mult_tensor_double[f'{field_name}.{key}'] = value
-                        elif modifier.type == ScoreModifierType.Add:
-                            add_tensor_double[f'{field_name}.{key}'] = value
-                else:
-                    if modifier.type == ScoreModifierType.Multiply:
-                        mult_tensor_double[modifier.field] = modifier.weight
-                    elif modifier.type == ScoreModifierType.Add:
-                        add_tensor_double[modifier.field] = modifier.weight
-                    
-            return {
-                common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_DOUBLE: mult_tensor_double,
-                common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_DOUBLE: add_tensor_double,
-                common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LONG: mult_tensor_long,
-                common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LONG: add_tensor_long
-            }
-            
-        return None"""
 
     def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
         if not marqo_query.or_phrases and not marqo_query.and_phrases:

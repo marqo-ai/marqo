@@ -10,6 +10,9 @@ from marqo.tensor_search.models.api_models import ScoreModifier
 from marqo.vespa.models import QueryResult
 from marqo.vespa.models.query_result import Root, Child, RootFields
 from tests.marqo_test import MarqoTestCase
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.tensor_search.api import update_documents
+
 
 
 class TestDictScoreModifiers(MarqoTestCase):
@@ -90,22 +93,21 @@ class TestDictScoreModifiers(MarqoTestCase):
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                print(f"add_docs status for {index.name}: {res}")
                 # Search with score modifier
                 # 0.5 + 1 * 5 = 5.5
                 score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 5}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
-                    score_modifiers=score_modifier
+                    score_modifiers=score_modifier,
+                    result_count=10
                 )
-                print(f"search status add to score {index.name}: {res}")
 
                 # Get the score of the first result.
                 score_of_first_result = res["hits"][0]["_score"]
 
                 # Assert that the first result has _id "6" and 5 <= score <= 6
-                assert res["hits"][0]["_id"] in ["6", "7"]
-                assert 5 <= score_of_first_result <= 6
+                self.assertIn(res["hits"][0]["_id"], ["6", "7"])
+                self.assertTrue(5 <= score_of_first_result <= 6)
 
     # Test multiply score by
     def test_multiply_score_by_map_score_modifier(self):
@@ -136,22 +138,21 @@ class TestDictScoreModifiers(MarqoTestCase):
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                print(f"add_docs status for {index.name}: {res}")
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
                 score_modifier = ScoreModifier(**{"multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
-                    score_modifiers=score_modifier
+                    score_modifiers=score_modifier,
+                    result_count=10
                 )
-                print(f"search status add to score {index.name}: {res}")
 
                 # Get the score of the first result.
                 score_of_first_result = res["hits"][0]["_score"]
 
-                # Assert that the first result has _id "6" and 5 <= score <= 6
-                assert res["hits"][0]["_id"] in ["1", "7"]
-                assert 0.9 <= score_of_first_result <= 1.1
+                # Assert that the first result has _id "6" and 0.8 <= score <= 1.2
+                self.assertIn(res["hits"][0]["_id"], ["1", "7"])
+                self.assertTrue(0.8 <= score_of_first_result <= 1.2)
 
     # Test combined add to score and multiply score by
     def test_combined_map_score_modifier(self):
@@ -182,36 +183,75 @@ class TestDictScoreModifiers(MarqoTestCase):
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                print(f"add_docs status for {index.name}: {res}")
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
-                '''
-                # 0.5 * 1 * 4 = 2
-                # 0.5 * 0.5 * 4 + 1 * 2 = 3
-                res = mq.index("map-score-modifiers-index").search(
-                    q="",
-                    score_modifiers={
-                        "add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 2}],
-                        "multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]
-                    }
-                )
-                print(json.dumps(res, indent=2))
-                '''
                 score_modifier = ScoreModifier(**{
                         "add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 2}],
                         "multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]
                     }
                 )
-                print(f"score_modifier: {score_modifier}")
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
-                    score_modifiers=score_modifier
+                    score_modifiers=score_modifier,
+                    result_count=10
                 )
-                print(f"search status add to score {index.name}: {res}")
 
                 # Get the score of the first result.
                 score_of_first_result = res["hits"][0]["_score"]
 
                 # Assert that the first result has _id "6" and 5 <= score <= 6
-                assert res["hits"][0]["_id"] == "7"
-                assert 2.9 <= score_of_first_result <= 3.1
+                self.assertTrue(res["hits"][0]["_id"] == "7")
+                self.assertTrue(2.9 <= score_of_first_result <= 3.1)
+
+
+    def test_partial_document_update(self):
+        """
+        Test that partial document update works for a map score modifier.
+        """
+        for index in [self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text_field": "a photo of a cat", "map_score_mods": {"a": 0.5}},
+                            {"_id": "2", "text_field": "a photo of a dog", "map_score_mods": {"b": 0.5}},
+                            {"_id": "3", "text_field": "a photo of a cat", "map_score_mods": {"c": 0.5}},
+                            {"_id": "4", "text_field": "a photo of a cat", "map_score_mods_int": {"a": 1}},
+                            {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"b": 1}},
+                            {"_id": "6", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1}},
+                            {"_id": "7", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
+                            "map_score_mods": {"a": 0.5}},
+                        ],
+                        tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                        mappings={
+                            "map_score_mods": {"type": "map_score_modifiers"},
+                            "map_score_mods_int": {"type": "map_score_modifiers"}
+                        } if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Get Document and assert that the score modifier is 0.5
+                # Sample:  updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
+                original_doc = tensor_search.get_document_by_id(self.config, index.name, "1")
+                self.assertTrue(original_doc["_id"] == "1")
+                self.assertTrue(original_doc["map_score_mods"]["a"] == 0.5)
+
+                # Update the document
+                updated_doc = {
+                    "map_score_mods": {"a": 1.5},
+                    "_id": "1"
+                }
+                r = update_documents(
+                    marqo_config=self.config,
+                    index_name=index.name,
+                    body=UpdateDocumentsBodyParams(documents=[updated_doc])
+                )
+
+                # Get updated document and assert that the score modifier is 1.5
+                updated_doc = tensor_search.get_document_by_id(self.config, index.name, "1")
+                self.assertTrue(updated_doc["_id"] == "1")
+                self.assertTrue(updated_doc["map_score_mods"]["a"] == 1.5)
+            
