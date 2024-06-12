@@ -63,7 +63,6 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
-        #score_modifiers: Dict[str, float] = dict()
         score_modifiers_double: Dict[str, float] = {}
         score_modifiers_long: Dict[str, int] = {}
 
@@ -153,7 +152,6 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
-        #score_modifiers: Dict[str, float] = {}
         score_modifiers_double: Dict[str, float] = {}
         score_modifiers_long: Dict[str, int] = {}
 
