@@ -9,12 +9,28 @@
     <artifactId>hybrid-searcher</artifactId>  <!-- Note: When changing this, also change bundle names in services.xml -->
     <version>1.0.0</version>
     <packaging>container-plugin</packaging>
-    <dependencies>                          <!-- For unit testing -->
-        <dependency>
+    <dependencies>                          
+        <dependency>                <!-- For unit testing -->
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.8.2</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>                <!-- Logging API dependency -->
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.23.1</version>
+        </dependency>
+        <dependency>                <!-- Actual logging implementation -->
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.23.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_annotations</artifactId>
+            <version>2.28.0</version>
+            <scope>provided</scope> <!-- or runtime if you prefer -->
         </dependency>
     </dependencies>
     <build>
@@ -23,6 +39,46 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+            <encoding>UTF-8</encoding>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <showWarnings>true</showWarnings>
+                    <compilerArgs>
+            <arg>-Xlint:all</arg>       <!-- To avoid the @ warning -->
+            <arg>-Xlint:-processing</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>        <!-- for errorprone build problem -->
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>4.2.1</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <instructions>
+                        <Import-Package>
+                            com.google.errorprone.annotations;version="[2.28,3.0)"
+                        </Import-Package>
+                    </instructions>
+                </configuration>
+            </plugin>
+            <plugin>        <!-- for errorprone build problem -->
+                <groupId>com.yahoo.vespa</groupId>
+                <artifactId>bundle-plugin</artifactId>
+                <version>8.355.18</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate-osgi-manifest</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
