@@ -50,10 +50,7 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
 
     """
     # Generate pseudo-unique ID for thread metrics.
-    current_thread = threading.current_thread()
-    thread_id = current_thread.ident
-    _id = f'image_download.{thread_id}'
-
+    _id = f'image_download.{threading.get_ident()}'
     TIMEOUT_SECONDS = 3
     if metric_obj is None:  # Occurs predominately in testing.
         metric_obj = RequestMetricsStore.for_request()
