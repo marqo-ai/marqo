@@ -50,19 +50,7 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
 
     """
     # Generate pseudo-unique ID for thread metrics.
-    # TODO - We might need to refactor this part as the image downloading happens before the _id validation.
-    #  We might download unnecessary images if the _id is invalid.
-    doc_id_lists = []
-    for d in allocated_docs:
-        if "_id" in d:
-            if isinstance(d["_id"], str):
-                doc_id_lists.append(d["_id"])
-            else:
-                continue
-        else:
-            doc_id_lists.append(str(random.getrandbits(64)))
-    _id = f'image_download.{hash("".join(doc_id_lists)) % 1000}'
-
+    _id = f'image_download.{hash(str(allocated_docs)) % 1000}'
     TIMEOUT_SECONDS = 3
     if metric_obj is None:  # Occurs predominately in testing.
         metric_obj = RequestMetricsStore.for_request()
