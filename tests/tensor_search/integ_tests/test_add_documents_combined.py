@@ -390,3 +390,52 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
             # Images should not be closed as they are Tensor instead of ImageType
             mock_close.assert_not_called()
+
+    def test_idErrorWhenImageDownloading(self):
+        """A test ensure image download is not raising 500 error when there is an invalid _id.
+
+        Image download use the document _id to generate a unique thread id.
+        However, the image download happens before validate the document _id.
+        This test ensures that the image download does not raise a 500 error when the document _id is invalid.
+        """
+        test_docs = [
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
+                                 "/examples/ImageSearchGuide/data/image1.jpg",
+                 "text_field_1": "this is a valid image",
+                 "_id": "1"
+            },
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
+                                 "/examples/ImageSearchGuide/data/image2.jpg",
+                "text_field_1": "this is a invalid image due to int id",
+                "_id": 2
+            },
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
+                                 "/examples/ImageSearchGuide/data/image3.jpg",
+                "text_field_1": "this is a invalid image due to None",
+                "_id": None
+            },
+            {
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
+                                 "/examples/ImageSearchGuide/data/image4.jpg",
+                "text_field_1": "this is a invalid image due to ",
+                "_id": []
+            }
+        ]
+
+        for index_name in [self.unstructured_marqo_index_name, self.structured_marqo_index_name]:
+            tensor_fields = ["image_field_1", "text_field_1"] if index_name == self.unstructured_marqo_index_name \
+                else None
+            with self.subTest(index_name):
+                r = tensor_search.add_documents(config=self.config,
+                                            add_docs_params=AddDocsParams(index_name=index_name,
+                                                                          docs=test_docs,
+                                                                          tensor_fields=tensor_fields))
+                self.assertEqual(True, r["errors"])
+                self.assertEqual(4, len(r["items"]))
+                self.assertEqual(200, r["items"][0]["status"])
+                for i in range(1, 4):
+                    self.assertEqual(400, r["items"][i]["status"])
+                    self.assertIn("Document _id must be a string", r["items"][i]["error"])
