@@ -17,8 +17,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.lang.InterruptedException;
 import java.util.concurrent.ExecutionException;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.LogManager;
+// import org.apache.logging.log4j.Logger;
+// import org.apache.logging.log4j.LogManager;
 
 /**
  * This searcher takes the YQL for both a lexical and tensor search from the query,
@@ -29,7 +29,7 @@ import org.apache.logging.log4j.LogManager;
 @Provides("HybridReRanking")
 public class HybridSearcher extends Searcher {
 
-    Logger logger = LogManager.getLogger(HybridSearcher.class);
+    // Logger logger = LogManager.getLogger(HybridSearcher.class);
 
     private static String MATCH_FEATURES_FIELD = "matchfeatures";
 
@@ -56,7 +56,7 @@ public class HybridSearcher extends Searcher {
         
         // Determine hybrid methods to use
 
-        logger.debug("Starting Hybrid Search script.");
+        // logger.debug("Starting Hybrid Search script.");
 
         String retrieval_method = query.properties().
                 getString("hybrid.retrievalMethod", "");
@@ -74,12 +74,12 @@ public class HybridSearcher extends Searcher {
         Double alpha = query.properties().getDouble("hybrid.alpha", 0.5);
 
         // Log fetched variables
-        logger.debug(String.format("Retrieval method found: %s", retrieval_method));
-        logger.debug(String.format("Ranking method found: %s", ranking_method));
-        logger.debug(String.format("YQL lexical found: %s", yql_lexical));
-        logger.debug(String.format("YQL tensor found: %s", yql_tensor));
-        logger.debug(String.format("RRF k found: %d", rrf_k));
-        logger.debug(String.format("alpha found: %.2f", alpha));
+        // logger.debug(String.format("Retrieval method found: %s", retrieval_method));
+        // logger.debug(String.format("Ranking method found: %s", ranking_method));
+        // logger.debug(String.format("YQL lexical found: %s", yql_lexical));
+        // logger.debug(String.format("YQL tensor found: %s", yql_tensor));
+        // logger.debug(String.format("RRF k found: %d", rrf_k));
+        // logger.debug(String.format("alpha found: %.2f", alpha));
 
         if (retrieval_method == "disjunction") {
             // Declare result variables
@@ -87,14 +87,14 @@ public class HybridSearcher extends Searcher {
             Query query_lexical = query.clone();
             query_lexical.properties().set("yql", yql_lexical);
             query_lexical.getRanking().setProfile(query.properties().getString("ranking.scoreModifiersLexical"));
-            logger.debug("LEXICAL QUERY: ");
-            logger.debug(query_lexical.toString());
+            //logger.debug("LEXICAL QUERY: ");
+            //logger.debug(query_lexical.toString());
 
             Query query_tensor = query.clone();
             query_tensor.properties().set("yql", yql_tensor);
             query_lexical.getRanking().setProfile(query.properties().getString("ranking.scoreModifiersTensor"));
-            logger.debug("TENSOR QUERY: ");
-            logger.debug(query_tensor.toString());
+            //logger.debug("TENSOR QUERY: ");
+            //logger.debug(query_tensor.toString());
 
             // Execute both searches async
             int timeout = 300 * 1000;       // TODO: make configurable
@@ -110,16 +110,16 @@ public class HybridSearcher extends Searcher {
                 throw new RuntimeException(e.toString());
             }
 
-            logger.debug("LEXICAL RESULTS");
-            logger.debug(result_lexical.toString());
-            logger.debug("TENSOR RESULTS");
-            logger.debug(result_tensor.toString());
+            //logger.debug("LEXICAL RESULTS");
+            //logger.debug(result_lexical.toString());
+            //logger.debug("TENSOR RESULTS");
+            //logger.debug(result_tensor.toString());
 
             // TODO: Possible move this outside, when other retrieval methods are available.
             if (ranking_method == "rrf") {
                 HitGroup fused_hit_list = rrf(result_tensor.hits(), result_lexical.hits(), rrf_k, alpha);
-                logger.debug("RRF Fused Hit Group");
-                logger.debug(fused_hit_list.toString());
+                //logger.debug("RRF Fused Hit Group");
+                //logger.debug(fused_hit_list.toString());
                 return new Result(query, fused_hit_list);
             }
         }
@@ -139,10 +139,10 @@ public class HybridSearcher extends Searcher {
         HitGroup result = new HitGroup();
         Double reciprocal_rank, existing_score, new_score;
 
-        logger.debug("Beginning RRF process.");
+        //logger.debug("Beginning RRF process.");
 
         // Iterate through tensor hits list
-        logger.debug(String.format("Tensor result list size: %d", hits_tensor.size()));
+        //logger.debug(String.format("Tensor result list size: %d", hits_tensor.size()));
         int rank = 1;
         for (Hit hit : hits_tensor) {
             reciprocal_rank = alpha * (1 / (rank + k));
@@ -150,13 +150,13 @@ public class HybridSearcher extends Searcher {
             hit.setRelevance(reciprocal_rank);                 // Update score to be weighted RR (tensor)
             result.add(hit);
 
-            logger.debug(String.format("Modified tensor hit at rank: %d", rank));
-            logger.debug(hit.toString());
+            //logger.debug(String.format("Modified tensor hit at rank: %d", rank));
+            //logger.debug(hit.toString());
             rank++;
         }
 
         // Iterate through lexical hits list
-        logger.debug(String.format("Lexical result list size: %d", hits_lexical.size()));
+        //logger.debug(String.format("Lexical result list size: %d", hits_lexical.size()));
         rank = 1;
         for (Hit hit : hits_lexical) {
             reciprocal_rank = (1-alpha) * (1 / (rank + k));
@@ -171,23 +171,23 @@ public class HybridSearcher extends Searcher {
             hit.setRelevance(new_score);      // Update score to be weighted RR (lexical)
             result.add(hit);
 
-            logger.debug(String.format("Modified lexical hit at rank: %d", rank));
-            logger.debug(hit.toString());
+            //logger.debug(String.format("Modified lexical hit at rank: %d", rank));
+            //logger.debug(hit.toString());
             rank++;
         }
 
         // sort result
-        logger.debug("Combined list (UNSORTED)");
-        logger.debug(result.toString());
+        //logger.debug("Combined list (UNSORTED)");
+        //logger.debug(result.toString());
         result.sort();
-        logger.debug("Combined list (SORTED)");
-        logger.debug(result.toString());
+        //logger.debug("Combined list (SORTED)");
+        //logger.debug(result.toString());
 
         // Only return top hits (max length)
         Integer final_length = Math.max(hits_tensor.size(), hits_lexical.size());
         result.trim(0, final_length);
-        logger.debug("Combined list (TRIMMED)");
-        logger.debug(result.toString());
+        //logger.debug("Combined list (TRIMMED)");
+        //logger.debug(result.toString());
 
         return result;
     }

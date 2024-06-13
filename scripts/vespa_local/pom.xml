@@ -16,26 +16,38 @@
             <version>5.8.2</version>
             <scope>test</scope>
         </dependency>
-        <dependency>                <!-- Logging API dependency -->
+        <!--
+        <dependency> 
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.13</version>
+        </dependency>
+
+        <dependency>              
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
             <version>2.23.1</version>
         </dependency>
-        <dependency>                <!-- Actual logging implementation -->
+        -->
+        <!--
+        <dependency>              
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
             <version>2.23.1</version>
         </dependency>
+        -->
+        <!--
         <dependency>
             <groupId>com.google.errorprone</groupId>
             <artifactId>error_prone_annotations</artifactId>
             <version>2.28.0</version>
-            <scope>provided</scope> <!-- or runtime if you prefer -->
+            <scope>compile</scope>
         </dependency>
+        -->
     </dependencies>
     <build>
         <plugins>
-            <plugin>
+            <plugin>    <!-- To avoid the @ warning -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
@@ -45,17 +57,17 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.5.1</version>
                 <configuration>
-            <encoding>UTF-8</encoding>
+                    <encoding>UTF-8</encoding>
                     <source>1.8</source>
                     <target>1.8</target>
                     <showWarnings>true</showWarnings>
-                    <compilerArgs>
-            <arg>-Xlint:all</arg>       <!-- To avoid the @ warning -->
-            <arg>-Xlint:-processing</arg>
+                    <compilerArgs> 
+                        <arg>-Xlint:-processing</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
-            <plugin>        <!-- for errorprone build problem -->
+            <!--
+            <plugin>       
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
                 <version>4.2.1</version>
@@ -63,12 +75,12 @@
                 <configuration>
                     <instructions>
                         <Import-Package>
-                            com.google.errorprone.annotations;version="[2.28,3.0)"
+                            com.google.errorprone.error_prone_annotations;version="[2.28,3.0)"  
                         </Import-Package>
                     </instructions>
                 </configuration>
             </plugin>
-            <plugin>        <!-- for errorprone build problem -->
+            <plugin>        
                 <groupId>com.yahoo.vespa</groupId>
                 <artifactId>bundle-plugin</artifactId>
                 <version>8.355.18</version>
@@ -80,6 +92,7 @@
                     </execution>
                 </executions>
             </plugin>
+            -->
         </plugins>
     </build>
     <parent>
