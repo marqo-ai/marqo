@@ -2,10 +2,10 @@
 import concurrent
 import copy
 import math
-import random
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import ContextManager
+import threading
 
 import PIL
 from PIL.ImageFile import ImageFile
@@ -49,11 +49,8 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
         None
 
     """
-    # TODO - We may not be handling errors in threads properly. Test introducing errors (e.g., call a method
-    #  that doesn't exist) in this code and verify
     # Generate pseudo-unique ID for thread metrics.
-    _id = hash("".join([d.get("_id", str(random.getrandbits(64))) for d in allocated_docs])) % 1000
-    _id = f"image_download.{_id}"
+    _id = f'image_download.{threading.get_ident()}'
     TIMEOUT_SECONDS = 3
     if metric_obj is None:  # Occurs predominately in testing.
         metric_obj = RequestMetricsStore.for_request()
