@@ -212,7 +212,6 @@ class StructuredVespaSchema(VespaSchema):
         lexical_fields = marqo_index.lexical_field_map.values()
         tensor_fields = marqo_index.tensor_fields
         score_modifier_fields_names = marqo_index.score_modifier_fields_names
-        map_score_modifier_fields_names = [field.name for field in marqo_index.fields if field.type in [FieldType.MapInt, FieldType.MapLong, FieldType.MapFloat, FieldType.MapDouble] and FieldFeature.ScoreModifier in field.features]
         model_dim = marqo_index.model.get_dimension()
 
         bm25_expression = ' + '.join([
@@ -254,7 +253,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
         
-        if score_modifier_fields_names or map_score_modifier_fields_names:
+        if score_modifier_fields_names:
             expression = (
                 f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE})) == 0, '
                 f'   1, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE}), prod)) '
