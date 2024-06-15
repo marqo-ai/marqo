@@ -21,8 +21,8 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.INT_FIELDS)
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
-    score_modifiers_double_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_DOUBLE)
-    score_modifiers_long_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_LONG)
+    score_modifiers_double_long_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_DOUBLE_LONG)
+    score_modifiers_int_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_INT)
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
@@ -88,18 +88,18 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 instance.fields.bool_fields[key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
-            elif isinstance(value, int):
+            elif isinstance(value, int) and not cls.is_large_int(value):
                 instance.fields.int_fields[key] = value
-                instance.fields.score_modifiers_long_fields[key] = value
-            elif isinstance(value, float):
-                instance.fields.float_fields[key] = value
-                instance.fields.score_modifiers_double_fields[key] = value
+                instance.fields.score_modifiers_int_fields[key] = int(value)
+            elif isinstance(value, float) or cls.is_large_int(value):
+                instance.fields.float_fields[key] = float(value)
+                instance.fields.score_modifiers_double_long_fields[key] = float(value)
             elif isinstance(value, dict):
                 for k, v in value.items():
-                    if isinstance(v, int):
-                        instance.fields.score_modifiers_long_fields[f"{key}.{k}"] = v
-                    elif isinstance(v, float):
-                        instance.fields.score_modifiers_double_fields[f"{key}.{k}"] = v
+                    if isinstance(v, int) and not cls.is_large_int(v):
+                        instance.fields.score_modifiers_int_fields[f"{key}.{k}"] = int(v)
+                    elif isinstance(v, float) or cls.is_large_int(v):
+                        instance.fields.score_modifiers_double_long_fields[f"{key}.{k}"] = float(v)
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
@@ -110,6 +110,9 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
         return instance
 
+    def is_large_int(value, threshold=2**31-1):
+        return isinstance(value, int) and abs(value) > threshold
+    
     def to_vespa_document(self) -> Dict[str, Any]:
         """Convert VespaDocumentObject to a Vespa document.
         Empty fields are removed from the document."""

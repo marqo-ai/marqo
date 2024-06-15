@@ -390,7 +390,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                 field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
             elif structured_field_type == FieldType.CustomVector:
                 field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
-            elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble]:
+            elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble, FieldType.MapLong]:
                 field_content = validate_map_field(field_content)
             else:
                 raise InvalidArgError(

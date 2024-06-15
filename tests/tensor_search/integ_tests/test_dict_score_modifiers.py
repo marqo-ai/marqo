@@ -37,6 +37,14 @@ class TestDictScoreModifiers(MarqoTestCase):
                              features=[FieldFeature.ScoreModifier]),
                 FieldRequest(name="map_score_mods_int", type=FieldType.MapInt,
                              features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="map_score_mods_long", type=FieldType.MapLong,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="map_score_mods_double", type=FieldType.MapDouble,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="score_mods_int", type=FieldType.Int,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="score_mods_long", type=FieldType.Long,
+                             features=[FieldFeature.ScoreModifier]),
             ],
             hnsw_config=HnswConfig(
                 ef_construction=512,
@@ -269,4 +277,54 @@ class TestDictScoreModifiers(MarqoTestCase):
                 # Assert that the first result has _id "1" and 3 <= score <= 4
                 self.assertTrue(res["hits"][0]["_id"] == "1")
                 self.assertTrue(3 <= score_of_first_result <= 4)
+
+    def test_long_score_modifier(self):
+        """
+        Test that long score modifier works for a map score modifier.
+        """
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text_field": "a photo of a cat", "map_score_mods_long": {"a": 4294967295012}},
+                            {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": 4294967295012},
+                            {"_id": "4", "text_field": "a photo of a cat", "score_mods_long": 1},
+                            {"_id": "6", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
+                            "map_score_mods": {"a": 0.5}},
+                        ],
+                        tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                        mappings={
+                            "map_score_mods_long": {"type": "map_score_modifiers"},
+                            "map_score_mods_int": {"type": "map_score_modifiers"},
+                        } if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+                # Search with score modifier
+                # 0.5 * 0.5 * 4 = 1 (1 and 7)
+                score_modifier = ScoreModifier(**{
+                        "add_to_score": [{"field_name": "map_score_mods_long.a", "weight": 20},
+                                         {"field_name": "score_mods_long", "weight": 20}],
+                    }
+                )
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="",
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+
+                # Get the score of the first result.
+                score_of_first_result = res["hits"][0]["_score"]
+                score_of_second_result = res["hits"][1]["_score"]
+
+                # anticipated score is 4294967295012*20 = 85899345900240
+                # Assert that the first and second result both have _ids in 1 and 2
+                # and 85899345900239 <= score <= 85899345900241
+                self.assertTrue(res["hits"][0]["_id"] in ["2", "1"])
+                self.assertTrue(res["hits"][1]["_id"] in ["2", "1"])
+                self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
+                self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
             

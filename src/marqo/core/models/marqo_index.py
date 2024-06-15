@@ -555,11 +555,12 @@ def validate_structured_field(values, marqo_index: bool) -> None:
 
     if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int, 
                                                                FieldType.Double, FieldType.MapFloat, 
-                                                               FieldType.MapInt, FieldType.MapDouble]:
+                                                               FieldType.MapInt, FieldType.MapDouble,
+                                                               FieldType.Long, FieldType.MapLong]:
         raise ValueError(
              f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
-             f'{FieldType.Float.value}, {FieldType.Int.value}, {FieldType.Double.value}, '
-             f'{FieldType.MapFloat.value}, {FieldType.MapInt.value}, or {FieldType.MapDouble.value}'
+             f'{FieldType.Float.value}, {FieldType.Int.value}, {FieldType.Double.value}, {FieldType.Long.value}, '
+             f'{FieldType.MapFloat.value}, {FieldType.MapInt.value}, {FieldType.MapDouble.value}, or {FieldType.MapLong.value}'
          )
 
     # These validations are specific to marqo_index.Field
