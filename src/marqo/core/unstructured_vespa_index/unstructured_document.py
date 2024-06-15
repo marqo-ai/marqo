@@ -108,10 +108,11 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         instance.fields.vespa_embeddings = document.get(index_constants.MARQO_DOC_EMBEDDINGS, {})
         instance.fields.vespa_chunks = document.get(index_constants.MARQO_DOC_CHUNKS, [])
         instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
+        print(f"From Unstructured from_marqo_document, instance: {instance}")
         return instance
 
-    def is_large_int(value, threshold=2**31-1):
-        return isinstance(value, int) and abs(value) > threshold
+    def is_large_int(value, low_threshold=2**31-1, high_threshold=2**64-1):
+        return isinstance(value, int) and low_threshold < abs(value) < high_threshold
     
     def to_vespa_document(self) -> Dict[str, Any]:
         """Convert VespaDocumentObject to a Vespa document.
