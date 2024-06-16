@@ -517,7 +517,7 @@ class StructuredVespaIndex(VespaIndex):
         query = {
             'searchChain': 'hybrid-chain',
             # TODO: remove yql or put a dummy
-            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {hybrid_term}{filter_term}',
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
             'yql.tensor': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
             'yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
             'hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
@@ -528,6 +528,8 @@ class StructuredVespaIndex(VespaIndex):
             'query_features': query_inputs,
             'presentation.summary': summary,
             'ranking': ranking,
+            'ranking.lexical': common.RANK_PROFILE_BM25,
+            'ranking.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
             'ranking.scoreModifiersLexical': common.RANK_PROFILE_BM25_MODIFIERS,
             'ranking.scoreModifiersTensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS
         }
