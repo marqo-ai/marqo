@@ -1,6 +1,6 @@
 from marqo.tensor_search.enums import MappingsObjectType
 
-MARQO_OBJECT_TYPES = {MappingsObjectType.multimodal_combination, MappingsObjectType.custom_vector, MappingsObjectType.map_score_modifiers}
+MARQO_OBJECT_TYPES = {MappingsObjectType.multimodal_combination, MappingsObjectType.custom_vector, MappingsObjectType.map_numerical}
 
 ILLEGAL_CUSTOMER_FIELD_NAME_CHARS = {'.', '/', '\n'}
 

@@ -59,13 +59,13 @@ custom_vector_mappings_schema = {
     "additionalProperties": False
 }
 
-map_score_modifiers_schema = {
+map_numerical_schema = {
     "$schema": "http://json-schema.org/draft-04/schema#",
     "type": "object",
     "properties": {
         "type": {
             "type": "string",
-            "enum": [MappingsObjectType.map_score_modifiers]
+            "enum": [MappingsObjectType.map_numerical]
         }
     },
     "required": ["type"],

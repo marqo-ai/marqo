@@ -127,7 +127,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
         for field_name, mapping in add_docs_params.mappings.items():
             if mapping.get("type", None) == enums.MappingsObjectType.multimodal_combination:
                 multimodal_sub_fields.extend(mapping["weights"].keys())
-            # TODO: Handle map_score_modifiers 
 
     t0 = timer()
     bulk_parent_dicts = []
