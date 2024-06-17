@@ -354,6 +354,10 @@ class StructuredMarqoIndex(MarqoIndex):
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:
+        """Return a map from lexical field name to the field object.
+
+        The field.lexical_field_name is not the same as the field.name. It is the name of the field that is used in the
+        index schema with Marqo prefix."""
         return self._cache_or_get('lexical_field_map',
                                   lambda: {field.lexical_field_name: field for field in self.fields if
                                            FieldFeature.LexicalSearch in field.features}
@@ -368,6 +372,13 @@ class StructuredMarqoIndex(MarqoIndex):
 
     @property
     def lexically_searchable_fields_names(self) -> Set[str]:
+        """Return a set of field names (str) that are lexically searchable.
+
+        These are the original field names without any Marqo prefix. You should use this to generate
+        the searchable fields in your lexical search query.
+
+        Note that field.name is not identical to field.lexical_field_name. The latter is the name of the field
+        that is used in the index schema"""
         return self._cache_or_get('lexically_searchable_fields_names',
                                   lambda: {field.name for field in self.fields if
                                            FieldFeature.LexicalSearch in field.features}

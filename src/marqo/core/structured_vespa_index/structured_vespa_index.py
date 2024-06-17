@@ -428,7 +428,7 @@ class StructuredVespaIndex(VespaIndex):
                     )
             fields_to_search = marqo_query.searchable_attributes
         else:
-            fields_to_search = self._marqo_index.lexical_field_map.keys()
+            fields_to_search = self._marqo_index.lexically_searchable_fields_names
 
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
