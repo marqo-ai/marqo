@@ -101,7 +101,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                # Search with score modifier
+                # Tensor Search with score modifier
                 # 0.5 + 1 * 5 = 5.5
                 score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 5}]})
                 res = tensor_search.search(
@@ -110,6 +110,22 @@ class TestDictScoreModifiers(MarqoTestCase):
                     result_count=10
                 )
 
+                # Get the score of the first result.
+                score_of_first_result = res["hits"][0]["_score"]
+
+                # Assert that the first result has _id "6" and 5 <= score <= 6
+                self.assertIn(res["hits"][0]["_id"], ["6", "7"])
+                self.assertTrue(5 <= score_of_first_result <= 6)
+
+                # Lexical Search with score modifier
+                # 0.3 + 1 * 5 = 5.3
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="a photo of a",
+                    search_method=SearchMethod.LEXICAL,
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+                
                 # Get the score of the first result.
                 score_of_first_result = res["hits"][0]["_score"]
 
@@ -146,7 +162,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                # Search with score modifier
+                # Tensor Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
                 score_modifier = ScoreModifier(**{"multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]})
                 res = tensor_search.search(
@@ -161,6 +177,23 @@ class TestDictScoreModifiers(MarqoTestCase):
                 # Assert that the first result has _id "6" and 0.8 <= score <= 1.2
                 self.assertIn(res["hits"][0]["_id"], ["1", "7"])
                 self.assertTrue(0.8 <= score_of_first_result <= 1.2)
+
+                # Lexical Search with score modifier
+                # 0.3 * 0.5 * 4 = 0.6 (1 and 7)
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="a photo of a",
+                    search_method=SearchMethod.LEXICAL,
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+                
+                # Get the score of the first result.
+                score_of_first_result = res["hits"][0]["_score"]
+
+                # Assert that the first result has _id "1" or "7" and 0.4 <= score <= 0.8
+                self.assertIn(res["hits"][0]["_id"], ["1", "7"])
+                self.assertTrue(0.4 <= score_of_first_result <= 0.8)
+
 
     # Test combined add to score and multiply score by
     def test_combined_map_score_modifier(self):
@@ -191,7 +224,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                # Search with score modifier
+                # Tensor Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
                 score_modifier = ScoreModifier(**{
                         "add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 2}],
@@ -211,6 +244,22 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertTrue(res["hits"][0]["_id"] == "7")
                 self.assertTrue(2.9 <= score_of_first_result <= 3.1)
 
+                # Lexical Search with score modifier
+                # 7: 0.3 * 0.5 * 4 + 1 * 2 = 2.6
+                # 6: 0.3 + 1 * 2 = 2.3
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="a photo of a",
+                    search_method=SearchMethod.LEXICAL,
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+
+                # Get the score of the first result.
+                score_of_first_result = res["hits"][0]["_score"]
+
+                # Assert that the first result has _id "6" and 2.4 <= score <= 2.8
+                self.assertTrue(res["hits"][0]["_id"] == "7")
+                self.assertTrue(2.4 <= score_of_first_result <= 2.8)
 
     def test_partial_document_update(self):
         """
@@ -263,7 +312,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertTrue(updated_doc["_id"] == "1")
                 self.assertTrue(updated_doc["map_score_mods"]["a"] == 1.5)
 
-                # Search with score modifier
+                # Tensor Search with score modifier
                 # 0.5 + 1.5 * 2 = 3.5
                 score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "map_score_mods.a", "weight": 2}]})
                 res = tensor_search.search(
@@ -303,8 +352,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                # Search with score modifier
-                # 0.5 * 0.5 * 4 = 1 (1 and 7)
+                # Tensor Search with score modifier
                 score_modifier = ScoreModifier(**{
                         "add_to_score": [{"field_name": "map_score_mods_long.a", "weight": 20},
                                          {"field_name": "score_mods_long", "weight": 20}],
@@ -316,7 +364,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                     result_count=10
                 )
 
-                # Get the score of the first result.
+                # Get the scores of the first and second result.
                 score_of_first_result = res["hits"][0]["_score"]
                 score_of_second_result = res["hits"][1]["_score"]
 
@@ -327,4 +375,23 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertTrue(res["hits"][1]["_id"] in ["2", "1"])
                 self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
                 self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
-            
+
+                # Lexical Search with score modifier
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="a photo of a",
+                    search_method=SearchMethod.LEXICAL,
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+
+                # Get the scores of the first and second result.
+                score_of_first_result = res["hits"][0]["_score"]
+                score_of_second_result = res["hits"][1]["_score"]
+
+                # anticipated score is 4294967295012*20 = 85899345900240
+                # Assert that the first and second result both have _ids in 1 and 2
+                # and 85899345900237 <= score <= 85899345900245
+                self.assertTrue(res["hits"][0]["_id"] in ["2", "1"])
+                self.assertTrue(res["hits"][1]["_id"] in ["2", "1"])
+                self.assertTrue(85899345900237 <= score_of_first_result <= 85899345900245)
+                self.assertTrue(85899345900237 <= score_of_second_result <= 85899345900245)
