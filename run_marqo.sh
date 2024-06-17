@@ -75,7 +75,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
 
       # Build Hybrid Searcher application and Jar
       echo "Building hybrid searcher jar"
-      dnf install -y mvn
+      dnf install -y maven
       cd /app/scripts/vespa_local
       mvn clean package
 
