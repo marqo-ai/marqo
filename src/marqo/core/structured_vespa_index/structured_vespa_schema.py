@@ -275,6 +275,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}}')
 
             if lexical_fields:
+                print(f"lexical rank construction")
                 rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BM25_MODIFIERS} '
                                      f'inherits {common.RANK_PROFILE_MODIFIERS} {{')
                 rank_profiles.append('inputs {')
