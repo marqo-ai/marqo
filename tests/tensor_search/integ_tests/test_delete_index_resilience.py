@@ -14,7 +14,7 @@ class TestDeleteIndexResilience(MarqoTestCase):
     Users should at least be able to bring Marqo to a consistent state by repeating the call to delete index and get
     a 200 response code.
 
-    I divide the delete index operation into the following steps:
+    The index deletion operation consists of the following steps:
     1. Fetch the index object by name from the marqo__settings schema. Raise 400 index_not_found error if the index
     does not exist.
     2. Download the application package.
@@ -25,6 +25,11 @@ class TestDeleteIndexResilience(MarqoTestCase):
 
     We will simulate failures in each of these steps and ensure that the delete index operation is resilient to these.
     """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.index_management.bootstrap_vespa()
 
     def setUp(self) -> None:
         self.index_name = "test_index_deletion"
