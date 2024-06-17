@@ -96,8 +96,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
                         mappings={
-                            "map_score_mods": {"type": "map_score_modifiers"},
-                            "map_score_mods_int": {"type": "map_score_modifiers"}
+                            "map_score_mods": {"type": "map_numerical"},
+                            "map_score_mods_int": {"type": "map_numerical"}
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
@@ -141,8 +141,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
                         mappings={
-                            "map_score_mods": {"type": "map_score_modifiers"},
-                            "map_score_mods_int": {"type": "map_score_modifiers"}
+                            "map_score_mods": {"type": "map_numerical"},
+                            "map_score_mods_int": {"type": "map_numerical"}
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
@@ -186,8 +186,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
                         mappings={
-                            "map_score_mods": {"type": "map_score_modifiers"},
-                            "map_score_mods_int": {"type": "map_score_modifiers"}
+                            "map_score_mods": {"type": "map_numerical"},
+                            "map_score_mods_int": {"type": "map_numerical"}
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
@@ -235,8 +235,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
                         mappings={
-                            "map_score_mods": {"type": "map_score_modifiers"},
-                            "map_score_mods_int": {"type": "map_score_modifiers"}
+                            "map_score_mods": {"type": "map_numerical"},
+                            "map_score_mods_int": {"type": "map_numerical"}
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
@@ -298,8 +298,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
                         mappings={
-                            "map_score_mods_long": {"type": "map_score_modifiers"},
-                            "map_score_mods_int": {"type": "map_score_modifiers"},
+                            "map_score_mods_long": {"type": "map_numerical"},
+                            "map_score_mods_int": {"type": "map_numerical"},
                         } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
