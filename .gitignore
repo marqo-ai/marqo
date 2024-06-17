@@ -72,6 +72,9 @@ instance/
 docs/_build/
 
 # PyBuilder
+target/
+
+# Maven Java Builds
 scripts/vespa_local/target/
 
 # Jupyter Notebook
