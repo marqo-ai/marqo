@@ -45,16 +45,6 @@ See https://docs.marqo.ai/2.0.0/Guides/Advanced-Usage/configuration/ for more in
   exit 1
 
 elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_CONFIG_URL" ]; then
-  # Run tests on Hybrid Searcher
-  apt-get install -y mvn
-  cd /app/scripts/vespa_local
-  echo "Running tests on Hybrid Searcher"
-  mvn clean test
-
-  # Build Hybrid Searcher application and Jar
-  echo "Building hybrid searcher jar"
-  mvn clean package
-
   # Start local vespa
   echo "External vector store not configured. Using local vector store"
   tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
@@ -82,6 +72,16 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
     # Check for the specific "not found" error response which indicates there is no application package deployed
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
       echo "Marqo did not find an existing vector store. Setting up vector store..."
+
+      # Build Hybrid Searcher application and Jar
+      echo "Building hybrid searcher jar"
+      apt-get install -y mvn
+      cd /app/scripts/vespa_local
+      mvn clean package
+
+      # Copy required vespa files to the application directory
+      cp -r {hosts.xml,services.xml,schemas} target/application
+
       # Deploy a dummy application package
       vespa deploy /app/scripts/vespa_local --wait 300 >/dev/null 2>&1
 

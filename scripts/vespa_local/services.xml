@@ -5,7 +5,7 @@
         <document-api/>
         <search>
             <chain id="hybrid-chain" inherits="vespa">
-                <searcher id="com.yahoo.search.example.HybridSearcher"
+                <searcher id="ai.marqo.search.HybridSearcher"
                           bundle="hybrid-searcher" />
             </chain>
         </search>

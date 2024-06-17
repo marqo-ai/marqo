@@ -1,11 +1,11 @@
-package com.yahoo.search.example.test;
+package ai.marqo.search.test;
 
 import com.yahoo.component.chain.Chain;
 import com.yahoo.schema.derived.SchemaInfo;
 import com.yahoo.search.*;
 import com.yahoo.search.searchchain.*;
-import com.yahoo.search.example.HybridSearcher;
-import com.yahoo.search.example.HybridSearcher;
+import ai.marqo.search.HybridSearcher;
+import ai.marqo.search.HybridSearcher;
 
 public class HybridSearcherTestCase extends junit.framework.TestCase {
 

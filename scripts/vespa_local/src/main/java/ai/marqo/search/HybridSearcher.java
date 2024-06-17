@@ -1,4 +1,4 @@
-package com.yahoo.search.example;
+package ai.marqo.search;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.After;
 import com.yahoo.component.chain.dependencies.Provides;
@@ -17,10 +17,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.lang.InterruptedException;
 import java.util.concurrent.ExecutionException;
-// import org.apache.logging.log4j.Logger;
-// import org.apache.logging.log4j.LogManager;
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This searcher takes the YQL for both a lexical and tensor search from the query,
@@ -32,7 +30,7 @@ import java.util.concurrent.ExecutionException;
 public class HybridSearcher extends Searcher {
 
     // Logger logger = LogManager.getLogger(HybridSearcher.class);
-    // Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
+    Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
     private static String MATCH_FEATURES_FIELD = "matchfeatures";
 
@@ -54,7 +52,7 @@ public class HybridSearcher extends Searcher {
 
         // TODO: add score modifiers query_features
         
-        // logger.debug("Starting Hybrid Search script.");
+        logger.debug("LOG: Starting Hybrid Search script.");
         System.out.println("Starting Hybrid Search script.");
 
         String retrieval_method = query.properties().
