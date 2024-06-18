@@ -64,6 +64,8 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
+        # we may need to retain the old score modifiers dict here
+        score_modifiers: Dict[str, float] = dict()
         score_modifiers_double_long: Dict[str, float] = {}
         score_modifiers_int: Dict[str, int] = {}
 
@@ -77,7 +79,7 @@ class StructuredVespaIndex(VespaIndex):
             if marqo_field == constants.MARQO_DOC_ID:
                 continue
             if marqo_field == constants.MARQO_DOC_TENSORS:
-                raise MarqoDocumentParsingError(f" You cannot modify '{marqo_field}' field. ")
+                raise MarqoDocumentParsingError(f"You cannot modify '{marqo_field}' field. ")
 
             tensor_fields_names = [tensor_field.name for tensor_field in self._marqo_index.tensor_fields]
             if marqo_field in tensor_fields_names:
@@ -93,6 +95,7 @@ class StructuredVespaIndex(VespaIndex):
             self._verify_marqo_field_type(marqo_field, marqo_value)
 
             index_field = self._marqo_index.field_map[marqo_field]
+            print(f"index_field: {index_field}")
 
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
@@ -120,18 +123,19 @@ class StructuredVespaIndex(VespaIndex):
 
             if FieldFeature.ScoreModifier in index_field.features:
                 # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
-                if index_field.type in [FieldType.Float, FieldType.Double, FieldType.MapFloat, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
+
+                if index_field.type in [FieldType.Double, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
                     if isinstance(marqo_value, dict):
                         for key, value in marqo_value.items():
                             score_modifiers_double_long[f'{index_field.name}.{key}'] = float(value)
                     else:
                         score_modifiers_double_long[index_field.name] = float(marqo_value)
-                elif index_field.type in [FieldType.Int, FieldType.MapInt]:
+                elif index_field.type in [FieldType.Int, FieldType.MapInt, FieldType.Float, FieldType.MapFloat]:
                     if isinstance(marqo_value, dict):
                         for key, value in marqo_value.items():
-                            score_modifiers_int[f'{index_field.name}.{key}'] = int(value)
+                            score_modifiers[f'{index_field.name}.{key}'] = value
                     else:
-                        score_modifiers_int[index_field.name] = int(marqo_value)
+                        score_modifiers[index_field.name] = marqo_value
 
         if len(score_modifiers_double_long) > 0:
             # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
@@ -142,12 +146,12 @@ class StructuredVespaIndex(VespaIndex):
                 }
             }
 
-        if len(score_modifiers_int) > 0:
+        if len(score_modifiers) > 0:
             # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
-            vespa_fields[common.FIELD_SCORE_MODIFIERS_INT] = {
+            vespa_fields[common.FIELD_SCORE_MODIFIERS] = {
                 "modify": {
                     "operation": "replace",
-                    "cells": score_modifiers_int
+                    "cells": score_modifiers
                 }
             }
        
@@ -158,6 +162,7 @@ class StructuredVespaIndex(VespaIndex):
         vespa_fields: Dict[str, Any] = dict()
         score_modifiers_double_long: Dict[str, float] = {}
         score_modifiers_int: Dict[str, int] = {}
+        score_modifiers: Dict[str, int] = {}
 
         # ID
         if constants.MARQO_DOC_ID in marqo_document:
@@ -174,6 +179,7 @@ class StructuredVespaIndex(VespaIndex):
             self._verify_marqo_field_type(marqo_field, marqo_value)
 
             index_field = self._marqo_index.field_map[marqo_field]
+            print(f"index_field: {index_field}")
 
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
@@ -194,18 +200,18 @@ class StructuredVespaIndex(VespaIndex):
                 vespa_fields[index_field.name] = marqo_value
 
             if FieldFeature.ScoreModifier in index_field.features:
-                if index_field.type in [FieldType.Float, FieldType.Double, FieldType.MapFloat, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
+                if index_field.type in [FieldType.Double, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
                     if isinstance(marqo_value, dict):
                         for key, value in marqo_value.items():
                             score_modifiers_double_long[f'{index_field.name}.{key}'] = float(value)
                     else:
                         score_modifiers_double_long[index_field.name] = float(marqo_value)
-                elif index_field.type in [FieldType.Int, FieldType.MapInt]:
+                elif index_field.type in [FieldType.Int, FieldType.MapInt, FieldType.Float, FieldType.MapFloat]:
                     if isinstance(marqo_value, dict):
                         for key, value in marqo_value.items():
-                            score_modifiers_int[f'{index_field.name}.{key}'] = int(value)
+                            score_modifiers[f'{index_field.name}.{key}'] = value
                     else:
-                        score_modifiers_int[index_field.name] = int(marqo_value)
+                        score_modifiers[index_field.name] = marqo_value
 
         # Tensors
         vector_count = 0
@@ -232,8 +238,8 @@ class StructuredVespaIndex(VespaIndex):
         # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = score_modifiers_double_long
-        if len(score_modifiers_int) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS_INT] = score_modifiers_int
+        if len(score_modifiers) > 0:
+            vespa_fields[common.FIELD_SCORE_MODIFIERS] = score_modifiers
 
         vespa_doc = {
             self._VESPA_DOC_FIELDS: vespa_fields
@@ -616,7 +622,6 @@ class StructuredVespaIndex(VespaIndex):
         else:
             return '*'
 
-    # Old score modifiers
     def _get_score_modifiers(self, marqo_query: MarqoQuery) -> \
             Optional[Dict[str, Dict[str, float]]]:
         if marqo_query.score_modifiers:

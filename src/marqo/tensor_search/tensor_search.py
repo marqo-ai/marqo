@@ -645,9 +645,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             processed_tensor_fields = {}
             for field in copied:
                 marqo_field = marqo_index.field_map.get(field)
+                print(f"marqo_field: {marqo_field}")
                 tensor_field = marqo_index.tensor_field_map.get(field)
                 is_tensor_field = tensor_field is not None
                 if not marqo_field:
+                    print(f"marqo_index.field_map.keys(): {marqo_index.field_map.keys()}")
                     message = (f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
                     document_is_valid = False
@@ -936,9 +938,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 copied[constants.MARQO_DOC_ID] = doc_id
 
                 try:
+                    print(f"copied: {copied}")
                     converted_doc = VespaDocument(**vespa_index.to_vespa_document(copied))
+                    print(f"converted_doc: {converted_doc}")
                     bulk_parent_dicts.append(converted_doc)
+                    print(f"bulk_parent_dicts: {bulk_parent_dicts}")
                 except core_exceptions.MarqoDocumentParsingError as e:
+                    print(f"error in add_documents: {e}")
                     document_is_valid = False
                     unsuccessful_docs.append(
                         (i, {'_id': doc_id, 'error': e.message,
