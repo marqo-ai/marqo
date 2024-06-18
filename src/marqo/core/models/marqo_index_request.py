@@ -1,5 +1,6 @@
 from abc import ABC
 from typing import List, Dict, Optional
+import re
 
 import pydantic
 from pydantic import root_validator, validator
@@ -40,13 +41,42 @@ class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_images: bool
     filter_string_max_length: int
 
-
+"""
+class FieldType(str, Enum):
+    Text = 'text'
+    Bool = 'bool'
+    Int = 'int'
+    Long = 'long'
+    Float = 'float'
+    Double = 'double'
+    ArrayText = 'array<text>'
+    ArrayInt = 'array<int>'
+    ArrayLong = 'array<long>'
+    ArrayFloat = 'array<float>'
+    ArrayDouble = 'array<double>'
+    ImagePointer = 'image_pointer'
+    MultimodalCombination = 'multimodal_combination'
+    CustomVector = "custom_vector"
+    MapNumerical = "map_numerical"
+    MapInt = 'map<text, int>'
+    MapLong = 'map<text, long>'  
+    MapFloat = 'map<text, float>'
+    MapDouble = 'map<text, double>'
+    """
 class FieldRequest(StrictBaseModel):
     name: str
-    type: marqo_index.FieldType
+    type: str # validated in validate_structured_field()
     features: List[marqo_index.FieldFeature] = []
     dependent_fields: Optional[Dict[str, float]] = pydantic.Field(alias='dependentFields')
 
+    @validator('type', pre=True, always=True)
+    def normalize_type(cls, v):
+        # Normalize the type string by removing extra spaces around '<', '>', and ', '
+        normalized_type = re.sub(r'\s*<\s*', '<', v)
+        normalized_type = re.sub(r'\s*>\s*', '>', normalized_type)
+        normalized_type = re.sub(r'\s*,\s*', ', ', normalized_type)
+        return normalized_type
+    
     @root_validator(skip_on_failure=True)
     def check_all_fields(cls, values):
         marqo_index.validate_structured_field(values, marqo_index=False)
