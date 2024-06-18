@@ -34,7 +34,7 @@ onnx
 protobuf
 onnxruntime==1.13.1
 pandas==1.5.1
-optimum==1.4.1
+optimum==1.20.0
 opencv-python-headless==4.6.0.66
 psutil==5.9.4
 multilingual-clip==1.0.10
