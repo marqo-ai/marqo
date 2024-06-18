@@ -124,6 +124,11 @@ If you have any more inquiries or thoughts, please don’t hesitate to reach out
 - A huge thank you to all our 4k stargazers! This is a new milestone for Marqo!
 - Stay connected and share your thoughts on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! Your insights, questions, and feedback are always welcome and highly appreciated.
 
+# Release 2.2.3
+
+## New features
+- Add configurable search timeout (https://github.com/marqo-ai/marqo/pull/843). Backend timeout now defaults to 1s, but can be configured with the environment variable `VESPA_SEARCH_TIMEOUT_MS`. See configuration instructions [here](https://docs.marqo.ai/2.5/Guides/Advanced-Usage/configuration/#configuring-usage-limits). 
+
 # Release 2.2.2
 
 ## Bug fixes and minor changes
