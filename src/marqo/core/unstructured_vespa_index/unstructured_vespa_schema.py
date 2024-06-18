@@ -18,6 +18,7 @@ class UnstructuredVespaSchema(VespaSchema):
     _FLOAT_FIELDS = unstructured_common.FLOAT_FIELDS
     _BOOL_FIELDS = unstructured_common.BOOL_FIELDS
 
+    # Deal with backwards compatibility for _SCORE_MODIFIERS = unstructured_common.SCORE_MODIFIERS
     _SCORE_MODIFIERS_DOUBLE_LONG = unstructured_common.SCORE_MODIFIERS_DOUBLE_LONG
     _SCORE_MODIFIERS_INT = unstructured_common.SCORE_MODIFIERS_INT
 

@@ -119,6 +119,7 @@ class StructuredVespaIndex(VespaIndex):
                 }
 
             if FieldFeature.ScoreModifier in index_field.features:
+                # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
                 if index_field.type in [FieldType.Float, FieldType.Double, FieldType.MapFloat, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
                     if isinstance(marqo_value, dict):
                         for key, value in marqo_value.items():
@@ -133,6 +134,7 @@ class StructuredVespaIndex(VespaIndex):
                         score_modifiers_int[index_field.name] = int(marqo_value)
 
         if len(score_modifiers_double_long) > 0:
+            # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = {
                 "modify": {
                     "operation": "replace",
@@ -141,6 +143,7 @@ class StructuredVespaIndex(VespaIndex):
             }
 
         if len(score_modifiers_int) > 0:
+            # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
             vespa_fields[common.FIELD_SCORE_MODIFIERS_INT] = {
                 "modify": {
                     "operation": "replace",
@@ -226,6 +229,7 @@ class StructuredVespaIndex(VespaIndex):
 
         vespa_fields[common.FIELD_VECTOR_COUNT] = vector_count
 
+        # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = score_modifiers_double_long
         if len(score_modifiers_int) > 0:
@@ -299,7 +303,8 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_document[constants.MARQO_DOC_ID] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
-            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
+            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS,
+                                                              common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
                                                               common.FIELD_SCORE_MODIFIERS_INT,
                                                               common.FIELD_VECTOR_COUNT,
                                                               self._VESPA_DOC_MATCH_FEATURES}:
