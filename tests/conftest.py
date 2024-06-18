@@ -9,10 +9,15 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--largemodel"):
-        # --largemodel given in cli: do not skip largemodel tests
-        return
     skip_largemodel = pytest.mark.skip(reason="need --largemodel option to run")
-    for item in items:
-        if "largemodel" in item.keywords:
-            item.add_marker(skip_largemodel)
+    skip_cpu_only = pytest.mark.skip(reason="skip in --largemodel mode when cpu_only is present")
+
+    if config.getoption("--largemodel"):
+        # --largemodel given in cli: do not skip largemodel tests, skip cpu_only tests
+        for item in items:
+            if "cpu_only" in item.keywords:
+                item.add_marker(skip_cpu_only)
+    else:
+        for item in items:
+            if "largemodel" in item.keywords:
+                item.add_marker(skip_largemodel)

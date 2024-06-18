@@ -1,6 +1,8 @@
 import uuid
 from unittest.mock import patch
 
+import pytest
+
 from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, IndexType
@@ -365,6 +367,7 @@ class TestMonitoring(MarqoTestCase):
         self.assertGreater(actual.backend.storage_used_percentage, 0.0)
         self.assertLessEqual(actual.backend.storage_used_percentage, 100.0)
 
+    @pytest.mark.cpu_only
     def test_getCudaInfo_fail_on_cpu_instance(self):
         """
         getCudaInfo raise the correct error when called on a CPU instance
