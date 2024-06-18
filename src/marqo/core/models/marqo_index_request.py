@@ -41,28 +41,7 @@ class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_images: bool
     filter_string_max_length: int
 
-"""
-class FieldType(str, Enum):
-    Text = 'text'
-    Bool = 'bool'
-    Int = 'int'
-    Long = 'long'
-    Float = 'float'
-    Double = 'double'
-    ArrayText = 'array<text>'
-    ArrayInt = 'array<int>'
-    ArrayLong = 'array<long>'
-    ArrayFloat = 'array<float>'
-    ArrayDouble = 'array<double>'
-    ImagePointer = 'image_pointer'
-    MultimodalCombination = 'multimodal_combination'
-    CustomVector = "custom_vector"
-    MapNumerical = "map_numerical"
-    MapInt = 'map<text, int>'
-    MapLong = 'map<text, long>'  
-    MapFloat = 'map<text, float>'
-    MapDouble = 'map<text, double>'
-    """
+
 class FieldRequest(StrictBaseModel):
     name: str
     type: str # validated in validate_structured_field()
