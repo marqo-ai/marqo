@@ -52,6 +52,7 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
         generated_schema, _ = test_unstructured_schema_object.generate_schema()
 
         expected_schema = self._read_schema_from_file('test_schemas/unstructured_vespa_index_schema.sd')
+        print(f"generated schema: \n\n {generated_schema}")
         self.assertEqual(
             self._remove_whitespace_in_schema(expected_schema),
             self._remove_whitespace_in_schema(generated_schema)
@@ -81,6 +82,8 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
 
                 expected_schema = self._read_schema_from_file(
                     f'test_schemas/unstructured_vespa_index_schema_distance_metric_{distance_metric.value}.sd')
+
+                print(f"generated schema {distance_metric.value}: \n\n {generated_schema}")
                 self.assertEqual(
                     self._remove_whitespace_in_schema(expected_schema),
                     self._remove_whitespace_in_schema(generated_schema)

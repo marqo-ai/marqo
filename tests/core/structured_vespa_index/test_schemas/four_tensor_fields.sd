@@ -51,7 +51,7 @@
             rank: filter
         }
         field marqo__score_modifiers_double_long type tensor<double>(p {}) { indexing: attribute | summary}
-        field marqo__score_modifiers_int type tensor<int8>(p {}) { indexing: attribute | summary}
+        field marqo__score_modifiers type tensor<float>(p {}) { indexing: attribute | summary}
             field marqo__chunks_title type array<string> {
             indexing: attribute | summary
         }
@@ -125,7 +125,7 @@
             query(marqo__add_weights) tensor<double>(p {})
         }
             function modify(score) {
-            expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long), prod)) * if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_int)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_int), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double_long), sum) + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_int), sum)
+            expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long), prod)) * if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double_long), sum) + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
     }}
         rank-profile bm25_modifiers inherits modifiers {
             inputs {
