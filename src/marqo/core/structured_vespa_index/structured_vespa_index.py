@@ -121,20 +121,27 @@ class StructuredVespaIndex(VespaIndex):
                 }
 
             if FieldFeature.ScoreModifier in index_field.features:
-                # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
-
                 if index_field.type in [FieldType.Double, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
-                    if isinstance(marqo_value, dict):
-                        for key, value in marqo_value.items():
-                            score_modifiers_double_long[f'{index_field.name}.{key}'] = float(value)
+                    target_dict = score_modifiers_double_long
+                    value_converter = float
+                elif index_field.type in [FieldType.Int, FieldType.MapInt]:
+                    if self._is_large_int(marqo_value):
+                        target_dict = score_modifiers_double_long
+                        value_converter = float
                     else:
-                        score_modifiers_double_long[index_field.name] = float(marqo_value)
-                elif index_field.type in [FieldType.Int, FieldType.MapInt, FieldType.Float, FieldType.MapFloat]:
-                    if isinstance(marqo_value, dict):
-                        for key, value in marqo_value.items():
-                            score_modifiers[f'{index_field.name}.{key}'] = value
-                    else:
-                        score_modifiers[index_field.name] = marqo_value
+                        target_dict = score_modifiers
+                        value_converter = float
+                elif index_field.type in [FieldType.Float, FieldType.MapFloat]:
+                    target_dict = score_modifiers
+                    value_converter = float
+                else:
+                    raise ValueError(f"Unsupported field type {index_field.type}")
+
+                if isinstance(marqo_value, dict):
+                    for key, value in marqo_value.items():
+                        target_dict[f'{index_field.name}.{key}'] = value_converter(value)
+                else:
+                    target_dict[index_field.name] = value_converter(marqo_value)
 
         if len(score_modifiers_double_long) > 0:
             # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
@@ -199,17 +206,26 @@ class StructuredVespaIndex(VespaIndex):
 
             if FieldFeature.ScoreModifier in index_field.features:
                 if index_field.type in [FieldType.Double, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
-                    if isinstance(marqo_value, dict):
-                        for key, value in marqo_value.items():
-                            score_modifiers_double_long[f'{index_field.name}.{key}'] = float(value)
+                    target_dict = score_modifiers_double_long
+                    value_converter = float
+                elif index_field.type in [FieldType.Int, FieldType.MapInt]:
+                    if self._is_large_int(marqo_value):
+                        target_dict = score_modifiers_double_long
+                        value_converter = float
                     else:
-                        score_modifiers_double_long[index_field.name] = float(marqo_value)
-                elif index_field.type in [FieldType.Int, FieldType.MapInt, FieldType.Float, FieldType.MapFloat]:
-                    if isinstance(marqo_value, dict):
-                        for key, value in marqo_value.items():
-                            score_modifiers[f'{index_field.name}.{key}'] = value
-                    else:
-                        score_modifiers[index_field.name] = marqo_value
+                        target_dict = score_modifiers
+                        value_converter = float
+                elif index_field.type in [FieldType.Float, FieldType.MapFloat]:
+                    target_dict = score_modifiers
+                    value_converter = float
+                else:
+                    raise ValueError(f"Unsupported field type {index_field.type}")
+
+                if isinstance(marqo_value, dict):
+                    for key, value in marqo_value.items():
+                        target_dict[f'{index_field.name}.{key}'] = value_converter(value)
+                else:
+                    target_dict[index_field.name] = value_converter(marqo_value)
 
         # Tensors
         vector_count = 0
@@ -374,6 +390,9 @@ class StructuredVespaIndex(VespaIndex):
             'model_restrict': self._marqo_index.schema_name,
             'timeout': '5s'
         }
+    
+    def _is_large_int(value, low_threshold=2**24, high_threshold=2**53):
+        return isinstance(value, int) and low_threshold < abs(value) < high_threshold
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
