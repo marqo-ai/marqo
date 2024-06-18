@@ -17,4 +17,9 @@ class TestDocumentation(unittest.TestCase):
                 url = getattr(marqo_docs, func)()
                 response = httpx.get(url, follow_redirects=True)
                 response.raise_for_status()
-                self.assertFalse('404.html' in response.content.decode(), f"{func} URL returned a 404 response")
+                self.assertFalse(
+                    '404.html' in response.content.decode(), f"{func} URL returned a 404 response"
+                )
+                self.assertFalse(
+                    '<title>Redirecting</title>' in response.content.decode(), f"{func} URL is a redirect"
+                )
