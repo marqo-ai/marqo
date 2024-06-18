@@ -319,7 +319,6 @@ class StructuredVespaIndex(VespaIndex):
                 continue
             elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS,
                                                               common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
-                                                              common.FIELD_SCORE_MODIFIERS_INT,
                                                               common.FIELD_VECTOR_COUNT,
                                                               self._VESPA_DOC_MATCH_FEATURES}:
                 continue
