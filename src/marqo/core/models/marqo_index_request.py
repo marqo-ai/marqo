@@ -44,24 +44,24 @@ class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
 
 class FieldRequest(StrictBaseModel):
     name: str
-    type: str # validated in validate_structured_field()
+    type: marqo_index.FieldType
     features: List[marqo_index.FieldFeature] = []
     dependent_fields: Optional[Dict[str, float]] = pydantic.Field(alias='dependentFields')
-
+    
     @validator('type', pre=True, always=True)
     def normalize_type(cls, v):
         # Normalize the type string by removing extra spaces around '<', '>', and ', '
         normalized_type = re.sub(r'\s*<\s*', '<', v)
         normalized_type = re.sub(r'\s*>\s*', '>', normalized_type)
         normalized_type = re.sub(r'\s*,\s*', ', ', normalized_type)
-        return normalized_type
+        return marqo_index.FieldType(normalized_type)
     
     @root_validator(skip_on_failure=True)
     def check_all_fields(cls, values):
         marqo_index.validate_structured_field(values, marqo_index=False)
 
         return values
-
+    
 
 class StructuredMarqoIndexRequest(MarqoIndexRequest):
     fields: List[FieldRequest]  # all fields, including tensor fields
@@ -99,3 +99,5 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
                                 f"Field '{subfield}' is a custom vector field and cannot be a dependent field of "
                                 f"multimodal field '{multimodal_field.name}'.")
         return values
+
+
