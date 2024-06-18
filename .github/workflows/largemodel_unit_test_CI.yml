@@ -9,11 +9,6 @@ on:
       - mainline
     paths-ignore:
       - '**.md'
-  pull_request:
-    branches:
-      - mainline
-    paths-ignore:
-      - '**.md'
 
 permissions:
   contents: read
@@ -60,20 +55,20 @@ jobs:
         with:
           python-version: "3.8"
           cache: "pip"
-          
+
       - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-base
           path: marqo-base
-          
+
       - name: Install dependencies
         run: |
           pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
-      
+
       - name: Start Vespa
         run: |
           # Define these for checking if Vespa is ready
@@ -109,7 +104,7 @@ jobs:
           # Delete the zip file
           rm vespa_tester_app.zip
           echo "Deleted vespa_tester_app.zip"
-          
+
       - name: Run Large Model Unit Tests
         run: |
           # Define these for use by marqo
@@ -119,7 +114,7 @@ jobs:
           
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
           pytest marqo/tests --largemodel
-          
+
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:
