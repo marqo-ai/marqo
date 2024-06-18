@@ -119,7 +119,6 @@ class StructuredVespaSchema(VespaSchema):
 
         # score modifiers
         if any(FieldFeature.ScoreModifier in f.features for f in self._index_request.fields):
-            # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
             document.append(
                 f'field {common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG} type tensor<double>(p{{}}) {{ indexing: attribute | summary }}',
             )
@@ -254,12 +253,6 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
         
         if score_modifier_fields_names:
-            # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
-            old_expression = f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' \
-                          f'reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) ' \
-                          f'* attribute({common.FIELD_SCORE_MODIFIERS}), prod)) * score ' \
-                          f'+ reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) ' \
-                          f'* attribute({common.FIELD_SCORE_MODIFIERS}), sum)'
             expression = (
                 f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '
                 f'   1, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), prod)) '

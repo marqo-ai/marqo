@@ -64,10 +64,8 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
-        # we may need to retain the old score modifiers dict here
         score_modifiers: Dict[str, float] = dict()
         score_modifiers_double_long: Dict[str, float] = {}
-        score_modifiers_int: Dict[str, int] = {}
 
         if constants.MARQO_DOC_ID not in marqo_document:
             raise MarqoDocumentParsingError(f"'{constants.MARQO_DOC_ID}' is a required field but it does not exist")
@@ -144,7 +142,6 @@ class StructuredVespaIndex(VespaIndex):
                     target_dict[index_field.name] = value_converter(marqo_value)
 
         if len(score_modifiers_double_long) > 0:
-            # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = {
                 "modify": {
                     "operation": "replace",
@@ -153,7 +150,6 @@ class StructuredVespaIndex(VespaIndex):
             }
 
         if len(score_modifiers) > 0:
-            # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
             vespa_fields[common.FIELD_SCORE_MODIFIERS] = {
                 "modify": {
                     "operation": "replace",
@@ -167,7 +163,6 @@ class StructuredVespaIndex(VespaIndex):
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
         score_modifiers_double_long: Dict[str, float] = {}
-        score_modifiers_int: Dict[str, int] = {}
         score_modifiers: Dict[str, int] = {}
 
         # ID
@@ -249,7 +244,6 @@ class StructuredVespaIndex(VespaIndex):
 
         vespa_fields[common.FIELD_VECTOR_COUNT] = vector_count
 
-        # Deal with backwards compatibility for FIELD_SCORE_MODIFIERS
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = score_modifiers_double_long
         if len(score_modifiers) > 0:
