@@ -16,7 +16,7 @@ def pytest_collection_modifyitems(config, items):
         # --largemodel given in cli: do not skip largemodel tests, skip cpu_only tests
         for item in items:
             if "cpu_only" in item.keywords:
-                item.add_marker(pytest.mark.skip_cpu_only)
+                item.add_marker(skip_cpu_only)
     else:
         for item in items:
             if "largemodel" in item.keywords:
