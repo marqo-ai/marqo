@@ -397,13 +397,12 @@ class StructuredVespaIndex(VespaIndex):
 
     def _is_large_int(value, low_threshold=2 ** 31, high_threshold=2 ** 63) -> bool:
         """
-        This method designed to identify integers that are large enough to 
-        potentially require special handling, such as storing them in a tensor<double> instead 
-        of a tensor<float> in Vespa due to precision concerns with floating-point representations of large integers. 
-        Particularly relevant for integers in the range 2^24 to 2^31 - 1, where floating-point types may lose precision.
+        This method is used to identify integers that are large enough to potentially require special handling, 
+        such as storing them in a tensor<double> instead of a tensor<float> in Vespa due to precision loss with 
+        floating-point representations of integers in the range 2^24 to 2^31 - 1.
         
-        Currently, we store all int in tensor<float>, and all long in tensor<long>, 
-        for backwards compatibility.
+        Currently, we store all int (abs(2^31) in tensor<float>, and all long (abs(2^63) in tensor<long>, 
+        for backwards compatibility and do not do any special handling.
         """
         return isinstance(value, int) and low_threshold <= abs(value) <= high_threshold
 
