@@ -110,7 +110,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
         return instance
 
-    def _is_large_int(value, low_threshold=2**31, high_threshold=2**53):
+    def _is_large_int(value, low_threshold=2**31, high_threshold=2**64):
         return isinstance(value, int) and low_threshold <= abs(value) <= high_threshold
     
     def to_vespa_document(self) -> Dict[str, Any]:
