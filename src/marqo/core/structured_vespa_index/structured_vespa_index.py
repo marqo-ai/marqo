@@ -395,8 +395,8 @@ class StructuredVespaIndex(VespaIndex):
             'timeout': '5s'
         }
 
-    def _is_large_int(value, low_threshold=2 ** 24, high_threshold=2 ** 53):
-        return isinstance(value, int) and low_threshold < abs(value) < high_threshold
+    def _is_large_int(value, low_threshold=2 ** 31, high_threshold=2 ** 64):
+        return isinstance(value, int) and low_threshold <= abs(value) <= high_threshold
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
