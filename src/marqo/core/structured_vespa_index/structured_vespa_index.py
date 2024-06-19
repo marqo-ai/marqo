@@ -772,7 +772,6 @@ class StructuredVespaIndex(VespaIndex):
                                         f"'{FieldType.Long} or '{FieldType.Double}' ")
 
     def _verify_long_field_range(self, value: int):
-        print(f"veirfying long")
         if not (self._MIN_LONG <= value <= self._MAX_LONG):
             raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
                                         f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
