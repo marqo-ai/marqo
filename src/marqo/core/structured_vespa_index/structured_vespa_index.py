@@ -97,8 +97,10 @@ class StructuredVespaIndex(VespaIndex):
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
 
+            print(f"marqo_value _verify_numerical_field_value: {marqo_value}")
             if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
                 for v in marqo_value:
+                    print(f"marqo_value _verify_numerical_field_value: {marqo_value}")
                     self._verify_numerical_field_value(v, index_field)
 
             if index_field.type == FieldType.Bool:
@@ -187,6 +189,11 @@ class StructuredVespaIndex(VespaIndex):
             if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
                 for v in marqo_value:
                     self._verify_numerical_field_value(v, index_field)
+
+            if isinstance(marqo_value, dict):
+                for k, v in marqo_value.items():
+                    if len(k) > 0 and type(v) in (float, int):
+                        self._verify_numerical_field_value(v, index_field)
 
             if index_field.type == FieldType.Bool:
                 # Booleans are stored as bytes in Vespa
@@ -725,13 +732,13 @@ class StructuredVespaIndex(VespaIndex):
                        f'during call to _verify_marqo_field_type')
 
     def _verify_numerical_field_value(self, value: Union[float, int], index_field: Field):
-        if index_field.type in (FieldType.Float, FieldType.ArrayFloat):
+        if index_field.type in (FieldType.Float, FieldType.ArrayFloat, FieldType.MapFloat):
             self._verify_float_field_range(value)
-        elif index_field.type in (FieldType.Int, FieldType.ArrayInt):
+        elif index_field.type in (FieldType.Int, FieldType.ArrayInt, FieldType.MapInt):
             self._verify_int_field_range(value)
-        elif index_field.type in (FieldType.Long, FieldType.ArrayLong):
+        elif index_field.type in (FieldType.Long, FieldType.ArrayLong, FieldType.MapLong):
             self._verify_long_field_range(value)
-        elif index_field.type in (FieldType.Double, FieldType.ArrayDouble):
+        elif index_field.type in (FieldType.Double, FieldType.ArrayDouble, FieldType.MapDouble):
             pass
         else:
             raise InternalError(f'Invalid field type {index_field.type} for field {index_field.name} called by'
@@ -753,6 +760,7 @@ class StructuredVespaIndex(VespaIndex):
                                         f"'{FieldType.Long} or '{FieldType.Double}' ")
 
     def _verify_long_field_range(self, value: int):
+        print(f"veirfying long")
         if not (self._MIN_LONG <= value <= self._MAX_LONG):
             raise InvalidDataRangeError(f"Invalid value {value} for long field. Expected a value in the range "
                                         f"[{self._MIN_LONG}, {self._MAX_LONG}], but found {value}. "
