@@ -1,15 +1,15 @@
 # Release 2.8.2
 
 ## Bug fixes and minor changes
-- Fix an issue in Marqo where loading several models (e.g., `open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k`) 
-- is unsuccessful. This was resolved by upgrading the `transformers` and `optimum` packages. ([#868](https://github.com/marqo-ai/marqo/pull/868))
+- Fix an issue in Marqo where loading some models (e.g., `open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k`) is unsuccessful. 
+This was resolved by upgrading the `transformers` and `optimum` packages. ([#868](https://github.com/marqo-ai/marqo/pull/868))
 
 # Release 2.8.1
 
 ## Bug fixes and minor changes
-- Fix a bug in Marqo where a 500 error is returned for the entire batch of documents when encountering an invalid document 
-ID during image downloading. Marqo now correctly returns a 400 error only for the invalid document, 
-allowing successful indexing of other valid documents. ([#860](https://github.com/marqo-ai/marqo/pull/860))
+- Fix a bug in Marqo where a 500 error is returned for the entire batch of documents when encountering an invalid document ID during image downloading. 
+Marqo now correctly returns an error and rejects the invalid document, 
+allowing successful indexing of other valid documents with a 200 response. ([#860](https://github.com/marqo-ai/marqo/pull/860))
 
 # Release 2.8.0
 
