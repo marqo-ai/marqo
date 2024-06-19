@@ -507,10 +507,10 @@ class StructuredVespaIndex(VespaIndex):
         # Combine fields to search and remove duplicates
         # Custom searcher will split this into lexical and tensor requests
         query_inputs.update({
-            common.QUERY_INPUT_LEXICAL_FIELDS_TO_SEARCH: {
+            common.QUERY_INPUT_FIELDS_TO_SEARCH_LEXICAL: {
                 f: 1 for f in fields_to_search_lexical
             },
-            common.QUERY_INPUT_TENSOR_FIELDS_TO_SEARCH: {
+            common.QUERY_INPUT_FIELDS_TO_SEARCH_TENSOR: {
                 f: 1 for f in fields_to_search_tensor
             }
         })
@@ -530,8 +530,8 @@ class StructuredVespaIndex(VespaIndex):
 
             'hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
             'hybrid.rankingMethod': marqo_query.hybrid_parameters.ranking_method,
-            'hybrid.useTensorScoreModifiers': True if hybrid_score_modifiers["tensor"] else False,
-            'hybrid.useLexicalScoreModifiers': True if hybrid_score_modifiers["lexical"] else False,
+            'hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers["tensor"] else False,
+            'hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers["lexical"] else False,
 
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,

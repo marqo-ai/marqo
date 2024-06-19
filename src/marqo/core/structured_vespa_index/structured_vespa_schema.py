@@ -268,8 +268,8 @@ class StructuredVespaSchema(VespaSchema):
                 rank_profiles.append(f'query({field.name}): 0')
 
             # Temp parameters to pass into respective queries (lexical and tensor)
-            rank_profiles.append(f'query({common.QUERY_INPUT_LEXICAL_FIELDS_TO_SEARCH}) tensor<int8>(p{{}})')
-            rank_profiles.append(f'query({common.QUERY_INPUT_TENSOR_FIELDS_TO_SEARCH}) tensor<int8>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_SEARCH_LEXICAL}) tensor<int8>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_SEARCH_TENSOR}) tensor<int8>(p{{}})')
             for search_type in ["lexical", "tensor"]:
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_{search_type}) tensor<float>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_{search_type}) tensor<float>(p{{}})')

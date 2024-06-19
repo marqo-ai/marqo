@@ -22,8 +22,8 @@ QUERY_INPUT_EMBEDDING = 'marqo__query_embedding'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = 'marqo__mult_weights'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = 'marqo__add_weights'
 # Used for hybrid search (split in custom searcher)
-QUERY_INPUT_LEXICAL_FIELDS_TO_SEARCH = "marqo__lexical_fields_to_search"
-QUERY_INPUT_TENSOR_FIELDS_TO_SEARCH = "marqo__tensor_fields_to_search"
+QUERY_INPUT_FIELDS_TO_SEARCH_LEXICAL = "marqo__fields_to_search_lexical"
+QUERY_INPUT_FIELDS_TO_SEARCH_TENSOR = "marqo__fields_to_search_tensor"
 
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
 SUMMARY_ALL_VECTOR = 'all-vector-summary'

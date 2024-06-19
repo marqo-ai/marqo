@@ -453,7 +453,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                with self.subTest(""):
+                with self.subTest("retrieval: disjunction, ranking: rrf"):
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -477,6 +477,36 @@ class TestHybridSearch(MarqoTestCase):
                             ]
                         ),
                         result_count=10
+                    )
+
+                    self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
+                    for i in range(len(hybrid_res["hits"])):
+                        self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
+
+                with self.subTest("retrieval: lexical, ranking: tensor"):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method=RetrievalMethod.Lexical,
+                            ranking_method=RankingMethod.Tensor,
+                            alpha=0.8,
+                            searchable_attributes_lexical=["text_field_1", "text_field_2"],
+                            searchable_attributes_tensor=["text_field_2"],
+                            score_modifiers_lexical=[
+                                # 2 fields in mult
+                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
+                                ScoreModifier(field="mult_field_2", weight=1.0, type=ScoreModifierType.Multiply)
+                            ],
+                            score_modifiers_tensor=[
+                                # 1 field in mult, 1 field in add
+                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
+                                ScoreModifier(field="add_field_1", weight=1.0, type=ScoreModifierType.Add)
+                            ]
+                        ),
+                        result_count=3
                     )
 
                     self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
