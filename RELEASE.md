@@ -1,6 +1,19 @@
-# Release 2.8.0
+# Release 2.8.2
 
 ## Bug fixes and minor changes
+- Fix an issue in Marqo where loading some models (e.g., `open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k`) is unsuccessful. 
+This was resolved by upgrading the `transformers` and `optimum` packages. ([#868](https://github.com/marqo-ai/marqo/pull/868))
+
+# Release 2.8.1
+
+## Bug fixes and minor changes
+- Fix a bug in Marqo where a 500 error is returned for the entire batch of documents when encountering an invalid document ID during image downloading. 
+Marqo now correctly returns an error and rejects the invalid document, 
+allowing successful indexing of other valid documents with a 200 response. ([#860](https://github.com/marqo-ai/marqo/pull/860))
+
+# Release 2.8.0
+
+## New features
 - Improve `add_documents` memory efficiency and throughput for CLIP and Open_CLIP models when indexing documents with images when no patch method is used ([#849](https://github.com/marqo-ai/marqo/pull/849)). The image downloading and preprocessing logic has been improved. Marqo now converts the images to tensors directly after downloading. In our tests, the memory usage has been reduced by 37.5% and the throughput has been increased by 7.5% (subject to your settings). Marqo is also more stable when indexing documents in a multi-threading scenario.
 - Add support for pre-warming patch models ([#847](https://github.com/marqo-ai/marqo/pull/847)). See usage [here](https://docs.marqo.ai/2.8/Guides/Advanced-Usage/configuration/#configuring-preloaded-patch-models).
 
