@@ -97,11 +97,15 @@ class StructuredVespaIndex(VespaIndex):
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
 
-            print(f"marqo_value _verify_numerical_field_value: {marqo_value}")
             if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
                 for v in marqo_value:
-                    print(f"marqo_value _verify_numerical_field_value: {marqo_value}")
                     self._verify_numerical_field_value(v, index_field)
+
+            if isinstance(marqo_value, dict) and index_field.type in (FieldType.MapFloat, FieldType.MapInt,
+                                                                      FieldType.MapLong, FieldType.MapDouble):
+                for k, v in marqo_value.items():
+                    if len(k) > 0 and type(v) in (float, int):
+                        self._verify_numerical_field_value(v, index_field)
 
             if index_field.type == FieldType.Bool:
                 # Booleans are stored as bytes in Vespa
@@ -158,7 +162,7 @@ class StructuredVespaIndex(VespaIndex):
                     "cells": score_modifiers
                 }
             }
-       
+
         return {"id": vespa_id, "fields": vespa_fields}
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
@@ -190,7 +194,8 @@ class StructuredVespaIndex(VespaIndex):
                 for v in marqo_value:
                     self._verify_numerical_field_value(v, index_field)
 
-            if isinstance(marqo_value, dict):
+            if isinstance(marqo_value, dict) and index_field.type in (FieldType.MapFloat, FieldType.MapInt,
+                                                                      FieldType.MapLong, FieldType.MapDouble):
                 for k, v in marqo_value.items():
                     if len(k) > 0 and type(v) in (float, int):
                         self._verify_numerical_field_value(v, index_field)
@@ -390,8 +395,8 @@ class StructuredVespaIndex(VespaIndex):
             'model_restrict': self._marqo_index.schema_name,
             'timeout': '5s'
         }
-    
-    def _is_large_int(value, low_threshold=2**24, high_threshold=2**53):
+
+    def _is_large_int(value, low_threshold=2 ** 24, high_threshold=2 ** 53):
         return isinstance(value, int) and low_threshold < abs(value) < high_threshold
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
@@ -664,7 +669,7 @@ class StructuredVespaIndex(VespaIndex):
             return 'false'
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
             return 'true'
-        
+
         if marqo_query.or_phrases:
             or_terms = 'weakAnd(%s)' % ', '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
