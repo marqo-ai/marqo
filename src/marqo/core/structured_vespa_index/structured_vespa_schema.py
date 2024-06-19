@@ -257,6 +257,27 @@ class StructuredVespaSchema(VespaSchema):
 
         # Hybrid search
         if lexical_fields and tensor_fields:
+            # Hybrid search rank profile simply organizes and passes rank features to respective inner lexica/tensor queries
+            # No actual ranking is done here.
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{')
+
+            # Input parameters (rank features)
+            rank_profiles.append('inputs {')
+            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
+            for field in tensor_fields:
+                rank_profiles.append(f'query({field.name}): 0')
+
+            # Temp parameters to pass into respective queries (lexical and tensor)
+            rank_profiles.append(f'query({common.QUERY_INPUT_LEXICAL_FIELDS_TO_SEARCH}) tensor<int8>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_TENSOR_FIELDS_TO_SEARCH}) tensor<int8>(p{{}})')
+            for search_type in ["lexical", "tensor"]:
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_{search_type}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_{search_type}) tensor<float>(p{{}})')
+
+            rank_profiles.append('}')
+            rank_profiles.append('}')
+
+            # TODO: remove RRF and normalize_linear normal. Shouldn't need them.
             # RRF Normal
             rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_RRF} inherits default {{')
 
@@ -359,10 +380,6 @@ class StructuredVespaSchema(VespaSchema):
                 rank_profiles.append('}')
                 rank_profiles.append(embedding_match_features_expression)
                 rank_profiles.append('}')
-
-            # TODO: Add hybrid rank profiles with modifiers
-            # RRF with Modifiers
-            # Normalized Linear with Modifiers
 
         return rank_profiles
 

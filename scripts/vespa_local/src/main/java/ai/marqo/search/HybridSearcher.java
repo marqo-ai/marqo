@@ -10,8 +10,13 @@ import com.yahoo.search.searchchain.Execution;
 import com.yahoo.search.searchchain.AsyncExecution;
 import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
+import com.yahoo.tensor.Tensor;
+import com.yahoo.tensor.Tensor.Cell;
+import com.yahoo.tensor.TensorAddress;
 import com.yahoo.net.URI;
 import java.util.HashMap;
+import java.util.Optional;
+import java.util.Iterator;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -33,6 +38,14 @@ public class HybridSearcher extends Searcher {
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
     private static String MATCH_FEATURES_FIELD = "matchfeatures";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = "query(marqo__mult_weights)";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL = "query(marqo__mult_weights_lexical)";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR = "query(marqo__mult_weights_tensor)";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = "query(marqo__add_weights)";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL = "query(marqo__add_weights_lexical)";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR = "query(marqo__add_weights_tensor)";
+    private static String QUERY_INPUT_LEXICAL_FIELDS_TO_SEARCH = "query(marqo__lexical_fields_to_search)";
+    private static String QUERY_INPUT_TENSOR_FIELDS_TO_SEARCH = "query(marqo__tensor_fields_to_search)";
 
     @Override
     public Result search(Query query, Execution execution) {
@@ -42,6 +55,8 @@ public class HybridSearcher extends Searcher {
         // hybrid.rankingMethod
         // hybrid.rrf_k
         // hybrid.alpha
+        // hybrid.useTensorScoreModifiers
+        // hybrid.useLexicalScoreModifiers
         // yql.tensor
         // yql.lexical
         // ranking.tensor
@@ -49,11 +64,8 @@ public class HybridSearcher extends Searcher {
 
         // Retrieval methods: disjunction, embedding_similarity, bm25
         // Ranking methods: rrf, normalize_linear, embedding_similarity, bm25
-
-        // TODO: add score modifiers query_features
         
-        logger.debug("LOG: Starting Hybrid Search script.");
-        System.out.println("Starting Hybrid Search script.");
+        logger.info("Starting Hybrid Search script.");
 
         String retrieval_method = query.properties().
                 getString("hybrid.retrievalMethod", "");
@@ -69,65 +81,153 @@ public class HybridSearcher extends Searcher {
         
         String rank_profile_lexical = query.properties().
                 getString("ranking.lexical", "");
+        
+        String rank_profile_lexical_score_modifiers = query.properties().
+                getString("ranking.lexicalScoreModifiers", "");
 
         String rank_profile_tensor = query.properties().
                 getString("ranking.tensor", "");
+
+        String rank_profile_tensor_score_modifiers = query.properties().
+                getString("ranking.tensorScoreModifiers", "");
         
         Integer rrf_k = query.properties().getInteger("hybrid.rrf_k", 60);
         Double alpha = query.properties().getDouble("hybrid.alpha", 0.5);
+        
+        // TODO: Parse this into an int
+        String timeout_string = query.properties().getString("timeout", "1000ms");
 
         // Log fetched variables
-        // logger.debug(String.format("Retrieval method found: %s", retrieval_method));
-        // logger.debug(String.format("Ranking method found: %s", ranking_method));
-        // logger.debug(String.format("YQL lexical found: %s", yql_lexical));
-        // logger.debug(String.format("YQL tensor found: %s", yql_tensor));
-        // logger.debug(String.format("RRF k found: %d", rrf_k));
-        // logger.debug(String.format("alpha found: %.2f", alpha));
-        System.out.println(String.format("Retrieval method found: %s", retrieval_method));
-        System.out.println(String.format("Ranking method found: %s", ranking_method));
-        System.out.println(String.format("YQL lexical found: %s", yql_lexical));
-        System.out.println(String.format("YQL tensor found: %s", yql_tensor));
-        System.out.println(String.format("Rank Profile lexical found: %s", rank_profile_lexical));
-        System.out.println(String.format("Rank Profile tensor found: %s", rank_profile_tensor));
+        logger.info(String.format("Retrieval method found: %s", retrieval_method));
+        logger.info(String.format("Ranking method found: %s", ranking_method));
+        logger.info(String.format("YQL lexical found: %s", yql_lexical));
+        logger.info(String.format("YQL tensor found: %s", yql_tensor));
+        logger.info(String.format("Rank Profile lexical found: %s", rank_profile_lexical));
+        logger.info(String.format("Rank Profile lexical score modifiers found: %s", rank_profile_lexical_score_modifiers));
+        logger.info(String.format("Rank Profile tensor found: %s", rank_profile_tensor));
+        logger.info(String.format("Rank Profile tensor score modifiers found: %s", rank_profile_tensor_score_modifiers));
         
-        System.out.println(String.format("alpha found: %.2f", alpha));
-        System.out.println(String.format("RRF k found: %d", rrf_k));
+        logger.info(String.format("alpha found: %.2f", alpha));
+        logger.info(String.format("RRF k found: %d", rrf_k));
 
-        System.out.println(String.format("Base Query is: "));
-        System.out.println(query.toDetailString());
+        logger.info(String.format("Base Query is: "));
+        logger.info(query.toDetailString());
         
-
         if (retrieval_method.equals("disjunction")) {
-            // Declare result variables
             Result result_lexical, result_tensor;
+
+            // Lexical search
             Query query_lexical = query.clone();
             query_lexical.properties().set("yql", yql_lexical);
-            // TODO: Change to score modifiers when added
-            query_lexical.getRanking().setProfile(rank_profile_lexical);
-            //logger.debug("LEXICAL QUERY: ");
-            //logger.debug(query_lexical.toString());
-            System.out.println("LEXICAL QUERY: ");
-            System.out.println(query_lexical.toDetailString());
-            System.out.println(query_lexical.getModel().getQueryString());
-            System.out.println(query_lexical.properties().getString("yql", ""));
 
+            // Set fields to search (extract)
+            Optional<Tensor> optional_lexical_fields_to_search = query.getRanking().getFeatures().
+                getTensor(QUERY_INPUT_LEXICAL_FIELDS_TO_SEARCH);
+            Tensor lexical_fields_to_search;
+            if (optional_lexical_fields_to_search.isPresent()){
+                lexical_fields_to_search = optional_lexical_fields_to_search.get();
+            } else {
+                throw new RuntimeException(QUERY_INPUT_LEXICAL_FIELDS_TO_SEARCH + " not found!");
+            }
+            
+            Iterator<Cell> lexical_cells = lexical_fields_to_search.cellIterator();
+            lexical_cells.forEachRemaining((cell) -> add_field_to_rank_features(cell, query_lexical));
+            
+            // Set lexical rank profile (with or without score modifiers)
+            if (query.properties().getBoolean("hybrid.useLexicalScoreModifiers")){
+                query_lexical.getRanking().setProfile(rank_profile_lexical_score_modifiers);
+
+                // Extract lexical rank features and reassign to main rank features.
+                // marqo__add_weights_lexical --> marqo__add_weights
+                Optional<Tensor> optional_add_weights = query.getRanking().getFeatures().
+                    getTensor(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL);
+                Tensor add_weights;
+                if (optional_add_weights.isPresent()){
+                    add_weights = optional_add_weights.get();
+                } else {
+                    throw new RuntimeException(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL + " score modifiers not found!");
+                }
+                
+                // marqo__mult_weights_lexical --> marqo__mult_weights
+                Optional<Tensor> optional_mult_weights = query.getRanking().getFeatures().
+                    getTensor(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL);
+                Tensor mult_weights;
+                if (optional_mult_weights.isPresent()){
+                    mult_weights = optional_mult_weights.get();
+                } else {
+                    throw new RuntimeException(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL + " score modifiers not found!");
+                }
+
+                query_lexical.getRanking().getFeatures().put(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS, add_weights);
+                query_lexical.getRanking().getFeatures().put(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS, mult_weights);
+
+            } else {
+                query_lexical.getRanking().setProfile(rank_profile_lexical);
+            }
+            logger.info("LEXICAL QUERY: ");
+            logger.info(query_lexical.toDetailString());
+            logger.info(query_lexical.getModel().getQueryString());
+            logger.info(query_lexical.properties().getString("yql", ""));
+            logger.info(query_lexical.getRanking().getFeatures().toString());
+
+            // Tensor search
             Query query_tensor = query.clone();
             query_tensor.properties().set("yql", yql_tensor);
-            // TODO: Change to score modifiers when added
-            query_tensor.getRanking().setProfile(rank_profile_tensor);
-            //logger.debug("TENSOR QUERY: ");
-            //logger.debug(query_tensor.toString());
-            System.out.println("TENSOR QUERY: ");
-            System.out.println(query_tensor.toDetailString());
-            System.out.println(query_tensor.getModel().getQueryString());
-            System.out.println(query_tensor.properties().getString("yql", ""));
+
+            // Set fields to search (extract from tensor)
+            Optional<Tensor> optional_tensor_fields_to_search = query.getRanking().getFeatures().
+                getTensor(QUERY_INPUT_TENSOR_FIELDS_TO_SEARCH);
+            Tensor tensor_fields_to_search;
+            if (optional_tensor_fields_to_search.isPresent()){
+                tensor_fields_to_search = optional_tensor_fields_to_search.get();
+            } else {
+                throw new RuntimeException(QUERY_INPUT_TENSOR_FIELDS_TO_SEARCH + " not found.");
+            }
+            Iterator<Cell> tensor_cells = tensor_fields_to_search.cellIterator();
+            tensor_cells.forEachRemaining((cell) -> add_field_to_rank_features(cell, query_tensor));
+
+            // Set tensor rank profile (with or without score modifiers)
+            if (query.properties().getBoolean("hybrid.useTensorScoreModifiers")){
+                query_tensor.getRanking().setProfile(rank_profile_tensor_score_modifiers);
+
+                // Extract tensor rank features and reassign to main rank features.
+                // query(marqo__add_weights_tensor) --> query(marqo__add_weights)
+                Optional<Tensor> optional_add_weights = query.getRanking().getFeatures().
+                    getTensor(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR);
+                Tensor add_weights;
+                if (optional_add_weights.isPresent()){
+                    add_weights = optional_add_weights.get();
+                } else {
+                    throw new RuntimeException(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR + " score modifiers not found.");
+                }
+                
+                // query(marqo__mult_weights_tensor) --> query(marqo__mult_weights)
+                Optional<Tensor> optional_mult_weights = query.getRanking().getFeatures().
+                    getTensor(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR);
+                Tensor mult_weights;
+                if (optional_mult_weights.isPresent()){
+                    mult_weights = optional_mult_weights.get();
+                } else {
+                    throw new RuntimeException(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR + " score modifiers not found.");
+                }
+
+                query_tensor.getRanking().getFeatures().put(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS, add_weights);
+                query_tensor.getRanking().getFeatures().put(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS, mult_weights);
+            } else {
+                query_tensor.getRanking().setProfile(rank_profile_tensor);
+            }
+            logger.info("TENSOR QUERY: ");
+            logger.info(query_tensor.toDetailString());
+            logger.info(query_tensor.getModel().getQueryString());
+            logger.info(query_tensor.properties().getString("yql", ""));
+            logger.info(query_tensor.getRanking().getFeatures().toString());
 
             // Execute both searches async
-            int timeout = 300 * 1000;       // TODO: make configurable
             AsyncExecution async_execution_lexical = new AsyncExecution(execution);
             Future<Result> future_lexical = async_execution_lexical.search(query_lexical);
             AsyncExecution async_execution_tensor = new AsyncExecution(execution);
             Future<Result> future_tensor = async_execution_tensor.search(query_tensor);
+            int timeout = 1000 * 1; // TODO: Change this to input.query(timeout)
             try {
                 result_lexical = future_lexical.get(timeout, TimeUnit.MILLISECONDS);
                 result_tensor = future_tensor.get(timeout, TimeUnit.MILLISECONDS);
@@ -136,21 +236,14 @@ public class HybridSearcher extends Searcher {
                 throw new RuntimeException(e.toString());
             }
 
-            //logger.debug("LEXICAL RESULTS");
-            //logger.debug(result_lexical.toString());
-            //logger.debug("TENSOR RESULTS");
-            //logger.debug(result_tensor.toString());
-            System.out.println("LEXICAL RESULTS");
-            System.out.println(result_lexical.toString());
-            System.out.println("TENSOR RESULTS");
-            System.out.println(result_tensor.toString());
+            logger.info("LEXICAL RESULTS" + result_lexical.toString());
+            logger.info("TENSOR RESULTS" + result_tensor.toString());
 
             // TODO: Possible move this outside, when other retrieval methods are available.
             if (ranking_method.equals("rrf")) {
                 HitGroup fused_hit_list = rrf(result_tensor.hits(), result_lexical.hits(), rrf_k, alpha);
-                //logger.debug("RRF Fused Hit Group");
-                //logger.debug(fused_hit_list.toString());
-                System.out.println("RRF Fused Hit Group");
+
+                logger.info("RRF Fused Hit Group");
                 printHitGroup(fused_hit_list);
                 return new Result(query, fused_hit_list);
             }
@@ -171,36 +264,29 @@ public class HybridSearcher extends Searcher {
         HitGroup result = new HitGroup();
         Double reciprocal_rank, existing_score, new_score;
 
-        //logger.debug("Beginning RRF process.");
-        System.out.println("Beginning RRF process.");
-        System.out.println("Beginning (empty) result state: ");
+        logger.info("Beginning RRF process.");
+        logger.info("Beginning (empty) result state: ");
         printHitGroup(result);
 
-        System.out.println(String.format("alpha is %.2f", alpha));
-        System.out.println(String.format("k is %d", k));
+        logger.info(String.format("alpha is %.2f", alpha));
+        logger.info(String.format("k is %d", k));
 
         // Iterate through tensor hits list
         
         int rank = 1;
         if (alpha > 0.0) {
-
-            //logger.debug(String.format("Tensor result list size: %d", hits_tensor.size()));
-            System.out.println(String.format("Iterating through tensor result list. Size: %d", hits_tensor.size()));
+            logger.info(String.format("Iterating through tensor result list. Size: %d", hits_tensor.size()));
 
             for (Hit hit : hits_tensor) {
                 reciprocal_rank = alpha * (1.0 / (rank + k));
                 rrf_scores.put(hit.getId().toString(), reciprocal_rank);   // Store hit's score via its URI
                 hit.setRelevance(reciprocal_rank);                 // Update score to be weighted RR (tensor)
                 result.add(hit);
-                System.out.println(String.format("Set relevance to: %.7f", reciprocal_rank));
-                
+                logger.info(String.format("Set relevance to: %.7f", reciprocal_rank));
+                logger.info(String.format("Modified tensor hit at rank: %d", rank));
+                logger.info(hit.toString());
 
-                //logger.debug(String.format("Modified tensor hit at rank: %d", rank));
-                //logger.debug(hit.toString());
-                System.out.println(String.format("Modified tensor hit at rank: %d", rank));
-                System.out.println(hit.toString());
-
-                System.out.println("Current result state: ");
+                logger.info("Current result state: ");
                 printHitGroup(result);
                 rank++;
             }
@@ -209,25 +295,23 @@ public class HybridSearcher extends Searcher {
         // Iterate through lexical hits list
         rank = 1;
         if (alpha < 1.0){
-
-            //logger.debug(String.format("Lexical result list size: %d", hits_lexical.size()));
-            System.out.println(String.format("Iterating through lexical result list. Size: %d", hits_lexical.size()));
+            logger.info(String.format("Iterating through lexical result list. Size: %d", hits_lexical.size()));
 
             for (Hit hit : hits_lexical) {
                 reciprocal_rank = (1.0-alpha) * (1.0 / (rank + k));
-                System.out.println(String.format("Calculated RRF (lexical) is: %.7f", reciprocal_rank));
+                logger.info(String.format("Calculated RRF (lexical) is: %.7f", reciprocal_rank));
 
                 // Check if score already exists. If so, add to it.
                 existing_score = rrf_scores.get(hit.getId().toString());
                 if (existing_score == null){
                     // If the score doesn't exist, add new hit to result list (with rrf score).
-                    System.out.println("No existing score found! Starting at 0.0.");
+                    logger.info("No existing score found! Starting at 0.0.");
                     hit.setRelevance(reciprocal_rank);      // Update score to be weighted RR (lexical)
                     rrf_scores.put(hit.getId().toString(), reciprocal_rank);    // Log score in hashmap
                     result.add(hit);
 
-                    System.out.println(String.format("Modified lexical hit at rank: %d", rank));
-                    System.out.println(hit.toString());
+                    logger.info(String.format("Modified lexical hit at rank: %d", rank));
+                    logger.info(hit.toString());
 
                 } else {
                     // If it does, find that hit in the result list and update it, adding new rrf to its score.
@@ -237,43 +321,51 @@ public class HybridSearcher extends Searcher {
                     // Update existing hit in result list
                     result.get(hit.getId().toString()).setRelevance(new_score); 
 
-                    System.out.println(String.format("Existing score found for hit: %s.", hit.getId().toString()));
-                    System.out.println(String.format("Existing score is: %.7f", existing_score));
-                    System.out.println(String.format("New score is: %.7f", new_score));
+                    logger.info(String.format("Existing score found for hit: %s.", hit.getId().toString()));
+                    logger.info(String.format("Existing score is: %.7f", existing_score));
+                    logger.info(String.format("New score is: %.7f", new_score));
                 }
 
-                //logger.debug(hit.toString());
-                System.out.println(String.format("Modified lexical hit at rank: %d", rank));
-                System.out.println(hit.toString());
+                logger.info(String.format("Modified lexical hit at rank: %d", rank));
+                logger.info(hit.toString());
 
                 rank++;
 
-                System.out.println("Current result state: ");
+                logger.info("Current result state: ");
                 printHitGroup(result);
             }
         }
 
         // Sort and trim results.
-
-        //logger.debug("Combined list (UNSORTED)");
-        //logger.debug(result.toString());
-        System.out.println("Combined list (UNSORTED)");
+        logger.info("Combined list (UNSORTED)");
         printHitGroup(result);
+
         result.sort();
-        //logger.debug("Combined list (SORTED)");
-        //logger.debug(result.toString());
-        System.out.println("Combined list (SORTED)");
+        logger.info("Combined list (SORTED)");
         printHitGroup(result);
 
         // Only return top hits (max length)
         Integer final_length = Math.max(hits_tensor.size(), hits_lexical.size());
         result.trim(0, final_length);
-        //logger.debug("Combined list (TRIMMED)");
-        //logger.debug(result.toString());
-        System.out.println("Combined list (TRIMMED)");
+        logger.info("Combined list (TRIMMED)");
         printHitGroup(result);
 
         return result;
+    }
+
+    /**
+     * Extracts mapped Tensor Address from cell then adds it as key to rank features, with cell value as the value.
+     * @param cell
+     * @param query
+     */
+    void add_field_to_rank_features(Cell cell, Query query){
+        TensorAddress cell_key = cell.getKey();
+        int dimensions = cell_key.size();
+        for (int i = 0; i < dimensions; i++){
+            String query_input_string = "query(" + cell_key.label(i) + ")";
+            logger.info(String.format("Setting Rank Feature %s to %s", query_input_string, cell.getValue()));
+            query.getRanking().getFeatures().put(query_input_string, cell.getValue());
+        }
     }
 
     /**
@@ -329,13 +421,13 @@ public class HybridSearcher extends Searcher {
      * @param hits
      */
     void printHitGroup(HitGroup hits) {
-        System.out.println(String.format("Hit Group has size: %s", hits.size()));
-        System.out.println("=======================");
+        logger.info(String.format("Hit Group has size: %s", hits.size()));
+        logger.info("=======================");
         int idx = 0;
         for (Hit hit : hits) {
-            System.out.println(String.format("{IDX: %s, HIT ID: %s, RELEVANCE: %.7f}", idx, hit.getId().toString(), hit.getRelevance().getScore()));
+            logger.info(String.format("{IDX: %s, HIT ID: %s, RELEVANCE: %.7f}", idx, hit.getId().toString(), hit.getRelevance().getScore()));
             idx++;
         }
-        System.out.println("=======================");
+        logger.info("=======================");
     }
 }

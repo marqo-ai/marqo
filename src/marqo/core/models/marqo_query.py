@@ -19,7 +19,6 @@ class MarqoQuery(StrictBaseModel, ABC):
     offset: Optional[int] = None
     attributes_to_retrieve: Optional[List[str]] = None
     filter: Optional[SearchFilter] = None
-    score_modifiers: Optional[List[ScoreModifier]] = None
     expose_facets: bool = False
 
     @validator('filter', pre=True, always=True)
@@ -43,6 +42,7 @@ class MarqoTensorQuery(MarqoQuery):
     ef_search: Optional[int] = None
     approximate: bool = True
     searchable_attributes: Optional[List[str]] = None
+    score_modifiers: Optional[List[ScoreModifier]] = None
 
     # TODO - validate that ef_search >= offset+limit if provided
 
@@ -51,8 +51,12 @@ class MarqoLexicalQuery(MarqoQuery):
     or_phrases: List[str]
     and_phrases: List[str]
     searchable_attributes: Optional[List[str]] = None
+    score_modifiers: Optional[List[ScoreModifier]] = None
+
     # TODO - validate at least one of or_phrases and and_phrases is not empty
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     hybrid_parameters: HybridParameters
+
+    # TODO - validate that score_modifiers is not allowed here.

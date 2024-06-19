@@ -13,6 +13,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 import unittest
+from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -143,6 +144,24 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=["text_field_1"]
         )
 
+        structured_text_index_score_modifiers = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field_2", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="add_field_1", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="add_field_2", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="mult_field_1", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="mult_field_2", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
+            ],
+            tensor_fields=["text_field_1", "text_field_2"]
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_text_index_encoded_name,
@@ -153,7 +172,8 @@ class TestHybridSearch(MarqoTestCase):
             structured_default_text_index_encoded_name,
             structured_default_image_index,
             structured_image_index_with_random_model,
-            structured_text_index_single_field
+            structured_text_index_single_field,
+            structured_text_index_score_modifiers
         ])
 
         # Assign to objects so they can be used in tests
@@ -167,6 +187,7 @@ class TestHybridSearch(MarqoTestCase):
         cls.structured_default_image_index = cls.indexes[7]
         cls.structured_image_index_with_random_model = cls.indexes[8]
         cls.structured_text_index_single_field = cls.indexes[9]
+        cls.structured_text_index_score_modifiers = cls.indexes[10]
 
     def setUp(self) -> None:
         super().setUp()
@@ -387,6 +408,74 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         text="dogs",
                         search_method="TENSOR",
+                        result_count=10
+                    )
+
+                    self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
+                    for i in range(len(hybrid_res["hits"])):
+                        self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
+
+    def test_hybrid_search_score_modifiers_searchable_attributes(self):
+        """
+        Tests that hybrid search with:
+        retrieval_method = "disjunction"
+        ranking_method = "rrf"
+        Using score_modifiers and searchable_attributes
+        """
+
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                # Add documents
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            # similar semantics to dogs
+                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
+                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
+                            {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
+                            {"_id": "doc4", "text_field_1": "huskies"},
+                            {"_id": "doc5", "text_field_1": "four-legged animals"},
+
+                            # shares lexical token with dogs
+                            {"_id": "doc6", "text_field_1": "hot dogs"},
+                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
+                            {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
+                            {"_id": "doc9", "text_field_1": "dogs random words"},
+                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
+
+                            {"_id": "doc11", "text_field_2": "dogs but wrong field"},
+                            {"_id": "doc12", "text_field_2": "puppies puppies", "add_field_1": -1.0, "mult_field_1": 0.5},
+                            {"_id": "doc13", "text_field_2": "canines canines"},
+
+                        ],
+                    )
+                )
+
+                with self.subTest(""):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method=RetrievalMethod.Disjunction,
+                            ranking_method=RankingMethod.RRF,
+                            alpha=0.8,
+                            searchable_attributes_lexical=["text_field_1", "text_field_2"],
+                            searchable_attributes_tensor=["text_field_2"],
+                            score_modifiers_lexical=[
+                                # 2 fields in mult
+                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
+                                ScoreModifier(field="mult_field_2", weight=1.0, type=ScoreModifierType.Multiply)
+                            ],
+                            score_modifiers_tensor=[
+                                # 1 field in mult, 1 field in add
+                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
+                                ScoreModifier(field="add_field_1", weight=1.0, type=ScoreModifierType.Add)
+                            ]
+                        ),
                         result_count=10
                     )
 
