@@ -144,7 +144,7 @@ class CacheModels:
             self.models = warmed_models
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
-        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
+        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cuda', 'cpu']
 
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
 
