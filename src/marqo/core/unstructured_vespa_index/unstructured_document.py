@@ -103,6 +103,11 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             elif isinstance(value, dict):
                 for k, v in value.items():
                     if isinstance(v, (int, float)):
+                        if isinstance(v, int):
+                            instance.fields.int_fields[f"{key}.{k}"] = v
+                        else:
+                            instance.fields.float_fields[f"{key}.{k}"] = float(v)
+                            
                         if marqo_index_version_lt_2_9_0:
                             instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
                         else:
