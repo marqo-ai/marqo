@@ -6,7 +6,7 @@ tar xf /temp/apache-maven-3.9.8-bin.tar.gz -C /opt
 ln -s /opt/apache-maven-3.9.8 /opt/maven
 
 touch /etc/profile.d/maven.sh
-bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/jre-openjdk" > /etc/profile.d/maven.sh'
+bash -c 'echo "export JAVA_HOME=/usr/lib/jvm/jre-17-openjdk" > /etc/profile.d/maven.sh'
 bash -c 'echo "export M2_HOME=/opt/maven" >> /etc/profile.d/maven.sh'
 bash -c 'echo "export MAVEN_HOME=/opt/maven" >> /etc/profile.d/maven.sh'
 bash -c 'echo "export PATH=\${M2_HOME}/bin:\${PATH}" >> /etc/profile.d/maven.sh'
