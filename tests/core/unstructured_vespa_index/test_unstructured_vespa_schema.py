@@ -81,6 +81,7 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
 
                 expected_schema = self._read_schema_from_file(
                     f'test_schemas/unstructured_vespa_index_schema_distance_metric_{distance_metric.value}.sd')
+
                 self.assertEqual(
                     self._remove_whitespace_in_schema(expected_schema),
                     self._remove_whitespace_in_schema(generated_schema)

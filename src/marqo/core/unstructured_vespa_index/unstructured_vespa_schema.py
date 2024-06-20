@@ -19,7 +19,7 @@ class UnstructuredVespaSchema(VespaSchema):
     _BOOL_FIELDS = unstructured_common.BOOL_FIELDS
 
     _SCORE_MODIFIERS_DOUBLE_LONG = unstructured_common.SCORE_MODIFIERS_DOUBLE_LONG
-    _SCORE_MODIFIERS_INT = unstructured_common.SCORE_MODIFIERS_INT
+    _SCORE_MODIFIERS = unstructured_common.SCORE_MODIFIERS
 
     _CHUNKS = unstructured_common.VESPA_DOC_CHUNKS
     _EMBEDDINGS = unstructured_common.VESPA_DOC_EMBEDDINGS
@@ -142,7 +142,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: attribute | summary
                     }}
 
-                    field {cls._SCORE_MODIFIERS_INT} type tensor<int8>(p{{}}) {{
+                    field {cls._SCORE_MODIFIERS} type tensor<float>(p{{}}) {{
                         indexing: attribute | summary
                     }}
 
@@ -194,7 +194,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         query(marqo__add_weights) tensor<double>(p{{}})
                     }}
                     function modify(score) {{
-                        expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long), prod)) * if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_int)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_int), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double_long), sum) + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_int), sum)
+                        expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long), prod)) * if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double_long), sum) + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
                    }}
                 }}
                 

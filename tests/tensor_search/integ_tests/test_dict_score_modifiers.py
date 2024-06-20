@@ -21,9 +21,13 @@ class TestDictScoreModifiers(MarqoTestCase):
         super().setUpClass()
 
         # UNSTRUCTURED indexes
-        unstructured_default_text_index = cls.unstructured_marqo_index_request(
+        old_unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k')
         )
+        new_unstructured_default_text_index = cls.unstructured_marqo_index_request(
+            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
+            marqo_version="2.9.0"
+        )   
 
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
@@ -54,13 +58,15 @@ class TestDictScoreModifiers(MarqoTestCase):
         )
 
         cls.indexes = cls.create_indexes([
-            unstructured_default_text_index,
+            old_unstructured_default_text_index,
+            new_unstructured_default_text_index,
             structured_default_text_index
         ])
 
         # Assign to objects so they can be used in tests
-        cls.unstructured_default_text_index = cls.indexes[0]
-        cls.structured_default_text_index = cls.indexes[1]
+        cls.old_unstructured_default_text_index = cls.indexes[0]
+        cls.new_unstructured_default_text_index = cls.indexes[1]
+        cls.structured_default_text_index = cls.indexes[2]
 
     def setUp(self) -> None:
         super().setUp()
@@ -77,7 +83,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         """
         Test that adding to score works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -138,7 +144,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         """
         Test that multiplying score by works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -200,7 +206,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         """
         Test that combining adding to score and multiplying score by works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -331,7 +337,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         """
         Test that long score modifier works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index, self.old_unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -373,8 +379,13 @@ class TestDictScoreModifiers(MarqoTestCase):
                 # and 85899345900239 <= score <= 85899345900241
                 self.assertTrue(res["hits"][0]["_id"] in ["2", "1"])
                 self.assertTrue(res["hits"][1]["_id"] in ["2", "1"])
-                self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
-                self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
+                if index in [self.new_unstructured_default_text_index, self.structured_default_text_index]:
+                    self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
+                    self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
+                else:
+                    self.assertTrue(85899345920000 <= score_of_first_result <= 85899345920001)
+                    self.assertTrue(85899345920000 <= score_of_second_result <= 85899345920001)
+
 
                 # Lexical Search with score modifier
                 res = tensor_search.search(

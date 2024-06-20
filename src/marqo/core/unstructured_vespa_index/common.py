@@ -12,8 +12,8 @@ INT_FIELDS = "marqo__int_fields"
 FLOAT_FIELDS = "marqo__float_fields"
 BOOL_FIELDS = "marqo__bool_fields"
 
+SCORE_MODIFIERS = "marqo__score_modifiers" # retain for backwards compatibility
 SCORE_MODIFIERS_DOUBLE_LONG = "marqo__score_modifiers_double_long"
-SCORE_MODIFIERS_INT = "marqo__score_modifiers_int"
 
 RANK_PROFILE_EMBEDDING_SIMILARITY = "embedding_similarity"
 RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = 'embedding_similarity_modifiers'
