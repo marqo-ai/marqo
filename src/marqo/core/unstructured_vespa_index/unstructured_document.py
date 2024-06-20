@@ -67,6 +67,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     def from_marqo_document(cls, document: Dict, filter_string_max_length: int, marqo_index_version: semver.VersionInfo) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
+        print(f"marqo_index_version: {marqo_index_version}")
 
         if index_constants.MARQO_DOC_ID not in document:
             raise VespaDocumentParsingError(f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
@@ -74,6 +75,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
 
         doc_id = document[index_constants.MARQO_DOC_ID]
         instance = cls(id=doc_id, fields=UnstructuredVespaDocumentFields(marqo__id=doc_id))
+        marqo_index_version_lt_2_9_0 = marqo_index_version < semver.VersionInfo.parse("2.9.0")
 
         for key, value in document.items():
             if key in [index_constants.MARQO_DOC_EMBEDDINGS, index_constants.MARQO_DOC_CHUNKS,
@@ -89,19 +91,23 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 instance.fields.bool_fields[key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
-            if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
-                target_score_modifier_tensor = instance.fields.score_modifiers_fields
-            else:
-                target_score_modifier_tensor = instance.fields.score_modifiers_double_long_fields
-            if isinstance(value, int):
-                instance.fields.int_fields[key] = value
-                target_score_modifier_tensor[key] = value
-            elif isinstance(value, float):
-                instance.fields.float_fields[key] = value
-                target_score_modifier_tensor[key] = value
+            elif isinstance(value, (int, float)):
+                if isinstance(value, int):
+                    instance.fields.int_fields[key] = value
+                else:
+                    instance.fields.float_fields[key] = float(value)
+                
+                if marqo_index_version_lt_2_9_0:
+                    instance.fields.score_modifiers_fields[key] = value
+                else:
+                    instance.fields.score_modifiers_double_long_fields[key] = value
             elif isinstance(value, dict):
                 for k, v in value.items():
-                    target_score_modifier_tensor[f"{key}.{k}"] = v
+                    if isinstance(v, (int, float)):
+                        if marqo_index_version_lt_2_9_0:
+                            instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                        else:
+                            instance.fields.score_modifiers_double_long_fields[f"{key}.{k}"] = v
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")

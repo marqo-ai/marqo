@@ -204,17 +204,11 @@ class StructuredVespaIndex(VespaIndex):
             if not index_field.lexical_field_name and not index_field.filter_field_name:
                 vespa_fields[index_field.name] = marqo_value
 
-            # Make branching logic
-            # if version is < 2.9, then use old score modifier logic
-            #   send all to score_modifiers
-            # else, use new score modifier logic
-            #   send all to score_modifiers_double
-
             if FieldFeature.ScoreModifier in index_field.features:
                 if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
                     target_dict = score_modifiers
                 else:
-                    target_dict = score_modifiers_double_long # change name to just double
+                    target_dict = score_modifiers_double_long 
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
