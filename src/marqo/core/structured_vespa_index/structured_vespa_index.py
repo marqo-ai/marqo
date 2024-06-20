@@ -64,7 +64,7 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
-        score_modifiers: Dict[str, float] = dict()
+        score_modifiers_2_8: Dict[str, float] = dict()
         score_modifiers_float: Dict[str, float] = {}
         score_modifiers_double_long: Dict[str, float] = {}
 
@@ -128,7 +128,7 @@ class StructuredVespaIndex(VespaIndex):
 
             if FieldFeature.ScoreModifier in index_field.features:
                 if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
-                    target_dict = score_modifiers
+                    target_dict = score_modifiers_2_8
                 else:
                     if index_field.type in [FieldType.MapFloat, FieldType.Float]:
                         target_dict = score_modifiers_float
@@ -157,11 +157,11 @@ class StructuredVespaIndex(VespaIndex):
                 }
             }
 
-        if len(score_modifiers) > 0:
+        if len(score_modifiers_2_8) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = {
                 "modify": {
                     "operation": "replace",
-                    "cells": score_modifiers
+                    "cells": score_modifiers_2_8
                 }
             }
 
@@ -170,7 +170,7 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
-        score_modifiers: Dict[str, int] = {}
+        score_modifiers_2_8: Dict[str, int] = {}
         score_modifiers_float: Dict[str, float] = {}
         score_modifiers_double_long: Dict[str, float] = {}
 
@@ -217,7 +217,7 @@ class StructuredVespaIndex(VespaIndex):
 
             if FieldFeature.ScoreModifier in index_field.features:
                 if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
-                    target_dict = score_modifiers
+                    target_dict = score_modifiers_2_8
                 else:
                     if index_field.type in [FieldType.MapFloat, FieldType.Float]:
                         target_dict = score_modifiers_float
@@ -256,8 +256,8 @@ class StructuredVespaIndex(VespaIndex):
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = score_modifiers_double_long
         if len(score_modifiers_float) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_FLOAT] = score_modifiers_float
-        if len(score_modifiers) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = score_modifiers
+        if len(score_modifiers_2_8) > 0:
+            vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = score_modifiers_2_8
 
         vespa_doc = {
             self._VESPA_DOC_FIELDS: vespa_fields
