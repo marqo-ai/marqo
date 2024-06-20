@@ -1,4 +1,5 @@
 import textwrap
+import semver
 
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
@@ -19,7 +20,8 @@ class UnstructuredVespaSchema(VespaSchema):
     _BOOL_FIELDS = unstructured_common.BOOL_FIELDS
 
     _SCORE_MODIFIERS_DOUBLE_LONG = unstructured_common.SCORE_MODIFIERS_DOUBLE_LONG
-    _SCORE_MODIFIERS = unstructured_common.SCORE_MODIFIERS
+    _SCORE_MODIFIERS_FLOAT = unstructured_common.SCORE_MODIFIERS_FLOAT
+    _SCORE_MODIFIERS_2_8 = unstructured_common.SCORE_MODIFIERS_2_8
 
     _CHUNKS = unstructured_common.VESPA_DOC_CHUNKS
     _EMBEDDINGS = unstructured_common.VESPA_DOC_EMBEDDINGS
@@ -67,6 +69,29 @@ class UnstructuredVespaSchema(VespaSchema):
     def _generate_unstructured_schema(cls, marqo_index: UnstructuredMarqoIndex) -> str:
         """This function generates the Vespa schema for an unstructured Marqo index."""
         dimension = str(marqo_index.model.get_dimension())
+
+        _2_8_score_modifier_expression = (
+            f'if (count(query(marqo__mult_weights)) == 0, 1, ' 
+            f'reduce(query(marqo__mult_weights) ' 
+            f'* attribute(marqo__score_modifiers), prod)) * score ' 
+            f'+ reduce(query(marqo__add_weights) ' 
+            f'* attribute(marqo__score_modifiers), sum)'
+        )
+
+        _2_9_score_modifier_expression = (
+            f'if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long)) == 0, '
+            f'   1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long), prod)) '
+            f'* if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_float)) == 0, '
+            f'   1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_float), prod)) '
+            f'* score '
+            f'+ reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double_long), sum) '
+            f'+ reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_float), sum)'
+        )
+
+        if marqo_index.parsed_marqo_version() < semver.VersionInfo.parse("2.9.0"):
+            expression = _2_8_score_modifier_expression
+        else:
+            expression = _2_9_score_modifier_expression
 
         return textwrap.dedent(
             f"""
@@ -142,7 +167,11 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: attribute | summary
                     }}
 
-                    field {cls._SCORE_MODIFIERS} type tensor<float>(p{{}}) {{
+                    field {cls._SCORE_MODIFIERS_FLOAT} type tensor<float>(p{{}}) {{
+                        indexing: attribute | summary
+                    }}
+
+                    field {cls._SCORE_MODIFIERS_2_8} type tensor<float>(p{{}}) {{
                         indexing: attribute | summary
                     }}
 
@@ -194,7 +223,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         query(marqo__add_weights) tensor<double>(p{{}})
                     }}
                     function modify(score) {{
-                        expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long), prod)) * if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double_long), sum) + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
+                        expression: {expression}
                    }}
                 }}
                 

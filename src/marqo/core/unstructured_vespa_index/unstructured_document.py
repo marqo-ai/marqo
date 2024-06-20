@@ -23,7 +23,8 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
     score_modifiers_double_long_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_DOUBLE_LONG)
-    score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
+    score_modifiers_float_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_FLOAT)
+    score_modifiers_fields_2_8: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_2_8)
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
@@ -94,12 +95,15 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 if isinstance(value, int):
                     instance.fields.int_fields[key] = value
                 else:
-                    instance.fields.float_fields[key] = float(value)
+                    instance.fields.float_fields[key] = value
                 
                 if marqo_index_version_lt_2_9_0:
-                    instance.fields.score_modifiers_fields[key] = value
+                    instance.fields.score_modifiers_fields_2_8[key] = value
                 else:
-                    instance.fields.score_modifiers_double_long_fields[key] = value
+                    if isinstance(value, float) and not cls._is_double(value):
+                        instance.fields.score_modifiers_float_fields[key] = value
+                    else:
+                        instance.fields.score_modifiers_double_long_fields[key] = value
             elif isinstance(value, dict):
                 for k, v in value.items():
                     if isinstance(v, (int, float)):
@@ -109,9 +113,12 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                             instance.fields.float_fields[f"{key}.{k}"] = float(v)
                             
                         if marqo_index_version_lt_2_9_0:
-                            instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                            instance.fields.score_modifiers_fields_2_8[f"{key}.{k}"] = v
                         else:
-                            instance.fields.score_modifiers_double_long_fields[f"{key}.{k}"] = v
+                            if isinstance(v, float) and not cls._is_double(v):
+                                instance.fields.score_modifiers_float_fields[f"{key}.{k}"] = v
+                            else:
+                                instance.fields.score_modifiers_double_long_fields[f"{key}.{k}"] = v
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
@@ -121,6 +128,14 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         instance.fields.vespa_chunks = document.get(index_constants.MARQO_DOC_CHUNKS, [])
         instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
         return instance
+    
+    def _is_double(value):
+        """Check if the value is likely a double-precision floating point number based on its magnitude."""
+        SINGLE_PRECISION_MAX = 3.4e38
+
+        if isinstance(value, float) and abs(value) > SINGLE_PRECISION_MAX:
+            return True  # Double because it's outside single precision range
+        return False
     
     def to_vespa_document(self) -> Dict[str, Any]:
         """Convert VespaDocumentObject to a Vespa document.

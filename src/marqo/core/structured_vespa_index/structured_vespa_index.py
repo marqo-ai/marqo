@@ -65,6 +65,7 @@ class StructuredVespaIndex(VespaIndex):
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
         score_modifiers: Dict[str, float] = dict()
+        score_modifiers_float: Dict[str, float] = {}
         score_modifiers_double_long: Dict[str, float] = {}
 
         if constants.MARQO_DOC_ID not in marqo_document:
@@ -129,7 +130,10 @@ class StructuredVespaIndex(VespaIndex):
                 if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
                     target_dict = score_modifiers
                 else:
-                    target_dict = score_modifiers_double_long # change name to just double
+                    if index_field.type in [FieldType.MapFloat, FieldType.Float]:
+                        target_dict = score_modifiers_float
+                    else:
+                        target_dict = score_modifiers_double_long
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
@@ -145,8 +149,16 @@ class StructuredVespaIndex(VespaIndex):
                 }
             }
 
+        if len(score_modifiers_float) > 0:
+            vespa_fields[common.FIELD_SCORE_MODIFIERS_FLOAT] = {
+                "modify": {
+                    "operation": "replace",
+                    "cells": score_modifiers_float
+                }
+            }
+
         if len(score_modifiers) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS] = {
+            vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = {
                 "modify": {
                     "operation": "replace",
                     "cells": score_modifiers
@@ -158,8 +170,9 @@ class StructuredVespaIndex(VespaIndex):
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         vespa_id: Optional[int] = None
         vespa_fields: Dict[str, Any] = dict()
-        score_modifiers_double_long: Dict[str, float] = {}
         score_modifiers: Dict[str, int] = {}
+        score_modifiers_float: Dict[str, float] = {}
+        score_modifiers_double_long: Dict[str, float] = {}
 
         # ID
         if constants.MARQO_DOC_ID in marqo_document:
@@ -206,7 +219,10 @@ class StructuredVespaIndex(VespaIndex):
                 if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
                     target_dict = score_modifiers
                 else:
-                    target_dict = score_modifiers_double_long 
+                    if index_field.type in [FieldType.MapFloat, FieldType.Float]:
+                        target_dict = score_modifiers_float
+                    else:
+                        target_dict = score_modifiers_double_long
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
@@ -238,8 +254,10 @@ class StructuredVespaIndex(VespaIndex):
 
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = score_modifiers_double_long
+        if len(score_modifiers_float) > 0:
+            vespa_fields[common.FIELD_SCORE_MODIFIERS_FLOAT] = score_modifiers_float
         if len(score_modifiers) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS] = score_modifiers
+            vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = score_modifiers
 
         vespa_doc = {
             self._VESPA_DOC_FIELDS: vespa_fields
@@ -309,7 +327,8 @@ class StructuredVespaIndex(VespaIndex):
                 marqo_document[constants.MARQO_DOC_ID] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
-            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS,
+            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_2_8,
+                                                              common.FIELD_SCORE_MODIFIERS_FLOAT,
                                                               common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
                                                               common.FIELD_VECTOR_COUNT,
                                                               self._VESPA_DOC_MATCH_FEATURES}:

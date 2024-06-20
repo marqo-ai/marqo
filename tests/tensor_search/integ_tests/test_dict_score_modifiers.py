@@ -3,6 +3,8 @@ from unittest import mock
 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -37,6 +39,10 @@ class TestDictScoreModifiers(MarqoTestCase):
             fields=[
                 FieldRequest(name="text_field", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch]),
+                FieldRequest(name="double_score_mods", type=FieldType.Double,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="float_score_mods", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
                 FieldRequest(name="map_score_mods", type=FieldType.MapFloat,
                              features=[FieldFeature.ScoreModifier]),
                 FieldRequest(name="map_score_mods_int", type=FieldType.MapInt,
@@ -77,6 +83,74 @@ class TestDictScoreModifiers(MarqoTestCase):
     def tearDown(self) -> None:
         super().tearDown()
         self.device_patcher.stop()
+
+    # Test Double score modifier
+    def test_double_score_modifier(self):
+        """
+        Test that adding to score works for a double score modifier.
+        """
+        for index in [self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text_field": "a photo of a cat", "double_score_mods": 0.5 * 1**39},
+                            {"_id": "2", "text_field": "a photo of a cat", "double_score_mods": 4.5 * 1**39},
+                            {"_id": "3", "text_field": "a photo of a cat", "double_score_mods": 5.5 * 1**39},
+                            {"_id": "4", "text_field": "a photo of a cat"}
+                        ]
+                    )
+                )
+                # Search with score modifier
+                # 0.5 + 5.5 * 2 = 11.5
+                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "double_score_mods", "weight": 2}]})
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="",
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+                # Get the score of the first result and divide by 1**39
+                score_of_first_result = res["hits"][0]["_score"] / 1**39
+                # Assert that the first result has _id "3" and 11 <= score <= 12
+                self.assertEqual(res["hits"][0]["_id"], "3")
+                self.assertTrue(11 <= score_of_first_result <= 12)
+
+    # Test Long score modifier
+    def test_long_score_modifier(self):
+        """
+        Test that adding to score works for a long score modifier.
+        """
+        for index in [self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text_field": "a photo of a cat", "long_score_mods": 2**34},
+                            {"_id": "2", "text_field": "a photo of a cat", "long_score_mods": 2**35},
+                            {"_id": "3", "text_field": "a photo of a cat", "long_score_mods": 2**36},
+                            {"_id": "4", "text_field": "a photo of a cat"}
+                        ]
+                    )
+                )
+                # Search with score modifier
+                # 0.5 + 2**36 * 2 = 2**37
+                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "long_score_mods", "weight": 2}]})
+                res = tensor_search.search(
+                    index_name=index.name, config=self.config, text="",
+                    score_modifiers=score_modifier,
+                    result_count=10
+                )
+                # Get the score of the first result and divide by 1**39
+                score_of_first_result = res["hits"][0]["_score"] / 1**39
+                # Assert that the first result has _id "3" and 2**37-1 <= score <= 2**37+1
+                self.assertEqual(res["hits"][0]["_id"], "3")
+                self.assertTrue(2**37 - 1 <= score_of_first_result <= 2**37 + 1)
 
     # Test Add to score
     def test_add_to_score_map_score_modifier(self):
@@ -335,7 +409,104 @@ class TestDictScoreModifiers(MarqoTestCase):
                     self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
                     self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
                 else:
+                    # In the old unstructured index, we expect to lose precision since the values
+                    # Are stored in tensor<float>
                     self.assertTrue(85899345920000 <= score_of_first_result <= 85899345920001)
                     self.assertTrue(85899345920000 <= score_of_second_result <= 85899345920001)
 
-            
+    def test_float_double_tensor_allocation_unstructured(self):
+        """
+        Test that float and double values are sent to the correct tensor in Vespa.
+        """
+        for index in [self.new_unstructured_default_text_index, self.old_unstructured_default_text_index]:
+            with self.subTest(index=index.type):
+                # We add a float document
+                # We add a double document
+
+                # For marqo old marqo index (<2.9) we expect the double value to loose precision
+                # Meaning it is stored in 
+                pass
+
+    def test_structured_tensor_storage_old_and_new(self):
+        # Mock the index and field map
+        index = mock.MagicMock()
+        index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.9.0")
+        index.field_map = {
+            "float_field": Field(name="float_field", type=FieldType.Float, features=[FieldFeature.ScoreModifier]),
+            "map_float_field": Field(name="map_float_field", type=FieldType.MapFloat, features=[FieldFeature.ScoreModifier]),
+            "double_field": Field(name="double_field", type=FieldType.Double, features=[FieldFeature.ScoreModifier]),
+            "map_double_field": Field(name="map_double_field", type=FieldType.MapDouble, features=[FieldFeature.ScoreModifier]),
+        }
+
+        vespa_index = StructuredVespaIndex(marqo_index=index)
+
+        # Document to be processed
+        marqo_document = {
+            "float_field": 1.23,
+            "double_field": 4.56,
+            "map_float_field": {"float_field": 1.23},
+            "map_double_field": {"double_field": 4.56},
+        }
+
+        # Call the method under test
+        vespa_doc = vespa_index.to_vespa_document(marqo_document)
+
+        # Assertions to check if the fields are stored correctly
+        self.assertIn("marqo__score_modifiers_float", vespa_doc["fields"])
+        self.assertIn("marqo__score_modifiers_double_long", vespa_doc["fields"])
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_float"]["float_field"], 1.23)
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_float"]["map_float_field.float_field"], 1.23)
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_double_long"]["double_field"], 4.56)
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_double_long"]["map_double_field.double_field"], 4.56)
+
+        # Test with a version less than 2.9.0
+        index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.8.0")
+        vespa_doc = vespa_index.to_vespa_document(marqo_document)
+
+        # Assertions for version less than 2.9.0
+        self.assertIn("marqo__score_modifiers", vespa_doc["fields"])
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers"]["float_field"], 1.23)
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers"]["double_field"], 4.56)
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers"]["map_float_field.float_field"], 1.23)
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers"]["map_double_field.double_field"], 4.56)
+
+    def test_unstructured_tensor_storage_old_and_new(self):
+        # Mock document
+        marqo_document = {
+            "_id": "1",
+            "MARQO_DOC_ID": "doc1",
+            "float_field": 1.23,
+            "double_field": 4.56e39,  # This value is intentionally large to simulate a double,
+            "map_double_field": {"double_field": 4.56e39},
+            "map_float_field": {"float_field": 1.23},
+            "int_field": 42
+        }
+
+        # Test with Marqo version >= 2.9.0
+        marqo_index_version = semver.VersionInfo.parse("2.9.0")
+        document = UnstructuredVespaDocument.from_marqo_document(
+            marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
+        )
+
+        # Assertions for version >= 2.9.0
+        self.assertEqual(document.fields.score_modifiers_float_fields["float_field"], 1.23)
+        self.assertEqual(document.fields.score_modifiers_double_long_fields["double_field"], 4.56e39)
+        self.assertEqual(document.fields.score_modifiers_double_long_fields["map_double_field.double_field"], 4.56e39)
+        self.assertEqual(document.fields.score_modifiers_float_fields["map_float_field.float_field"], 1.23)
+        self.assertNotIn("int_field", document.fields.score_modifiers_float_fields)
+        self.assertIn("int_field", document.fields.score_modifiers_double_long_fields)
+
+
+        # Test with Marqo version < 2.9.0
+        marqo_index_version = semver.VersionInfo.parse("2.8.0")
+        document = UnstructuredVespaDocument.from_marqo_document(
+            marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
+        )
+
+        # Assertions for version < 2.9.0
+        self.assertEqual(document.fields.score_modifiers_fields_2_8["float_field"], 1.23)
+        self.assertEqual(document.fields.score_modifiers_fields_2_8["double_field"], 4.56e39)
+        self.assertEqual(document.fields.score_modifiers_fields_2_8["map_double_field.double_field"], 4.56e39)
+        self.assertEqual(document.fields.score_modifiers_fields_2_8["map_float_field.float_field"], 1.23)
+        self.assertEqual(document.fields.score_modifiers_fields_2_8["int_field"], 42)
+
