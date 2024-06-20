@@ -107,7 +107,7 @@ class TestStructuredVespaIndex(MarqoTestCase):
             'id': 'my_id',
             'fields': {
                 common.FIELD_ID: 'my_id',
-                common.FIELD_SCORE_MODIFIERS: {'price': 100.0, 'rank': 1.0},
+                common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG: {'price': 100.0, 'rank': 1.0},
                 common.FIELD_VECTOR_COUNT: 2,
                 self.marqo_index.field_map['title'].lexical_field_name: 'my title',
                 'description': 'my description',
