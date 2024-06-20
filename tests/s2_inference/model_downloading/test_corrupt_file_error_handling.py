@@ -1,12 +1,16 @@
 import unittest
-from unittest.mock import MagicMock, patch
-from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.s2_inference.s2_inference import _load_model
-from marqo.s2_inference.hf_utils import extract_huggingface_archive
-from marqo.s2_inference.configs import ModelCache
 import zipfile
-import tarfile
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.hf_utils import extract_huggingface_archive
+from marqo.s2_inference.s2_inference import _load_model
+
+
+@pytest.mark.cpu_only
 class TestCorruptFileInOpenCLIP(unittest.TestCase):
     '''Test that a corrupt file in OpenCLIP is handled correctly.
         Note that the downloaded file should be a single .bin, .pt file.
