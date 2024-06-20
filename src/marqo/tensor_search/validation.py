@@ -369,12 +369,11 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
 
     # If field is declared in mappings, it overwrites the default.
     if mappings and field in mappings:
-        if mappings[field]["type"] == FieldType.MultimodalCombination:
+        if mappings[field]["type"] == enums.MappingsObjectType.multimodal_combination: #FieldType.MultimodalCombination:
             field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
-        elif mappings[field]["type"] == FieldType.CustomVector:
+        elif mappings[field]["type"] == enums.MappingsObjectType.custom_vector: #FieldType.CustomVector:
             field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
-        elif mappings[field]["type"] == FieldType.MapNumerical:
-            
+        elif mappings[field]["type"] == enums.MappingsObjectType.map_numerical: #FieldType.MapNumerical:
             field_content = validate_map_field(field_content)
         else:
             raise InvalidArgError(

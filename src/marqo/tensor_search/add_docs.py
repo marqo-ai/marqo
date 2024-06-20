@@ -218,11 +218,11 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
             raise base_exceptions.InternalError(f"Invalid dict field {field_name}. Could not find field in mappings object.")
 
         if mappings[field_name]["type"] == enums.MappingsObjectType.multimodal_combination:
-            return FieldType.MultimodalCombination
+            return enums.MappingsObjectType.multimodal_combination #FieldType.MultimodalCombination
         elif mappings[field_name]["type"] == enums.MappingsObjectType.custom_vector:
-            return FieldType.CustomVector
+            return enums.MappingsObjectType.custom_vector #FieldType.CustomVector
         elif mappings[field_name]["type"] == enums.MappingsObjectType.map_numerical:
-            return FieldType.MapNumerical
+            return enums.MappingsObjectType.map_numerical
         else:
             raise base_exceptions.InternalError(f"Invalid dict field type: '{mappings[field_name]['type']}' for field: '{field_name}' in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
     else:

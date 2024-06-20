@@ -94,7 +94,6 @@ class StructuredVespaIndex(VespaIndex):
 
             index_field = self._marqo_index.field_map[marqo_field]
             marqo_index_version = self._marqo_index.parsed_marqo_version()
-            print(f"from structured_vespa_index.py, marqo_index_version: {marqo_index_version}")
 
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
@@ -178,7 +177,6 @@ class StructuredVespaIndex(VespaIndex):
 
             index_field = self._marqo_index.field_map[marqo_field]
             marqo_index_version = self._marqo_index.parsed_marqo_version()
-            print(f"from structured_vespa_index.py, marqo_index_version: {marqo_index_version}")
 
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)

@@ -40,7 +40,6 @@ class FieldType(str, Enum):
     ImagePointer = 'image_pointer'
     MultimodalCombination = 'multimodal_combination'
     CustomVector = "custom_vector"
-    MapNumerical = "map_numerical"
     MapInt = 'map<text, int>'
     MapLong = 'map<text, long>'  
     MapFloat = 'map<text, float>'
