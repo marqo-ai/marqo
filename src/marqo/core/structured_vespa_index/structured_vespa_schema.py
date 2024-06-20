@@ -1,11 +1,11 @@
 from typing import List
+import semver
 
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex, FieldFeature, Field, TensorField, MarqoIndex
 from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_schema import VespaSchema
 from marqo.exceptions import InternalError
-from distutils.version import StrictVersion
 
 
 
@@ -279,7 +279,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
 
             rank_profiles.append('function modify(score) {')
-            if StrictVersion(marqo_index.parsed_marqo_version()) <= StrictVersion("2.9"):
+            if marqo_index.parsed_marqo_version() < semver.VersionInfo.parse("2.9.0"):
                 rank_profiles.append(f'   expression: {old_expression}')
             else:
                 rank_profiles.append(f'   expression: {expression}')

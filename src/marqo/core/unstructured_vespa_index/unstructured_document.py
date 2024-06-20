@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 from typing import List, Dict, Any
+import semver
 
 from pydantic import Field, BaseModel
 from marqo.base_model import MarqoBaseModel
@@ -8,7 +9,6 @@ from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants
 from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
-from distutils.version import StrictVersion
 
 
 class UnstructuredVespaDocumentFields(MarqoBaseModel):
@@ -64,7 +64,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                    fields=UnstructuredVespaDocumentFields(**fields))
 
     @classmethod
-    def from_marqo_document(cls, document: Dict, filter_string_max_length: int, marqo_index_version: str) -> "UnstructuredVespaDocument":
+    def from_marqo_document(cls, document: Dict, filter_string_max_length: int, marqo_index_version: semver.VersionInfo) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
 
@@ -89,7 +89,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 instance.fields.bool_fields[key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
-            if StrictVersion(marqo_index_version) < StrictVersion("2.9"):
+            if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
                 target_score_modifier_tensor = instance.fields.score_modifiers_fields
             else:
                 target_score_modifier_tensor = instance.fields.score_modifiers_double_long_fields

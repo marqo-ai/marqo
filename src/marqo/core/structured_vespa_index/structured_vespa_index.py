@@ -1,3 +1,4 @@
+import semver
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
                                    InvalidDataRangeError, MarqoDocumentParsingError)
@@ -7,7 +8,6 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
-from distutils.version import StrictVersion
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -127,7 +127,7 @@ class StructuredVespaIndex(VespaIndex):
                 }
 
             if FieldFeature.ScoreModifier in index_field.features:
-                if StrictVersion(marqo_index_version) <= StrictVersion("2.9"):
+                if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
                     target_dict = score_modifiers
                 else:
                     target_dict = score_modifiers_double_long # change name to just double
@@ -211,7 +211,7 @@ class StructuredVespaIndex(VespaIndex):
             #   send all to score_modifiers_double
 
             if FieldFeature.ScoreModifier in index_field.features:
-                if LooseVersion(marqo_index_version) <= LooseVersion("2.9"):
+                if marqo_index_version < semver.VersionInfo.parse("2.9.0"):
                     target_dict = score_modifiers
                 else:
                     target_dict = score_modifiers_double_long # change name to just double
