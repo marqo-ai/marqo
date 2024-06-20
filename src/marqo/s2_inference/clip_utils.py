@@ -1,8 +1,11 @@
 import os
+from io import BytesIO
 
+import certifi
 import clip
 import numpy as np
 import open_clip
+import pycurl
 import requests
 import torch
 import transformers
@@ -15,7 +18,7 @@ from urllib3.exceptions import HTTPError as urllib3_HTTPError
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
-from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from marqo.s2_inference.types import *
@@ -39,7 +42,7 @@ def _convert_image_to_rgb(image: ImageType) -> ImageType:
     return image.convert("RGB")
 
 
-def _get_transform(n_px: int, image_mean:List[float] = None, image_std: List[float] = None) -> torch.Tensor:
+def _get_transform(n_px: int, image_mean: List[float] = None, image_std: List[float] = None) -> torch.Tensor:
     '''This function returns a transform to preprocess the image. The processed image will be passed into
     clip model for inference.
     Args:
@@ -84,14 +87,14 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     return results
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout=3,
+def load_image_from_path(image_path: str, image_download_headers: dict, timeout_ms=3000,
                          metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
         image_path (str): Local or remote path to image.
         image_download_headers (dict): header for the image download
-        timeout (number): timeout (in seconds)
+        timeout_ms (int): timeout (in milliseconds), for the whole request
     Raises:
         ValueError: If the local path is invalid, and is not a url
         UnidentifiedImageError: If the image is irretrievable or unprocessable.
@@ -102,56 +105,89 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout=
     if os.path.isfile(image_path):
         img = Image.open(image_path)
     elif validators.url(image_path):
+        if metrics_obj is not None:
+            metrics_obj.start(f"image_download.{image_path}")
         try:
-            if metrics_obj is not None:
-                metrics_obj.start(f"image_download.{image_path}")
-
-            with requests.get(image_path, stream=True, timeout=timeout, headers=image_download_headers) as resp:
-                if not resp.ok:
-                    raise UnidentifiedImageError(
-                        f"image url `{image_path}` returned {resp.status_code}. Reason: {resp.reason}")
-
-                img = Image.open(resp.raw)
-
+            img_io: BytesIO = download_image_from_url(image_path, image_download_headers, timeout_ms)
+            img = Image.open(img_io)
+        except ImageDownloadError as e:
+            raise UnidentifiedImageError(str(e)) from e
+        finally:
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")
-
-        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException, ConnectionError, urllib3_HTTPError
-                ) as e:
-            raise UnidentifiedImageError(
-                f"image url `{image_path}` is unreachable, perhaps due to timeout. "
-                f"Timeout threshold is set to {timeout} seconds."
-                f"\nConnection error type: `{e.__class__.__name__}`")
     else:
         raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
 
     return img
 
 
-def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType], image_download_headers: dict) -> ImageType:
+def download_image_from_url(image_path: str, image_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
+    """Download an image from a URL and return a PIL image using pycurl.
+
+    Args:
+        image_path (str): URL to the image.
+        image_download_headers (dict): Headers for the image download.
+        timeout_ms (int): Timeout in milliseconds, for the whole request.
+
+    Returns:
+        buffer (BytesIO): The image as a BytesIO object.
+
+    Raises:
+        ImageDownloadError: If the image download fails.
+    """
+
+    if not isinstance(timeout_ms, int):
+        raise InternalError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
+
+    buffer = BytesIO()
+    c = pycurl.Curl()
+    c.setopt(c.CAINFO, certifi.where())
+    c.setopt(c.URL, image_path)
+    c.setopt(c.WRITEDATA, buffer)
+    c.setopt(c.TIMEOUT_MS, timeout_ms)
+    c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in image_download_headers.items()])
+
+    try:
+        c.perform()
+        if c.getinfo(c.RESPONSE_CODE) != 200:
+            raise ImageDownloadError(f"image url `{image_path}` returned {c.getinfo(c.RESPONSE_CODE)}")
+    except pycurl.error as e:
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
+                                 f"The original error is: {e}")
+    finally:
+        c.close()
+    buffer.seek(0)
+    return buffer
+
+
+def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
+                               image_download_headers: dict) -> Union[ImageType, Tensor]:
     """standardizes the input to be a PIL image
 
     Args:
-        image (Union[str, np.ndarray, ImageType]): can be a local file, url or array
+        image (Union[str, np.ndarray, ImageType, Tensor]): can be a local file, url, array or a tensor
 
     Raises:
         ValueError: _description_
         TypeError: _description_
 
     Returns:
-        ImageType: PIL image
+        standardized the image:
+            ImageType: PIL image if input is a string, an array or a PIL image
+            Tensor: torch tensor if input is a torch tensor
     """
     # check for the input type
     if isinstance(image, str):
         img = load_image_from_path(image, image_download_headers)
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
-
+    elif isinstance(image, torch.Tensor):
+        img = image
     elif isinstance(image, ImageType):
         img = image
     else:
-        raise UnidentifiedImageError(f"input of type {type(image)} did not match allowed types of str, np.ndarray, ImageType")
+        raise UnidentifiedImageError(f"input of type {type(image)} "
+                                     f"did not match allowed types of str, np.ndarray, ImageType, Tensor")
 
     return img
 
@@ -195,7 +231,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
                 False
 
     # if it is an array, then it is an image
-    elif isinstance(thing, (ImageType, ndarray)):
+    elif isinstance(thing, (ImageType, ndarray, Tensor)):
         return True
     else:
         raise UnidentifiedImageError(f"expected type Image or str for inputs but received type {type(thing)}")
@@ -326,9 +362,17 @@ class CLIP:
 
         return self._convert_output(outputs)
 
-    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                    normalize = True, image_download_headers: Optional[Dict] = None) -> FloatTensor:
-        
+    def _preprocess_images(self, images: Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor],
+                           image_download_headers: Optional[Dict] = None) -> Tensor:
+        """Preprocess the input image to be ready for the model.
+
+        Args:
+            images (Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor]): input image,
+            can be a str(url), a PIL image, or a tensor, or a list of them
+            image_download_headers (Optional[Dict]): headers for the image download
+        Return:
+            Tensor: the processed image tensor with shape (batch_size, channel, n_px, n_px)
+        """
         if self.model is None:
             self.load()
         if image_download_headers is None:
@@ -336,12 +380,29 @@ class CLIP:
 
         # default to batch encoding
         if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images, image_download_headers)
+            image_input: List[Union[ImageType, Tensor]] \
+                = format_and_load_CLIP_images(images, image_download_headers)
         else:
-            image_input = [format_and_load_CLIP_image(images, image_download_headers)]
+            image_input: List[Union[ImageType, Tensor]] = [format_and_load_CLIP_image(images, image_download_headers)]
 
-        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
-    
+        image_input_processed: Tensor = torch.stack([self.preprocess(_img).to(self.device) \
+                                                                    if not isinstance(_img, torch.Tensor) else _img \
+                                                                for _img in image_input])
+        return image_input_processed
+
+    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor],
+                    normalize = True, image_download_headers: Optional[Dict] = None) -> FloatTensor:
+        """Encode the input image to a tensor representation.
+
+        Args:
+            images (Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor]): input image,
+            can be a str(url), a PIL image, or a tensor, or a list of them
+            normalize (bool): whether to normalize the output tensor
+            image_download_headers (Optional[Dict]): headers for the image download
+        Return:
+            FloatTensor: the encoded image tensor with shape (batch_size, embedding_dim)
+        """
+        self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
 
@@ -506,22 +567,11 @@ class OPEN_CLIP(CLIP):
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(tokenizer_name)
 
-
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
                      image_download_headers: Optional[Dict] = None,
                      normalize=True) -> FloatTensor:
 
-        if self.model is None:
-            self.load()
-        if image_download_headers is None:
-            image_download_headers = dict()
-        # default to batch encoding
-        if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images, image_download_headers)
-        else:
-            image_input = [format_and_load_CLIP_image(images, image_download_headers)]
-
-        self.image_input_processed = torch.stack([self.preprocess(_img).to(self.device) for _img in image_input])
+        self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
@@ -529,7 +579,6 @@ class OPEN_CLIP(CLIP):
                     outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
             else:
                 outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
-
 
         if normalize:
             _shape_before = outputs.shape

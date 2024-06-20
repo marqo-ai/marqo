@@ -10,6 +10,7 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_CONFIG_URL: "http://localhost:19071",
         EnvVars.VESPA_QUERY_URL: "http://localhost:8080",
         EnvVars.VESPA_DOCUMENT_URL: "http://localhost:8080",
+        EnvVars.ZOOKEEPER_HOSTS: None,
         EnvVars.VESPA_CONTENT_CLUSTER_NAME: "content_default",
         EnvVars.VESPA_POOL_SIZE: 10,
         EnvVars.VESPA_FEED_POOL_SIZE: 10,
@@ -45,5 +46,6 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_DOCUMENTS_BATCH_SIZE: 128,
         EnvVars.MARQO_INFERENCE_CACHE_SIZE: 0,
         EnvVars.MARQO_INFERENCE_CACHE_TYPE: "LRU",
-        EnvVars.MARQO_BEST_AVAILABLE_DEVICE: "cpu"      # on_start_script will determine this.
+        EnvVars.MARQO_BEST_AVAILABLE_DEVICE: "cpu",      # on_start_script will determine this.
+        EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT: 15,
     }

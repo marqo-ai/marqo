@@ -17,3 +17,8 @@ memory-profiler==0.61.0
 cachetools==5.3.1
 pynvml==11.5.0 # For cuda utilization
 readerwriterlock==1.0.9
+kazoo==2.10.0
+pycurl==7.45.3
+certifi==2019.11.28
+transformers==4.41.2
+optimum==1.20.0

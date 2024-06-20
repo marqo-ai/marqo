@@ -9,10 +9,6 @@
 name: Run all Marqo tests
 
 on:
-  pull_request_review:
-    types: [submitted]
-    branches:
-      - mainline
   workflow_dispatch:
 
 permissions:

@@ -26,7 +26,7 @@ class TestEncoding(unittest.TestCase):
     def test_vectorize(self):
         names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
-                 "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+                 "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
         names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
                     "hf/multilingual-e5-small"]
@@ -107,7 +107,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_load_hf_text_model(self):
-        names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6"]
+        names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5"]
 
         names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
                     "hf/multilingual-e5-small"]
@@ -159,8 +159,8 @@ class TestEncoding(unittest.TestCase):
 
     def test_model_outputs(self):
         names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',"all-MiniLM-L6-v1",
-                 "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
-                 "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+                 "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
+                 "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
         names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
                     "hf/multilingual-e5-small"]
@@ -184,7 +184,7 @@ class TestEncoding(unittest.TestCase):
         names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  'RN50', "ViT-B/16", "all-MiniLM-L6-v1",
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
-                 "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+                 "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
         names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
                     "hf/multilingual-e5-small"]
@@ -214,7 +214,8 @@ class TestEncoding(unittest.TestCase):
         # note: sbert native seems to provide normalized embeddings even with = False, needs more investigation
         # , 
         names = [ 'RN50', "ViT-B/16", "hf/all-MiniLM-L6-v1",
-                 "hf/all_datasets_v4_MiniLM-L6", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
+                 "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5",
+                  "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
         names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
                     "hf/multilingual-e5-small"]
@@ -272,7 +273,8 @@ class TestOpenClipModelEncoding(unittest.TestCase):
         self.open_clip_test_model = ['open_clip/RN50/yfcc15m', 'open_clip/ViT-B-32/laion2b_s34b_b79k',
                                      'open_clip/ViT-B-16/laion2b_s34b_b88k', 'open_clip/convnext_base/laion400m_s13b_b51k',
                                      'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
-                                     'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k']
+                                     'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
+                                     'open_clip/EVA02-B-16/merged2b_s8b_b131k']
         pass
 
     def tearDown(self) -> None:

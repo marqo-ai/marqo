@@ -12,6 +12,10 @@ httpx==0.25.0
 semver==3.0.2
 memory-profiler==0.61.0
 pynvml==11.5.0
+kazoo==2.10.0
+pycurl==7.45.3
+certifi==2019.11.28
+transformers==4.41.2
 
 # s2_inference:
 more_itertools
@@ -30,7 +34,7 @@ onnx
 protobuf
 onnxruntime==1.13.1
 pandas==1.5.1
-optimum==1.4.1
+optimum==1.20.0
 opencv-python-headless==4.6.0.66
 psutil==5.9.4
 multilingual-clip==1.0.10
@@ -43,7 +47,6 @@ cachetools==5.3.1
 platformdirs==3.5.0
 safetensors==0.4.1
 timm==0.9.12
-transformers==4.29.0
 
 flatbuffers==23.5.9
 certifi==2019.11.28
