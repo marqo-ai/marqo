@@ -106,7 +106,7 @@ class StructuredVespaIndex(VespaIndex):
             if isinstance(marqo_value, dict) and index_field.type in (FieldType.MapFloat, FieldType.MapInt,
                                                                       FieldType.MapLong, FieldType.MapDouble):
                 for k, v in marqo_value.items():
-                    if len(k) > 0 and type(v) in (float, int):
+                    if type(v) in (float, int):
                         self._verify_numerical_field_value(v, index_field)
 
             if index_field.type == FieldType.Bool:
@@ -201,7 +201,7 @@ class StructuredVespaIndex(VespaIndex):
             if isinstance(marqo_value, dict) and index_field.type in (FieldType.MapFloat, FieldType.MapInt,
                                                                       FieldType.MapLong, FieldType.MapDouble):
                 for k, v in marqo_value.items():
-                    if len(k) > 0 and type(v) in (float, int):
+                    if type(v) in (float, int):
                         self._verify_numerical_field_value(v, index_field)
 
             if index_field.type == FieldType.Bool:
