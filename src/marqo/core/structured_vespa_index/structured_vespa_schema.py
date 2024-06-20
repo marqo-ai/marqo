@@ -5,6 +5,8 @@ from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_schema import VespaSchema
 from marqo.exceptions import InternalError
+from distutils.version import StrictVersion
+
 
 
 class StructuredVespaSchema(VespaSchema):
@@ -253,6 +255,13 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
         
         if score_modifier_fields_names:
+            old_expression = (
+                f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, 1, ' 
+                f'reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) ' 
+                f'* attribute({common.FIELD_SCORE_MODIFIERS}), prod)) * score ' 
+                f'+ reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) ' 
+                f'* attribute({common.FIELD_SCORE_MODIFIERS}), sum)'
+            )
             expression = (
                 f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '
                 f'   1, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), prod)) '
@@ -270,7 +279,10 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
 
             rank_profiles.append('function modify(score) {')
-            rank_profiles.append(f'   expression: {expression}')
+            if StrictVersion(marqo_index.parsed_marqo_version()) <= StrictVersion("2.9"):
+                rank_profiles.append(f'   expression: {old_expression}')
+            else:
+                rank_profiles.append(f'   expression: {expression}')
             rank_profiles.append('}}')
 
             if lexical_fields:

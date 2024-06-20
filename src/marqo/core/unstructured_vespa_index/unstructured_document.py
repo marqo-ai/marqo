@@ -8,6 +8,7 @@ from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants
 from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
+from distutils.version import StrictVersion
 
 
 class UnstructuredVespaDocumentFields(MarqoBaseModel):
@@ -63,7 +64,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                    fields=UnstructuredVespaDocumentFields(**fields))
 
     @classmethod
-    def from_marqo_document(cls, document: Dict, filter_string_max_length: int) -> "UnstructuredVespaDocument":
+    def from_marqo_document(cls, document: Dict, filter_string_max_length: int, marqo_index_version: str) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
 
@@ -88,18 +89,19 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 instance.fields.bool_fields[key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
-            elif isinstance(value, int) and not cls._is_large_int(value):
+            if StrictVersion(marqo_index_version) < StrictVersion("2.9"):
+                target_score_modifier_tensor = instance.fields.score_modifiers_fields
+            else:
+                target_score_modifier_tensor = instance.fields.score_modifiers_double_long_fields
+            if isinstance(value, int):
                 instance.fields.int_fields[key] = value
-                instance.fields.score_modifiers_fields[key] = value
-            elif isinstance(value, float) or cls._is_large_int(value):
-                instance.fields.float_fields[key] = float(value)
-                instance.fields.score_modifiers_double_long_fields[key] = float(value)
+                target_score_modifier_tensor[key] = value
+            elif isinstance(value, float):
+                instance.fields.float_fields[key] = value
+                target_score_modifier_tensor[key] = value
             elif isinstance(value, dict):
                 for k, v in value.items():
-                    if isinstance(v, int) and not cls._is_large_int(v):
-                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
-                    elif isinstance(v, float) or cls._is_large_int(v):
-                        instance.fields.score_modifiers_double_long_fields[f"{key}.{k}"] = float(v)
+                    target_score_modifier_tensor[f"{key}.{k}"] = v
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
@@ -109,17 +111,6 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         instance.fields.vespa_chunks = document.get(index_constants.MARQO_DOC_CHUNKS, [])
         instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
         return instance
-
-    def _is_large_int(value, low_threshold=2**31, high_threshold=2**63) -> bool:
-        """
-        This method is used to identify integers that are large enough to potentially require special handling, 
-        such as storing them in a tensor<double> instead of a tensor<float> in Vespa due to precision loss with 
-        floating-point representations of integers in the range 2^24 to 2^31 - 1.
-        
-        Currently, we store all int (abs(2^31) in tensor<float>, and all long (abs(2^63) in tensor<long>, 
-        for backwards compatibility and do not do any special handling.
-        """
-        return isinstance(value, int) and low_threshold <= abs(value) <= high_threshold
     
     def to_vespa_document(self) -> Dict[str, Any]:
         """Convert VespaDocumentObject to a Vespa document.

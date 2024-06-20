@@ -7,6 +7,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
+from distutils.version import StrictVersion
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -92,6 +93,8 @@ class StructuredVespaIndex(VespaIndex):
             self._verify_marqo_field_type(marqo_field, marqo_value)
 
             index_field = self._marqo_index.field_map[marqo_field]
+            marqo_index_version = self._marqo_index.parsed_marqo_version()
+            print(f"from structured_vespa_index.py, marqo_index_version: {marqo_index_version}")
 
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
@@ -124,27 +127,16 @@ class StructuredVespaIndex(VespaIndex):
                 }
 
             if FieldFeature.ScoreModifier in index_field.features:
-                if index_field.type in [FieldType.Double, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
-                    target_dict = score_modifiers_double_long
-                    value_converter = float
-                elif index_field.type in [FieldType.Int, FieldType.MapInt]:
-                    if self._is_large_int(marqo_value):
-                        target_dict = score_modifiers_double_long
-                        value_converter = float
-                    else:
-                        target_dict = score_modifiers
-                        value_converter = float
-                elif index_field.type in [FieldType.Float, FieldType.MapFloat]:
+                if StrictVersion(marqo_index_version) <= StrictVersion("2.9"):
                     target_dict = score_modifiers
-                    value_converter = float
                 else:
-                    raise ValueError(f"Unsupported field type {index_field.type}")
+                    target_dict = score_modifiers_double_long # change name to just double
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        target_dict[f'{index_field.name}.{key}'] = value_converter(value)
+                        target_dict[f'{index_field.name}.{key}'] = value
                 else:
-                    target_dict[index_field.name] = value_converter(marqo_value)
+                    target_dict[index_field.name] = marqo_value
 
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = {
@@ -185,6 +177,8 @@ class StructuredVespaIndex(VespaIndex):
             self._verify_marqo_field_type(marqo_field, marqo_value)
 
             index_field = self._marqo_index.field_map[marqo_field]
+            marqo_index_version = self._marqo_index.parsed_marqo_version()
+            print(f"from structured_vespa_index.py, marqo_index_version: {marqo_index_version}")
 
             if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
                 self._verify_numerical_field_value(marqo_value, index_field)
@@ -210,28 +204,23 @@ class StructuredVespaIndex(VespaIndex):
             if not index_field.lexical_field_name and not index_field.filter_field_name:
                 vespa_fields[index_field.name] = marqo_value
 
+            # Make branching logic
+            # if version is < 2.9, then use old score modifier logic
+            #   send all to score_modifiers
+            # else, use new score modifier logic
+            #   send all to score_modifiers_double
+
             if FieldFeature.ScoreModifier in index_field.features:
-                if index_field.type in [FieldType.Double, FieldType.MapDouble, FieldType.Long, FieldType.MapLong]:
-                    target_dict = score_modifiers_double_long
-                    value_converter = float
-                elif index_field.type in [FieldType.Int, FieldType.MapInt]:
-                    if self._is_large_int(marqo_value):
-                        target_dict = score_modifiers_double_long
-                        value_converter = float
-                    else:
-                        target_dict = score_modifiers
-                        value_converter = float
-                elif index_field.type in [FieldType.Float, FieldType.MapFloat]:
+                if LooseVersion(marqo_index_version) <= LooseVersion("2.9"):
                     target_dict = score_modifiers
-                    value_converter = float
                 else:
-                    raise ValueError(f"Unsupported field type {index_field.type}")
+                    target_dict = score_modifiers_double_long # change name to just double
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        target_dict[f'{index_field.name}.{key}'] = value_converter(value)
+                        target_dict[f'{index_field.name}.{key}'] = value
                 else:
-                    target_dict[index_field.name] = value_converter(marqo_value)
+                    target_dict[index_field.name] = marqo_value
 
         # Tensors
         vector_count = 0
@@ -394,17 +383,6 @@ class StructuredVespaIndex(VespaIndex):
             'model_restrict': self._marqo_index.schema_name,
             'timeout': '5s'
         }
-
-    def _is_large_int(value, low_threshold=2 ** 31, high_threshold=2 ** 63) -> bool:
-        """
-        This method is used to identify integers that are large enough to potentially require special handling, 
-        such as storing them in a tensor<double> instead of a tensor<float> in Vespa due to precision loss with 
-        floating-point representations of integers in the range 2^24 to 2^31 - 1.
-        
-        Currently, we store all int (abs(2^31) in tensor<float>, and all long (abs(2^63) in tensor<long>, 
-        for backwards compatibility and do not do any special handling.
-        """
-        return isinstance(value, int) and low_threshold <= abs(value) <= high_threshold
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
