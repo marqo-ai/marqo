@@ -73,16 +73,6 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
       echo "Marqo did not find an existing vector store. Setting up vector store..."
 
-      # Build Hybrid Searcher application and Jar
-      echo "Building hybrid searcher jar"
-      dnf update -y
-      dnf install -y maven
-      cd /app/scripts/vespa_local
-      mvn clean package
-
-      # Copy required vespa files to the application directory
-      cp -r {hosts.xml,services.xml,schemas} target/application
-
       # Deploy a dummy application package
       vespa deploy /app/scripts/vespa_local --wait 300 >/dev/null 2>&1
 
