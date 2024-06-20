@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Install maven
+echo "Installing maven."
 wget https://dlcdn.apache.org/maven/maven-3/3.9.8/binaries/apache-maven-3.9.8-bin.tar.gz -P /temp
 tar xf /temp/apache-maven-3.9.8-bin.tar.gz -C /opt
 ln -s /opt/apache-maven-3.9.8 /opt/maven
@@ -15,6 +16,7 @@ chmod +x /etc/profile.d/maven.sh
 source /etc/profile.d/maven.sh
 
 # Build Hybrid Searcher application and Jar
-echo "Building hybrid searcher jar"
+echo "Building hybrid searcher jar."
 cd /app/scripts/vespa_local
 mvn clean package
+echo "Application package built."
