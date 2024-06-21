@@ -465,7 +465,6 @@ class IndexManagement:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
         if not os.path.exists(schema_path):
             logger.warn(f"Schema {name} does not exist in application package, nothing to remove")
-            return None
         else:
             os.remove(schema_path)
 
