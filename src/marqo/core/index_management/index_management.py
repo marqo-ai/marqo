@@ -124,6 +124,7 @@ class IndexManagement:
             if configured and self.index_exists(marqo_index_request.name):
                 raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
             else:
+                print("call log")
                 logger.debug('Marqo config does not exist. Configuring Vespa as part of index creation')
                 self._add_marqo_config(app)
 
