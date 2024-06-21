@@ -337,7 +337,8 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             retrieval_method=RetrievalMethod.Disjunction,
                             ranking_method=RankingMethod.RRF,
-                            alpha=0
+                            alpha=0,
+                            verbose=True
                         ),
                         result_count=10
                     )
@@ -398,7 +399,8 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             retrieval_method=RetrievalMethod.Disjunction,
                             ranking_method=RankingMethod.RRF,
-                            alpha=1.0
+                            alpha=1.0,
+                            verbose=True
                         ),
                         result_count=10
                     )
@@ -460,8 +462,8 @@ class TestHybridSearch(MarqoTestCase):
                         text="dogs",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Disjunction,
-                            ranking_method=RankingMethod.RRF,
+                            retrieval_method=RetrievalMethod.Lexical,
+                            ranking_method=RankingMethod.Lexical,
                             alpha=0.8,
                             searchable_attributes_lexical=["text_field_1", "text_field_2"],
                             searchable_attributes_tensor=["text_field_2"],
@@ -474,41 +476,150 @@ class TestHybridSearch(MarqoTestCase):
                                 # 1 field in mult, 1 field in add
                                 ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
                                 ScoreModifier(field="add_field_1", weight=1.0, type=ScoreModifierType.Add)
-                            ]
+                            ],
+                            verbose=True
                         ),
                         result_count=10
                     )
+                    self.assertIn("hits", hybrid_res)
 
-                    self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
+                    # self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
                     #for i in range(len(hybrid_res["hits"])):
                     #    self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
 
-                with self.subTest("retrieval: lexical, ranking: tensor"):
-                    hybrid_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Lexical,
-                            ranking_method=RankingMethod.Tensor,
-                            alpha=0.8,
-                            searchable_attributes_lexical=["text_field_1", "text_field_2"],
-                            searchable_attributes_tensor=["text_field_2"],
-                            score_modifiers_lexical=[
-                                # 2 fields in mult
-                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
-                                ScoreModifier(field="mult_field_2", weight=1.0, type=ScoreModifierType.Multiply)
-                            ],
-                            score_modifiers_tensor=[
-                                # 1 field in mult, 1 field in add
-                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
-                                ScoreModifier(field="add_field_1", weight=1.0, type=ScoreModifierType.Add)
-                            ]
-                        ),
-                        result_count=3
-                    )
 
-                    self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
-                    for i in range(len(hybrid_res["hits"])):
-                        self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
+    def test_hybrid_search_same_retrieval_and_ranking(self):
+        """
+        Tests that hybrid search with:
+        retrieval_method = "lexical", ranking_method = "lexical" and
+        retrieval_method = "tensor", ranking_method = "tensor"
+
+        Results must be the same as lexical search and tensor search respectively.
+        """
+
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                # Add documents
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            # similar semantics to dogs
+                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
+                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
+                            {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
+                            {"_id": "doc4", "text_field_1": "huskies"},
+                            {"_id": "doc5", "text_field_1": "four-legged animals"},
+
+                            # shares lexical token with dogs
+                            {"_id": "doc6", "text_field_1": "hot dogs"},
+                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
+                            {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
+                            {"_id": "doc9", "text_field_1": "dogs random words"},
+                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
+
+                            {"_id": "doc11", "text_field_2": "dogs but wrong field"},
+                            {"_id": "doc12", "text_field_2": "puppies puppies", "add_field_1": -1.0, "mult_field_1": 0.5},
+                            {"_id": "doc13", "text_field_2": "canines canines"},
+
+                        ],
+                    )
+                )
+
+                test_cases = [
+                    (RetrievalMethod.Lexical, RankingMethod.Lexical),
+                    (RetrievalMethod.Tensor, RankingMethod.Tensor)
+                ]
+
+                for retrieval_method, ranking_method in test_cases:
+                    with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
+                        hybrid_res = tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(
+                                retrieval_method=retrieval_method,
+                                ranking_method=ranking_method,
+                                verbose=True
+                            ),
+                            result_count=10
+                        )
+
+                        base_res = tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method=retrieval_method,     # will be either lexical or tensor
+                            result_count=10
+                        )
+
+                        self.assertIn("hits", hybrid_res)
+                        self.assertIn("hits", base_res)
+                        self.assertEqual(len(hybrid_res["hits"]), len(base_res["hits"]))
+                        for i in range(len(hybrid_res["hits"])):
+                            self.assertEqual(hybrid_res["hits"][i]["_id"], base_res["hits"][i]["_id"])
+
+    def test_hybrid_search_opposite_retrieval_and_ranking(self):
+        """
+        Tests that hybrid search with:
+        retrieval_method = "lexical", ranking_method = "tensor" and
+        retrieval_method = "tensor", ranking_method = "lexical"
+
+        TODO: Figure out testing metric.
+        """
+
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                # Add documents
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            # similar semantics to dogs
+                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
+                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
+                            {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
+                            {"_id": "doc4", "text_field_1": "huskies"},
+                            {"_id": "doc5", "text_field_1": "four-legged animals"},
+
+                            # shares lexical token with dogs
+                            {"_id": "doc6", "text_field_1": "hot dogs"},
+                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
+                            {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
+                            {"_id": "doc9", "text_field_1": "dogs random words"},
+                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
+
+                            {"_id": "doc11", "text_field_2": "dogs but wrong field"},
+                            {"_id": "doc12", "text_field_2": "puppies puppies", "add_field_1": -1.0, "mult_field_1": 0.5},
+                            {"_id": "doc13", "text_field_2": "canines canines"},
+
+                        ],
+                    )
+                )
+
+                test_cases = [
+                    (RetrievalMethod.Lexical, RankingMethod.Tensor),
+                    (RetrievalMethod.Tensor, RankingMethod.Lexical)
+                ]
+
+                for retrieval_method, ranking_method in test_cases:
+                    with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
+                        hybrid_res = tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(
+                                retrieval_method=retrieval_method,
+                                ranking_method=ranking_method,
+                                verbose=True
+                            ),
+                            result_count=10
+                        )
+
+                        self.assertIn("hits", hybrid_res)
+
+

@@ -156,7 +156,7 @@ public class HybridSearcher extends Searcher {
                 result.add(hit);
                 logIfVerbose(String.format("Set relevance to: %.7f", reciprocalRank), verbose);
                 logIfVerbose(String.format("Modified tensor hit at rank: %d", rank), verbose);
-                logIfVerbose(hit.toString());
+                logIfVerbose(hit.toString(), verbose);
 
                 logIfVerbose("Current result state: ", verbose);
                 logHitGroup(result, verbose);
