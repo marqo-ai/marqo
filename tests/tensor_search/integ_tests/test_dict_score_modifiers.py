@@ -5,6 +5,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
+from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -24,16 +25,16 @@ class TestDictScoreModifiers(MarqoTestCase):
 
         # UNSTRUCTURED indexes
         old_unstructured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k')
+            model=Model(name='random/small')
         )
         new_unstructured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='open_clip/ViT-B-32/laion2b_s34b_b79k'),
+            model=Model(name='random/small'),
             marqo_version="2.9.0"
         )   
 
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            model=Model(name="random/small"),
             vector_numeric_type=VectorNumericType.Float,
             normalize_embeddings=True,
             fields=[
@@ -131,16 +132,16 @@ class TestDictScoreModifiers(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
-                            {"_id": "1", "text_field": "a photo of a cat", "long_score_mods": 2**34},
-                            {"_id": "2", "text_field": "a photo of a cat", "long_score_mods": 2**35},
-                            {"_id": "3", "text_field": "a photo of a cat", "long_score_mods": 2**36},
+                            {"_id": "1", "text_field": "a photo of a cat", "score_mods_long": 2**34},
+                            {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": 2**35},
+                            {"_id": "3", "text_field": "a photo of a cat", "score_mods_long": 2**36},
                             {"_id": "4", "text_field": "a photo of a cat"}
                         ]
                     )
                 )
                 # Search with score modifier
                 # 0.5 + 2**36 * 2 = 2**37
-                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "long_score_mods", "weight": 2}]})
+                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "score_mods_long", "weight": 2}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -358,11 +359,11 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertTrue(res["hits"][0]["_id"] == "1")
                 self.assertTrue(3 <= score_of_first_result <= 4)
 
-    def test_long_score_modifier(self):
+    def test_long_dict_score_modifier(self):
         """
         Test that long score modifier works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index, self.old_unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]: #, self.old_unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -489,24 +490,28 @@ class TestDictScoreModifiers(MarqoTestCase):
         )
 
         # Assertions for version >= 2.9.0
-        self.assertEqual(document.fields.score_modifiers_float_fields["float_field"], 1.23)
-        self.assertEqual(document.fields.score_modifiers_double_long_fields["double_field"], 4.56e39)
-        self.assertEqual(document.fields.score_modifiers_double_long_fields["map_double_field.double_field"], 4.56e39)
-        self.assertEqual(document.fields.score_modifiers_float_fields["map_float_field.float_field"], 1.23)
-        self.assertNotIn("int_field", document.fields.score_modifiers_float_fields)
-        self.assertIn("int_field", document.fields.score_modifiers_double_long_fields)
+        self.assertEqual(document.fields.score_modifiers_fields["float_field"], 1.23)
+        self.assertEqual(document.fields.score_modifiers_fields["double_field"], 4.56e39)
+        self.assertEqual(document.fields.score_modifiers_fields["map_double_field.double_field"], 4.56e39)
+        self.assertEqual(document.fields.score_modifiers_fields["map_float_field.float_field"], 1.23)
+        self.assertIn("int_field", document.fields.score_modifiers_fields)
 
 
-        # Test with Marqo version < 2.9.0
+        # Test with Marqo version < 2.9.0, dict should error
         marqo_index_version = semver.VersionInfo.parse("2.8.0")
+        with self.assertRaises(VespaDocumentParsingError):
+            document = UnstructuredVespaDocument.from_marqo_document(
+                marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
+            )
+
+        marqo_document.pop("map_double_field")
+        marqo_document.pop("map_float_field")
+
         document = UnstructuredVespaDocument.from_marqo_document(
             marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
         )
 
         # Assertions for version < 2.9.0
-        self.assertEqual(document.fields.score_modifiers_fields_2_8["float_field"], 1.23)
-        self.assertEqual(document.fields.score_modifiers_fields_2_8["double_field"], 4.56e39)
-        self.assertEqual(document.fields.score_modifiers_fields_2_8["map_double_field.double_field"], 4.56e39)
-        self.assertEqual(document.fields.score_modifiers_fields_2_8["map_float_field.float_field"], 1.23)
-        self.assertEqual(document.fields.score_modifiers_fields_2_8["int_field"], 42)
-
+        self.assertEqual(document.fields.score_modifiers_fields["float_field"], 1.23)
+        self.assertEqual(document.fields.score_modifiers_fields["double_field"], 4.56e39)
+        self.assertEqual(document.fields.score_modifiers_fields["int_field"], 42)

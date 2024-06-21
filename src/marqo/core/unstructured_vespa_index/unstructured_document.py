@@ -22,9 +22,7 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.INT_FIELDS)
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
-    score_modifiers_double_long_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_DOUBLE_LONG)
-    score_modifiers_float_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_FLOAT)
-    score_modifiers_fields_2_8: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS_2_8)
+    score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
@@ -91,34 +89,20 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 instance.fields.bool_fields[key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
                 instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
-            elif isinstance(value, (int, float)):
-                if isinstance(value, int):
-                    instance.fields.int_fields[key] = value
-                else:
-                    instance.fields.float_fields[key] = value
-                
-                if marqo_index_version_lt_2_9_0:
-                    instance.fields.score_modifiers_fields_2_8[key] = value
-                else:
-                    if isinstance(value, float) and not cls._is_double(value):
-                        instance.fields.score_modifiers_float_fields[key] = value
-                    else:
-                        instance.fields.score_modifiers_double_long_fields[key] = value
-            elif isinstance(value, dict):
+            elif isinstance(value, int):
+                instance.fields.int_fields[key] = value
+                instance.fields.score_modifiers_fields[key] = value
+            elif isinstance(value, float):
+                instance.fields.float_fields[key] = value
+                instance.fields.score_modifiers_fields[key] = value
+            elif isinstance(value, dict) and not marqo_index_version_lt_2_9_0:
                 for k, v in value.items():
-                    if isinstance(v, (int, float)):
-                        if isinstance(v, int):
-                            instance.fields.int_fields[f"{key}.{k}"] = v
-                        else:
-                            instance.fields.float_fields[f"{key}.{k}"] = float(v)
-                            
-                        if marqo_index_version_lt_2_9_0:
-                            instance.fields.score_modifiers_fields_2_8[f"{key}.{k}"] = v
-                        else:
-                            if isinstance(v, float) and not cls._is_double(v):
-                                instance.fields.score_modifiers_float_fields[f"{key}.{k}"] = v
-                            else:
-                                instance.fields.score_modifiers_double_long_fields[f"{key}.{k}"] = v
+                    if isinstance(v, int):
+                        instance.fields.int_fields[f"{key}.{k}"] = v
+                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                    elif isinstance(v, float):
+                        instance.fields.float_fields[f"{key}.{k}"] = float(v)
+                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
