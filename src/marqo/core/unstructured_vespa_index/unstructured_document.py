@@ -113,14 +113,6 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
         return instance
     
-    def _is_double(value):
-        """Check if the value is likely a double-precision floating point number based on its magnitude."""
-        SINGLE_PRECISION_MAX = 3.4e38
-
-        if isinstance(value, float) and abs(value) > SINGLE_PRECISION_MAX:
-            return True  # Double because it's outside single precision range
-        return False
-    
     def to_vespa_document(self) -> Dict[str, Any]:
         """Convert VespaDocumentObject to a Vespa document.
         Empty fields are removed from the document."""
