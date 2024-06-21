@@ -406,27 +406,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                 # and 85899345900239 <= score <= 85899345900241
                 self.assertTrue(res["hits"][0]["_id"] in ["2", "1"])
                 self.assertTrue(res["hits"][1]["_id"] in ["2", "1"])
-                if index in [self.new_unstructured_default_text_index, self.structured_default_text_index]:
-                    self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
-                    self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
-                else:
-                    # In the old unstructured index, we expect to lose precision since the values
-                    # Are stored in tensor<float>
-                    self.assertTrue(85899345920000 <= score_of_first_result <= 85899345920001)
-                    self.assertTrue(85899345920000 <= score_of_second_result <= 85899345920001)
-
-    def test_float_double_tensor_allocation_unstructured(self):
-        """
-        Test that float and double values are sent to the correct tensor in Vespa.
-        """
-        for index in [self.new_unstructured_default_text_index, self.old_unstructured_default_text_index]:
-            with self.subTest(index=index.type):
-                # We add a float document
-                # We add a double document
-
-                # For marqo old marqo index (<2.9) we expect the double value to loose precision
-                # Meaning it is stored in 
-                pass
+                self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
+                self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
 
     def test_structured_tensor_storage_old_and_new(self):
         # Mock the index and field map
