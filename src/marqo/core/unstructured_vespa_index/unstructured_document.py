@@ -7,7 +7,7 @@ from pydantic import Field, BaseModel
 from marqo.base_model import MarqoBaseModel
 
 from marqo.core import constants as index_constants
-from marqo.core.exceptions import VespaDocumentParsingError
+from marqo.core.exceptions import VespaDocumentParsingError, UnsupportedFeatureError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 
 
@@ -103,6 +103,9 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                     elif isinstance(v, float):
                         instance.fields.float_fields[f"{key}.{k}"] = float(v)
                         instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+            elif isinstance(value, dict) and marqo_index_version_lt_2_9_0:
+                raise UnsupportedFeatureError(f"Document {document} with a map field {key} "
+                                 f"is not supported in Marqo version < 2.9.0")
             else:
                 raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")

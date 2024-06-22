@@ -68,7 +68,27 @@ class TestStructuredVespaIndex(MarqoTestCase):
                     type=FieldType.ArrayFloat,
                     features=[FieldFeature.Filter],
                     filter_field_name='filter_last_updated'
-                )
+                ),
+                Field(
+                    name='float_field',
+                    type=FieldType.Float,
+                    features=[FieldFeature.ScoreModifier],
+                ),
+                Field(
+                    name='double_field',
+                    type=FieldType.Double,
+                    features=[FieldFeature.ScoreModifier],
+                ),
+                Field(
+                    name='map_float_field',
+                    type=FieldType.MapFloat,
+                    features=[FieldFeature.ScoreModifier],
+                ),
+                Field(
+                    name='map_double_field',
+                    type=FieldType.MapDouble,
+                    features=[FieldFeature.ScoreModifier],
+                ),
             ],
             tensor_fields=[
                 TensorField(
@@ -92,6 +112,10 @@ class TestStructuredVespaIndex(MarqoTestCase):
             'is_active': True,
             'price': 100.0,
             'rank': 1,
+            "float_field": 1.23,
+            "double_field": 4.56,
+            "map_float_field": {"float_field": 1.23},
+            "map_double_field": {"double_field": 4.56},
             'click_per_day': [1, 2, 3],
             'last_updated': [1.0, 2.0, 3.0],
             constants.MARQO_DOC_TENSORS: {
@@ -107,9 +131,13 @@ class TestStructuredVespaIndex(MarqoTestCase):
             'id': 'my_id',
             'fields': {
                 common.FIELD_ID: 'my_id',
-                common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG: {'rank': 1},
-                common.FIELD_SCORE_MODIFIERS_FLOAT: {'price': 100.0},
+                common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG: {'rank': 1, 'double_field': 4.56, 'map_double_field.double_field': 4.56},
+                common.FIELD_SCORE_MODIFIERS_FLOAT: {'price': 100.0, 'float_field': 1.23, 'map_float_field.float_field': 1.23},
                 common.FIELD_VECTOR_COUNT: 2,
+                "float_field": 1.23,
+                "double_field": 4.56,
+                "map_float_field": {'float_field': 1.23},
+                "map_double_field": {'double_field': 4.56},
                 self.marqo_index.field_map['title'].lexical_field_name: 'my title',
                 'description': 'my description',
                 self.marqo_index.field_map['category'].lexical_field_name: 'my category',
@@ -126,7 +154,6 @@ class TestStructuredVespaIndex(MarqoTestCase):
                                                                               '1': [4.0, 5.0, 6.0]}
             }
         }
-
         self.assertEqual(expected_vespa_doc, actual_vespa_doc)
 
     def test_to_vespa_document_invalidDataType_fails(self):

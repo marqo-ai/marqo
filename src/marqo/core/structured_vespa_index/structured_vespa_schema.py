@@ -256,10 +256,18 @@ class StructuredVespaSchema(VespaSchema):
         
         if score_modifier_fields_names:
             expression = (
-                f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '
-                f'   1, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), prod)) '
-                f'* if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT})) == 0, '
-                f'   1, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT}), prod)) '
+                f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS})) == 0, '
+                f'    score, '
+                f'    if (count(attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) + count(attribute({common.FIELD_SCORE_MODIFIERS_FLOAT})) == 0, '
+                f'        0, '
+                f'        if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '
+                f'            1, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), prod) '
+                f'        ) '
+                f'        * if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT})) == 0, '
+                f'            1, reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT}), prod) '
+                f'        ) '
+                f'    ) '
+                f') '
                 f'* score '
                 f'+ reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), sum) '
                 f'+ reduce(query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT}), sum)'

@@ -5,7 +5,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
-from marqo.core.exceptions import VespaDocumentParsingError
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
@@ -24,10 +24,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         super().setUpClass()
 
         # UNSTRUCTURED indexes
-        old_unstructured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='random/small')
-        )
-        new_unstructured_default_text_index = cls.unstructured_marqo_index_request(
+        unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
             marqo_version="2.9.0"
         )   
@@ -56,6 +53,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                              features=[FieldFeature.ScoreModifier]),
                 FieldRequest(name="score_mods_long", type=FieldType.Long,
                              features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="price_2", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
             ],
             hnsw_config=HnswConfig(
                 ef_construction=512,
@@ -65,15 +64,13 @@ class TestDictScoreModifiers(MarqoTestCase):
         )
 
         cls.indexes = cls.create_indexes([
-            old_unstructured_default_text_index,
-            new_unstructured_default_text_index,
+            unstructured_default_text_index,
             structured_default_text_index
         ])
 
         # Assign to objects so they can be used in tests
-        cls.old_unstructured_default_text_index = cls.indexes[0]
-        cls.new_unstructured_default_text_index = cls.indexes[1]
-        cls.structured_default_text_index = cls.indexes[2]
+        cls.unstructured_default_text_index = cls.indexes[0]
+        cls.structured_default_text_index = cls.indexes[1]
 
     def setUp(self) -> None:
         super().setUp()
@@ -158,7 +155,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         """
         Test that adding to score works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -203,7 +200,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         """
         Test that multiplying score by works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -235,6 +232,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                     score_modifiers=score_modifier,
                     result_count=10
                 )
+                print(f"res: {res}")
 
                 # Get the score of the first result.
                 score_of_first_result = res["hits"][0]["_score"]
@@ -243,12 +241,50 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertIn(res["hits"][0]["_id"], ["1", "7"])
                 self.assertTrue(0.8 <= score_of_first_result <= 1.2)
 
+    # Test the expected multiply whole score by 0 if score modifier does not exist in document
+    # but there is a score modifier in the query.
+    def test_multiply_zero_if_no_score_modifier_in_doc(self):
+        """
+        Test the expected multiply whole score by 0 if score modifier does not exist in document
+        but there is a score modifier in the query.
+        """
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
+            # Add documents
+            res = tensor_search.add_documents(
+                config=self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=index.name,
+                    docs=[
+                        {'_id' : '20',
+                        'text_field': 'The quick brown fox',
+                        # 'price_2': 100.0
+                        }
+                    ],
+                    tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                )
+            )
+
+            # Search with score modifier
+            score_modifiers= ScoreModifier(**{
+                    "multiply_score_by": [{"field_name": "price_2", "weight": 1}]
+                }
+            )
+
+            res = tensor_search.search(
+                index_name=index.name, config=self.config, text="",
+                score_modifiers=score_modifiers,
+                result_count=10
+            )
+
+            # Assert that the score is 0 (multiply whole score by 0)
+            self.assertEqual(res["hits"][0]["_score"], 0.0)
+
     # Test combined add to score and multiply score by
     def test_combined_map_score_modifier(self):
         """
         Test that combining adding to score and multiplying score by works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -273,7 +309,8 @@ class TestDictScoreModifiers(MarqoTestCase):
                     )
                 )
                 # Search with score modifier
-                # 0.5 * 0.5 * 4 = 1 (1 and 7)
+                # 0.5 * 0.5 * 4 = 1 (1 and 7) multiply_score_by
+                # for 7, 0.5 * 0.5 * 4 + 1 * 2 = 3 (6 and 7) add_to_score
                 score_modifier = ScoreModifier(**{
                         "add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 2}],
                         "multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]
@@ -363,7 +400,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         """
         Test that long score modifier works for a map score modifier.
         """
-        for index in [self.structured_default_text_index, self.new_unstructured_default_text_index]: #, self.old_unstructured_default_text_index]:
+        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
                 res = tensor_search.add_documents(
@@ -480,7 +517,7 @@ class TestDictScoreModifiers(MarqoTestCase):
 
         # Test with Marqo version < 2.9.0, dict should error
         marqo_index_version = semver.VersionInfo.parse("2.8.0")
-        with self.assertRaises(VespaDocumentParsingError):
+        with self.assertRaises(UnsupportedFeatureError):
             document = UnstructuredVespaDocument.from_marqo_document(
                 marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
             )
