@@ -1,21 +1,17 @@
 import os
 from unittest import mock
 
+from marqo.api.models.update_documents import UpdateDocumentsBodyParams
+from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
-from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
+from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import ScoreModifier
-from marqo.vespa.models import QueryResult
-from marqo.vespa.models.query_result import Root, Child, RootFields
 from tests.marqo_test import MarqoTestCase
-from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.tensor_search.api import update_documents
-
 
 
 class TestDictScoreModifiers(MarqoTestCase):
@@ -27,7 +23,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
             marqo_version="2.9.0"
-        )   
+        )
 
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
@@ -95,9 +91,9 @@ class TestDictScoreModifiers(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
-                            {"_id": "1", "text_field": "a photo of a cat", "double_score_mods": 0.5 * 1**39},
-                            {"_id": "2", "text_field": "a photo of a cat", "double_score_mods": 4.5 * 1**39},
-                            {"_id": "3", "text_field": "a photo of a cat", "double_score_mods": 5.5 * 1**39},
+                            {"_id": "1", "text_field": "a photo of a cat", "double_score_mods": 0.5 * 1 ** 39},
+                            {"_id": "2", "text_field": "a photo of a cat", "double_score_mods": 4.5 * 1 ** 39},
+                            {"_id": "3", "text_field": "a photo of a cat", "double_score_mods": 5.5 * 1 ** 39},
                             {"_id": "4", "text_field": "a photo of a cat"}
                         ]
                     )
@@ -111,7 +107,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                     result_count=10
                 )
                 # Get the score of the first result and divide by 1**39
-                score_of_first_result = res["hits"][0]["_score"] / 1**39
+                score_of_first_result = res["hits"][0]["_score"] / 1 ** 39
                 # Assert that the first result has _id "3" and 11 <= score <= 12
                 self.assertEqual(res["hits"][0]["_id"], "3")
                 self.assertTrue(11 <= score_of_first_result <= 12)
@@ -129,9 +125,9 @@ class TestDictScoreModifiers(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
-                            {"_id": "1", "text_field": "a photo of a cat", "score_mods_long": 2**34},
-                            {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": 2**35},
-                            {"_id": "3", "text_field": "a photo of a cat", "score_mods_long": 2**36},
+                            {"_id": "1", "text_field": "a photo of a cat", "score_mods_long": 2 ** 34},
+                            {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": 2 ** 35},
+                            {"_id": "3", "text_field": "a photo of a cat", "score_mods_long": 2 ** 36},
                             {"_id": "4", "text_field": "a photo of a cat"}
                         ]
                     )
@@ -145,10 +141,10 @@ class TestDictScoreModifiers(MarqoTestCase):
                     result_count=10
                 )
                 # Get the score of the first result and divide by 1**39
-                score_of_first_result = res["hits"][0]["_score"] / 1**39
+                score_of_first_result = res["hits"][0]["_score"] / 1 ** 39
                 # Assert that the first result has _id "3" and 2**37-1 <= score <= 2**37+1
                 self.assertEqual(res["hits"][0]["_id"], "3")
-                self.assertTrue(2**37 - 1 <= score_of_first_result <= 2**37 + 1)
+                self.assertTrue(2 ** 37 - 1 <= score_of_first_result <= 2 ** 37 + 1)
 
     # Test Add to score
     def test_add_to_score_map_score_modifier(self):
@@ -170,18 +166,15 @@ class TestDictScoreModifiers(MarqoTestCase):
                             {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"b": 1}},
                             {"_id": "6", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1}},
                             {"_id": "7", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
-                            "map_score_mods": {"a": 0.5}},
+                             "map_score_mods": {"a": 0.5}},
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                        mappings={
-                            "map_score_mods": {"type": "map_numerical"},
-                            "map_score_mods_int": {"type": "map_numerical"}
-                        } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
                 # Search with score modifier
                 # 0.5 + 1 * 5 = 5.5
-                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 5}]})
+                score_modifier = ScoreModifier(
+                    **{"add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 5}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -215,24 +208,20 @@ class TestDictScoreModifiers(MarqoTestCase):
                             {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"b": 1}},
                             {"_id": "6", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1}},
                             {"_id": "7", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
-                            "map_score_mods": {"a": 0.5}},
+                             "map_score_mods": {"a": 0.5}},
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                        mappings={
-                            "map_score_mods": {"type": "map_numerical"},
-                            "map_score_mods_int": {"type": "map_numerical"}
-                        } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
-                score_modifier = ScoreModifier(**{"multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]})
+                score_modifier = ScoreModifier(
+                    **{"multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
                     result_count=10
                 )
-                print(f"res: {res}")
 
                 # Get the score of the first result.
                 score_of_first_result = res["hits"][0]["_score"]
@@ -261,23 +250,19 @@ class TestDictScoreModifiers(MarqoTestCase):
                             {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"b": 1}},
                             {"_id": "6", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1}},
                             {"_id": "7", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
-                            "map_score_mods": {"a": 0.5}},
+                             "map_score_mods": {"a": 0.5}},
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                        mappings={
-                            "map_score_mods": {"type": "map_numerical"},
-                            "map_score_mods_int": {"type": "map_numerical"}
-                        } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7) multiply_score_by
                 # for 7, 0.5 * 0.5 * 4 + 1 * 2 = 3 (6 and 7) add_to_score
                 score_modifier = ScoreModifier(**{
-                        "add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 2}],
-                        "multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]
-                    }
-                )
+                    "add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 2}],
+                    "multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]
+                }
+                                               )
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -290,7 +275,6 @@ class TestDictScoreModifiers(MarqoTestCase):
                 # Assert that the first result has _id "6" and 5 <= score <= 6
                 self.assertTrue(res["hits"][0]["_id"] == "7")
                 self.assertTrue(2.9 <= score_of_first_result <= 3.1)
-
 
     def test_partial_document_update(self):
         """
@@ -311,13 +295,9 @@ class TestDictScoreModifiers(MarqoTestCase):
                             {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"b": 1}},
                             {"_id": "6", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1}},
                             {"_id": "7", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
-                            "map_score_mods": {"a": 0.5}},
+                             "map_score_mods": {"a": 0.5}},
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                        mappings={
-                            "map_score_mods": {"type": "map_numerical"},
-                            "map_score_mods_int": {"type": "map_numerical"}
-                        } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 
@@ -374,22 +354,18 @@ class TestDictScoreModifiers(MarqoTestCase):
                             {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": 4294967295012},
                             {"_id": "4", "text_field": "a photo of a cat", "score_mods_long": 1},
                             {"_id": "6", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
-                            "map_score_mods": {"a": 0.5}},
+                             "map_score_mods": {"a": 0.5}},
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                        mappings={
-                            "map_score_mods_long": {"type": "map_numerical"},
-                            "map_score_mods_int": {"type": "map_numerical"},
-                        } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
                 score_modifier = ScoreModifier(**{
-                        "add_to_score": [{"field_name": "map_score_mods_long.a", "weight": 20},
-                                         {"field_name": "score_mods_long", "weight": 20}],
-                    }
-                )
+                    "add_to_score": [{"field_name": "map_score_mods_long.a", "weight": 20},
+                                     {"field_name": "score_mods_long", "weight": 20}],
+                }
+                                               )
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -407,7 +383,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertTrue(res["hits"][1]["_id"] in ["2", "1"])
                 self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
                 self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
-    
+
     def test_unstructured_unsupported_map_error(self):
         """
         Test that only the document errors out, not the whole batch
@@ -422,28 +398,89 @@ class TestDictScoreModifiers(MarqoTestCase):
                         docs=[
                             {"_id": "1", "text_field": "a photo of a cat", "map_score_mods_long": {"a": 4294967295012}},
                             {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": 4294967295012},
-                            {"_id": "3", "text_field": "a photo of a cat", "score_mods_long": 1, "unsupported_map": {"text": "hello", "number": 42}},
-                            {"_id": "4", "text_field": "a photo of a cat", "score_mods_long": 1, "unsupported_number_map": {"number": 42}},
+                            {"_id": "3", "text_field": "a photo of a cat", "score_mods_long": 1,
+                             "unsupported_map": {"text": "hello", "number": 42}},
+                            {"_id": "4", "text_field": "a photo of a cat", "score_mods_long": 1,
+                             "supported_number_map": {"number": 42}},
                             {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
-                            "map_score_mods_float": {"a": 0.5}},
+                             "map_score_mods_float": {"a": 0.5}},
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                        mappings={
-                            "map_score_mods_long": {"type": "map_numerical"},
-                            "map_score_mods_int": {"type": "map_numerical"},
-                            "map_score_mods_float": {"type": "map_numerical"},
-                        } if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 
                 # Expected
-                expected = {"1": 200, "2": 200, "3": 400, "4": 400, "5": 200}
+                expected = {"1": 200, "2": 200, "3": 400, "4": 200, "5": 200}
 
                 # Get actual returned document add status
-                actual = {item["_id"]:item["status"] for item in res["items"]}
+                actual = {item["_id"]: item["status"] for item in res["items"]}
 
                 # Assert that they are equal
                 self.assertEqual(expected, actual)
+
+    def test_unstructured_wrong_map_numerical_format(self):
+        """
+        Test that the wrong map numerical format errors out
+        """
+        for index in [self.unstructured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text_field": "a photo of a cat", "map_score_mods_long": {"a": [42]}},
+                            {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": {1: 1}},
+                            {"_id": "3", "text_field": "a photo of a cat", "score_mods_long": 84},
+                            {"_id": "4", "text_field": "a photo of a cat", "score_mods_long": 1,
+                             "unsupported_map": {"text": "hello", "number": 42}},
+                            {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
+                             "map_score_mods_float": {"a": 0.5}},
+                            {"_id": "6", "text_field": "a photo of a dog", "my_int": 2,
+                             "my_custom_audio_vector_1": {"vector": [x for x in range(32)]}},
+                        ],
+                        tensor_fields=["text_field", "my_combination_field", "my_custom_audio_vector_1"],
+                        mappings={
+                            "my_combination_field": {
+                                "type": "multimodal_combination",
+                                "weights": {"text2": 0.5, "text_field": 0.5},
+                            },
+                            "my_custom_audio_vector_1": {"type": "custom_vector"},
+                        },
+                    )
+                )
+
+                # Expected
+                expected = {"1": 400, "2": 400, "3": 200, "4": 400, "5": 200, "6": 200}
+
+                # Get actual returned document add status
+                actual = {item["_id"]: item["status"] for item in res["items"]}
+
+                # Assert that they are equal
+                self.assertEqual(expected, actual)
+
+    def test_unstructured_map_numerical_as_custom_vector(self):
+        """
+        Test that the wrong map numerical format errors out
+        """
+        for index in [self.unstructured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                with self.assertRaises(ValidationError):
+                    res = tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index.name,
+                            docs=[
+                                {"_id": "7", "text2": "hello", "my_int": 2, "my_custom_audio_vector_1": {"vector": 24}},
+                            ],
+                            tensor_fields=["text_field", "my_custom_audio_vector_1"],
+                            mappings={
+                                "my_custom_audio_vector_1": {"type": "custom_vector"},
+                            },
+                        )
+                    )
 
     def test_structured_tensor_storage_old_and_new(self):
         # Mock the index and field map
@@ -451,9 +488,11 @@ class TestDictScoreModifiers(MarqoTestCase):
         index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.9.0")
         index.field_map = {
             "float_field": Field(name="float_field", type=FieldType.Float, features=[FieldFeature.ScoreModifier]),
-            "map_float_field": Field(name="map_float_field", type=FieldType.MapFloat, features=[FieldFeature.ScoreModifier]),
+            "map_float_field": Field(name="map_float_field", type=FieldType.MapFloat,
+                                     features=[FieldFeature.ScoreModifier]),
             "double_field": Field(name="double_field", type=FieldType.Double, features=[FieldFeature.ScoreModifier]),
-            "map_double_field": Field(name="map_double_field", type=FieldType.MapDouble, features=[FieldFeature.ScoreModifier]),
+            "map_double_field": Field(name="map_double_field", type=FieldType.MapDouble,
+                                      features=[FieldFeature.ScoreModifier]),
         }
 
         vespa_index = StructuredVespaIndex(marqo_index=index)
@@ -475,7 +514,8 @@ class TestDictScoreModifiers(MarqoTestCase):
         self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_float"]["float_field"], 1.23)
         self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_float"]["map_float_field.float_field"], 1.23)
         self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_double_long"]["double_field"], 4.56)
-        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_double_long"]["map_double_field.double_field"], 4.56)
+        self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers_double_long"]["map_double_field.double_field"],
+                         4.56)
 
         # Test with a version less than 2.9.0
         index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.8.0")
@@ -513,7 +553,6 @@ class TestDictScoreModifiers(MarqoTestCase):
         self.assertEqual(document.fields.score_modifiers_fields["map_float_field.float_field"], 1.23)
         self.assertIn("int_field", document.fields.score_modifiers_fields)
 
-
         # Test with Marqo version < 2.9.0, dict should error
         marqo_index_version = semver.VersionInfo.parse("2.8.0")
         with self.assertRaises(UnsupportedFeatureError):
@@ -532,5 +571,3 @@ class TestDictScoreModifiers(MarqoTestCase):
         self.assertEqual(document.fields.score_modifiers_fields["float_field"], 1.23)
         self.assertEqual(document.fields.score_modifiers_fields["double_field"], 4.56e39)
         self.assertEqual(document.fields.score_modifiers_fields["int_field"], 42)
-
-   

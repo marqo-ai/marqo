@@ -17,7 +17,6 @@ from marqo.tensor_search.models.mappings_object import (
     mappings_schema,
     multimodal_combination_mappings_schema,
     custom_vector_mappings_schema,
-    map_numerical_schema
 )
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search.models.custom_vector_object import CustomVector
@@ -373,12 +372,10 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
         elif mappings[field]["type"] == enums.MappingsObjectType.custom_vector:
             field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
-        elif mappings[field]["type"] == enums.MappingsObjectType.map_numerical:
-            field_content = validate_map_field(field_content)
         else:
             raise InvalidArgError(
                 f"The field `{field}` is of invalid type in the `mappings` parameter. The only object field type supported "
-                f"is `custom_vector` and `map_numerical`. However, the `mappings` provided is: {mappings}. Please change the "
+                f"is `custom_vector`. However, the `mappings` provided is: {mappings}. Please change the "
                 f"type of {field}. "
                 f"See `{marqo_docs.mappings()}` for more info on object fields. "
             )
@@ -390,7 +387,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             elif structured_field_type == FieldType.CustomVector:
                 field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
             elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble, FieldType.MapLong]:
-                field_content = validate_map_field(field_content)
+                field_content = validate_map_numeric_field(field_content)
             else:
                 raise InvalidArgError(
                     f"The field {field} is of type `{structured_field_type}`, which is not a valid object field type. "
@@ -399,22 +396,27 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                     f"See `{marqo_docs.mappings()}` for more info on object fields. "
                 )
         else:
-            # Index is unstructured, so it must be in mappings.
-            raise InvalidArgError(
-                f"The field {field} must be in the add_documents `mappings` parameter to use it as an object field type. "
-                f"However, the `mappings` provided is: {mappings}. Please change the field content or add the field to `mappings`. "
-                f"See `{marqo_docs.mappings()}` for more info on object fields."
-            )
+            # Index is unstructured, check if it is a map numeric field
+            try:
+                field_content = validate_map_numeric_field(field_content)
+            except Exception:
+                raise InvalidArgError(
+                    f"The field '{field}' contains a dictionary value. "
+                    f"If this field is intended to be a map numeric field, please ensure all subfields are of type <string>:<float> or <string>:<int>. "
+                    f"Otherwise, the field must be declared in the add_documents `mappings` parameter to use it as an object field type. "
+                    f"The `mappings` provided is: {mappings}. "
+                    f"Please either adjust the field content to be a valid map numeric field, "
+                    f"or add the field to `mappings` with the appropriate type. "
+                    f"See `{marqo_docs.mappings()}` for more info on object fields and supported types."
+                )
 
     return field_content
 
-def validate_map_field(field_content):
+def validate_map_numeric_field(field_content):
      """
      Validates the field content if it is a map field (dict)
      Args:
          field_content: the field content
-         is_non_tensor_field: whether this is a non-tensor-field
-         index_model_dimensions: the `dimensions` property of the index to be added to
      Returns:
          field_content if the validation passes
      """
@@ -550,9 +552,6 @@ def validate_mappings_object(
             elif config["type"] == enums.MappingsObjectType.custom_vector:
                 validate_custom_vector_mappings_object(config)
                 # TODO: add validation for custom vector structured/unstructured here
-            elif config["type"] == enums.MappingsObjectType.map_numerical:
-                validate_map_numerical_mappings_object(config)
-
 
 
         return mappings_object
@@ -560,16 +559,6 @@ def validate_mappings_object(
         raise InvalidArgError(
             f"Error validating mappings object. Reason: {str(e)}. "
             f" Read about the mappings object here: `{marqo_docs.mappings()}`"
-        )
-
-def validate_map_numerical_mappings_object(mappings_object: Dict):
-    """Validates the map score modifiers mappings object"""
-    try:
-        jsonschema.validate(instance=mappings_object, schema=map_numerical_schema)
-    except jsonschema.ValidationError as e:
-        raise InvalidArgError(
-            f"Error validating map score modifiers mappings object. Reason: \n{str(e)}"
-            f"\n Read about the mappings object here: `{marqo_docs.mappings()}`"
         )
     
 def validate_multimodal_combination_mappings_object(mappings_object: Dict):

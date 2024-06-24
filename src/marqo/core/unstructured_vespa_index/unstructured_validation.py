@@ -4,7 +4,7 @@ import jsonschema
 
 from marqo.api import exceptions as errors
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_mappings_schema, custom_vector_mappings_schema, map_numerical_schema
+from marqo.tensor_search.models.mappings_object import mappings_schema, multimodal_combination_mappings_schema, custom_vector_mappings_schema
 from marqo.core.models.marqo_index import validate_field_name as common_validate_field_name
 from marqo import marqo_docs
 
@@ -27,22 +27,11 @@ def validate_mappings_object_format(mappings: Dict) -> None:
             elif configuration["type"] == enums.MappingsObjectType.custom_vector:
                 # Add any other custom_vector field name validations if needed.
                 _validate_custom_vector_configuration_format(configuration)
-            elif configuration["type"] == enums.MappingsObjectType.map_numerical:
-                _validate_map_numerical_configuration_format(configuration)
 
     except jsonschema.ValidationError as e:
         raise errors.InvalidArgError(
             f"Error validating mappings object. Reason: {str(e)}. "
             f"Read about the mappings object here: {marqo_docs.mappings()}"
-        )
-
-def _validate_map_numerical_configuration_format(configuration: Dict):
-    try:
-        jsonschema.validate(instance=configuration, schema=map_numerical_schema)
-    except jsonschema.ValidationError as e:
-        raise errors.InvalidArgError(
-            f"Error validating map score modifiers mappings object. Reason: \n{str(e)}"
-            f"\n Read about the mappings object here: {marqo_docs.mappings()}"
         )
 
 def _validate_multimodal_combination_field_name(multimodal_field_name: str):
