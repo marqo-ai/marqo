@@ -464,8 +464,8 @@ class IndexManagement:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
         if not os.path.exists(schema_path):
             logger.warn(f"Schema {name} does not exist in application package, nothing to remove")
-
-        os.remove(schema_path)
+        else:
+            os.remove(schema_path)
 
     def _add_schema_to_services(self, app: str, name: str) -> None:
         services_path = os.path.join(app, 'services.xml')
