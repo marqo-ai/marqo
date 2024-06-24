@@ -403,10 +403,8 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
             # Index is unstructured, check if it is a map numeric field
             if marqo_index_version_lt_2_9_0:
                 raise InvalidArgError(
-                    f"Unsupported map field. "
-                    f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields "
-                    f"and must be declared in the `mappings` parameter (See `{marqo_docs.mappings()}). "
-                    f"Only indexes created with Marqo 2.9.0 or above support map numerical fields."
+                    f"The field {field} is a map field and only supported for indexes created with Marqo 2.9.0 or later. "
+                    f"See {marqo_docs.map_fields()} and {marqo_docs.mappings()}."
                 )
             
             field_content = validate_map_numeric_field(field_content)
