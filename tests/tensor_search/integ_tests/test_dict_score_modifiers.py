@@ -407,6 +407,43 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertTrue(res["hits"][1]["_id"] in ["2", "1"])
                 self.assertTrue(85899345900239 <= score_of_first_result <= 85899345900241)
                 self.assertTrue(85899345900239 <= score_of_second_result <= 85899345900241)
+    
+    def test_unstructured_unsupported_map_error(self):
+        """
+        Test that only the document errors out, not the whole batch
+        """
+        for index in [self.unstructured_default_text_index]:
+            with self.subTest(index=index.type):
+                # Add documents
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "1", "text_field": "a photo of a cat", "map_score_mods_long": {"a": 4294967295012}},
+                            {"_id": "2", "text_field": "a photo of a cat", "score_mods_long": 4294967295012},
+                            {"_id": "3", "text_field": "a photo of a cat", "score_mods_long": 1, "unsupported_map": {"text": "hello", "number": 42}},
+                            {"_id": "4", "text_field": "a photo of a cat", "score_mods_long": 1, "unsupported_number_map": {"number": 42}},
+                            {"_id": "5", "text_field": "a photo of a cat", "map_score_mods_int": {"c": 1},
+                            "map_score_mods_float": {"a": 0.5}},
+                        ],
+                        tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
+                        mappings={
+                            "map_score_mods_long": {"type": "map_numerical"},
+                            "map_score_mods_int": {"type": "map_numerical"},
+                            "map_score_mods_float": {"type": "map_numerical"},
+                        } if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Expected
+                expected = {"1": 200, "2": 200, "3": 400, "4": 400, "5": 200}
+
+                # Get actual returned document add status
+                actual = {item["_id"]:item["status"] for item in res["items"]}
+
+                # Assert that they are equal
+                self.assertEqual(expected, actual)
 
     def test_structured_tensor_storage_old_and_new(self):
         # Mock the index and field map
@@ -495,3 +532,5 @@ class TestDictScoreModifiers(MarqoTestCase):
         self.assertEqual(document.fields.score_modifiers_fields["float_field"], 1.23)
         self.assertEqual(document.fields.score_modifiers_fields["double_field"], 4.56e39)
         self.assertEqual(document.fields.score_modifiers_fields["int_field"], 42)
+
+   

@@ -104,10 +104,13 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                         instance.fields.float_fields[f"{key}.{k}"] = float(v)
                         instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
             elif isinstance(value, dict) and marqo_index_version_lt_2_9_0:
-                raise UnsupportedFeatureError(f"Document {document} with a map field {key} "
-                                 f"is not supported in Marqo version < 2.9.0")
+                raise UnsupportedFeatureError(
+                    f"Field {key} is an unsupported map field."
+                    f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields. "
+                    f"Only indexes created with Marqo 2.9.0 support map numerical fields."
+                )
             else:
-                raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
+                raise VespaDocumentParsingError(f"Field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
 
         instance.fields.vespa_multimodal_params = document.get(unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, {})
