@@ -106,8 +106,9 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             elif isinstance(value, dict) and marqo_index_version_lt_2_9_0:
                 raise UnsupportedFeatureError(
                     f"Field {key} is an unsupported map field."
-                    f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields. "
-                    f"Only indexes created with Marqo 2.9.0 support map numerical fields."
+                    f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields "
+                    f"and must be declared in the `mappings` parameter. "
+                    f"Only indexes created with Marqo 2.9.0 or above support map numerical fields."
                 )
             else:
                 raise VespaDocumentParsingError(f"Field {key} has an "
