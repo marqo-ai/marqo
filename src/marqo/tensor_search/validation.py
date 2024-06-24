@@ -7,7 +7,6 @@ import semver
 import jsonschema
 
 import marqo.core.models.marqo_index as marqo_index
-from marqo.core.exceptions import UnsupportedFeatureError
 import marqo.exceptions as base_exceptions
 from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
@@ -402,7 +401,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
         else:
             # Index is unstructured, check if it is a map numeric field
             if marqo_index_version_lt_2_9_0:
-                raise UnsupportedFeatureError(
+                raise InvalidArgError(
                     f"Unsupported map field. "
                     f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields "
                     f"and must be declared in the `mappings` parameter (See `{marqo_docs.mappings()}). "
