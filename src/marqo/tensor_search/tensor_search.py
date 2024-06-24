@@ -231,7 +231,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         field_content = validation.validate_dict(
                             field=field, field_content=field_content,
                             is_non_tensor_field=not is_tensor_field,
-                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions)
+                            mappings=add_docs_params.mappings, index_model_dimensions=index_model_dimensions,
+                            marqo_index_version=marqo_index.parsed_marqo_version())
                 except (errors.InvalidArgError, core_exceptions.MarqoDocumentParsingError) as err:
                     document_is_valid = False
                     unsuccessful_docs.append(

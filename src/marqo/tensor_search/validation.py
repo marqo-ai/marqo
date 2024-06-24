@@ -1,6 +1,8 @@
 import json
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type, Sequence, Union
+import semver
+
 
 import jsonschema
 
@@ -353,7 +355,8 @@ def validate_id(_id: str):
 
 
 def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, mappings: Dict,
-                  index_model_dimensions: int = None, structured_field_type: FieldType = None):
+                  index_model_dimensions: int = None, structured_field_type: FieldType = None,
+                  marqo_index_version: semver.VersionInfo = None):
     """
     Args:
         field: the field name
@@ -365,7 +368,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
     Returns:
         Updated field_content dict or raise an error
     """
-
+    marqo_index_version_lt_2_9_0 = marqo_index_version < semver.VersionInfo.parse("2.9.0")
     # If field is declared in mappings, it overwrites the default.
     if mappings and field in mappings:
         if mappings[field]["type"] == enums.MappingsObjectType.multimodal_combination:
@@ -397,6 +400,15 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                 )
         else:
             # Index is unstructured, check if it is a map numeric field
+            if marqo_index_version_lt_2_9_0:
+                raise InvalidArgError(
+                    f"Unsupported map field. "
+                    f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields "
+                    f"and must be declared in the `mappings` parameter. "
+                    f"Only indexes created with Marqo 2.9.0 or above support map numerical fields."
+                    f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields. "
+                    f"Only indexes created with Marqo 2.9.0 or above support map numerical fields."
+                )
             try:
                 field_content = validate_map_numeric_field(field_content)
             except Exception:
