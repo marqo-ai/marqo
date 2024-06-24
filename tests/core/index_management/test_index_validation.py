@@ -119,7 +119,8 @@ class TestIndexValidateSettings(unittest.TestCase):
         with self.assertRaises(ValidationError) as context:
             IndexManagement.validate_index_settings("test_index", input_settings)
         self.assertIn("__root__", str(context.exception))
+        print(f"hello: ", str(context.exception))
         self.assertIn("Invalid field name 'dependent_fields'. See Create Index "
                       "API reference here "
-                      "https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/ (type=value_error)",
+                      "https://docs.marqo.ai/2.9/API-Reference/Indexes/create_index/ (type=value_error)",
                       str(context.exception))
