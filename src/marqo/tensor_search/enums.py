@@ -90,7 +90,7 @@ class RequestType:
 class MappingsObjectType(str, Enum):
     multimodal_combination = "multimodal_combination"
     custom_vector = "custom_vector"
-    
+
 
 class SearchDb:
     vespa = 'vespa'

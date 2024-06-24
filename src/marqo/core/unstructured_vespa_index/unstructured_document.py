@@ -7,7 +7,7 @@ from pydantic import Field, BaseModel
 from marqo.base_model import MarqoBaseModel
 
 from marqo.core import constants as index_constants
-from marqo.core.exceptions import VespaDocumentParsingError, UnsupportedFeatureError
+from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 
 

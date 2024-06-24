@@ -528,7 +528,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers"]["map_float_field.float_field"], 1.23)
         self.assertEqual(vespa_doc["fields"]["marqo__score_modifiers"]["map_double_field.double_field"], 4.56)
 
-    def test_unstructured_tensor_storage_old_and_new(self):
+    def test_unstructured_from_marqo_document(self):
         # Mock document
         marqo_document = {
             "_id": "1",
@@ -543,7 +543,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         # Test with Marqo version >= 2.9.0
         marqo_index_version = semver.VersionInfo.parse("2.9.0")
         document = UnstructuredVespaDocument.from_marqo_document(
-            marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
+            marqo_document, filter_string_max_length=100
         )
 
         # Assertions for version >= 2.9.0
@@ -552,22 +552,3 @@ class TestDictScoreModifiers(MarqoTestCase):
         self.assertEqual(document.fields.score_modifiers_fields["map_double_field.double_field"], 4.56e39)
         self.assertEqual(document.fields.score_modifiers_fields["map_float_field.float_field"], 1.23)
         self.assertIn("int_field", document.fields.score_modifiers_fields)
-
-        # Test with Marqo version < 2.9.0, dict should error
-        marqo_index_version = semver.VersionInfo.parse("2.8.0")
-        with self.assertRaises(UnsupportedFeatureError):
-            document = UnstructuredVespaDocument.from_marqo_document(
-                marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
-            )
-
-        marqo_document.pop("map_double_field")
-        marqo_document.pop("map_float_field")
-
-        document = UnstructuredVespaDocument.from_marqo_document(
-            marqo_document, filter_string_max_length=100, marqo_index_version=marqo_index_version
-        )
-
-        # Assertions for version < 2.9.0
-        self.assertEqual(document.fields.score_modifiers_fields["float_field"], 1.23)
-        self.assertEqual(document.fields.score_modifiers_fields["double_field"], 4.56e39)
-        self.assertEqual(document.fields.score_modifiers_fields["int_field"], 42)

@@ -7,6 +7,7 @@ import semver
 import jsonschema
 
 import marqo.core.models.marqo_index as marqo_index
+from marqo.core.exceptions import UnsupportedFeatureError
 import marqo.exceptions as base_exceptions
 from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
@@ -409,8 +410,8 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                 )
             try:
                 field_content = validate_map_numeric_field(field_content)
-            except Exception:
-                raise InvalidArgError(
+            except UnsupportedFeatureError:
+                raise UnsupportedFeatureError(
                     f"The field '{field}' contains a dictionary value. "
                     f"If this field is intended to be a map numeric field, please ensure all subfields are of type <string>:<float> or <string>:<int>. "
                     f"Otherwise, the field must be declared in the add_documents `mappings` parameter to use it as an object field type. "
@@ -433,25 +434,25 @@ def validate_map_numeric_field(field_content):
 
      # Validate that the field content is a dict
      if not isinstance(field_content, dict):
-         raise InvalidArgError(
+         raise UnsupportedFeatureError(
              f"The field content `{field_content}` is of type `{type(field_content).__name__}`, which is not a valid type for a map field."
              f"A map field must be a dictionary."
          )
 
      # Validate that the dict is only of one level
      if any(isinstance(v, dict) for v in field_content.values()):
-         raise InvalidArgError(
+         raise UnsupportedFeatureError(
              "Nested dictionaries are not allowed in map fields. Each value must be a single int, float, or double."
          )
 
      # Validate that the values of the dict are int, float, or double
      for key, value in field_content.items():
          if not isinstance(key, str):
-             raise InvalidArgError(
+             raise UnsupportedFeatureError(
                  f"Key `{key}` in map field is not a string. All keys must be strings."
              )
          if not isinstance(value, (int, float)):
-             raise InvalidArgError(
+             raise UnsupportedFeatureError(
                  f"Value `{value}` for key `{key}` in map field is not of type int or float."
              )
 
