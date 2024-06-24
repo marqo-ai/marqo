@@ -1,29 +1,93 @@
 import os
 import shutil
+import threading
+import time
 import uuid
 from unittest import mock
+from unittest.mock import patch
 
 from marqo import version
 from marqo.core.exceptions import IndexExistsError
+from marqo.core.exceptions import IndexNotFoundError
+from marqo.core.exceptions import InternalError
+from marqo.core.exceptions import OperationConflictError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
-from marqo.core.exceptions import OperationConflictError
-from unittest.mock import patch
-import threading
-import time
-from marqo.core.exceptions import InternalError
+
+
+class IndexResilienceError(Exception):
+    """A custom exception to raise when an error is encountered during the index resilience test."""
+    pass
 
 
 class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
+        super().setUp()
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client,
                                                 enable_index_operations=True)
+
+    def _check_delete_index_resilience(self, index_name: str):
+        """A helper method to check the resilience of the delete index operation."""
+        try:
+            # Repeat the delete index operation, it is OK to raise IndexNotFoundError
+            self.index_management.delete_index_by_name(index_name)
+        except IndexNotFoundError:
+            pass
+        self.create_indexes([self.unstructured_marqo_index_request(name=index_name)])
+        # Add documents to the index
+        r = tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index_name,
+                tensor_fields=[],
+                docs=[{"test": "test", "_id": "1"}]
+            )
+        )
+        self.assertEqual(r["errors"], False)
+
+        # Test search
+        r = tensor_search.search(
+            config=self.config,
+            index_name=index_name,
+            text="test",
+            search_method="LEXICAL"
+        )
+        self.assertEqual(1, len(r["hits"]))
+
+    def _check_create_index_resilience(self, index_name: str, index_request: MarqoIndexRequest):
+        """A helper method to check the resilience of the create index operation."""
+        self.index_management.create_index(index_request)
+        # Add documents to the index
+        r = tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index_name,
+                tensor_fields=[],
+                docs=[{"test": "test", "_id": "1"}]
+            )
+        )
+        self.assertEqual(r["errors"], False)
+
+        # Test search
+        r = tensor_search.search(
+            config=self.config,
+            index_name=index_name,
+            text="test",
+            search_method="LEXICAL"
+        )
+        self.assertEqual(1, len(r["hits"]))
+
+        # Ensure the index can be deleted successfully
+        self.index_management.delete_index_by_name(index_name)
 
     def test_bootstrap_vespa_doesNotExist_successful(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
@@ -344,3 +408,98 @@ class TestIndexManagement(MarqoTestCase):
         """
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
         self.assertIsNone(self.index_management._zookeeper_deployment_lock)
+
+    def test_delete_index_resilience_deployApplicationPackageError_successful(self):
+        """
+        Test that the delete index operation is resilient to failures in deploying the application package.
+        """
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.unstructured_marqo_index_request(
+            name=index_name,
+        )
+        self.index_management.create_index(marqo_index_request)
+        error = IndexResilienceError("Failed to deploy the application package")
+        with patch("marqo.vespa.vespa_client.VespaClient.deploy_application", side_effect=error):
+            with self.assertRaises(IndexResilienceError):
+                self.index_management.delete_index_by_name(index_name)
+
+        self._check_delete_index_resilience(index_name)
+
+    def test_delete_index_resilience_deleteDocumentInVespaSchemaError_successful(self):
+        """Test that the delete index operation is resilient to failures in deleting the document in the Vespa
+        marqo__settings schema.
+        """
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.unstructured_marqo_index_request(
+            name=index_name,
+        )
+        self.index_management.create_index(marqo_index_request)
+        error = IndexResilienceError("Failed to deploy the application package")
+        with patch("marqo.core.index_management.index_management.IndexManagement._delete_index_settings_by_name",
+                   side_effect=error):
+            with self.assertRaises(IndexResilienceError):
+                tensor_search.delete_index(self.config, index_name)
+        self._check_delete_index_resilience(index_name)
+
+    def test_create_index_resilience_deployApplicationPackageError_successful(self):
+        """
+        Test that the create index operation is resilient to failures in deploying the application package.
+        """
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.unstructured_marqo_index_request(
+            name=index_name,
+        )
+        error = IndexResilienceError("Failed to deploy the application package")
+        with patch("marqo.vespa.vespa_client.VespaClient.deploy_application", side_effect=error):
+            with self.assertRaises(IndexResilienceError):
+                self.index_management.create_index(marqo_index_request)
+        self._check_create_index_resilience(index_name, marqo_index_request)
+
+    def test_create_index_resilience_addIndexSettingsError_successful(self):
+        """
+        Test that the create index operation is resilient to failures in adding the index settings to the
+        marqo__settings index.
+        """
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.unstructured_marqo_index_request(
+            name=index_name,
+        )
+        error = IndexResilienceError("Failed to add the index settings to the marqo__settings index")
+        with patch("marqo.core.index_management.index_management.IndexManagement._save_index_settings",
+                   side_effect=error):
+            with self.assertRaises(IndexResilienceError):
+                self.index_management.create_index(marqo_index_request)
+        self._check_create_index_resilience(index_name, marqo_index_request)
+
+    def test_create_index_resilience_bootstrapError_successful(self):
+        """Test to ensure create index is resilient when boost_trap is not successful."""
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.unstructured_marqo_index_request(
+            name=index_name,
+        )
+
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            with mock.patch("marqo.core.index_management.index_management.logger.debug") as mock_logger_debug:
+                self._check_create_index_resilience(index_name, marqo_index_request)
+
+        self.assertIn("Marqo config does not exist. Configuring Vespa as part of index creation",
+                      str(mock_logger_debug.call_args_list))
+
+    def test_create_index_resilience_bootstrapPartialError_successful(self):
+        """Test to ensure create index is resilient when bootstrap is only partial successful."""
+        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
+        marqo_index_request = self.unstructured_marqo_index_request(
+            name=index_name,
+        )
+        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+            self.assertTrue(self.index_management.bootstrap_vespa())
+
+            # Delete marqo config to simulate partial configuration for 2.1+
+            self.vespa_client.delete_document(
+                schema=settings_schema_name,
+                id=IndexManagement._MARQO_CONFIG_DOC_ID
+            )
+
+            self._check_create_index_resilience(index_name, marqo_index_request)
