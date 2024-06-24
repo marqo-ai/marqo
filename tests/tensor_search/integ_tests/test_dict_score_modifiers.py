@@ -411,12 +411,16 @@ class TestDictScoreModifiers(MarqoTestCase):
 
                 # Expected
                 expected = {"1": 200, "2": 200, "3": 400, "4": 200, "5": 200}
+                expected_doc_3_error = {
+                    "invalid_argument": "Value `hello` for key `text` in map field is not of type int or float."}
 
                 # Get actual returned document add status
                 actual = {item["_id"]: item["status"] for item in res["items"]}
+                actual_doc3 = {res["items"][2]["code"]: res["items"][2]["error"]}
 
-                # Assert that they are equal
+                # Assert that expected and actual status codes are equal
                 self.assertEqual(expected, actual)
+                self.assertEqual(expected_doc_3_error, actual_doc3)
 
     def test_unstructured_wrong_map_numerical_format(self):
         """
@@ -452,13 +456,37 @@ class TestDictScoreModifiers(MarqoTestCase):
                 )
 
                 # Expected
-                expected = {"1": 400, "2": 400, "3": 200, "4": 400, "5": 200, "6": 200}
+                expected_results = {
+                    "1": {"status": 400, "error": "in map field is not of type int or float",
+                          "code": "invalid_argument"},
+                    "2": {"status": 400, "error": "All keys must be strings.", "code": "invalid_argument"},
+                    "3": {"status": 200},
+                    "4": {"status": 400, "error": "in map field is not of type int or float",
+                          "code": "invalid_argument"},
+                    "5": {"status": 200},
+                    "6": {"status": 200}
+                }
 
-                # Get actual returned document add status
-                actual = {item["_id"]: item["status"] for item in res["items"]}
+                # Get actual returned document
+                actual_results = res["items"]
 
-                # Assert that they are equal
-                self.assertEqual(expected, actual)
+                for item in actual_results:
+                    doc_id = item["_id"]
+                    expected = expected_results[doc_id]
+
+                    with self.subTest(doc_id=doc_id):
+                        self.assertEqual(item["status"], expected["status"],
+                                         f"Document {doc_id} status mismatch")
+
+                        if expected["status"] == 400:
+                            self.assertIn(expected["error"], item["error"],
+                                          f"Document {doc_id} error message mismatch")
+                        else:
+                            self.assertIn("_id", item, f"Document {doc_id} missing _id field")
+
+                actual_statuses = {item["_id"]: item["status"] for item in res["items"]}
+                expected_statuses = {id: data["status"] for id, data in expected_results.items()}
+                self.assertEqual(expected_statuses, actual_statuses, "Overall status results mismatch")
 
     def test_unstructured_map_numerical_as_custom_vector(self):
         """

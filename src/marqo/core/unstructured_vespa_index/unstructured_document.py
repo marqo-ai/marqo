@@ -111,7 +111,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         instance.fields.vespa_chunks = document.get(index_constants.MARQO_DOC_CHUNKS, [])
         instance.fields.vector_counts = len(instance.fields.vespa_embeddings)
         return instance
-    
+
     def to_vespa_document(self) -> Dict[str, Any]:
         """Convert VespaDocumentObject to a Vespa document.
         Empty fields are removed from the document."""

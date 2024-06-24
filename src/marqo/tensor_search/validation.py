@@ -402,24 +402,14 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
         else:
             # Index is unstructured, check if it is a map numeric field
             if marqo_index_version_lt_2_9_0:
-                raise InvalidArgError(
+                raise UnsupportedFeatureError(
                     f"Unsupported map field. "
                     f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields "
-                    f"and must be declared in the `mappings` parameter. "
+                    f"and must be declared in the `mappings` parameter (See `{marqo_docs.mappings()}). "
                     f"Only indexes created with Marqo 2.9.0 or above support map numerical fields."
                 )
-            try:
-                field_content = validate_map_numeric_field(field_content)
-            except UnsupportedFeatureError:
-                raise UnsupportedFeatureError(
-                    f"The field '{field}' contains a dictionary value. "
-                    f"If this field is intended to be a map numeric field, please ensure all subfields are of type <string>:<float> or <string>:<int>. "
-                    f"Otherwise, the field must be declared in the add_documents `mappings` parameter to use it as an object field type. "
-                    f"The `mappings` provided is: {mappings}. "
-                    f"Please either adjust the field content to be a valid map numeric field, "
-                    f"or add the field to `mappings` with the appropriate type. "
-                    f"See `{marqo_docs.mappings()}` for more info on object fields and supported types."
-                )
+            
+            field_content = validate_map_numeric_field(field_content)
 
     return field_content
 
@@ -434,25 +424,25 @@ def validate_map_numeric_field(field_content):
 
      # Validate that the field content is a dict
      if not isinstance(field_content, dict):
-         raise UnsupportedFeatureError(
+         raise InvalidArgError(
              f"The field content `{field_content}` is of type `{type(field_content).__name__}`, which is not a valid type for a map field."
              f"A map field must be a dictionary."
          )
 
      # Validate that the dict is only of one level
      if any(isinstance(v, dict) for v in field_content.values()):
-         raise UnsupportedFeatureError(
+         raise InvalidArgError(
              "Nested dictionaries are not allowed in map fields. Each value must be a single int, float, or double."
          )
 
      # Validate that the values of the dict are int, float, or double
      for key, value in field_content.items():
          if not isinstance(key, str):
-             raise UnsupportedFeatureError(
+             raise InvalidArgError(
                  f"Key `{key}` in map field is not a string. All keys must be strings."
              )
          if not isinstance(value, (int, float)):
-             raise UnsupportedFeatureError(
+             raise InvalidArgError(
                  f"Value `{value}` for key `{key}` in map field is not of type int or float."
              )
 
