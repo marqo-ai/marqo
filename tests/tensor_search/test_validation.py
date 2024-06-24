@@ -934,7 +934,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                                         field_content=obj,
                                         is_non_tensor_field=False,
                                         mappings=test_mappings,
-                                        index_model_dimensions=index_model_dimensions) == obj
+                                        index_model_dimensions=index_model_dimensions,
+                                        marqo_index_version="2.9.0") == obj
 
         # custom vector, valid (no content). must be filled with empty string
         obj = {"vector": [1.0 for _ in range(index_model_dimensions)]}
@@ -942,7 +943,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                                         field_content=obj,
                                         is_non_tensor_field=False,
                                         mappings=test_mappings,
-                                        index_model_dimensions=index_model_dimensions) \
+                                        index_model_dimensions=index_model_dimensions,
+                                        marqo_index_version="2.9.0") \
                == {"content": "", "vector": [1.0 for _ in range(index_model_dimensions)]}
 
         invalid_custom_vector_objects = [
@@ -977,7 +979,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                                              field_content=case,
                                              is_non_tensor_field=False,
                                              mappings=test_mappings,
-                                             index_model_dimensions=index_model_dimensions)
+                                             index_model_dimensions=index_model_dimensions,
+                                             marqo_index_version="2.9.0")
                     raise AssertionError
                 except ValidationError as e:
                     assert error_message in str(e.args[0][0].exc)
@@ -990,7 +993,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                                                         "vector": [1.0 for _ in range(index_model_dimensions)]},
                                          is_non_tensor_field=False,
                                          mappings=test_mappings,
-                                         index_model_dimensions=None)
+                                         index_model_dimensions=None,
+                                         marqo_index_version="2.9.0")
             self.assertIn("none is not an allowed value", str(cm.exception.args[0][0].exc))
 
         # Non-int index model dimensions
@@ -1001,7 +1005,8 @@ class TestValidateIndexSettings(unittest.TestCase):
                                                         "vector": [1.0 for _ in range(index_model_dimensions)]},
                                          is_non_tensor_field=False,
                                          mappings=test_mappings,
-                                         index_model_dimensions="wrong type")
+                                         index_model_dimensions="wrong type",
+                                         marqo_index_version="2.9.0")
 
             self.assertIn("value is not a valid integer", str(cm.exception.args[0][0].exc))
 

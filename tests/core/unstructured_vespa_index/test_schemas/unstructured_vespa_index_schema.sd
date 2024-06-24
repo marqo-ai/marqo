@@ -66,7 +66,7 @@ schema marqo__test_00unstructured_00schema {
                                rank: filter }
         }
 
-        field marqo__score_modifiers type tensor<float>(p{}) {
+        field marqo__score_modifiers type tensor<double>(p{}) {
             indexing: attribute | summary
         }
 
@@ -114,8 +114,8 @@ schema marqo__test_00unstructured_00schema {
 
     rank-profile modifiers inherits default {
         inputs {
-            query(marqo__mult_weights) tensor<float>(p{})
-            query(marqo__add_weights) tensor<float>(p{})
+            query(marqo__mult_weights) tensor<double>(p{})
+            query(marqo__add_weights) tensor<double>(p{})
         }
         function modify(score) {
             expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
@@ -124,8 +124,8 @@ schema marqo__test_00unstructured_00schema {
 
     rank-profile bm25_modifiers inherits modifiers {
         inputs {
-            query(marqo__mult_weights) tensor<float>(p{})
-            query(marqo__add_weights) tensor<float>(p{})
+            query(marqo__mult_weights) tensor<double>(p{})
+            query(marqo__add_weights) tensor<double>(p{})
         }
         first-phase {
             expression: modify(bm25(marqo__strings))
@@ -134,8 +134,8 @@ schema marqo__test_00unstructured_00schema {
 
     rank-profile embedding_similarity_modifiers inherits modifiers {
         inputs {
-            query(marqo__mult_weights) tensor<float>(p{})
-            query(marqo__add_weights) tensor<float>(p{})
+            query(marqo__mult_weights) tensor<double>(p{})
+            query(marqo__add_weights) tensor<double>(p{})
             query(embedding_query) tensor<float>(x[32])
         }
         first-phase {

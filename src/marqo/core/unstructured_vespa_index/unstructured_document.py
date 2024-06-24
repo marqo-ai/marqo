@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 from typing import List, Dict, Any
+import semver
 
 from pydantic import Field, BaseModel
 from marqo.base_model import MarqoBaseModel
@@ -93,8 +94,16 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             elif isinstance(value, float):
                 instance.fields.float_fields[key] = value
                 instance.fields.score_modifiers_fields[key] = value
+            elif isinstance(value, dict):
+                for k, v in value.items():
+                    if isinstance(v, int):
+                        instance.fields.int_fields[f"{key}.{k}"] = v
+                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                    elif isinstance(v, float):
+                        instance.fields.float_fields[f"{key}.{k}"] = float(v)
+                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
             else:
-                raise VespaDocumentParsingError(f"Document {document} with field {key} has an "
+                raise VespaDocumentParsingError(f"In document {doc_id}, field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
 
         instance.fields.vespa_multimodal_params = document.get(unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, {})
