@@ -5,7 +5,7 @@ from pydantic import root_validator
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.models.marqo_index as core
-from marqo import version
+from marqo import version, marqo_docs
 from marqo.base_model import StrictBaseModel
 from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
     UnstructuredMarqoIndexRequest
@@ -53,7 +53,7 @@ class IndexSettings(StrictBaseModel):
                 for key in d.keys():
                     if '_' in key:
                         raise ValueError(f"Invalid field name '{key}'. "
-                                         f"See Create Index API reference here https://docs.marqo.ai/2.0.0/API-Reference/Indexes/create_index/")
+                                         f"See Create Index API reference here {marqo_docs.create_index()}")
 
                     if key not in ['dependentFields', 'modelProperties']:
                         validate_keys(d[key])
