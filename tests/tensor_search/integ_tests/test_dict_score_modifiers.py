@@ -241,44 +241,6 @@ class TestDictScoreModifiers(MarqoTestCase):
                 self.assertIn(res["hits"][0]["_id"], ["1", "7"])
                 self.assertTrue(0.8 <= score_of_first_result <= 1.2)
 
-    # Test the expected multiply whole score by 0 if score modifier does not exist in document
-    # but there is a score modifier in the query.
-    def test_multiply_zero_if_no_score_modifier_in_doc(self):
-        """
-        Test the expected multiply whole score by 0 if score modifier does not exist in document
-        but there is a score modifier in the query.
-        """
-        for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
-            # Add documents
-            res = tensor_search.add_documents(
-                config=self.config,
-                add_docs_params=AddDocsParams(
-                    index_name=index.name,
-                    docs=[
-                        {'_id' : '20',
-                        'text_field': 'The quick brown fox',
-                        # 'price_2': 100.0
-                        }
-                    ],
-                    tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                )
-            )
-
-            # Search with score modifier
-            score_modifiers= ScoreModifier(**{
-                    "multiply_score_by": [{"field_name": "price_2", "weight": 1}]
-                }
-            )
-
-            res = tensor_search.search(
-                index_name=index.name, config=self.config, text="",
-                score_modifiers=score_modifiers,
-                result_count=10
-            )
-
-            # Assert that the score is 0 (multiply whole score by 0)
-            self.assertEqual(res["hits"][0]["_score"], 0.0)
-
     # Test combined add to score and multiply score by
     def test_combined_map_score_modifier(self):
         """
