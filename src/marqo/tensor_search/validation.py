@@ -378,7 +378,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
         else:
             raise InvalidArgError(
                 f"The field `{field}` is of invalid type in the `mappings` parameter. The only object field type supported "
-                f"is `custom_vector`. However, the `mappings` provided is: {mappings}. Please change the "
+                f"is `custom_vector` and `map_numerical`. However, the `mappings` provided is: {mappings}. Please change the "
                 f"type of {field}. "
                 f"See `{marqo_docs.mappings()}` for more info on object fields. "
             )
