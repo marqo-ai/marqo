@@ -365,6 +365,7 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
         is_non_tensor_field: for multimodal tensor combination field, this should be True
         mappings: a dictionary to help validate the object field content
         index_model_dimensions: the dimensions of the model of the index. used to validate custom vector field.
+        marqo_index_version: the version of the Marqo index
     Returns:
         Updated field_content dict or raise an error
     """
