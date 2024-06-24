@@ -63,7 +63,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                    fields=UnstructuredVespaDocumentFields(**fields))
 
     @classmethod
-    def from_marqo_document(cls, document: Dict, filter_string_max_length: int, marqo_index_version: semver.VersionInfo) -> "UnstructuredVespaDocument":
+    def from_marqo_document(cls, document: Dict, filter_string_max_length: int) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
 
@@ -73,7 +73,6 @@ class UnstructuredVespaDocument(MarqoBaseModel):
 
         doc_id = document[index_constants.MARQO_DOC_ID]
         instance = cls(id=doc_id, fields=UnstructuredVespaDocumentFields(marqo__id=doc_id))
-        marqo_index_version_lt_2_9_0 = marqo_index_version < semver.VersionInfo.parse("2.9.0")
 
         for key, value in document.items():
             if key in [index_constants.MARQO_DOC_EMBEDDINGS, index_constants.MARQO_DOC_CHUNKS,
@@ -95,7 +94,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             elif isinstance(value, float):
                 instance.fields.float_fields[key] = value
                 instance.fields.score_modifiers_fields[key] = value
-            elif isinstance(value, dict) and not marqo_index_version_lt_2_9_0:
+            elif isinstance(value, dict):
                 for k, v in value.items():
                     if isinstance(v, int):
                         instance.fields.int_fields[f"{key}.{k}"] = v

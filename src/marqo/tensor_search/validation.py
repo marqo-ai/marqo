@@ -406,8 +406,6 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                     f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields "
                     f"and must be declared in the `mappings` parameter. "
                     f"Only indexes created with Marqo 2.9.0 or above support map numerical fields."
-                    f"In Marqo versions prior to 2.9.0, only custom vector fields are supported as map fields. "
-                    f"Only indexes created with Marqo 2.9.0 or above support map numerical fields."
                 )
             try:
                 field_content = validate_map_numeric_field(field_content)
