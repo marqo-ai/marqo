@@ -75,6 +75,14 @@ class UnstructuredVespaSchema(VespaSchema):
             f'+ reduce(query(marqo__add_weights) ' 
             f'* attribute(marqo__score_modifiers), sum)'
         )
+        _score_modifier_expression = (
+            f'if (count(query(marqo__mult_weights)) == 0, 1, '
+            f'if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0, '
+            f'1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod))) '
+            f'* score '
+            f'+ if (count(query(marqo__add_weights)) == 0, 0, '
+            f'reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum))'
+        )
 
         return textwrap.dedent(
             f"""
