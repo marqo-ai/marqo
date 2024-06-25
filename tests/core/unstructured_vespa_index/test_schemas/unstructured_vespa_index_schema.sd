@@ -118,7 +118,7 @@ schema marqo__test_00unstructured_00schema {
             query(marqo__add_weights) tensor<double>(p{})
         }
         function modify(score) {
-            expression: if (count(query(marqo__mult_weights)) == 0, 1, if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod))) * score + if (count(query(marqo__add_weights)) == 0, 0, reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum))
+            expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
         }
     }
 
