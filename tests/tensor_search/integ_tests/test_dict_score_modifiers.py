@@ -2,7 +2,6 @@ import os
 from unittest import mock
 
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
