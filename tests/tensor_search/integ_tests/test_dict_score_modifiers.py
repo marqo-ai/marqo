@@ -2,7 +2,6 @@ import os
 from unittest import mock
 
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
-from marqo.core.exceptions import UnsupportedFeatureError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
@@ -216,7 +215,9 @@ class TestDictScoreModifiers(MarqoTestCase):
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
                 score_modifier = ScoreModifier(
-                    **{"multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]})
+                    **{"multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4},
+                                             {"field_name": "map_score_mods.d", "weight": 4}]}) # Nonexistent field.
+                                            # Nonexistent field should not zero out the whole score
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
