@@ -14,6 +14,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 import unittest
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
+from marqo.tensor_search.models.api_models import ScoreModifier as apiScoreModifier
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -462,21 +463,25 @@ class TestHybridSearch(MarqoTestCase):
                         text="dogs",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Lexical,
-                            ranking_method=RankingMethod.Lexical,
+                            retrieval_method=RetrievalMethod.Disjunction,
+                            ranking_method=RankingMethod.RRF,
                             alpha=0.8,
                             searchable_attributes_lexical=["text_field_1", "text_field_2"],
                             searchable_attributes_tensor=["text_field_2"],
-                            score_modifiers_lexical=[
-                                # 2 fields in mult
-                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
-                                ScoreModifier(field="mult_field_2", weight=1.0, type=ScoreModifierType.Multiply)
-                            ],
-                            score_modifiers_tensor=[
-                                # 1 field in mult, 1 field in add
-                                ScoreModifier(field="mult_field_1", weight=1.0, type=ScoreModifierType.Multiply),
-                                ScoreModifier(field="add_field_1", weight=1.0, type=ScoreModifierType.Add)
-                            ],
+                            score_modifiers_lexical={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": 1.0},
+                                    {"field_name": "mult_field_2", "weight": 1.0}
+                                ]
+                            },
+                            score_modifiers_tensor={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": 1.0}
+                                ],
+                                "add_to_score": [
+                                    {"field_name": "add_field_1", "weight": 1.0}
+                                ]
+                            },
                             verbose=True
                         ),
                         result_count=10
@@ -622,4 +627,141 @@ class TestHybridSearch(MarqoTestCase):
 
                         self.assertIn("hits", hybrid_res)
 
+    def test_hybrid_search_invalid_parameters_fails(self):
+        test_cases = [
+            ({
+                 "alpha": 0.6,
+                 "ranking_method": "tensor"
+             }, "can only be defined for 'rrf' and "),
+            ({
+                 "rrf_k": 61,
+                 "ranking_method": "normalize_linear"
+             }, "can only be defined for 'rrf'"),
+            ({
+                 "rrf_k": 60.1,
+             }, "must be an integer"),
+            ({
+                "alpha": 1.1
+            }, "between 0 and 1"),
+            ({
+                 "rrf_k": -1
+             }, "greater than or equal to 0"),
+            ({
+                "retrieval_method": "disjunction",
+                "ranking_method": "lexical"
+            }, "ranking_method must be: rrf"),
+            ({
+                 "retrieval_method": "tensor",
+                 "ranking_method": "rrf"
+             }, "ranking_method must be: tensor or lexical"),
+            ({
+                 "retrieval_method": "lexical",
+                 "ranking_method": "rrf"
+             }, "ranking_method must be: tensor or lexical"),
+            # Searchable attributes need to match retrieval method
+            ({
+                "retrieval_method": "tensor",
+                "ranking_method": "tensor",
+                "searchable_attributes_lexical": ["text_field_1"]
+             }, "can only be defined for 'lexical',"),
+            ({
+                "retrieval_method": "lexical",
+                "ranking_method": "lexical",
+                "searchable_attributes_tensor": ["text_field_1"]
+             }, "can only be defined for 'tensor',"),
+            # Score modifiers need to match ranking method
+            ({
+                 "retrieval_method": "tensor",
+                 "ranking_method": "tensor",
+                 "score_modifiers_lexical": {
+                     "multiply_score_by": [
+                         {"field_name": "mult_field_1", "weight": 1.0}
+                     ]
+                 },
+             }, "can only be defined for 'lexical',"),
+            ({
+                 "retrieval_method": "lexical",
+                 "ranking_method": "lexical",
+                 "score_modifiers_tensor": {
+                    "multiply_score_by": [
+                        {"field_name": "mult_field_1", "weight": 1.0}
+                    ]
+                 }
+             }, "can only be defined for 'tensor',"),
+            # Non-existent retrieval method
+            ({"retrieval_method": "something something"},
+                "not a valid enumeration member"),
+            # Non-existent ranking method
+            ({"ranking_method": "something something"},
+                "not a valid enumeration member")
+        ]
+        # TODO: add unstructured index
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                for hybrid_parameters, error_message in test_cases:
+                    with self.subTest(hybrid_parameters=hybrid_parameters):
+                        with self.assertRaises(ValueError) as e:
+                            tensor_search.search(
+                                config=self.config,
+                                index_name=index.name,
+                                text="dogs",
+                                search_method="HYBRID",
+                                hybrid_parameters=HybridParameters(**hybrid_parameters)
+                            )
+                        self.assertIn(error_message, str(e.exception))
+
+    def test_hybrid_search_conflicting_parameters_fails(self):
+        """
+        Ensure that searchable_attributes cannot be set alongside hybrid_parameters.searchable_attributes_lexical or
+        hybrid_parameters.searchable_attributes_tensor.
+
+        score_modifiers cannot be set alongside hybrid_parameters.score_modifiers_lexical or
+        hybrid_parameters.score_modifiers_tensor.
+        """
+
+        test_cases = [
+            ({
+                 "searchable_attributes_lexical": ["text_field_1"]
+            }, "or searchable_attributes, not both."),
+            ({
+                 "searchable_attributes_tensor": ["text_field_1"]
+            }, "or searchable_attributes, not both."),
+            ({
+                 "score_modifiers_lexical": {
+                    "multiply_score_by": [
+                        {"field_name": "mult_field_1", "weight": 1.0}
+                    ]
+                 }
+             }, "or score_modifiers, not both."),
+            ({
+                 "score_modifiers_tensor": {
+                    "multiply_score_by": [
+                        {"field_name": "mult_field_1", "weight": 1.0}
+                    ]
+                 }
+             }, "or score_modifiers, not both."),
+        ]
+        # TODO: add unstructured index
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                for hybrid_parameters, error_message in test_cases:
+                    with self.subTest(hybrid_parameters=hybrid_parameters):
+                        with self.assertRaises(ValueError) as e:
+                            tensor_search.search(
+                                config=self.config,
+                                index_name=index.name,
+                                text="dogs",
+                                search_method="HYBRID",
+                                score_modifiers=apiScoreModifier(
+                                    multiply_score_by=[
+                                        {"field_name": "mult_field_1", "weight": 1.0}
+                                    ],
+                                    add_to_score=[
+                                        {"field_name": "add_field_1", "weight": 1.0}
+                                    ]
+                                ),
+                                searchable_attributes=["text_field_1"],
+                                hybrid_parameters=HybridParameters(**hybrid_parameters)
+                            )
+                        self.assertIn(error_message, str(e.exception))
 

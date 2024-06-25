@@ -1991,7 +1991,6 @@ def _hybrid_search(
     # Parse text into required and optional terms.
     (required_terms, optional_terms) = utils.parse_lexical_query(query)
 
-    # We do not pass searchable_attributes
     marqo_query = MarqoHybridQuery(
         index_name=index_name,
         vector_query=vectorised_text,
@@ -2003,7 +2002,13 @@ def _hybrid_search(
         or_phrases=optional_terms,
         and_phrases=required_terms,
         attributes_to_retrieve=attributes_to_retrieve,
+        searchable_attributes=searchable_attributes,
         score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        # Hybrid-specific attributes
+        score_modifiers_lexical = hybrid_parameters.score_modifiers_lexical.to_marqo_score_modifiers()
+            if hybrid_parameters.score_modifiers_lexical is not None else None,
+        score_modifiers_tensor = hybrid_parameters.score_modifiers_tensor.to_marqo_score_modifiers()
+            if hybrid_parameters.score_modifiers_tensor is not None else None,
         hybrid_parameters=hybrid_parameters
     )
 

@@ -66,20 +66,6 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError(f"Invalid search method {search_method}")
         return values
 
-    @root_validator(pre=False)
-    def validate_hybrid_parameters(cls, values):
-        """
-        Normal searchable attributes cannot be defined at the same time as hybrid parameters
-        """
-        hybrid_parameters = values.get('hybridParameters')
-        if values.get('searchableAttributes') is not None and (
-            hybrid_parameters.get('searchable_attributes_lexical') is not None or
-            hybrid_parameters.get('searchable_attributes_tensor') is not None
-        ):
-            raise ValueError("Normal searchable attributes cannot be defined at the same time as hybrid parameters")
-
-        return values
-
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
         return validation.validate_str_against_enum(

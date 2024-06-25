@@ -765,15 +765,15 @@ class StructuredVespaIndex(VespaIndex):
                 f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_{search_type}": add_tensor
             }
 
-        if hybrid_query.hybrid_parameters.score_modifiers_lexical:
+        if hybrid_query.score_modifiers_lexical:
             result['lexical'] = _convert_score_modifiers_to_tensors(
-                hybrid_query.hybrid_parameters.score_modifiers_lexical,
+                hybrid_query.score_modifiers_lexical,
                 "lexical"
             )
 
-        if hybrid_query.hybrid_parameters.score_modifiers_tensor:
+        if hybrid_query.score_modifiers_tensor:
             result['tensor'] = _convert_score_modifiers_to_tensors(
-                hybrid_query.hybrid_parameters.score_modifiers_tensor,
+                hybrid_query.score_modifiers_tensor,
                 "tensor"
             )
 
