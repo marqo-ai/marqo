@@ -1,3 +1,20 @@
+# Release 2.9.0
+
+## New features
+- Add numeric map data types, available for filtering and score modification ([#851](https://github.com/marqo-ai/marqo/pull/851) and [#880](https://github.com/marqo-ai/marqo/pull/880)). See the new types [here](https://docs.marqo.ai/2.9/API-Reference/Indexes/create_structured_index/?h=struct#fields). For usage in search, see [here](https://docs.marqo.ai/2.9/API-Reference/Search/search/?h=map#example_4). For large score modifier dictionaries, there is negligible performance impact in queries with 1000 score modifiers against upwards of 15,000 score modifiers per document. This is supported only for indexes created with Marqo 2.9 or later.
+- Support double and long score modifiers in map and standard numeric fields in both structured and unstructured indexes ([#851](https://github.com/marqo-ai/marqo/pull/851)). See the new types [here](https://docs.marqo.ai/2.9/API-Reference/Indexes/create_structured_index/?h=struct#fields).
+
+## Bug fixes and minor changes
+- Address loss of accuracy for large integers ([#851](https://github.com/marqo-ai/marqo/pull/851)). Previously, integers loose accuracy starting from `2^24`. Integers now have guaranteed accuracy up to `2^53` and negligible loss up to `2^64`.
+- Address bug in score modifiers where missing values in docs used in  `multiply_score_by`  lead to `0*score` instead of `1*score` ([#880](https://github.com/marqo-ai/marqo/pull/851) and [#851](https://github.com/marqo-ai/marqo/pull/880)).
+- Fix failure of state transfer between some versions of Marqo due to Vespa binaries being copied with state ([#874](https://github.com/marqo-ai/marqo/pull/874). Now only exposes `/opt/vespa/var` and `/opt/vespa/logs` as volumes, improving upgrade stability. Breaking change for users with custom volume mappings.
+- Improve the model warm-up strategy on instances with CUDA. Marqo now requires less memory to warm-up the models when spinning up ([#877](https://github.com/marqo-ai/marqo/pull/877).
+- Improve create/delete index resilience to partial failures due to transient network issues ([#866](https://github.com/marqo-ai/marqo/pull/866). Users can bring Marqo to a consistent state by repeating the operation until getting a 200 response.
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.3k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
 # Release 2.8.2
 
 ## Bug fixes and minor changes
