@@ -1,5 +1,5 @@
 # Stage 1: Build the Java package using Maven
-FROM maven:3.8.1-jdk-11 as maven_build
+FROM maven:3.8.7-openjdk-18-slim as maven_build
 
 WORKDIR /app/scripts/vespa_local
 COPY scripts/vespa_local/pom.xml .
