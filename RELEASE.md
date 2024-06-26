@@ -1,3 +1,19 @@
+# Release 2.9.0
+
+## New features
+- Numeric map data type. Add numeric map data types, available for filtering and score modification ([#851](https://github.com/marqo-ai/marqo/pull/851)). You can now store a map/dictionary of numeric value and use these in your filters and score modifiers, or simply retrieve these with your documents. See the new types [here](https://docs.marqo.ai/2.9/API-Reference/Indexes/create_structured_index/?h=struct#fields). For usage in search, see [here](https://docs.marqo.ai/2.9/API-Reference/Search/search/?h=map#example_4).  This is supported only for indexes created with Marqo 2.9 or later.
+- Double and long score modifier fields. Support double and long in map and standard numeric fields for score modifiers in both structured and unstructured indexes ([#851](https://github.com/marqo-ai/marqo/pull/851)). You can now use double values with full precision as score modifiers, as well as integers with guaranteed precision up to `2^53 - 1` (increased from `2^24 - 1`), with only negligible precision loss for larger values. For details on these new types, see the documentation [here](https://docs.marqo.ai/2.9/API-Reference/Indexes/create_structured_index/?h=struct#fields).
+
+## Bug fixes and minor changes
+- Fix the bug in score modifiers where missing score modifiers in docs used in `multiply_score_by` lead to the multiplication of scores by `0` instead of by `1` ([#851](https://github.com/marqo-ai/marqo/pull/851)).
+- Improve upgrade stability ([#874](https://github.com/marqo-ai/marqo/pull/874)). Fix failure of state transfer between some versions of Marqo due to Vespa binaries being copied with state. For more information, see the documentation [here](https://docs.marqo.ai/2.9/Guides/Advanced-Usage/transferring_state/?h=transfer)
+- Improve the model warmup strategy on instances with CUDA ([#877](https://github.com/marqo-ai/marqo/pull/877)). Marqo now requires less memory to warmup the models when spinning up .
+- Improve create/delete index resilience to partial failures ([#866](https://github.com/marqo-ai/marqo/pull/866)). You can now bring Marqo to a consistent state by repeating the operation until getting a `200` response.
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.3k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
 # Release 2.8.2
 
 ## Bug fixes and minor changes
