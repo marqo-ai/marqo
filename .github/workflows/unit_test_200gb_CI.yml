@@ -95,6 +95,8 @@ jobs:
           
           # Build application package
           echo "Installing maven"
+          apt-get update
+          apt-get install default-jdk -y
           apt-get install maven -y
           echo "Building java application package"
           mvn clean package
