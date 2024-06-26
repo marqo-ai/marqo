@@ -200,98 +200,88 @@ class TestHybridSearch(MarqoTestCase):
         super().tearDown()
         self.device_patcher.stop()
 
-    @unittest.skip
     def test_hybrid_search_calls_correct_vespa_query(self):
         """
-        Test all hybrid search methods call the correct vespa queries.
+        Test all hybrid search calls the correct vespa queries.
         """
 
-        # TODO: Test cases
-        # alpha = 0 should be SAME as a lexical search.
-        # alpha = 1 should be SAME as a tensor search.
-        # alpha = 0.5 should be a mix of both.
-
-        # Retrieval and Ranking Method Mappings
-        RETRIEVAL_METHOD_YQL_MAPPING = {
-            # Use OR
-            RetrievalMethod.Disjunction: '(({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}'
-                                         'nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding))) '
-                                         'OR weakAnd(default contains "dogs")',
-            # Use rank(tensor, lexical)
-            RetrievalMethod.Tensor: 'rank((({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}'
-                                    'nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding))), '
-                                    'weakAnd(default contains "dogs"))',
-            # Use rank(lexical, tensor)
-            RetrievalMethod.Lexical: 'rank(weakAnd(default contains "dogs"), '
-                                     '(({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}'
-                                    'nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding))))'
-        }
-
-        RANKING_METHOD_PROFILE_MAPPING = {
-            RankingMethod.RRF: common.RANK_PROFILE_HYBRID_RRF,
-            RankingMethod.NormalizeLinear: common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR,
-            RankingMethod.Tensor: common.RANK_PROFILE_EMBEDDING_SIMILARITY,
-            RankingMethod.Lexical: common.RANK_PROFILE_BM25
-        }
-
-        for index in [self.structured_text_index_single_field]:
+        for index in [self.structured_text_index_score_modifiers]:
             with self.subTest(index=index.name):
-                # Add documents
-                tensor_search.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
+                original_query = self.config.vespa_client.query
+                def pass_through_query(*arg, **kwargs):
+                    return original_query(*arg, **kwargs)
+
+                mock_vespa_client_query = unittest.mock.MagicMock()
+                mock_vespa_client_query.side_effect = pass_through_query
+
+                @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                def run():
+                    res = tensor_search.search(
+                        config=self.config,
                         index_name=index.name,
-                        docs=[
-                            {"_id": "doc1", "text_field_1": "dogs"},
-                            {"_id": "doc2", "text_field_1": "puppies"},     # similar semantics to dogs
-                            {"_id": "doc3", "text_field_1": "canines"},     # similar semantics to dogs
-                            {"_id": "doc4", "text_field_1": "hot dogs"},    # shares lexical token with dogs
-                            {"_id": "doc5", "text_field_1": "dogs is a word"},
-                        ],
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method="disjunction",
+                            ranking_method="rrf",
+                            alpha=0.6,
+                            rrf_k=61,
+                            searchable_attributes_lexical=["text_field_1", "text_field_2"],
+                            searchable_attributes_tensor=["text_field_2"],
+                            score_modifiers_lexical={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": 1.0},
+                                    {"field_name": "mult_field_2", "weight": 1.0}
+                                ]
+                            },
+                            score_modifiers_tensor={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": 1.0}
+                                ],
+                                "add_to_score": [
+                                    {"field_name": "add_field_1", "weight": 1.0}
+                                ]
+                            }
+
+                        )
                     )
-                )
+                    return res
 
-                for retrieval_method in RetrievalMethod:
-                    for ranking_method in RankingMethod:
-                        with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
-                            original_query = self.config.vespa_client.query
-                            def pass_through_query(*arg, **kwargs):
-                                return original_query(*arg, **kwargs)
+                res = run()
 
-                            mock_vespa_client_query = unittest.mock.MagicMock()
-                            mock_vespa_client_query.side_effect = pass_through_query
+                call_args = mock_vespa_client_query.call_args_list
+                self.assertEqual(len(call_args), 1)
 
-                            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-                            def run():
-                                res = tensor_search.search(
-                                    config=self.config,
-                                    index_name=index.name,
-                                    text="dogs",
-                                    search_method="HYBRID",
-                                    hybrid_parameters=HybridParameters(
-                                        retrieval_method=retrieval_method,
-                                        ranking_method=ranking_method,
-                                        alpha=0.6,
-                                    )
-                                )
-                                return res
+                vespa_query_kwargs = call_args[0][1]
+                self.assertIn("PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.", vespa_query_kwargs["yql"])
+                self.assertIn("(({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                              "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)) OR "
+                              "({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                              "nearestNeighbor(marqo__embeddings_text_field_2, marqo__query_embedding)))",
+                              vespa_query_kwargs["yql.tensor"])
+                self.assertIn("weakAnd(default contains \"dogs\")", vespa_query_kwargs["yql.lexical"])
+                self.assertEqual(vespa_query_kwargs["hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
+                self.assertEqual(vespa_query_kwargs["hybrid.rankingMethod"], RankingMethod.RRF)
+                self.assertEqual(vespa_query_kwargs["hybrid.tensorScoreModifiersPresent"], True)
+                self.assertEqual(vespa_query_kwargs["hybrid.lexicalScoreModifiersPresent"], True)
+                self.assertEqual(vespa_query_kwargs["hybrid.alpha"], 0.6)
+                self.assertEqual(vespa_query_kwargs["hybrid.rrf_k"], 61)
 
-                            res = run()
+                self.assertEqual(vespa_query_kwargs["ranking"], "hybrid_custom_searcher")
+                self.assertEqual(vespa_query_kwargs["ranking.lexical"], "bm25")
+                self.assertEqual(vespa_query_kwargs["ranking.tensor"], "embedding_similarity")
+                self.assertEqual(vespa_query_kwargs["ranking.lexicalScoreModifiers"], "bm25_modifiers")
+                self.assertEqual(vespa_query_kwargs["ranking.tensorScoreModifiers"], "embedding_similarity_modifiers")
 
-                            call_args = mock_vespa_client_query.call_args_list
-                            self.assertEqual(len(call_args), 1)
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_search_lexical"], {'text_field_1': 1, 'text_field_2': 1})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_search_tensor"], {'text_field_2': 1})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_lexical"], {'mult_field_1': 1.0, 'mult_field_2': 1.0})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_lexical"], {})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_tensor"], {'mult_field_1': 1.0})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_tensor"], {'add_field_1': 1.0})
 
-                            # Make sure _hybrid_search is called
-                            # Check the query (yql) and ranking profile selected are as intended
-                            vespa_query_kwargs = call_args[0].kwargs
-                            self.assertIn(RETRIEVAL_METHOD_YQL_MAPPING[retrieval_method], vespa_query_kwargs["yql"])
-                            self.assertEqual(RANKING_METHOD_PROFILE_MAPPING[ranking_method], vespa_query_kwargs["ranking"])
-                            if ranking_method in {RankingMethod.RRF, RankingMethod.NormalizeLinear}:
-                                self.assertEqual(0.6, vespa_query_kwargs["query_features"]["alpha"])
-
-                            # Make sure results are retrieved
-                            self.assertIn("hits", res)
-                            self.assertGreater(len(res["hits"]), 0)
+                # Make sure results are retrieved
+                self.assertIn("hits", res)
 
 
     def test_hybrid_search_disjunction_rrf_zero_alpha_same_as_lexical(self):
@@ -493,7 +483,7 @@ class TestHybridSearch(MarqoTestCase):
                     #    self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
 
 
-    def test_hybrid_search_same_retrieval_and_ranking(self):
+    def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):
         """
         Tests that hybrid search with:
         retrieval_method = "lexical", ranking_method = "lexical" and
