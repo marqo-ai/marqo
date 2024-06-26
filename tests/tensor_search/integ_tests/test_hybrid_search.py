@@ -319,32 +319,31 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                with self.subTest("alpha=0.0"):
-                    hybrid_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Disjunction,
-                            ranking_method=RankingMethod.RRF,
-                            alpha=0,
-                            verbose=True
-                        ),
-                        result_count=10
-                    )
+                hybrid_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrieval_method=RetrievalMethod.Disjunction,
+                        ranking_method=RankingMethod.RRF,
+                        alpha=0,
+                        verbose=True
+                    ),
+                    result_count=10
+                )
 
-                    lexical_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="LEXICAL",
-                        result_count=10
-                    )
+                lexical_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="LEXICAL",
+                    result_count=10
+                )
 
-                    self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
-                    for i in range(len(hybrid_res["hits"])):
-                        self.assertEqual(hybrid_res["hits"][i]["_id"], lexical_res["hits"][i]["_id"])
+                self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
+                for i in range(len(hybrid_res["hits"])):
+                    self.assertEqual(hybrid_res["hits"][i]["_id"], lexical_res["hits"][i]["_id"])
 
     def test_hybrid_search_disjunction_rrf_one_alpha_same_as_tensor(self):
         """

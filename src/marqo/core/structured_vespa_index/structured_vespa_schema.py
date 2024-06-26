@@ -266,7 +266,7 @@ class StructuredVespaSchema(VespaSchema):
 
         # Hybrid search
         if lexical_fields and tensor_fields:
-            # Hybrid search rank profile simply organizes and passes rank features to respective inner lexica/tensor queries
+            # Hybrid search rank profile simply organizes and passes rank features to respective inner lexical/tensor queries
             # No actual ranking is done here.
             rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{')
 
@@ -280,8 +280,8 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_SEARCH_LEXICAL}) tensor<int8>(p{{}})')
             rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_SEARCH_TENSOR}) tensor<int8>(p{{}})')
             for search_type in ["lexical", "tensor"]:
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_{search_type}) tensor<float>(p{{}})')
-                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_{search_type}) tensor<float>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_{search_type}) tensor<double>(p{{}})')
+                rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_{search_type}) tensor<double>(p{{}})')
 
             rank_profiles.append('}')
             rank_profiles.append('}')
