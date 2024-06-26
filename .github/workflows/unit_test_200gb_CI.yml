@@ -93,9 +93,15 @@ jobs:
           done
           echo -e "\nDone waiting."
           
+          # Build application package
+          echo "Installing maven"
+          apt-get install maven -y
+          echo "Building java application package"
+          mvn clean package
+          
           # Zip up schemas and services
           apt-get install zip -y
-          zip -r vespa_tester_app.zip services.xml schemas
+          zip -r vespa_tester_app.zip target
 
           # Deploy application with test schema
           curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
