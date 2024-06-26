@@ -96,7 +96,7 @@ jobs:
           # Build application package
           apt-get update -y
           echo "Installing jdk 17"
-          apt-get install openjdk-17-jdk openjdk-17-jre -y
+          apt-get install openjdk-17-jdk -y
           echo "Installing maven"
           apt-get install maven -y
           echo "Building java application package"
