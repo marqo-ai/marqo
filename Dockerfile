@@ -1,5 +1,13 @@
 FROM marqoai/marqo-base:20 as base_image
-VOLUME /opt/vespa/
+
+# Allow mounting volume containing data and configs for vespa
+VOLUME /opt/vespa/var
+# Allow mounting volume to expose vespa logs
+VOLUME /opt/vespa/logs
+# This is required when mounting var folder from an older version of vespa (>30 minor version gap)
+# See https://docs.vespa.ai/en/operations-selfhosted/live-upgrade.html for details
+ENV VESPA_SKIP_UPGRADE_CHECK true
+
 ARG TARGETPLATFORM
 ARG COMMITHASH
 WORKDIR /app

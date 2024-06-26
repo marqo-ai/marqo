@@ -1,4 +1,5 @@
 import textwrap
+import semver
 
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
@@ -66,6 +67,13 @@ class UnstructuredVespaSchema(VespaSchema):
     def _generate_unstructured_schema(cls, marqo_index: UnstructuredMarqoIndex) -> str:
         """This function generates the Vespa schema for an unstructured Marqo index."""
         dimension = str(marqo_index.model.get_dimension())
+
+        _score_modifier_expression = (
+            f'if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0, '
+            f'  1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) '
+            f'* score '
+            f'+ reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)'
+        )
 
         return textwrap.dedent(
             f"""
@@ -137,7 +145,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                            rank: filter }}
                     }}
 
-                    field {cls._SCORE_MODIFIERS} type tensor<float>(p{{}}) {{
+                    field {cls._SCORE_MODIFIERS} type tensor<double>(p{{}}) {{
                         indexing: attribute | summary
                     }}
 
@@ -216,18 +224,18 @@ class UnstructuredVespaSchema(VespaSchema):
                 
                 rank-profile modifiers inherits default {{
                     inputs {{
-                        query(marqo__mult_weights) tensor<float>(p{{}})
-                        query(marqo__add_weights) tensor<float>(p{{}})
+                        query(marqo__mult_weights) tensor<double>(p{{}})
+                        query(marqo__add_weights) tensor<double>(p{{}})
                     }}
                     function modify(score) {{
-                        expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
+                        expression: {_score_modifier_expression}
                    }}
                 }}
                 
                 rank-profile {unstructured_common.RANK_PROFILE_BM25_MODIFIERS} inherits modifiers {{
                     inputs {{
-                        query(marqo__mult_weights) tensor<float>(p{{}})
-                        query(marqo__add_weights) tensor<float>(p{{}})
+                        query(marqo__mult_weights) tensor<double>(p{{}})
+                        query(marqo__add_weights) tensor<double>(p{{}})
                     }}
                     first-phase {{
                         expression: modify(bm25({cls._STRINGS}))
@@ -236,8 +244,8 @@ class UnstructuredVespaSchema(VespaSchema):
                 
                 rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS} inherits modifiers {{
                     inputs {{
-                        query(marqo__mult_weights) tensor<float>(p{{}})
-                        query(marqo__add_weights) tensor<float>(p{{}})
+                        query(marqo__mult_weights) tensor<double>(p{{}})
+                        query(marqo__add_weights) tensor<double>(p{{}})
                         query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
                     }}
                     first-phase {{

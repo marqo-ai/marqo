@@ -4,7 +4,10 @@ from marqo import config
 import torch
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import enums
-
+from marqo.tensor_search.api import generate_config
+import os
+from unittest import mock
+from marqo.tensor_search.enums import EnvVars
 
 @unittest.skip
 class TestConfig(MarqoTestCase):
@@ -37,6 +40,8 @@ class TestConfig(MarqoTestCase):
         assert str(enums.Device.cpu) == "cpu"
 
 
+
+
 @unittest.skip
 class TestConfigBackend(MarqoTestCase):
 
@@ -58,3 +63,27 @@ class TestConfigBackend(MarqoTestCase):
     def test_init_custom_backend_as_string(self):
         c = config.Config(url=self.endpoint, backend="elasticsearch")
         assert c.backend == "elasticsearch"
+
+
+class TestGenerateConfig(MarqoTestCase):
+
+    def test_configWithoutZookeeperHostsBeingSet(self):
+        """Test that the config is generated correctly when ZOOKEEPER_HOSTS is not set or is an empty string."""
+        environment_variable_test_cases = [
+            {"ZOOKEEPER_HOSTS": ""},  # Empty string
+            dict()  # Empty dict, unset
+        ]
+        for env in environment_variable_test_cases:
+            with self.subTest(env):
+                with mock.patch.dict(os.environ, env):
+                    c = generate_config()
+                    self.assertIsNone(c._zookeeper_client)
+
+    def test_configWithZookeeperHostsBeingSet(self):
+        """Test that the config is generated correctly when ZOOKEEPER_HOSTS is set to a value."""
+        env = {"ZOOKEEPER_HOSTS": "a.fake.url"}
+        with mock.patch.dict(os.environ, env):
+            with mock.patch("marqo.config.Config._connect_to_zookeeper") as mock_connect_to_zookeeper:
+                c = generate_config()
+                mock_connect_to_zookeeper.assert_called_once()
+                self.assertIsNotNone(c._zookeeper_client)

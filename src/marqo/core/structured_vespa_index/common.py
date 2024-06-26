@@ -1,7 +1,10 @@
 from marqo.core.models.marqo_index import DistanceMetric
 
 FIELD_ID = "marqo__id"
-FIELD_SCORE_MODIFIERS = 'marqo__score_modifiers'
+
+FIELD_SCORE_MODIFIERS_2_8 = 'marqo__score_modifiers' # retain for backwards compatibility
+FIELD_SCORE_MODIFIERS_FLOAT = 'marqo__score_modifiers_float'
+FIELD_SCORE_MODIFIERS_DOUBLE_LONG = 'marqo__score_modifiers_double_long'
 FIELD_VECTOR_COUNT = 'marqo__vector_count'
 
 RANK_PROFILE_BM25 = 'bm25'

@@ -1,6 +1,7 @@
 import os
 import textwrap
 import xml.etree.ElementTree as ET
+from contextlib import contextmanager
 from datetime import datetime
 from typing import List
 from typing import Optional
@@ -10,22 +11,20 @@ import marqo.vespa.vespa_client
 from marqo import version
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core import constants
-from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.distributed_lock.zookeeper_distributed_lock import ZookeeperDistributedLock
-from marqo.core.exceptions import OperationConflictError
+from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
+from marqo.core.exceptions import OperationConflictError
+from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.exceptions import InternalError
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.vespa_client import VespaClient
-from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
-from contextlib import contextmanager
-
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -60,13 +59,23 @@ class IndexManagement:
         '''
     )
 
-    def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[ZookeeperClient] = None):
+    def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[ZookeeperClient] = None,
+                 enable_index_operations: bool = False):
+        """Instantiate an IndexManagement object.
+
+        Args:
+            vespa_client: VespaClient object
+            zookeeper_client: ZookeeperClient object
+            enable_index_operations: A flag to enable index operations. If set to True,
+                the object can create/delete indexes, otherwise, it raises an InternalError during index operations.
+        """
         self.vespa_client = vespa_client
         self._zookeeper_client = zookeeper_client
         self._zookeeper_deployment_lock: Optional[ZookeeperDistributedLock] = self._instantiate_deployment_lock()
+        self._enable_index_operations = enable_index_operations
 
     def _instantiate_deployment_lock(self) -> Optional[ZookeeperDistributedLock]:
-        """Instantiate a ZookeeperDistributedLock"""
+        """Instantiate a ZookeeperDistributedLock."""
         if self._zookeeper_client is None:
             return None
         else:
@@ -441,7 +450,7 @@ class IndexManagement:
                 f.write(query_profile)
 
             return True
-        pass
+        return False
 
     def _add_schema(self, app: str, name: str, schema: str) -> None:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
@@ -455,8 +464,8 @@ class IndexManagement:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
         if not os.path.exists(schema_path):
             logger.warn(f"Schema {name} does not exist in application package, nothing to remove")
-
-        os.remove(schema_path)
+        else:
+            os.remove(schema_path)
 
     def _add_schema_to_services(self, app: str, name: str) -> None:
         services_path = os.path.join(app, 'services.xml')
@@ -544,16 +553,29 @@ class IndexManagement:
     def _deployment_lock_context_manager(self):
         """A context manager for deployment lock acquisition.
 
+        If the _enable_index_operations flag is set to True, the context manager tries to acquire the deployment lock.
+            If the lock is acquired, the context manager yields control to the caller. Or if the lock is not acquired,
+            it raises an OperationConflictError.
+            If the lock is None, the context manager yields control to the caller without acquiring the lock.
+        If the _enable_index_operations flag is set to False, the context manager raises an InternalError during
+            index operations.
+
         Raises:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
-            InternalError: If deployment lock is not instantiated
+            InternalError: If index_management object is not enabled for index operations
         """
-        if self._zookeeper_deployment_lock is None:
-            raise InternalError("Deployment lock is not instantiated and cannot be used for index creation/deletion")
-        try:
-            with self._zookeeper_deployment_lock:
-                yield
-        except ZookeeperLockNotAcquiredError:
-            raise OperationConflictError("Another index creation/deletion operation is in progress. "
-                                         "Your request is rejected. Please try again later")
+        if self._enable_index_operations:
+            if self._zookeeper_deployment_lock is None:
+                logger.warning(f"No Zookeeper client provided. "
+                               f"Concurrent index operations may result in race conditions. ")
+                yield  # No lock, proceed without locking
+            else:
+                try:
+                    with self._zookeeper_deployment_lock:
+                        yield
+                except ZookeeperLockNotAcquiredError:
+                    raise OperationConflictError("Another index creation/deletion operation is in progress. "
+                                                 "Your request is rejected. Please try again later")
+        else:
+            raise InternalError("You index_management object is not enabled for index operations. ")

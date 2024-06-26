@@ -1,3 +1,57 @@
+# Release 2.8.2
+
+## Bug fixes and minor changes
+- Fix an issue in Marqo where loading some models (e.g., `open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k`) is unsuccessful. 
+This was resolved by upgrading the `transformers` and `optimum` packages. ([#868](https://github.com/marqo-ai/marqo/pull/868))
+
+# Release 2.8.1
+
+## Bug fixes and minor changes
+- Fix a bug in Marqo where a 500 error is returned for the entire batch of documents when encountering an invalid document ID during image downloading. 
+Marqo now correctly returns an error and rejects the invalid document, 
+allowing successful indexing of other valid documents with a 200 response. ([#860](https://github.com/marqo-ai/marqo/pull/860))
+
+# Release 2.8.0
+
+## New features
+- Improve `add_documents` memory efficiency and throughput for CLIP and Open_CLIP models when indexing documents with images when no patch method is used ([#849](https://github.com/marqo-ai/marqo/pull/849)). The image downloading and preprocessing logic has been improved. Marqo now converts the images to tensors directly after downloading. In our tests, the memory usage has been reduced by 37.5% and the throughput has been increased by 7.5% (subject to your settings). Marqo is also more stable when indexing documents in a multi-threading scenario.
+- Add support for pre-warming patch models ([#847](https://github.com/marqo-ai/marqo/pull/847)). See usage [here](https://docs.marqo.ai/2.8/Guides/Advanced-Usage/configuration/#configuring-preloaded-patch-models).
+
+## Bug fixes and minor changes
+- Replace the requests package with pycurl for faster image downloads ([#814](https://github.com/marqo-ai/marqo/pull/814)). Marqo now downloads images 2-3x faster in our tests and the overall `add_documents` throughput is increased by 7.5%
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.2k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+
+# Release 2.7.2
+
+## Bug fixes and minor changes
+- Fix an issue causing an error during the Marqo shutdown process (https://github.com/marqo-ai/marqo/pull/850). Marqo now shuts down properly without encountering errors.
+
+# Release 2.7.1
+
+## Bug fixes and minor changes
+- Resolve an issue where Marqo could not create or delete an index when not connected to the Zookeeper server (https://github.com/marqo-ai/marqo/pull/848). Users can now create or delete an index without needing to connect to the Zookeeper server. However, please note that without the Zookeeper server, your request is not protected in concurrent scenarios. For guidance on configuring your Zookeeper server, refer to [this documentation](https://docs.marqo.ai/2.7/Guides/Advanced-Usage/configuration/#configure-backend-communication).
+
+# Release 2.7.0
+
+## New features
+- Update Open CLIP version and support new families of models, e.g., `MetaCLIP`, `DatacompCLIP`  ([#833](https://github.com/marqo-ai/marqo/pull/833)). Update the Open CLIP version to `2.24.0`  which includes new and state-of-the-art multimodal models. You can choose these models to build your index. Check [here](https://github.com/marqo-ai/marqo/releases/%5B%3Chttps://docs.marqo.ai/2.7/Guides/Models-Reference/list_of_models/#open-clip%3E%5D(%3Chttps://docs.marqo.ai/2.6/Guides/Models-Reference/list_of_models/#open-clip%3E)) for the available models.
+- Support lexical search with only a filter (https://github.com/marqo-ai/marqo/pull/840). Marqo now supports a match-all query (`"*"`) with a filter in lexical search. This allows you to search your documents solely based on the filter content without considering the relevance. This is a community-requested feature (https://github.com/marqo-ai/marqo/issues/770, https://github.com/marqo-ai/marqo/issues/771) and we love to hear from our users.
+
+## Bug fixes and minor changes
+- Improve the thread safety of index creation and deletion operations (https://github.com/marqo-ai/marqo/pull/838). Marqo now returns an `operation_conflict_error(409)` if users try to delete or create an index when there is another index creation or deletion in progress.
+- Fix a bug that an empty string lexical search query (`""`) returns a 500 error (https://github.com/marqo-ai/marqo/pull/840). Marqo now returns an empty search result for such a query.
+- Address verbose logging at the `WARNING` level when `attributes_to_retrieve` excludes fields required to build highlights. (https://github.com/marqo-ai/marqo/pull/837)
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.2k stargazers!
+- Thanks [@jesse-lord](https://github.com/jess-lord) and [@afroozsheikh](https://github.com/afroozsheikh) for requesting valuable features to improve Marqo!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+
 # Release 2.6.0
 
 ## New features 
@@ -82,6 +136,11 @@ If you have any more inquiries or thoughts, please don’t hesitate to reach out
 ## Contributor shout-outs
 - A huge thank you to all our 4k stargazers! This is a new milestone for Marqo!
 - Stay connected and share your thoughts on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! Your insights, questions, and feedback are always welcome and highly appreciated.
+
+# Release 2.2.3
+
+## New features
+- Add configurable search timeout (https://github.com/marqo-ai/marqo/pull/843). Backend timeout now defaults to 1s, but can be configured with the environment variable `VESPA_SEARCH_TIMEOUT_MS`. See configuration instructions [here](https://docs.marqo.ai/2.5/Guides/Advanced-Usage/configuration/#configuring-usage-limits). 
 
 # Release 2.2.2
 

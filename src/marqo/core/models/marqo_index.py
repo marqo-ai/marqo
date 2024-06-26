@@ -40,6 +40,10 @@ class FieldType(str, Enum):
     ImagePointer = 'image_pointer'
     MultimodalCombination = 'multimodal_combination'
     CustomVector = "custom_vector"
+    MapInt = 'map<text, int>'
+    MapLong = 'map<text, long>'  
+    MapFloat = 'map<text, float>'
+    MapDouble = 'map<text, double>'
 
 
 class VectorNumericType(Enum):
@@ -349,6 +353,10 @@ class StructuredMarqoIndex(MarqoIndex):
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:
+        """Return a map from lexical field name to the field object.
+
+        The field.lexical_field_name is not the same as the field.name. It is the name of the field that is used in the
+        index schema with Marqo prefix."""
         return self._cache_or_get('lexical_field_map',
                                   lambda: {field.lexical_field_name: field for field in self.fields if
                                            FieldFeature.LexicalSearch in field.features}
@@ -363,6 +371,13 @@ class StructuredMarqoIndex(MarqoIndex):
 
     @property
     def lexically_searchable_fields_names(self) -> Set[str]:
+        """Return a set of field names (str) that are lexically searchable.
+
+        These are the original field names without any Marqo prefix. You should use this to generate
+        the searchable fields in your lexical search query.
+
+        Note that field.name is not identical to field.lexical_field_name. The latter is the name of the field
+        that is used in the index schema"""
         return self._cache_or_get('lexically_searchable_fields_names',
                                   lambda: {field.name for field in self.fields if
                                            FieldFeature.LexicalSearch in field.features}
@@ -548,11 +563,15 @@ def validate_structured_field(values, marqo_index: bool) -> None:
             f'{FieldType.Text.value} or {FieldType.ArrayText.value}'
         )
 
-    if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int]:
+    if FieldFeature.ScoreModifier in features and type not in [FieldType.Float, FieldType.Int, 
+                                                               FieldType.Double, FieldType.MapFloat, 
+                                                               FieldType.MapInt, FieldType.MapDouble,
+                                                               FieldType.Long, FieldType.MapLong]:
         raise ValueError(
-            f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
-            f'{FieldType.Float.value} or {FieldType.Int.value}'
-        )
+             f'{name}: Field with {FieldFeature.ScoreModifier.value} feature must be of type '
+             f'{FieldType.Float.value}, {FieldType.Int.value}, {FieldType.Double.value}, {FieldType.Long.value}, '
+             f'{FieldType.MapFloat.value}, {FieldType.MapInt.value}, {FieldType.MapDouble.value}, or {FieldType.MapLong.value}'
+         )
 
     # These validations are specific to marqo_index.Field
     if marqo_index:

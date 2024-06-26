@@ -105,6 +105,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
   export VESPA_QUERY_URL="http://localhost:8080"
   export VESPA_DOCUMENT_URL="http://localhost:8080"
   export VESPA_CONFIG_URL="http://localhost:19071"
+  export ZOOKEEPER_HOSTS="localhost:2181"
   export VESPA_IS_INTERNAL=True
 
 else

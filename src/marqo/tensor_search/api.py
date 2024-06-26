@@ -53,10 +53,11 @@ def generate_config() -> config.Config:
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
     )
 
+    # Zookeeper is only instantiated if the hosts are provided
     zookeeper_client = ZookeeperClient(
         zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT),
         hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
-    )
+    ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
 
     # Determine default device
     default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
@@ -190,8 +191,9 @@ def marqo_internal_exception_handler(request, exc: api_exceptions.MarqoError):
 
 
 @app.on_event("shutdown")
-def shutdown_event(marqo_config: config.Config = Depends(get_config)):
+def shutdown_event():
     """Close the Zookeeper client on shutdown."""
+    marqo_config = get_config()
     marqo_config.stop_and_close_zookeeper_client()
 
 
