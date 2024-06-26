@@ -286,62 +286,6 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
             rank_profiles.append('}')
 
-            # TODO: remove RRF and normalize_linear normal. Shouldn't need them.
-            # RRF Normal
-            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_RRF} inherits default {{')
-
-            # Input parameters
-            rank_profiles.append('inputs {')
-            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            rank_profiles.append(f'query(alpha) double')  # TODO check if this works
-            for field in tensor_fields:
-                rank_profiles.append(f'query({field.name}): 0')
-            rank_profiles.append('}')
-            # Make embedding_similarity_expression and bm25_expression into functions for RRF
-            rank_profiles.append('function bm25_expression() {')
-            rank_profiles.append(f'expression: {bm25_expression}')
-            rank_profiles.append('}')
-            rank_profiles.append('function embedding_similarity_expression() {')
-            rank_profiles.append(f'expression: {embedding_similarity_expression}')
-            rank_profiles.append('}')
-            rank_profiles.append('first-phase {')
-            rank_profiles.append(f'expression: query(alpha) * {embedding_similarity_expression} + '
-                                 f'(1 - query(alpha)) * {bm25_expression}')      # TODO, how to combine lexical and tensor better here?
-            rank_profiles.append('}')
-            rank_profiles.append('global-phase {')
-            rank_profiles.append(f'expression: {self._generate_rrf_expression()}')
-            rank_profiles.append('}')
-            rank_profiles.append(embedding_match_features_expression)
-            rank_profiles.append('}')
-
-            # Normalized Linear Normal
-            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_NORMALIZE_LINEAR} inherits default {{')
-
-            # Input parameters
-            rank_profiles.append('inputs {')
-            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            rank_profiles.append(f'query(alpha) double')    # TODO check if this works
-            for field in tensor_fields:
-                rank_profiles.append(f'query({field.name}): 0')
-            rank_profiles.append('}')
-            # Make embedding_similarity_expression and bm25_expression into functions for Normalize Linear
-            rank_profiles.append('function bm25_expression() {')
-            rank_profiles.append(f'expression: {bm25_expression}')
-            rank_profiles.append('}')
-            rank_profiles.append('function embedding_similarity_expression() {')
-            rank_profiles.append(f'expression: {embedding_similarity_expression}')
-            rank_profiles.append('}')
-            rank_profiles.append('first-phase {')
-            rank_profiles.append(f'expression: query(alpha) * {embedding_similarity_expression} + '
-                                 f'(1 - query(alpha)) * {bm25_expression}')  # TODO, how to combine lexical and tensor better here?
-            rank_profiles.append('}')
-            rank_profiles.append('global-phase {')
-            rank_profiles.append(
-                f'expression: {self._generate_normalize_linear_expression()}')
-            rank_profiles.append('}')
-            rank_profiles.append(embedding_match_features_expression)
-            rank_profiles.append('}')
-
         if score_modifier_fields_names:
             expression = (
                 f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '
