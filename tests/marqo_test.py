@@ -88,6 +88,8 @@ class MarqoTestCase(unittest.TestCase):
                 return indexes
             except Exception as e:
                 print(f"Error creating indexes: {e}")
+
+            return indexes
                 
         """max_retries = 5
         retry_wait_time = 90  # seconds
@@ -103,8 +105,7 @@ class MarqoTestCase(unittest.TestCase):
                     raise e"""
         #indexes = cls.index_management.batch_create_indexes(index_requests)
         
-
-        return indexes
+            
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
