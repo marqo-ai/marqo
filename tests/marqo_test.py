@@ -35,15 +35,15 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
-        """
+        
         # Lock method
         if cls.indexes:
             with cls.delete_lock:
                 try:
                     cls.index_management.batch_delete_indexes(cls.indexes)
                 except Exception as e:
-                    print(f"Error deleting indexes: {e}")"""
-        max_retries = 5
+                    print(f"Error deleting indexes: {e}")
+        """max_retries = 5
         retry_wait_time = 90  # seconds
         if cls.indexes:
             for attempt in range(max_retries):
@@ -54,7 +54,7 @@ class MarqoTestCase(unittest.TestCase):
                     if attempt < max_retries - 1:
                         time.sleep(retry_wait_time)
                     else:
-                        raise e
+                        raise e"""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -79,7 +79,7 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         # Retries. If fail, wait for 30 seconds and retry request up to 5 tries
-        """
+        
         # Lock method
         with cls.create_lock:
             try:
@@ -88,8 +88,8 @@ class MarqoTestCase(unittest.TestCase):
                 return indexes
             except Exception as e:
                 print(f"Error creating indexes: {e}")
-                """
-        max_retries = 5
+                
+        """max_retries = 5
         retry_wait_time = 90  # seconds
         for attempt in range(max_retries):
             try:
@@ -100,7 +100,7 @@ class MarqoTestCase(unittest.TestCase):
                 if attempt < max_retries - 1:
                     time.sleep(retry_wait_time)
                 else:
-                    raise e
+                    raise e"""
         #indexes = cls.index_management.batch_create_indexes(index_requests)
         
 
