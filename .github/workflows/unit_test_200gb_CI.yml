@@ -101,13 +101,9 @@ jobs:
           apt-get install maven -y
           echo "Building java application package"
           mvn clean package
-          
-          # Zip up schemas and services
-          apt-get install zip -y
-          zip -r vespa_tester_app.zip target/application
 
           # Deploy application with test schema
-          curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
+          curl --header "Content-Type:application/zip" --data-binary @target/application.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 
           # wait for vespa to start (document url):
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \

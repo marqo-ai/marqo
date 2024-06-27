@@ -4,8 +4,6 @@ FROM maven:3.8.7-openjdk-18-slim as maven_build
 WORKDIR /app/scripts/vespa_local
 COPY scripts/vespa_local/pom.xml .
 COPY scripts/vespa_local/src ./src
-
-# Run Maven clean and package
 RUN mvn clean package
 
 # Stage 2: Base image for Python setup
