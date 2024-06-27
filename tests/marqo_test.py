@@ -32,8 +32,18 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
+        max_retries = 5
+        retry_wait_time = 30  # seconds
         if cls.indexes:
-            cls.index_management.batch_delete_indexes(cls.indexes)
+            for attempt in range(max_retries):
+                try:
+                    cls.index_management.batch_delete_indexes(cls.indexes)
+                    break
+                except Exception as e: # TODO: Change this exception to something more specific
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_wait_time)
+                    else:
+                        raise e
 
     @classmethod
     def setUpClass(cls) -> None:
