@@ -76,11 +76,26 @@ jobs:
 
       - name: Start Vespa
         run: |
-          echo "Disabling unattended-upgrades"
-          systemctl stop unattended-upgrades.service || true
+            retry_command() {
+              local n=1
+              local max=5
+              local delay=5
+              while true; do
+                  "$@" && break || {
+                      if [[ $n -lt $max ]]; then
+                          ((n++))
+                          echo "Command failed. Attempt $n/$max:"
+                          sleep $delay;
+                      else
+                          echo "The command has failed after $n attempts."
+                          return 1
+                      fi
+                  }
+              done
+          }
           
           echo "Updating package list"
-          apt-get update -y
+          retry_command apt-get update -y
           
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -101,9 +116,9 @@ jobs:
 
           # Build application package
           echo "Installing jdk 17"
-          apt-get install openjdk-17-jdk -y
+          retry_command apt-get install openjdk-17-jdk -y
           echo "Installing maven"
-          apt-get install maven -y
+          retry_command apt-get install maven -y
           echo "Building java application package"
           mvn clean package
 
@@ -115,6 +130,7 @@ jobs:
             (echo "Vespa (Document URL) did not start in time" && exit 1)
           
           echo "Vespa document API is available. Local Vespa setup complete."
+
           
       - name: Run Unit Tests
         run: |
