@@ -186,9 +186,6 @@ class UnstructuredVespaSchema(VespaSchema):
                 }}
 
                 rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits default {{
-                    inputs {{
-                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
-                    }}
                     first-phase {{
                         expression: bm25({cls._STRINGS})
                     }}
