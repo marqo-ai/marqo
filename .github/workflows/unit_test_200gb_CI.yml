@@ -120,7 +120,7 @@ jobs:
           export ZOOKEEPER_HOSTS=http://localhost:2181
 
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest -n auto lsmarqo/tests
+          pytest -n auto marqo/tests
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
