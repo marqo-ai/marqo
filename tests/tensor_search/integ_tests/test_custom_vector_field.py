@@ -1,7 +1,7 @@
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifier
+from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifierLists
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.models.search import SearchContext
@@ -714,11 +714,11 @@ class TestCustomVectorField(MarqoTestCase):
                     config=self.config, index_name=index.name, text={"dummy text": 0},
                     search_method=enums.SearchMethod.TENSOR,
                     context=SearchContext(**{"tensor": [{"vector": self.random_vector_1, "weight": 1}], }),
-                    score_modifiers=ScoreModifier(**{"multiply_score_by":
+                    score_modifiers=ScoreModifierLists(**{"multiply_score_by":
                                                          [{"field_name": "multiply",
                                                            "weight": 1}
                                                           ]
-                                                     })
+                                                          })
                 )
                 assert res["hits"][0]["_id"] == "doc1"
 

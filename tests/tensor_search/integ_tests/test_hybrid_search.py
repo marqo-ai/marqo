@@ -14,7 +14,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 import unittest
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
-from marqo.tensor_search.models.api_models import ScoreModifier as apiScoreModifier
+from marqo.tensor_search.models.api_models import ScoreModifierLists as apiScoreModifier
 
 
 class TestHybridSearch(MarqoTestCase):

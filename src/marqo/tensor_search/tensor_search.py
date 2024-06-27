@@ -76,7 +76,7 @@ from marqo.tensor_search.enums import (
 )
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifier
+from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
@@ -1207,7 +1207,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            device: str = None, boost: Optional[Dict] = None,
            image_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
-           score_modifiers: Optional[ScoreModifier] = None,
+           score_modifiers: Optional[ScoreModifierLists] = None,
            model_auth: Optional[ModelAuth] = None,
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
@@ -1812,7 +1812,7 @@ def _vector_text_search(
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
-        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
+        score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
         highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
     """
     
@@ -1942,7 +1942,7 @@ def _hybrid_search(
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
-        score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
+        score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
         highlights: bool = False, text_query_prefix: Optional[str] = None,
         hybrid_parameters: HybridParameters = None) -> Dict:
     """

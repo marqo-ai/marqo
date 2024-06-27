@@ -6,7 +6,7 @@ from pydantic import validator, BaseModel, root_validator
 
 from marqo.base_model import StrictBaseModel
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 
 class RetrievalMethod(str, Enum):
@@ -31,8 +31,8 @@ class HybridParameters(StrictBaseModel):
     verbose: bool = False
 
     # Input for API, but form will change before being passed to core Hybrid Query.
-    score_modifiers_lexical: Optional[ScoreModifier] = None
-    score_modifiers_tensor: Optional[ScoreModifier] = None
+    score_modifiers_lexical: Optional[ScoreModifierLists] = None
+    score_modifiers_tensor: Optional[ScoreModifierLists] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):

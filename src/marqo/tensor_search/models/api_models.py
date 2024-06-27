@@ -14,7 +14,7 @@ from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 
 
@@ -40,7 +40,7 @@ class SearchQuery(BaseMarqoModel):
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
     context: Optional[SearchContext] = None
-    scoreModifiers: Optional[ScoreModifier] = None
+    scoreModifiers: Optional[ScoreModifierLists] = None
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
     hybridParameters: Optional[HybridParameters] = None
@@ -97,7 +97,7 @@ class BulkSearchQueryEntity(SearchQuery):
     index: MarqoIndex
 
     context: Optional[SearchContext] = None
-    scoreModifiers: Optional[ScoreModifier] = None
+    scoreModifiers: Optional[ScoreModifierLists] = None
     text_query_prefix: Optional[str] = None
 
     def to_search_query(self):

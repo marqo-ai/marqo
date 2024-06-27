@@ -11,7 +11,7 @@ from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier, ScoreModifierOperator
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from tests.marqo_test import MarqoTestCase
 
 
@@ -580,7 +580,7 @@ class TestRecommender(MarqoTestCase):
                         verbose=1,
                         reranker='bm25',
                         attributes_to_retrieve=['title'],
-                        score_modifiers=ScoreModifier(
+                        score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         )
                     )
@@ -600,7 +600,7 @@ class TestRecommender(MarqoTestCase):
                         reranker='bm25',
                         filter=mock.ANY,
                         attributes_to_retrieve=['title'],
-                        score_modifiers=ScoreModifier(
+                        score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
                         processing_start=mock.ANY
@@ -621,7 +621,7 @@ class TestRecommender(MarqoTestCase):
                         verbose=2,
                         reranker='bm25',
                         attributes_to_retrieve=['title'],
-                        score_modifiers=ScoreModifier(
+                        score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
                     )
@@ -641,7 +641,7 @@ class TestRecommender(MarqoTestCase):
                         reranker='bm25',
                         filter=mock.ANY,
                         attributes_to_retrieve=['title'],
-                        score_modifiers=ScoreModifier(
+                        score_modifiers=ScoreModifierLists(
                             multiply_score_by=[ScoreModifierOperator(field_name="title", weight=1)]
                         ),
                         processing_start=mock.ANY
