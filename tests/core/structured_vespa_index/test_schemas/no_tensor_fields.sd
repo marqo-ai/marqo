@@ -21,6 +21,7 @@
     }
         rank-profile bm25 inherits default {
             inputs {
+            query(marqo__query_embedding) tensor<float>(x[512])
             query(title): 0
         }
             first-phase {

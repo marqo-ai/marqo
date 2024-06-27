@@ -56,11 +56,11 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
-from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.clip_utils import _is_image
@@ -1326,7 +1326,9 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
             )
         elif search_method.upper() == SearchMethod.HYBRID:
-            search_result = _hybrid_search(
+            # TODO: Deal with circular import when all modules are refactored out.
+            from marqo.core.search.hybrid_search import HybridSearch
+            search_result = HybridSearch().search(
                 config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
@@ -1771,7 +1773,8 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
             scoreModifiers=q.scoreModifiers,
             index=q.index,
             modelAuth=q.modelAuth,
-            text_query_prefix=q.text_query_prefix
+            text_query_prefix=q.text_query_prefix,
+            hybridParameters=q.hybridParameters
         )
         prefixed_queries.append(new_query_object)
     
@@ -1932,6 +1935,7 @@ def _vector_text_search(
     return gathered_docs
 
 
+# TODO: REMOVE
 def _hybrid_search(
         config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5, offset: int = 0,
         ef_search: Optional[int] = None, approximate: bool = True,

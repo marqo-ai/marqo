@@ -400,18 +400,10 @@ class StructuredVespaIndex(VespaIndex):
         }
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
-        if marqo_query.searchable_attributes is not None:
-            for att in marqo_query.searchable_attributes:
-                if att not in self._marqo_index.tensor_field_map:
-                    raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no tensor field {att}. '
-                        f'Available tensor fields are: {", ".join(self._marqo_index.tensor_field_map.keys())}'
-                    )
-
-            fields_to_search = marqo_query.searchable_attributes
-        else:
-            fields_to_search = self._marqo_index.tensor_field_map.keys()
-
+        fields_to_search = self._extract_fields_to_search(
+            marqo_query=marqo_query,
+            searchable_attributes=marqo_query.searchable_attributes
+        )
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
@@ -451,18 +443,11 @@ class StructuredVespaIndex(VespaIndex):
         return query
 
     def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
-        if marqo_query.searchable_attributes is not None:
-            for att in marqo_query.searchable_attributes:
-                if att not in self._marqo_index.lexically_searchable_fields_names:
-                    raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no lexically searchable field {att}. '
-                        f'Available lexically searchable fields are: '
-                        f'{", ".join(self._marqo_index.lexically_searchable_fields_names)}'
-                    )
-            fields_to_search = marqo_query.searchable_attributes
-        else:
-            fields_to_search = self._marqo_index.lexically_searchable_fields_names
 
+        fields_to_search = self._extract_fields_to_search(
+            marqo_query=marqo_query,
+            searchable_attributes=marqo_query.searchable_attributes
+        )
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
@@ -500,33 +485,17 @@ class StructuredVespaIndex(VespaIndex):
         # TODO: Split out the redundant code in lexical and tensor query functions
 
         # Tensor term
-        if marqo_query.hybrid_parameters.searchable_attributes_tensor is not None:
-            for att in marqo_query.hybrid_parameters.searchable_attributes_tensor:
-                if att not in self._marqo_index.tensor_field_map:
-                    raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no tensor field {att}. '
-                        f'Available tensor fields are: {", ".join(self._marqo_index.tensor_field_map.keys())}'
-                    )
-
-            fields_to_search_tensor = marqo_query.hybrid_parameters.searchable_attributes_tensor
-        else:
-            fields_to_search_tensor = self._marqo_index.tensor_field_map.keys()
-
+        fields_to_search_tensor = self._extract_fields_to_search(
+            marqo_query=marqo_query,
+            searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_tensor
+        )
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search_tensor else "False"
 
         # Lexical term
-        if marqo_query.hybrid_parameters.searchable_attributes_lexical is not None:
-            for att in marqo_query.hybrid_parameters.searchable_attributes_lexical:
-                if att not in self._marqo_index.lexically_searchable_fields_names:
-                    raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no lexically searchable field {att}. '
-                        f'Available lexically searchable fields are: '
-                        f'{", ".join(self._marqo_index.lexically_searchable_fields_names)}'
-                    )
-            fields_to_search_lexical = marqo_query.hybrid_parameters.searchable_attributes_lexical
-        else:
-            fields_to_search_lexical = self._marqo_index.lexical_field_map.keys()
-
+        fields_to_search_lexical = self._extract_fields_to_search(
+            marqo_query=marqo_query,
+            searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_lexical
+        )
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search_lexical else "False"
 
         # If retrieval and ranking methods are opposite (lexical/tensor), use the rank() operator
@@ -574,14 +543,7 @@ class StructuredVespaIndex(VespaIndex):
         query = {
             'searchChain': 'hybrid-chain',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
-            'yql.tensor': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
-            'yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
-
-            'hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
-            'hybrid.rankingMethod': marqo_query.hybrid_parameters.ranking_method,
-            'hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers["tensor"] else False,
-            'hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers["lexical"] else False,
-            'hybrid.verbose': marqo_query.hybrid_parameters.verbose,
+            'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
 
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
@@ -589,22 +551,57 @@ class StructuredVespaIndex(VespaIndex):
             'query_features': query_inputs,
             'presentation.summary': summary,
 
-            'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            'ranking.lexical': common.RANK_PROFILE_BM25,
-            'ranking.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
-            'ranking.lexicalScoreModifiers': common.RANK_PROFILE_BM25_MODIFIERS,
-            'ranking.tensorScoreModifiers': common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS
+            # Custom searcher parameters
+            'marqo__yql.tensor': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
+            'marqo__yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+
+            'marqo__ranking.lexical': common.RANK_PROFILE_BM25,
+            'marqo__ranking.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
+            'marqo__ranking.lexicalScoreModifiers': common.RANK_PROFILE_BM25_MODIFIERS,
+            'marqo__ranking.tensorScoreModifiers': common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS,
+
+            'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
+            'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.ranking_method,
+            'marqo__hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers["tensor"] else False,
+            'marqo__hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers["lexical"] else False,
+            'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
         query = {k: v for k, v in query.items() if v is not None}
 
         if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF, RankingMethod.NormalizeLinear}:
-            query["hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
+            query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
 
         if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF}:
-            query["hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrf_k
+            query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrf_k
 
         return query
 
+    def _extract_fields_to_search(self, marqo_query: MarqoQuery, searchable_attributes: List[str]) -> List[str]:
+        """
+        Extracts fields to search from the list of searchable attributes.
+        Validates that the fields are valid tensor fields/lexically searchable attributes, depending on the search method.
+        If searchable_attributes is None, returns all tensor/lexical fields.
+        """
+        if isinstance(marqo_query, MarqoTensorQuery):
+            full_field_list = self._marqo_index.tensor_field_map.keys()
+        elif isinstance(marqo_query, MarqoLexicalQuery):
+            full_field_list = self._marqo_index.lexically_searchable_fields_names
+        else:
+            raise InternalError(f'Unknown query type for "_extract_fields_to_search": {type(marqo_query)}')
+
+        if searchable_attributes is not None:
+            for att in searchable_attributes:
+                if att not in full_field_list:
+                    raise InvalidFieldNameError(
+                        f'Index {self._marqo_index.name} has no {search_method.lower()} field {att}. '
+                        f'Available {search_method.lower()} fields are: {", ".join(full_field_list)}'
+                    )
+
+            fields_to_search = searchable_attributes
+        else:
+            fields_to_search = full_field_list
+
+        return fields_to_search
 
     def _get_individual_field_tensor_search_terms(self, marqo_query: MarqoTensorQuery) -> List[str]:
         """

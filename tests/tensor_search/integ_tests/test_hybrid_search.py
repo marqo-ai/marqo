@@ -258,20 +258,20 @@ class TestHybridSearch(MarqoTestCase):
                               "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)) OR "
                               "({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
                               "nearestNeighbor(marqo__embeddings_text_field_2, marqo__query_embedding)))",
-                              vespa_query_kwargs["yql.tensor"])
-                self.assertIn("weakAnd(default contains \"dogs\")", vespa_query_kwargs["yql.lexical"])
-                self.assertEqual(vespa_query_kwargs["hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
-                self.assertEqual(vespa_query_kwargs["hybrid.rankingMethod"], RankingMethod.RRF)
-                self.assertEqual(vespa_query_kwargs["hybrid.tensorScoreModifiersPresent"], True)
-                self.assertEqual(vespa_query_kwargs["hybrid.lexicalScoreModifiersPresent"], True)
-                self.assertEqual(vespa_query_kwargs["hybrid.alpha"], 0.6)
-                self.assertEqual(vespa_query_kwargs["hybrid.rrf_k"], 61)
+                              vespa_query_kwargs["marqo__yql.tensor"])
+                self.assertIn("weakAnd(default contains \"dogs\")", vespa_query_kwargs["marqo__yql.lexical"])
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.tensorScoreModifiersPresent"], True)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.lexicalScoreModifiersPresent"], True)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.6)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 61)
 
                 self.assertEqual(vespa_query_kwargs["ranking"], "hybrid_custom_searcher")
-                self.assertEqual(vespa_query_kwargs["ranking.lexical"], "bm25")
-                self.assertEqual(vespa_query_kwargs["ranking.tensor"], "embedding_similarity")
-                self.assertEqual(vespa_query_kwargs["ranking.lexicalScoreModifiers"], "bm25_modifiers")
-                self.assertEqual(vespa_query_kwargs["ranking.tensorScoreModifiers"], "embedding_similarity_modifiers")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.lexical"], "bm25")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.tensor"], "embedding_similarity")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.lexicalScoreModifiers"], "bm25_modifiers")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.tensorScoreModifiers"], "embedding_similarity_modifiers")
 
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_search_lexical"], {'text_field_1': 1, 'text_field_2': 1})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_search_tensor"], {'text_field_2': 1})
@@ -380,32 +380,31 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                with self.subTest("alpha=1.0"):
-                    hybrid_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Disjunction,
-                            ranking_method=RankingMethod.RRF,
-                            alpha=1.0,
-                            verbose=True
-                        ),
-                        result_count=10
-                    )
+                hybrid_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrieval_method=RetrievalMethod.Disjunction,
+                        ranking_method=RankingMethod.RRF,
+                        alpha=1.0,
+                        verbose=True
+                    ),
+                    result_count=10
+                )
 
-                    tensor_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="TENSOR",
-                        result_count=10
-                    )
+                tensor_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="TENSOR",
+                    result_count=10
+                )
 
-                    self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
-                    for i in range(len(hybrid_res["hits"])):
-                        self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
+                self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
+                for i in range(len(hybrid_res["hits"])):
+                    self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
 
     def test_hybrid_search_score_modifiers_searchable_attributes(self):
         """
