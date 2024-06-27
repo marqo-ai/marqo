@@ -207,14 +207,6 @@ class StructuredVespaSchema(VespaSchema):
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
                     f'{self._generate_max_similarity_expression(tensor_fields[1:])})')
 
-    def _generate_rrf_expression(self) -> str:
-        return (f"query(alpha) * reciprocal_rank(embedding_similarity_expression) + "
-                f"(1-query(alpha)) * reciprocal_rank(bm25_expression)")     # TODO: add k back somehow, maybe index creation
-
-    def _generate_normalize_linear_expression(self) -> str:
-        return (f"query(alpha) * normalize_linear(embedding_similarity_expression) + "
-                f"(1-query(alpha)) * normalize_linear(bm25_expression)")
-
     def _generate_rank_profiles(self, marqo_index: StructuredMarqoIndex) -> List[str]:
         rank_profiles: List[str] = list()
 

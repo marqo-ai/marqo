@@ -76,6 +76,12 @@ jobs:
 
       - name: Start Vespa
         run: |
+          echo "Disabling unattended-upgrades"
+          systemctl stop unattended-upgrades.service || true
+          
+          echo "Updating package list"
+          apt-get update -y
+          
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
