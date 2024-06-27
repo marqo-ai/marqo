@@ -57,8 +57,20 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
-        indexes = cls.index_management.batch_create_indexes(index_requests)
-        cls.indexes = indexes
+        # Retries. If fail, wait for 30 seconds and retry request up to 5 tries
+        max_retries = 5
+        retry_wait_time = 30  # seconds
+        for attempt in range(max_retries):
+            try:
+                indexes = cls.index_management.batch_create_indexes(index_requests)
+                break
+            except Exception as e: # TODO: Change this exception to something more specific
+                if attempt < max_retries - 1:
+                    time.sleep(retry_wait_time)
+                else:
+                    raise e
+        #indexes = cls.index_management.batch_create_indexes(index_requests)
+        cls.indexes = cls.indexes + indexes
 
         return indexes
 
