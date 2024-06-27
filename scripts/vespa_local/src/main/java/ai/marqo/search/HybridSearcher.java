@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 @Provides("HybridReRanking")
 public class HybridSearcher extends Searcher {
 
-    // Logger logger = LogManager.getLogger(HybridSearcher.class);
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
     private static String MATCH_FEATURES_FIELD = "matchfeatures";
@@ -312,54 +311,6 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(queryNew.getRanking().getFeatures().toString(), verbose);
 
         return queryNew;
-    }
-
-    /**
-     * Implement feature score scaling and normalization
-     * @param hits
-     * @param features
-     */
-    void normalize(HitGroup hits, String[] features) {
-        // Min - Max normalization
-        double[] minValues = new double[features.length];
-        double[] maxValues = new double[features.length];
-        for(int i = 0; i < features.length;i++) {
-            minValues[i] = Double.MAX_VALUE;
-            maxValues[i] = Double.MIN_VALUE;
-        }
-
-        //Find min and max value in the re-ranking window
-        for (Hit hit : hits) {
-            if(hit.isAuxiliary())
-                continue;
-            FeatureData featureData = (FeatureData) hit.getField(MATCH_FEATURES_FIELD);
-            if(featureData == null)
-                throw new RuntimeException("No feature data in hit - wrong rank profile used?");
-            for(int i = 0; i < features.length; i++) {
-                // loop through bm25, colbert_maxsim
-                double score = featureData.getDouble(features[i]);
-                if(score < minValues[i])
-                    minValues[i] = score;
-                if(score > maxValues[i])
-                    maxValues[i] = score;
-            }
-        }
-        //re-score using normalized value
-        for (Hit hit : hits) {
-            if(hit.isAuxiliary())
-                continue;
-            FeatureData featureData = (FeatureData) hit.getField(MATCH_FEATURES_FIELD);
-            double finalScore = 0;
-            for(int i = 0; i < features.length; i++) {
-                // loop through bm25, colbert_maxsim
-                double score = featureData.getDouble(features[i]);
-                // No alpha implemented yet. can be added here
-                finalScore += (score - minValues[i]) / (maxValues[i] - minValues[i]);
-            }
-            // average bm25 and colbert_maxsim. 
-            finalScore = finalScore / features.length;
-            hit.setRelevance(finalScore);
-        }
     }
 
     /**

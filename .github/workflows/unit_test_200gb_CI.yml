@@ -115,10 +115,6 @@ jobs:
             (echo "Vespa (Document URL) did not start in time" && exit 1)
           
           echo "Vespa document API is available. Local Vespa setup complete."
-
-          # Delete the zip file
-          rm vespa_tester_app.zip
-          echo "Deleted vespa_tester_app.zip"
           
       - name: Run Unit Tests
         run: |
