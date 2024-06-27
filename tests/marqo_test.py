@@ -2,7 +2,7 @@ import time
 import unittest
 import uuid
 from unittest.mock import patch, Mock
-import threading
+import multiprocessing
 
 import vespa.application as pyvespa
 
@@ -18,9 +18,9 @@ from marqo.vespa.vespa_client import VespaClient
 
 
 class MarqoTestCase(unittest.TestCase):
-    indexes = []
-    create_lock = threading.Lock()
-    delete_lock = threading.Lock()
+    #indexes = []
+    create_lock = multiprocessing.Lock()
+    delete_lock = multiprocessing.Lock()
 
     @classmethod
     def configure_request_metrics(cls):
@@ -36,7 +36,6 @@ class MarqoTestCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.patcher.stop()
         
-        # Lock method
         if cls.indexes:
             with cls.delete_lock:
                 try:
@@ -75,21 +74,18 @@ class MarqoTestCase(unittest.TestCase):
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
         cls.CONTENT_CLUSTER = 'content_default'
+        cls.indexes = []
 
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
-        # Retries. If fail, wait for 30 seconds and retry request up to 5 tries
-        
-        # Lock method
         with cls.create_lock:
             try:
                 indexes = cls.index_management.batch_create_indexes(index_requests)
-                cls.indexes = cls.indexes + indexes
+                cls.indexes.extend(indexes) 
                 return indexes
             except Exception as e:
                 print(f"Error creating indexes: {e}")
-
-            return indexes
+                return []
                 
         """max_retries = 5
         retry_wait_time = 90  # seconds
