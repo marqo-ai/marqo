@@ -46,16 +46,17 @@ class MarqoTestCase(unittest.TestCase):
         initial_wait_time = 120 # seconds
         max_wait_time = 1000  # seconds
         if cls.indexes:
-            for attempt in range(max_retries):
-                try:
-                    cls.index_management.batch_delete_indexes(cls.indexes)
-                    break
-                except Exception as e: # TODO: Change this exception to something more specific
-                    if attempt < max_retries - 1:
-                        wait_time = min(initial_wait_time * (2 ** attempt), max_wait_time)
-                        time.sleep(wait_time)
-                    else:
-                        raise e
+            with cls.delete_lock:
+                for attempt in range(max_retries):
+                    try:
+                        cls.index_management.batch_delete_indexes(cls.indexes)
+                        break
+                    except Exception as e: # TODO: Change this exception to something more specific
+                        if attempt < max_retries - 1:
+                            wait_time = min(initial_wait_time * (2 ** attempt), max_wait_time)
+                            time.sleep(wait_time)
+                        else:
+                            raise e
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -88,21 +89,21 @@ class MarqoTestCase(unittest.TestCase):
             except Exception as e:
                 print(f"Error creating indexes: {e}")
                 return []"""
-                
-        max_retries = 25
-        initial_wait_time = 120 # seconds
-        max_wait_time = 1000  # seconds
-        for attempt in range(max_retries):
-            try:
-                indexes = cls.index_management.batch_create_indexes(index_requests)
-                cls.indexes = cls.indexes + indexes
-                break
-            except Exception as e: # TODO: Change this exception to something more specific
-                if attempt < max_retries - 1:
-                    wait_time = min(initial_wait_time * (2 ** attempt), max_wait_time)
-                    time.sleep(wait_time)
-                else:
-                    raise e
+        with cls.create_lock:
+            max_retries = 25
+            initial_wait_time = 120 # seconds
+            max_wait_time = 1000  # seconds
+            for attempt in range(max_retries):
+                try:
+                    indexes = cls.index_management.batch_create_indexes(index_requests)
+                    cls.indexes.extend(indexes)
+                    break
+                except Exception as e: # TODO: Change this exception to something more specific
+                    if attempt < max_retries - 1:
+                        wait_time = min(initial_wait_time * (2 ** attempt), max_wait_time)
+                        time.sleep(wait_time)
+                    else:
+                        raise e
         #indexes = cls.index_management.batch_create_indexes(index_requests)
         
             
