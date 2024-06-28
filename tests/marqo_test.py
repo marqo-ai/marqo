@@ -43,7 +43,7 @@ class MarqoTestCase(unittest.TestCase):
                 except Exception as e:
                     print(f"Error deleting indexes: {e}")"""
         max_retries = 25
-        retry_wait_time = 60  # seconds
+        retry_wait_time = 240  # seconds
         if cls.indexes:
             for attempt in range(max_retries):
                 try:
@@ -88,7 +88,7 @@ class MarqoTestCase(unittest.TestCase):
                 return []"""
                 
         max_retries = 25
-        retry_wait_time = 60  # seconds
+        retry_wait_time = 240  # seconds
         for attempt in range(max_retries):
             try:
                 indexes = cls.index_management.batch_create_indexes(index_requests)
