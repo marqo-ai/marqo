@@ -81,7 +81,7 @@ class MarqoTestCase(unittest.TestCase):
         with cls.create_lock:
             try:
                 indexes = cls.index_management.batch_create_indexes(index_requests)
-                cls.indexes.extend(indexes) 
+                cls.indexes = indexes
                 return indexes
             except Exception as e:
                 print(f"Error creating indexes: {e}")
