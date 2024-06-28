@@ -96,7 +96,7 @@ class MarqoTestCase(unittest.TestCase):
             for attempt in range(max_retries):
                 try:
                     indexes = cls.index_management.batch_create_indexes(index_requests)
-                    cls.indexes.extend(indexes)
+                    cls.indexes = indexes
                     break
                 except Exception as e: # TODO: Change this exception to something more specific
                     if attempt < max_retries - 1:
