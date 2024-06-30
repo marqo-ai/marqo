@@ -511,7 +511,7 @@ class StructuredVespaIndex(VespaIndex):
         # Filter term
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
-            filter_term = f' AND {filter_term}'
+            filter_term = f' AND {filter_term}' # TODO, fix this is till going through
         else:
             filter_term = ''
         select_attributes = self._get_select_attributes(marqo_query)
