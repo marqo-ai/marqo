@@ -4,3 +4,5 @@ MARQO_DOC_HIGHLIGHTS = '_highlights'  # doc-level so must not clash with index f
 MARQO_DOC_CHUNKS = 'chunks'
 MARQO_DOC_EMBEDDINGS = 'embeddings'
 MARQO_DOC_ID = '_id'
+
+MARQO_HYBRID_SEARCH_MINIMUM_VERSION = '2.10.0'

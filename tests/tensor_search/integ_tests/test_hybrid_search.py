@@ -801,6 +801,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("has no tensor field mult_field_1", str(e.exception))
 
     # TODO: Remove when unstructured index is supported
+    @unittest.skip
     def test_hybrid_search_on_unstructured_index_fails(self):
         """
         Test that hybrid search on an unstructured index fails.

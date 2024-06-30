@@ -63,15 +63,14 @@ public class HybridSearcher extends Searcher {
         
         Integer rrf_k = query.properties().getInteger("marqo__hybrid.rrf_k", 60);
         Double alpha = query.properties().getDouble("marqo__hybrid.alpha", 0.5);
-        
-        // TODO: Parse this into an int
-        String timeout_string = query.properties().getString("timeout", "1000ms");
+        Integer timeout = query.properties().getInteger("timeout", 1000);
 
         // Log fetched variables
         logIfVerbose(String.format("Retrieval method found: %s", retrievalMethod), verbose);
         logIfVerbose(String.format("Ranking method found: %s", rankingMethod), verbose);
         logIfVerbose(String.format("alpha found: %.2f", alpha), verbose);
         logIfVerbose(String.format("RRF k found: %d", rrf_k), verbose);
+        logIfVerbose(String.format("Timeout int found: %d", timeout), verbose);
 
         logIfVerbose(String.format("Base Query is: "), verbose);
         logIfVerbose(query.toDetailString(), verbose);
@@ -86,13 +85,12 @@ public class HybridSearcher extends Searcher {
             Future<Result> futureLexical = asyncExecutionLexical.search(queryLexical);
             AsyncExecution asyncExecutionTensor = new AsyncExecution(execution);
             Future<Result> futureTensor = asyncExecutionTensor.search(queryTensor);
-            int timeout = 1000 * 1; // TODO: Change this to input.query(timeout)
             try {
                 resultLexical = futureLexical.get(timeout, TimeUnit.MILLISECONDS);
                 resultTensor = futureTensor.get(timeout, TimeUnit.MILLISECONDS);
             } catch(TimeoutException | InterruptedException | ExecutionException e) {
                 // TODO: Handle timeout better
-                throw new RuntimeException(e.toString());
+                throw new RuntimeException(String.format("Hybrid search disjunction timeout error. Current timeout: %d. ", timeout) + e.toString());
             }
 
             logIfVerbose("LEXICAL RESULTS: " + resultLexical.toString() + " || TENSOR RESULTS: " +
@@ -105,7 +103,7 @@ public class HybridSearcher extends Searcher {
                 logHitGroup(fusedHitList, verbose);
                 return new Result(query, fusedHitList);
             } else {
-                throw new RuntimeException(String.format("For retrievalMethod='disjunction', rankingMethod must be 'rrf'."));
+                throw new RuntimeException("For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
             }
             
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)){

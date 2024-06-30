@@ -17,6 +17,7 @@ from marqo.tensor_search.enums import SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from tests.utils.transition import add_docs_caller
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 
 
 class TestPagination(MarqoTestCase):
@@ -91,6 +92,62 @@ class TestPagination(MarqoTestCase):
                             off = page_num * page_size
                             page_res = tensor_search.search(
                                 search_method=search_method,
+                                config=self.config,
+                                index_name=index.name,
+                                text='my title',
+                                result_count=lim, offset=off)
+
+                            paginated_search_results["hits"].extend(page_res["hits"])
+
+                        # Compare paginated to full results (length only for now)
+                        self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
+
+    def test_pagination_hybrid(self):
+        num_docs = 400
+        batch_size = 100
+
+        # TODO: Add unstructured index when supported
+        for index in [self.index_structured]:
+            for _ in range(0, num_docs, batch_size):
+                r = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(index_name=index.name,
+                                                  docs=[{"title": 'my title', 'desc': 'my title'} for i in
+                                                        range(batch_size)],
+                                                  device="cpu",
+                                                  tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                  else None
+                                                  )
+                )
+                self.assertFalse(r['errors'], "Errors in add documents call")
+
+            test_cases = [
+                ("disjunction", "rrf"),
+                ("lexical", "tensor"),
+                ("tensor", "lexical"),
+            ]
+
+            for retrieval_method, ranking_method in test_cases:
+                full_search_results = tensor_search.search(
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(retrieval_method=retrieval_method,
+                                                       ranking_method=ranking_method),
+                    config=self.config,
+                    index_name=index.name,
+                    text='my title',
+                    result_count=400)
+
+                for page_size in [5, 10, 100, 200]:
+                    with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
+                        paginated_search_results = {"hits": []}
+
+                        for page_num in range(math.ceil(num_docs / page_size)):
+                            lim = page_size
+                            off = page_num * page_size
+                            page_res = tensor_search.search(
+                                search_method="HYBRID",
+                                hybrid_parameters=HybridParameters(retrieval_method=retrieval_method,
+                                                                   ranking_method=ranking_method),
                                 config=self.config,
                                 index_name=index.name,
                                 text='my title',
