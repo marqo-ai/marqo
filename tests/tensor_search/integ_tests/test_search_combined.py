@@ -315,7 +315,7 @@ class TestSearch(MarqoTestCase):
 
     def test_filtering(self):
         # TODO: remove
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index][-1:]:
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents first
                 res = tensor_search.add_documents(
@@ -411,8 +411,7 @@ class TestSearch(MarqoTestCase):
                         # Filtering on empty string returns no results
                         ("text_field_1 in ()", 0, None),
                     ]
-                # TODO: remove
-                for filter_string, expected_hits, expected_ids in test_cases[-1:]:
+                for filter_string, expected_hits, expected_ids in test_cases:
                     with self.subTest(
                             f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_ids}"):
                         res = tensor_search.search(
