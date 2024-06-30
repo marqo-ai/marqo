@@ -401,7 +401,7 @@ class StructuredVespaIndex(VespaIndex):
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
         fields_to_search = self._extract_fields_to_search(
-            marqo_query=marqo_query,
+            search_method='tensor',
             searchable_attributes=marqo_query.searchable_attributes
         )
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
@@ -445,7 +445,7 @@ class StructuredVespaIndex(VespaIndex):
     def _to_vespa_lexical_query(self, marqo_query: MarqoLexicalQuery) -> Dict[str, Any]:
 
         fields_to_search = self._extract_fields_to_search(
-            marqo_query=marqo_query,
+            search_method='lexical',
             searchable_attributes=marqo_query.searchable_attributes
         )
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search else "False"
@@ -482,18 +482,16 @@ class StructuredVespaIndex(VespaIndex):
         return query
 
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
-        # TODO: Split out the redundant code in lexical and tensor query functions
-
         # Tensor term
         fields_to_search_tensor = self._extract_fields_to_search(
-            marqo_query=marqo_query,
+            search_method='tensor',
             searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_tensor
         )
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search_tensor else "False"
 
         # Lexical term
         fields_to_search_lexical = self._extract_fields_to_search(
-            marqo_query=marqo_query,
+            search_method='lexical',
             searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_lexical
         )
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search_lexical else "False"
@@ -576,18 +574,18 @@ class StructuredVespaIndex(VespaIndex):
 
         return query
 
-    def _extract_fields_to_search(self, marqo_query: MarqoQuery, searchable_attributes: List[str]) -> List[str]:
+    def _extract_fields_to_search(self, search_method: str, searchable_attributes: List[str]) -> List[str]:
         """
         Extracts fields to search from the list of searchable attributes.
         Validates that the fields are valid tensor fields/lexically searchable attributes, depending on the search method.
         If searchable_attributes is None, returns all tensor/lexical fields.
         """
-        if isinstance(marqo_query, MarqoTensorQuery):
+        if search_method.lower() == 'tensor':
             full_field_list = self._marqo_index.tensor_field_map.keys()
-        elif isinstance(marqo_query, MarqoLexicalQuery):
+        elif search_method.lower() == 'lexical':
             full_field_list = self._marqo_index.lexically_searchable_fields_names
         else:
-            raise InternalError(f'Unknown query type for "_extract_fields_to_search": {type(marqo_query)}')
+            raise InternalError(f'Unknown search method for "_extract_fields_to_search": {search_method}')
 
         if searchable_attributes is not None:
             for att in searchable_attributes:

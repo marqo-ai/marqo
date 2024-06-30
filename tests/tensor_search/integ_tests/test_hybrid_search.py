@@ -753,3 +753,69 @@ class TestHybridSearch(MarqoTestCase):
                             )
                         self.assertIn(error_message, str(e.exception))
 
+    def test_hybrid_search_structured_invalid_fields_fails(self):
+        """
+        If searching with HYBRID, searchable_attributes_lexical must only have lexical fields, and
+        searchable_attributes_tensor must only have tensor fields.
+        """
+        # Non-lexical field
+        test_cases = [
+            ("disjunction", "rrf"),
+            ("lexical", "lexical"),
+            ("lexical", "tensor")
+        ]
+        for retrieval_method, ranking_method in test_cases:
+            with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
+                with self.assertRaises(core_exceptions.InvalidFieldNameError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=self.structured_text_index_score_modifiers.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method=retrieval_method,
+                            ranking_method=ranking_method,
+                            searchable_attributes_lexical=["text_field_1", "add_field_1"]
+                        )
+                    )
+                self.assertIn("has no lexical field add_field_1", str(e.exception))
+
+        # Non-tensor field
+        test_cases = [
+            ("disjunction", "rrf"),
+            ("tensor", "tensor"),
+            ("tensor", "lexical")
+        ]
+        for retrieval_method, ranking_method in test_cases:
+            with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
+                with self.assertRaises(core_exceptions.InvalidFieldNameError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=self.structured_text_index_score_modifiers.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            searchable_attributes_tensor=["mult_field_1", "text_field_1"]
+                        )
+                    )
+                self.assertIn("has no tensor field mult_field_1", str(e.exception))
+
+    # TODO: Remove when unstructured index is supported
+    def test_hybrid_search_on_unstructured_index_fails(self):
+        """
+        Test that hybrid search on an unstructured index fails.
+        """
+
+        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_default_text_index.name,
+                text="dogs",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrieval_method=RetrievalMethod.Disjunction,
+                    ranking_method=RankingMethod.RRF,
+                    alpha=0.6
+                )
+            )
+        self.assertIn("not yet supported for hybrid search", str(e.exception))
