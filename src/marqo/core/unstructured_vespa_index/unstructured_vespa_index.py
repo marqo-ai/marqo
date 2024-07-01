@@ -238,9 +238,11 @@ class UnstructuredVespaIndex(VespaIndex):
                 return 'false'
             if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
                 return 'true'
-            
+
             if marqo_query.or_phrases:
-                or_terms = 'weakAnd(%s)' % ', '.join([
+                # or_terms = '{"targetHits": 10}weakAnd(%s)' % ', '.join([
+                # or_terms = 'weakAnd(%s)' % ', '.join([
+                or_terms = ' OR '.join([
                     f'default contains "{phrase}"' for phrase in marqo_query.or_phrases
                 ])
             else:
@@ -253,7 +255,6 @@ class UnstructuredVespaIndex(VespaIndex):
                     and_terms = f' AND ({and_terms})'
             else:
                 and_terms = ''
-
 
             return f'{or_terms}{and_terms}'
 

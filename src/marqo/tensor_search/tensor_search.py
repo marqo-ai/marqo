@@ -52,7 +52,6 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
@@ -138,7 +137,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
-    
+
     text_chunk_prefix = marqo_index.model.get_text_chunk_prefix(add_docs_params.text_chunk_prefix)
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
@@ -163,12 +162,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         docs=docs, thread_count=add_docs_params.image_download_thread_count,
                         tensor_fields=tensor_fields_and_multimodal_subfields,
                         image_download_headers=add_docs_params.image_download_headers,
-                        model_name = marqo_index.model.name,
+                        model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
-                        patch_method_exists = marqo_index.image_preprocessing.patch_method is not None
+                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None
                     )
                 )
 
@@ -444,14 +443,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                     # Use_existing tensor does not apply, or we didn't find it, then we vectorise
                     if combo_chunk is None:
-                        
+
                         if field_content:  # Check if the subfields are present
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                              unsuccessful_doc_to_append,
                              combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
                                 field_name,
                                 field_content, i, doc_id, add_docs_params.device, marqo_index,
-                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth, text_chunk_prefix=text_chunk_prefix)
+                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth,
+                                text_chunk_prefix=text_chunk_prefix)
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                             if combo_document_is_valid is False:
@@ -596,7 +596,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         docs=docs, thread_count=add_docs_params.image_download_thread_count,
                         tensor_fields=image_fields,
                         image_download_headers=add_docs_params.image_download_headers,
-                        model_name = marqo_index.model.name,
+                        model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
@@ -853,7 +853,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             # Multimodal fields haven't been processed yet, so we do that here
             if document_is_valid:  # No need to process multimodal fields if the document is invalid
                 for tensor_field in marqo_index.tensor_fields:
-                    
+
                     marqo_field = marqo_index.field_map[tensor_field.name]
                     if marqo_field.type == FieldType.MultimodalCombination:
                         field_name = tensor_field.name
@@ -916,7 +916,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                              unsuccessful_doc_to_append,
                              combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
                                 field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
-                                image_repo, mappings, model_auth=add_docs_params.model_auth, text_chunk_prefix=text_chunk_prefix)
+                                image_repo, mappings, model_auth=add_docs_params.model_auth,
+                                text_chunk_prefix=text_chunk_prefix)
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
 
@@ -1314,7 +1315,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         if approximate is None:
             approximate = True
 
-
         search_result = _vector_text_search(
             config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
             ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
@@ -1329,15 +1329,16 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         if approximate is not None:
             raise errors.InvalidArgError(
                 f"approximate is not a valid argument for lexical search")
-        if score_modifiers is not None:
-            raise errors.InvalidArgError(
-                "Score modifiers is not supported for lexical search yet"
-            )
+        # if score_modifiers is not None:
+        #     raise errors.InvalidArgError(
+        #         "Score modifiers is not supported for lexical search yet"
+        #     )
 
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
+            score_modifiers=score_modifiers
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -1376,7 +1377,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
+        score_modifiers: Optional[ScoreModifier] = None):
     """
 
     Args:
@@ -1419,6 +1421,7 @@ def _lexical_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers else None
     )
 
     vespa_index = vespa_index_factory(marqo_index)
@@ -1723,6 +1726,7 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
                 raise not_found_error
     raise not_found_error
 
+
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
     prefixed_queries = []
     for q in queries:
@@ -1762,11 +1766,12 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
             text_query_prefix=q.text_query_prefix
         )
         prefixed_queries.append(new_query_object)
-    
+
     return prefixed_queries
 
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
+    Qidx, List[float]]:
     """Run the query vectorisation process"""
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
@@ -2045,7 +2050,8 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
-                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
+                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise,
+                                                                                       text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=prefixed_text_content_to_vectorise,
@@ -2101,7 +2107,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
         doc_id: str, device: str, marqo_index: StructuredMarqoIndex, image_repo, field_map: dict,
-        model_auth: Optional[ModelAuth] = None, 
+        model_auth: Optional[ModelAuth] = None,
         text_chunk_prefix: str = None
 ):
     """
@@ -2183,9 +2189,9 @@ def vectorise_multimodal_combination_field_structured(
         start_time = timer()
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
-            
             with RequestMetricsStore.for_request().time(f"create_vectors"):
-                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
+                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise,
+                                                                                       text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.get_properties(), content=prefixed_text_content_to_vectorise,
