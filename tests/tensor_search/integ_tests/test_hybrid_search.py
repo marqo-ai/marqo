@@ -603,7 +603,7 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_res = tensor_search.search(
                             config=self.config,
                             index_name=index.name,
-                            text="dogs",
+                            text='dogs',
                             search_method="HYBRID",
                             hybrid_parameters=HybridParameters(
                                 retrieval_method=retrieval_method,

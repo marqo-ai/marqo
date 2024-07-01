@@ -89,7 +89,6 @@ public class HybridSearcher extends Searcher {
                 resultLexical = futureLexical.get(timeout, TimeUnit.MILLISECONDS);
                 resultTensor = futureTensor.get(timeout, TimeUnit.MILLISECONDS);
             } catch(TimeoutException | InterruptedException | ExecutionException e) {
-                // TODO: Handle timeout better
                 throw new RuntimeException(String.format("Hybrid search disjunction timeout error. Current timeout: %d. ", timeout) + e.toString());
             }
 
