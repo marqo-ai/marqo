@@ -950,7 +950,6 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("hits", res)
 
     # TODO: Remove when unstructured index is supported
-    @unittest.skip
     def test_hybrid_search_on_unstructured_index_fails(self):
         """
         Test that hybrid search on an unstructured index fails.
