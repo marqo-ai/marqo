@@ -560,7 +560,7 @@ class TestHybridSearch(MarqoTestCase):
         retrieval_method = "lexical", ranking_method = "tensor" and
         retrieval_method = "tensor", ranking_method = "lexical"
 
-        TODO: Figure out testing metric.
+        have expected results.
         """
 
         for index in [self.structured_text_index_score_modifiers]:
@@ -572,15 +572,15 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         docs=[
                             # similar semantics to dogs
-                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
-                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
+                            {"_id": "doc1", "text_field_1": "dogs"},
+                            {"_id": "doc2", "text_field_1": "puppies"},
                             {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
                             {"_id": "doc4", "text_field_1": "huskies"},
                             {"_id": "doc5", "text_field_1": "four-legged animals"},
 
                             # shares lexical token with dogs
                             {"_id": "doc6", "text_field_1": "hot dogs"},
-                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
+                            {"_id": "doc7", "text_field_1": "dogs is a word"},
                             {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
                             {"_id": "doc9", "text_field_1": "dogs random words"},
                             {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
@@ -593,27 +593,86 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                test_cases = [
-                    (RetrievalMethod.Lexical, RankingMethod.Tensor),
-                    (RetrievalMethod.Tensor, RankingMethod.Lexical)
-                ]
+                # Basic results (for reference)
+                tensor_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="TENSOR",
+                    result_count=10
+                )
 
-                for retrieval_method, ranking_method in test_cases:
-                    with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
-                        hybrid_res = tensor_search.search(
-                            config=self.config,
-                            index_name=index.name,
-                            text='dogs',
-                            search_method="HYBRID",
-                            hybrid_parameters=HybridParameters(
-                                retrieval_method=retrieval_method,
-                                ranking_method=ranking_method,
-                                verbose=True
-                            ),
-                            result_count=10
-                        )
+                tensor_res_all_docs = tensor_search.search( # To get tensor scores of every doc, for reference
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="TENSOR",
+                    result_count=20
+                )
 
-                        self.assertIn("hits", hybrid_res)
+                lexical_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="LEXICAL",
+                    result_count=10
+                )
+                """
+                # Lexical retrieval with Tensor ranking
+                with self.subTest(retrieval_method=RetrievalMethod.Lexical, ranking_method=RankingMethod.Tensor):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method=RetrievalMethod.Lexical,
+                            ranking_method=RankingMethod.Tensor,
+                            verbose=True
+                        ),
+                        result_count=10
+                    )
+                    self.assertIn("hits", hybrid_res)
+
+                    # RETRIEVAL: 10 documents must match the 10 from lexical search (order may differ)
+                    self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
+                    lexical_res_ids = [doc["_id"] for doc in lexical_res["hits"]]
+                    for hybrid_hit in hybrid_res["hits"]:
+                        self.assertIn(hybrid_hit["_id"], lexical_res_ids)
+
+                    # RANKING: scores must match the tensor search scores
+                    for hybrid_hit in hybrid_res["hits"]:
+                        tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
+                        self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
+                """
+                # Tensor retrieval with Lexical ranking
+                with self.subTest(retrieval_method=RetrievalMethod.Tensor, ranking_method=RankingMethod.Lexical):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method=RetrievalMethod.Tensor,
+                            ranking_method=RankingMethod.Lexical,
+                            verbose=True
+                        ),
+                        result_count=10
+                    )
+
+                    self.assertIn("hits", hybrid_res)
+
+                    # RETRIEVAL: 10 documents must match the 10 from tensor search (order may differ)
+                    self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
+                    tensor_res_ids = [doc["_id"] for doc in tensor_res["hits"]]
+                    for hybrid_hit in hybrid_res["hits"]:
+                        self.assertIn(hybrid_hit["_id"], tensor_res_ids)
+
+                    # RANKING: scores must match the lexical search scores
+                    for hybrid_hit in hybrid_res["hits"]:
+                        lexical_hit = next(doc for doc in lexical_res["hits"] if doc["_id"] == hybrid_hit["_id"])
+                        self.assertEqual(hybrid_hit["_score"], lexical_hit["_score"])
+
 
     def test_hybrid_search_invalid_parameters_fails(self):
         test_cases = [
@@ -799,6 +858,44 @@ class TestHybridSearch(MarqoTestCase):
                         )
                     )
                 self.assertIn("has no tensor field mult_field_1", str(e.exception))
+
+    def test_hybrid_search_default_parameters(self):
+        """
+        Test hybrid search when no hybrid parameters are provided.
+        """
+
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                original_query = self.config.vespa_client.query
+                def pass_through_query(*arg, **kwargs):
+                    return original_query(*arg, **kwargs)
+
+                mock_vespa_client_query = unittest.mock.MagicMock()
+                mock_vespa_client_query.side_effect = pass_through_query
+
+                @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                def run():
+                    res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                    )
+                    return res
+
+                res = run()
+
+                call_args = mock_vespa_client_query.call_args_list
+                self.assertEqual(len(call_args), 1)
+
+                vespa_query_kwargs = call_args[0][1]
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.5)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 60)
+
+                # Make sure results are retrieved
+                self.assertIn("hits", res)
 
     # TODO: Remove when unstructured index is supported
     @unittest.skip

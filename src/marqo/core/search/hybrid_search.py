@@ -119,6 +119,10 @@ class HybridSearch:
                 f"Current index version is {marqo_index_version}."
             )
 
+        # Use default hybrid settings if not provided
+        if hybrid_parameters is None:
+            hybrid_parameters = HybridParameters()
+
         # TODO: Remove when we support unstructured.
         if isinstance(marqo_index, UnstructuredMarqoIndex):
             raise core_exceptions.UnsupportedFeatureError("Unstructured indexes are not yet supported for hybrid search. "

@@ -273,7 +273,7 @@ public class HybridSearcher extends Searcher {
 
         // Create New Subquery
         Query queryNew = query.clone();
-        queryNew.properties().set("yql", yqlNew);     // TODO: figure out if this works, output
+        queryNew.properties().set("yql", yqlNew);
 
         // Set fields to search (extract using RETRIEVAL method)
         String featureNameFieldsToSearch = addQueryWrapper(QUERY_INPUT_FIELDS_TO_SEARCH + "_" + retrievalMethod);
