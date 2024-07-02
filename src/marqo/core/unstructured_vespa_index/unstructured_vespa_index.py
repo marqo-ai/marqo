@@ -259,10 +259,15 @@ class UnstructuredVespaIndex(VespaIndex):
 
         lexical_term = _get_lexical_search_term(marqo_query)
         filter_term = self._get_filter_term(marqo_query)
+
         if filter_term:
-            filter_term = f' AND {filter_term}'
+            search_term = f'({lexical_term}) AND ({filter_term})'
         else:
-            filter_term = ''
+            search_term = f'({lexical_term})'
+        #if filter_term:
+        #    filter_term = f' AND {filter_term}'
+        #else:
+        #    filter_term = ''
 
         summary = unstructured_common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets \
             else unstructured_common.SUMMARY_ALL_NON_VECTOR
@@ -277,7 +282,7 @@ class UnstructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f'select * from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'yql': f'select * from {self._marqo_index.schema_name} where {search_term}',
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
