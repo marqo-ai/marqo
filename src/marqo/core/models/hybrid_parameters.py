@@ -43,7 +43,7 @@ class HybridParameters(StrictBaseModel):
                 values['alpha'] = 0.5
         else:
             if values.get('ranking_method') not in fusion_ranking_methods:
-                raise ValueError("'alpha' can only be defined for 'rrf' and 'normalize_linear' ranking methods")
+                raise ValueError("'alpha' can only be defined for 'rrf' ranking method")    # TODO: Re-add normalize linear
 
         # rrf_k can only be defined for RRF
         if values.get('rrf_k') is None:
@@ -66,17 +66,17 @@ class HybridParameters(StrictBaseModel):
         # score_modifiers_lexical can only be defined for Lexical, RRF, NormalizeLinear
         if values.get('score_modifiers_lexical') is not None:
             if values.get('ranking_method') not in [RankingMethod.Lexical, RankingMethod.RRF, RankingMethod.NormalizeLinear]:
-                raise ValueError("'score_modifiers_lexical' can only be defined for 'lexical', 'rrf', 'normalize_linear' ranking methods")
+                raise ValueError("'score_modifiers_lexical' can only be defined for 'lexical', 'rrf' ranking methods")  # TODO: re-add normalize_linear
 
         # score_modifiers_tensor can only be defined for Tensor, RRF, NormalizeLinear
         if values.get('score_modifiers_tensor') is not None:
             if values.get('ranking_method') not in [RankingMethod.Tensor, RankingMethod.RRF, RankingMethod.NormalizeLinear]:
-                raise ValueError("'score_modifiers_tensor' can only be defined for 'tensor', 'rrf', 'normalize_linear' ranking methods")
+                raise ValueError("'score_modifiers_tensor' can only be defined for 'tensor', 'rrf', ranking methods")   # TODO: re-add normalize_linear
 
         # if retrieval_method == Disjunction, then ranking_method must be RRF, NormalizeLinear
         if values.get('retrieval_method') == RetrievalMethod.Disjunction:
             if values.get('ranking_method') not in [RankingMethod.RRF, RankingMethod.NormalizeLinear]:
-                raise ValueError("For retrieval_method: disjunction, ranking_method must be: rrf or normalize_linear")
+                raise ValueError("For retrieval_method: disjunction, ranking_method must be: rrf")      # TODO: re-add normalize_linear
 
         # if retrieval_method is Lexical or Tensor, then ranking_method must be Tensor, Lexical
         if values.get('retrieval_method') in [RetrievalMethod.Lexical, RetrievalMethod.Tensor]:

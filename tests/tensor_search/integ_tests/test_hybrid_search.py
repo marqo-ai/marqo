@@ -25,7 +25,7 @@ class TestHybridSearch(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-
+        # TODO: Cut down number of indexes
         # UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='hf/all_datasets_v4_MiniLM-L6')
@@ -192,6 +192,27 @@ class TestHybridSearch(MarqoTestCase):
 
     def setUp(self) -> None:
         super().setUp()
+
+        self.docs_list = [
+            # similar semantics to dogs
+            {"_id": "doc1", "text_field_1": "dogs"},
+            {"_id": "doc2", "text_field_1": "puppies"},
+            {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
+            {"_id": "doc4", "text_field_1": "huskies"},
+            {"_id": "doc5", "text_field_1": "four-legged animals"},
+
+            # shares lexical token with dogs
+            {"_id": "doc6", "text_field_1": "hot dogs"},
+            {"_id": "doc7", "text_field_1": "dogs is a word"},
+            {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
+            {"_id": "doc9", "text_field_1": "dogs random words"},
+            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
+
+            {"_id": "doc11", "text_field_2": "dogs but wrong field"},
+            {"_id": "doc12", "text_field_2": "puppies puppies", "add_field_1": -1.0, "mult_field_1": 0.5},
+            {"_id": "doc13", "text_field_2": "canines canines"},
+        ]
+
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
@@ -259,7 +280,7 @@ class TestHybridSearch(MarqoTestCase):
                               "({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
                               "nearestNeighbor(marqo__embeddings_text_field_2, marqo__query_embedding)))",
                               vespa_query_kwargs["marqo__yql.tensor"])
-                self.assertIn("weakAnd(default contains \"dogs\")", vespa_query_kwargs["marqo__yql.lexical"])
+                self.assertIn("default contains \"dogs\"", vespa_query_kwargs["marqo__yql.lexical"])
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.tensorScoreModifiersPresent"], True)
@@ -301,21 +322,7 @@ class TestHybridSearch(MarqoTestCase):
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=[
-                            # similar semantics to dogs
-                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
-                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
-                            {"_id": "doc3", "text_field_1": "canines"},
-                            {"_id": "doc4", "text_field_1": "huskies"},
-                            {"_id": "doc5", "text_field_1": "four-legged animals"},
-
-                            # shares lexical token with dogs
-                            {"_id": "doc6", "text_field_1": "hot dogs"},
-                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
-                            {"_id": "doc8", "text_field_1": "something something dogs"},
-                            {"_id": "doc9", "text_field_1": "dogs random words"},
-                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
-                        ],
+                        docs=self.docs_list
                     )
                 )
 
@@ -362,21 +369,7 @@ class TestHybridSearch(MarqoTestCase):
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=[
-                            # similar semantics to dogs
-                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
-                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
-                            {"_id": "doc3", "text_field_1": "canines"},
-                            {"_id": "doc4", "text_field_1": "huskies"},
-                            {"_id": "doc5", "text_field_1": "four-legged animals"},
-
-                            # shares lexical token with dogs
-                            {"_id": "doc6", "text_field_1": "hot dogs"},
-                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
-                            {"_id": "doc8", "text_field_1": "something something dogs"},
-                            {"_id": "doc9", "text_field_1": "dogs random words"},
-                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
-                        ],
+                        docs=self.docs_list
                     )
                 )
 
@@ -421,26 +414,7 @@ class TestHybridSearch(MarqoTestCase):
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=[
-                            # similar semantics to dogs
-                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
-                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
-                            {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
-                            {"_id": "doc4", "text_field_1": "huskies"},
-                            {"_id": "doc5", "text_field_1": "four-legged animals"},
-
-                            # shares lexical token with dogs
-                            {"_id": "doc6", "text_field_1": "hot dogs"},
-                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
-                            {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
-                            {"_id": "doc9", "text_field_1": "dogs random words"},
-                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
-
-                            {"_id": "doc11", "text_field_2": "dogs but wrong field"},
-                            {"_id": "doc12", "text_field_2": "puppies puppies", "add_field_1": -1.0, "mult_field_1": 0.5},
-                            {"_id": "doc13", "text_field_2": "canines canines"},
-
-                        ],
+                        docs=self.docs_list
                     )
                 )
 
@@ -497,26 +471,7 @@ class TestHybridSearch(MarqoTestCase):
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=[
-                            # similar semantics to dogs
-                            {"_id": "doc1", "text_field_1": "dogs"},        # URI: 83e4b178e136f600809a80e0
-                            {"_id": "doc2", "text_field_1": "puppies"},     # URI: 271559ecc987c6a0cf7768c9
-                            {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
-                            {"_id": "doc4", "text_field_1": "huskies"},
-                            {"_id": "doc5", "text_field_1": "four-legged animals"},
-
-                            # shares lexical token with dogs
-                            {"_id": "doc6", "text_field_1": "hot dogs"},
-                            {"_id": "doc7", "text_field_1": "dogs is a word"},  # URI: 84299cc1111b4e299606971f
-                            {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
-                            {"_id": "doc9", "text_field_1": "dogs random words"},
-                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
-
-                            {"_id": "doc11", "text_field_2": "dogs but wrong field"},
-                            {"_id": "doc12", "text_field_2": "puppies puppies", "add_field_1": -1.0, "mult_field_1": 0.5},
-                            {"_id": "doc13", "text_field_2": "canines canines"},
-
-                        ],
+                        docs=self.docs_list
                     )
                 )
 
@@ -554,13 +509,9 @@ class TestHybridSearch(MarqoTestCase):
                         for i in range(len(hybrid_res["hits"])):
                             self.assertEqual(hybrid_res["hits"][i]["_id"], base_res["hits"][i]["_id"])
 
-    def test_hybrid_search_opposite_retrieval_and_ranking(self):
+    def test_hybrid_search_with_filter(self):
         """
-        Tests that hybrid search with:
-        retrieval_method = "lexical", ranking_method = "tensor" and
-        retrieval_method = "tensor", ranking_method = "lexical"
-
-        have expected results.
+        Tests that filter is applied correctly in hybrid search.
         """
 
         for index in [self.structured_text_index_score_modifiers]:
@@ -570,56 +521,135 @@ class TestHybridSearch(MarqoTestCase):
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=[
-                            # similar semantics to dogs
-                            {"_id": "doc1", "text_field_1": "dogs"},
-                            {"_id": "doc2", "text_field_1": "puppies"},
-                            {"_id": "doc3", "text_field_1": "canines", "add_field_1": 2.0, "mult_field_1": 3.0},
-                            {"_id": "doc4", "text_field_1": "huskies"},
-                            {"_id": "doc5", "text_field_1": "four-legged animals"},
-
-                            # shares lexical token with dogs
-                            {"_id": "doc6", "text_field_1": "hot dogs"},
-                            {"_id": "doc7", "text_field_1": "dogs is a word"},
-                            {"_id": "doc8", "text_field_1": "something something dogs", "add_field_1": 1.0, "mult_field_1": 2.0},
-                            {"_id": "doc9", "text_field_1": "dogs random words"},
-                            {"_id": "doc10", "text_field_1": "dogs dogs dogs"},
-
-                            {"_id": "doc11", "text_field_2": "dogs but wrong field"},
-                            {"_id": "doc12", "text_field_2": "puppies puppies", "add_field_1": -1.0, "mult_field_1": 0.5},
-                            {"_id": "doc13", "text_field_2": "canines canines"},
-
-                        ],
+                        docs=self.docs_list
                     )
                 )
 
-                # Basic results (for reference)
-                tensor_res = tensor_search.search(
+                test_cases = [
+                    (RetrievalMethod.Disjunction, RankingMethod.RRF),
+                    (RetrievalMethod.Lexical, RankingMethod.Lexical),
+                    (RetrievalMethod.Tensor, RankingMethod.Tensor)
+                ]
+
+                for retrieval_method, ranking_method in test_cases:
+                    with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
+                        hybrid_res = tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method="HYBRID",
+                            filter="text_field_1:(something something dogs)",
+                            hybrid_parameters=HybridParameters(
+                                retrieval_method=retrieval_method,
+                                ranking_method=ranking_method,
+                                verbose=True
+                            ),
+                            result_count=10
+                        )
+
+                        self.assertIn("hits", hybrid_res)
+                        self.assertEqual(len(hybrid_res["hits"]), 1)
+                        self.assertEqual(hybrid_res["hits"][0]["_id"], "doc8")
+
+    def test_hybrid_search_with_images(self):
+        """
+        Tests that hybrid search is accurate with images, both in query and in documents.
+        """
+
+        for index in [self.structured_default_image_index]:
+            with self.subTest(index=index.name):
+                # Add documents
+                tensor_search.add_documents(
                     config=self.config,
-                    index_name=index.name,
-                    text="dogs",
-                    search_method="TENSOR",
-                    result_count=10
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "hippo image", "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+                            {"_id": "random image", "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"},
+                            {"_id": "hippo text", "text_field_1": "hippo"},
+                            {"_id": "hippo text low relevance", "text_field_1": "hippo text text random"},
+                            {"_id": "random text", "text_field_1": "random text"}
+                        ]
+                    )
                 )
 
-                tensor_res_all_docs = tensor_search.search( # To get tensor scores of every doc, for reference
+                with self.subTest("disjunction text search"):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="hippo",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method="disjunction",
+                            ranking_method="rrf",
+                            verbose=True
+                        ),
+                        result_count=4
+                    )
+
+                    self.assertIn("hits", hybrid_res)
+                    self.assertEqual(hybrid_res["hits"][0]["_id"], "hippo text")
+                    self.assertEqual(hybrid_res["hits"][1]["_id"], "hippo text low relevance")
+                    self.assertEqual(hybrid_res["hits"][2]["_id"], "random text")
+
+                with self.subTest("disjunction image search"):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method="disjunction",
+                            ranking_method="rrf",
+                            verbose=True
+                        ),
+                        result_count=4
+                    )
+
+                    self.assertIn("hits", hybrid_res)
+                    self.assertEqual(hybrid_res["hits"][0]["_id"], "hippo image")
+                    self.assertEqual(hybrid_res["hits"][1]["_id"], "random image")
+                    self.assertEqual(hybrid_res["hits"][2]["_id"], "hippo text")
+
+    def test_hybrid_search_opposite_retrieval_and_ranking(self):
+        """
+        Tests that hybrid search with:
+        retrieval_method = "lexical", ranking_method = "tensor" and
+        retrieval_method = "tensor", ranking_method = "lexical"
+
+        have expected results. The documents themselves should exactly match retrieval method, but the scores
+        should match the ranking method. This is only consistent for single-field search, as retrieval top k will
+        match the ranking top k.
+        """
+
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                # Add documents
+                tensor_search.add_documents(
                     config=self.config,
-                    index_name=index.name,
-                    text="dogs",
-                    search_method="TENSOR",
-                    result_count=20
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list
+                    )
                 )
 
-                lexical_res = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text="dogs",
-                    search_method="LEXICAL",
-                    result_count=10
-                )
-                """
                 # Lexical retrieval with Tensor ranking
                 with self.subTest(retrieval_method=RetrievalMethod.Lexical, ranking_method=RankingMethod.Tensor):
+                    # Basic results (for reference)
+                    tensor_res_all_docs = tensor_search.search( # To get tensor scores of every doc, for reference
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="TENSOR",
+                        result_count=20,
+                    )
+                    lexical_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="LEXICAL",
+                        result_count=10,
+                    )
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -644,9 +674,25 @@ class TestHybridSearch(MarqoTestCase):
                     for hybrid_hit in hybrid_res["hits"]:
                         tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
                         self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
-                """
+
                 # Tensor retrieval with Lexical ranking
                 with self.subTest(retrieval_method=RetrievalMethod.Tensor, ranking_method=RankingMethod.Lexical):
+                    # Basic results (for reference)
+                    lexical_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="LEXICAL",
+                        result_count=10,
+                    )
+                    tensor_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="TENSOR",
+                        result_count=10,
+                        searchable_attributes=["text_field_1"]
+                    )
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -655,6 +701,7 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             retrieval_method=RetrievalMethod.Tensor,
                             ranking_method=RankingMethod.Lexical,
+                            searchable_attributes_tensor=["text_field_1"],
                             verbose=True
                         ),
                         result_count=10
@@ -670,8 +717,13 @@ class TestHybridSearch(MarqoTestCase):
 
                     # RANKING: scores must match the lexical search scores
                     for hybrid_hit in hybrid_res["hits"]:
-                        lexical_hit = next(doc for doc in lexical_res["hits"] if doc["_id"] == hybrid_hit["_id"])
-                        self.assertEqual(hybrid_hit["_score"], lexical_hit["_score"])
+                        if hybrid_hit["_score"] > 0:
+                            # Score should match its counterpart in lexical search
+                            lexical_hit = next(doc for doc in lexical_res["hits"] if doc["_id"] == hybrid_hit["_id"])
+                            self.assertEqual(hybrid_hit["_score"], lexical_hit["_score"])
+                        else:
+                            # If score is 0, it should not be in lexical search results
+                            self.assertNotIn(hybrid_hit["_id"], [doc["_id"] for doc in lexical_res["hits"]])
 
 
     def test_hybrid_search_invalid_parameters_fails(self):
@@ -679,7 +731,7 @@ class TestHybridSearch(MarqoTestCase):
             ({
                  "alpha": 0.6,
                  "ranking_method": "tensor"
-             }, "can only be defined for 'rrf' and "),
+             }, "can only be defined for 'rrf'"),
             ({
                  "rrf_k": 61,
                  "ranking_method": "normalize_linear"

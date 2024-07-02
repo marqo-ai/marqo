@@ -469,7 +469,7 @@ class StructuredVespaIndex(VespaIndex):
             query_inputs.update(score_modifiers)
 
         query = {
-            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'yql': f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}',
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
@@ -509,7 +509,7 @@ class StructuredVespaIndex(VespaIndex):
         # Filter term
         filter_term = self._get_filter_term(marqo_query)
         if filter_term:
-            filter_term = f' AND {filter_term}' # TODO, fix this is till going through
+            filter_term = f' AND ({filter_term})' # TODO, fix this is till going through
         else:
             filter_term = ''
         select_attributes = self._get_select_attributes(marqo_query)
@@ -551,7 +551,7 @@ class StructuredVespaIndex(VespaIndex):
 
             # Custom searcher parameters
             'marqo__yql.tensor': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
-            'marqo__yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where {lexical_term}{filter_term}',
+            'marqo__yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}',
 
             'marqo__ranking.lexical': common.RANK_PROFILE_BM25,
             'marqo__ranking.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
