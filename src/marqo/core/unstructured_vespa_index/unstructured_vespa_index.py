@@ -240,7 +240,7 @@ class UnstructuredVespaIndex(VespaIndex):
                 return 'true'
             
             if marqo_query.or_phrases:
-                or_terms = 'weakAnd(%s)' % ', '.join([
+                or_terms = ' OR '.join([
                     f'default contains "{phrase}"' for phrase in marqo_query.or_phrases
                 ])
             else:
@@ -250,11 +250,11 @@ class UnstructuredVespaIndex(VespaIndex):
                     f'default contains "{phrase}"' for phrase in marqo_query.and_phrases
                 ])
                 if or_terms:
+                    or_terms = f'({or_terms})'
                     and_terms = f' AND ({and_terms})'
             else:
                 and_terms = ''
-
-
+            
             return f'{or_terms}{and_terms}'
 
         lexical_term = _get_lexical_search_term(marqo_query)
