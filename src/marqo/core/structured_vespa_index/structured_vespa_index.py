@@ -333,6 +333,8 @@ class StructuredVespaIndex(VespaIndex):
                                                               common.FIELD_SCORE_MODIFIERS_FLOAT,
                                                               common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
                                                               common.FIELD_VECTOR_COUNT,
+                                                              common.RESULT_FIELD_RAW_TENSOR_SCORE,
+                                                              common.RESULT_FIELD_RAW_LEXICAL_SCORE,
                                                               self._VESPA_DOC_MATCH_FEATURES}:
                 continue
             else:
@@ -605,8 +607,13 @@ class StructuredVespaIndex(VespaIndex):
         """
         Returns list of strings representing the tensor search terms for each field in the query.
         """
-        if marqo_query.searchable_attributes is not None:
-            fields_to_search = [f for f in marqo_query.searchable_attributes if f in self._marqo_index.tensor_field_map]
+        if isinstance(marqo_query, MarqoHybridQuery):
+            searchable_attributes = marqo_query.hybrid_parameters.searchable_attributes_tensor
+        else:
+            searchable_attributes = marqo_query.searchable_attributes
+
+        if searchable_attributes is not None:
+            fields_to_search = [f for f in searchable_attributes if f in self._marqo_index.tensor_field_map]
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
@@ -873,10 +880,15 @@ class StructuredVespaIndex(VespaIndex):
         return f'{or_terms}{and_terms}'
 
     def _get_lexical_contains_term(self, phrase, query: MarqoQuery) -> str:
-        if query.searchable_attributes is not None:
+        if isinstance(query, MarqoHybridQuery):
+            searchable_attributes = query.hybrid_parameters.searchable_attributes_lexical
+        else:
+            searchable_attributes = query.searchable_attributes
+
+        if searchable_attributes is not None:
             return ' OR '.join([
                 f'{self._marqo_index.field_map[field].lexical_field_name} contains "{phrase}"'
-                for field in query.searchable_attributes
+                for field in searchable_attributes
             ])
         else:
             return f'default contains "{phrase}"'

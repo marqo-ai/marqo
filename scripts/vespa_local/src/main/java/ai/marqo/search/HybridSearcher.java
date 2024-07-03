@@ -100,7 +100,8 @@ public class HybridSearcher extends Searcher {
                 HitGroup fusedHitList = rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
                 logIfVerbose("RRF Fused Hit Group", verbose);
                 logHitGroup(fusedHitList, verbose);
-                return new Result(query, fusedHitList);
+                Result tempResult = new Result(query, fusedHitList);
+                return tempResult;
             } else {
                 throw new RuntimeException("For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
             }
@@ -148,14 +149,15 @@ public class HybridSearcher extends Searcher {
             logIfVerbose(String.format("Iterating through tensor result list. Size: %d", hitsTensor.size()), verbose);
 
             for (Hit hit : hitsTensor) {
+                logIfVerbose(String.format("Tensor hit at rank: %d", rank), verbose);   // TODO: Expose marqo__id
+                logIfVerbose(hit.toString(), verbose);
+
                 reciprocalRank = alpha * (1.0 / (rank + k));
                 rrfScores.put(hit.getId().toString(), reciprocalRank);   // Store hit's score via its URI
+                hit.setField("marqo__raw_tensor_score", hit.getRelevance().getScore());   // Encode raw score for Marqo debugging purposes
                 hit.setRelevance(reciprocalRank);                 // Update score to be weighted RR (tensor)
                 result.add(hit);
                 logIfVerbose(String.format("Set relevance to: %.7f", reciprocalRank), verbose);
-                logIfVerbose(String.format("Modified tensor hit at rank: %d", rank), verbose);
-                logIfVerbose(hit.toString(), verbose);
-
                 logIfVerbose("Current result state: ", verbose);
                 logHitGroup(result, verbose);
                 rank++;
@@ -168,6 +170,9 @@ public class HybridSearcher extends Searcher {
             logIfVerbose(String.format("Iterating through lexical result list. Size: %d", hitsLexical.size()), verbose);
 
             for (Hit hit : hitsLexical) {
+                logIfVerbose(String.format("Lexical hit at rank: %d", rank), verbose);      // TODO: Expose marqo__id
+                logIfVerbose(hit.toString(), verbose);
+
                 reciprocalRank = (1.0-alpha) * (1.0 / (rank + k));
                 logIfVerbose(String.format("Calculated RRF (lexical) is: %.7f", reciprocalRank), verbose);
 
@@ -176,12 +181,10 @@ public class HybridSearcher extends Searcher {
                 if (existingScore == null){
                     // If the score doesn't exist, add new hit to result list (with rrf score).
                     logIfVerbose("No existing score found! Starting at 0.0.", verbose);
+                    hit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());   // Encode raw score for Marqo debugging purposes
                     hit.setRelevance(reciprocalRank);      // Update score to be weighted RR (lexical)
                     rrfScores.put(hit.getId().toString(), reciprocalRank);    // Log score in hashmap
                     result.add(hit);
-
-                    logIfVerbose(String.format("Modified lexical hit at rank: %d", rank), verbose);
-                    logIfVerbose(hit.toString(), verbose);
 
                 } else {
                     // If it does, find that hit in the result list and update it, adding new rrf to its score.
@@ -189,7 +192,9 @@ public class HybridSearcher extends Searcher {
                     rrfScores.put(hit.getId().toString(), newScore);
 
                     // Update existing hit in result list
-                    result.get(hit.getId().toString()).setRelevance(newScore);
+                    Hit existingHit = result.get(hit.getId().toString());
+                    existingHit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());   // Encode raw score (of lexical hit) for Marqo debugging purposes
+                    existingHit.setRelevance(newScore);
 
                     logIfVerbose(String.format("Existing score found for hit: %s.", hit.getId().toString()), verbose);
                     logIfVerbose(String.format("Existing score is: %.7f", existingScore), verbose);

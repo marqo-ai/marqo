@@ -1936,6 +1936,7 @@ def _vector_text_search(
 
 
 # TODO: REMOVE
+"""
 def _hybrid_search(
         config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5, offset: int = 0,
         ef_search: Optional[int] = None, approximate: bool = True,
@@ -1945,7 +1946,7 @@ def _hybrid_search(
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
         highlights: bool = False, text_query_prefix: Optional[str] = None,
         hybrid_parameters: HybridParameters = None) -> Dict:
-    """
+    
 
     Args:
         config:
@@ -1984,7 +1985,7 @@ def _hybrid_search(
     Future work:
         - max result count should be in a config somewhere
         - searching a non existent index should return a HTTP-type error
-    """
+    
 
     # TODO: Break out into separate modules: create_tensor_query, create_lexical query, so it can be used in both functions. No redundant code.
     # # SEARCH TIMER-LOGGER (pre-processing)
@@ -2077,7 +2078,7 @@ def _hybrid_search(
     )
 
     return gathered_docs
-
+"""
 
 def delete_index(config: Config, index_name):
     config.index_management.delete_index_by_name(index_name)

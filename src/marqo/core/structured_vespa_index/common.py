@@ -15,6 +15,8 @@ RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = 'embedding_similarity_modifiers'
 
 # For hybrid search
 RANK_PROFILE_HYBRID_CUSTOM_SEARCHER = 'hybrid_custom_searcher'
+RESULT_FIELD_RAW_TENSOR_SCORE = 'marqo__raw_tensor_score'
+RESULT_FIELD_RAW_LEXICAL_SCORE = 'marqo__raw_lexical_score'
 
 # Note field names are also used as query inputs, so make sure these reserved names have a marqo__ prefix
 QUERY_INPUT_EMBEDDING = 'marqo__query_embedding'
