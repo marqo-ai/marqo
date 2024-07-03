@@ -327,14 +327,16 @@ class StructuredVespaIndex(VespaIndex):
                     raise VespaDocumentParsingError(f'Unexpected tensor subfield {field}')
             elif field == common.FIELD_ID:
                 marqo_document[constants.MARQO_DOC_ID] = value
+            elif field == common.RESULT_FIELD_RAW_LEXICAL_SCORE:    # Return raw lexical/tensor scores if available. Usually for hybrid search (disjunction).
+                marqo_document[constants.MARQO_RAW_LEXICAL_SCORE] = value
+            elif field == common.RESULT_FIELD_RAW_TENSOR_SCORE:
+                marqo_document[constants.MARQO_RAW_TENSOR_SCORE] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
             elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_2_8,
                                                               common.FIELD_SCORE_MODIFIERS_FLOAT,
                                                               common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
                                                               common.FIELD_VECTOR_COUNT,
-                                                              common.RESULT_FIELD_RAW_TENSOR_SCORE,
-                                                              common.RESULT_FIELD_RAW_LEXICAL_SCORE,
                                                               self._VESPA_DOC_MATCH_FEATURES}:
                 continue
             else:
@@ -502,7 +504,7 @@ class StructuredVespaIndex(VespaIndex):
         if (marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Lexical and
                 marqo_query.hybrid_parameters.ranking_method == RankingMethod.Tensor):
             individual_tensor_terms = self._get_individual_field_tensor_search_terms(marqo_query)
-            lexical_term = f'rank({lexical_term}, {",".join(individual_tensor_terms)})'     # TODO: Check why relevance is 0 when lexical is being ranked with tensor rank profile
+            lexical_term = f'rank({lexical_term}, {",".join(individual_tensor_terms)})'
 
         elif (marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Tensor and
               marqo_query.hybrid_parameters.ranking_method == RankingMethod.Lexical):
