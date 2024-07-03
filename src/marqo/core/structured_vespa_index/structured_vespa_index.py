@@ -396,17 +396,8 @@ class StructuredVespaIndex(VespaIndex):
         }
 
     def _to_vespa_tensor_query(self, marqo_query: MarqoTensorQuery) -> Dict[str, Any]:
-        if marqo_query.searchable_attributes is not None:
-            for att in marqo_query.searchable_attributes:
-                if att not in self._marqo_index.tensor_field_map:
-                    raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no tensor field {att}. '
-                        f'Available tensor fields are: {", ".join(self._marqo_index.tensor_field_map.keys())}'
-                    )
 
-            fields_to_search = marqo_query.searchable_attributes
-        else:
-            fields_to_search = self._marqo_index.tensor_field_map.keys()
+        fields_to_search = self._marqo_index.tensor_field_map.keys()
 
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search else "False"
         filter_term = self._get_filter_term(marqo_query)
@@ -417,8 +408,8 @@ class StructuredVespaIndex(VespaIndex):
         select_attributes = self._get_select_attributes(marqo_query)
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
-        ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
-            else common.RANK_PROFILE_EMBEDDING_SIMILARITY
+        ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY if "normal" in select_attributes \
+            else "lightgbm"
 
         query_inputs = {
             common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
@@ -436,7 +427,7 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': "lightgbm"
+            'ranking': ranking
         }
         query = {k: v for k, v in query.items() if v is not None}
 
