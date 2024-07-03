@@ -264,10 +264,6 @@ class UnstructuredVespaIndex(VespaIndex):
             search_term = f'({lexical_term}) AND ({filter_term})'
         else:
             search_term = f'({lexical_term})'
-        #if filter_term:
-        #    filter_term = f' AND {filter_term}'
-        #else:
-        #    filter_term = ''
 
         summary = unstructured_common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets \
             else unstructured_common.SUMMARY_ALL_NON_VECTOR
