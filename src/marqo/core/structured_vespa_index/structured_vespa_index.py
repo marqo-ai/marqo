@@ -408,8 +408,8 @@ class StructuredVespaIndex(VespaIndex):
         select_attributes = self._get_select_attributes(marqo_query)
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
-        ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY if "normal" in select_attributes \
-            else "lightgbm"
+        ranking = "lightgbm" if "lightgbm" in marqo_query.searchable_attributes \
+            else common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
         query_inputs = {
             common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
