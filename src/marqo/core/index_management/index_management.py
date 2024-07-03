@@ -140,6 +140,9 @@ class IndexManagement:
 
             self._add_schema(app, marqo_index.schema_name, schema)
             self._add_schema_to_services(app, marqo_index.schema_name)
+            if marqo_index_request.rank_profile is not None:
+                self._add_rank_profile_to_app(app, marqo_index_request.rank_profile)
+
             self.vespa_client.deploy_application(app)
             self.vespa_client.wait_for_application_convergence()
             self._save_index_settings(marqo_index)
@@ -148,6 +151,15 @@ class IndexManagement:
                 self._save_marqo_version(version.get_version())
 
             return marqo_index
+
+    def _add_rank_profile_to_app(self, app, rank_profile):
+        import json
+        model_dir_path = os.path.join(app, 'models')
+        if not os.path.exists(model_dir_path):
+            os.makedirs(model_dir_path)
+        model_path = os.path.join(model_dir_path, f'lightgbm_model.json')
+        with open(model_path, 'w') as f:
+            json.dump(json.loads(rank_profile), f)
 
     @staticmethod
     def validate_index_settings(index_name: str, settings_dict: dict) -> None:

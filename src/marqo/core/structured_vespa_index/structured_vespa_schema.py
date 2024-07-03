@@ -49,11 +49,34 @@ class StructuredVespaSchema(VespaSchema):
 
         schema.extend(document_section)
         schema.extend(self._generate_rank_profiles(marqo_index))
+        schema.extend(self._generate_lightgbm_rank_profiles(marqo_index))
         schema.extend(self._generate_default_fieldset(marqo_index))
         schema.extend(self._generate_summaries(marqo_index))
         schema.append('}')
 
         return '\n'.join(schema), marqo_index
+
+    def _generate_lightgbm_rank_profiles(self, marqo_index: StructuredMarqoIndex) -> List[str]:
+        rank_profiles: List[str] = list()
+        rank_profiles.append("rank-profile lightgbm inherits default {")
+        rank_profiles.append("inputs {")
+        rank_profiles.append(f"query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{marqo_index.model.get_dimension()}])")
+        rank_profiles.append("}")
+        rank_profiles.append("first-phase {")
+        rank_profiles.append(f"expression: max(if(query(query) > 0, closeness(field, marqo__embeddings_query), 0), if(query(dummy_search_field) > 0, closeness(field, marqo__embeddings_dummy_search_field), 0))")
+        rank_profiles.append("}")
+
+        for field in marqo_index.fields:
+            if field.type == FieldType.Float:
+                rank_profiles.append(f"function {field.name}() {{")
+                rank_profiles.append(f"expression: attribute(marqo__filter_{field.name})")
+                rank_profiles.append("}")
+
+        rank_profiles.append("second-phase {")
+        rank_profiles.append("expression: lightgbm(\"lightgbm_model.json\")")
+        rank_profiles.append("}")
+        rank_profiles.append("}")
+        return rank_profiles
 
     def _generate_document_section(self, schema_name: str) -> (List[str], StructuredMarqoIndex):
         """
@@ -253,7 +276,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('}')
             rank_profiles.append(embedding_match_features_expression)
             rank_profiles.append('}')
-        
+
         if score_modifier_fields_names:
             expression = (
                 f'if (count(query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}) * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '

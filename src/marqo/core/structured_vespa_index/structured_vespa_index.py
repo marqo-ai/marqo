@@ -436,7 +436,7 @@ class StructuredVespaIndex(VespaIndex):
             'offset': marqo_query.offset,
             'query_features': query_inputs,
             'presentation.summary': summary,
-            'ranking': ranking
+            'ranking': "lightgbm"
         }
         query = {k: v for k, v in query.items() if v is not None}
 

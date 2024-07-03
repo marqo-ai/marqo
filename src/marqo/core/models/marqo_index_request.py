@@ -30,6 +30,7 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
     marqo_version: str
     created_at: int
     updated_at: int
+    rank_profile: Optional[str] = None
 
     @validator('name')
     def validate_name(cls, name):

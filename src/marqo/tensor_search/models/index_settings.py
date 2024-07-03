@@ -43,6 +43,7 @@ class IndexSettings(StrictBaseModel):
             m=16
         )
     )
+    rankProfile: Optional[str] = None
     
 
     @root_validator(pre=True)
@@ -107,6 +108,7 @@ class IndexSettings(StrictBaseModel):
                 marqo_version=version.get_version(),
                 created_at=time.time(),
                 updated_at=time.time(),
+                rank_profile=self.rankProfile
             )
         elif self.type == core.IndexType.Unstructured:
             if self.allFields is not None:
@@ -147,7 +149,8 @@ class IndexSettings(StrictBaseModel):
                 filter_string_max_length=self.filterStringMaxLength,
                 marqo_version=version.get_version(),
                 created_at=time.time(),
-                updated_at=time.time()
+                updated_at=time.time(),
+                rank_profile=self.rankProfile
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {self.type}")

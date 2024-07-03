@@ -184,7 +184,40 @@ class UnstructuredVespaSchema(VespaSchema):
                     }}
                     match-features: closest({cls._EMBEDDINGS})
                 }}
-
+                
+                rank-profile lightgbm inherits default {{
+                    inputs {{
+                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
+                    }}
+                    first-phase {{
+                        expression: closeness(field, {cls._EMBEDDINGS})
+                    }}
+                    
+                    function bi_encoder() {{
+                        expression: attribute({cls._FLOAT_FIELDS}, doc_bi_encoder).weight
+                    }}
+                    
+                    function bm25_title() {{
+                        expression: attribute({cls._FLOAT_FIELDS}, doc_bm25_title).weight
+                    }}
+                    
+                    function bm25_description() {{
+                        expression: attribute({cls._FLOAT_FIELDS}, doc_bm25_description).weight
+                    }}
+                    
+                    function bm25_bullets() {{
+                        expression: attribute({cls._FLOAT_FIELDS}, doc_bm25_bullets).weight
+                    }}
+                    
+                    function nativeRank_title() {{
+                        expression: attribute({cls._FLOAT_FIELDS}, doc_nativeRank_title).weight
+                    }}
+                    
+                    second-phase {{
+                        expression: lightgbm("lightgbm_model.json")
+                    }}
+                }}
+            
                 rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits default {{
                     first-phase {{
                     expression: bm25({cls._STRINGS})
