@@ -6,8 +6,10 @@ import com.yahoo.search.searchchain.*;
 import org.junit.Test;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.result.Hit;
+
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import org.assertj.core.api.Assertions;
 
 
 public class HybridSearcherTestCase {
@@ -80,35 +82,25 @@ public class HybridSearcherTestCase {
         HitGroup result = testSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
 
         // Check that the result size is correct
-        Assertions.assertThat(result).hasSize(6);
+        assertThat(result.asList()).hasSize(6);
 
-        // Check if the hits are interleaved correctly
-//        assertThat(result.get(0).getId().toString().equals("both1"));
-//        assertThat(result.get(1).getId().toString().equals("both2"));
-//        assertThat(result.get(2).getId().toString().equals("tensor1") || result.get(2).getId().toString().equals("lexical1"));  // Result ordering is ambiguous for ties
-//        assertThat(result.get(3).getId().toString().equals("tensor1") || result.get(3).getId().toString().equals("lexical1"));
-//        assertThat(result.get(4).getId().toString().equals("tensor2") || result.get(4).getId().toString().equals("lexical2"));
-//        assertThat(result.get(5).getId().toString().equals("tensor2") || result.get(5).getId().toString().equals("lexical2"));
+        // Check that result order and scores are correct
+        assertThat(result.asList()).containsExactly(
+                new Hit("both1", alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k))),    // Score should be a sum (tensor rank and lexical rank)
+                new Hit("both2", alpha * (1.0 / (6 + k)) + alpha * (1.0 / (5 + k))),    // Score should be a sum (tensor rank and lexical rank)
+                new Hit("lexical1", alpha * (1.0 / (1 + k))),           // Since tie, lexical was put first. Likely due to alphabetical ID.
+                new Hit("tensor1", alpha * (1.0 / (1 + k))),
+                new Hit("lexical2", alpha * (1.0 / (2 + k))),
+                new Hit("tensor2", alpha * (1.0 / (2 + k)))
+        );
 
-        // Check RRF score is calculated correctly
-        //assertEquals(result.get(0).getRelevance().getScore(), (alpha * (1.0 / (5 + k))) + (alpha * (1.0 / (4 + k)))); // appears in both lists
-        //assertEquals(result.get(1).getRelevance().getScore(), (alpha * (1.0 / (6 + k))) + (alpha * (1.0 / (5 + k)))); // appears in both lists
-        //assertEquals(result.get(2).getRelevance().getScore(), alpha * (1.0 / (1 + k)));     // 1st in tensor/lexical list
-        //assertEquals(result.get(3).getRelevance().getScore(), alpha * (1.0 / (1 + k)));     // 1st in tensor/lexical list
-        //assertEquals(result.get(4).getRelevance().getScore(), alpha * (1.0 / (2 + k)));     // 2nd in tensor/lexical list
-        //assertEquals(result.get(5).getRelevance().getScore(), alpha * (1.0 / (2 + k)));     // 2nd in tensor/lexical list
-
-        // Check raw score is encoded
-        /*assertEquals(result.get(0).getField("marqo__raw_tensor_score"), 0.4);
-        assertEquals(result.get(0).getField("marqo__raw_lexical_score"), 0.45);
-        assertEquals(result.get(1).getField("marqo__raw_tensor_score"), 0.3);
-        assertEquals(result.get(1).getField("marqo__raw_lexical_score"), 0.44);
-
-        assertEquals(result.get(1).getRelevance().getScore(), (alpha * (1.0 / (6 + k))) + (alpha * (1.0 / (5 + k)))); // appears in both lists
-        assertEquals(result.get(2).getRelevance().getScore(), alpha * (1.0 / (1 + k)));     // 1st in tensor/lexical list
-        assertEquals(result.get(3).getRelevance().getScore(), alpha * (1.0 / (1 + k)));     // 1st in tensor/lexical list
-        assertEquals(result.get(4).getRelevance().getScore(), alpha * (1.0 / (2 + k)));     // 2nd in tensor/lexical list
-        assertEquals(result.get(5).getRelevance().getScore(), alpha * (1.0 / (2 + k)));     // 2nd in tensor/lexical list*/
+        // TODO: Add back when Map is fixed
+        //assertThat(result.get(0).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.4, "marqo__raw_lexical_score", 0.45));
+        //assertThat(result.get(1).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.3, "marqo__raw_lexical_score", 0.44));
+        //assertThat(result.get(2).fields()).containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
+        //assertThat(result.get(3).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
+        //assertThat(result.get(4).fields()).containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
+        //assertThat(result.get(5).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
     }
 
     @Test
