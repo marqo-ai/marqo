@@ -469,7 +469,7 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")    # lowest score (score*-10*3)
                     self.assertEqual(hybrid_res["hits"][-1]["_score"], -30.0)
 
-
+                # TODO: Uncomment when tensor/lexical modifiers bug is fixed
                 """
                 with self.subTest("retrieval: tensor, ranking: lexical"):
                     hybrid_res = tensor_search.search(
@@ -498,7 +498,6 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # second highest score (score + 5*1)
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
                 """
-                # TODO: Add RRF Disjunction test
                 with self.subTest("retrieval: disjunction, ranking: rrf"):
                     hybrid_res = tensor_search.search(
                         config=self.config,

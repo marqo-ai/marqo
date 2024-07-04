@@ -322,7 +322,7 @@ public class HybridSearcher extends Searcher {
      * @param hits
      * @param verbose
      */
-    void logHitGroup(HitGroup hits, boolean verbose) {
+    public void logHitGroup(HitGroup hits, boolean verbose) {
         if (verbose) {
             logger.info(String.format("Hit Group has size: %s", hits.size()));
             logger.info("=======================");
