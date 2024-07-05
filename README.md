@@ -482,11 +482,13 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 2. Activate the virtual environment ```source ./venv/bin/activate```.
 
-3. Install requirements from the requirements file: ```pip install -r requirements.txt```.
+3. Install requirements from the requirements file: ```pip install tox```.
 
-4. Run tests by running the tox file. CD into this dir and then run "tox".
+4. Check this open file limit of your OS by running ```ulimit -a``` and set it to a large value using ```ulimit -Sn 10000``` to avoid Too many open file issue
 
-5. If you update dependencies, make sure to delete the .tox dir and rerun.
+5. Run tests by running the tox file. CD into this dir and then run "tox".
+
+6. If you update dependencies, make sure to delete the .tox dir and rerun.
 
 ## Merge instructions:
 

@@ -72,7 +72,7 @@ jobs:
           pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.dev.txt
-          pip install pytest==7.4.0
+          pip install tox==4.16.0
 
       - name: Build Vespa
         run: |
@@ -133,9 +133,15 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
+          tox
+#          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
+#          pytest marqo/tests
 
-          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-test-report
+          path: htmlcov/
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
