@@ -556,10 +556,16 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__yql.tensor': f'select {select_attributes} from {self._marqo_index.schema_name} where {tensor_term}{filter_term}',
             'marqo__yql.lexical': f'select {select_attributes} from {self._marqo_index.schema_name} where ({lexical_term}){filter_term}',
 
-            'marqo__ranking.lexical': common.RANK_PROFILE_BM25,
-            'marqo__ranking.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
-            'marqo__ranking.lexicalScoreModifiers': common.RANK_PROFILE_BM25_MODIFIERS,
-            'marqo__ranking.tensorScoreModifiers': common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS,
+            # TODO: Test these
+            'marqo__ranking.lexical.lexical': common.RANK_PROFILE_BM25,
+            'marqo__ranking.tensor.tensor': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
+            'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
+            'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
+
+            'marqo__ranking.lexical.lexicalScoreModifiers': common.RANK_PROFILE_BM25_MODIFIERS,
+            'marqo__ranking.tensor.tensorScoreModifiers': common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS,
+            'marqo__ranking.lexical.tensorScoreModifiers': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
+            'marqo__ranking.tensor.lexicalScoreModifiers': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
 
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.ranking_method,

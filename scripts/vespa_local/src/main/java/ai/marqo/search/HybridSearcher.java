@@ -324,20 +324,20 @@ public class HybridSearcher extends Searcher {
         // Extract relevant properties
         // YQL uses RETRIEVAL method
         String yqlNew = query.properties().getString("marqo__yql." + retrievalMethod, "");
-        // Rank Profile uses RANKING method
-        String rankProfileNew = query.properties().getString("marqo__ranking." + rankingMethod, "");
+        // Rank Profile uses RETRIEVAL + RANKING method
+        String rankProfileNew = query.properties().getString("marqo__ranking." + retrievalMethod + "." + rankingMethod, "");
         String rankProfileNewScoreModifiers =
                 query.properties()
-                        .getString("marqo__ranking." + rankingMethod + "ScoreModifiers", "");
+                        .getString("marqo__ranking." + retrievalMethod + "." + rankingMethod + "ScoreModifiers", "");
 
         // Log fetched properties
         logIfVerbose(String.format("YQL %s found: %s", retrievalMethod, yqlNew), verbose);
         logIfVerbose(
-                String.format("Rank Profile %s found: %s", rankingMethod, rankProfileNew), verbose);
+                String.format("Rank Profile %s.%s found: %s", retrievalMethod, rankingMethod, rankProfileNew), verbose);
         logIfVerbose(
                 String.format(
-                        "Rank Profile %s score modifiers found: %s",
-                        rankingMethod, rankProfileNewScoreModifiers),
+                        "Rank Profile %s.%s score modifiers found: %s",
+                        retrievalMethod, rankingMethod, rankProfileNewScoreModifiers),
                 verbose);
 
         // Create New Subquery
@@ -356,6 +356,7 @@ public class HybridSearcher extends Searcher {
                                 cell, queryNew, retrievalMethod, rankingMethod, verbose));
 
         // Set rank profile (using RANKING method)
+        // TODO: Use rankProfileNewScoreModifiers also if retrievalMethod="lexical" + rankingMethod="tensor", and either are present.
         if (query.properties()
                 .getBoolean("marqo__hybrid." + rankingMethod + "ScoreModifiersPresent")) {
             // With Score Modifiers (using RANKING method)
