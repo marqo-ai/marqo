@@ -52,6 +52,7 @@ class MarqoTensorQuery(MarqoQuery):
     vector_query: List[float]
     ef_search: Optional[int] = None
     approximate: bool = True
+    rerank: bool = False
 
     # TODO - validate that ef_search >= offset+limit if provided
 

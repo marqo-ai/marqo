@@ -253,7 +253,8 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth,
-            text_query_prefix=search_query.textQueryPrefix
+            text_query_prefix=search_query.textQueryPrefix,
+            rerank=search_query.rerank
         )
 
 

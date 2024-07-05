@@ -1209,7 +1209,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
            score_modifiers: Optional[ScoreModifier] = None,
            model_auth: Optional[ModelAuth] = None,
            processing_start: float = None,
-           text_query_prefix: Optional[str] = None) -> Dict:
+           text_query_prefix: Optional[str] = None,
+           rerank: bool = False) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1320,7 +1321,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
             ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
             filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
             image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
-            model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
+            model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank=rerank
         )
     elif search_method.upper() == SearchMethod.LEXICAL:
         if ef_search is not None:
@@ -1798,7 +1799,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
         score_modifiers: Optional[ScoreModifier] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
+        highlights: bool = False, text_query_prefix: Optional[str] = None,
+        rerank: bool = False) -> Dict:
     """
     
     Args:
@@ -1871,7 +1873,8 @@ def _vector_text_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        rerank=rerank
     )
 
     vespa_index = vespa_index_factory(marqo_index)
