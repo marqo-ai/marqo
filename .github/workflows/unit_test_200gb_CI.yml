@@ -69,9 +69,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements.txt
+          # pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
-          pip install -r marqo/requirements.dev.txt
+          # pip install -r marqo/requirements.dev.txt
           pip install tox==4.16.0
 
       - name: Build Vespa
