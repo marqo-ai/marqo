@@ -133,28 +133,13 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <formats>
-                        <format>
-                            <includes>
-                                <include>src/main/java/**/*.java</include>
-                                <include>src/test/java/**/*.java</include>
-                            </includes>
-                            <trimTrailingWhitespace/>
-                            <endWithNewline/>
-                            <indent>
-                                <tabs>true</tabs>
-                                <spacesPerTab>4</spacesPerTab>
-                            </indent>
-                        </format>
-                    </formats>
                     <java>
                         <googleJavaFormat>
                             <version>1.22.0</version>
-                            <style>GOOGLE</style>
+                            <style>AOSP</style>
                             <reflowLongStrings>true</reflowLongStrings>
                             <formatJavadoc>false</formatJavadoc>
                         </googleJavaFormat>
-                        <prettier />
                         <importOrder />
                         <removeUnusedImports />
                         <formatAnnotations />
