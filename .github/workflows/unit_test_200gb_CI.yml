@@ -133,6 +133,7 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
+          cd marqo
           tox
 #          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
 #          pytest marqo/tests
