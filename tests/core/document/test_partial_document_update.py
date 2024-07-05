@@ -267,7 +267,7 @@ class TestUpdate(MarqoTestCase):
         }
 
         score_modifier = ScoreModifier(**{
-            "add_to_score": [{"field_name": "int_field_score_modifier", "weight": "1"}]
+            "add_to_score": [{"field_name": "int_field_score_modifier", "weight": 1}]
         })
 
         r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
@@ -319,7 +319,7 @@ class TestUpdate(MarqoTestCase):
         }
 
         score_modifier = ScoreModifier(**{
-            "add_to_score": [{"field_name": "float_field_score_modifier", "weight": "1"}]
+            "add_to_score": [{"field_name": "float_field_score_modifier", "weight": 1.0}]
         })
 
         r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
@@ -670,7 +670,7 @@ class TestUpdate(MarqoTestCase):
 
         for i in range(100):
             score_modifiers = ScoreModifier(**{
-                "add_to_score": [{"field_name": f"float_field_{i}", "weight": "1"}]
+                "add_to_score": [{"field_name": f"float_field_{i}", "weight": "1.0"}]
             })
 
             modified_score = tensor_search.search(config=self.config, index_name=self.large_score_modifier_index_name,

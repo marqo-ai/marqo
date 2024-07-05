@@ -33,6 +33,10 @@ def mappings():
     return _build_url('API-Reference/Documents/mappings/')
 
 
+def map_fields():
+    return _build_url('API-Reference/Documents/add_or_replace_documents/#map-fields/')
+
+
 def list_of_models():
     return _build_url('Guides/Models-Reference/list_of_models/')
 

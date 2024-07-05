@@ -1,11 +1,11 @@
-schema marqo__my_00index {
-    document {
-        field marqo__id type string {
+    schema marqo__my_00index {
+        document {
+            field marqo__id type string {
             indexing: attribute | summary
             attribute: fast-search
             rank: filter
         }
-        field marqo__lexical_title type string {
+            field marqo__lexical_title type string {
             indexing: index | summary
             index: enable-bm25
         }
@@ -50,7 +50,8 @@ schema marqo__my_00index {
             attribute: fast-search
             rank: filter
         }
-        field marqo__score_modifiers type tensor<float>(p {}) { indexing: attribute | summary}
+        field marqo__score_modifiers_double_long type tensor<double>(p {}) { indexing: attribute | summary}
+        field marqo__score_modifiers_float type tensor<float>(p {}) { indexing: attribute | summary}
             field marqo__chunks_title type array<string> {
             indexing: attribute | summary
         }
@@ -73,10 +74,7 @@ schema marqo__my_00index {
                     neighbors-to-explore-at-insert: 100
             }}
         }
-            field marqo__vector_count type int{
-            indexing: attribute | summary
-        }
-
+        field marqo__vector_count type int { indexing: attribute | summary}
     }
         rank-profile bm25 inherits default {
             inputs {
@@ -99,16 +97,16 @@ schema marqo__my_00index {
     }
         rank-profile modifiers inherits default {
             inputs {
-            query(marqo__mult_weights) tensor<float>(p {})
-            query(marqo__add_weights) tensor<float>(p {})
+            query(marqo__mult_weights) tensor<double>(p {})
+            query(marqo__add_weights) tensor<double>(p {})
         }
             function modify(score) {
-            expression: if (count(query(marqo__mult_weights)) == 0, 1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)
+            expression: if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_double_long), prod)) * if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers_float)) == 0,    1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers_float), prod)) * score + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_double_long), sum) + reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers_float), sum)
     }}
         rank-profile bm25_modifiers inherits modifiers {
             inputs {
-            query(marqo__mult_weights) tensor<float>(p {})
-            query(marqo__add_weights) tensor<float>(p {})
+            query(marqo__mult_weights) tensor<double>(p {})
+            query(marqo__add_weights) tensor<double>(p {})
             query(title): 0
             query(category): 0
         }
@@ -117,8 +115,8 @@ schema marqo__my_00index {
     }}
         rank-profile embedding_similarity_modifiers inherits modifiers {
             inputs {
-            query(marqo__mult_weights) tensor<float>(p {})
-            query(marqo__add_weights) tensor<float>(p {})
+            query(marqo__mult_weights) tensor<double>(p {})
+            query(marqo__add_weights) tensor<double>(p {})
             query(marqo__query_embedding) tensor<float>(x[512])
             query(title): 0
             query(description): 0

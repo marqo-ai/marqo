@@ -34,7 +34,6 @@ def validate_mappings_object_format(mappings: Dict) -> None:
             f"Read about the mappings object here: {marqo_docs.mappings()}"
         )
 
-
 def _validate_multimodal_combination_field_name(multimodal_field_name: str):
     validate_field_name(multimodal_field_name)
     # This error will never be raised because _id can't be a tensor_fields
