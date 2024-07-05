@@ -234,13 +234,14 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["marqo__ranking.lexicalScoreModifiers"], "bm25_modifiers")
                 self.assertEqual(vespa_query_kwargs["marqo__ranking.tensorScoreModifiers"], "embedding_similarity_modifiers")
 
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_search_lexical"], {'text_field_1': 1, 'text_field_2': 1})
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_search_tensor"], {'text_field_2': 1, 'text_field_3': 1})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_lexical"], {'text_field_1': 1, 'text_field_2': 1})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"], {'text_field_2': 1, 'text_field_3': 1})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_lexical"], {'mult_field_1': 1.0, 'mult_field_2': 1.0})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_lexical"], {})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_tensor"], {'mult_field_1': 1.0})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_tensor"], {'add_field_1': 1.0})
 
+                # TODO: For lexical/tensor and tensor/lexical. Check fields to rank specifically.
                 # Make sure results are retrieved
                 self.assertIn("hits", res)
 

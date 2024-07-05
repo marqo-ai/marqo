@@ -524,13 +524,12 @@ class StructuredVespaIndex(VespaIndex):
             common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
         }
 
-        # Combine fields to search and remove duplicates
-        # Custom searcher will split this into lexical and tensor requests
+        # Separate fields to rank (lexical and tensor)
         query_inputs.update({
-            common.QUERY_INPUT_FIELDS_TO_SEARCH_LEXICAL: {
+            common.QUERY_INPUT_FIELDS_TO_RANK_LEXICAL: {
                 f: 1 for f in fields_to_search_lexical
             },
-            common.QUERY_INPUT_FIELDS_TO_SEARCH_TENSOR: {
+            common.QUERY_INPUT_FIELDS_TO_RANK_TENSOR: {
                 f: 1 for f in fields_to_search_tensor
             }
         })

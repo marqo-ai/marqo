@@ -178,13 +178,52 @@ class StructuredVespaSchema(VespaSchema):
 
         return document, marqo_index
 
-    def _generate_max_similarity_expression(self, tensor_fields: List[TensorField]) -> str:
+    def _generate_max_bm25_expression(self, lexical_fields: dict_values[str, Field], prefixed: bool) -> str:
+        """
+        Recursively generate max closeness expression for all lexical fields.
+        Max is a binary operator, so for more than 2 fields this method gets max of:
+        1) first field
+        2) max of the rest of the fields.
+
+        prefixed arg determines whether to add "marqo__lexical_" prefix to tensor field name.
+        """
+
+        def get_field_name(field: Field) -> str:
+            return field.lexical_field_name if prefixed else field.name
+
+        # Base cases
+        # If no lexical fields, return empty string.
+        # If only 1 or 2 lexical fields, get max of one/both.
+        if len(lexical_fields) == 0:
+            return ""
+        elif len(lexical_fields) == 1:
+            return (f'if(query({get_field_name(lexical_fields[0])}) > 0, '
+                    f'bm25({lexical_fields[0].lexical_field_name}), 0)')
+        elif len(lexical_fields) == 2:
+            return (f'max('
+                    f'if(query({get_field_name(lexical_fields[0])}) > 0, '
+                    f'bm25({lexical_fields[0].lexical_field_name}), 0), '
+                    f'if(query({get_field_name(lexical_fields[1])}) > 0, '
+                    f'bm25({lexical_fields[1].lexical_field_name}), 0))')
+        # Recursive step
+        else:
+            return (f'max('
+                    f'if(query({get_field_name(lexical_fields[0])}) > 0, '
+                    f'bm25({lexical_fields[0].lexical_field_name}), 0), '
+                    f'{self._generate_max_bm25_expression(lexical_fields[1:])})')
+
+    def _generate_max_similarity_expression(self, tensor_fields: List[TensorField], prefixed: bool) -> str:
         """
         Recursively generate max closeness expression for all tensor fields.
         Max is a binary operator, so for more than 2 fields this method gets max of:
         1) first field
         2) max of the rest of the fields.
+
+        prefixed arg determines whether to add "marqo__tensor_" prefix to tensor field name.
         """
+
+        def get_field_name(field: TensorField) -> str:
+            return f'marqo__tensor_{field.name}' if prefixed else field.name
 
         # Base cases
         # If no tensor fields, return empty string.
@@ -192,18 +231,18 @@ class StructuredVespaSchema(VespaSchema):
         if len(tensor_fields) == 0:
             return ""
         elif len(tensor_fields) == 1:
-            return (f'if(query({tensor_fields[0].name}) > 0, '
+            return (f'if(query({get_field_name(tensor_fields[0])}) > 0, '
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0)')
         elif len(tensor_fields) == 2:
             return (f'max('
-                    f'if(query({tensor_fields[0].name}) > 0, '
+                    f'if(query({get_field_name(tensor_fields[0])}) > 0, '
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
-                    f'if(query({tensor_fields[1].name}) > 0, '
+                    f'if(query({get_field_name(tensor_fields[1])}) > 0, '
                     f'closeness(field, {tensor_fields[1].embeddings_field_name}), 0))')
         # Recursive step
         else:
             return (f'max('
-                    f'if(query({tensor_fields[0].name}) > 0, '
+                    f'if(query({get_field_name(tensor_fields[0])}) > 0, '
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
                     f'{self._generate_max_similarity_expression(tensor_fields[1:])})')
 
@@ -215,11 +254,12 @@ class StructuredVespaSchema(VespaSchema):
         score_modifier_fields_names = marqo_index.score_modifier_fields_names
         model_dim = marqo_index.model.get_dimension()
 
+        # For normal bm25 and embedding_similarity rank profiles
         bm25_expression = ' + '.join([
             f'if (query({field.name}) > 0, bm25({field.lexical_field_name}), 0)' for field in lexical_fields
         ])
 
-        embedding_similarity_expression = self._generate_max_similarity_expression(tensor_fields)
+        embedding_similarity_expression = self._generate_max_similarity_expression(tensor_fields, prefixed=False)
 
         embedding_match_features_expression = \
             'match-features: ' + \
@@ -231,8 +271,6 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BM25} inherits default {{')
 
             rank_profiles.append('inputs {')
-            # TODO: possibly separate this into a new rank-profile hybrid_bm25_ranker
-            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
             for field in lexical_fields:
                 rank_profiles.append(f'query({field.name}): 0')
             rank_profiles.append('}')
@@ -258,7 +296,8 @@ class StructuredVespaSchema(VespaSchema):
 
         # Hybrid search
         if lexical_fields and tensor_fields:
-            # Hybrid search rank profile simply organizes and passes rank features to respective inner lexical/tensor queries
+            # HYBRID SEARCH CUSTOM
+            # rank profile simply organizes and passes rank features to respective inner lexical/tensor queries
             # No actual ranking is done here.
             rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{')
 
@@ -269,14 +308,108 @@ class StructuredVespaSchema(VespaSchema):
                 rank_profiles.append(f'query({field.name}): 0')
 
             # Temp parameters to pass into respective queries (lexical and tensor)
-            rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_SEARCH_LEXICAL}) tensor<int8>(p{{}})')
-            rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_SEARCH_TENSOR}) tensor<int8>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_RANK_TENSOR}) tensor<int8>(p{{}})')
             for search_type in ["lexical", "tensor"]:
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_{search_type}) tensor<double>(p{{}})')
                 rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_{search_type}) tensor<double>(p{{}})')
 
             rank_profiles.append('}')
             rank_profiles.append('}')
+
+            # HYBRID SEARCH BASE RANK PROFILE
+            # Contains modifiers and the 3 lexical aggregate functions.
+            # No need for rank profiles with and without modifiers. Same will be used for both.
+            # 2 new parameters (mult_weights and add_weights) are passed
+            hybrid_modifiers_expression = (
+                f'if (count(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '
+                f'   1, reduce(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), prod)) '
+                f'* if (count(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT})) == 0, '
+                f'   1, reduce(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT}), prod)) '
+                f'* score '
+                f'+ reduce(add_weights * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), sum) '
+                f'+ reduce(add_weights * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT}), sum)'
+            )
+
+            # Prefix marqo__lexical_ must be in the rank feature name
+            hybrid_bm25_expression_sum = ' + '.join([
+                f'if (query({field.lexical_field_name}) > 0, bm25({field.lexical_field_name}), 0)' for field in
+                lexical_fields
+            ])
+            # Adds 1 for every lexical field marked with (1)
+            hybrid_lexical_rank_features_count = ' + '.join([
+                f'query({field.lexical_field_name})' for field in lexical_fields
+            ])
+            hybrid_bm25_expression_avg = (
+                f'({hybrid_bm25_expression_sum}) / '
+                f'if ({hybrid_lexical_rank_features_count} == 0, 1, {hybrid_lexical_rank_features_count})'
+            )
+            hybrid_bm25_expression_max = self._generate_max_bm25_expression(lexical_fields, prefixed=True)
+            hybrid_embedding_similarity_expression = self._generate_max_similarity_expression(tensor_fields,
+                                                                                              prefixed=True)
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BASE} inherits default {{')
+            rank_profiles.append('inputs {')
+            # Score Modifiers
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_lexical) tensor<double>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_lexical) tensor<double>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_tensor) tensor<double>(p{{}})')
+            rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_tensor) tensor<double>(p{{}})')
+            # Tensor embeddings
+            rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
+            # Lexical aggregator: 0 (sum), 1 (avg), 2 (max)
+            rank_profiles.append(f'query({common.QUERY_INPUT_BM25_AGGREGATOR}): 0')
+            # Lexical parameters for phase 1 ranking
+            for field in lexical_fields:
+                rank_profiles.append(f'query({common.RANK_FEATURE_PREFIX_LEXICAL + field.name}): 0')
+            rank_profiles.append('}')
+
+            rank_profiles.append('function modify(score, mult_weights, add_weights) {')
+            rank_profiles.append(f'   expression: {hybrid_modifiers_expression}')
+            rank_profiles.append('}}')
+
+            # 3 aggregate functions
+            rank_profiles.append('function lexical_score_sum() {')
+            rank_profiles.append(f'expression: {hybrid_bm25_expression_sum}')
+            rank_profiles.append('}')
+            rank_profiles.append('function lexical_score_avg() {')
+            rank_profiles.append(f'expression: {hybrid_bm25_expression_avg}')
+            rank_profiles.append('}')
+            rank_profiles.append('function lexical_score_max() {')
+            rank_profiles.append(f'expression: {hybrid_bm25_expression_max}')
+            rank_profiles.append('}')
+            # Decide which of the 3 lexical aggregate functions to use
+            rank_profiles.append('function lexical_score() {')
+            rank_profiles.append(
+                f'expression: if (query({common.QUERY_INPUT_BM25_AGGREGATOR}) == 0, lexical_score_sum(), '
+                f'if (query({common.QUERY_INPUT_BM25_AGGREGATOR}) == 1, lexical_score_avg(), '
+                f'lexical_score_max()))')
+            rank_profiles.append('}')
+
+            # For hybrid bm25 and embedding_similarity rank profiles
+            # HYBRID SEARCH LEXICAL THEN TENSOR
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY} inherits {common.RANK_PROFILE_BASE} {{')
+            rank_profiles.append('inputs {')
+            # Tensor parameters for phase 2 ranking
+            for field in tensor_fields:
+                rank_profiles.append(f'query({common.RANK_FEATURE_PREFIX_LEXICAL + field.name}): 0')
+            rank_profiles.append('}')
+
+            rank_profiles.append('first-phase {')   # First phase ranks on LEXICAL
+            rank_profiles.append(f'expression: modify(lexical_score(), query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_lexical), query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_lexical))')
+            rank_profiles.append('}')
+            rank_profiles.append('second-phase {')  # Second phase ranks on TENSOR
+            rank_profiles.append(f'expression: modify({hybrid_embedding_similarity_expression}, query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_tensor), query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_tensor))')
+            rank_profiles.append('}')
+            rank_profiles.append(embedding_match_features_expression)
+            rank_profiles.append('}')
+
+            # HYBRID SEARCH TENSOR THEN LEXICAL
+            # Only 1 phase ranking (lexical only)
+            rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25} inherits {common.RANK_PROFILE_BASE} {{')
+            rank_profiles.append('first-phase {')  # First phase ranks on LEXICAL
+            rank_profiles.append(f'expression: modify(lexical_score(), query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_lexical), query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_lexical))')
+            rank_profiles.append('}}')
+
 
         if score_modifier_fields_names:
             expression = (

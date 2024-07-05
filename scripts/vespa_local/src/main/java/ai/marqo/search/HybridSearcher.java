@@ -36,11 +36,11 @@ public class HybridSearcher extends Searcher {
 
 	Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
-	private static String MATCH_FEATURES_FIELD = "matchfeatures";
-	private static String QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = "marqo__mult_weights";
-	private static String QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = "marqo__add_weights";
-	private static String QUERY_INPUT_FIELDS_TO_SEARCH = "marqo__fields_to_search";
-	private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
+    private static String MATCH_FEATURES_FIELD = "matchfeatures";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = "marqo__mult_weights";
+    private static String QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = "marqo__add_weights";
+    private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
+    private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
 
 	@Override
 	public Result search(Query query, Execution execution) {
@@ -226,22 +226,29 @@ public class HybridSearcher extends Searcher {
 
 		return result;
 	}
-
-	/**
-	 * Extracts mapped Tensor Address from cell then adds it as key to rank features, with cell value as the value.
-	 * @param cell
-	 * @param query
-	 * @param verbose
-	 */
-	void addFieldToRankFeatures(Cell cell, Query query, boolean verbose){
-		TensorAddress cellKey = cell.getKey();
-		int dimensions = cellKey.size();
-		for (int i = 0; i < dimensions; i++){
-			String queryInputString = addQueryWrapper(cellKey.label(i));
-			logIfVerbose(String.format("Setting Rank Feature %s to %s", queryInputString, cell.getValue()), verbose);
-			query.getRanking().getFeatures().put(queryInputString, cell.getValue());
-		}
-	}
+		
+    /**
+     * Extracts mapped Tensor Address from cell then adds it as key to rank features, with cell value as the value.
+     * @param cell
+     * @param query
+     * @param verbose
+     */
+    void addFieldToRankFeatures(Cell cell, Query query, String retrievalMethod, String rankingMethod, boolean verbose){
+        TensorAddress cellKey = cell.getKey();
+        String queryInputString;
+        int dimensions = cellKey.size();
+        for (int i = 0; i < dimensions; i++){
+            if (retrievalMethod.equals("tensor") && rankingMethod.equals("lexical") || retrievalMethod.equals("lexical") && rankingMethod.equals("tensor")){
+                // If the retrieval and ranking methods are different, add the ranking method to the rank feature name.
+                queryInputString = addQueryWrapper("marqo__" + rankingMethod + "_" + cellKey.label(i));  // e.g. marqo__lexical_field1
+            } else {
+                // Otherwise use the original rank feature name (disjunction, lexical/lexical, tensor/tensor).
+                queryInputString = addQueryWrapper(cellKey.label(i));
+            }
+            query.getRanking().getFeatures().put(queryInputString, cell.getValue());
+            logIfVerbose(String.format("Setting Rank Feature %s to %s", queryInputString, cell.getValue()), verbose);
+        }
+    }
 
 	/**
 	 * Creates custom sub-query from the original query.
@@ -279,12 +286,12 @@ public class HybridSearcher extends Searcher {
 		Query queryNew = query.clone();
 		queryNew.properties().set("yql", yqlNew);
 
-		// Set fields to search (extract using RETRIEVAL method)
-		String featureNameFieldsToSearch = addQueryWrapper(QUERY_INPUT_FIELDS_TO_SEARCH + "_" + retrievalMethod);
-		logIfVerbose("Using fields to search from " + featureNameFieldsToSearch, verbose);
-		Tensor fieldsToSearch = extractTensorRankFeature(query, featureNameFieldsToSearch);
-		Iterator<Cell> cells = fieldsToSearch.cellIterator();
-		cells.forEachRemaining((cell) -> addFieldToRankFeatures(cell, queryNew, verbose));
+		// Set fields to rank (extract using RANKING method)
+        String featureNameFieldsToRank = addQueryWrapper(QUERY_INPUT_FIELDS_TO_RANK + "_" + rankingMethod);
+        logIfVerbose("Using fields to rank from " + featureNameFieldsToRank, verbose);
+        Tensor fieldsToRank = extractTensorRankFeature(query, featureNameFieldsToRank);
+        Iterator<Cell> cells = fieldsToRank.cellIterator();
+        cells.forEachRemaining((cell) -> addFieldToRankFeatures(cell, queryNew, retrievalMethod, rankingMethod, verbose));
 
 		// Set rank profile (using RANKING method)
 		if (query.properties().getBoolean("marqo__hybrid." + rankingMethod + "ScoreModifiersPresent")){
@@ -292,14 +299,15 @@ public class HybridSearcher extends Searcher {
 			queryNew.getRanking().setProfile(rankProfileNewScoreModifiers);
 
 			// Extract lexical/tensor rank features and reassign to main rank features.
-			// marqo__add_weights_tensor --> marqo__add_weights
-			// marqo__mult_weights_tensor --> marqo__mult_weights
-			String featureNameScoreModifiersAddWeights = addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS + "_" + rankingMethod);
-			String featureNameScoreModifiersMultWeights = addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS + "_" + rankingMethod);
-			Tensor add_weights = extractTensorRankFeature(query, featureNameScoreModifiersAddWeights);
-			Tensor mult_weights = extractTensorRankFeature(query, featureNameScoreModifiersMultWeights);
-			queryNew.getRanking().getFeatures().put(addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS), add_weights);
-			queryNew.getRanking().getFeatures().put(addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS), mult_weights);
+            // Only do this for disjunction, lexical/lexical, or tensor/tensor, which use the original rank profiles.
+            if (rankingMethod.equals(retrievalMethod)){
+                String featureNameScoreModifiersAddWeights = addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS + "_" + rankingMethod);
+                String featureNameScoreModifiersMultWeights = addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS + "_" + rankingMethod);
+                Tensor add_weights = extractTensorRankFeature(query, featureNameScoreModifiersAddWeights);
+                Tensor mult_weights = extractTensorRankFeature(query, featureNameScoreModifiersMultWeights);
+                queryNew.getRanking().getFeatures().put(addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS), add_weights);
+                queryNew.getRanking().getFeatures().put(addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS), mult_weights);
+            }
 
 		} else {
 			// Without Score Modifiers
