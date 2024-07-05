@@ -9,17 +9,19 @@
     <artifactId>hybrid-searcher</artifactId>  <!-- Note: When changing this, also change bundle names in services.xml -->
     <version>1.0.0</version>
     <packaging>container-plugin</packaging>
-    <dependencies>                          
-        <dependency>                <!-- For unit testing -->
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.8.2</version>
-            <scope>test</scope>
-        </dependency>
+
+    <dependencies>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <!-- Start: Test dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.8.2</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.assertj</groupId>
@@ -33,6 +35,7 @@
             <version>5.12.0</version>
             <scope>test</scope>
         </dependency>
+        <!-- End: Test dependencies -->
     </dependencies>
     <build>
         <plugins>
@@ -47,8 +50,8 @@
                 <version>3.5.1</version>
                 <configuration>
                     <encoding>UTF-8</encoding>
-                    <source>17</source>
-                    <target>17</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                     <showWarnings>true</showWarnings>
                     <compilerArgs> 
                         <arg>-Xlint:-processing</arg>
@@ -78,6 +81,39 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.43.0</version>
+                <configuration>
+                    <formats>
+                        <format>
+                            <includes>
+                                <include>src/main/java/**/*.java</include>
+                                <include>src/test/java/**/*.java</include>
+                            </includes>
+                            <trimTrailingWhitespace/>
+                            <endWithNewline/>
+                            <indent>
+                                <tabs>true</tabs>
+                                <spacesPerTab>4</spacesPerTab>
+                            </indent>
+                        </format>
+                    </formats>
+                    <java>
+                        <googleJavaFormat>
+                            <version>1.22.0</version>
+                            <style>GOOGLE</style>
+                            <reflowLongStrings>true</reflowLongStrings>
+                            <formatJavadoc>false</formatJavadoc>
+                        </googleJavaFormat>
+                        <prettier />
+                        <importOrder />
+                        <removeUnusedImports />
+                        <formatAnnotations />
+                    </java>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
     <parent>
@@ -91,5 +127,6 @@
         <bundle-plugin.failOnWarnings>true</bundle-plugin.failOnWarnings>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <test.hide>true</test.hide>
+        <java.version>17</java.version>
     </properties>
 </project>
