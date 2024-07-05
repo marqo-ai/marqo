@@ -78,8 +78,6 @@ public class HybridSearcherTestCase {
         query.properties().set("marqo__hybrid.alpha", alpha);
         query.properties().set("marqo__yql.lexical", "lexical yql");
         query.properties().set("marqo__yql.tensor", "tensor yql");
-        query.getRanking().getFeatures().put("query(marqo__fields_to_search_lexical)", 0.1);
-        query.getRanking().getFeatures().put("query(marqo__fields_to_search_tensor)", 0.1);
         query.getRanking().getFeatures().put("query(marqo__fields_to_rank_lexical)", 0.1);
         query.getRanking().getFeatures().put("query(marqo__fields_to_rank_tensor)", 0.1);
         return query;
