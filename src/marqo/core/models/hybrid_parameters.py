@@ -53,15 +53,17 @@ class HybridParameters(StrictBaseModel):
             if values.get('ranking_method') != RankingMethod.RRF:
                 raise ValueError("'rrf_k' can only be defined for 'rrf' ranking method")
 
-        # searchable_attributes_lexical can only be defined for Lexical, Disjunction
+        # searchable_attributes_lexical can only be defined for Lexical (ranking or retrieval), Disjunction
         if values.get('searchable_attributes_lexical') is not None:
-            if values.get('retrieval_method') not in [RetrievalMethod.Lexical, RetrievalMethod.Disjunction]:
-                raise ValueError("'searchable_attributes_lexical' can only be defined for 'lexical', 'disjunction' retrieval methods")
+            if not (values.get('retrieval_method') in [RetrievalMethod.Lexical, RetrievalMethod.Disjunction] or
+                    values.get('ranking_method') == RankingMethod.Lexical):
+                raise ValueError("'searchable_attributes_lexical' can only be defined for 'lexical', 'disjunction' retrieval methods or 'lexical' ranking method")
 
-        # searchable_attributes_tensor can only be defined for Tensor, Disjunction
+        # searchable_attributes_tensor can only be defined for Tensor (ranking or retrieval), Disjunction
         if values.get('searchable_attributes_tensor') is not None:
-            if values.get('retrieval_method') not in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction]:
-                raise ValueError("'searchable_attributes_tensor' can only be defined for 'tensor', 'disjunction' retrieval methods")
+            if not (values.get('retrieval_method') not in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction] or
+                    values.get('ranking_method') == RankingMethod.Tensor):
+                raise ValueError("'searchable_attributes_tensor' can only be defined for 'tensor', 'disjunction' retrieval methods or 'tensor' ranking method")
 
         # score_modifiers_lexical can only be defined for Lexical, RRF, NormalizeLinear
         if values.get('score_modifiers_lexical') is not None:

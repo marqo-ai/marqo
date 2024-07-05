@@ -25,7 +25,6 @@ class TestHybridSearch(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        # TODO: Cut down number of indexes
         # UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='hf/all_datasets_v4_MiniLM-L6')

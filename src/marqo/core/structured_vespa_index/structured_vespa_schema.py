@@ -178,7 +178,7 @@ class StructuredVespaSchema(VespaSchema):
 
         return document, marqo_index
 
-    def _generate_max_bm25_expression(self, lexical_fields: dict_values[str, Field], prefixed: bool) -> str:
+    def _generate_max_bm25_expression(self, lexical_fields: List[Field], prefixed: bool) -> str:
         """
         Recursively generate max closeness expression for all lexical fields.
         Max is a binary operator, so for more than 2 fields this method gets max of:
@@ -210,7 +210,7 @@ class StructuredVespaSchema(VespaSchema):
             return (f'max('
                     f'if(query({get_field_name(lexical_fields[0])}) > 0, '
                     f'bm25({lexical_fields[0].lexical_field_name}), 0), '
-                    f'{self._generate_max_bm25_expression(lexical_fields[1:])})')
+                    f'{self._generate_max_bm25_expression(lexical_fields[1:], prefixed=prefixed)})')
 
     def _generate_max_similarity_expression(self, tensor_fields: List[TensorField], prefixed: bool) -> str:
         """
@@ -244,7 +244,7 @@ class StructuredVespaSchema(VespaSchema):
             return (f'max('
                     f'if(query({get_field_name(tensor_fields[0])}) > 0, '
                     f'closeness(field, {tensor_fields[0].embeddings_field_name}), 0), '
-                    f'{self._generate_max_similarity_expression(tensor_fields[1:])})')
+                    f'{self._generate_max_similarity_expression(tensor_fields[1:], prefixed=prefixed)})')
 
     def _generate_rank_profiles(self, marqo_index: StructuredMarqoIndex) -> List[str]:
         rank_profiles: List[str] = list()
@@ -344,7 +344,7 @@ class StructuredVespaSchema(VespaSchema):
                 f'({hybrid_bm25_expression_sum}) / '
                 f'if ({hybrid_lexical_rank_features_count} == 0, 1, {hybrid_lexical_rank_features_count})'
             )
-            hybrid_bm25_expression_max = self._generate_max_bm25_expression(lexical_fields, prefixed=True)
+            hybrid_bm25_expression_max = self._generate_max_bm25_expression(list(lexical_fields), prefixed=True)
             hybrid_embedding_similarity_expression = self._generate_max_similarity_expression(tensor_fields,
                                                                                               prefixed=True)
             rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BASE} inherits default {{')
@@ -365,7 +365,7 @@ class StructuredVespaSchema(VespaSchema):
 
             rank_profiles.append('function modify(score, mult_weights, add_weights) {')
             rank_profiles.append(f'   expression: {hybrid_modifiers_expression}')
-            rank_profiles.append('}}')
+            rank_profiles.append('}')
 
             # 3 aggregate functions
             rank_profiles.append('function lexical_score_sum() {')
@@ -383,6 +383,7 @@ class StructuredVespaSchema(VespaSchema):
                 f'expression: if (query({common.QUERY_INPUT_BM25_AGGREGATOR}) == 0, lexical_score_sum(), '
                 f'if (query({common.QUERY_INPUT_BM25_AGGREGATOR}) == 1, lexical_score_avg(), '
                 f'lexical_score_max()))')
+            rank_profiles.append('}')
             rank_profiles.append('}')
 
             # For hybrid bm25 and embedding_similarity rank profiles
