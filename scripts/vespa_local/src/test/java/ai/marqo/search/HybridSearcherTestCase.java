@@ -3,34 +3,83 @@ package ai.marqo.search;
 import com.yahoo.component.chain.Chain;
 import com.yahoo.search.*;
 import com.yahoo.search.searchchain.*;
+import org.junit.Before;
 import org.junit.Test;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.result.Hit;
+import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 
+@RunWith(MockitoJUnitRunner.class)
 public class HybridSearcherTestCase {
 
-    public void testHybridSearcher() {
-        // Create chain
-        Chain<Searcher> searchChain = new Chain<Searcher>(new HybridSearcher());
+    private HybridSearcher hybridSearcher;
 
-        // Create an empty context, in a running container this would be
-        // populated with settings used by different searcher. Tests must
-        // set this according to their own requirements.
-        SearchChainRegistry searchChainRegistry = new SearchChainRegistry();
-        Execution.Context context = Execution.Context.createContextStub(searchChainRegistry);
+    @Mock
+    private Searcher downstreamSearcher;
+
+    @Before
+    public void setUp() {
+        hybridSearcher = new HybridSearcher();
+    }
+
+    @Test
+    public void testHybridSearcher() {
+        Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+        Execution.Context context = Execution.Context.createContextStub((SearchChainRegistry) null);
         Execution execution = new Execution(searchChain, context);
 
-        // Execute it
-        //Result result = execution.search(new Query("search/?query=somequery"));
+        int k = 60;
+        double alpha = 0.5;
 
-        //assertNotNull(result.hits());
-        // Assert the result has the expected hit by scanning for the ID
-        //assertNotNull(result.hits().get("test"));
+        Query query = getHybridQuery(k, alpha, "test");
+
+        HitGroup hitsTensor = new HitGroup();
+        hitsTensor.add(new Hit("tensor1", 1.0));
+        hitsTensor.add(new Hit("both", 0.4));
+
+        HitGroup hitsLexical = new HitGroup();
+        hitsLexical.add(new Hit("both", 0.45));
+
+        ArgumentCaptor<Query> queryArgumentCaptor = ArgumentCaptor.forClass(Query.class);
+
+        when(downstreamSearcher.process(queryArgumentCaptor.capture(), any(Execution.class)))
+                .thenReturn(new Result(query, hitsLexical)).thenReturn(new Result(query, hitsTensor));
+
+        Result result = execution.search(query);
+        // verify the result is the fused hit group
+        assertThat(result).isNotNull();
+        assertThat(result.hits().get(0)).isEqualTo(new Hit("both", alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k))));
+        assertThat(result.hits().get(0).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.4, "marqo__raw_lexical_score", 0.45));
+
+        // verify the correct queries are constructed
+        List<Query> allQueries = queryArgumentCaptor.getAllValues();
+        assertThat(allQueries).hasSize(2);
+        assertThat(allQueries.get(0).properties().get("yql")).isEqualTo("lexical yql");
+        assertThat(allQueries.get(1).properties().get("yql")).isEqualTo("tensor yql");
+    }
+
+    private static Query getHybridQuery(int k, double alpha, String queryString) {
+        Query query = new Query("search/?query=" + queryString);
+        query.properties().set("marqo__hybrid.retrievalMethod", "disjunction");
+        query.properties().set("marqo__hybrid.rankingMethod", "rrf");
+        query.properties().set("marqo__hybrid.rrf_k", k);
+        query.properties().set("marqo__hybrid.alpha", alpha);
+        query.properties().set("marqo__yql.lexical", "lexical yql");
+        query.properties().set("marqo__yql.tensor", "tensor yql");
+        query.getRanking().getFeatures().put("query(marqo__fields_to_search_lexical)", 0.1);
+        query.getRanking().getFeatures().put("query(marqo__fields_to_search_tensor)", 0.1);
+        return query;
     }
 
     @Test
@@ -55,7 +104,6 @@ public class HybridSearcherTestCase {
         // Use nested classes to group tests (eg testAlpha)
         // Each case is 1 method
 
-
         // Create tensor hits
         HitGroup hitsTensor = new HitGroup();
         hitsTensor.add(new Hit("tensor1", 1.0));
@@ -74,8 +122,8 @@ public class HybridSearcherTestCase {
         hitsLexical.add(new Hit("both2", 0.44));
 
         // Set parameters
-        Integer k = 60;
-        Double alpha = 0.5;
+        int k = 60;
+        double alpha = 0.5;
         boolean verbose = false;
 
         // Call the rrf function
@@ -94,13 +142,12 @@ public class HybridSearcherTestCase {
                 new Hit("tensor2", alpha * (1.0 / (2 + k)))
         );
 
-        // TODO: Add back when Map is fixed
-        //assertThat(result.get(0).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.4, "marqo__raw_lexical_score", 0.45));
-        //assertThat(result.get(1).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.3, "marqo__raw_lexical_score", 0.44));
-        //assertThat(result.get(2).fields()).containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
-        //assertThat(result.get(3).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
-        //assertThat(result.get(4).fields()).containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
-        //assertThat(result.get(5).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+        assertThat(result.get(0).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.4, "marqo__raw_lexical_score", 0.45));
+        assertThat(result.get(1).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.3, "marqo__raw_lexical_score", 0.44));
+        assertThat(result.get(2).fields()).containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
+        assertThat(result.get(3).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
+        assertThat(result.get(4).fields()).containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
+        assertThat(result.get(5).fields()).containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
     }
 
     @Test
