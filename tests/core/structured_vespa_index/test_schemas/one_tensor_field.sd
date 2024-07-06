@@ -88,12 +88,12 @@
             inputs {
             query(marqo__query_embedding) tensor<float>(x[512])
             query(title): 0
-            query(marqo__fields_to_search_lexical) tensor<int8>(p{})
-            query(marqo__fields_to_search_tensor) tensor<int8>(p{})
-            query(marqo__mult_weights_lexical) tensor<double>(p{})
-            query(marqo__add_weights_lexical) tensor<double>(p{})
-            query(marqo__mult_weights_tensor) tensor<double>(p{})
-            query(marqo__add_weights_tensor) tensor<double>(p{})
+            query(marqo__fields_to_search_lexical) tensor<int8>(p {})
+            query(marqo__fields_to_search_tensor) tensor<int8>(p {})
+            query(marqo__mult_weights_lexical) tensor<double>(p {})
+            query(marqo__add_weights_lexical) tensor<double>(p {})
+            query(marqo__mult_weights_tensor) tensor<double>(p {})
+            query(marqo__add_weights_tensor) tensor<double>(p {})
         }
     }
         rank-profile modifiers inherits default {
