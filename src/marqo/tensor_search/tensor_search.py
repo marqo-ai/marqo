@@ -1915,16 +1915,6 @@ def _vector_text_search(
 
     if boost is not None:
         raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
-        # gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
-
-    # completely_sorted = sort_chunks(gathered_docs)
-
-    # if verbose:
-    #     print("Chunk vector search, sorted result:")
-    #     if verbose == 1:
-    #         pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
-    #     elif verbose == 2:
-    #         pprint.pprint(completely_sorted)
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(

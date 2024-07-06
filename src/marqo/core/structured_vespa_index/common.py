@@ -10,8 +10,8 @@ FIELD_VECTOR_COUNT = 'marqo__vector_count'
 RANK_PROFILE_BM25 = 'bm25'
 RANK_PROFILE_EMBEDDING_SIMILARITY = 'embedding_similarity'
 RANK_PROFILE_MODIFIERS = 'modifiers'
-RANK_PROFILE_BM25_MODIFIERS = 'bm25_modifiers'
-RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = 'embedding_similarity_modifiers'
+RANK_PROFILE_BM25_MODIFIERS_2_9 = 'bm25_modifiers'
+RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 = 'embedding_similarity_modifiers'
 
 # For hybrid search
 RANK_PROFILE_BASE = 'base_rank_profile'
