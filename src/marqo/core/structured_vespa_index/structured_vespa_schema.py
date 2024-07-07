@@ -238,11 +238,13 @@ class StructuredVespaSchema(VespaSchema):
 
         # Basic expressions
         bm25_sum_expression = ' + '.join([
-            f'if (query({field.name}) > 0, bm25({field.lexical_field_name}), 0)' for field in lexical_fields
+            f'if (query({field.lexical_field_name}) > 0, bm25({field.lexical_field_name}), 0)' for field in
+            lexical_fields
         ])
         bm25_avg_denominoator_sum = ' + '.join([f'bm25({field.lexical_field_name})' for field in lexical_fields])
         bmw25_avg_expression = (f'({bm25_sum_expression}) / if (' +
-                                f' + '.join([f'query({field.name})' for field in lexical_fields]) + f' == 0, 1, ' +
+                                f' + '.join([f'query({field.lexical_field_name})' for field in lexical_fields]) +
+                                f' == 0, 1, ' +
                                 f'if ({bm25_avg_denominoator_sum} == 0, 1, {bm25_avg_denominoator_sum}))'
                                 )
         bm25_max_expression = self._generate_max_bm25_expression(list(lexical_fields))
@@ -340,8 +342,8 @@ class StructuredVespaSchema(VespaSchema):
             # Input parameters (rank features)
             rank_profiles.append('inputs {')
             rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-            for field in tensor_fields:
-                rank_profiles.append(f'query({field.name}): 0')
+            # for field in tensor_fields:
+            #     rank_profiles.append(f'query({field.emb}): 0')
 
             # Temp parameters to pass into respective queries (lexical and tensor)
             rank_profiles.append(f'query({common.QUERY_INPUT_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})')
