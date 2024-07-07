@@ -9,8 +9,9 @@ from typing import Union, List, Dict, Optional
 import pydantic
 from pydantic import BaseModel, root_validator
 
-from marqo.core.models.marqo_index import MarqoIndex
+from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.hybrid_parameters import HybridParameters
+from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -25,8 +26,16 @@ class BaseMarqoModel(BaseModel):
     pass
 
 
+class CustomVectorQuery(ImmutableStrictBaseModel):
+    class CustomVector(ImmutableStrictBaseModel):
+        content: Optional[str] = None
+        vector: List[float]
+
+    custom_vector: CustomVector
+
+
 class SearchQuery(BaseMarqoModel):
-    q: Optional[Union[str, Dict[str, float]]] = None
+    q: Optional[Union[str, Dict[str, float], CustomVectorQuery]] = None
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10
