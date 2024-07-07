@@ -493,13 +493,13 @@ class StructuredVespaIndex(VespaIndex):
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         # Tensor term
         fields_to_search_tensor = self._get_tensor_fields_to_search(
-            marqo_query.hybrid_parameters.searchable_attributes_tensor
+            searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_tensor
         )
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search_tensor else "False"
 
         # Lexical term
-        fields_to_search_lexical = self._get_lexical_search_term(
-            marqo_query.hybrid_parameters.searchable_attributes_lexical
+        fields_to_search_lexical = self._get_lexical_fields_to_search(
+            searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_lexical
         )
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search_lexical else "False"
 
@@ -565,8 +565,8 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
             'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
 
-            'marqo__ranking.lexical.lexicalScoreModifiers': common.RANK_PROFILE_BM25_MODIFIERS,
-            'marqo__ranking.tensor.tensorScoreModifiers': common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS,
+            'marqo__ranking.lexical.lexicalScoreModifiers': common.RANK_PROFILE_BM25,
+            'marqo__ranking.tensor.tensorScoreModifiers': common.RANK_PROFILE_EMBEDDING_SIMILARITY,
             'marqo__ranking.lexical.tensorScoreModifiers': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
             'marqo__ranking.tensor.lexicalScoreModifiers': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
 
@@ -591,9 +591,8 @@ class StructuredVespaIndex(VespaIndex):
             marqo_query: Optional[MarqoTensorQuery] = None,
             searchable_attributes: Optional[List[str]] = None
     ) -> List[str]:
-        if (marqo_query is None and searchable_attributes is None or
-                marqo_query is not None and searchable_attributes is not None):
-            raise ValueError('Exactly one of marqo_query and searchable_attributes must be provided')
+        if marqo_query is not None and searchable_attributes is not None:
+            raise ValueError('Cannot provide both marqo_query and searchable_attributes')
 
         searchable_attributes = marqo_query.searchable_attributes if marqo_query is not None else searchable_attributes
 
@@ -620,9 +619,8 @@ class StructuredVespaIndex(VespaIndex):
             marqo_query: Optional[MarqoLexicalQuery] = None,
             searchable_attributes: Optional[List[str]] = None
     ) -> List[str]:
-        if (marqo_query is None and searchable_attributes is None or
-                marqo_query is not None and searchable_attributes is not None):
-            raise ValueError('Exactly one of marqo_query and searchable_attributes must be provided')
+        if marqo_query is not None and searchable_attributes is not None:
+            raise ValueError('Cannot provide both marqo_query and searchable_attributes')
 
         searchable_attributes = marqo_query.searchable_attributes if marqo_query is not None else searchable_attributes
 
@@ -891,10 +889,18 @@ class StructuredVespaIndex(VespaIndex):
                     add_tensor[modifier.field] = modifier.weight
                 else:
                     raise InternalError(f'Unknown score modifier type {modifier.type}')
-            return {
-                f"{common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS}_{search_type}": mult_tensor,
-                f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS}_{search_type}": add_tensor
-            }
+            if search_type == "lexical":
+                return {
+                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}": mult_tensor,
+                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}": add_tensor
+                }
+            elif search_type == "tensor":
+                return {
+                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}": mult_tensor,
+                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}": add_tensor
+                }
+            else:
+                raise InternalError(f"Unknown search type {search_type}")
 
         if hybrid_query.score_modifiers_lexical:
             result['lexical'] = _convert_score_modifiers_to_tensors(
