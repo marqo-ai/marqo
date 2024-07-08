@@ -76,6 +76,27 @@ jobs:
 
       - name: Start Vespa
         run: |
+          retry_command() {
+            local n=1
+            local max=5
+            local delay=5
+            while true; do
+                "$@" && break || {
+                    if [[ $n -lt $max ]]; then
+                        ((n++))
+                        echo "Command failed. Attempt $n/$max:"
+                        sleep $delay;
+                    else
+                        echo "The command has failed after $n attempts."
+                        return 1
+                    fi
+                }
+            done
+          }
+          
+          echo "Updating package list"
+          retry_command apt-get update -y
+          
           # Build Vespa components
           echo "Installing jdk 17"
           retry_command apt-get install openjdk-17-jdk -y
@@ -103,7 +124,7 @@ jobs:
           echo -e "\nDone waiting."
           
           # Zip up schemas and services
-          apt-get install zip -y
+          retry_command apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
 
           # Deploy application with test schema
