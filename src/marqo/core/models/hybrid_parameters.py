@@ -16,7 +16,6 @@ class RetrievalMethod(str, Enum):
 
 class RankingMethod(str, Enum):
     RRF = 'rrf'
-    NormalizeLinear = 'normalize_linear'
     Tensor = 'tensor'
     Lexical = 'lexical'
 
