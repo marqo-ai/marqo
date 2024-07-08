@@ -57,6 +57,7 @@ from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
@@ -1448,7 +1449,16 @@ def _lexical_search(
     with RequestMetricsStore.for_request().time("search.lexical.vespa",
                                                 lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
                                                 ):
-        responses = config.vespa_client.query(**vespa_query)
+        try:
+            responses = config.vespa_client.query(**vespa_query)
+        except VespaStatusError as e:
+            # The index will not have the bm25 rank profile if there are no lexical fields
+            if f"does not contain requested rank profile '{RANK_PROFILE_BM25}'" in e.message:
+                raise core_exceptions.InvalidArgumentError(
+                    f"Index {index_name} has no lexically searchable fields, thus lexical search cannot be performed. "
+                    f"Please create an index with a lexically searchable field, or try a different search method."
+                )
+            raise e
 
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.lexical.postprocess")
@@ -1906,7 +1916,16 @@ def _vector_text_search(
     with RequestMetricsStore.for_request().time("search.vector.vespa",
                                                 lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
                                                 ):
-        responses = config.vespa_client.query(**vespa_query)
+        try:
+            responses = config.vespa_client.query(**vespa_query)
+        except VespaStatusError as e:
+            # The index will not have the embedding_similarity rank profile if there are no tensor fields
+            if f"No profile named '{RANK_PROFILE_EMBEDDING_SIMILARITY}'" in e.message:
+                raise core_exceptions.InvalidArgumentError(
+                    f"Index {index_name} has no tensor fields, thus tensor search cannot be performed. "
+                    f"Please create an index with a tensor field, or try a different search method."
+                )
+            raise e
 
     if not approximate and (responses.root.coverage.coverage < 100 or responses.root.coverage.degraded is not None):
         raise errors.InternalError(

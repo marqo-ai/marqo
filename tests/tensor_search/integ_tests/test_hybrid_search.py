@@ -75,11 +75,18 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
         )
 
+        structured_index_empty = cls.structured_marqo_index_request(
+            model=Model(name="sentence-transformers/all-MiniLM-L6-v2"),
+            fields=[],
+            tensor_fields=[]
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             #unstructured_default_image_index,
             structured_default_image_index,
-            structured_text_index_score_modifiers
+            structured_text_index_score_modifiers,
+            structured_index_empty
         ])
 
         # Assign to objects so they can be used in tests
@@ -87,6 +94,7 @@ class TestHybridSearch(MarqoTestCase):
         #cls.unstructured_default_image_index = cls.indexes[1]
         cls.structured_default_image_index = cls.indexes[1]
         cls.structured_text_index_score_modifiers = cls.indexes[2]
+        cls.structured_index_empty = cls.indexes[3]
 
     def setUp(self) -> None:
         super().setUp()
@@ -1005,6 +1013,50 @@ class TestHybridSearch(MarqoTestCase):
 
                 # Make sure results are retrieved
                 self.assertIn("hits", res)
+
+    def test_hybrid_search_structured_index_has_no_hybrid_rank_profile_fails(self):
+        """
+        If an index does not have both lexical and tensor fields, it will have no hybrid rank profile.
+        If hybrid search is done on such an index, it should fail with 400.
+
+        Tests for lexical and tensor search methods as well.
+        """
+
+        # Lexical search
+        with self.subTest("lexical search"):
+            with self.assertRaises(core_exceptions.InvalidArgumentError) as cm:
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_index_empty.name,
+                    text="dogs",
+                    search_method="LEXICAL",
+                    result_count=10
+                )
+            self.assertIn("no lexically searchable fields", str(cm.exception))
+
+        # Tensor search
+        with self.subTest("tensor search"):
+            with self.assertRaises(core_exceptions.InvalidArgumentError) as cm:
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_index_empty.name,
+                    text="dogs",
+                    search_method="TENSOR",
+                    result_count=10
+                )
+            self.assertIn("no tensor fields", str(cm.exception))
+
+        # Hybrid search
+        with self.subTest("hybrid search"):
+            with self.assertRaises(core_exceptions.InvalidArgumentError) as cm:
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_index_empty.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    result_count=10
+                )
+            self.assertIn("either has no tensor fields or no lexically searchable fields", str(cm.exception))
 
     def test_hybrid_parameters_with_wrong_search_method_fails(self):
         """

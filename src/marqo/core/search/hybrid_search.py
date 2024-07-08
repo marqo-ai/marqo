@@ -11,6 +11,7 @@ from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import (
@@ -21,6 +22,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
+from marqo.vespa.exceptions import VespaStatusError
 
 
 class HybridSearch:
@@ -165,7 +167,17 @@ class HybridSearch:
         with RequestMetricsStore.for_request().time("search.hybrid.vespa",
                                                     lambda t: logger.debug(f"Vespa search: took {t:.3f}ms")
                                                     ):
-            responses = config.vespa_client.query(**vespa_query)
+            try:
+                responses = config.vespa_client.query(**vespa_query)
+            except VespaStatusError as e:
+                # The index will not have the embedding_similarity rank profile if there are no tensor fields
+                if f"No profile named '{RANK_PROFILE_HYBRID_CUSTOM_SEARCHER}'" in e.message:
+                    raise core_exceptions.InvalidArgumentError(
+                        f"Index {index_name} either has no tensor fields or no lexically searchable fields, "
+                        f"thus hybrid search cannot be performed. "
+                        f"Please create an index with both tensor and lexical fields, or try a different search method."
+                    )
+                raise e
 
         if not approximate and (responses.root.coverage.coverage < 100 or responses.root.coverage.degraded is not None):
             raise errors.InternalError(
