@@ -394,7 +394,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(
                 f'expression: modify(lexical_score(), '
                 f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}_lexical))')
+                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))')
             rank_profiles.append('}}')
 
         return rank_profiles
