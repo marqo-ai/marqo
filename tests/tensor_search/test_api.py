@@ -192,11 +192,7 @@ class TestApiCustomEnvVars(MarqoTestCase):
                     with self.subTest(index=index.name):
                         res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
                             "q": "irrelevant",
-                            "searchMethod": "HYBRID",
-                            "hybridParameters": {
-                                "retrieval_method": "lexical",
-                                "ranking_method": "tensor"
-                            }
+                            "searchMethod": "HYBRID"
                         })
                         # The search request must timeout, since the timeout is set to 1ms
                         self.assertEqual(res.status_code, 504)
