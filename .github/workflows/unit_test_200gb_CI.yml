@@ -76,33 +76,21 @@ jobs:
 
       - name: Start Vespa
         run: |
-          retry_command() {
-            local n=1
-            local max=5
-            local delay=5
-            while true; do
-                "$@" && break || {
-                    if [[ $n -lt $max ]]; then
-                        ((n++))
-                        echo "Command failed. Attempt $n/$max:"
-                        sleep $delay;
-                    else
-                        echo "The command has failed after $n attempts."
-                        return 1
-                    fi
-                }
-            done
-          }
-          
-          echo "Updating package list"
-          retry_command apt-get update -y
+          # Build Vespa components
+          echo "Installing jdk 17"
+          retry_command apt-get install openjdk-17-jdk -y
+          echo "Installing maven"
+          retry_command apt-get install maven -y
+          echo "Building Vespa components"
+          cd marqo/vespa
+          mvn clean package
           
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
           
-          cd marqo/scripts/vespa_local
+          cd ../scripts/vespa_local
           set -x
           python vespa_local.py start
           set +x
@@ -113,17 +101,13 @@ jobs:
               sleep 1
           done
           echo -e "\nDone waiting."
-
-          # Build application package
-          echo "Installing jdk 17"
-          retry_command apt-get install openjdk-17-jdk -y
-          echo "Installing maven"
-          retry_command apt-get install maven -y
-          echo "Building java application package"
-          mvn clean package
+          
+          # Zip up schemas and services
+          apt-get install zip -y
+          zip -r vespa_tester_app.zip services.xml schemas
 
           # Deploy application with test schema
-          curl --header "Content-Type:application/zip" --data-binary @target/application.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
+          curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
 
           # wait for vespa to start (document url):
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
@@ -131,6 +115,9 @@ jobs:
           
           echo "Vespa document API is available. Local Vespa setup complete."
 
+          # Delete the zip file
+          rm vespa_tester_app.zip
+          echo "Deleted vespa_tester_app.zip"
           
       - name: Run Unit Tests
         run: |
