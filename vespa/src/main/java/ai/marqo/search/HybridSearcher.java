@@ -75,8 +75,15 @@ public class HybridSearcher extends Searcher {
 
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
-            Query queryLexical = createSubQuery(query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
-            Query queryTensor = createSubQuery(query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
+            Query queryLexical =
+                    createSubQuery(
+                            query,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            MARQO_SEARCH_METHOD_LEXICAL,
+                            verbose);
+            Query queryTensor =
+                    createSubQuery(
+                            query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
 
             // Execute both searches async
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);
