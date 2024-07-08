@@ -5,6 +5,9 @@ MARQO_DOC_CHUNKS = 'chunks'
 MARQO_DOC_EMBEDDINGS = 'embeddings'
 MARQO_DOC_ID = '_id'
 
+MARQO_SEARCH_METHOD_TENSOR = 'tensor'
+MARQO_SEARCH_METHOD_LEXICAL = 'lexical'
+
 # For hybrid search
 MARQO_RAW_TENSOR_SCORE = '_raw_tensor_score'
 MARQO_RAW_LEXICAL_SCORE = '_raw_lexical_score'

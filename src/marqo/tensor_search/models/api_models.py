@@ -75,6 +75,16 @@ class SearchQuery(BaseMarqoModel):
             raise ValueError(f"Invalid search method {search_method}")
         return values
 
+    @root_validator(pre=False)
+    def validate_hybrid_parameters_only_for_hybrid_search(cls, values):
+        """Validate that hybrid parameters are only provided for hybrid search"""
+        hybrid_parameters = values.get('hybridParameters')
+        search_method = values.get('searchMethod')
+        if hybrid_parameters is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"Hybrid parameters can only be provided for 'HYBRID' search. "
+                             f"Search method is {search_method}.")
+        return values
+
     @pydantic.validator('searchMethod')
     def validate_search_method(cls, value):
         return validation.validate_str_against_enum(

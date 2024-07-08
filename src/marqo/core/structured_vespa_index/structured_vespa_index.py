@@ -539,10 +539,10 @@ class StructuredVespaIndex(VespaIndex):
 
         # Extract score modifiers
         hybrid_score_modifiers = self._get_hybrid_score_modifiers(marqo_query)
-        if hybrid_score_modifiers["lexical"]:
-            query_inputs.update(hybrid_score_modifiers["lexical"])
-        if hybrid_score_modifiers["tensor"]:
-            query_inputs.update(hybrid_score_modifiers["tensor"])
+        if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL]:
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL])
+        if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR]:
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR])
 
         query = {
             'searchChain': 'marqo',
@@ -566,13 +566,13 @@ class StructuredVespaIndex(VespaIndex):
 
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.ranking_method,
-            'marqo__hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers["tensor"] else False,
-            'marqo__hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers["lexical"] else False,
+            'marqo__hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR] else False,
+            'marqo__hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL] else False,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
         query = {k: v for k, v in query.items() if v is not None}
 
-        if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF, RankingMethod.NormalizeLinear}:
+        if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF}: # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
 
         if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF}:
@@ -860,8 +860,8 @@ class StructuredVespaIndex(VespaIndex):
         """
 
         result = {
-            'lexical': None,
-            'tensor': None
+            constants.MARQO_SEARCH_METHOD_LEXICAL: None,
+            constants.MARQO_SEARCH_METHOD_TENSOR: None
         }
 
         def _convert_score_modifiers_to_tensors(score_modifiers: List[ScoreModifier], search_type: str) -> Dict[
@@ -883,12 +883,12 @@ class StructuredVespaIndex(VespaIndex):
                     add_tensor[modifier.field] = modifier.weight
                 else:
                     raise InternalError(f'Unknown score modifier type {modifier.type}')
-            if search_type == "lexical":
+            if search_type == constants.MARQO_SEARCH_METHOD_LEXICAL:
                 return {
                     f"{common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}": mult_tensor,
                     f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}": add_tensor
                 }
-            elif search_type == "tensor":
+            elif search_type == constants.MARQO_SEARCH_METHOD_TENSOR:
                 return {
                     f"{common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}": mult_tensor,
                     f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}": add_tensor
@@ -897,15 +897,15 @@ class StructuredVespaIndex(VespaIndex):
                 raise InternalError(f"Unknown search type {search_type}")
 
         if hybrid_query.score_modifiers_lexical:
-            result['lexical'] = _convert_score_modifiers_to_tensors(
+            result[constants.MARQO_SEARCH_METHOD_LEXICAL] = _convert_score_modifiers_to_tensors(
                 hybrid_query.score_modifiers_lexical,
-                "lexical"
+                constants.MARQO_SEARCH_METHOD_LEXICAL
             )
 
         if hybrid_query.score_modifiers_tensor:
-            result['tensor'] = _convert_score_modifiers_to_tensors(
+            result[constants.MARQO_SEARCH_METHOD_TENSOR] = _convert_score_modifiers_to_tensors(
                 hybrid_query.score_modifiers_tensor,
-                "tensor"
+                constants.MARQO_SEARCH_METHOD_TENSOR
             )
 
         return result

@@ -36,47 +36,6 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         # STRUCTURED indexes
-        structured_default_text_index = cls.structured_marqo_index_request(
-            model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
-            fields=[
-                FieldRequest(name="text_field_1", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="text_field_2", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="text_field_3", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="text_field_4", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="text_field_5", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="text_field_6", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="text_field_7", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="text_field_8", type=FieldType.Text,
-                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(name="int_field_1", type=FieldType.Int,
-                             features=[FieldFeature.Filter]),
-                FieldRequest(name="float_field_1", type=FieldType.Float,
-                             features=[FieldFeature.Filter]),
-                FieldRequest(name="bool_field_1", type=FieldType.Bool,
-                             features=[FieldFeature.Filter]),
-                FieldRequest(name="bool_field_2", type=FieldType.Bool,
-                             features=[FieldFeature.Filter]),
-                FieldRequest(name="list_field_1", type=FieldType.ArrayText,
-                             features=[FieldFeature.Filter]),
-                FieldRequest(name="long_field_1", type=FieldType.Long, features=[FieldFeature.Filter]),
-                FieldRequest(name="double_field_1", type=FieldType.Double, features=[FieldFeature.Filter]),
-                FieldRequest(name="custom_vector_field_1", type=FieldType.CustomVector, features=[FieldFeature.Filter]),
-                FieldRequest(name="multimodal_field_1", type=FieldType.MultimodalCombination,
-                             dependent_fields={"text_field_7": 0.1, "text_field_8": 0.1})
-            ],
-
-            tensor_fields=["text_field_1", "text_field_2", "text_field_3",
-                           "text_field_4", "text_field_5", "text_field_6",
-                           "custom_vector_field_1", "multimodal_field_1"]
-        )
-
         structured_default_image_index = cls.structured_marqo_index_request(
             model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
             fields=[
@@ -95,6 +54,7 @@ class TestHybridSearch(MarqoTestCase):
         )
 
         structured_text_index_score_modifiers = cls.structured_marqo_index_request(
+            model=Model(name="sentence-transformers/all-MiniLM-L6-v2"),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
@@ -117,7 +77,6 @@ class TestHybridSearch(MarqoTestCase):
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             #unstructured_default_image_index,
-            structured_default_text_index,
             structured_default_image_index,
             structured_text_index_score_modifiers
         ])
@@ -125,9 +84,8 @@ class TestHybridSearch(MarqoTestCase):
         # Assign to objects so they can be used in tests
         cls.unstructured_default_text_index = cls.indexes[0]
         #cls.unstructured_default_image_index = cls.indexes[1]
-        cls.structured_default_text_index = cls.indexes[1]
-        cls.structured_default_image_index = cls.indexes[2]
-        cls.structured_text_index_score_modifiers = cls.indexes[3]
+        cls.structured_default_image_index = cls.indexes[1]
+        cls.structured_text_index_score_modifiers = cls.indexes[2]
 
     def setUp(self) -> None:
         super().setUp()
@@ -379,8 +337,8 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertIn("hits", hybrid_res)
                     self.assertEqual(len(hybrid_res["hits"]), 3)            # Only 3 documents have text_field_2 at all
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc12")   # puppies puppies in text field 2
-                    self.assertEqual(hybrid_res["hits"][1]["_id"], "doc11")
-                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc13")
+                    self.assertEqual(hybrid_res["hits"][1]["_id"], "doc13")
+                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc11")
 
                 with self.subTest("retrieval: lexical, ranking: tensor"):
                     hybrid_res = tensor_search.search(
@@ -475,15 +433,6 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][-1]["_score"], -30.0)
 
                 with self.subTest("retrieval: tensor, ranking: lexical"):
-
-                    test_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="HELLO WORLD",
-                        search_method="LEXICAL",
-                        result_count=10
-                    )
-
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -752,6 +701,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
+                # TODO: get tensor and lexical res outside, in base function
                 # Lexical retrieval with Tensor ranking
                 with self.subTest(retrieval_method=RetrievalMethod.Lexical, ranking_method=RankingMethod.Tensor):
                     # Basic results (for reference)
@@ -1073,6 +1023,25 @@ class TestHybridSearch(MarqoTestCase):
                 # Make sure results are retrieved
                 self.assertIn("hits", res)
 
+    def test_hybrid_parameters_with_wrong_search_method_fails(self):
+        """
+        Test that hybrid parameters with wrong search method fails.
+        """
+
+        with self.assertRaises(ValueError) as e:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.structured_text_index_score_modifiers.name,
+                text="dogs",
+                search_method="TENSOR",
+                hybrid_parameters=HybridParameters(
+                    retrieval_method=RetrievalMethod.Disjunction,
+                    ranking_method=RankingMethod.RRF,
+                    alpha=0.6
+                )
+            )
+        self.assertIn("can only be provided for 'HYBRID'", str(e.exception))
+
     # TODO: Remove when unstructured index is supported
     def test_hybrid_search_on_unstructured_index_fails(self):
         """
@@ -1092,3 +1061,4 @@ class TestHybridSearch(MarqoTestCase):
                 )
             )
         self.assertIn("not yet supported for hybrid search", str(e.exception))
+

@@ -16,7 +16,6 @@ class RetrievalMethod(str, Enum):
 
 class RankingMethod(str, Enum):
     RRF = 'rrf'
-    NormalizeLinear = 'normalize_linear'
     Tensor = 'tensor'
     Lexical = 'lexical'
 
@@ -37,7 +36,7 @@ class HybridParameters(StrictBaseModel):
     @root_validator(pre=False)
     def validate_properties(cls, values):
         # alpha can only be defined for RRF and NormalizeLinear
-        fusion_ranking_methods = [RankingMethod.RRF, RankingMethod.NormalizeLinear]
+        fusion_ranking_methods = [RankingMethod.RRF]
         if values.get('alpha') is None:
             if values.get('ranking_method') in fusion_ranking_methods:
                 values['alpha'] = 0.5
@@ -70,21 +69,19 @@ class HybridParameters(StrictBaseModel):
 
         # score_modifiers_lexical can only be defined for Lexical, RRF, NormalizeLinear
         if values.get('score_modifiers_lexical') is not None:
-            if values.get('ranking_method') not in [RankingMethod.Lexical, RankingMethod.RRF,
-                                                    RankingMethod.NormalizeLinear]:
+            if values.get('ranking_method') not in [RankingMethod.Lexical, RankingMethod.RRF]:
                 raise ValueError(
                     "'score_modifiers_lexical' can only be defined for 'lexical', 'rrf' ranking methods")  # TODO: re-add normalize_linear
 
         # score_modifiers_tensor can only be defined for Tensor, RRF, NormalizeLinear
         if values.get('score_modifiers_tensor') is not None:
-            if values.get('ranking_method') not in [RankingMethod.Tensor, RankingMethod.RRF,
-                                                    RankingMethod.NormalizeLinear]:
+            if values.get('ranking_method') not in [RankingMethod.Tensor, RankingMethod.RRF]:
                 raise ValueError(
                     "'score_modifiers_tensor' can only be defined for 'tensor', 'rrf', ranking methods")  # TODO: re-add normalize_linear
 
         # if retrieval_method == Disjunction, then ranking_method must be RRF, NormalizeLinear
         if values.get('retrieval_method') == RetrievalMethod.Disjunction:
-            if values.get('ranking_method') not in [RankingMethod.RRF, RankingMethod.NormalizeLinear]:
+            if values.get('ranking_method') not in [RankingMethod.RRF]:
                 raise ValueError(
                     "For retrieval_method: disjunction, ranking_method must be: rrf")  # TODO: re-add normalize_linear
 
