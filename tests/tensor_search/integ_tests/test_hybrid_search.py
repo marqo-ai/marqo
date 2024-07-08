@@ -15,6 +15,7 @@ from marqo import exceptions as base_exceptions
 import unittest
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.tensor_search.models.api_models import ScoreModifierLists
+from marqo.tensor_search import api
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -885,58 +886,40 @@ class TestHybridSearch(MarqoTestCase):
 
     def test_hybrid_search_conflicting_parameters_fails(self):
         """
-        Ensure that searchable_attributes cannot be set alongside hybrid_parameters.searchable_attributes_lexical or
-        hybrid_parameters.searchable_attributes_tensor.
-
-        score_modifiers cannot be set alongside hybrid_parameters.score_modifiers_lexical or
-        hybrid_parameters.score_modifiers_tensor.
+        Ensure that searchable_attributes and score_modifiers cannot be set in hybrid search.
         """
 
-        test_cases = [
-            ({
-                 "searchable_attributes_lexical": ["text_field_1"]
-            }, "or searchable_attributes, not both."),
-            ({
-                 "searchable_attributes_tensor": ["text_field_1"]
-            }, "or searchable_attributes, not both."),
-            ({
-                 "score_modifiers_lexical": {
-                    "multiply_score_by": [
-                        {"field_name": "mult_field_1", "weight": 1.0}
-                    ]
-                 }
-             }, "or score_modifiers, not both."),
-            ({
-                 "score_modifiers_tensor": {
-                    "multiply_score_by": [
-                        {"field_name": "mult_field_1", "weight": 1.0}
-                    ]
-                 }
-             }, "or score_modifiers, not both."),
-        ]
         # TODO: add unstructured index
         for index in [self.structured_text_index_score_modifiers]:
             with self.subTest(index=index.name):
-                for hybrid_parameters, error_message in test_cases:
-                    with self.subTest(hybrid_parameters=hybrid_parameters):
-                        with self.assertRaises(ValueError) as e:
-                            tensor_search.search(
-                                config=self.config,
-                                index_name=index.name,
-                                text="dogs",
-                                search_method="HYBRID",
-                                score_modifiers=ScoreModifierLists(
-                                    multiply_score_by=[
-                                        {"field_name": "mult_field_1", "weight": 1.0}
-                                    ],
-                                    add_to_score=[
-                                        {"field_name": "add_field_1", "weight": 1.0}
-                                    ]
-                                ),
-                                searchable_attributes=["text_field_1"],
-                                hybrid_parameters=HybridParameters(**hybrid_parameters)
-                            )
-                        self.assertIn(error_message, str(e.exception))
+                with self.subTest("searchable_attributes active"):
+                    with self.assertRaises(ValueError) as e:
+                        tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method="HYBRID",
+                            searchable_attributes=["text_field_1"]
+                        )
+                    self.assertIn("'searchable_attributes' cannot be used for hybrid", str(e.exception))
+
+                with self.subTest("score_modifiers active"):
+                    with self.assertRaises(ValueError) as e:
+                        tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method="HYBRID",
+                            score_modifiers=ScoreModifierLists(
+                                multiply_score_by=[
+                                    {"field_name": "mult_field_1", "weight": 1.0}
+                                ],
+                                add_to_score=[
+                                    {"field_name": "add_field_1", "weight": 1.0}
+                                ]
+                            ),
+                        )
+                    self.assertIn("'score_modifiers' cannot be used for hybrid", str(e.exception))
 
     def test_hybrid_search_structured_invalid_fields_fails(self):
         """
@@ -1028,19 +1011,9 @@ class TestHybridSearch(MarqoTestCase):
         Test that hybrid parameters with wrong search method fails.
         """
 
-        with self.assertRaises(ValueError) as e:
-            tensor_search.search(
-                config=self.config,
-                index_name=self.structured_text_index_score_modifiers.name,
-                text="dogs",
-                search_method="TENSOR",
-                hybrid_parameters=HybridParameters(
-                    retrieval_method=RetrievalMethod.Disjunction,
-                    ranking_method=RankingMethod.RRF,
-                    alpha=0.6
-                )
-            )
-        self.assertIn("can only be provided for 'HYBRID'", str(e.exception))
+        # TODO: Use api.search() instead of tensor_search.search()
+        # Covered in API tests
+        pass
 
     # TODO: Remove when unstructured index is supported
     def test_hybrid_search_on_unstructured_index_fails(self):

@@ -62,26 +62,16 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):
-        # score_modifiers cannot defined at the same time as score_modifiers_tensor / score_modifiers_lexical
+        # score_modifiers cannot defined for hybrid search
         if values.get("score_modifiers") is not None:
-            if values.get("score_modifiers_tensor") is None and values.get("score_modifiers_lexical") is None:
-                # Set the score modifiers for both tensor and lexical search to default
-                values['score_modifiers_lexical'] = values['score_modifiers']
-                values['score_modifiers_tensor'] = values['score_modifiers']
-            else:
-                raise ValueError("For hybrid search, either define hybrid.parameters.score_modifiers_tensor and "
-                                "hybrid.parameters.score_modifiers_lexical or score_modifiers, not both.")
+            raise ValueError("'score_modifiers' cannot be used for hybrid search. Instead, define the "
+                             "'score_modifiers_tensor' and/or 'score_modifiers_lexical' keys inside the "
+                             "'hybrid_parameters' dict parameter.")
 
-        # searchable_attributes cannot be defined at the same time as searchable_attributes_tensor / searchable_attributes_lexical
+        # searchable_attributes cannot be defined for hybrid search
         if values.get("searchable_attributes") is not None:
-            if values.get("hybrid_parameters") is not None:
-                if values.get("hybrid_parameters").searchable_attributes_tensor is None and \
-                values.get("hybrid_parameters").searchable_attributes_lexical is None:
-                    # Set the searchable attributes for both tensor and lexical search to default
-                    values['hybrid_parameters'].searchable_attributes_lexical = values['searchable_attributes']
-                    values['hybrid_parameters'].searchable_attributes_tensor = values['searchable_attributes']
-                else:
-                    raise ValueError("For hybrid search, either define hybrid.parameters.searchable_attributes_tensor and "
-                                    "hybrid.parameters.searchable_attributes_lexical or searchable_attributes, not both.")
+            raise ValueError("'searchable_attributes' cannot be used for hybrid search. Instead, define the "
+                             "'searchable_attributes_tensor' and/or 'searchable_attributes_lexical' keys inside the "
+                             "'hybrid_parameters' dict parameter.")
 
         return values
