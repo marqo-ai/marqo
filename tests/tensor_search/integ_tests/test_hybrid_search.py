@@ -14,7 +14,7 @@ from tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
 import unittest
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
-from marqo.tensor_search.models.api_models import ScoreModifierLists as apiScoreModifier
+from marqo.tensor_search.models.api_models import ScoreModifierLists
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -228,17 +228,22 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 61)
 
                 self.assertEqual(vespa_query_kwargs["ranking"], "hybrid_custom_searcher")
-                self.assertEqual(vespa_query_kwargs["marqo__ranking.lexical"], "bm25")
-                self.assertEqual(vespa_query_kwargs["marqo__ranking.tensor"], "embedding_similarity")
-                self.assertEqual(vespa_query_kwargs["marqo__ranking.lexicalScoreModifiers"], "bm25_modifiers")
-                self.assertEqual(vespa_query_kwargs["marqo__ranking.tensorScoreModifiers"], "embedding_similarity_modifiers")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.lexical.lexical"], "bm25")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.tensor.tensor"], "embedding_similarity")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.lexical.tensor"], "hybrid_bm25_then_embedding_similarity")
+                self.assertEqual(vespa_query_kwargs["marqo__ranking.tensor.lexical"], "hybrid_embedding_similarity_then_bm25")
 
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_lexical"], {'text_field_1': 1, 'text_field_2': 1})
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"], {'text_field_2': 1, 'text_field_3': 1})
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_lexical"], {'mult_field_1': 1.0, 'mult_field_2': 1.0})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_lexical"],
+                                 {'marqo__lexical_text_field_1': 1, 'marqo__lexical_text_field_2': 1})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"],
+                                 {'marqo__embeddings_text_field_2': 1, 'marqo__embeddings_text_field_3': 1})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_lexical"],
+                                 {'mult_field_1': 1.0, 'mult_field_2': 1.0})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_lexical"], {})
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_tensor"], {'mult_field_1': 1.0})
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_tensor"], {'add_field_1': 1.0})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_tensor"],
+                                 {'mult_field_1': 1.0})
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_tensor"],
+                                 {'add_field_1': 1.0})
 
                 # TODO: For lexical/tensor and tensor/lexical. Check fields to rank specifically.
                 # Make sure results are retrieved
@@ -469,9 +474,16 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")    # lowest score (score*-10*3)
                     self.assertEqual(hybrid_res["hits"][-1]["_score"], -30.0)
 
-                # TODO: Uncomment when tensor/lexical modifiers bug is fixed
-                """
                 with self.subTest("retrieval: tensor, ranking: lexical"):
+
+                    test_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="HELLO WORLD",
+                        search_method="LEXICAL",
+                        result_count=10
+                    )
+
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -486,18 +498,27 @@ class TestHybridSearch(MarqoTestCase):
                                     {"field_name": "mult_field_2", "weight": -10}
                                 ],
                                 "add_to_score": [
-                                    {"field_name": "add_field_1", "weight": 5}
+                                    {"field_name": "add_field_1", "weight": 2}
                                 ]
                             },
+                            searchable_attributes_lexical=["text_field_1"],
+                            verbose=True
                         ),
-                        result_count=10
+                        result_count=10,
                     )
                     self.assertIn("hits", hybrid_res)
+
+                    base_lexical_score = hybrid_res["hits"][3]["_score"]
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
+                    self.assertAlmostEqual(hybrid_res["hits"][0]["_score"], base_lexical_score * 10 * 3)
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # second highest score (score*10*2)
-                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # second highest score (score + 5*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_score"], base_lexical_score * 10 * 2)
+                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # third highest score (score + 2*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_score"], base_lexical_score + 2*1)
+                    self.assertEqual(hybrid_res["hits"][3]["_id"], "doc6")  # ORIGINAL SCORE
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
-                """
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_score"], base_lexical_score * -10 * 3)
+
                 with self.subTest("retrieval: disjunction, ranking: rrf"):
                     hybrid_res = tensor_search.search(
                         config=self.config,
@@ -537,20 +558,20 @@ class TestHybridSearch(MarqoTestCase):
                     base_tensor_score = hybrid_res["hits"][3]["_raw_tensor_score"]
 
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
-                    self.assertEqual(hybrid_res["hits"][0]["_raw_lexical_score"], base_lexical_score * 10 * 3)
+                    self.assertAlmostEqual(hybrid_res["hits"][0]["_raw_lexical_score"], base_lexical_score * 10 * 3)
                     self.assertEqual(hybrid_res["hits"][0]["_raw_tensor_score"], base_tensor_score * 10 * 3)
 
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # (score*10*2)
-                    self.assertEqual(hybrid_res["hits"][1]["_raw_lexical_score"], base_lexical_score * 10 * 2)
-                    self.assertEqual(hybrid_res["hits"][1]["_raw_tensor_score"], base_tensor_score * 10 * 2)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_raw_lexical_score"], base_lexical_score * 10 * 2)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_raw_tensor_score"], base_tensor_score * 10 * 2)
 
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
-                    self.assertEqual(hybrid_res["hits"][2]["_raw_lexical_score"], base_lexical_score + 5*1)
-                    self.assertEqual(hybrid_res["hits"][2]["_raw_tensor_score"], base_tensor_score + 5*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_raw_lexical_score"], base_lexical_score + 5*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_raw_tensor_score"], base_tensor_score + 5*1)
 
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
-                    self.assertEqual(hybrid_res["hits"][-1]["_raw_lexical_score"], base_lexical_score * -10 * 3)
-                    self.assertEqual(hybrid_res["hits"][-1]["_raw_tensor_score"], base_tensor_score * -10 * 3)
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_raw_lexical_score"], base_lexical_score * -10 * 3)
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_raw_tensor_score"], base_tensor_score * -10 * 3)
 
 
     def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):
@@ -954,7 +975,7 @@ class TestHybridSearch(MarqoTestCase):
                                 index_name=index.name,
                                 text="dogs",
                                 search_method="HYBRID",
-                                score_modifiers=apiScoreModifier(
+                                score_modifiers=ScoreModifierLists(
                                     multiply_score_by=[
                                         {"field_name": "mult_field_1", "weight": 1.0}
                                     ],
