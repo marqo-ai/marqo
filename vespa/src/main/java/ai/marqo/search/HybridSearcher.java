@@ -39,6 +39,8 @@ public class HybridSearcher extends Searcher {
     private static String QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = "marqo__mult_weights";
     private static String QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = "marqo__add_weights";
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
+    private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
+    private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
 
     @Override
@@ -47,8 +49,8 @@ public class HybridSearcher extends Searcher {
 
         // Retrieval methods: disjunction, tensor, lexical
         // Ranking methods: rrf, normalize_linear, tensor, lexical
-        STANDARD_SEARCH_TYPES.add("lexical");
-        STANDARD_SEARCH_TYPES.add("tensor");
+        STANDARD_SEARCH_TYPES.add(MARQO_SEARCH_METHOD_LEXICAL);
+        STANDARD_SEARCH_TYPES.add(MARQO_SEARCH_METHOD_TENSOR);
 
         boolean verbose = query.properties().getBoolean("marqo__hybrid.verbose", false);
 
@@ -73,8 +75,8 @@ public class HybridSearcher extends Searcher {
 
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
-            Query queryLexical = createSubQuery(query, "lexical", "lexical", verbose);
-            Query queryTensor = createSubQuery(query, "tensor", "tensor", verbose);
+            Query queryLexical = createSubQuery(query, MARQO_SEARCH_METHOD_LEXICAL, MARQO_SEARCH_METHOD_LEXICAL, verbose);
+            Query queryTensor = createSubQuery(query, MARQO_SEARCH_METHOD_TENSOR, MARQO_SEARCH_METHOD_TENSOR, verbose);
 
             // Execute both searches async
             AsyncExecution asyncExecutionLexical = new AsyncExecution(execution);

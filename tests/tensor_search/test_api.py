@@ -157,7 +157,7 @@ class TestApiCustomEnvVars(MarqoTestCase):
         unstructured_index_request = cls.unstructured_marqo_index_request()
         structured_index_request = cls.structured_marqo_index_request(
             fields=[
-                FieldRequest(name='field1', type=FieldType.Text),
+                FieldRequest(name='field1', type=FieldType.Text, features=['lexical_search']),
                 FieldRequest(name='field2', type=FieldType.Text)
             ],
             tensor_fields=['field1']
@@ -175,15 +175,33 @@ class TestApiCustomEnvVars(MarqoTestCase):
             # VespaClient will be created with default timeout of 1ms
             self.client = TestClient(api.app)
 
-        for index in [self.unstructured_index, self.structured_index]:
-            with self.subTest(index=index.name):
-                res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
-                    "q": "irrelevant"
-                })
-                # The search request must timeout, since the timeout is set to 1ms
-                self.assertEqual(res.status_code, 504)
-                self.assertEqual(res.json()["code"], "vector_store_timeout")
-                self.assertEqual(res.json()["type"], "invalid_request")
+            with self.subTest(search_method="TENSOR"):
+                for index in [self.unstructured_index, self.structured_index]:
+                    with self.subTest(index=index.name):
+                        res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                            "q": "irrelevant",
+                            "searchMethod": "TENSOR"
+                        })
+                        # The search request must timeout, since the timeout is set to 1ms
+                        self.assertEqual(res.status_code, 504)
+                        self.assertEqual(res.json()["code"], "vector_store_timeout")
+                        self.assertEqual(res.json()["type"], "invalid_request")
+
+            with self.subTest(search_method="HYBRID"):
+                for index in [self.structured_index]:   # TODO: add unstructured when supported
+                    with self.subTest(index=index.name):
+                        res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                            "q": "irrelevant",
+                            "searchMethod": "HYBRID",
+                            "hybridParameters": {
+                                "retrieval_method": "lexical",
+                                "ranking_method": "tensor"
+                            }
+                        })
+                        # The search request must timeout, since the timeout is set to 1ms
+                        self.assertEqual(res.status_code, 504)
+                        self.assertEqual(res.json()["code"], "vector_store_timeout")
+                        self.assertEqual(res.json()["type"], "invalid_request")
 
 
 class TestApiErrors(MarqoTestCase):
