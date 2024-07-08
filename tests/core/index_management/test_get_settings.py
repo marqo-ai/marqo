@@ -88,7 +88,7 @@ class TestGetSettings(MarqoTestCase):
                         'parameters': {'efConstruction': 512, 'm': 16},
                         'spaceType': DistanceMetric.PrenormalizedAngular
                     },
-                    'filterStringMaxLength': 20,
+                    'filterStringMaxLength': 50,
                     'imagePreprocessing': {},
                     'model': 'hf/e5-base-v2',
                     'normalizeEmbeddings': True,
@@ -153,7 +153,7 @@ class TestGetSettings(MarqoTestCase):
                         'parameters': {'efConstruction': 512, 'm': 16},
                         'spaceType': DistanceMetric.PrenormalizedAngular
                     },
-                    'filterStringMaxLength': 20,
+                    'filterStringMaxLength': 50,
                     'imagePreprocessing': {},
                     'model': 'ViT-B/32',
                     'normalizeEmbeddings': False,
