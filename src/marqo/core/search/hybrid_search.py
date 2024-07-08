@@ -1,18 +1,5 @@
-import copy
-import json
-import typing
-import uuid
-from collections import defaultdict
-from contextlib import ExitStack
-from timeit import default_timer as timer
-from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
+from typing import List, Optional, Union, Iterable, Dict
 
-import numpy as np
-import psutil
-from PIL import Image
-
-import marqo.core.unstructured_vespa_index.common as unstructured_common
-from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
@@ -20,46 +7,30 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.models.marqo_index import IndexType
-from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
-from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.models.hybrid_parameters import HybridParameters
-from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
-from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
-from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex
+from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
-from marqo.s2_inference import errors as s2_inference_errors
-from marqo.s2_inference import s2_inference
-from marqo.s2_inference.clip_utils import _is_image
-from marqo.s2_inference.processing import image as image_processor
-from marqo.s2_inference.processing import text as text_processor
-from marqo.s2_inference.reranking import rerank
-from marqo.tensor_search import delete_docs
-from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
-from marqo.tensor_search import utils, validation, add_docs
+from marqo.tensor_search import utils
 from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars
+    SearchMethod
 )
-from marqo.tensor_search.index_meta_cache import get_cache
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
-from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
+from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists, CustomVectorQuery
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
+from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.vespa.exceptions import VespaStatusError
-from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
+
+
 class HybridSearch:
     def search(
-            self, config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5,
+            self, config: Config, index_name: str, query: Optional[Union[str, CustomVectorQuery]],
+            result_count: int = 5,
             offset: int = 0, ef_search: Optional[int] = None, approximate: bool = True,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
             attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-            image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
+            image_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
             hybrid_parameters: HybridParameters = None) -> Dict:
@@ -132,11 +103,27 @@ class HybridSearch:
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
 
+        if isinstance(query, CustomVectorQuery):
+            query_text_vectorise = None
+            query_text_search = query.custom_vector.content
+
+            if context is None:
+                context = SearchContext(
+                    tensor=[SearchContextTensor(vector=query.custom_vector.vector, weight=1)]
+                )
+            else:
+                context.tensor.append(SearchContextTensor(vector=query.custom_vector.vector, weight=1))
+        else:  # string query
+            query_text_vectorise = query
+            query_text_search = query
+
         queries = [BulkSearchQueryEntity(
-            q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID, limit=result_count,
+            q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,
+            limit=result_count,
             offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
             boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
-            index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, hybridParameters=hybrid_parameters
+            index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix,
+            hybridParameters=hybrid_parameters
         )]
 
         with RequestMetricsStore.for_request().time(f"search.hybrid.vector_inference_full_pipeline"):
@@ -144,7 +131,7 @@ class HybridSearch:
         vectorised_text = list(qidx_to_vectors.values())[0]
 
         # Parse text into required and optional terms.
-        (required_terms, optional_terms) = utils.parse_lexical_query(query)
+        (required_terms, optional_terms) = utils.parse_lexical_query(query_text_search)
 
         marqo_query = MarqoHybridQuery(
             index_name=index_name,

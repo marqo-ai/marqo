@@ -52,15 +52,14 @@ from marqo.api import exceptions as errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
-from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
-from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
+from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
-from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.clip_utils import _is_image
@@ -139,7 +138,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
-    
+
     text_chunk_prefix = marqo_index.model.get_text_chunk_prefix(add_docs_params.text_chunk_prefix)
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
@@ -164,12 +163,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         docs=docs, thread_count=add_docs_params.image_download_thread_count,
                         tensor_fields=tensor_fields_and_multimodal_subfields,
                         image_download_headers=add_docs_params.image_download_headers,
-                        model_name = marqo_index.model.name,
+                        model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
-                        patch_method_exists = marqo_index.image_preprocessing.patch_method is not None
+                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None
                     )
                 )
 
@@ -445,14 +444,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                     # Use_existing tensor does not apply, or we didn't find it, then we vectorise
                     if combo_chunk is None:
-                        
+
                         if field_content:  # Check if the subfields are present
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                              unsuccessful_doc_to_append,
                              combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
                                 field_name,
                                 field_content, i, doc_id, add_docs_params.device, marqo_index,
-                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth, text_chunk_prefix=text_chunk_prefix)
+                                image_repo, multimodal_params, model_auth=add_docs_params.model_auth,
+                                text_chunk_prefix=text_chunk_prefix)
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
                             if combo_document_is_valid is False:
@@ -597,7 +597,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         docs=docs, thread_count=add_docs_params.image_download_thread_count,
                         tensor_fields=image_fields,
                         image_download_headers=add_docs_params.image_download_headers,
-                        model_name = marqo_index.model.name,
+                        model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
@@ -854,7 +854,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             # Multimodal fields haven't been processed yet, so we do that here
             if document_is_valid:  # No need to process multimodal fields if the document is invalid
                 for tensor_field in marqo_index.tensor_fields:
-                    
+
                     marqo_field = marqo_index.field_map[tensor_field.name]
                     if marqo_field.type == FieldType.MultimodalCombination:
                         field_name = tensor_field.name
@@ -917,7 +917,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                              unsuccessful_doc_to_append,
                              combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
                                 field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
-                                image_repo, mappings, model_auth=add_docs_params.model_auth, text_chunk_prefix=text_chunk_prefix)
+                                image_repo, mappings, model_auth=add_docs_params.model_auth,
+                                text_chunk_prefix=text_chunk_prefix)
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
 
@@ -1321,7 +1322,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
             search_result = _vector_text_search(
                 config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
-                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
+                boost=boost,
                 image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
             )
@@ -1331,7 +1333,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
             search_result = HybridSearch().search(
                 config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
-                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve, boost=boost,
+                filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
+                boost=boost,
                 image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
                 hybrid_parameters=hybrid_parameters
@@ -1386,6 +1389,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
     logger.debug(f"search ({search_method.lower()}) completed with total processing time: {(time_taken):.3f}s.")
 
     return search_result
+
 
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
@@ -1737,6 +1741,7 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
                 raise not_found_error
     raise not_found_error
 
+
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
     prefixed_queries = []
     for q in queries:
@@ -1777,11 +1782,12 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
             hybridParameters=q.hybridParameters
         )
         prefixed_queries.append(new_query_object)
-    
+
     return prefixed_queries
 
 
-def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[Qidx, List[float]]:
+def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
+    Qidx, List[float]]:
     """Run the query vectorisation process"""
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
@@ -1915,16 +1921,6 @@ def _vector_text_search(
 
     if boost is not None:
         raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
-        # gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
-
-    # completely_sorted = sort_chunks(gathered_docs)
-
-    # if verbose:
-    #     print("Chunk vector search, sorted result:")
-    #     if verbose == 1:
-    #         pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
-    #     elif verbose == 2:
-    #         pprint.pprint(completely_sorted)
 
     total_postprocess_time = RequestMetricsStore.for_request().stop("search.vector.postprocess")
     logger.debug(
@@ -2080,6 +2076,7 @@ def _hybrid_search(
     return gathered_docs
 """
 
+
 def delete_index(config: Config, index_name):
     config.index_management.delete_index_by_name(index_name)
     if index_name in get_cache():
@@ -2205,7 +2202,8 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors"):
-                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
+                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise,
+                                                                                       text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=prefixed_text_content_to_vectorise,
@@ -2261,7 +2259,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
         doc_id: str, device: str, marqo_index: StructuredMarqoIndex, image_repo, field_map: dict,
-        model_auth: Optional[ModelAuth] = None, 
+        model_auth: Optional[ModelAuth] = None,
         text_chunk_prefix: str = None
 ):
     """
@@ -2343,9 +2341,9 @@ def vectorise_multimodal_combination_field_structured(
         start_time = timer()
         text_vectors = []
         if len(text_content_to_vectorise) > 0:
-            
             with RequestMetricsStore.for_request().time(f"create_vectors"):
-                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
+                prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise,
+                                                                                       text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.get_properties(), content=prefixed_text_content_to_vectorise,

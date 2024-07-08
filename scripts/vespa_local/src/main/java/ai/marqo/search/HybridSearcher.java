@@ -280,18 +280,7 @@ public class HybridSearcher extends Searcher {
         String queryInputString;
         int dimensions = cellKey.size();
         for (int i = 0; i < dimensions; i++) {
-            if (retrievalMethod.equals("tensor") && rankingMethod.equals("lexical")
-                    || retrievalMethod.equals("lexical") && rankingMethod.equals("tensor")) {
-                // If the retrieval and ranking methods are different, add the ranking method to the
-                // rank feature name.
-                queryInputString =
-                        addQueryWrapper(
-                                String.format("marqo__%s_%s", rankingMethod, cellKey.label(i)));
-            } else {
-                // Otherwise use the original rank feature name (disjunction, lexical/lexical,
-                // tensor/tensor).
-                queryInputString = addQueryWrapper(cellKey.label(i));
-            }
+            queryInputString = addQueryWrapper(cellKey.label(i));
             query.getRanking().getFeatures().put(queryInputString, cell.getValue());
             logIfVerbose(
                     String.format(
@@ -325,15 +314,26 @@ public class HybridSearcher extends Searcher {
         // YQL uses RETRIEVAL method
         String yqlNew = query.properties().getString("marqo__yql." + retrievalMethod, "");
         // Rank Profile uses RETRIEVAL + RANKING method
-        String rankProfileNew = query.properties().getString("marqo__ranking." + retrievalMethod + "." + rankingMethod, "");
+        String rankProfileNew =
+                query.properties()
+                        .getString("marqo__ranking." + retrievalMethod + "." + rankingMethod, "");
         String rankProfileNewScoreModifiers =
                 query.properties()
-                        .getString("marqo__ranking." + retrievalMethod + "." + rankingMethod + "ScoreModifiers", "");
+                        .getString(
+                                "marqo__ranking."
+                                        + retrievalMethod
+                                        + "."
+                                        + rankingMethod
+                                        + "ScoreModifiers",
+                                "");
 
         // Log fetched properties
         logIfVerbose(String.format("YQL %s found: %s", retrievalMethod, yqlNew), verbose);
         logIfVerbose(
-                String.format("Rank Profile %s.%s found: %s", retrievalMethod, rankingMethod, rankProfileNew), verbose);
+                String.format(
+                        "Rank Profile %s.%s found: %s",
+                        retrievalMethod, rankingMethod, rankProfileNew),
+                verbose);
         logIfVerbose(
                 String.format(
                         "Rank Profile %s.%s score modifiers found: %s",
@@ -356,7 +356,8 @@ public class HybridSearcher extends Searcher {
                                 cell, queryNew, retrievalMethod, rankingMethod, verbose));
 
         // Set rank profile (using RANKING method)
-        // TODO: Use rankProfileNewScoreModifiers also if retrievalMethod="lexical" + rankingMethod="tensor", and either are present.
+        // TODO: Use rankProfileNewScoreModifiers also if retrievalMethod="lexical" +
+        // rankingMethod="tensor", and either are present.
         if (query.properties()
                 .getBoolean("marqo__hybrid." + rankingMethod + "ScoreModifiersPresent")) {
             // With Score Modifiers (using RANKING method)
