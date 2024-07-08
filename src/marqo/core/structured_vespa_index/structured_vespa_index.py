@@ -545,7 +545,7 @@ class StructuredVespaIndex(VespaIndex):
             query_inputs.update(hybrid_score_modifiers["tensor"])
 
         query = {
-            'searchChain': 'hybrid-chain',
+            'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
 

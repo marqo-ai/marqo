@@ -14,7 +14,6 @@ def start(args):
               "--name vespa "
               "--hostname vespa-container "
               "--publish 8080:8080 --publish 19071:19071 --publish 2181:2181 "
-              "--publish 5005:5005 "   # For debugging
               "vespaengine/vespa")
 
 
