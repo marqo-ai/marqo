@@ -759,6 +759,7 @@ class TestHybridSearch(MarqoTestCase):
                             retrieval_method=RetrievalMethod.Lexical,
                             ranking_method=RankingMethod.Tensor,
                             searchable_attributes_lexical=["text_field_1"],
+                            searchable_attributes_tensor=["text_field_1"],
                             verbose=True
                         ),
                         result_count=10
@@ -784,6 +785,7 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         text="dogs",
                         search_method="LEXICAL",
+                        searchable_attributes=["text_field_1"],
                         result_count=10,
                     )
                     tensor_res = tensor_search.search(
@@ -802,6 +804,7 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             retrieval_method=RetrievalMethod.Tensor,
                             ranking_method=RankingMethod.Lexical,
+                            searchable_attributes_lexical=["text_field_1"],
                             searchable_attributes_tensor=["text_field_1"],
                             verbose=True
                         ),
@@ -989,7 +992,7 @@ class TestHybridSearch(MarqoTestCase):
                             searchable_attributes_lexical=["text_field_1", "add_field_1"]
                         )
                     )
-                self.assertIn("has no lexical field add_field_1", str(e.exception))
+                self.assertIn("has no lexically searchable field add_field_1", str(e.exception))
 
         # Non-tensor field
         test_cases = [

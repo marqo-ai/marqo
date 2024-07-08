@@ -63,7 +63,7 @@ class HybridParameters(StrictBaseModel):
 
         # searchable_attributes_tensor can only be defined for Tensor (ranking or retrieval), Disjunction
         if values.get('searchable_attributes_tensor') is not None:
-            if not (values.get('retrieval_method') not in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction] or
+            if not (values.get('retrieval_method') in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction] or
                     values.get('ranking_method') == RankingMethod.Tensor):
                 raise ValueError(
                     "'searchable_attributes_tensor' can only be defined for 'tensor', 'disjunction' retrieval methods or 'tensor' ranking method")

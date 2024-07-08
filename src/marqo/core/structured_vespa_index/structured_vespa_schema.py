@@ -241,11 +241,11 @@ class StructuredVespaSchema(VespaSchema):
             f'if (query({field.lexical_field_name}) > 0, bm25({field.lexical_field_name}), 0)' for field in
             lexical_fields
         ])
-        bm25_avg_denominoator_sum = ' + '.join([f'bm25({field.lexical_field_name})' for field in lexical_fields])
+        bm25_avg_denominator_sum = ' + '.join([f'bm25({field.lexical_field_name})' for field in lexical_fields])
         bmw25_avg_expression = (f'({bm25_sum_expression}) / if (' +
                                 f' + '.join([f'query({field.lexical_field_name})' for field in lexical_fields]) +
                                 f' == 0, 1, ' +
-                                f'if ({bm25_avg_denominoator_sum} == 0, 1, {bm25_avg_denominoator_sum}))'
+                                f'if ({bm25_avg_denominator_sum} == 0, 1, {bm25_avg_denominator_sum}))'
                                 )
         bm25_max_expression = self._generate_max_bm25_expression(list(lexical_fields))
         embedding_similarity_expression = self._generate_max_similarity_expression(tensor_fields)

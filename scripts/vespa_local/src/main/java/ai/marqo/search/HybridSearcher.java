@@ -317,15 +317,6 @@ public class HybridSearcher extends Searcher {
         String rankProfileNew =
                 query.properties()
                         .getString("marqo__ranking." + retrievalMethod + "." + rankingMethod, "");
-        String rankProfileNewScoreModifiers =
-                query.properties()
-                        .getString(
-                                "marqo__ranking."
-                                        + retrievalMethod
-                                        + "."
-                                        + rankingMethod
-                                        + "ScoreModifiers",
-                                "");
 
         // Log fetched properties
         logIfVerbose(String.format("YQL %s found: %s", retrievalMethod, yqlNew), verbose);
@@ -333,11 +324,6 @@ public class HybridSearcher extends Searcher {
                 String.format(
                         "Rank Profile %s.%s found: %s",
                         retrievalMethod, rankingMethod, rankProfileNew),
-                verbose);
-        logIfVerbose(
-                String.format(
-                        "Rank Profile %s.%s score modifiers found: %s",
-                        retrievalMethod, rankingMethod, rankProfileNewScoreModifiers),
                 verbose);
 
         // Create New Subquery
@@ -356,17 +342,16 @@ public class HybridSearcher extends Searcher {
                                 cell, queryNew, retrievalMethod, rankingMethod, verbose));
 
         // Set rank profile (using RANKING method)
-        // TODO: Use rankProfileNewScoreModifiers also if retrievalMethod="lexical" +
-        // rankingMethod="tensor", and either are present.
+        queryNew.getRanking().setProfile(rankProfileNew);
+        // TODO: Remove, no need to re assign features
+        /*
         if (query.properties()
                 .getBoolean("marqo__hybrid." + rankingMethod + "ScoreModifiersPresent")) {
-            // With Score Modifiers (using RANKING method)
-            queryNew.getRanking().setProfile(rankProfileNewScoreModifiers);
-
             // Extract lexical/tensor rank features and reassign to main rank features.
             // Only do this for disjunction, lexical/lexical, or tensor/tensor, which use the
             // original
             // rank profiles.
+
             if (rankingMethod.equals(retrievalMethod)) {
                 String featureNameScoreModifiersAddWeights =
                         addQueryWrapper(
@@ -388,10 +373,8 @@ public class HybridSearcher extends Searcher {
                                 mult_weights);
             }
 
-        } else {
-            // Without Score Modifiers
-            queryNew.getRanking().setProfile(rankProfileNew);
         }
+        */
 
         // Log tensor query final state
         logIfVerbose("FINAL QUERY: ", verbose);
@@ -399,6 +382,8 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(queryNew.getModel().getQueryString(), verbose);
         logIfVerbose(queryNew.properties().getString("yql", ""), verbose);
         logIfVerbose(queryNew.getRanking().getFeatures().toString(), verbose);
+        logIfVerbose(
+                String.format("Rank Profile: %s", queryNew.getRanking().getProfile()), verbose);
 
         return queryNew;
     }
