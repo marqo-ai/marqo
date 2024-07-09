@@ -512,24 +512,24 @@ class TestHybridSearch(MarqoTestCase):
 
                     # Score without score modifiers
                     self.assertEqual(hybrid_res["hits"][3]["_id"], "doc6")  # (score)
-                    base_lexical_score = hybrid_res["hits"][3]["_raw_lexical_score"]
-                    base_tensor_score = hybrid_res["hits"][3]["_raw_tensor_score"]
+                    base_lexical_score = hybrid_res["hits"][3]["_lexical_score"]
+                    base_tensor_score = hybrid_res["hits"][3]["_tensor_score"]
 
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
-                    self.assertAlmostEqual(hybrid_res["hits"][0]["_raw_lexical_score"], base_lexical_score * 10 * 3)
-                    self.assertEqual(hybrid_res["hits"][0]["_raw_tensor_score"], base_tensor_score * 10 * 3)
+                    self.assertAlmostEqual(hybrid_res["hits"][0]["_lexical_score"], base_lexical_score * 10 * 3)
+                    self.assertEqual(hybrid_res["hits"][0]["_tensor_score"], base_tensor_score * 10 * 3)
 
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # (score*10*2)
-                    self.assertAlmostEqual(hybrid_res["hits"][1]["_raw_lexical_score"], base_lexical_score * 10 * 2)
-                    self.assertAlmostEqual(hybrid_res["hits"][1]["_raw_tensor_score"], base_tensor_score * 10 * 2)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_lexical_score"], base_lexical_score * 10 * 2)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_tensor_score"], base_tensor_score * 10 * 2)
 
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
-                    self.assertAlmostEqual(hybrid_res["hits"][2]["_raw_lexical_score"], base_lexical_score + 5*1)
-                    self.assertAlmostEqual(hybrid_res["hits"][2]["_raw_tensor_score"], base_tensor_score + 5*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_lexical_score"], base_lexical_score + 5*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_tensor_score"], base_tensor_score + 5*1)
 
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
-                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_raw_lexical_score"], base_lexical_score * -10 * 3)
-                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_raw_tensor_score"], base_tensor_score * -10 * 3)
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_lexical_score"], base_lexical_score * -10 * 3)
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -10 * 3)
 
 
     def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):

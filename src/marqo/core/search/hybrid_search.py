@@ -80,6 +80,8 @@ class HybridSearch:
         # # SEARCH TIMER-LOGGER (pre-processing)
         if not device:
             raise api_exceptions.InternalError("_hybrid_search cannot be called without `device`!")
+        if boost is not None:
+            raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
 
         RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
 
@@ -189,19 +191,6 @@ class HybridSearch:
         # SEARCH TIMER-LOGGER (post-processing)
         RequestMetricsStore.for_request().start("search.hybrid.postprocess")
         gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
-
-        if boost is not None:
-            raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
-            # gathered_docs = boost_score(gathered_docs, boost, searchable_attributes)
-
-        # completely_sorted = sort_chunks(gathered_docs)
-
-        # if verbose:
-        #     print("Chunk vector search, sorted result:")
-        #     if verbose == 1:
-        #         pprint.pprint(utils.truncate_dict_vectors(completely_sorted))
-        #     elif verbose == 2:
-        #         pprint.pprint(completely_sorted)
 
         total_postprocess_time = RequestMetricsStore.for_request().stop("search.hybrid.postprocess")
         logger.debug(

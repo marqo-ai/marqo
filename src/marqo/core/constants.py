@@ -9,7 +9,7 @@ MARQO_SEARCH_METHOD_TENSOR = 'tensor'
 MARQO_SEARCH_METHOD_LEXICAL = 'lexical'
 
 # For hybrid search
-MARQO_RAW_TENSOR_SCORE = '_raw_tensor_score'
-MARQO_RAW_LEXICAL_SCORE = '_raw_lexical_score'
+MARQO_DOC_HYBRID_TENSOR_SCORE = '_tensor_score'
+MARQO_DOC_HYBRID_LEXICAL_SCORE = '_lexical_score'
 
 MARQO_HYBRID_SEARCH_MINIMUM_VERSION = '2.10.0'

@@ -328,10 +328,10 @@ class StructuredVespaIndex(VespaIndex):
                     raise VespaDocumentParsingError(f'Unexpected tensor subfield {field}')
             elif field == common.FIELD_ID:
                 marqo_document[constants.MARQO_DOC_ID] = value
-            elif field == common.RESULT_FIELD_RAW_LEXICAL_SCORE:  # Return raw lexical/tensor scores if available. Usually for hybrid search (disjunction).
-                marqo_document[constants.MARQO_RAW_LEXICAL_SCORE] = value
-            elif field == common.RESULT_FIELD_RAW_TENSOR_SCORE:
-                marqo_document[constants.MARQO_RAW_TENSOR_SCORE] = value
+            elif field == common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE:  # Return raw lexical/tensor scores if available. Usually for hybrid search (disjunction).
+                marqo_document[constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = value
+            elif field == common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE:
+                marqo_document[constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = value
             elif field == self._VESPA_DOC_MATCH_FEATURES:
                 continue
             elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_2_8,
@@ -911,17 +911,30 @@ class StructuredVespaIndex(VespaIndex):
         return result
 
     def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
+        if isinstance(query, MarqoHybridQuery):
+            score_modifiers = query.hybrid_parameters.score_modifiers_lexical
+        else:
+            score_modifiers = query.score_modifiers
+
+        # Empty query and wildcard
         if not marqo_query.or_phrases and not marqo_query.and_phrases:
             return 'false'
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
             return 'true'
 
-        if marqo_query.or_phrases:
+        # Optional tokens
+        if marqo_query.or_phrases and score_modifiers:
             or_terms = ' OR '.join([
+                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+            ])
+        elif marqo_query.or_phrases and not score_modifiers:
+            or_terms = 'weakAnd(%s)' % ', '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
             ])
         else:
             or_terms = ''
+
+        # Required tokens
         if marqo_query.and_phrases:
             and_terms = ' AND '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.and_phrases
