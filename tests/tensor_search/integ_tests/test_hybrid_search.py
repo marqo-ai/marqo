@@ -400,6 +400,8 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
                 for i in range(len(hybrid_res["hits"])):
                     self.assertEqual(hybrid_res["hits"][i]["_id"], lexical_res["hits"][i]["_id"])
+                    self.assertEqual(hybrid_res["hits"][i]["_lexical_score"], lexical_res["hits"][i]["_score"])
+
 
     def test_hybrid_search_disjunction_rrf_one_alpha_same_as_tensor(self):
         """
@@ -447,6 +449,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
                 for i in range(len(hybrid_res["hits"])):
                     self.assertEqual(hybrid_res["hits"][i]["_id"], tensor_res["hits"][i]["_id"])
+                    self.assertEqual(hybrid_res["hits"][i]["_tensor_score"], tensor_res["hits"][i]["_score"])
 
     def test_hybrid_search_searchable_attributes(self):
         """
@@ -722,6 +725,7 @@ class TestHybridSearch(MarqoTestCase):
                         self.assertEqual(len(hybrid_res["hits"]), len(base_res["hits"]))
                         for i in range(len(hybrid_res["hits"])):
                             self.assertEqual(hybrid_res["hits"][i]["_id"], base_res["hits"][i]["_id"])
+                            self.assertEqual(hybrid_res["hits"][i]["_score"], base_res["hits"][i]["_score"])
 
     def test_hybrid_search_with_filter(self):
         """
