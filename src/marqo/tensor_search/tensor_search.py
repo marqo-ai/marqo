@@ -1393,7 +1393,7 @@ def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
-        score_modifiers: Optional[ScoreModifier] = None):
+        score_modifiers: Optional[ScoreModifierLists] = None):
     """
 
     Args:
