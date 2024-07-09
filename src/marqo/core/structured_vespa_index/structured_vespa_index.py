@@ -345,11 +345,6 @@ class StructuredVespaIndex(VespaIndex):
                     f'Unknown field {field} for index {self._marqo_index.name} in Vespa document'
                 )
 
-        # be sure to default a lexical score 0 if it is not present
-        if constants.MARQO_DOC_HYBRID_TENSOR_SCORE in marqo_document:
-            marqo_document[constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = marqo_document.get(
-                constants.MARQO_DOC_HYBRID_LEXICAL_SCORE, 0)
-
         # Highlights
         if return_highlights and self._VESPA_DOC_MATCH_FEATURES in fields:
             marqo_document[constants.MARQO_DOC_HIGHLIGHTS] = self._extract_highlights(
