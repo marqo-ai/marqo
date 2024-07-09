@@ -35,9 +35,6 @@ public class HybridSearcher extends Searcher {
 
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
-    private static String MATCH_FEATURES_FIELD = "matchfeatures";
-    private static String QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS = "marqo__mult_weights";
-    private static String QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS = "marqo__add_weights";
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
@@ -115,8 +112,7 @@ public class HybridSearcher extends Searcher {
                         rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
                 logIfVerbose("RRF Fused Hit Group", verbose);
                 logHitGroup(fusedHitList, verbose);
-                Result tempResult = new Result(query, fusedHitList);
-                return tempResult;
+                return new Result(query, fusedHitList);
             } else {
                 throw new RuntimeException(
                         "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
@@ -129,7 +125,7 @@ public class HybridSearcher extends Searcher {
                 Result result = execution.search(combinedQuery);
                 logIfVerbose("Results: ", verbose);
                 logHitGroup(result.hits(), verbose);
-                return execution.search(combinedQuery);
+                return result;
             } else {
                 throw new RuntimeException(
                         "If retrievalMethod is 'lexical' or 'tensor', rankingMethod can only be"
@@ -175,7 +171,7 @@ public class HybridSearcher extends Searcher {
             for (Hit hit : hitsTensor) {
                 logIfVerbose(
                         String.format("Tensor hit at rank: %d", rank),
-                        verbose); // TODO: Expose marqo__id
+                        verbose); // TODO: For easier debugging, expose marqo__id
                 logIfVerbose(hit.toString(), verbose);
 
                 reciprocalRank = alpha * (1.0 / (rank + k));
@@ -188,8 +184,6 @@ public class HybridSearcher extends Searcher {
                 hit.setRelevance(reciprocalRank); // Update score to be weighted RR (tensor)
                 result.add(hit);
                 logIfVerbose(String.format("Set relevance to: %.7f", reciprocalRank), verbose);
-                logIfVerbose("Current result state: ", verbose);
-                logHitGroup(result, verbose);
                 rank++;
             }
         }
@@ -205,7 +199,7 @@ public class HybridSearcher extends Searcher {
             for (Hit hit : hitsLexical) {
                 logIfVerbose(
                         String.format("Lexical hit at rank: %d", rank),
-                        verbose); // TODO: Expose marqo__id
+                        verbose); // TODO: For easier debugging, expose marqo__id
                 logIfVerbose(hit.toString(), verbose);
 
                 reciprocalRank = (1.0 - alpha) * (1.0 / (rank + k));
@@ -228,8 +222,7 @@ public class HybridSearcher extends Searcher {
 
                 } else {
                     // If it does, find that hit in the result list and update it, adding new rrf to
-                    // its
-                    // score.
+                    // its score.
                     newScore = existingScore + reciprocalRank;
                     rrfScores.put(hit.getId().toString(), newScore);
 
@@ -254,9 +247,6 @@ public class HybridSearcher extends Searcher {
                 logIfVerbose(hit.toString(), verbose);
 
                 rank++;
-
-                logIfVerbose("Current result state: ", verbose);
-                logHitGroup(result, verbose);
             }
         }
 
@@ -352,38 +342,6 @@ public class HybridSearcher extends Searcher {
 
         // Set rank profile (using RANKING method)
         queryNew.getRanking().setProfile(rankProfileNew);
-        // TODO: Remove, no need to re assign features
-        /*
-        if (query.properties()
-                .getBoolean("marqo__hybrid." + rankingMethod + "ScoreModifiersPresent")) {
-            // Extract lexical/tensor rank features and reassign to main rank features.
-            // Only do this for disjunction, lexical/lexical, or tensor/tensor, which use the
-            // original
-            // rank profiles.
-
-            if (rankingMethod.equals(retrievalMethod)) {
-                String featureNameScoreModifiersAddWeights =
-                        addQueryWrapper(
-                                QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS + "_" + rankingMethod);
-                String featureNameScoreModifiersMultWeights =
-                        addQueryWrapper(
-                                QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS + "_" + rankingMethod);
-                Tensor add_weights =
-                        extractTensorRankFeature(query, featureNameScoreModifiersAddWeights);
-                Tensor mult_weights =
-                        extractTensorRankFeature(query, featureNameScoreModifiersMultWeights);
-                queryNew.getRanking()
-                        .getFeatures()
-                        .put(addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS), add_weights);
-                queryNew.getRanking()
-                        .getFeatures()
-                        .put(
-                                addQueryWrapper(QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS),
-                                mult_weights);
-            }
-
-        }
-        */
 
         // Log tensor query final state
         logIfVerbose("FINAL QUERY: ", verbose);

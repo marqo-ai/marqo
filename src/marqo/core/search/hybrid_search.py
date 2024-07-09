@@ -45,36 +45,32 @@ class HybridSearch:
                     <query string>:<weight float> pairs, or None with a context
                 result_count:
                 offset:
-                searchable_attributes: Iterable of field names to search. If left as None, then all will
-                    be searched
+                searchable_attributes: Iterable of field names to search. Should be None for hybrid search, or will
+                raise validation error in MarqoHybridQuery
                 verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
                     objects are printed out
                 attributes_to_retrieve: if set, only returns these fields
                 image_download_headers: headers for downloading images
                 context: a dictionary to allow custom vectors in search
-                score_modifiers: a dictionary to modify the score based on field values, for tensor search only
+                score_modifiers: a dictionary to modify the score based on field values, should be None for hybrid search
                 model_auth: Authorisation details for downloading a model (if required)
                 highlights: if True, highlights will be returned
+                text_query_prefix: prefix for text queries (for vectorisation only)
+                hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
+                    default values will be used.
             Returns:
-
-            Note:
-                - uses multisearch, which returns k results in each attribute. Not that much of a concern unless you have a
-                ridiculous number of attributes
-                - Should not be directly called by client - the search() method should
-                be called. The search() method adds syncing
-                - device should ALWAYS be set
 
             Output format:
                 [
                     {
-                        _id: doc_id
-                        doc: {# original document},
-                        highlights:[{}],
+                        "_id": doc_id
+                        "doc": {# original document},
+                        "highlights":[{}],
+                        "_score": score,
+                        "_lexical_score": RRF raw lexical score (if any)
+                        "_tensor_score": tensor score (if any)
                     },
                 ]
-            Future work:
-                - max result count should be in a config somewhere
-                - searching a non existent index should return a HTTP-type error
             """
 
         # # SEARCH TIMER-LOGGER (pre-processing)

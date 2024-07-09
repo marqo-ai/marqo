@@ -911,10 +911,10 @@ class StructuredVespaIndex(VespaIndex):
         return result
 
     def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
-        if isinstance(query, MarqoHybridQuery):
-            score_modifiers = query.hybrid_parameters.score_modifiers_lexical
+        if isinstance(marqo_query, MarqoHybridQuery):
+            score_modifiers = marqo_query.hybrid_parameters.score_modifiers_lexical
         else:
-            score_modifiers = query.score_modifiers
+            score_modifiers = marqo_query.score_modifiers
 
         # Empty query and wildcard
         if not marqo_query.or_phrases and not marqo_query.and_phrases:

@@ -67,7 +67,8 @@ class SearchQuery(BaseMarqoModel):
 
         if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
             if query is None and context is None:
-                raise ValueError("One of Query(q) or context is required for tensor search but both are missing")
+                raise ValueError(f"One of Query(q) or context is required for {search_method} "
+                                 f"search but both are missing")
         elif search_method.upper() == SearchMethod.LEXICAL:
             if query is None:
                 raise ValueError("Query(q) is required for lexical search")
