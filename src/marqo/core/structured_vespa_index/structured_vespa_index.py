@@ -666,12 +666,17 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.or_phrases == ["*"] and not marqo_query.and_phrases:
             return 'true'
 
-        if marqo_query.or_phrases:
+        if marqo_query.or_phrases and marqo_query.score_modifiers:
             or_terms = ' OR '.join([
+                self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
+            ])
+        elif marqo_query.or_phrases and not marqo_query.score_modifiers:
+            or_terms = 'weakAnd(%s)' % ', '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.or_phrases
             ])
         else:
             or_terms = ''
+
         if marqo_query.and_phrases:
             and_terms = ' AND '.join([
                 self._get_lexical_contains_term(phrase, marqo_query) for phrase in marqo_query.and_phrases
