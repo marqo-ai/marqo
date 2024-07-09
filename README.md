@@ -54,7 +54,7 @@ import marqo
 
 mq = marqo.Client(url='http://localhost:8882')
 
-mq.create_index("my-first-index")
+mq.create_index("my-first-index", model="hf/all_datasets_v4_MiniLM-L6")
 
 mq.index("my-first-index").add_documents([
     {

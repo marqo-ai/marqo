@@ -126,7 +126,7 @@ class IndexSettings(StrictBaseModel):
             if self.filterStringMaxLength is None:
                 # Default value for filter_string_max_length is 20, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
-                self.filterStringMaxLength = 20
+                self.filterStringMaxLength = 50
 
             return UnstructuredMarqoIndexRequest(
                 name=index_name,
