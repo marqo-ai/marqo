@@ -30,8 +30,6 @@ public class HybridSearcher extends Searcher {
 
     @Override
     public Result search(Query query, Execution execution) {
-        boolean verbose = query.properties().getBoolean("marqo__hybrid.verbose", false);
-        logIfVerbose("Starting Hybrid Search script.", verbose);
 
         MarqoQuery marqoQuery = MarqoQuery.from(query);
 
@@ -67,7 +65,7 @@ public class HybridSearcher extends Searcher {
                             resultLexical.hits(),
                             marqoQuery.getRrfK(),
                             marqoQuery.getAlpha(),
-                            verbose);
+                            query);
             query.trace(new NamedHitGroup("RRF Fused", fusedHitList), 1);
             return new Result(query, fusedHitList);
 
@@ -87,49 +85,38 @@ public class HybridSearcher extends Searcher {
      * @param hitsLexical
      * @param k
      * @param alpha
-     * @param verbose
+     * @param query
      */
-    HitGroup rrf(
-            HitGroup hitsTensor, HitGroup hitsLexical, Integer k, Double alpha, boolean verbose) {
+    HitGroup rrf(HitGroup hitsTensor, HitGroup hitsLexical, Integer k, Double alpha, Query query) {
 
         HashMap<String, Double> rrfScores = new HashMap<>();
         HitGroup result = new HitGroup();
         Double reciprocalRank, existingScore, newScore;
 
-        logIfVerbose("Beginning RRF process.", verbose);
-        logIfVerbose("Beginning (empty) result state: ", verbose);
-        logHitGroup(result, verbose);
-
-        logIfVerbose(String.format("alpha is %.2f", alpha), verbose);
-        logIfVerbose(String.format("k is %d", k), verbose);
+        query.trace(String.format("Beginning RRF process. k=%d, alpha=%.2f", k, alpha), 2);
 
         // Iterate through tensor hits list
-
         int rank = 1;
         if (alpha > 0.0) {
-            logIfVerbose(
+            query.trace(
                     String.format(
                             "Iterating through tensor result list. Size: %d", hitsTensor.size()),
-                    verbose);
+                    2);
 
             for (Hit hit : hitsTensor) {
-                logIfVerbose(
-                        String.format("Tensor hit at rank: %d", rank),
-                        verbose); // TODO: Expose marqo__id
-                logIfVerbose(hit.toString(), verbose);
-
                 reciprocalRank = alpha * (1.0 / (rank + k));
-                rrfScores.put(
-                        hit.getId().toString(), reciprocalRank); // Store hit's score via its URI
-                hit.setField(
-                        "marqo__raw_tensor_score",
-                        hit.getRelevance()
-                                .getScore()); // Encode raw score for Marqo debugging purposes
-                hit.setRelevance(reciprocalRank); // Update score to be weighted RR (tensor)
+                query.trace(
+                        String.format(
+                                "Tensor hit at rank: %d, hit: %s, Calculated RRF (Tensor): %.7f",
+                                rank, hit, reciprocalRank),
+                        2);
+                // Store hit's score via its URI
+                rrfScores.put(hit.getId().toString(), reciprocalRank);
+                // Encode raw score for Marqo debugging purposes
+                hit.setField("marqo__raw_tensor_score", hit.getRelevance().getScore());
+                // Update score to be weighted RR (tensor)
+                hit.setRelevance(reciprocalRank);
                 result.add(hit);
-                logIfVerbose(String.format("Set relevance to: %.7f", reciprocalRank), verbose);
-                logIfVerbose("Current result state: ", verbose);
-                logHitGroup(result, verbose);
                 rank++;
             }
         }
@@ -137,115 +124,69 @@ public class HybridSearcher extends Searcher {
         // Iterate through lexical hits list
         rank = 1;
         if (alpha < 1.0) {
-            logIfVerbose(
+            query.trace(
                     String.format(
                             "Iterating through lexical result list. Size: %d", hitsLexical.size()),
-                    verbose);
+                    2);
 
             for (Hit hit : hitsLexical) {
-                logIfVerbose(
-                        String.format("Lexical hit at rank: %d", rank),
-                        verbose); // TODO: Expose marqo__id
-                logIfVerbose(hit.toString(), verbose);
 
                 reciprocalRank = (1.0 - alpha) * (1.0 / (rank + k));
-                logIfVerbose(
-                        String.format("Calculated RRF (lexical) is: %.7f", reciprocalRank),
-                        verbose);
+                query.trace(
+                        String.format(
+                                "Tensor hit at rank: %d, hit: %s, Calculated RRF (lexical): %.7f",
+                                rank, hit, reciprocalRank),
+                        2);
 
                 // Check if score already exists. If so, add to it.
                 existingScore = rrfScores.get(hit.getId().toString());
                 if (existingScore == null) {
                     // If the score doesn't exist, add new hit to result list (with rrf score).
-                    logIfVerbose("No existing score found! Starting at 0.0.", verbose);
-                    hit.setField(
-                            "marqo__raw_lexical_score",
-                            hit.getRelevance()
-                                    .getScore()); // Encode raw score for Marqo debugging purposes
-                    hit.setRelevance(reciprocalRank); // Update score to be weighted RR (lexical)
+                    query.trace("No existing score found! Starting at 0.0.", 2);
+                    // Encode raw score for Marqo debugging purposes
+                    hit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());
+                    // Update score to be weighted RR (lexical)
+                    hit.setRelevance(reciprocalRank);
                     rrfScores.put(hit.getId().toString(), reciprocalRank); // Log score in hashmap
                     result.add(hit);
 
                 } else {
                     // If it does, find that hit in the result list and update it, adding new rrf to
-                    // its
-                    // score.
+                    // its score.
                     newScore = existingScore + reciprocalRank;
                     rrfScores.put(hit.getId().toString(), newScore);
 
                     // Update existing hit in result list
                     Hit existingHit = result.get(hit.getId().toString());
-                    existingHit.setField(
-                            "marqo__raw_lexical_score",
-                            hit.getRelevance()
-                                    .getScore()); // Encode raw score (of lexical hit) for Marqo
-                    // debugging purposes
+                    // Encode raw score (of lexical hit) for Marqo debugging purposes
+                    existingHit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());
                     existingHit.setRelevance(newScore);
 
-                    logIfVerbose(
+                    query.trace(
                             String.format(
-                                    "Existing score found for hit: %s.", hit.getId().toString()),
-                            verbose);
-                    logIfVerbose(String.format("Existing score is: %.7f", existingScore), verbose);
-                    logIfVerbose(String.format("New score is: %.7f", newScore), verbose);
+                                    "Existing score found for hit: %s. Existing score is: %.7f. New"
+                                            + " score is: %.7f",
+                                    hit.getId().toString(), existingScore, newScore),
+                            2);
                 }
 
-                logIfVerbose(String.format("Modified lexical hit at rank: %d", rank), verbose);
-                logIfVerbose(hit.toString(), verbose);
-
+                query.trace(
+                        String.format("Modified lexical hit at rank: %d. hit: %s", rank, hit), 2);
                 rank++;
-
-                logIfVerbose("Current result state: ", verbose);
-                logHitGroup(result, verbose);
             }
         }
 
         // Sort and trim results.
-        logIfVerbose("Combined list (UNSORTED)", verbose);
-        logHitGroup(result, verbose);
+        query.trace(new NamedHitGroup("Combined list (UNSORTED)", result), 2);
 
         result.sort();
-        logIfVerbose("Combined list (SORTED)", verbose);
-        logHitGroup(result, verbose);
+        query.trace(new NamedHitGroup("Combined list (SORTED)", result), 2);
 
         // Only return top hits (max length)
-        Integer finalLength = Math.max(hitsTensor.size(), hitsLexical.size());
+        int finalLength = Math.max(hitsTensor.size(), hitsLexical.size());
         result.trim(0, finalLength);
-        logIfVerbose("Combined list (TRIMMED)", verbose);
-        logHitGroup(result, verbose);
+        query.trace(new NamedHitGroup("Combined list (TRIMMED)", result), 2);
 
         return result;
-    }
-
-    /**
-     * Print human-readable list of hits with relevances.
-     * @param hits
-     * @param verbose
-     */
-    public void logHitGroup(HitGroup hits, boolean verbose) {
-        if (verbose) {
-            logger.info(String.format("Hit Group has size: %s", hits.size()));
-            logger.info("=======================");
-            int idx = 0;
-            for (Hit hit : hits) {
-                logger.info(
-                        String.format(
-                                "{IDX: %s, HIT ID: %s, RELEVANCE: %.7f}",
-                                idx, hit.getId().toString(), hit.getRelevance().getScore()));
-                idx++;
-            }
-            logger.info("=======================");
-        }
-    }
-
-    /**
-     * Log to info if the verbose flag is turned on.
-     * @param str
-     * @param verbose
-     */
-    void logIfVerbose(String str, boolean verbose) {
-        if (verbose) {
-            logger.info(str);
-        }
     }
 }

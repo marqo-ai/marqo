@@ -87,6 +87,10 @@ public class HybridSearcherTestCase {
     public void testRRF() {
         // Create Hybrid Searcher
         HybridSearcher testSearcher = new HybridSearcher();
+        int k = 60;
+        double alpha = 0.5;
+
+        Query query = getHybridQuery(k, alpha, "test");
 
         // Cases
         // With tied scores
@@ -122,13 +126,8 @@ public class HybridSearcherTestCase {
         hitsLexical.add(new Hit("both1", 0.45));
         hitsLexical.add(new Hit("both2", 0.44));
 
-        // Set parameters
-        int k = 60;
-        double alpha = 0.5;
-        boolean verbose = false;
-
         // Call the rrf function
-        HitGroup result = testSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+        HitGroup result = testSearcher.rrf(hitsTensor, hitsLexical, k, alpha, query);
 
         // Check that the result size is correct
         assertThat(result.asList()).hasSize(6);
