@@ -1127,3 +1127,45 @@ class TestSearchStructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)
+
+    def test_tensor_search_with_custom_vector_query(self):
+        """
+        Tests that using a custom vector works as expected with marqo
+        """
+        # test with no context and context
+        res = tensor_search.search(
+            text={"custom_vector": {"context": "This text is ignored", "vector": [1, ] * 384}}, 
+            config=self.config, 
+            index_name=self.default_text_index,
+            result_count=5
+        )
+        self.assertIn("hits", res)
+        self.assertEqual(5, len(res["hits"]))
+
+        # text with context and content
+        res = tensor_search.search(
+            text={"custom_vector": {"context": "This text is ignored", "vector": [1, ] * 384}}, 
+            config=self.config, 
+            index_name=self.default_text_index,
+            context=SearchContext(
+                **{
+                    "tensor": [
+                        {"vector": [1, ] * 384, "weight": 1},
+                        {"vector": [2, ] * 384, "weight": 2}
+                    ]
+                }
+            ),
+            result_count=5
+        )
+        self.assertIn("hits", res)
+        self.assertEqual(5, len(res["hits"]))
+
+        # test not context and no content
+        res = tensor_search.search(
+            text={"custom_vector": {"vector": [1, ] * 384}}, 
+            config=self.config, 
+            index_name=self.default_text_index,
+            result_count=5
+        )
+        self.assertIn("hits", res)
+        self.assertEqual(5, len(res["hits"]))

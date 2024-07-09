@@ -33,7 +33,7 @@ def validate_query(q: Optional[Union[dict, str, CustomVector]], search_method: U
     if isinstance(q, str) or q is None:
         return q
     elif isinstance(q, CustomVectorQuery):
-        if search_method.upper() != SearchMethod.HYBRID:
+        if search_method.upper() != SearchMethod.HYBRID and search_method.upper() != SearchMethod.TENSOR:
             raise InvalidArgError(
                 'Custom vector search is currently only supported for search_method="HYBRID" '
                 f"\nReceived search_method `{search_method}`. {usage_ref}")
