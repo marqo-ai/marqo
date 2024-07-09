@@ -47,6 +47,7 @@ import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
+from marqo.tensor_search.models.api_models import CustomVectorQuery
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
 from marqo.config import Config
@@ -79,7 +80,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer
+from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, SearchContextTensor
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
@@ -1822,11 +1823,11 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Optional[Union[str, dict]], result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Optional[Union[str, dict, CustomVectorQuery]], result_count: int = 5, offset: int = 0,
         ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None, context: Optional[Dict] = None,
+        image_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
         highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
     """
@@ -1879,6 +1880,15 @@ def _vector_text_search(
 
     # Determine the text query prefix
     text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
+
+    if isinstance(query, CustomVectorQuery):
+        if context is None:
+            context = SearchContext(
+                tensor=[SearchContextTensor(vector=query.custom_vector.vector, weight=1)]
+            )
+        else:
+            context.tensor.append(SearchContextTensor(vector=query.custom_vector.vector, weight=1))
+        query = None
 
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
