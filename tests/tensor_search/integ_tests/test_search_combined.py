@@ -10,7 +10,6 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
-from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
