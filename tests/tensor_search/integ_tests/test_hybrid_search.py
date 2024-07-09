@@ -18,6 +18,7 @@ from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search import api
 import numpy as np
+from marqo.tensor_search.models.api_models import CustomVectorQuery
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -84,7 +85,8 @@ class TestHybridSearch(MarqoTestCase):
                 FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
                 FieldRequest(name="custom_field_1", type=FieldType.CustomVector)
             ],
-            tensor_fields=["text_field_1", "image_field_1", "custom_field_1"]
+            tensor_fields=["text_field_1", "image_field_1", "custom_field_1"],
+            normalize_embeddings=False
         )
 
         structured_index_empty = cls.structured_marqo_index_request(
@@ -227,9 +229,130 @@ class TestHybridSearch(MarqoTestCase):
                                  {'add_field_1': 1.0})
 
                 # TODO: For lexical/tensor and tensor/lexical. Check fields to rank specifically.
+                # TODO: with and without score modifiers
                 # Make sure results are retrieved
                 self.assertIn("hits", res)
 
+    def test_hybrid_search_with_custom_vector_query(self):
+        """
+        Tests that using a custom vector query sends the correct arguments to vespa
+        """
+        sample_vector = [0.5 for _ in range(16)]
+
+        for index in [self.structured_index_with_no_model]:
+            with self.subTest(index=index.name):
+                original_query = self.config.vespa_client.query
+                def pass_through_query(*arg, **kwargs):
+                    return original_query(*arg, **kwargs)
+
+                mock_vespa_client_query = unittest.mock.MagicMock()
+                mock_vespa_client_query.side_effect = pass_through_query
+
+                with self.subTest("Custom vector query, with content, no context"):
+                    @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                    def run():
+                        res = tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text=CustomVectorQuery(
+                                custom_vector=CustomVectorQuery.CustomVector(
+                                    content= "sample",
+                                    vector=sample_vector
+                                )
+                            ),
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(
+                                searchable_attributes_lexical=["text_field_1"],
+                                searchable_attributes_tensor=["text_field_1"]
+                            ),
+                            result_count=3
+                        )
+                        return res
+
+                    res = run()
+
+                    call_args = mock_vespa_client_query.call_args_list
+
+                    vespa_query_kwargs = call_args[-1][1]
+                    self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                                  "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
+                                  vespa_query_kwargs["marqo__yql.tensor"])
+                    # Lexical yql has content text, but Tensor uses the sample vector
+                    self.assertIn("marqo__lexical_text_field_1 contains \"sample\"", vespa_query_kwargs["marqo__yql.lexical"])
+                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                                     sample_vector)
+                    self.assertIn("hits", res)
+
+                with self.subTest("Custom vector query, with context, with content"):
+                    @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                    def run():
+                        res = tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text=CustomVectorQuery(
+                                custom_vector=CustomVectorQuery.CustomVector(
+                                    content= "sample",
+                                    vector=sample_vector
+                                )
+                            ),
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(
+                                searchable_attributes_lexical=["text_field_1"],
+                                searchable_attributes_tensor=["text_field_1"]
+                            ),
+                            context=SearchContext(**{"tensor": [{"vector": [i*2 for i in sample_vector],     # Double the sample vector
+                                                                              "weight": 1}], })
+                        )
+                        return res
+
+                    res = run()
+
+                    call_args = mock_vespa_client_query.call_args_list
+
+                    vespa_query_kwargs = call_args[-1][1]
+                    self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                                  "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
+                                  vespa_query_kwargs["marqo__yql.tensor"])
+                    # Lexical yql has content text, but Tensor uses the sample vector
+                    self.assertIn("marqo__lexical_text_field_1 contains \"sample\"",
+                                  vespa_query_kwargs["marqo__yql.lexical"])
+                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                                     [i*1.5 for i in sample_vector])    # Should average the query & context vectors
+                    self.assertIn("hits", res)
+
+            with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
+                @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+                def run():
+                    res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text=CustomVectorQuery(
+                            custom_vector=CustomVectorQuery.CustomVector(
+                                content=None,
+                                vector=sample_vector
+                            )
+                        ),
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method="tensor",
+                            ranking_method="tensor",
+                            searchable_attributes_tensor=["text_field_1"]
+                        ),
+                        result_count=3
+                    )
+                    return res
+
+                res = run()
+
+                call_args = mock_vespa_client_query.call_args_list
+
+                vespa_query_kwargs = call_args[-1][1]
+                self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                              "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
+                              vespa_query_kwargs["marqo__yql.tensor"])
+                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                                 sample_vector)
+                self.assertIn("hits", res)
 
     def test_hybrid_search_disjunction_rrf_zero_alpha_same_as_lexical(self):
         """
