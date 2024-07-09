@@ -529,10 +529,10 @@ class StructuredVespaIndex(VespaIndex):
 
         # Separate fields to rank (lexical and tensor)
         query_inputs.update({
-            common.QUERY_INPUT_FIELDS_TO_RANK_LEXICAL: {
+            common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {
                 f: 1 for f in fields_to_search_lexical
             },
-            common.QUERY_INPUT_FIELDS_TO_RANK_TENSOR: {
+            common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {
                 f: 1 for f in fields_to_search_tensor
             }
         })
