@@ -120,5 +120,5 @@ class TestIndexValidateSettings(unittest.TestCase):
             IndexManagement.validate_index_settings("test_index", input_settings)
         self.assertIn("__root__", str(context.exception))
 
-        self.assertIn("See Create Index API reference here. See Create Index ", 
+        self.assertIn("Invalid field name 'dependent_fields'. See Create Index", 
                       str(context.exception))
