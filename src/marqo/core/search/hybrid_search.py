@@ -103,6 +103,7 @@ class HybridSearch:
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
 
+        # Edge cases for q data type
         if isinstance(query, CustomVectorQuery):
             query_text_vectorise = None
             query_text_search = query.custom_vector.content
@@ -113,7 +114,21 @@ class HybridSearch:
                 )
             else:
                 context.tensor.append(SearchContextTensor(vector=query.custom_vector.vector, weight=1))
-        else:  # string query
+        elif query is None:
+            # This is only acceptable if retrieval_method="tensor", ranking_method="tensor", and context exists.
+            # Treated like normal tensor search with context.
+            if not (hybrid_parameters.retrieval_method.upper() == SearchMethod.TENSOR and
+                    hybrid_parameters.ranking_method.upper() == SearchMethod.TENSOR):
+                raise core_exceptions.InvalidArgumentError(
+                    "Query cannot be 'None' for hybrid search unless retrieval_method and ranking_method "
+                    "are both 'tensor'.")
+            if context is None:
+                raise core_exceptions.InvalidArgumentError(
+                    "Query cannot be 'None' for hybrid search unless 'context' is provided.")
+            query_text_vectorise = None
+            query_text_search = None
+
+        else:  # string or dict query
             query_text_vectorise = query
             query_text_search = query
 
@@ -131,7 +146,11 @@ class HybridSearch:
         vectorised_text = list(qidx_to_vectors.values())[0]
 
         # Parse text into required and optional terms.
-        (required_terms, optional_terms) = utils.parse_lexical_query(query_text_search)
+        if query_text_search:
+            (required_terms, optional_terms) = utils.parse_lexical_query(query_text_search)
+        else:
+            required_terms = []
+            optional_terms = []
 
         marqo_query = MarqoHybridQuery(
             index_name=index_name,

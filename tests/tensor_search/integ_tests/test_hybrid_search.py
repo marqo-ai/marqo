@@ -15,7 +15,9 @@ from marqo import exceptions as base_exceptions
 import unittest
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.tensor_search.models.api_models import ScoreModifierLists
+from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search import api
+import numpy as np
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -75,6 +77,16 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
         )
 
+        structured_index_with_no_model = cls.structured_marqo_index_request(
+            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
+            fields=[
+                FieldRequest(name='text_field_1', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
+                FieldRequest(name='image_field_1', type=FieldType.ImagePointer),
+                FieldRequest(name="custom_field_1", type=FieldType.CustomVector)
+            ],
+            tensor_fields=["text_field_1", "image_field_1", "custom_field_1"]
+        )
+
         structured_index_empty = cls.structured_marqo_index_request(
             model=Model(name="sentence-transformers/all-MiniLM-L6-v2"),
             fields=[],
@@ -86,6 +98,7 @@ class TestHybridSearch(MarqoTestCase):
             #unstructured_default_image_index,
             structured_default_image_index,
             structured_text_index_score_modifiers,
+            structured_index_with_no_model,
             structured_index_empty
         ])
 
@@ -94,7 +107,8 @@ class TestHybridSearch(MarqoTestCase):
         #cls.unstructured_default_image_index = cls.indexes[1]
         cls.structured_default_image_index = cls.indexes[1]
         cls.structured_text_index_score_modifiers = cls.indexes[2]
-        cls.structured_index_empty = cls.indexes[3]
+        cls.structured_index_with_no_model = cls.indexes[3]
+        cls.structured_index_empty = cls.indexes[4]
 
     def setUp(self) -> None:
         super().setUp()
@@ -1057,6 +1071,81 @@ class TestHybridSearch(MarqoTestCase):
                     result_count=10
                 )
             self.assertIn("either has no tensor fields or no lexically searchable fields", str(cm.exception))
+
+    def test_hybrid_search_none_query_wrong_retrieval_or_ranking_fails(self):
+        """
+        Test that hybrid search with a None query and wrong retrieval or ranking method fails.
+        """
+        custom_vector = [0.655 for _ in range(16)]
+        test_cases = [
+            (RetrievalMethod.Disjunction, RankingMethod.RRF),
+            (RetrievalMethod.Tensor, RankingMethod.Lexical),
+            (RetrievalMethod.Lexical, RankingMethod.Tensor),
+            (RetrievalMethod.Lexical, RankingMethod.Lexical)
+        ]
+
+        for retrieval_method, ranking_method in test_cases:
+            with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
+                with self.assertRaises(InvalidArgumentError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=self.structured_index_with_no_model.name,
+                        text=None,
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrieval_method=retrieval_method,
+                            ranking_method=ranking_method,
+                            verbose=True
+                        )
+                    )
+                self.assertIn("unless retrieval_method and ranking_method are both 'tensor'", str(e.exception))
+
+    def test_hybrid_search_none_query_with_context_vectors_passes(self):
+        """Test to ensure that context vectors work with no_model by setting query as None and providing context
+        vectors in search method. Uses hybrid search.
+        """
+
+        custom_vector = [0.655 for _ in range(16)]
+
+        docs = [
+            {
+                "_id": "1",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_1",
+                        "vector": np.random.rand(16).tolist()
+                    }
+            },
+            {
+                "_id": "2",
+                "custom_field_1":
+                    {
+                        "content": "test custom field content_2",
+                        "vector": custom_vector
+                    }
+            }
+        ]
+
+        for index in [self.structured_index_with_no_model]:
+            with (self.subTest(index_name=index.name)):
+                add_docs_params = AddDocsParams(index_name=index.name,
+                                                docs=docs)
+                _ = tensor_search.add_documents(config=self.config,
+                                                add_docs_params=add_docs_params)
+
+                r = tensor_search.search(config=self.config, index_name=index.name, text=None,
+                                         search_method="hybrid",
+                                         hybrid_parameters=HybridParameters(retrieval_method=RetrievalMethod.Tensor,
+                                                                            ranking_method=RankingMethod.Tensor,
+                                                                            verbose=True),
+                                         context=SearchContext(**{"tensor": [{"vector": custom_vector,
+                                                                              "weight": 1}], }))
+                self.assertEqual(2, len(r["hits"]))
+                self.assertEqual("2", r["hits"][0]["_id"])
+                self.assertAlmostEqual(1, r["hits"][0]["_score"], places=1)
+
+                self.assertEqual("1", r["hits"][1]["_id"])
+                self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
 
     def test_hybrid_parameters_with_wrong_search_method_fails(self):
         """

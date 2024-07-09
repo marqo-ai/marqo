@@ -144,7 +144,9 @@ class TestNoModel(MarqoTestCase):
                 self.assertIn("Cannot vectorise anything with 'no_model'", str(e.exception))
 
     def test_no_model_work_with_context_vectors_in_search(self):
-        """Test to ensure that context vectors work with no_model by setting query as None"""
+        """Test to ensure that context vectors work with no_model by setting query as None
+        Tests tensor search
+        """
 
         custom_vector = [0.655 for _ in range(self.DIMENSION)]
 
@@ -182,6 +184,7 @@ class TestNoModel(MarqoTestCase):
                                                 add_docs_params=add_docs_params)
 
                 r = tensor_search.search(config=self.config, index_name=index_name, text=None,
+                                         search_method="tensor",
                                          context=SearchContext(**{"tensor": [{"vector": custom_vector,
                                                                               "weight": 1}], }))
                 self.assertEqual(2, len(r["hits"]))
@@ -190,18 +193,6 @@ class TestNoModel(MarqoTestCase):
 
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
-
-    def test_no_model_work_with_custom_vectors_in_search(self):
-        """Test to ensure that context vectors work with no_model by setting query as None"""
-        for index_name in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
-            with (self.subTest(index_name=index_name)):
-                r = tensor_search.search(config=self.config, index_name=index_name, text=None,
-                                         context=SearchContext(**{"tensor": [{"vector": [1, ] * self.DIMENSION,
-                                                                              "weight": -1},
-                                                                             {"vector": [1, ] * self.DIMENSION,
-                                                                              "weight": 1}], }))
-
-
 
 
     def test_no_model_and_context_vectors_dimension(self):

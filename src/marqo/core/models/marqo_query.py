@@ -51,7 +51,8 @@ class MarqoLexicalQuery(MarqoQuery):
     or_phrases: List[str]
     and_phrases: List[str]
 
-    # TODO - validate at least one of or_phrases and and_phrases is not empty
+    # Both lists can be empty only if it's a MarqoHybridQuery and it's
+    # retrieval_method & ranking_method are "TENSOR" (i.e. it's a pure tensor search)
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
