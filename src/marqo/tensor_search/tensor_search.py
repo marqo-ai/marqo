@@ -1530,7 +1530,10 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
             del marqo_doc[constants.MARQO_DOC_TENSORS]
         hits.append(marqo_doc)
 
-    return {'hits': hits}
+    if response.trace:
+        return {'hits': hits, 'trace': response.trace}
+    else:
+        return {'hits': hits}
 
 
 def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attributes_to_retrieve: List[str]) -> Dict[

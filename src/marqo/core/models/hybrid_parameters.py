@@ -27,7 +27,7 @@ class HybridParameters(StrictBaseModel):
     rrf_k: Optional[int] = None
     searchable_attributes_lexical: Optional[List[str]] = None
     searchable_attributes_tensor: Optional[List[str]] = None
-    verbose: bool = False
+    verbose: int = 0
 
     # Input for API, but form will change before being passed to core Hybrid Query.
     score_modifiers_lexical: Optional[ScoreModifierLists] = None

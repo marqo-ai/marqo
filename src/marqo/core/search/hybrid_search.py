@@ -47,8 +47,11 @@ class HybridSearch:
                 offset:
                 searchable_attributes: Iterable of field names to search. If left as None, then all will
                     be searched
-                verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
-                    objects are printed out
+                hybrid_parameters.verbose:
+                    if 0 - nothing is in query trace.
+                    if 1 - important information about the search is included in query trace
+                    if 2 - detailed information in each step is included in query trace (this can cause bloated
+                       trace object in the response, please use only for debugging purpose).
                 attributes_to_retrieve: if set, only returns these fields
                 image_download_headers: headers for downloading images
                 context: a dictionary to allow custom vectors in search
