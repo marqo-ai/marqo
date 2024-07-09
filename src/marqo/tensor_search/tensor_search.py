@@ -1329,15 +1329,12 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
         if approximate is not None:
             raise errors.InvalidArgError(
                 f"approximate is not a valid argument for lexical search")
-        if score_modifiers is not None:
-            raise errors.InvalidArgError(
-                "Score modifiers is not supported for lexical search yet"
-            )
 
         search_result = _lexical_search(
             config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
-            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights
+            filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
+            score_modifiers=score_modifiers
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -1376,7 +1373,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict]],
 def _lexical_search(
         config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
-        highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False):
+        highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
+        score_modifiers: Optional[ScoreModifier] = None):
     """
 
     Args:
@@ -1419,6 +1417,7 @@ def _lexical_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers else None
     )
 
     vespa_index = vespa_index_factory(marqo_index)
