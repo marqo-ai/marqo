@@ -55,24 +55,24 @@ jobs:
           fetch-depth: 0
           path: marqo
 
-#      - name: Set up Python 3.8
-#        uses: actions/setup-python@v3
-#        with:
-#          python-version: "3.8"
-#          cache: "pip"
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.8"
+          cache: "pip"
           
-#      - name: Checkout marqo-base for requirements
-#        uses: actions/checkout@v3
-#        with:
-#          repository: marqo-ai/marqo-base
-#          path: marqo-base
+      - name: Checkout marqo-base for requirements
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo-base
+          path: marqo-base
 
-#      - name: Install dependencies
-#        run: |
-#          pip install -r marqo-base/requirements.txt
-#          # override base requirements with marqo requirements, if needed:
-#          pip install -r marqo/requirements.dev.txt
-#          pip install pytest==7.4.0
+      - name: Install dependencies
+        run: |
+          pip install -r marqo-base/requirements.txt
+          # override base requirements with marqo requirements, if needed: 
+          pip install -r marqo/requirements.dev.txt
+          pip install pytest==7.4.0
 
       - name: Build Vespa
         run: |
