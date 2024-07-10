@@ -65,14 +65,14 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     def validate_searchable_attributes_and_score_modifiers(cls, values):
         # score_modifiers cannot defined for hybrid search
         if values.get("score_modifiers") is not None:
-            raise ValueError("'score_modifiers' cannot be used for hybrid search. Instead, define the "
-                             "'score_modifiers_tensor' and/or 'score_modifiers_lexical' keys inside the "
-                             "'hybrid_parameters' dict parameter.")
+            raise ValueError("'scoreModifiers' cannot be used for hybrid search. Instead, define the "
+                             "'scoreModifiersTensor' and/or 'scoreModifiersLexical' keys inside the "
+                             "'hybridParameters' dict parameter.")
 
         # searchable_attributes cannot be defined for hybrid search
         if values.get("searchable_attributes") is not None:
-            raise ValueError("'searchable_attributes' cannot be used for hybrid search. Instead, define the "
-                             "'searchable_attributes_tensor' and/or 'searchable_attributes_lexical' keys inside the "
-                             "'hybrid_parameters' dict parameter.")
+            raise ValueError("'searchableAttributes' cannot be used for hybrid search. Instead, define the "
+                             "'searchableAttributesTensor' and/or 'searchableAttributesLexical' keys inside the "
+                             "'hybridParameters' dict parameter.")
 
         return values

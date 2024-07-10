@@ -168,10 +168,10 @@ class TestHybridSearch(MarqoTestCase):
                             retrievalMethod="disjunction",
                             rankingMethod="rrf",
                             alpha=0.6,
-                            rrf_k=61,
+                            rrfK=61,
                             searchableAttributesLexical=["text_field_1", "text_field_2"],
                             searchableAttributesTensor=["text_field_2", "text_field_3"],
-                            score_modifiers_lexical={
+                            scoreModifiersLexical={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 1.0},
                                     {"field_name": "mult_field_2", "weight": 1.0}
@@ -832,8 +832,8 @@ class TestHybridSearch(MarqoTestCase):
     def test_hybrid_search_opposite_retrieval_and_ranking(self):
         """
         Tests that hybrid search with:
-        retrieval_method = "lexical", ranking_method = "tensor" and
-        retrieval_method = "tensor", ranking_method = "lexical"
+        retrievalMethod = "lexical", rankingMethod = "tensor" and
+        retrievalMethod = "tensor", rankingMethod = "lexical"
 
         have expected results. The documents themselves should exactly match retrieval method, but the scores
         should match the ranking method. This is only consistent for single-field search, as retrieval top k will
@@ -954,68 +954,68 @@ class TestHybridSearch(MarqoTestCase):
         test_cases = [
             ({
                  "alpha": 0.6,
-                 "ranking_method": "tensor"
+                 "rankingMethod": "tensor"
              }, "can only be defined for 'rrf'"),
             ({
-                 "rrf_k": 61,
-                 "ranking_method": "normalize_linear"
+                 "rrfK": 61,
+                 "rankingMethod": "normalize_linear"
              }, "can only be defined for 'rrf'"),
             ({
-                 "rrf_k": 60.1,
+                 "rrfK": 60.1,
              }, "must be an integer"),
             ({
                 "alpha": 1.1
             }, "between 0 and 1"),
             ({
-                 "rrf_k": -1
+                 "rrfK": -1
              }, "greater than or equal to 0"),
             ({
-                "retrieval_method": "disjunction",
-                "ranking_method": "lexical"
-            }, "ranking_method must be: rrf"),
+                "retrievalMethod": "disjunction",
+                "rankingMethod": "lexical"
+            }, "rankingMethod must be: rrf"),
             ({
-                 "retrieval_method": "tensor",
-                 "ranking_method": "rrf"
-             }, "ranking_method must be: tensor or lexical"),
+                 "retrievalMethod": "tensor",
+                 "rankingMethod": "rrf"
+             }, "rankingMethod must be: tensor or lexical"),
             ({
-                 "retrieval_method": "lexical",
-                 "ranking_method": "rrf"
-             }, "ranking_method must be: tensor or lexical"),
+                 "retrievalMethod": "lexical",
+                 "rankingMethod": "rrf"
+             }, "rankingMethod must be: tensor or lexical"),
             # Searchable attributes need to match retrieval method
             ({
-                "retrieval_method": "tensor",
-                "ranking_method": "tensor",
-                "searchable_attributes_lexical": ["text_field_1"]
+                "retrievalMethod": "tensor",
+                "rankingMethod": "tensor",
+                "searchableAttributesLexical": ["text_field_1"]
              }, "can only be defined for 'lexical',"),
             ({
-                "retrieval_method": "lexical",
-                "ranking_method": "lexical",
-                "searchable_attributes_tensor": ["text_field_1"]
+                "retrievalMethod": "lexical",
+                "rankingMethod": "lexical",
+                "searchableAttributesTensor": ["text_field_1"]
              }, "can only be defined for 'tensor',"),
             # Score modifiers need to match ranking method
             ({
-                 "retrieval_method": "tensor",
-                 "ranking_method": "tensor",
-                 "score_modifiers_lexical": {
+                 "retrievalMethod": "tensor",
+                 "rankingMethod": "tensor",
+                 "scoreModifiersLexical": {
                      "multiply_score_by": [
                          {"field_name": "mult_field_1", "weight": 1.0}
                      ]
                  },
              }, "can only be defined for 'lexical',"),
             ({
-                 "retrieval_method": "lexical",
-                 "ranking_method": "lexical",
-                 "score_modifiers_tensor": {
+                 "retrievalMethod": "lexical",
+                 "rankingMethod": "lexical",
+                 "scoreModifiersTensor": {
                     "multiply_score_by": [
                         {"field_name": "mult_field_1", "weight": 1.0}
                     ]
                  }
              }, "can only be defined for 'tensor',"),
             # Non-existent retrieval method
-            ({"retrieval_method": "something something"},
+            ({"retrievalMethod": "something something"},
                 "not a valid enumeration member"),
             # Non-existent ranking method
-            ({"ranking_method": "something something"},
+            ({"rankingMethod": "something something"},
                 "not a valid enumeration member")
         ]
         # TODO: add unstructured index
@@ -1050,7 +1050,7 @@ class TestHybridSearch(MarqoTestCase):
                             search_method="HYBRID",
                             searchable_attributes=["text_field_1"]
                         )
-                    self.assertIn("'searchable_attributes' cannot be used for hybrid", str(e.exception))
+                    self.assertIn("'searchableAttributes' cannot be used for hybrid", str(e.exception))
 
                 with self.subTest("score_modifiers active"):
                     with self.assertRaises(ValueError) as e:
@@ -1068,12 +1068,12 @@ class TestHybridSearch(MarqoTestCase):
                                 ]
                             ),
                         )
-                    self.assertIn("'score_modifiers' cannot be used for hybrid", str(e.exception))
+                    self.assertIn("'scoreModifiers' cannot be used for hybrid", str(e.exception))
 
     def test_hybrid_search_structured_invalid_fields_fails(self):
         """
-        If searching with HYBRID, searchable_attributes_lexical must only have lexical fields, and
-        searchable_attributes_tensor must only have tensor fields.
+        If searching with HYBRID, searchableAttributesLexical must only have lexical fields, and
+        searchableAttributesTensor must only have tensor fields.
         """
         # Non-lexical field
         test_cases = [

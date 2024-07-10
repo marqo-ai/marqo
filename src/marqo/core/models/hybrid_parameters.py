@@ -74,10 +74,10 @@ class HybridParameters(StrictBaseModel):
                     "'scoreModifiersLexical' can only be defined for 'lexical', 'rrf' ranking methods")  # TODO: re-add normalize_linear
 
         # score_modifiers_tensor can only be defined for Tensor, RRF, NormalizeLinear
-        if values.get('searchableAttributesTensor') is not None:
+        if values.get('scoreModifiersTensor') is not None:
             if values.get('rankingMethod') not in [RankingMethod.Tensor, RankingMethod.RRF]:
                 raise ValueError(
-                    "'searchableAttributesTensor' can only be defined for 'tensor', 'rrf', ranking methods")  # TODO: re-add normalize_linear
+                    "'scoreModifiersTensor' can only be defined for 'tensor', 'rrf', ranking methods")  # TODO: re-add normalize_linear
 
         # if retrievalMethod == Disjunction, then ranking_method must be RRF, NormalizeLinear
         if values.get('retrievalMethod') == RetrievalMethod.Disjunction:
