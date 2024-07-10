@@ -1884,10 +1884,10 @@ def _vector_text_search(
     if isinstance(query, CustomVectorQuery):
         if context is None:
             context = SearchContext(
-                tensor=[SearchContextTensor(vector=query.custom_vector.vector, weight=1)]
+                tensor=[SearchContextTensor(vector=query.customVector.vector, weight=1)]
             )
         else:
-            context.tensor.append(SearchContextTensor(vector=query.custom_vector.vector, weight=1))
+            context.tensor.append(SearchContextTensor(vector=query.customVector.vector, weight=1))
         query = None
 
     queries = [BulkSearchQueryEntity(

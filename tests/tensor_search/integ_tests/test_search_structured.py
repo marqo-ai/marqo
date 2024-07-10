@@ -1145,7 +1145,7 @@ class TestSearchStructured(MarqoTestCase):
 
         res = tensor_search.search(
             text=CustomVectorQuery(
-                custom_vector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
+                customVector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
             ),
             config=self.config,
             index_name=self.default_text_index,
@@ -1157,7 +1157,7 @@ class TestSearchStructured(MarqoTestCase):
         # text with context and content
         res = tensor_search.search(
             text=CustomVectorQuery(
-                custom_vector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
+                customVector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
             ),
             config=self.config,
             index_name=self.default_text_index,
@@ -1177,7 +1177,7 @@ class TestSearchStructured(MarqoTestCase):
         # test not context and no content
         res = tensor_search.search(
             text=CustomVectorQuery(
-                custom_vector=CustomVectorQuery.CustomVector(vector=[1, ] * 384)
+                customVector=CustomVectorQuery.CustomVector(vector=[1, ] * 384)
             ), config=self.config,
             index_name=self.default_text_index,
             result_count=5

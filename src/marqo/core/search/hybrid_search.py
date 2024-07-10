@@ -106,14 +106,14 @@ class HybridSearch:
         # Edge cases for q data type
         if isinstance(query, CustomVectorQuery):
             query_text_vectorise = None
-            query_text_search = query.custom_vector.content
+            query_text_search = query.customVector.content
 
             if context is None:
                 context = SearchContext(
-                    tensor=[SearchContextTensor(vector=query.custom_vector.vector, weight=1)]
+                    tensor=[SearchContextTensor(vector=query.customVector.vector, weight=1)]
                 )
             else:
-                context.tensor.append(SearchContextTensor(vector=query.custom_vector.vector, weight=1))
+                context.tensor.append(SearchContextTensor(vector=query.customVector.vector, weight=1))
         elif query is None:
             # This is only acceptable if retrieval_method="tensor", ranking_method="tensor", and context exists.
             # Treated like normal tensor search with context.
