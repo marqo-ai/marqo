@@ -118,9 +118,14 @@ class TestSearchRegression(MarqoTestCase):
                             result_count=10
                         )
 
+                        docs_with_same_bm25_score = {"doc8", "doc9"}
                         self.assertEqual(len(search_res["hits"]), len(results_2_9.search_results[search_method]))
                         for i in range(len(search_res["hits"])):
-                            self.assertEqual(search_res["hits"][i]["_id"], results_2_9.search_results[search_method][i]["_id"])
+                            # Docs with same bm25 score are interchangeable in order
+                            if (search_res["hits"][i]["_id"] in docs_with_same_bm25_score) and (search_method == SearchMethod.LEXICAL):
+                                self.assertIn(results_2_9.search_results[search_method][i]["_id"], docs_with_same_bm25_score)
+                            else:
+                                self.assertEqual(search_res["hits"][i]["_id"], results_2_9.search_results[search_method][i]["_id"])
                             self.assertEqual(search_res["hits"][i]["_score"], results_2_9.search_results[search_method][i]["_score"])
 
     def test_document_vectors_match_2_9(self):

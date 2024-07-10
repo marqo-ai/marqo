@@ -5,8 +5,92 @@ Marqo branch: releases/2.9
 Vespa version:
 """
 search_results = dict()
+search_results["LEXICAL"] = [{'_id': 'doc10',
+   'text_field_1': 'dogs dogs dogs',
+   '_score': 0.9099117035883404,
+   '_highlights': []},
+  {'_id': 'doc1',
+   'text_field_1': 'dogs',
+   '_score': 0.8034326744450241,
+   '_highlights': []},
+  {'_id': 'doc6',
+   'text_field_1': 'hot dogs',
+   '_score': 0.6482632738011352,
+   '_highlights': []},
+  {'_id': 'doc9',
+   'text_field_1': 'dogs random words',
+   '_score': 0.5433285712074263,
+   '_highlights': []},
+  {'_id': 'doc8',
+   'text_field_1': 'something something dogs',
+   'add_field_1': 1.0,
+   'mult_field_1': 2.0,
+   '_score': 0.5433285712074263,
+   '_highlights': []},
+  {'_id': 'doc11',
+   'text_field_2': 'dogs but wrong field',
+   '_score': 0.5181658414945609,
+   '_highlights': []},
+  {'_id': 'doc7',
+   'text_field_1': 'dogs is a word',
+   '_score': 0.4676326402342555,
+   '_highlights': []}
+]
 
-search_results["LEXICAL"] = [
+search_results["TENSOR"] = [{'_id': 'doc1',
+   'text_field_1': 'dogs',
+   '_highlights': [{'text_field_1': 'dogs'}],
+   '_score': 1.0},
+  {'_id': 'doc10',
+   'text_field_1': 'dogs dogs dogs',
+   '_highlights': [{'text_field_1': 'dogs dogs dogs'}],
+   '_score': 0.9017540519684583},
+  {'_id': 'doc3',
+   'text_field_1': 'canines',
+   'add_field_1': 2.0,
+   'mult_field_1': 3.0,
+   '_highlights': [{'text_field_1': 'canines'}],
+   '_score': 0.8867412005147546},
+  {'_id': 'doc2',
+   'text_field_1': 'puppies',
+   '_highlights': [{'text_field_1': 'puppies'}],
+   '_score': 0.8183337347638111},
+  {'_id': 'doc13',
+   'text_field_2': 'canines canines',
+   '_highlights': [{'text_field_2': 'canines canines'}],
+   '_score': 0.8171547370054506},
+  {'_id': 'doc6',
+   'text_field_1': 'hot dogs',
+   '_highlights': [{'text_field_1': 'hot dogs'}],
+   '_score': 0.7853537294525494},
+  {'_id': 'doc12',
+   'add_field_1': -1.0,
+   'mult_field_1': 0.5,
+   'text_field_2': 'puppies puppies',
+   '_highlights': [{'text_field_2': 'puppies puppies'}],
+   '_score': 0.7440955012899646},
+  {'_id': 'doc7',
+   'text_field_1': 'dogs is a word',
+   '_highlights': [{'text_field_1': 'dogs is a word'}],
+   '_score': 0.7431717415374671},
+  {'_id': 'doc11',
+   'text_field_2': 'dogs but wrong field',
+   '_highlights': [{'text_field_2': 'dogs but wrong field'}],
+   '_score': 0.7098774458656195},
+  {'_id': 'doc9',
+   'text_field_1': 'dogs random words',
+   '_highlights': [{'text_field_1': 'dogs random words'}],
+   '_score': 0.7008764748105084}
+]
+
+
+"""
+Search results are using containerized marqo.
+Marqo Image: 2.9
+"""
+
+search_results_container = dict()
+search_results_container["LEXICAL"] = [
     {'_id': 'doc10',
        'text_field_1': 'dogs dogs dogs',
        '_score': 1.1185285961247438,
@@ -39,7 +123,7 @@ search_results["LEXICAL"] = [
    '_highlights': []}
 ]
 
-search_results["TENSOR"] = [{'_id': 'doc1',
+search_results_container["TENSOR"] = [{'_id': 'doc1',
    'text_field_1': 'dogs',
    '_highlights': [{'text_field_1': 'dogs'}],
    '_score': 1.0},
