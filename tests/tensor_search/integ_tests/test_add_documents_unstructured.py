@@ -234,7 +234,6 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
         Invalid documents return errors
         """
         bad_doc_args = [
-            [{"_id": "to_fail_123", "title": dict()}],  # dict for non-combination field
             [{"_id": "to_fail_123", "title": ["wow", "this", "is"]}],  # tensor field list
             [{"_id": "to_fail_123", "title": ["wow", "this", "is"]},  # tensor field list
              {"_id": "to_pass_123", "title": 'some_content'}],

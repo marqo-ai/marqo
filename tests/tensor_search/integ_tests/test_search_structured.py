@@ -6,8 +6,6 @@ from unittest import mock
 
 import requests
 
-import marqo.core.exceptions as core_exceptions
-from pydantic import ValidationError
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
@@ -18,6 +16,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase
 
@@ -1133,9 +1132,22 @@ class TestSearchStructured(MarqoTestCase):
         Tests that using a custom vector works as expected with marqo
         """
         # test with no context and context
+        docs = [
+                   {"text_field_1": "some text", "text_field_2": "Close match hehehe", "int_field_1": 1},
+               ] * 10
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+            )
+        )
+
         res = tensor_search.search(
-            text={"custom_vector": {"context": "This text is ignored", "vector": [1, ] * 384}}, 
-            config=self.config, 
+            text=CustomVectorQuery(
+                custom_vector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
+            ),
+            config=self.config,
             index_name=self.default_text_index,
             result_count=5
         )
@@ -1144,8 +1156,10 @@ class TestSearchStructured(MarqoTestCase):
 
         # text with context and content
         res = tensor_search.search(
-            text={"custom_vector": {"context": "This text is ignored", "vector": [1, ] * 384}}, 
-            config=self.config, 
+            text=CustomVectorQuery(
+                custom_vector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
+            ),
+            config=self.config,
             index_name=self.default_text_index,
             context=SearchContext(
                 **{
@@ -1162,8 +1176,9 @@ class TestSearchStructured(MarqoTestCase):
 
         # test not context and no content
         res = tensor_search.search(
-            text={"custom_vector": {"vector": [1, ] * 384}}, 
-            config=self.config, 
+            text=CustomVectorQuery(
+                custom_vector=CustomVectorQuery.CustomVector(vector=[1, ] * 384)
+            ), config=self.config,
             index_name=self.default_text_index,
             result_count=5
         )

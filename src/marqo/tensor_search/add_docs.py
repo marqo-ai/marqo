@@ -214,9 +214,6 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
     """
 
     if isinstance(field_content, dict):
-        if not mappings:
-            raise base_exceptions.InternalError(f"Mappings object is required for dict fields. Field {field_name} "
-                                                f"is {field_content} but mappings not found.")
         if field_name not in mappings:
             raise base_exceptions.InternalError(f"Invalid dict field {field_name}. Could not find field in mappings object.")
 
