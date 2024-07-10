@@ -74,44 +74,31 @@ jobs:
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 
-      - name: Start Vespa
+      - name: Build Vespa
         run: |
-          retry_command() {
-            local n=1
-            local max=5
-            local delay=5
-            while true; do
-                "$@" && break || {
-                    if [[ $n -lt $max ]]; then
-                        ((n++))
-                        echo "Command failed. Attempt $n/$max:"
-                        sleep $delay;
-                    else
-                        echo "The command has failed after $n attempts."
-                        return 1
-                    fi
-                }
-            done
-          }
+          systemctl stop unattended-upgrades
+          apt-get remove -y unattended-upgrades
           
           echo "Updating package list"
-          retry_command apt-get update -y
+          apt-get update -y
           
           # Build Vespa components
           echo "Installing jdk 17"
-          retry_command apt-get install openjdk-17-jdk -y
+          sudo apt-get install openjdk-17-jdk -y
           echo "Installing maven"
-          retry_command apt-get install maven -y
+          sudo apt-get install maven -y
           echo "Building Vespa components"
           cd marqo/vespa
           mvn clean package
-          
+
+      - name: Start Vespa
+        run: |
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
           
-          cd ../scripts/vespa_local
+          cd marqo/scripts/vespa_local
           set -x
           python vespa_local.py start
           set +x
@@ -124,7 +111,7 @@ jobs:
           echo -e "\nDone waiting."
           
           # Zip up schemas and services
-          retry_command apt-get install zip -y
+          sudo apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
 
           # Deploy application with test schema
