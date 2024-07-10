@@ -29,7 +29,9 @@ Vector databases are specialized components for vector similarity and only servi
 
 Here is a code snippet for a minimal example of vector search with Marqo (see [Getting Started](#getting-started)):
 
-1. Use docker to run Marqo:
+1. Marqo requires Docker. To install Docker go to the [Docker Official website](https://docs.docker.com/get-docker/). Ensure that docker has at least 8GB memory and 50GB storage.
+   
+2. Use docker to run Marqo:
 
 ```bash
 
@@ -39,15 +41,13 @@ docker run --name marqo -it -p 8882:8882 marqoai/marqo:latest
 
 ```
 
-Note: If your `marqo` container keeps getting killed, this is most likely due to a lack of memory being allocated to Docker. Increasing the memory limit for Docker to at least 6GB (8GB recommended) in your Docker settings may fix the problem.
-
-2. Install the Marqo client:
+3. Install the Marqo client:
 
 ```bash
 pip install marqo
 ```
 
-3. Start indexing and searching! Let's look at a simple example below:
+4. Start indexing and searching! Let's look at a simple example below:
 
 ```python
 import marqo
