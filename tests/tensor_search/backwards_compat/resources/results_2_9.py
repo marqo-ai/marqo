@@ -2,7 +2,34 @@
 Search results are using locally running marqo with containerized Vespa.
 Results may vary when using Vespa binary.
 Marqo branch: releases/2.9
-Vespa version:
+Vespa version: 8.332.5
+Index settings (this will affect scores):
+
+{'type': 'structured',
+ 'allFields': [{'name': 'text_field_1',
+   'type': 'text',
+   'features': ['lexical_search', 'filter']},
+  {'name': 'text_field_2',
+   'type': 'text',
+   'features': ['lexical_search', 'filter']},
+  {'name': 'text_field_3',
+   'type': 'text',
+   'features': ['lexical_search', 'filter']},
+  {'name': 'add_field_1', 'type': 'float', 'features': ['score_modifier']},
+  {'name': 'add_field_2', 'type': 'float', 'features': ['score_modifier']},
+  {'name': 'mult_field_1', 'type': 'float', 'features': ['score_modifier']},
+  {'name': 'mult_field_2', 'type': 'float', 'features': ['score_modifier']}],
+ 'tensorFields': ['text_field_1', 'text_field_2', 'text_field_3'],
+ 'model': 'sentence-transformers/all-MiniLM-L6-v2',
+ 'normalizeEmbeddings': True,
+ 'textPreprocessing': {'splitLength': 2,
+  'splitOverlap': 0,
+  'splitMethod': 'sentence'},
+ 'imagePreprocessing': {},
+ 'vectorNumericType': 'float',
+ 'annParameters': {'spaceType': 'angular',
+  'parameters': {'efConstruction': 128, 'm': 16}}}
+
 """
 search_results = dict()
 search_results["LEXICAL"] = [{'_id': 'doc10',
@@ -122,7 +149,51 @@ search_results_container["LEXICAL"] = [
    '_highlights': []}
 ]
 
-search_results_container["TENSOR"] = []
+search_results_container["TENSOR"] =  [{'_id': 'doc1',
+   'text_field_1': 'dogs',
+   '_highlights': [{'text_field_1': 'dogs'}],
+   '_score': 1.0},
+  {'_id': 'doc10',
+   'text_field_1': 'dogs dogs dogs',
+   '_highlights': [{'text_field_1': 'dogs dogs dogs'}],
+   '_score': 0.6797435636868525},
+  {'_id': 'doc3',
+   'text_field_1': 'canines',
+   'add_field_1': 2.0,
+   'mult_field_1': 3.0,
+   '_highlights': [{'text_field_1': 'canines'}],
+   '_score': 0.6618306968231087},
+  {'_id': 'doc2',
+   'text_field_1': 'puppies',
+   '_highlights': [{'text_field_1': 'puppies'}],
+   '_score': 0.5954815847505068},
+  {'_id': 'doc13',
+   'text_field_2': 'canines canines',
+   '_highlights': [{'text_field_2': 'canines canines'}],
+   '_score': 0.59448985189802},
+  {'_id': 'doc6',
+   'text_field_1': 'hot dogs',
+   '_highlights': [{'text_field_1': 'hot dogs'}],
+   '_score': 0.5690523414528106},
+  {'_id': 'doc12',
+   'add_field_1': -1.0,
+   'mult_field_1': 0.5,
+   'text_field_2': 'puppies puppies',
+   '_highlights': [{'text_field_2': 'puppies puppies'}],
+   '_score': 0.5390326429611109},
+  {'_id': 'doc7',
+   'text_field_1': 'dogs is a word',
+   '_highlights': [{'text_field_1': 'dogs is a word'}],
+   '_score': 0.5383908249822464},
+  {'_id': 'doc11',
+   'text_field_2': 'dogs but wrong field',
+   '_highlights': [{'text_field_2': 'dogs but wrong field'}],
+   '_score': 0.5159641580388035},
+  {'_id': 'doc9',
+   'text_field_1': 'dogs random words',
+   '_highlights': [{'text_field_1': 'dogs random words'}],
+   '_score': 0.5101072182063875}
+]
 
 doc_10_embedding = [-0.05668389052152634,
     0.024104630574584007,
