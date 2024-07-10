@@ -130,8 +130,8 @@ class TestPagination(MarqoTestCase):
             for retrieval_method, ranking_method in test_cases:
                 full_search_results = tensor_search.search(
                     search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(retrieval_method=retrieval_method,
-                                                       ranking_method=ranking_method),
+                    hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
+                                                       rankingMethod=ranking_method),
                     config=self.config,
                     index_name=index.name,
                     text='my title',
@@ -146,8 +146,8 @@ class TestPagination(MarqoTestCase):
                             off = page_num * page_size
                             page_res = tensor_search.search(
                                 search_method="HYBRID",
-                                hybrid_parameters=HybridParameters(retrieval_method=retrieval_method,
-                                                                   ranking_method=ranking_method),
+                                hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
+                                                                   rankingMethod=ranking_method),
                                 config=self.config,
                                 index_name=index.name,
                                 text='my title',
