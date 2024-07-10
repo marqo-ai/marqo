@@ -95,7 +95,7 @@ jobs:
           }
           
           systemctl stop unattended-upgrades
-          apt-get remove unattended-upgrades
+          apt-get remove -y unattended-upgrades
           
           echo "Updating package list"
           retry_command apt-get update -y
