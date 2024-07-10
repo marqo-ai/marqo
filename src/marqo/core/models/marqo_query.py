@@ -2,21 +2,12 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import validator
+from pydantic import validator, root_validator
 
 from marqo.base_model import StrictBaseModel
+from marqo.core.models.score_modifier import ScoreModifier
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
-
-
-class ScoreModifierType(Enum):
-    Multiply = 'multiply'
-    Add = 'add'
-
-
-class ScoreModifier(StrictBaseModel):
-    field: str
-    weight: float
-    type: ScoreModifierType
+from marqo.core.models.hybrid_parameters import HybridParameters
 
 
 class MarqoQuery(StrictBaseModel, ABC):
@@ -59,8 +50,29 @@ class MarqoTensorQuery(MarqoQuery):
 class MarqoLexicalQuery(MarqoQuery):
     or_phrases: List[str]
     and_phrases: List[str]
-    # TODO - validate at least one of or_phrases and and_phrases is not empty
+
+    # Both lists can be empty only if it's a MarqoHybridQuery and it's
+    # retrieval_method & ranking_method are "TENSOR" (i.e. it's a pure tensor search)
 
 
 class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
-    pass
+    hybrid_parameters: HybridParameters
+
+    # Core module will use these fields instead of the score_modifiers_lexical and score_modifiers_tensor inside the HybridParameters
+    score_modifiers_lexical: Optional[List[ScoreModifier]] = None
+    score_modifiers_tensor: Optional[List[ScoreModifier]] = None
+    @root_validator(pre=True)
+    def validate_searchable_attributes_and_score_modifiers(cls, values):
+        # score_modifiers cannot defined for hybrid search
+        if values.get("score_modifiers") is not None:
+            raise ValueError("'scoreModifiers' cannot be used for hybrid search. Instead, define the "
+                             "'scoreModifiersTensor' and/or 'scoreModifiersLexical' keys inside the "
+                             "'hybridParameters' dict parameter.")
+
+        # searchable_attributes cannot be defined for hybrid search
+        if values.get("searchable_attributes") is not None:
+            raise ValueError("'searchableAttributes' cannot be used for hybrid search. Instead, define the "
+                             "'searchableAttributesTensor' and/or 'searchableAttributesLexical' keys inside the "
+                             "'hybridParameters' dict parameter.")
+
+        return values

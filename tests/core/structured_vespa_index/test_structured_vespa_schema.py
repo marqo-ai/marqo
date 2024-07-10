@@ -47,6 +47,7 @@ class TestStructuredVespaSchema(MarqoTestCase):
         Test an index that has all field types and configurations. 1 tensor field.
         Rank profile does NOT use max for embedding similarity.
         """
+        self.maxDiff = None
         marqo_index_request = self.structured_marqo_index_request(
             name='my_index',
             model=Model(name='ViT-B/32'),

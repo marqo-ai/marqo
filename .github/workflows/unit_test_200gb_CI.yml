@@ -66,13 +66,30 @@ jobs:
         with:
           repository: marqo-ai/marqo-base
           path: marqo-base
-          
+
       - name: Install dependencies
         run: |
           pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
+
+      - name: Build Vespa
+        run: |
+          systemctl stop unattended-upgrades
+          apt-get remove -y unattended-upgrades
+          
+          echo "Updating package list"
+          apt-get update -y
+          
+          # Build Vespa components
+          echo "Installing jdk 17"
+          sudo apt-get install openjdk-17-jdk -y
+          echo "Installing maven"
+          sudo apt-get install maven -y
+          echo "Building Vespa components"
+          cd marqo/vespa
+          mvn clean package
 
       - name: Start Vespa
         run: |
@@ -94,7 +111,7 @@ jobs:
           echo -e "\nDone waiting."
           
           # Zip up schemas and services
-          apt-get install zip -y
+          sudo apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
 
           # Deploy application with test schema

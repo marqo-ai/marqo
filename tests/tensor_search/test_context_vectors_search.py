@@ -124,5 +124,5 @@ class TestContextVectors(MarqoTestCase):
             with self.subTest(msg=index_name):
                 with self.assertRaises(ValidationError) as e:
                     res = tensor_search.search(text=None, config=self.config, index_name=index_name, context=None)
-                self.assertIn("One of Query(q) or context is required for tensor search",
+                self.assertIn("One of Query(q) or context is required for TENSOR search",
                               str(e.exception))

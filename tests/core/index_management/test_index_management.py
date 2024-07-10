@@ -90,6 +90,8 @@ class TestIndexManagement(MarqoTestCase):
         self.index_management.delete_index_by_name(index_name)
 
     def test_bootstrap_vespa_doesNotExist_successful(self):
+        # TODO - There is a risk that this test passes because another test run created the artifacts (app package)
+        # We need to reset the application package between test runs
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
         with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
             self.assertTrue(self.index_management.bootstrap_vespa())
@@ -109,12 +111,18 @@ class TestIndexManagement(MarqoTestCase):
                 else:
                     raise e
 
-            # Verify default query profile exists
+            # Verify application package is configured correctly
             app = self.vespa_client.download_application()
+
             query_profile_exists = os.path.exists(
                 os.path.join(app, 'search/query-profiles', 'default.xml')
             )
             self.assertTrue(query_profile_exists, 'Default query profile does not exist')
+
+            custom_searcher_exists = os.path.exists(
+                os.path.join(app, 'components', IndexManagement._MARQO_CUSTOM_SEARCHERS_JAR)
+            )
+            self.assertTrue(custom_searcher_exists, 'Custom searchers jar does not exist')
 
     def test_bootstrap_vespa_exists_skips(self):
         settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')

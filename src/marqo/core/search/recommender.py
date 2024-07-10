@@ -9,7 +9,7 @@ from marqo.core.models.marqo_index import IndexType
 from marqo.core.utils.vector_interpolation import from_interpolation_method, ZeroSumWeightsError, \
     ZeroMagnitudeVectorError
 from marqo.exceptions import InvalidArgumentError
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 from marqo.vespa.vespa_client import VespaClient
 
@@ -35,7 +35,7 @@ class Recommender:
                   reranker: Union[str, Dict] = None,
                   filter: str = None,
                   attributes_to_retrieve: Optional[List[str]] = None,
-                  score_modifiers: Optional[ScoreModifier] = None
+                  score_modifiers: Optional[ScoreModifierLists] = None
                   ):
         """
         Recommend documents similar to the provided documents.

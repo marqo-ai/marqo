@@ -11,7 +11,7 @@ from marqo import exceptions as base_exceptions
 from marqo.tensor_search import enums
 from marqo.tensor_search import validation
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from pydantic import ValidationError
 
@@ -873,7 +873,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
         for invalid_custom_score_fields in invalid_custom_score_fields_list:
             try:
-                v = ScoreModifier(**invalid_custom_score_fields)
+                v = ScoreModifierLists(**invalid_custom_score_fields)
                 raise AssertionError(invalid_custom_score_fields, v)
             except InvalidArgError:
                 pass
@@ -914,7 +914,7 @@ class TestValidateIndexSettings(unittest.TestCase):
         ]
 
         for valid_custom_score_fields in valid_custom_score_fields_list:
-            ScoreModifier(**valid_custom_score_fields)
+            ScoreModifierLists(**valid_custom_score_fields)
 
     def test_validate_dict(self):
         """

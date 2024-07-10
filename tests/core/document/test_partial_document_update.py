@@ -13,7 +13,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from tests.marqo_test import MarqoTestCase
 
 
@@ -266,7 +266,7 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        score_modifier = ScoreModifier(**{
+        score_modifier = ScoreModifierLists(**{
             "add_to_score": [{"field_name": "int_field_score_modifier", "weight": 1}]
         })
 
@@ -318,7 +318,7 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        score_modifier = ScoreModifier(**{
+        score_modifier = ScoreModifierLists(**{
             "add_to_score": [{"field_name": "float_field_score_modifier", "weight": 1.0}]
         })
 
@@ -669,7 +669,7 @@ class TestUpdate(MarqoTestCase):
                                               text="test")["hits"][0]["_score"]
 
         for i in range(100):
-            score_modifiers = ScoreModifier(**{
+            score_modifiers = ScoreModifierLists(**{
                 "add_to_score": [{"field_name": f"float_field_{i}", "weight": "1.0"}]
             })
 

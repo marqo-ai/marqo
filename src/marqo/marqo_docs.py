@@ -51,3 +51,7 @@ def configuring_preloaded_models():
 
 def bring_your_own_model():
     return _build_url('Guides/Models-Reference/bring_your_own_model/')
+
+
+def query_reference():
+    return _build_url('API-Reference/search/#query-q')

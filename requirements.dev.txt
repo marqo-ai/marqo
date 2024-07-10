@@ -1,3 +1,4 @@
+# TODO: remove these, only keep test packages
 # tensor search, identical to requirements.txt:
 requests==2.28.1
 anyio==3.7.1

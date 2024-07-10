@@ -9,7 +9,7 @@ from marqo.core.unstructured_vespa_index.unstructured_document import Unstructur
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.api_models import ScoreModifier
+from marqo.tensor_search.models.api_models import ScoreModifierLists
 from tests.marqo_test import MarqoTestCase
 
 
@@ -99,7 +99,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 )
                 # Search with score modifier
                 # 0.5 + 5.5 * 2 = 11.5
-                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "double_score_mods", "weight": 2}]})
+                score_modifier = ScoreModifierLists(**{"add_to_score": [{"field_name": "double_score_mods", "weight": 2}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -133,7 +133,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 )
                 # Search with score modifier
                 # 0.5 + 2**36 * 2 = 2**37
-                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "score_mods_long", "weight": 2}]})
+                score_modifier = ScoreModifierLists(**{"add_to_score": [{"field_name": "score_mods_long", "weight": 2}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -172,7 +172,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 )
                 # Search with score modifier
                 # 0.5 + 1 * 5 = 5.5
-                score_modifier = ScoreModifier(
+                score_modifier = ScoreModifierLists(
                     **{"add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 5}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
@@ -214,7 +214,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                 )
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
-                score_modifier = ScoreModifier(
+                score_modifier = ScoreModifierLists(
                     **{"multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4},
                                              {"field_name": "map_score_mods.d", "weight": 4}]}) # Nonexistent field.
                                             # Nonexistent field should not zero out the whole score
@@ -259,11 +259,11 @@ class TestDictScoreModifiers(MarqoTestCase):
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7) multiply_score_by
                 # for 7, 0.5 * 0.5 * 4 + 1 * 2 = 3 (6 and 7) add_to_score
-                score_modifier = ScoreModifier(**{
+                score_modifier = ScoreModifierLists(**{
                     "add_to_score": [{"field_name": "map_score_mods_int.c", "weight": 2}],
                     "multiply_score_by": [{"field_name": "map_score_mods.a", "weight": 4}]
                 }
-                                               )
+                                                    )
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -326,7 +326,7 @@ class TestDictScoreModifiers(MarqoTestCase):
 
                 # Search with score modifier
                 # 0.5 + 1.5 * 2 = 3.5
-                score_modifier = ScoreModifier(**{"add_to_score": [{"field_name": "map_score_mods.a", "weight": 2}]})
+                score_modifier = ScoreModifierLists(**{"add_to_score": [{"field_name": "map_score_mods.a", "weight": 2}]})
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -362,11 +362,11 @@ class TestDictScoreModifiers(MarqoTestCase):
                 )
                 # Search with score modifier
                 # 0.5 * 0.5 * 4 = 1 (1 and 7)
-                score_modifier = ScoreModifier(**{
+                score_modifier = ScoreModifierLists(**{
                     "add_to_score": [{"field_name": "map_score_mods_long.a", "weight": 20},
                                      {"field_name": "score_mods_long", "weight": 20}],
                 }
-                                               )
+                                                    )
                 res = tensor_search.search(
                     index_name=index.name, config=self.config, text="",
                     score_modifiers=score_modifier,
@@ -548,6 +548,7 @@ class TestDictScoreModifiers(MarqoTestCase):
 
         # Test with a version less than 2.9.0
         index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.8.0")
+        vespa_index = StructuredVespaIndex(marqo_index=index)
         vespa_doc = vespa_index.to_vespa_document(marqo_document)
 
         # Assertions for version less than 2.9.0

@@ -9,11 +9,13 @@ from typing import Union, List, Dict, Optional
 import pydantic
 from pydantic import BaseModel, root_validator
 
+from marqo.base_model import ImmutableStrictBaseModel
+from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext, SearchContextTensor
 
 
@@ -24,8 +26,16 @@ class BaseMarqoModel(BaseModel):
     pass
 
 
+class CustomVectorQuery(ImmutableStrictBaseModel):
+    class CustomVector(ImmutableStrictBaseModel):
+        content: Optional[str] = None
+        vector: List[float]
+
+    customVector: CustomVector
+
+
 class SearchQuery(BaseMarqoModel):
-    q: Optional[Union[str, Dict[str, float]]] = None
+    q: Optional[Union[str, Dict[str, float], CustomVectorQuery]] = None
     searchableAttributes: Union[None, List[str]] = None
     searchMethod: Union[None, str] = "TENSOR"
     limit: int = 10
@@ -39,13 +49,14 @@ class SearchQuery(BaseMarqoModel):
     boost: Optional[Dict] = None
     image_download_headers: Optional[Dict] = None
     context: Optional[SearchContext] = None
-    scoreModifiers: Optional[ScoreModifier] = None
+    scoreModifiers: Optional[ScoreModifierLists] = None
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
+    hybridParameters: Optional[HybridParameters] = None
 
     @root_validator(pre=False)
     def validate_query_and_context(cls, values):
-        """Validate that one of query and context are present for tensor search, or just the query for lexical search.
+        """Validate that one of query and context are present for tensor/hybrid search, or just the query for lexical search.
 
         Raises:
             InvalidArgError: If validation fails
@@ -54,14 +65,25 @@ class SearchQuery(BaseMarqoModel):
         query = values.get('q')
         context = values.get('context')
 
-        if search_method.upper() == SearchMethod.TENSOR:
+        if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
             if query is None and context is None:
-                raise ValueError("One of Query(q) or context is required for tensor search but both are missing")
+                raise ValueError(f"One of Query(q) or context is required for {search_method} "
+                                 f"search but both are missing")
         elif search_method.upper() == SearchMethod.LEXICAL:
             if query is None:
                 raise ValueError("Query(q) is required for lexical search")
         else:
             raise ValueError(f"Invalid search method {search_method}")
+        return values
+
+    @root_validator(pre=False)
+    def validate_hybrid_parameters_only_for_hybrid_search(cls, values):
+        """Validate that hybrid parameters are only provided for hybrid search"""
+        hybrid_parameters = values.get('hybridParameters')
+        search_method = values.get('searchMethod')
+        if hybrid_parameters is not None and search_method.upper() != SearchMethod.HYBRID:
+            raise ValueError(f"Hybrid parameters can only be provided for 'HYBRID' search. "
+                             f"Search method is {search_method}.")
         return values
 
     @pydantic.validator('searchMethod')
@@ -80,7 +102,7 @@ class BulkSearchQueryEntity(SearchQuery):
     index: MarqoIndex
 
     context: Optional[SearchContext] = None
-    scoreModifiers: Optional[ScoreModifier] = None
+    scoreModifiers: Optional[ScoreModifierLists] = None
     text_query_prefix: Optional[str] = None
 
     def to_search_query(self):
