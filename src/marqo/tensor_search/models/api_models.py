@@ -7,7 +7,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 from typing import Union, List, Dict, Optional
 
 import pydantic
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, root_validator, validator
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.hybrid_parameters import HybridParameters
@@ -37,7 +37,7 @@ class CustomVectorQuery(ImmutableStrictBaseModel):
 class SearchQuery(BaseMarqoModel):
     q: Optional[Union[str, Dict[str, float], CustomVectorQuery]] = None
     searchableAttributes: Union[None, List[str]] = None
-    searchMethod: Union[None, str] = "TENSOR"
+    searchMethod: SearchMethod = SearchMethod.TENSOR
     limit: int = 10
     offset: int = 0
     efSearch: Optional[int] = None
@@ -54,7 +54,21 @@ class SearchQuery(BaseMarqoModel):
     textQueryPrefix: Optional[str] = None
     hybridParameters: Optional[HybridParameters] = None
 
-    @root_validator(pre=False)
+    @validator("searchMethod", pre=True)
+    def _preprocess_search_method(cls, value):
+        """Preprocess the searchMethod value for validation.
+
+        1. Set the default search method to SearchMethod.TENSOR if None is provided.
+        2. Return the search method in uppercase if it is a string.
+        """
+        if value is None:
+            return SearchMethod.TENSOR
+        elif isinstance(value, str):
+            return value.upper()
+        else:
+            return value
+
+    @root_validator(pre=False, skip_on_failure=True)
     def validate_query_and_context(cls, values):
         """Validate that one of query and context are present for tensor/hybrid search, or just the query for lexical search.
 
