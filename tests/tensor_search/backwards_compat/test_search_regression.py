@@ -19,6 +19,7 @@ from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search import api
 import numpy as np
 from marqo.tensor_search.models.api_models import CustomVectorQuery
+from tests.tensor_search.backwards_compat.resources import results_2_9
 
 
 class TestSearchRegression(MarqoTestCase):
@@ -81,87 +82,6 @@ class TestSearchRegression(MarqoTestCase):
             {"_id": "doc13", "text_field_2": "canines canines"},
         ]
 
-        self.results_2_9 = dict()
-
-        self.results_2_9["LEXICAL"] = [
-            {'_id': 'doc10',
-               'text_field_1': 'dogs dogs dogs',
-               '_score': 1.1185285961247438,
-               '_highlights': []},
-          {'_id': 'doc1',
-           'text_field_1': 'dogs',
-           '_score': 0.9876369518973803,
-           '_highlights': []},
-          {'_id': 'doc6',
-           'text_field_1': 'hot dogs',
-           '_score': 0.7968916178399463,
-           '_highlights': []},
-          {'_id': 'doc9',
-           'text_field_1': 'dogs random words',
-           '_score': 0.6678983703478686,
-           '_highlights': []},
-          {'_id': 'doc8',
-           'text_field_1': 'something something dogs',
-           'add_field_1': 1.0,
-           'mult_field_1': 2.0,
-           '_score': 0.6678983703478686,
-           '_highlights': []},
-          {'_id': 'doc11',
-           'text_field_2': 'dogs but wrong field',
-           '_score': 0.6369665418754974,
-           '_highlights': []},
-          {'_id': 'doc7',
-           'text_field_1': 'dogs is a word',
-           '_score': 0.574847513797856,
-           '_highlights': []}
-        ]
-
-        self.results_2_9["TENSOR"] = [{'_id': 'doc1',
-           'text_field_1': 'dogs',
-           '_highlights': [{'text_field_1': 'dogs'}],
-           '_score': 1.0},
-          {'_id': 'doc10',
-           'text_field_1': 'dogs dogs dogs',
-           '_highlights': [{'text_field_1': 'dogs dogs dogs'}],
-           '_score': 0.901753906564094},
-          {'_id': 'doc3',
-           'text_field_1': 'canines',
-           'add_field_1': 2.0,
-           'mult_field_1': 3.0,
-           '_highlights': [{'text_field_1': 'canines'}],
-           '_score': 0.886741153647037},
-          {'_id': 'doc2',
-           'text_field_1': 'puppies',
-           '_highlights': [{'text_field_1': 'puppies'}],
-           '_score': 0.8183335751020673},
-          {'_id': 'doc13',
-           'text_field_2': 'canines canines',
-           '_highlights': [{'text_field_2': 'canines canines'}],
-           '_score': 0.817154577803434},
-          {'_id': 'doc6',
-           'text_field_1': 'hot dogs',
-           '_highlights': [{'text_field_1': 'hot dogs'}],
-           '_score': 0.7853536191636338},
-          {'_id': 'doc12',
-           'add_field_1': -1.0,
-           'mult_field_1': 0.5,
-           'text_field_2': 'puppies puppies',
-           '_highlights': [{'text_field_2': 'puppies puppies'}],
-           '_score': 0.7440953692828544},
-          {'_id': 'doc7',
-           'text_field_1': 'dogs is a word',
-           '_highlights': [{'text_field_1': 'dogs is a word'}],
-           '_score': 0.7431715440181559},
-          {'_id': 'doc11',
-           'text_field_2': 'dogs but wrong field',
-           '_highlights': [{'text_field_2': 'dogs but wrong field'}],
-           '_score': 0.7098773257203361},
-          {'_id': 'doc9',
-           'text_field_1': 'dogs random words',
-           '_highlights': [{'text_field_1': 'dogs random words'}],
-           '_score': 0.7008764748105084}
-        ]
-
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
@@ -198,7 +118,30 @@ class TestSearchRegression(MarqoTestCase):
                             result_count=10
                         )
 
-                        self.assertEqual(len(search_res["hits"]), len(self.results_2_9[search_method]))
+                        self.assertEqual(len(search_res["hits"]), len(results_2_9.search_results[search_method]))
                         for i in range(len(search_res["hits"])):
-                            self.assertEqual(search_res["hits"][i]["_id"], self.results_2_9[search_method][i]["_id"])
-                            self.assertEqual(search_res["hits"][i]["_score"], self.results_2_9[search_method][i]["_score"])
+                            self.assertEqual(search_res["hits"][i]["_id"], results_2_9.search_results[search_method][i]["_id"])
+                            self.assertEqual(search_res["hits"][i]["_score"], results_2_9.search_results[search_method][i]["_score"])
+
+    def test_document_vectors_match_2_9(self):
+        """
+        Tests that document vectors match those
+        of Marqo 2.9.0
+        """
+
+        for index in [self.structured_text_index_score_modifiers]:
+            with self.subTest(index=index.name):
+                # Add documents
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list
+                    )
+                )
+
+                # Get document
+                fetched_doc = tensor_search.get_document_by_id(self.config, index.name,
+                                                               "doc10", show_vectors=True)
+                self.assertEqual(fetched_doc["_tensor_facets"][0]["_embedding"],
+                                 results_2_9.doc_10_embedding)
