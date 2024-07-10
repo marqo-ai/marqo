@@ -548,6 +548,7 @@ class TestDictScoreModifiers(MarqoTestCase):
 
         # Test with a version less than 2.9.0
         index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.8.0")
+        vespa_index = StructuredVespaIndex(marqo_index=index)
         vespa_doc = vespa_index.to_vespa_document(marqo_document)
 
         # Assertions for version less than 2.9.0
