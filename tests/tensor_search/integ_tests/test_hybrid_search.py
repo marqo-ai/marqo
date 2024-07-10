@@ -255,7 +255,7 @@ class TestHybridSearch(MarqoTestCase):
                             config=self.config,
                             index_name=index.name,
                             text=CustomVectorQuery(
-                                custom_vector=CustomVectorQuery.CustomVector(
+                                customVector=CustomVectorQuery.CustomVector(
                                     content= "sample",
                                     vector=sample_vector
                                 )
@@ -290,7 +290,7 @@ class TestHybridSearch(MarqoTestCase):
                             config=self.config,
                             index_name=index.name,
                             text=CustomVectorQuery(
-                                custom_vector=CustomVectorQuery.CustomVector(
+                                customVector=CustomVectorQuery.CustomVector(
                                     content= "sample",
                                     vector=sample_vector
                                 )
@@ -327,7 +327,7 @@ class TestHybridSearch(MarqoTestCase):
                         config=self.config,
                         index_name=index.name,
                         text=CustomVectorQuery(
-                            custom_vector=CustomVectorQuery.CustomVector(
+                            customVector=CustomVectorQuery.CustomVector(
                                 content=None,
                                 vector=sample_vector
                             )
