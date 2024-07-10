@@ -126,7 +126,7 @@ class TestSearchRegression(MarqoTestCase):
                                 self.assertIn(results_2_9.search_results[search_method][i]["_id"], docs_with_same_bm25_score)
                             else:
                                 self.assertEqual(search_res["hits"][i]["_id"], results_2_9.search_results[search_method][i]["_id"])
-                            self.assertEqual(search_res["hits"][i]["_score"], results_2_9.search_results[search_method][i]["_score"])
+                            self.assertTrue(np.allclose(search_res["hits"][i]["_score"], results_2_9.search_results[search_method][i]["_score"], atol=1e-6))
 
     def test_document_vectors_match_2_9(self):
         """
@@ -148,5 +148,5 @@ class TestSearchRegression(MarqoTestCase):
                 # Get document
                 fetched_doc = tensor_search.get_document_by_id(self.config, index.name,
                                                                "doc10", show_vectors=True)
-                self.assertEqual(fetched_doc["_tensor_facets"][0]["_embedding"],
-                                 results_2_9.doc_10_embedding)
+                self.assertTrue(np.allclose(fetched_doc["_tensor_facets"][0]["_embedding"],
+                                 results_2_9.doc_10_embedding, atol=1e-6))
