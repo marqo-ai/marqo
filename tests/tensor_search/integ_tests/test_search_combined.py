@@ -10,6 +10,8 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
+from marqo.tensor_search.models.api_models import SearchQuery
+from pydantic import ValidationError
 
 
 class TestSearch(MarqoTestCase):
@@ -764,3 +766,29 @@ class TestSearch(MarqoTestCase):
                 self.assertEqual(1, len(res["hits"]))
                 self.assertEqual("21", res["hits"][0]["_id"])
                 self.assertTrue(0 < res["hits"][0]["_score"], f"score: {res['hits'][0]['_score']}")
+
+    def test_search_query_ExpectedErrorRaisedForInvalidSearchMethod(self):
+        """Test that the ValidationError is raised when an incorrect search method is provided."""
+        invalid_search_methods = [
+            ("", "Empty string"),
+            (1, "Integer"),
+            ([], "List"),
+            ({"searchMethod": "LEXICAL"}, "Dictionary"),
+        ]
+        for search_method, search_method_type in invalid_search_methods:
+            with self.subTest(search_method_type=search_method_type):
+                with self.assertRaises(ValidationError):
+                    _ = SearchQuery(q="test", search_method=search_method)
+
+    def test_search_query_CanAcceptDifferentSearchMethods(self):
+        """Test that the SearchQuery can accept different search methods."""
+        valid_search_methods = [
+            ("lexical", SearchMethod.LEXICAL, "lowercase lexical"),
+            ("teNsor", SearchMethod.TENSOR, "mixed case tensor"),
+            (None, SearchMethod.TENSOR, "None"),
+        ]
+        for search_method, expected_search_method, search_method_type in valid_search_methods:
+            with self.subTest(search_method_type=search_method_type):
+                search_query = SearchQuery(q="test", searchMethod=search_method)
+                self.assertEqual(expected_search_method, search_query.searchMethod)
+
