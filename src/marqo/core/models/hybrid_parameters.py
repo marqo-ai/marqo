@@ -21,74 +21,74 @@ class RankingMethod(str, Enum):
 
 
 class HybridParameters(StrictBaseModel):
-    retrieval_method: Optional[RetrievalMethod] = RetrievalMethod.Disjunction
-    ranking_method: Optional[RankingMethod] = RankingMethod.RRF
+    retrievalMethod: Optional[RetrievalMethod] = RetrievalMethod.Disjunction
+    rankingMethod: Optional[RankingMethod] = RankingMethod.RRF
     alpha: Optional[float] = None
-    rrf_k: Optional[int] = None
-    searchable_attributes_lexical: Optional[List[str]] = None
-    searchable_attributes_tensor: Optional[List[str]] = None
+    rrfK: Optional[int] = None
+    searchableAttributesLexical: Optional[List[str]] = None
+    searchableAttributesTensor: Optional[List[str]] = None
     verbose: bool = False
 
     # Input for API, but form will change before being passed to core Hybrid Query.
-    score_modifiers_lexical: Optional[ScoreModifierLists] = None
-    score_modifiers_tensor: Optional[ScoreModifierLists] = None
+    scoreModifiersLexical: Optional[ScoreModifierLists] = None
+    scoreModifiersTensor: Optional[ScoreModifierLists] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):
         # alpha can only be defined for RRF and NormalizeLinear
         fusion_ranking_methods = [RankingMethod.RRF]
         if values.get('alpha') is None:
-            if values.get('ranking_method') in fusion_ranking_methods:
+            if values.get('rankingMethod') in fusion_ranking_methods:
                 values['alpha'] = 0.5
         else:
-            if values.get('ranking_method') not in fusion_ranking_methods:
+            if values.get('rankingMethod') not in fusion_ranking_methods:
                 raise ValueError(
                     "'alpha' can only be defined for 'rrf' ranking method")  # TODO: Re-add normalize linear
 
         # rrf_k can only be defined for RRF
-        if values.get('rrf_k') is None:
-            if values.get('ranking_method') == RankingMethod.RRF:
-                values['rrf_k'] = 60
+        if values.get('rrfK') is None:
+            if values.get('rankingMethod') == RankingMethod.RRF:
+                values['rrfK'] = 60
         else:
-            if values.get('ranking_method') != RankingMethod.RRF:
-                raise ValueError("'rrf_k' can only be defined for 'rrf' ranking method")
+            if values.get('rankingMethod') != RankingMethod.RRF:
+                raise ValueError("'rrfK' can only be defined for 'rrf' ranking method")
 
         # searchable_attributes_lexical can only be defined for Lexical (ranking or retrieval), Disjunction
-        if values.get('searchable_attributes_lexical') is not None:
-            if not (values.get('retrieval_method') in [RetrievalMethod.Lexical, RetrievalMethod.Disjunction] or
-                    values.get('ranking_method') == RankingMethod.Lexical):
+        if values.get('searchableAttributesLexical') is not None:
+            if not (values.get('retrievalMethod') in [RetrievalMethod.Lexical, RetrievalMethod.Disjunction] or
+                    values.get('rankingMethod') == RankingMethod.Lexical):
                 raise ValueError(
-                    "'searchable_attributes_lexical' can only be defined for 'lexical', 'disjunction' retrieval methods or 'lexical' ranking method")
+                    "'searchableAttributesLexical' can only be defined for 'lexical', 'disjunction' retrieval methods or 'lexical' ranking method")
 
         # searchable_attributes_tensor can only be defined for Tensor (ranking or retrieval), Disjunction
-        if values.get('searchable_attributes_tensor') is not None:
-            if not (values.get('retrieval_method') in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction] or
-                    values.get('ranking_method') == RankingMethod.Tensor):
+        if values.get('searchableAttributesTensor') is not None:
+            if not (values.get('retrievalMethod') in [RetrievalMethod.Tensor, RetrievalMethod.Disjunction] or
+                    values.get('rankingMethod') == RankingMethod.Tensor):
                 raise ValueError(
-                    "'searchable_attributes_tensor' can only be defined for 'tensor', 'disjunction' retrieval methods or 'tensor' ranking method")
+                    "'searchableAttributesTensor' can only be defined for 'tensor', 'disjunction' retrieval methods or 'tensor' ranking method")
 
         # score_modifiers_lexical can only be defined for Lexical, RRF, NormalizeLinear
-        if values.get('score_modifiers_lexical') is not None:
-            if values.get('ranking_method') not in [RankingMethod.Lexical, RankingMethod.RRF]:
+        if values.get('scoreModifiersLexical') is not None:
+            if values.get('rankingMethod') not in [RankingMethod.Lexical, RankingMethod.RRF]:
                 raise ValueError(
-                    "'score_modifiers_lexical' can only be defined for 'lexical', 'rrf' ranking methods")  # TODO: re-add normalize_linear
+                    "'scoreModifiersLexical' can only be defined for 'lexical', 'rrf' ranking methods")  # TODO: re-add normalize_linear
 
         # score_modifiers_tensor can only be defined for Tensor, RRF, NormalizeLinear
-        if values.get('score_modifiers_tensor') is not None:
-            if values.get('ranking_method') not in [RankingMethod.Tensor, RankingMethod.RRF]:
+        if values.get('searchableAttributesTensor') is not None:
+            if values.get('rankingMethod') not in [RankingMethod.Tensor, RankingMethod.RRF]:
                 raise ValueError(
-                    "'score_modifiers_tensor' can only be defined for 'tensor', 'rrf', ranking methods")  # TODO: re-add normalize_linear
+                    "'searchableAttributesTensor' can only be defined for 'tensor', 'rrf', ranking methods")  # TODO: re-add normalize_linear
 
-        # if retrieval_method == Disjunction, then ranking_method must be RRF, NormalizeLinear
-        if values.get('retrieval_method') == RetrievalMethod.Disjunction:
-            if values.get('ranking_method') not in [RankingMethod.RRF]:
+        # if retrievalMethod == Disjunction, then ranking_method must be RRF, NormalizeLinear
+        if values.get('retrievalMethod') == RetrievalMethod.Disjunction:
+            if values.get('rankingMethod') not in [RankingMethod.RRF]:
                 raise ValueError(
-                    "For retrieval_method: disjunction, ranking_method must be: rrf")  # TODO: re-add normalize_linear
+                    "For retrievalMethod: disjunction, rankingMethod must be: rrf")  # TODO: re-add normalize_linear
 
-        # if retrieval_method is Lexical or Tensor, then ranking_method must be Tensor, Lexical
-        if values.get('retrieval_method') in [RetrievalMethod.Lexical, RetrievalMethod.Tensor]:
-            if values.get('ranking_method') not in [RankingMethod.Lexical, RankingMethod.Tensor]:
-                raise ValueError("For retrieval_method: tensor or lexical, ranking_method must be: tensor or lexical")
+        # if retrievalMethod is Lexical or Tensor, then ranking_method must be Tensor, Lexical
+        if values.get('retrievalMethod') in [RetrievalMethod.Lexical, RetrievalMethod.Tensor]:
+            if values.get('rankingMethod') not in [RankingMethod.Lexical, RankingMethod.Tensor]:
+                raise ValueError("For retrievalMethod: tensor or lexical, rankingMethod must be: tensor or lexical")
 
         return values
 
@@ -100,12 +100,12 @@ class HybridParameters(StrictBaseModel):
                 raise ValueError("alpha can only be between 0 and 1")
         return alpha
 
-    @validator('rrf_k', pre=True)
-    def validate_rrf_k(cls, rrf_k):
+    @validator('rrfK', pre=True)
+    def validate_rrf_k(cls, rrfK):
         # rrf_k can only be int greater than or equal to 0
-        if rrf_k is not None:
-            if not isinstance(rrf_k, int):
-                raise ValueError("rrf_k must be an integer")
-            if rrf_k < 0:
-                raise ValueError("rrf_k can only be greater than or equal to 0")
-        return rrf_k
+        if rrfK is not None:
+            if not isinstance(rrfK, int):
+                raise ValueError("rrfK must be an integer")
+            if rrfK < 0:
+                raise ValueError("rrfK can only be greater than or equal to 0")
+        return rrfK

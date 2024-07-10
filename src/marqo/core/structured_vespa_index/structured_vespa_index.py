@@ -493,24 +493,24 @@ class StructuredVespaIndex(VespaIndex):
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
         # Tensor term
         fields_to_search_tensor = self._get_tensor_fields_to_search(
-            searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_tensor
+            searchable_attributes=marqo_query.hybrid_parameters.searchableAttributesTensor
         )
         tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search_tensor else "False"
 
         # Lexical term
         fields_to_search_lexical = self._get_lexical_fields_to_search(
-            searchable_attributes=marqo_query.hybrid_parameters.searchable_attributes_lexical
+            searchable_attributes=marqo_query.hybrid_parameters.searchableAttributesLexical
         )
         lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search_lexical else "False"
 
         # If retrieval and ranking methods are opposite (lexical/tensor), use the rank() operator
-        if (marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Lexical and
-                marqo_query.hybrid_parameters.ranking_method == RankingMethod.Tensor):
+        if (marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and
+                marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Tensor):
             individual_tensor_terms = self._get_individual_field_tensor_search_terms(marqo_query)
             lexical_term = f'rank({lexical_term}, {",".join(individual_tensor_terms)})'
 
-        elif (marqo_query.hybrid_parameters.retrieval_method == RetrievalMethod.Tensor and
-              marqo_query.hybrid_parameters.ranking_method == RankingMethod.Lexical):
+        elif (marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Tensor and
+              marqo_query.hybrid_parameters.rankingMethod == RankingMethod.Lexical):
             tensor_term = f'rank({tensor_term}, {lexical_term})'
 
         # Filter term
@@ -564,19 +564,19 @@ class StructuredVespaIndex(VespaIndex):
             'marqo__ranking.lexical.tensor': common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY,
             'marqo__ranking.tensor.lexical': common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25,
 
-            'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrieval_method,
-            'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.ranking_method,
+            'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
+            'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
             'marqo__hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR] else False,
             'marqo__hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL] else False,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
         query = {k: v for k, v in query.items() if v is not None}
 
-        if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF}: # TODO: Add NormalizeLinear
+        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}: # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
 
-        if marqo_query.hybrid_parameters.ranking_method in {RankingMethod.RRF}:
-            query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrf_k
+        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:
+            query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
 
         return query
 
@@ -642,7 +642,7 @@ class StructuredVespaIndex(VespaIndex):
         Returns list of strings representing the tensor search terms for each field in the query.
         """
         if isinstance(marqo_query, MarqoHybridQuery):
-            searchable_attributes = marqo_query.hybrid_parameters.searchable_attributes_tensor
+            searchable_attributes = marqo_query.hybrid_parameters.searchableAttributesTensor
         else:
             searchable_attributes = marqo_query.searchable_attributes
 
@@ -912,7 +912,7 @@ class StructuredVespaIndex(VespaIndex):
 
     def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
-            score_modifiers = marqo_query.hybrid_parameters.score_modifiers_lexical
+            score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
         else:
             score_modifiers = marqo_query.score_modifiers
 
@@ -949,7 +949,7 @@ class StructuredVespaIndex(VespaIndex):
 
     def _get_lexical_contains_term(self, phrase, query: MarqoQuery) -> str:
         if isinstance(query, MarqoHybridQuery):
-            searchable_attributes = query.hybrid_parameters.searchable_attributes_lexical
+            searchable_attributes = query.hybrid_parameters.searchableAttributesLexical
         else:
             searchable_attributes = query.searchable_attributes
 

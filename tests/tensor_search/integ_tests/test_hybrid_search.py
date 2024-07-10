@@ -165,19 +165,19 @@ class TestHybridSearch(MarqoTestCase):
                         text="dogs",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method="disjunction",
-                            ranking_method="rrf",
+                            retrievalMethod="disjunction",
+                            rankingMethod="rrf",
                             alpha=0.6,
                             rrf_k=61,
-                            searchable_attributes_lexical=["text_field_1", "text_field_2"],
-                            searchable_attributes_tensor=["text_field_2", "text_field_3"],
+                            searchableAttributesLexical=["text_field_1", "text_field_2"],
+                            searchableAttributesTensor=["text_field_2", "text_field_3"],
                             score_modifiers_lexical={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 1.0},
                                     {"field_name": "mult_field_2", "weight": 1.0}
                                 ]
                             },
-                            score_modifiers_tensor={
+                            scoreModifiersTensor={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 1.0}
                                 ],
@@ -255,15 +255,15 @@ class TestHybridSearch(MarqoTestCase):
                             config=self.config,
                             index_name=index.name,
                             text=CustomVectorQuery(
-                                customVector=CustomVectorQuery.CustomVector(
+                                custom_vector=CustomVectorQuery.CustomVector(
                                     content= "sample",
                                     vector=sample_vector
                                 )
                             ),
                             search_method="HYBRID",
                             hybrid_parameters=HybridParameters(
-                                searchable_attributes_lexical=["text_field_1"],
-                                searchable_attributes_tensor=["text_field_1"]
+                                searchableAttributesLexical=["text_field_1"],
+                                searchableAttributesTensor=["text_field_1"]
                             ),
                             result_count=3
                         )
@@ -290,15 +290,15 @@ class TestHybridSearch(MarqoTestCase):
                             config=self.config,
                             index_name=index.name,
                             text=CustomVectorQuery(
-                                customVector=CustomVectorQuery.CustomVector(
+                                custom_vector=CustomVectorQuery.CustomVector(
                                     content= "sample",
                                     vector=sample_vector
                                 )
                             ),
                             search_method="HYBRID",
                             hybrid_parameters=HybridParameters(
-                                searchable_attributes_lexical=["text_field_1"],
-                                searchable_attributes_tensor=["text_field_1"]
+                                searchableAttributesLexical=["text_field_1"],
+                                searchableAttributesTensor=["text_field_1"]
                             ),
                             context=SearchContext(**{"tensor": [{"vector": [i*2 for i in sample_vector],     # Double the sample vector
                                                                               "weight": 1}], })
@@ -327,16 +327,16 @@ class TestHybridSearch(MarqoTestCase):
                         config=self.config,
                         index_name=index.name,
                         text=CustomVectorQuery(
-                            customVector=CustomVectorQuery.CustomVector(
+                            custom_vector=CustomVectorQuery.CustomVector(
                                 content=None,
                                 vector=sample_vector
                             )
                         ),
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method="tensor",
-                            ranking_method="tensor",
-                            searchable_attributes_tensor=["text_field_1"]
+                            retrievalMethod="tensor",
+                            rankingMethod="tensor",
+                            searchableAttributesTensor=["text_field_1"]
                         ),
                         result_count=3
                     )
@@ -381,8 +381,8 @@ class TestHybridSearch(MarqoTestCase):
                     text="dogs",
                     search_method="HYBRID",
                     hybrid_parameters=HybridParameters(
-                        retrieval_method=RetrievalMethod.Disjunction,
-                        ranking_method=RankingMethod.RRF,
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
                         alpha=0,
                         verbose=True
                     ),
@@ -430,8 +430,8 @@ class TestHybridSearch(MarqoTestCase):
                     text="dogs",
                     search_method="HYBRID",
                     hybrid_parameters=HybridParameters(
-                        retrieval_method=RetrievalMethod.Disjunction,
-                        ranking_method=RankingMethod.RRF,
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
                         alpha=1.0,
                         verbose=True
                     ),
@@ -474,12 +474,12 @@ class TestHybridSearch(MarqoTestCase):
                         text="puppies",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Disjunction,
-                            ranking_method=RankingMethod.RRF,
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
                             alpha=0.5,
                             verbose=True,
-                            searchable_attributes_lexical=["text_field_2"],
-                            searchable_attributes_tensor=["text_field_2"],
+                            searchableAttributesLexical=["text_field_2"],
+                            searchableAttributesTensor=["text_field_2"],
                         ),
                         result_count=10
                     )
@@ -496,9 +496,9 @@ class TestHybridSearch(MarqoTestCase):
                         text="puppies",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Lexical,
-                            ranking_method=RankingMethod.Tensor,
-                            searchable_attributes_lexical=["text_field_2"]
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor,
+                            searchableAttributesLexical=["text_field_2"]
                         ),
                         result_count=10
                     )
@@ -513,9 +513,9 @@ class TestHybridSearch(MarqoTestCase):
                         text="puppies",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Tensor,
-                            ranking_method=RankingMethod.Lexical,
-                            searchable_attributes_tensor=["text_field_2"]
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Lexical,
+                            searchableAttributesTensor=["text_field_2"]
                         ),
                         result_count=10
                     )
@@ -554,9 +554,9 @@ class TestHybridSearch(MarqoTestCase):
                         text="HELLO WORLD",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Lexical,
-                            ranking_method=RankingMethod.Tensor,
-                            score_modifiers_tensor={
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor,
+                            scoreModifiersTensor={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 10},
                                     {"field_name": "mult_field_2", "weight": -10}
@@ -588,9 +588,9 @@ class TestHybridSearch(MarqoTestCase):
                         text="HELLO WORLD",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Tensor,
-                            ranking_method=RankingMethod.Lexical,
-                            score_modifiers_lexical={
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Lexical,
+                            scoreModifiersLexical={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 10},
                                     {"field_name": "mult_field_2", "weight": -10}
@@ -599,7 +599,7 @@ class TestHybridSearch(MarqoTestCase):
                                     {"field_name": "add_field_1", "weight": 2}
                                 ]
                             },
-                            searchable_attributes_lexical=["text_field_1"],
+                            searchableAttributesLexical=["text_field_1"],
                             verbose=True
                         ),
                         result_count=10,
@@ -624,9 +624,9 @@ class TestHybridSearch(MarqoTestCase):
                         text="HELLO WORLD",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Disjunction,
-                            ranking_method=RankingMethod.RRF,
-                            score_modifiers_lexical={
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            scoreModifiersLexical={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 10},
                                     {"field_name": "mult_field_2", "weight": -10}
@@ -635,7 +635,7 @@ class TestHybridSearch(MarqoTestCase):
                                     {"field_name": "add_field_1", "weight": 5}
                                 ]
                             },
-                            score_modifiers_tensor={
+                            scoreModifiersTensor={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 10},
                                     {"field_name": "mult_field_2", "weight": -10}
@@ -705,8 +705,8 @@ class TestHybridSearch(MarqoTestCase):
                             text="dogs",
                             search_method="HYBRID",
                             hybrid_parameters=HybridParameters(
-                                retrieval_method=retrieval_method,
-                                ranking_method=ranking_method,
+                                retrievalMethod=retrieval_method,
+                                rankingMethod=ranking_method,
                                 verbose=True
                             ),
                             result_count=10
@@ -758,8 +758,8 @@ class TestHybridSearch(MarqoTestCase):
                             search_method="HYBRID",
                             filter="text_field_1:(something something dogs)",
                             hybrid_parameters=HybridParameters(
-                                retrieval_method=retrieval_method,
-                                ranking_method=ranking_method,
+                                retrievalMethod=retrieval_method,
+                                rankingMethod=ranking_method,
                                 verbose=True
                             ),
                             result_count=10
@@ -798,8 +798,8 @@ class TestHybridSearch(MarqoTestCase):
                         text="hippo",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method="disjunction",
-                            ranking_method="rrf",
+                            retrievalMethod="disjunction",
+                            rankingMethod="rrf",
                             verbose=True
                         ),
                         result_count=4
@@ -817,8 +817,8 @@ class TestHybridSearch(MarqoTestCase):
                         text="https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method="disjunction",
-                            ranking_method="rrf",
+                            retrievalMethod="disjunction",
+                            rankingMethod="rrf",
                             verbose=True
                         ),
                         result_count=4
@@ -853,7 +853,7 @@ class TestHybridSearch(MarqoTestCase):
 
                 # TODO: get tensor and lexical res outside, in base function
                 # Lexical retrieval with Tensor ranking
-                with self.subTest(retrieval_method=RetrievalMethod.Lexical, ranking_method=RankingMethod.Tensor):
+                with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
                     # Basic results (for reference)
                     tensor_res_all_docs = tensor_search.search( # To get tensor scores of every doc, for reference
                         config=self.config,
@@ -877,10 +877,10 @@ class TestHybridSearch(MarqoTestCase):
                         text="dogs",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Lexical,
-                            ranking_method=RankingMethod.Tensor,
-                            searchable_attributes_lexical=["text_field_1"],
-                            searchable_attributes_tensor=["text_field_1"],
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor,
+                            searchableAttributesLexical=["text_field_1"],
+                            searchableAttributesTensor=["text_field_1"],
                             verbose=True
                         ),
                         result_count=10
@@ -899,7 +899,7 @@ class TestHybridSearch(MarqoTestCase):
                         self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
 
                 # Tensor retrieval with Lexical ranking
-                with self.subTest(retrieval_method=RetrievalMethod.Tensor, ranking_method=RankingMethod.Lexical):
+                with self.subTest(retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Lexical):
                     # Basic results (for reference)
                     lexical_res = tensor_search.search(
                         config=self.config,
@@ -923,10 +923,10 @@ class TestHybridSearch(MarqoTestCase):
                         text="dogs",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=RetrievalMethod.Tensor,
-                            ranking_method=RankingMethod.Lexical,
-                            searchable_attributes_lexical=["text_field_1"],
-                            searchable_attributes_tensor=["text_field_1"],
+                            retrievalMethod=RetrievalMethod.Tensor,
+                            rankingMethod=RankingMethod.Lexical,
+                            searchableAttributesLexical=["text_field_1"],
+                            searchableAttributesTensor=["text_field_1"],
                             verbose=True
                         ),
                         result_count=10
@@ -1090,9 +1090,9 @@ class TestHybridSearch(MarqoTestCase):
                         text="dogs",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=retrieval_method,
-                            ranking_method=ranking_method,
-                            searchable_attributes_lexical=["text_field_1", "add_field_1"]
+                            retrievalMethod=retrieval_method,
+                            rankingMethod=ranking_method,
+                            searchableAttributesLexical=["text_field_1", "add_field_1"]
                         )
                     )
                 self.assertIn("has no lexically searchable field add_field_1", str(e.exception))
@@ -1112,7 +1112,7 @@ class TestHybridSearch(MarqoTestCase):
                         text="dogs",
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            searchable_attributes_tensor=["mult_field_1", "text_field_1"]
+                            searchableAttributesTensor=["mult_field_1", "text_field_1"]
                         )
                     )
                 self.assertIn("has no tensor field mult_field_1", str(e.exception))
@@ -1220,8 +1220,8 @@ class TestHybridSearch(MarqoTestCase):
                         text=None,
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
-                            retrieval_method=retrieval_method,
-                            ranking_method=ranking_method,
+                            retrievalMethod=retrieval_method,
+                            rankingMethod=ranking_method,
                             verbose=True
                         )
                     )
@@ -1262,8 +1262,8 @@ class TestHybridSearch(MarqoTestCase):
 
                 r = tensor_search.search(config=self.config, index_name=index.name, text=None,
                                          search_method="hybrid",
-                                         hybrid_parameters=HybridParameters(retrieval_method=RetrievalMethod.Tensor,
-                                                                            ranking_method=RankingMethod.Tensor,
+                                         hybrid_parameters=HybridParameters(retrievalMethod=RetrievalMethod.Tensor,
+                                                                            rankingMethod=RankingMethod.Tensor,
                                                                             verbose=True),
                                          context=SearchContext(**{"tensor": [{"vector": custom_vector,
                                                                               "weight": 1}], }))
@@ -1296,8 +1296,8 @@ class TestHybridSearch(MarqoTestCase):
                 text="dogs",
                 search_method="HYBRID",
                 hybrid_parameters=HybridParameters(
-                    retrieval_method=RetrievalMethod.Disjunction,
-                    ranking_method=RankingMethod.RRF,
+                    retrievalMethod=RetrievalMethod.Disjunction,
+                    rankingMethod=RankingMethod.RRF,
                     alpha=0.6
                 )
             )

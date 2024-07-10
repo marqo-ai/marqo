@@ -106,19 +106,19 @@ class HybridSearch:
         # Edge cases for q data type
         if isinstance(query, CustomVectorQuery):
             query_text_vectorise = None
-            query_text_search = query.customVector.content
+            query_text_search = query.custom_vector.content
 
             if context is None:
                 context = SearchContext(
-                    tensor=[SearchContextTensor(vector=query.customVector.vector, weight=1)]
+                    tensor=[SearchContextTensor(vector=query.custom_vector.vector, weight=1)]
                 )
             else:
-                context.tensor.append(SearchContextTensor(vector=query.customVector.vector, weight=1))
+                context.tensor.append(SearchContextTensor(vector=query.custom_vector.vector, weight=1))
         elif query is None:
             # This is only acceptable if retrieval_method="tensor", ranking_method="tensor", and context exists.
             # Treated like normal tensor search with context.
-            if not (hybrid_parameters.retrieval_method.upper() == SearchMethod.TENSOR and
-                    hybrid_parameters.ranking_method.upper() == SearchMethod.TENSOR):
+            if not (hybrid_parameters.retrievalMethod.upper() == SearchMethod.TENSOR and
+                    hybrid_parameters.rankingMethod.upper() == SearchMethod.TENSOR):
                 raise core_exceptions.InvalidArgumentError(
                     "Query cannot be 'None' for hybrid search unless retrieval_method and ranking_method "
                     "are both 'tensor'.")
@@ -166,10 +166,10 @@ class HybridSearch:
             searchable_attributes=searchable_attributes,
             score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
             # Hybrid-specific attributes
-            score_modifiers_lexical=hybrid_parameters.score_modifiers_lexical.to_marqo_score_modifiers()
-            if hybrid_parameters.score_modifiers_lexical is not None else None,
-            score_modifiers_tensor=hybrid_parameters.score_modifiers_tensor.to_marqo_score_modifiers()
-            if hybrid_parameters.score_modifiers_tensor is not None else None,
+            score_modifiers_lexical=hybrid_parameters.scoreModifiersLexical.to_marqo_score_modifiers()
+            if hybrid_parameters.scoreModifiersLexical is not None else None,
+            score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
+            if hybrid_parameters.scoreModifiersTensor is not None else None,
             hybrid_parameters=hybrid_parameters
         )
 
