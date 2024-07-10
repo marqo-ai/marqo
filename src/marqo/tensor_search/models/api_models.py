@@ -31,7 +31,7 @@ class CustomVectorQuery(ImmutableStrictBaseModel):
         content: Optional[str] = None
         vector: List[float]
 
-    customVector: CustomVector
+    custom_vector: CustomVector
 
 
 class SearchQuery(BaseMarqoModel):
