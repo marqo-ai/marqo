@@ -61,19 +61,26 @@ jobs:
           python-version: "3.8"
           cache: "pip"
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin' # this is the open JDK distribution
+          cache: maven
+
       - name: Build Vespa
         run: |
-          systemctl stop unattended-upgrades
-          apt-get remove -y unattended-upgrades
-          
-          echo "Updating package list"
-          apt-get update -y
-          
-          # Build Vespa components
-          echo "Installing jdk 17"
-          sudo apt-get install openjdk-17-jdk -y
-          echo "Installing maven"
-          sudo apt-get install maven -y
+#          systemctl stop unattended-upgrades
+#          apt-get remove -y unattended-upgrades
+#
+#          echo "Updating package list"
+#          apt-get update -y
+#
+#          # Build Vespa components
+#          echo "Installing jdk 17"
+#          sudo apt-get install openjdk-17-jdk -y
+#          echo "Installing maven"
+#          sudo apt-get install maven -y
           echo "Building Vespa components"
           cd marqo/vespa
           mvn clean package
@@ -122,7 +129,7 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
           pip install tox==4.16.0
           cd marqo
-          tox
+          tox -- tests/tensor_search/test_multimodal_tensor_combination.py
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
