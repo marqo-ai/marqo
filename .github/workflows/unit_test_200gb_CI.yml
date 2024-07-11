@@ -49,23 +49,19 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
     steps:
-      - name: Checkout marqo repo
-        uses: actions/checkout@v3
+      - name: Checkout marqo repo and setup maven action
+        uses: s4u/setup-maven-action@v1.14.0
         with:
           fetch-depth: 0
           path: marqo
+          java-distribution: 'temurin' # this is the open JDK distribution
+          java-version: '17'
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
         with:
           python-version: "3.8"
           cache: "pip"
-
-      - name: Setup Maven Action
-        uses: s4u/setup-maven-action@v1.14.0
-        with:
-          java-distribution: 'temurin' # this is the open JDK distribution
-          java-version: '17'
 
       - name: Build Vespa
         run: |
