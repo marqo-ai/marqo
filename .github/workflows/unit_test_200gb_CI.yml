@@ -62,7 +62,7 @@ jobs:
           cache: "pip"
 
       - name: Setup Maven Action
-        uses: s4u/setup-maven-action@1.14.0
+        uses: s4u/setup-maven-action@v1.14.0
         with:
           java-distribution: 'temurin' # this is the open JDK distribution
           java-version: '17'
