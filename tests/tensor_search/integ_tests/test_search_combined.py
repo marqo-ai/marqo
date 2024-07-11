@@ -865,3 +865,7 @@ class TestSearch(MarqoTestCase):
             with self.subTest(search_method_type=search_method_type):
                 search_query = SearchQuery(q="test", searchMethod=search_method)
                 self.assertEqual(expected_search_method, search_query.searchMethod)
+
+        # A special case for no search method provided
+        search_query = SearchQuery(q="test")
+        self.assertEqual(SearchMethod.TENSOR, search_query.searchMethod)
