@@ -14,7 +14,7 @@ def start(args):
               "--name vespa "
               "--hostname vespa-container "
               "--publish 8080:8080 --publish 19071:19071 --publish 2181:2181 "
-              "vespaengine/vespa")
+              "vespaengine/vespa:8.367.14")
 
 
 def restart(args):

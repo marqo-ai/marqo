@@ -1,38 +1,46 @@
 import json
-from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Sequence, Union
-import semver
-
+from typing import Type, Sequence
 
 import jsonschema
 
 import marqo.core.models.marqo_index as marqo_index
-import marqo.exceptions as base_exceptions
+from marqo import marqo_docs
 from marqo.api.exceptions import (
     InvalidFieldNameError, InvalidArgError, InvalidDocumentIdError, DocTooLargeError)
+from marqo.core.models.marqo_index import *
 from marqo.tensor_search import constants as tensor_search_constants
 from marqo.tensor_search import enums, utils
 from marqo.tensor_search.enums import SearchMethod
+from marqo.tensor_search.models.custom_vector_object import CustomVector
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
-from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.models.mappings_object import (
     mappings_schema,
     multimodal_combination_mappings_schema,
     custom_vector_mappings_schema,
 )
-from marqo.core.models.marqo_index import *
-from marqo.tensor_search.models.custom_vector_object import CustomVector
-from marqo import marqo_docs
+from marqo.tensor_search.models.search import SearchContext
 
 
-def validate_query(q: Optional[Union[dict, str]], search_method: Union[str, SearchMethod]) -> Optional[Union[dict, str]]:
+def validate_query(q: Optional[Union[dict, str, CustomVector]], search_method: Union[str, SearchMethod]) -> Optional[
+    Union[dict, str, CustomVector]]:
     """
     Returns q if an error is not raised"""
-    usage_ref = "\nSee query reference here: https://docs.marqo.ai/0.0.13/API-Reference/search/#query-q"
+    usage_ref = f"\nSee query reference here: {marqo_docs.query_reference()}"
+
+    # TODO - it looks like API pydantic model is catching invalid input (e.g. bad dict) before it reaches this point
+    from marqo.tensor_search.models.api_models import CustomVectorQuery
 
     if isinstance(q, str) or q is None:
-        pass
+        return q
+    elif isinstance(q, CustomVectorQuery):
+        if search_method.upper() != SearchMethod.HYBRID and search_method.upper() != SearchMethod.TENSOR:
+            raise InvalidArgError(
+                'Custom vector search is currently only supported for search_method="HYBRID" '
+                f"\nReceived search_method `{search_method}`. {usage_ref}")
+
+        return q
     elif isinstance(q, dict):
+
         if search_method.upper() != SearchMethod.TENSOR:
             raise InvalidArgError(
                 'Multi-query search is currently only supported for search_method="TENSOR" '
@@ -390,7 +398,8 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                 field_content = validate_multimodal_combination(field_content, is_non_tensor_field, mappings[field])
             elif structured_field_type == FieldType.CustomVector:
                 field_content = validate_custom_vector(field_content, is_non_tensor_field, index_model_dimensions)
-            elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble, FieldType.MapLong]:
+            elif structured_field_type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapDouble,
+                                           FieldType.MapLong]:
                 field_content = validate_map_numeric_field(field_content)
             else:
                 raise InvalidArgError(
@@ -406,45 +415,47 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                     f"The field {field} is a map field and only supported for indexes created with Marqo 2.9.0 or later. "
                     f"See {marqo_docs.map_fields()} and {marqo_docs.mappings()}."
                 )
-            
+
             field_content = validate_map_numeric_field(field_content)
 
     return field_content
 
+
 def validate_map_numeric_field(field_content):
-     """
-     Validates the field content if it is a map field (dict)
-     Args:
-         field_content: the field content
-     Returns:
-         field_content if the validation passes
-     """
+    """
+    Validates the field content if it is a map field (dict)
+    Args:
+        field_content: the field content
+    Returns:
+        field_content if the validation passes
+    """
 
-     # Validate that the field content is a dict
-     if not isinstance(field_content, dict):
-         raise InvalidArgError(
-             f"The field content `{field_content}` is of type `{type(field_content).__name__}`, which is not a valid type for a map field."
-             f"A map field must be a dictionary."
-         )
+    # Validate that the field content is a dict
+    if not isinstance(field_content, dict):
+        raise InvalidArgError(
+            f"The field content `{field_content}` is of type `{type(field_content).__name__}`, which is not a valid type for a map field."
+            f"A map field must be a dictionary."
+        )
 
-     # Validate that the dict is only of one level
-     if any(isinstance(v, dict) for v in field_content.values()):
-         raise InvalidArgError(
-             "Nested dictionaries are not allowed in map fields. Each value must be a single int, float, or double."
-         )
+    # Validate that the dict is only of one level
+    if any(isinstance(v, dict) for v in field_content.values()):
+        raise InvalidArgError(
+            "Nested dictionaries are not allowed in map fields. Each value must be a single int, float, or double."
+        )
 
-     # Validate that the values of the dict are int, float, or double
-     for key, value in field_content.items():
-         if not isinstance(key, str):
-             raise InvalidArgError(
-                 f"Key `{key}` in map field is not a string. All keys must be strings."
-             )
-         if not isinstance(value, (int, float)):
-             raise InvalidArgError(
-                 f"Value `{value}` for key `{key}` in map field is not of type int or float."
-             )
+    # Validate that the values of the dict are int, float, or double
+    for key, value in field_content.items():
+        if not isinstance(key, str):
+            raise InvalidArgError(
+                f"Key `{key}` in map field is not a string. All keys must be strings."
+            )
+        if not isinstance(value, (int, float)):
+            raise InvalidArgError(
+                f"Value `{value}` for key `{key}` in map field is not of type int or float."
+            )
 
-     return field_content
+    return field_content
+
 
 def validate_multimodal_combination(field_content, is_non_tensor_field, field_mapping):
     """
@@ -552,14 +563,14 @@ def validate_mappings_object(
                 validate_custom_vector_mappings_object(config)
                 # TODO: add validation for custom vector structured/unstructured here
 
-
         return mappings_object
     except jsonschema.ValidationError as e:
         raise InvalidArgError(
             f"Error validating mappings object. Reason: {str(e)}. "
             f" Read about the mappings object here: `{marqo_docs.mappings()}`"
         )
-    
+
+
 def validate_multimodal_combination_mappings_object(mappings_object: Dict):
     """Validates the multimodal mappings object
 

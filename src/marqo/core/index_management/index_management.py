@@ -1,8 +1,10 @@
 import os
+import shutil
 import textwrap
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import List
 from typing import Optional
 
@@ -19,7 +21,6 @@ from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
@@ -36,6 +37,10 @@ class _MarqoConfig(ImmutableStrictBaseModel):
 class IndexManagement:
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
+    _MARQO_CUSTOM_SEARCHERS_JAR = 'marqo-custom-searchers-deploy.jar'
+    _MARQO_CUSTOM_SEARCHERS_ID = 'marqo'
+    _MARQO_CUSTOM_SEARCHERS_BUNDLE = 'marqo-custom-searchers'  # artifact id
+    _MARQO_CUSTOM_SEARCHERS = ['ai.marqo.search.HybridSearcher']
     _MARQO_SETTINGS_SCHEMA_TEMPLATE = textwrap.dedent(
         '''
         schema %s {
@@ -404,8 +409,9 @@ class IndexManagement:
         """
         added_settings_schema = self._add_marqo_settings_schema(app)
         added_query_profile = self._add_default_query_profile(app)
+        added_custom_searchers = self._add_custom_searchers(app)
 
-        return added_settings_schema or added_query_profile
+        return added_settings_schema or added_query_profile or added_custom_searchers
 
     def _add_marqo_settings_schema(self, app: str) -> bool:
         """
@@ -452,6 +458,20 @@ class IndexManagement:
             return True
         return False
 
+    def _add_custom_searchers(self, app: str) -> bool:
+        target_path = os.path.join(app, 'components', self._MARQO_CUSTOM_SEARCHERS_JAR)
+        if not os.path.exists(target_path):
+            logger.debug('Custom searchers JAR does not exist. Copying from Vespa target directory')
+            current_dir = Path(__file__).parent
+            source_path = current_dir / f'../../../../vespa/target/{self._MARQO_CUSTOM_SEARCHERS_JAR}'
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            shutil.copy(source_path, target_path)
+
+            self._add_custom_searchers_to_services(app)
+
+            return True
+        return False
+
     def _add_schema(self, app: str, name: str, schema: str) -> None:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
         if os.path.exists(schema_path):
@@ -473,13 +493,27 @@ class IndexManagement:
         tree = ET.parse(services_path)
         root = tree.getroot()
 
-        documents_section = root.find(".//documents")
+        documents_elements = root.findall("content/documents")
 
-        new_document = ET.SubElement(documents_section, "document")
-        new_document.set("type", name)
-        new_document.set("mode", "index")
+        if len(documents_elements) > 1:
+            raise InternalError("Multiple documents elements found in services.xml. Marqo expects only one "
+                                "Vespa content cluster")
+        if len(documents_elements) == 0:
+            raise InternalError("No documents element found in services.xml")
 
-        tree.write(services_path)
+        documents_element = documents_elements[0]
+
+        # Check for existing document types
+        existing_documents = [doc.get("type") for doc in documents_element.findall("document")]
+
+        if name not in existing_documents:
+            new_document = ET.SubElement(documents_element, "document")
+            new_document.set("type", name)
+            new_document.set("mode", "index")
+
+            tree.write(services_path)
+        else:
+            logger.warn(f"Schema {name} already exists in services.xml, nothing to add")
 
     def _remove_schema_from_services(self, app: str, name: str) -> None:
         services_path = os.path.join(app, 'services.xml')
@@ -487,20 +521,59 @@ class IndexManagement:
         tree = ET.parse(services_path)
         root = tree.getroot()
 
-        # TODO - Verify there is only one documents section (one content cluster)
-        # Error out otherwise as we don't know which one to use
-        documents_section = root.find(".//documents")
+        documents_elements = root.findall("content/documents")
+
+        if len(documents_elements) > 1:
+            raise InternalError("Multiple documents elements found in services.xml. Marqo expects only one "
+                                "Vespa content cluster")
+        if len(documents_elements) == 0:
+            raise InternalError("No documents element found in services.xml")
+
+        documents_element = documents_elements[0]
 
         deleted = False
-        for document in documents_section.findall("document"):
+        for document in documents_element.findall("document"):
             if document.get("type") == name:
-                documents_section.remove(document)
+                documents_element.remove(document)
+
+                if deleted:
+                    logger.warn(f"Multiple schemas with name {name} found in services.xml, removing all")
+
                 deleted = True
 
         if not deleted:
             logger.warn(f"Schema {name} does not exist in services.xml, nothing to remove")
         else:
             tree.write(services_path)
+
+    def _add_custom_searchers_to_services(self, app: str) -> None:
+        services_path = os.path.join(app, 'services.xml')
+
+        tree = ET.parse(services_path)
+        root = tree.getroot()
+
+        search_elements = root.findall("container/search")
+
+        if len(search_elements) > 1:
+            logger.warn("Multiple search elements found in services.xml, adding custom searchers to all")
+        if len(search_elements) == 0:
+            raise InternalError("No search elements found in services.xml")
+
+        for search_element in search_elements:
+            chains = search_element.findall("chain")
+            for chain in chains:
+                if chain.get("id") == self._MARQO_CUSTOM_SEARCHERS_ID:
+                    logger.warn("Custom searchers already exist in services.xml, nothing to add")
+                    return
+            chain = ET.SubElement(search_element, "chain")
+            chain.set("id", self._MARQO_CUSTOM_SEARCHERS_ID)
+            chain.set("inherits", "vespa")
+            for searcher in self._MARQO_CUSTOM_SEARCHERS:
+                searcher_element = ET.SubElement(chain, "searcher")
+                searcher_element.set("id", searcher)
+                searcher_element.set("bundle", self._MARQO_CUSTOM_SEARCHERS_BUNDLE)
+
+        tree.write(services_path)
 
     def _add_schema_removal_override(self, app: str) -> None:
         validation_overrides_path = os.path.join(app, 'validation-overrides.xml')

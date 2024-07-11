@@ -4,7 +4,7 @@ from unittest import mock
 from tests.utils.transition import add_docs_caller
 from marqo.api.exceptions import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.api_models import ScoreModifier
+from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.enums import TensorField
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
@@ -35,7 +35,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
             })
         pass
 
-        self.test_valid_score_modifiers_list = [ScoreModifier(**x) for x in [
+        self.test_valid_score_modifiers_list = [ScoreModifierLists(**x) for x in [
             {
                 # miss one weight
                 "multiply_score_by":
@@ -172,7 +172,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
 
         modifier_res = tensor_search.search(config=self.config, index_name=self.index_name,
                                             text="what is the rider doing?",
-                                            score_modifiers=ScoreModifier(**{
+                                            score_modifiers=ScoreModifierLists(**{
                                                     "multiply_score_by":
                                                         [{"field_name": "multiply_1",
                                                           "weight": 1,},
@@ -189,7 +189,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
         modifier_score = modifier_res["hits"][0]["_score"]
         self.assertEqual(normal_score, modifier_score)
 
-    def get_expected_score(self, doc, ori_score, score_modifiers: ScoreModifier):
+    def get_expected_score(self, doc, ori_score, score_modifiers: ScoreModifierLists):
         add = 0.0
         if score_modifiers.multiply_score_by is not None:
             for config in score_modifiers.multiply_score_by:
@@ -521,7 +521,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
         
         for invalid_score_modifiers in invalid_score_modifiers_list:
             try:
-                v = ScoreModifier(**invalid_score_modifiers)
+                v = ScoreModifierLists(**invalid_score_modifiers)
                 raise AssertionError(invalid_score_modifiers, v)
             except InvalidArgError:
                 pass
@@ -573,7 +573,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
             })
         pass
 
-        self.test_valid_score_modifiers_list = [ScoreModifier(**x) for x in [
+        self.test_valid_score_modifiers_list = [ScoreModifierLists(**x) for x in [
             {
                 # miss one weight
                 "multiply_score_by":
@@ -720,7 +720,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
                 BulkSearchQueryEntity(
                     index=self.index_name,
                     q="what is the rider doing?",
-                    scoreModifiers=ScoreModifier(**{
+                    scoreModifiers=ScoreModifierLists(**{
                         "multiply_score_by":
                             [{"field_name": "multiply_1",
                             "weight": 1,},
@@ -741,7 +741,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
         modifier_score = modifier_res["result"][0]["hits"][0]["_score"]
         self.assertEqual(normal_score, modifier_score)
 
-    def get_expected_score(self, doc, ori_score, score_modifiers: ScoreModifier):
+    def get_expected_score(self, doc, ori_score, score_modifiers: ScoreModifierLists):
         add = 0.0
         if score_modifiers.multiply_score_by is not None:
             for config in score_modifiers.multiply_score_by:
@@ -1062,7 +1062,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
             for verbose in [0, 1, 2]:
                 search_res = tensor_search.search(config=self.config, text="random text",
                                                   index_name=self.index_name, verbose=verbose,
-                                                  score_modifiers=ScoreModifier(**{
+                                                  score_modifiers=ScoreModifierLists(**{
                                                       "multiply_score_by":
                                                           [{"field_name": "multiply_1",
                                                             "weight": 1, },

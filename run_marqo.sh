@@ -72,6 +72,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
     # Check for the specific "not found" error response which indicates there is no application package deployed
     if echo "$RESPONSE" | grep -q '"error-code":"NOT_FOUND"'; then
       echo "Marqo did not find an existing vector store. Setting up vector store..."
+
       # Deploy a dummy application package
       vespa deploy /app/scripts/vespa_local --wait 300 >/dev/null 2>&1
 

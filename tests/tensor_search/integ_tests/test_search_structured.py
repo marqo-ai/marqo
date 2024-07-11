@@ -6,8 +6,6 @@ from unittest import mock
 
 import requests
 
-import marqo.core.exceptions as core_exceptions
-from pydantic import ValidationError
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
@@ -18,6 +16,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase
 
@@ -1127,3 +1126,61 @@ class TestSearchStructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)
+
+    def test_tensor_search_with_custom_vector_query(self):
+        """
+        Tests that using a custom vector works as expected with marqo
+        """
+        # test with no context and context
+        docs = [
+                   {"text_field_1": "some text", "text_field_2": "Close match hehehe", "int_field_1": 1},
+               ] * 10
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.default_text_index,
+                docs=docs,
+            )
+        )
+
+        res = tensor_search.search(
+            text=CustomVectorQuery(
+                customVector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
+            ),
+            config=self.config,
+            index_name=self.default_text_index,
+            result_count=5
+        )
+        self.assertIn("hits", res)
+        self.assertEqual(5, len(res["hits"]))
+
+        # text with context and content
+        res = tensor_search.search(
+            text=CustomVectorQuery(
+                customVector=CustomVectorQuery.CustomVector(content="This text is ignored", vector=[1, ] * 384)
+            ),
+            config=self.config,
+            index_name=self.default_text_index,
+            context=SearchContext(
+                **{
+                    "tensor": [
+                        {"vector": [1, ] * 384, "weight": 1},
+                        {"vector": [2, ] * 384, "weight": 2}
+                    ]
+                }
+            ),
+            result_count=5
+        )
+        self.assertIn("hits", res)
+        self.assertEqual(5, len(res["hits"]))
+
+        # test not context and no content
+        res = tensor_search.search(
+            text=CustomVectorQuery(
+                customVector=CustomVectorQuery.CustomVector(vector=[1, ] * 384)
+            ), config=self.config,
+            index_name=self.default_text_index,
+            result_count=5
+        )
+        self.assertIn("hits", res)
+        self.assertEqual(5, len(res["hits"]))

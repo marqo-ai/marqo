@@ -199,7 +199,7 @@ class MarqoTestCase(unittest.TestCase):
                 m=16
             ),
             treat_urls_and_pointers_as_images: bool = False,
-            marqo_version='1.0.0',
+            marqo_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time(),
     ) -> UnstructuredMarqoIndexRequest:

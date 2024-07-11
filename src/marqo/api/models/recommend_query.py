@@ -2,7 +2,7 @@ from typing import Dict, List, Union, Optional
 
 from marqo.core.models.interpolation_method import InterpolationMethod
 from marqo.tensor_search.models.api_models import BaseMarqoModel
-from marqo.tensor_search.models.score_modifiers_object import ScoreModifier
+from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 
 
 class RecommendQuery(BaseMarqoModel):
@@ -19,4 +19,4 @@ class RecommendQuery(BaseMarqoModel):
     reRanker: str = None
     filter: str = None
     attributesToRetrieve: Union[None, List[str]] = None
-    scoreModifiers: Optional[ScoreModifier] = None
+    scoreModifiers: Optional[ScoreModifierLists] = None

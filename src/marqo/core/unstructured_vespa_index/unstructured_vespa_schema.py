@@ -187,7 +187,7 @@ class UnstructuredVespaSchema(VespaSchema):
 
                 rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits default {{
                     first-phase {{
-                    expression: bm25({cls._STRINGS})
+                        expression: bm25({cls._STRINGS})
                     }}
                 }}
                 

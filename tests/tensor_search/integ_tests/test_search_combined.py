@@ -10,6 +10,10 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo import exceptions as base_exceptions
+from marqo.core.models.marqo_query import MarqoLexicalQuery
+from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
+from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 
 
 class TestSearch(MarqoTestCase):
@@ -161,6 +165,10 @@ class TestSearch(MarqoTestCase):
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
+        self.structured_index = mock.MagicMock()
+        self.unstructured_index = mock.MagicMock()
+        self.structured_vespa_index = StructuredVespaIndex(self.structured_index)
+        self.unstructured_vespa_index = UnstructuredVespaIndex(self.unstructured_index)
 
     def tearDown(self) -> None:
         super().tearDown()
@@ -314,6 +322,7 @@ class TestSearch(MarqoTestCase):
                             self.assertEqual(expected_id, res["hits"][0]["_id"])
 
     def test_filtering(self):
+        # TODO: remove
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents first
@@ -410,7 +419,6 @@ class TestSearch(MarqoTestCase):
                         # Filtering on empty string returns no results
                         ("text_field_1 in ()", 0, None),
                     ]
-
                 for filter_string, expected_hits, expected_ids in test_cases:
                     with self.subTest(
                             f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_ids}"):
@@ -733,7 +741,7 @@ class TestSearch(MarqoTestCase):
         ]
 
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(msg = index.type):
+            with self.subTest(msg=index.type):
                 tensor_fields = ["text_field_1", "text_field_2"] \
                     if isinstance(index, UnstructuredMarqoIndex) else None
                 tensor_search.add_documents(
@@ -764,3 +772,67 @@ class TestSearch(MarqoTestCase):
                 self.assertEqual(1, len(res["hits"]))
                 self.assertEqual("21", res["hits"][0]["_id"])
                 self.assertTrue(0 < res["hits"][0]["_score"], f"score: {res['hits'][0]['_score']}")
+
+    def test_get_lexical_search_term(self):
+        # List of (VespaIndex, method_name) tuples to test
+        indexes_to_test = [
+            (self.structured_vespa_index, '_get_lexical_search_term'),
+            (self.unstructured_vespa_index, '_to_vespa_lexical_query')
+        ]
+
+        for index, method_name in indexes_to_test:
+            with self.subTest(index_type=type(index).__name__):
+                # Mock the _get_lexical_contains_term method for StructuredVespaIndex
+                if isinstance(index, StructuredVespaIndex):
+                    index._get_lexical_contains_term = mock.MagicMock(
+                        side_effect=lambda phrase, query: f'contains("{phrase}")')
+
+                # Test cases
+                test_cases = [
+                    # Test with score modifiers (should use OR)
+                    (
+                        MarqoLexicalQuery(
+                            index_name="test_index",
+                            limit=10,
+                            or_phrases=["term1", "term2"],
+                            and_phrases=[],
+                            score_modifiers=[ScoreModifier(field="field1", weight=1.0, type=ScoreModifierType.Multiply)]
+                        ),
+                        'contains("term1") OR contains("term2")' if isinstance(index, StructuredVespaIndex)
+                        else '(default contains "term1" OR default contains "term2")'
+                    ),
+                    # Test without score modifiers (should use weakAnd)
+                    (
+                        MarqoLexicalQuery(
+                            index_name="test_index",
+                            limit=10,
+                            or_phrases=["term1", "term2"],
+                            and_phrases=[]
+                        ),
+                        'weakAnd(contains("term1"), contains("term2"))' if isinstance(index, StructuredVespaIndex)
+                        else '(weakAnd(default contains "term1", default contains "term2"))'
+                    ),
+                    # Test with both OR and AND phrases
+                    (
+                        MarqoLexicalQuery(
+                            index_name="test_index",
+                            limit=10,
+                            or_phrases=["term1", "term2"],
+                            and_phrases=["term3", "term4"]
+                        ),
+                        '(weakAnd(contains("term1"), contains("term2"))) AND (contains("term3") AND contains("term4"))'
+                        if isinstance(index, StructuredVespaIndex)
+                        else '((weakAnd(default contains "term1", default contains "term2")) '
+                             'AND (default contains "term3" AND default contains "term4"))'
+                    ),
+                ]
+
+                for query, expected_result in test_cases:
+                    if isinstance(index, StructuredVespaIndex):
+                        result = getattr(index, method_name)(query)
+                    else:
+                        # For UnstructuredVespaIndex, we need to extract the search term from the full query
+                        full_query = getattr(index, method_name)(query)
+                        result = full_query['yql'].split('where')[1].strip()
+
+                    self.assertEqual(result, expected_result)
