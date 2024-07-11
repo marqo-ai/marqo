@@ -48,12 +48,16 @@ jobs:
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
+    env:
+      VESPA_CONFIG_URL: http://localhost:19071
+      VESPA_DOCUMENT_URL: http://localhost:8080
+      VESPA_QUERY_URL: http://localhost:8080
     steps:
       - name: Checkout marqo repo and setup maven action
         uses: s4u/setup-maven-action@v1.14.0
         with:
-          fetch-depth: 0
-          path: marqo
+          checkout-fetch-depth: 0
+          checkout-path: marqo
           java-distribution: 'temurin' # this is the open JDK distribution
           java-version: '17'
 
@@ -71,11 +75,6 @@ jobs:
 
       - name: Start Vespa
         run: |
-          # Define these for checking if Vespa is ready
-          export VESPA_CONFIG_URL=http://localhost:19071
-          export VESPA_DOCUMENT_URL=http://localhost:8080
-          export VESPA_QUERY_URL=http://localhost:8080
-          
           cd marqo/scripts/vespa_local
           set -x
           python vespa_local.py start
@@ -107,10 +106,6 @@ jobs:
           
       - name: Run Unit Tests
         run: |
-          # Define these for use by marqo
-          export VESPA_CONFIG_URL=http://localhost:19071
-          export VESPA_DOCUMENT_URL=http://localhost:8080
-          export VESPA_QUERY_URL=http://localhost:8080
           pip install tox==4.16.0
           cd marqo
           tox -- tests/tensor_search/test_multimodal_tensor_combination.py
