@@ -70,17 +70,6 @@ jobs:
 
       - name: Build Vespa
         run: |
-#          systemctl stop unattended-upgrades
-#          apt-get remove -y unattended-upgrades
-#
-#          echo "Updating package list"
-#          apt-get update -y
-#
-#          # Build Vespa components
-#          echo "Installing jdk 17"
-#          sudo apt-get install openjdk-17-jdk -y
-#          echo "Installing maven"
-#          sudo apt-get install maven -y
           echo "Building Vespa components"
           cd marqo/vespa
           mvn clean package
