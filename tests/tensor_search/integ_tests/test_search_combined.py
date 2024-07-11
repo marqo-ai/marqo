@@ -850,8 +850,9 @@ class TestSearch(MarqoTestCase):
         ]
         for search_method, search_method_type in invalid_search_methods:
             with self.subTest(search_method_type=search_method_type):
-                with self.assertRaises(ValidationError):
+                with self.assertRaises(ValidationError) as cm:
                     _ = SearchQuery(q="test", search_method=search_method)
+                self.assertIn("search_method", str(cm.exception))
 
     def test_search_query_CanAcceptDifferentSearchMethods(self):
         """Test that the SearchQuery can accept different search methods."""
