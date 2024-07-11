@@ -107,10 +107,10 @@ class TestBaseExceptionHandler(MarqoTestCase):
         self.assertNotIn("This should not be propagated.", converted_error.message)
         self.assertIn("unexpected internal error", converted_error.message)
 
-    async def test_validation_exception_handler(self):
+    async def test_validation_exception_handler_CorrectResponseBody(self):
+        """Ensure that the validation exception handler returns the correct response body when 422 is raised."""
         # Create a mock request
         mock_request = MagicMock(spec=Request)
-
         # Manually create a RequestValidationError
         errors = [
             {
@@ -122,11 +122,8 @@ class TestBaseExceptionHandler(MarqoTestCase):
         ]
         validation_error = RequestValidationError(errors)
 
-        # Call the exception handler with the mock request and validation error
         response = await api_validation_exception_handler(mock_request, validation_error)
-        # Assert the response status code
         self.assertEqual(422, response.status_code)
-        # Assert the response content
         self.assertEqual(
             {
                 "detail": jsonable_encoder(validation_error.errors()),
