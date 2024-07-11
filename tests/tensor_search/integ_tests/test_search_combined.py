@@ -839,7 +839,6 @@ class TestSearch(MarqoTestCase):
 
                     self.assertEqual(result, expected_result)
 
-
     def test_search_query_ExpectedErrorRaisedForInvalidSearchMethod(self):
         """Test that the ValidationError is raised when an incorrect search method is provided."""
         invalid_search_methods = [
