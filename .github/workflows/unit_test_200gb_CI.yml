@@ -108,7 +108,7 @@ jobs:
         run: |
           pip install tox==4.16.0
           cd marqo
-          tox -- tests/tensor_search/test_multimodal_tensor_combination.py
+          tox
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
