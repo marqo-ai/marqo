@@ -61,12 +61,11 @@ jobs:
           python-version: "3.8"
           cache: "pip"
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Setup Maven Action
+        uses: s4u/setup-maven-action@1.14.0
         with:
+          java-distribution: 'temurin' # this is the open JDK distribution
           java-version: '17'
-          distribution: 'temurin' # this is the open JDK distribution
-          cache: maven
 
       - name: Build Vespa
         run: |
