@@ -159,7 +159,7 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def api_validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Catch FastAPI validation errors and return a 422 error with the error messages.
 
     Note: The Pydantic Validation error that happens at the API will be caught here and returned as a 422 error.
