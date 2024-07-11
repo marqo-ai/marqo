@@ -106,7 +106,7 @@ class __InvalidRequestError(MarqoWebError):
 
 
 class UnprocessableEntityError(__InvalidRequestError):
-    code = "un_processable_entity"
+    code = "unprocessable_entity"
     status_code = HTTPStatus.UNPROCESSABLE_ENTITY
 
 
