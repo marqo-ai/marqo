@@ -2,7 +2,7 @@
 
 ## New features
 
-- Hybrid Search (`"searchMethod": "HYBRID”`) ([https://github.com/marqo-ai/marqo/pull/803](https://github.com/marqo-ai/marqo/pull/845)). Marqo now supports hybrid search, combining lexical and tensor search (using reciprocal rank fusion) to provide the best relevance possible. See usage [here](https://docs.marqo.ai/2.10/API-Reference/Search/search/#hybrid-parameters).
+- Hybrid Search (`"searchMethod": "HYBRID”`) (https://github.com/marqo-ai/marqo/pull/845). Marqo now supports hybrid search, combining lexical and tensor search (using reciprocal rank fusion) to provide the best relevance possible. See usage [here](https://docs.marqo.ai/2.10/API-Reference/Search/search/#hybrid-parameters).
 - Lexical Search score modifiers (https://github.com/marqo-ai/marqo/pull/884). Score modifiers are now supported for lexical search. Score modifiers are applied on all matches, not just the top k retrieved, resulting in more relevant hits. See usage [here](https://docs.marqo.ai/2.10/API-Reference/Search/search/#score-modifiers).
 
 ## Bug fixes and minor changes
