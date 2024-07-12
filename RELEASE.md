@@ -1,3 +1,19 @@
+# Release 2.10.0
+
+## New features
+
+- Hybrid Search (`"searchMethod": "HYBRID”`) (https://github.com/marqo-ai/marqo/pull/845). Marqo now supports hybrid search, combining lexical and tensor search (using reciprocal rank fusion) to provide the best relevance possible. See usage [here](https://docs.marqo.ai/2.10/API-Reference/Search/search/#hybrid-parameters).
+- Lexical Search score modifiers (https://github.com/marqo-ai/marqo/pull/884). Score modifiers are now supported for lexical search. Score modifiers are applied on all matches, not just the top k retrieved, resulting in more relevant hits. See usage [here](https://docs.marqo.ai/2.10/API-Reference/Search/search/#score-modifiers).
+
+## Bug fixes and minor changes
+
+- Increase unstructured index default `filterStringMaxLength` to 50, from 20 (https://github.com/marqo-ai/marqo/pull/887). Maximum length of string fields to be used in query filters now defaults to 50 characters long.
+
+## Contributor shout-outs
+
+- Huge shoutout to all our 4.3k stargazers! We’ve come a long way as a team and as a community, so a huge thanks to everyone who continues to support Marqo.
+- Feel free to keep on sharing questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+
 # Release 2.9.0
 
 ## New features
