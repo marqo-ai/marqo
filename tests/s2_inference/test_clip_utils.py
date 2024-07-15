@@ -56,6 +56,43 @@ class TestImageDownloading(unittest.TestCase):
         # Check if c.close() was called
         mock_curl_instance.close.assert_called_once()
 
+    def test_is_image(self):
+        # Test with valid image file extensions
+        self.assertTrue(clip_utils._is_image('image.jpg'))
+        self.assertTrue(clip_utils._is_image('image.png'))
+        self.assertTrue(clip_utils._is_image('image.jpeg'))
+        self.assertTrue(clip_utils._is_image('image.bmp'))
+
+        # Test with uppercase extensions
+        self.assertTrue(clip_utils._is_image('image.JPG'))
+        self.assertTrue(clip_utils._is_image('image.PNG'))
+
+        # Test with valid URL
+        self.assertTrue(clip_utils._is_image('https://example.com/image.jpg'))
+
+        # Test with invalid file extensions
+        self.assertFalse(clip_utils._is_image('document.pdf'))
+        self.assertFalse(clip_utils._is_image('text.txt'))
+
+        # Test with no file extension
+        self.assertFalse(clip_utils._is_image('imagewithoutextension'))
+
+        # Test with PIL Image
+        pil_image = PIL.Image.new('RGB', (100, 100))
+        self.assertTrue(clip_utils._is_image(pil_image))
+
+        # Test with list of images
+        image_list = ['image1.jpg', 'image2.png', 'https://example.com/image3.jpeg']
+        self.assertTrue(clip_utils._is_image(image_list))
+
+        # Test with empty list
+        with self.assertRaises(clip_utils.UnidentifiedImageError):
+            clip_utils._is_image([])
+
+        # Test with invalid type
+        with self.assertRaises(clip_utils.UnidentifiedImageError):
+            clip_utils._is_image(123)
+
 
 class TestDownloadFromRepo(unittest.TestCase):
 
