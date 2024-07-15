@@ -116,7 +116,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")
     else:
-        raise UnidentifiedImageError(f"Input str of `{image_path}` is not a local file or a valid url. "
+        raise UnidentifiedImageError(f"Input str of {image_path} is not a local file or a valid url. "
                                      f"If you are using Marqo Cloud, please note that images can only be downloaded "
                                      f"from a URL and local files are not supported. "
                                      f"If you are running Marqo in a Docker container, you will need to use a Docker "
