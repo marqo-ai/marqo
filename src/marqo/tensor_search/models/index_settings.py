@@ -175,7 +175,9 @@ class IndexSettings(StrictBaseModel):
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
-                )
+                ),
+                textQueryPrefix=marqo_index.model.text_query_prefix,
+                textChunkPrefix=marqo_index.model.text_chunk_prefix
             )
         elif isinstance(marqo_index, core.UnstructuredMarqoIndex):
             return cls(
@@ -191,7 +193,9 @@ class IndexSettings(StrictBaseModel):
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
                     parameters=marqo_index.hnsw_config
-                )
+                ),
+                textQueryPrefix=marqo_index.model.text_query_prefix,
+                textChunkPrefix=marqo_index.model.text_chunk_prefix
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")
