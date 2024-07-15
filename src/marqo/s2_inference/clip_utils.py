@@ -25,6 +25,7 @@ from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
+from marqo import marqo_docs
 
 logger = get_logger(__name__)
 
@@ -122,7 +123,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
                                      f"If you are running Marqo in a Docker container, you will need to use a Docker "
                                      f"volume so that your container can access host files. "
                                      f"For more information, please refer to: "
-                                     f"https://docs.marqo.ai/latest/Guides/Advanced-Usage/images/")
+                                     f"{marqo_docs.indexing_images()}")
 
     return img
 
