@@ -105,6 +105,11 @@ class __InvalidRequestError(MarqoWebError):
     error_type = "invalid_request"
 
 
+class UnprocessableEntityError(__InvalidRequestError):
+    code = "unprocessable_entity"
+    status_code = HTTPStatus.UNPROCESSABLE_ENTITY
+
+
 class TooManyRequestsError(__InvalidRequestError):
     code = "too_many_requests"
     status_code = HTTPStatus.TOO_MANY_REQUESTS
