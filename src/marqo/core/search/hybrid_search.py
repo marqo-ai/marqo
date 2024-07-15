@@ -83,12 +83,6 @@ class HybridSearch:
 
         marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
-        # TODO: Remove when we support unstructured.
-        if isinstance(marqo_index, UnstructuredMarqoIndex):
-            raise core_exceptions.UnsupportedFeatureError(
-                "Unstructured indexes are not yet supported for hybrid search. "
-                "Please use a structured index.")
-
         marqo_index_version = marqo_index.parsed_marqo_version()
         if marqo_index_version < constants.MARQO_HYBRID_SEARCH_MINIMUM_VERSION:
             raise core_exceptions.UnsupportedFeatureError(
