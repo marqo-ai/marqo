@@ -15,6 +15,7 @@ from multilingual_clip import pt_multilingual_clip
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from torchvision.transforms import InterpolationMode
 from urllib3.exceptions import HTTPError as urllib3_HTTPError
+from requests import Request, Session
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
@@ -184,7 +185,9 @@ def encode_url(url: str) -> str:
         UnicodeEncodeError: If the URL cannot be encoded properly.
 
     """
-    return requests.utils.requote_uri(url)
+    s = Session()
+    req = Request('GET', url)
+    return s.prepare_request(req).url
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
                                image_download_headers: dict) -> Union[ImageType, Tensor]:
