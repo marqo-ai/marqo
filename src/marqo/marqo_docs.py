@@ -54,4 +54,8 @@ def bring_your_own_model():
 
 
 def query_reference():
-    return _build_url('API-Reference/search/#query-q')
+    return _build_url('API-Reference/Search/search/#query-q')
+
+
+def indexing_images():
+    return _build_url('Guides/Advanced-Usage/images/')
