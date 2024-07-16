@@ -1288,7 +1288,7 @@ class TestHybridSearch(MarqoTestCase):
                     text="dogs",
                     search_method="HYBRID"
                 )
-            self.assertIn(f"Marqo 2.10 or later. "
+            self.assertIn(f"Marqo 2.10.0 or later. "
                           f"This index was created with", str(e.exception))
 
     def test_hybrid_parameters_with_wrong_search_method_fails(self):
