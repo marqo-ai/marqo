@@ -12,10 +12,9 @@ import transformers
 import validators
 from PIL import Image, UnidentifiedImageError
 from multilingual_clip import pt_multilingual_clip
+from requests.utils import requote_uri
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from torchvision.transforms import InterpolationMode
-from urllib3.exceptions import HTTPError as urllib3_HTTPError
-from requests import Request, Session
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
@@ -26,7 +25,6 @@ from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
-from requests.utils import requote_uri
 
 logger = get_logger(__name__)
 
@@ -85,7 +83,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     results = []
     for image in images:
         results.append(format_and_load_CLIP_image(image, image_download_headers))
-    
+
     return results
 
 
@@ -185,9 +183,7 @@ def encode_url(url: str) -> str:
         UnicodeEncodeError: If the URL cannot be encoded properly.
 
     """
-    s = Session()
-    req = Request('GET', url)
-    return s.prepare_request(req).url
+    return requests.utils.requote_uri(url)
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
                                image_download_headers: dict) -> Union[ImageType, Tensor]:
@@ -225,7 +221,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     # some logic to determine if something is an image or not
     # assume the batch is the same type
     # maybe we use something like this https://github.com/ahupp/python-magic
-    
+
     _allowed = get_allowed_image_types()
 
     # we assume the batch is this way if a list
@@ -238,15 +234,15 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         thing = inputs[0]
     else:
         thing = inputs
-    
+
     # if it is a string, determine if it is a local file or url
     if isinstance(thing, str):
         name, extension = os.path.splitext(thing.lower())
-        
+
         # if it has the correct extension, asssume yes
         if extension in _allowed:
             return True
-        
+
         # if it is a local file without extension, then raise an error
         if os.path.isfile(thing):
             # we could also read the first part of the file and infer
@@ -267,7 +263,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
 
 
 class CLIP:
-    
+
     """
     conveniance class wrapper to make clip work easily for both text and image encoding
     """
@@ -375,7 +371,7 @@ class CLIP:
         return outputs.norm(dim=-1, keepdim=True)
 
     def encode_text(self, sentence: Union[str, List[str]], normalize = True) -> FloatTensor:
-        
+
         if self.model is None:
             self.load()
 
@@ -441,7 +437,7 @@ class CLIP:
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], 
+    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
                                 default: str = 'text', normalize = True, **kwargs) -> FloatTensor:
 
         infer = kwargs.pop('infer', True)
