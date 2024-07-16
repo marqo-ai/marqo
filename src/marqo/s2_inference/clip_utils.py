@@ -25,6 +25,7 @@ from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
+from requests.utils import requote_uri
 
 logger = get_logger(__name__)
 
@@ -139,10 +140,15 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     if not isinstance(timeout_ms, int):
         raise InternalError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
 
+    try:
+        encoded_url = requote_uri(image_path)
+    except UnicodeEncodeError as e:
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
+                                 f"The url could not be encoded properly. Original error: {e}")
     buffer = BytesIO()
     c = pycurl.Curl()
     c.setopt(c.CAINFO, certifi.where())
-    c.setopt(c.URL, image_path)
+    c.setopt(c.URL, encoded_url)
     c.setopt(c.WRITEDATA, buffer)
     c.setopt(c.TIMEOUT_MS, timeout_ms)
     c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in image_download_headers.items()])
@@ -159,6 +165,26 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     buffer.seek(0)
     return buffer
 
+
+def encode_url(url: str) -> str:
+    """
+    Encode a URL to a valid format with only ASCII characters and reserved characters using percent-encoding.
+
+    In version 2.8, we replaced the requests library with pycurl for image downloads. Consequently, we need to implement
+    the URL encoding function ourselves. This function replicates the encoding behavior of the
+    'requests.utils.requote_uri' function from the requests library.
+
+    Args:
+        url (str): The URL to encode.
+
+    Returns:
+        str: The encoded URL.
+
+    Raises:
+        UnicodeEncodeError: If the URL cannot be encoded properly.
+
+    """
+    return requests.utils.requote_uri(url)
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
                                image_download_headers: dict) -> Union[ImageType, Tensor]:
