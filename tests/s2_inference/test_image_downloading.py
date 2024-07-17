@@ -24,6 +24,7 @@ class TestImageDownloading(TestCase):
             ("https://example.com", "https://example.com", "URL with HTTPS scheme"),
             ("ftp://example.com", "ftp://example.com", "URL with FTP scheme"),
             ("", "", "Empty URL"),
+            ("http://example.com/œ∑.jpg", "http://example.com/%C5%93%E2%88%91.jpg", "URL with unicode characters in the path"),
             ("http://127.0.0.1/test", "http://127.0.0.1/test", "URL with IP address"),
         ]
 
