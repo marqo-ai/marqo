@@ -19,8 +19,6 @@ RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS = 'embedding_similarity_modifiers'
 RANK_PROFILE_BM25 = "bm25"
 RANK_PROFILE_BM25_MODIFIERS = "bm25_modifiers"
 
-QUERY_INPUT_EMBEDDING = "embedding_query"
-
 MARQO_DOC_MULTIMODAL_PARAMS = "multimodal_params"
 VESPA_DOC_MULTIMODAL_PARAMS = "marqo__multimodal_params"
 
@@ -41,7 +39,8 @@ RANK_PROFILE_BM25_MODIFIERS_2_9 = 'bm25_modifiers'
 RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 = 'embedding_similarity_modifiers'
 
 # Note field names are also used as query inputs, so make sure these reserved names have a marqo__ prefix
-# QUERY_INPUT_EMBEDDING = 'marqo__query_embedding'
+# QUERY_INPUT_EMBEDDING = 'embedding_query'
+QUERY_INPUT_EMBEDDING = "marqo__query_embedding"    # TODO: see if this change from 'embedding_query' to 'embedding_query' changes anything
 QUERY_INPUT_BM25_AGGREGATOR = 'marqo__bm25_aggregator'
 QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9 = 'marqo__mult_weights'
 QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9 = 'marqo__add_weights'
