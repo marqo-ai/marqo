@@ -10,7 +10,7 @@ from pydantic import ValidationError, validator
 from pydantic.error_wrappers import ErrorWrapper
 from pydantic.utils import ROOT_KEY
 
-from marqo.base_model import ImmutableStrictBaseModel, StrictBaseModel
+from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
@@ -235,9 +235,12 @@ class Model(StrictBaseModel):
         return default_prefix
 
 
-class MarqoIndex(ImmutableStrictBaseModel, ABC):
+class MarqoIndex(ImmutableBaseModel, ABC):
     """
     Base class for a Marqo index.
+    We inherit from ImmutableBaseModel deliberately to ignore extra fields during deserialization.
+    We will be adding multiple fields to this class in the future. This change will make MarqoIndex forward
+    compatible to these changes and allow us to roll back Marqo without breaking the Pydantic validation.
     """
     name: str
     schema_name: str
