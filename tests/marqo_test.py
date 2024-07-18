@@ -123,6 +123,57 @@ class MarqoTestCase(unittest.TestCase):
         )
 
     @classmethod
+    def unstructured_marqo_index(
+            cls,
+            name: str,
+            schema_name: str,
+            fields: List[Field] = None,
+            tensor_fields: List[TensorField] = None,
+            model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
+            normalize_embeddings: bool = True,
+            text_preprocessing: TextPreProcessing = TextPreProcessing(
+                split_length=2,
+                split_overlap=0,
+                split_method=TextSplitMethod.Sentence
+            ),
+            image_preprocessing: ImagePreProcessing = ImagePreProcessing(
+                patch_method=None
+            ),
+            distance_metric: DistanceMetric = DistanceMetric.Angular,
+            vector_numeric_type: VectorNumericType = VectorNumericType.Float,
+            hnsw_config: HnswConfig = HnswConfig(
+                ef_construction=128,
+                m=16
+            ),
+            marqo_version=version.get_version(),
+            created_at=time.time(),
+            updated_at=time.time(),
+            treat_urls_and_pointers_as_images=True,
+            filter_string_max_length=100
+    ) -> UnstructuredMarqoIndex:
+        """
+        Helper method that provides reasonable defaults for StructuredMarqoIndex.
+        """
+        return UnstructuredMarqoIndex(
+            name=name,
+            schema_name=schema_name,
+            model=model,
+            normalize_embeddings=normalize_embeddings,
+            text_preprocessing=text_preprocessing,
+            image_preprocessing=image_preprocessing,
+            distance_metric=distance_metric,
+            vector_numeric_type=vector_numeric_type,
+            hnsw_config=hnsw_config,
+            fields=fields,
+            tensor_fields=tensor_fields,
+            marqo_version=marqo_version,
+            created_at=created_at,
+            updated_at=updated_at,
+            treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
+            filter_string_max_length=filter_string_max_length
+        )
+
+    @classmethod
     def structured_marqo_index_request(
             cls,
             fields: List[FieldRequest],

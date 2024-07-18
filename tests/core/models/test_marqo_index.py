@@ -75,21 +75,31 @@ class TestStructuredMarqoIndex(MarqoTestCase):
         """
         Test Pydantic allows deserialization of MarqoIndex with extra fields
         """
-        marqo_index = self.structured_marqo_index(
-            name='my_index',
-            schema_name='my_index',
-            fields=[
-                Field(name='title', type=FieldType.Text)
-            ],
-            tensor_fields=[],
-            marqo_version="2.12.0"
-        )
-        index_setting_json = json.loads(marqo_index.json())
-        index_setting_json["random_field"] = "value"
+        indexes = [
+            self.structured_marqo_index(
+                name='my_index',
+                schema_name='my_index',
+                fields=[
+                    Field(name='title', type=FieldType.Text)
+                ],
+                tensor_fields=[],
+                marqo_version="2.12.0"
+            ),
+            self.unstructured_marqo_index(
+                name='my_index_2',
+                schema_name='my_index_2',
+                marqo_version="2.12.0"
+            )
+        ]
 
-        try:
-            parsed_index = MarqoIndex.parse_raw(json.dumps(index_setting_json))
-            # assert that extra fields are ignored
-            self.assertTrue("random_field" not in parsed_index)
-        except pydantic.error_wrappers.ValidationError as e:
-            self.fail(f"Pydantic validation failed: {e}")
+        for index in indexes:
+            with self.subTest(index=index):
+                index_setting_json = json.loads(index.json())
+                index_setting_json["random_field"] = "value"
+
+                try:
+                    parsed_index = MarqoIndex.parse_raw(json.dumps(index_setting_json))
+                    # assert that extra fields are ignored
+                    self.assertTrue("random_field" not in parsed_index)
+                except pydantic.error_wrappers.ValidationError as e:
+                    self.fail(f"Pydantic validation failed: {e}")
