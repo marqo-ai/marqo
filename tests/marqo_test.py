@@ -152,7 +152,7 @@ class MarqoTestCase(unittest.TestCase):
             filter_string_max_length=100
     ) -> UnstructuredMarqoIndex:
         """
-        Helper method that provides reasonable defaults for StructuredMarqoIndex.
+        Helper method that provides reasonable defaults for UnstructuredMarqoIndex.
         """
         return UnstructuredMarqoIndex(
             name=name,
