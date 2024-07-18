@@ -92,8 +92,9 @@ class HybridSearch:
         marqo_index_version = marqo_index.parsed_marqo_version()
         if marqo_index_version < constants.MARQO_HYBRID_SEARCH_MINIMUM_VERSION:
             raise core_exceptions.UnsupportedFeatureError(
-                f"Hybrid search is only supported for Marqo indexes with version >= {constants.MARQO_HYBRID_SEARCH_MINIMUM_VERSION}. "
-                f"Current index version is {marqo_index_version}."
+                f"Hybrid search is only supported for Marqo indexes created with Marqo "
+                f"{constants.MARQO_HYBRID_SEARCH_MINIMUM_VERSION} or later. This index was created with Marqo "
+                f"{marqo_index_version}."
             )
 
         # Use default hybrid settings if not provided
