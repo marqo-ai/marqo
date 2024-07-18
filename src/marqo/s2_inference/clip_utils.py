@@ -140,7 +140,7 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
         raise InternalError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
 
     try:
-        encoded_url = requote_uri(image_path)
+        encoded_url = encode_url(image_path)
     except UnicodeEncodeError as e:
         raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
                                  f"The url could not be encoded properly. Original error: {e}")
