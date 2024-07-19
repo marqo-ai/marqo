@@ -52,6 +52,10 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     id: str
     fields: UnstructuredVespaDocumentFields = Field(default_factory=UnstructuredVespaDocumentFields)
 
+    # For hybrid search
+    raw_tensor_score: float = None
+    raw_lexical_score: float = None
+
     _VESPA_DOC_FIELDS = "fields"
     _VESPA_DOC_ID = "id"
 
@@ -59,8 +63,16 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     def from_vespa_document(cls, document: Dict) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a Vespa document."""
         fields = document.get(cls._VESPA_DOC_FIELDS, {})
+
+        raw_lexical_score = fields.pop(unstructured_common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE) \
+            if unstructured_common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE in fields else None
+        raw_tensor_score = fields.pop(unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE) \
+            if unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE in fields else None
+
         return cls(id=document[cls._VESPA_DOC_ID],
-                   fields=UnstructuredVespaDocumentFields(**fields))
+                    raw_tensor_score = raw_tensor_score,
+                    raw_lexical_score = raw_lexical_score,
+                    fields=UnstructuredVespaDocumentFields(**fields))
 
     @classmethod
     def from_marqo_document(cls, document: Dict, filter_string_max_length: int) -> "UnstructuredVespaDocument":
@@ -179,4 +191,10 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 raise VespaDocumentParsingError(f"Document {self.fields.marqo__id} does not have any chunks. "
                                                 f"No highlights can be extracted.")
             marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.fields.extract_highlights()
+
+        # Hybrid search raw scores
+        if self.raw_tensor_score is not None:
+            marqo_document[index_constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = self.raw_tensor_score
+        if self.raw_lexical_score is not None:
+            marqo_document[index_constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = self.raw_lexical_score
         return marqo_document

@@ -63,8 +63,7 @@ class UnstructuredVespaSchema(VespaSchema):
             filter_string_max_length=self._index_request.filter_string_max_length,
         )
 
-    @classmethod
-    def _generate_unstructured_schema(cls, marqo_index: UnstructuredMarqoIndex) -> str:
+    def _generate_unstructured_schema(self, marqo_index: UnstructuredMarqoIndex) -> str:
         """This function generates the Vespa schema for an unstructured Marqo index."""
         dimension = str(marqo_index.model.get_dimension())
 
@@ -72,22 +71,22 @@ class UnstructuredVespaSchema(VespaSchema):
             f"""
             schema {marqo_index.schema_name} {{
                 document {{
-                    field {cls._FIELD_ID} type string {{
+                    field {self._FIELD_ID} type string {{
                         indexing: attribute | summary
                         attribute: fast-search
                         rank: filter
                     }}
 
-                    field {cls._STRINGS} type array<string>{{
+                    field {self._STRINGS} type array<string>{{
                         indexing: index
                         index: enable-bm25
                     }}
 
-                    field {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{
+                    field {self._LONGS_STRINGS_FIELDS} type map<string, string> {{
                         indexing: summary
                     }}
 
-                    field {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{
+                    field {self._SHORT_STRINGS_FIELDS} type map<string, string> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -97,7 +96,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                               rank: filter }}
                     }}
 
-                    field {cls._STRING_ARRAY} type array<string> {{
+                    field {self._STRING_ARRAY} type array<string> {{
                         indexing: attribute | summary
                         attribute: fast-search
                         rank: filter
@@ -107,7 +106,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: summary
                     }}
 
-                    field {cls._INT_FIELDS} type map<string, long> {{
+                    field {self._INT_FIELDS} type map<string, long> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -117,7 +116,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                            rank: filter }}
                     }}
                     
-                    field {cls._BOOL_FIELDS} type map<string, byte> {{
+                    field {self._BOOL_FIELDS} type map<string, byte> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                             attribute: fast-search
@@ -127,7 +126,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                               rank: filter }}
                         }}
                                                     
-                    field {cls._FLOAT_FIELDS} type map<string, double> {{
+                    field {self._FLOAT_FIELDS} type map<string, double> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -138,11 +137,11 @@ class UnstructuredVespaSchema(VespaSchema):
                                            rank: filter }}
                     }}
 
-                    field {cls._SCORE_MODIFIERS} type tensor<double>(p{{}}) {{
+                    field {self._SCORE_MODIFIERS} type tensor<double>(p{{}}) {{
                         indexing: attribute | summary
                     }}
 
-                    field {cls._CHUNKS} type array<string> {{
+                    field {self._CHUNKS} type array<string> {{
                         indexing: summary
                     }}
                     
@@ -150,10 +149,10 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: attribute | summary
                     }}
                     
-                    field {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
+                    field {self._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
                         indexing: attribute | index | summary
                         attribute {{
-                            distance-metric: {cls._get_distance_metric(cls, marqo_index.distance_metric)}
+                            distance-metric: {self._get_distance_metric(marqo_index.distance_metric)}
                         }}
                         index {{
                             hnsw {{
@@ -165,48 +164,51 @@ class UnstructuredVespaSchema(VespaSchema):
                 }}
 
                 fieldset default {{
-                    fields: {cls._STRINGS}
+                    fields: {self._STRINGS}
                 }}
             """
         )
 
         # Add rank profiles
-        rank_profile_list = cls._generate_rank_profiles(marqo_index)
+        rank_profile_list = self._generate_rank_profiles(marqo_index)
         schema += "\n".join(rank_profile_list)
 
         # Add summaries
         schema += textwrap.dedent(
             f"""
-                document-summary {cls._SUMMARY_ALL_NON_VECTOR} {{
-                    summary {cls._FIELD_ID} type string {{}}
-                    summary {cls._STRINGS} type array<string> {{}}
-                    summary {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._STRING_ARRAY} type array<string> {{}}
-                    summary {cls._BOOL_FIELDS} type map<string, byte> {{}}
-                    summary {cls._INT_FIELDS} type map<string, long> {{}}
-                    summary {cls._FLOAT_FIELDS} type map<string, double> {{}}
-                    summary {cls._CHUNKS} type array<string> {{}}
+                document-summary {self._SUMMARY_ALL_NON_VECTOR} {{
+                    summary {self._FIELD_ID} type string {{}}
+                    summary {self._STRINGS} type array<string> {{}}
+                    summary {self._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._STRING_ARRAY} type array<string> {{}}
+                    summary {self._BOOL_FIELDS} type map<string, byte> {{}}
+                    summary {self._INT_FIELDS} type map<string, long> {{}}
+                    summary {self._FLOAT_FIELDS} type map<string, double> {{}}
+                    summary {self._CHUNKS} type array<string> {{}}
                 }}
 
-                document-summary {cls._SUMMARY_ALL_VECTOR} {{
-                    summary {cls._FIELD_ID} type string {{}}
-                    summary {cls._STRINGS} type array<string> {{}}
-                    summary {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._STRING_ARRAY} type array<string> {{}}
-                    summary {cls._BOOL_FIELDS} type map<string, byte> {{}}
-                    summary {cls._INT_FIELDS} type map<string, long> {{}}
-                    summary {cls._FLOAT_FIELDS} type map<string, double> {{}}
-                    summary {cls._CHUNKS} type array<string> {{}}
-                    summary {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{}}
+                document-summary {self._SUMMARY_ALL_VECTOR} {{
+                    summary {self._FIELD_ID} type string {{}}
+                    summary {self._STRINGS} type array<string> {{}}
+                    summary {self._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._STRING_ARRAY} type array<string> {{}}
+                    summary {self._BOOL_FIELDS} type map<string, byte> {{}}
+                    summary {self._INT_FIELDS} type map<string, long> {{}}
+                    summary {self._FLOAT_FIELDS} type map<string, double> {{}}
+                    summary {self._CHUNKS} type array<string> {{}}
+                    summary {self._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{}}
                 }}
             }}
             """
         )
 
+        return schema
+
     def _generate_rank_profiles(self, marqo_index: UnstructuredMarqoIndex):
         rank_profiles: List[str] = list()
+        model_dim = marqo_index.model.get_dimension()
 
         # generate base rank profile
         rank_profiles.extend(self._generate_base_rank_profile(marqo_index))
@@ -232,12 +234,12 @@ class UnstructuredVespaSchema(VespaSchema):
                              f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR})'
                              f')')
         rank_profiles.append('}')
-        rank_profiles.append(f'match-features: closest({cls._EMBEDDINGS})')
+        rank_profiles.append(f'match-features: closest({self._EMBEDDINGS})')
         rank_profiles.append('}')
 
         # hybrid custom searcher profile
         # Temp parameters to pass into respective queries (lexical and tensor)
-        rank_profiles.append(f'rank-profile {common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{')
+        rank_profiles.append(f'rank-profile {unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{')
         rank_profiles.append('inputs {')
         rank_profiles.append(f'query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
         rank_profiles.append(f'query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})')
@@ -274,7 +276,7 @@ class UnstructuredVespaSchema(VespaSchema):
             f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))'
         )
         rank_profiles.append('}')
-        rank_profiles.append(f'match-features: closest({cls._EMBEDDINGS})')
+        rank_profiles.append(f'match-features: closest({self._EMBEDDINGS})')
         rank_profiles.append('}')
 
         # HYBRID SEARCH TENSOR THEN LEXICAL
@@ -309,10 +311,10 @@ class UnstructuredVespaSchema(VespaSchema):
 
         # modifiers function
         score_modifier_expression = (
-            f'if (count(mult_weights * attribute({cls._SCORE_MODIFIERS})) == 0, '
-            f'  1, reduce(mult_weights * attribute({cls._SCORE_MODIFIERS}), prod)) '
+            f'if (count(mult_weights * attribute({self._SCORE_MODIFIERS})) == 0, '
+            f'  1, reduce(mult_weights * attribute({self._SCORE_MODIFIERS}), prod)) '
             f'* score '
-            f'+ reduce(add_weights * attribute({cls._SCORE_MODIFIERS}), sum)'
+            f'+ reduce(add_weights * attribute({self._SCORE_MODIFIERS}), sum)'
         )
         base_rank_profile.append('function modify(score, mult_weights, add_weights) {')
         base_rank_profile.append(f'    expression: {score_modifier_expression}')
@@ -320,12 +322,12 @@ class UnstructuredVespaSchema(VespaSchema):
 
         # lexical score function
         base_rank_profile.append('function lexical_score() {')
-        base_rank_profile.append(f'expression: bm25({cls._STRINGS})')
+        base_rank_profile.append(f'expression: bm25({self._STRINGS})')
         base_rank_profile.append('}')
 
         # embedding score function
         base_rank_profile.append('function embedding_score() {')
-        base_rank_profile.append(f'expression: closeness(field, {cls._EMBEDDINGS})')
+        base_rank_profile.append(f'expression: closeness(field, {self._EMBEDDINGS})')
         base_rank_profile.append('}')
 
         base_rank_profile.append('}')

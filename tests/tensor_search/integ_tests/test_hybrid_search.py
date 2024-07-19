@@ -31,7 +31,7 @@ class TestHybridSearch(MarqoTestCase):
         super().setUpClass()
         # UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
+            model=Model(name='sentence-transformers/all-MiniLM-L6-v2')
         )
 
         unstructured_default_image_index = cls.unstructured_marqo_index_request(
@@ -364,15 +364,17 @@ class TestHybridSearch(MarqoTestCase):
         is the same as a lexical search (in terms of result order).
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                tensor_search.add_documents(
+                add_docs_res = tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=self.docs_list
-                    )
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None
+                    ),
                 )
 
                 hybrid_res = tensor_search.search(
@@ -413,14 +415,16 @@ class TestHybridSearch(MarqoTestCase):
         is the same as a tensor search (in terms of result order).
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=self.docs_list
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 
@@ -1282,24 +1286,3 @@ class TestHybridSearch(MarqoTestCase):
         # TODO: Use api.search() instead of tensor_search.search()
         # Covered in API tests
         pass
-
-    # TODO: Remove when unstructured index is supported
-    def test_hybrid_search_on_unstructured_index_fails(self):
-        """
-        Test that hybrid search on an unstructured index fails.
-        """
-
-        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
-            tensor_search.search(
-                config=self.config,
-                index_name=self.unstructured_default_text_index.name,
-                text="dogs",
-                search_method="HYBRID",
-                hybrid_parameters=HybridParameters(
-                    retrievalMethod=RetrievalMethod.Disjunction,
-                    rankingMethod=RankingMethod.RRF,
-                    alpha=0.6
-                )
-            )
-        self.assertIn("not yet supported for hybrid search", str(e.exception))
-

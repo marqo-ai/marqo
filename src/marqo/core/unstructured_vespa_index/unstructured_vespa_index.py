@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import marqo.core.constants as index_constants
 import marqo.core.search.search_filter as search_filter
@@ -6,7 +6,8 @@ from marqo.api import exceptions as errors
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import UnstructuredMarqoIndex
 from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery)
-from marqo.core.models.score_modifier import ScoreModifierType
+from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
+from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.core.vespa_index import VespaIndex
@@ -46,12 +47,13 @@ class UnstructuredVespaIndex(VespaIndex):
                                          'You can create a structured index '
                                          'by `mq.create_index("your_index_name", type="structured")`')
 
-        if isinstance(marqo_query, MarqoTensorQuery):
+        if isinstance(marqo_query, MarqoHybridQuery):       # TODO: Rethink structure so order of checking doesn't matter
+            return self._to_vespa_hybrid_query(marqo_query)
+        elif isinstance(marqo_query, MarqoTensorQuery):
             return self._to_vespa_tensor_query(marqo_query)
         elif isinstance(marqo_query, MarqoLexicalQuery):
             return self._to_vespa_lexical_query(marqo_query)
-        elif isinstance(marqo_query, MarqoHybridQuery):
-            return self._to_vespa_hybrid_query(marqo_query)
+
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
 
@@ -211,7 +213,6 @@ class UnstructuredVespaIndex(VespaIndex):
         if marqo_query.filter is not None:
             return tree_to_filter_string(marqo_query.filter.root)
 
-    @staticmethod
     def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
         """
         Returns classic score modifiers (from tensor or lexical queries) as a dictionary of dictionaries.
@@ -328,7 +329,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
         return result
 
-    def _get_lexical_search_term(marqo_query: MarqoLexicalQuery) -> str:
+    def _get_lexical_search_term(self, marqo_query: MarqoLexicalQuery) -> str:
         if isinstance(marqo_query, MarqoHybridQuery):
             score_modifiers = marqo_query.hybrid_parameters.scoreModifiersLexical
         else:
@@ -404,7 +405,7 @@ class UnstructuredVespaIndex(VespaIndex):
         # Tensor term
         tensor_term = self._get_tensor_search_term(marqo_query)
         # Lexical term
-        lexical_term = self._get_lexical_search_term(marqo_query) if fields_to_search_lexical else "False"
+        lexical_term = self._get_lexical_search_term(marqo_query)
 
         # If retrieval and ranking methods are opposite (lexical/tensor), use the rank() operator
         if (marqo_query.hybrid_parameters.retrievalMethod == RetrievalMethod.Lexical and
@@ -429,18 +430,21 @@ class UnstructuredVespaIndex(VespaIndex):
 
         # Assign parameters to query
         query_inputs = {
-            unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+            unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query,
+            unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {},
+            unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {}
         }
 
+        # TODO: add this back when searchable attributes are implemented
         # Separate fields to rank (lexical and tensor)
-        query_inputs.update({
-            unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {
-                f: 1 for f in fields_to_search_lexical
-            },
-            unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {
-                f: 1 for f in fields_to_search_tensor
-            }
-        })
+        #query_inputs.update({
+        #    unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {
+        #        f: 1 for f in fields_to_search_lexical
+        #    },
+        #    unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {
+        #        f: 1 for f in fields_to_search_tensor
+        #    }
+        #})
 
         # Extract score modifiers
         hybrid_score_modifiers = self._get_hybrid_score_modifiers(marqo_query)
