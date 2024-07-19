@@ -4,11 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class FeedDocumentResponse(BaseModel):
-    path_id: str = Field(alias='pathId')
-    id: str
-
-
-class FeedBatchDocumentResponse(BaseModel):
+    """A response from feeding a document to Vespa."""
     status: int
     path_id: str = Field(alias='pathId')
     id: Optional[str]
@@ -16,5 +12,6 @@ class FeedBatchDocumentResponse(BaseModel):
 
 
 class FeedBatchResponse(BaseModel):
-    responses: List[FeedBatchDocumentResponse]
+    """A response from feeding a batch of documents to Vespa."""
+    responses: List[FeedDocumentResponse]
     errors: bool

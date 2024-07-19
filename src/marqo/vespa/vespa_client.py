@@ -15,7 +15,7 @@ import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError)
-from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
+from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
@@ -675,49 +675,80 @@ class VespaClient:
         doc_id = document.id
         data = {'fields': document.fields}
 
+        # only used for documents that are not updated
+        error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
+
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
             data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
+                return UpdateDocumentResponse(**resp.json(), status=resp.status_code)
             except httpx.HTTPError as e:
-                raise VespaError(e) from e
-
-        try:
-            # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
-            return UpdateDocumentResponse(**resp.json(), status=resp.status_code)
-        except JSONDecodeError:
-            if resp.status_code == 200:
-                # A 200 response shouldn't reach here
-                raise VespaError(f'Unexpected response: {resp.text}')
-
-            self._raise_for_status(resp)
+                error_message = (f"Marqo has encountered an error while updating this document to Vespa and "
+                                 f"the document is not updated. Original error: {e}. "
+                                 f"This might be a transient network issue and you can "
+                                 f"retry the operation. If the issue persists, please contact Marqo support")
+                return UpdateDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
+            except JSONDecodeError as e:
+                if resp.status_code == 200:
+                    # A 200 response shouldn't reach here
+                    raise ValueError(f"Marqo received an unexpected response from Vespa: {resp.text} with 200 "
+                                     f"status_code. The response is not in the JSON format and Marqo can not decode "
+                                     f"it") from e
+                else:
+                    error_message = (f"Marqo has encountered an error while update this document to Vespa and the "
+                                     f"response can not be decoded. The document is not updated. The response "
+                                     f"text is: {resp.text}")
+                    return UpdateDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
 
     async def _feed_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                    document: VespaDocument, schema: str,
-                                   timeout: int) -> FeedBatchDocumentResponse:
+                                   timeout: int) -> FeedDocumentResponse:
+        """An async method to feed a document to Vespa.
+
+        Note: This method is used by the async feed batch method to feed documents concurrently. Unhandled exceptions
+        will be raised in the main thread and leads a 500 error for the whole batch. Therefore, exceptions should be
+        handled gracefully in this method for the specific document.
+
+        Raises:
+            RuntimeError: If the document is not indexed and the response can not be decoded but has a 200 status code.
+
+        Returns:
+            FeedDocumentResponse object
+        """
         doc_id = document.id
         data = {'fields': document.fields}
 
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
+
+            # only used for documents that are not indexed
+            error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
+
             try:
                 resp = await async_client.post(end_point, json=data, timeout=timeout)
+                return FeedDocumentResponse(**resp.json(), status=resp.status_code)
             except httpx.HTTPError as e:
-                raise VespaError(e) from e
-
-        try:
-            # This will cover 200 and document-specific errors. Other unexpected errors will be raised.
-            return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
-        except JSONDecodeError as e:
-            if resp.status_code == 200:
-                # A 200 response shouldn't reach here
-                raise VespaError(f'Unexpected response: {resp.text}') from e
-
-            self._raise_for_status(resp)
+                error_message = (f"Marqo has encountered an error while feeding this document to Vespa and "
+                                 f"the document is not indexed. Original error: {e}. "
+                                 f"This might be a transient network issue and you can "
+                                 f"retry the operation. If the issue persists, please contact Marqo support")
+                return FeedDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
+            except JSONDecodeError as e:
+                if resp.status_code == 200:
+                    # A 200 response shouldn't reach here
+                    raise ValueError(f"Marqo received an unexpected response from Vespa: {resp.text} with 200 "
+                                       f"status_code. The response is not in the JSON format and Marqo can not decode "
+                                       f"it") from e
+                else:
+                    error_message = (f"Marqo has encountered an error while feeding this document to Vespa and the "
+                                     f"response can not be decoded. The document is not indexed. The response "
+                                     f"text is: {resp.text}")
+                    return FeedDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
-                            timeout: int) -> FeedBatchDocumentResponse:
+                            timeout: int) -> FeedDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
 
@@ -725,7 +756,7 @@ class VespaClient:
 
         resp = sync_client.post(end_point, json=data, timeout=timeout)
 
-        return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
+        return FeedDocumentResponse(**resp.json(), status=resp.status_code)
 
     async def _get_batch_async(self,
                                ids: List[str],
