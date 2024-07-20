@@ -83,12 +83,12 @@ class TestStructuredMarqoIndex(MarqoTestCase):
                     Field(name='title', type=FieldType.Text)
                 ],
                 tensor_fields=[],
-                marqo_version="2.12.0"
+                marqo_version='2.12.0'
             ),
             self.unstructured_marqo_index(
                 name='my_index_2',
                 schema_name='my_index_2',
-                marqo_version="2.12.0"
+                marqo_version='2.12.0'
             )
         ]
 
@@ -99,7 +99,9 @@ class TestStructuredMarqoIndex(MarqoTestCase):
 
                 try:
                     parsed_index = MarqoIndex.parse_raw(json.dumps(index_setting_json))
-                    # assert that extra fields are ignored
-                    self.assertTrue("random_field" not in parsed_index)
+                    # assert that the extra field is deserialized
+                    self.assertEqual("value", parsed_index.random_field)
+                    # assert that the extra field is kept after serialization
+                    self.assertTrue("random_field" in parsed_index.json())
                 except pydantic.error_wrappers.ValidationError as e:
                     self.fail(f"Pydantic validation failed: {e}")
