@@ -238,9 +238,10 @@ class Model(StrictBaseModel):
 class MarqoIndex(ImmutableBaseModel, ABC):
     """
     Base class for a Marqo index.
-    We inherit from ImmutableBaseModel deliberately to ignore extra fields during deserialization.
+    We inherit from ImmutableBaseModel and add the extra = "allow" config to allow extra fields during deserialization.
     We will be adding multiple fields to this class in the future. This change will make MarqoIndex forward
-    compatible to these changes and allow us to roll back Marqo without breaking the Pydantic validation.
+    compatible to these changes and allow us to rollback Marqo without breaking the Pydantic validation or dropping
+    the added fields.
     """
     name: str
     schema_name: str
