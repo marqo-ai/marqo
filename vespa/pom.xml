@@ -20,7 +20,7 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.8.2</version>
+            <version>${org.junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -144,5 +144,6 @@
         <test.hide>true</test.hide>
         <java.version>17</java.version>
         <error-prone.version>2.28.0</error-prone.version>
+        <org.junit.version>5.10.3</org.junit.version>
     </properties>
 </project>
