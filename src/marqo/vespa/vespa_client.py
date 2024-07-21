@@ -13,6 +13,7 @@ import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
+from marqo.core.models import MarqoIndex
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError)
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchResponse, \
@@ -523,6 +524,34 @@ class VespaClient:
         self._raise_for_status(resp)
 
         return ApplicationMetrics(**resp.json())
+
+    def get_index_setting_by_name(self, index_name: str) -> Optional[MarqoIndex]:
+        try:
+            resp = self.http_client.get(f'{self.document_url}/index-settings/{index_name}')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        if resp.status_code == 404:
+            return None
+
+        self._raise_for_status(resp)
+
+        return MarqoIndex(**resp.json())
+
+    def get_all_index_settings(self) -> List[MarqoIndex]:
+        try:
+            resp = self.http_client.get(f'{self.document_url}/index-settings')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        index_list = resp.json()
+        if isinstance(index_list, list):
+            return [MarqoIndex(**item) for item in index_list]
+
+        raise VespaError(f'Get all index settings returns invalid response: {index_list}')
+
 
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:
