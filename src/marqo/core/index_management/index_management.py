@@ -1,3 +1,5 @@
+import hashlib
+import json
 import os
 import shutil
 import textwrap
@@ -5,7 +7,7 @@ import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Union
 from typing import Optional
 
 import marqo.logging
@@ -37,9 +39,9 @@ class _MarqoConfig(ImmutableStrictBaseModel):
 class IndexManagement:
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
-    _MARQO_CUSTOM_SEARCHERS_JAR = 'marqo-custom-searchers-deploy.jar'
+    _MARQO_CUSTOM_SEARCHERS_JAR = 'marqo-custom-components-deploy.jar'
     _MARQO_CUSTOM_SEARCHERS_ID = 'marqo'
-    _MARQO_CUSTOM_SEARCHERS_BUNDLE = 'marqo-custom-searchers'  # artifact id
+    _MARQO_CUSTOM_SEARCHERS_BUNDLE = 'marqo-custom-components'  # artifact id
     _MARQO_CUSTOM_SEARCHERS = ['ai.marqo.search.HybridSearcher']
     _MARQO_SETTINGS_SCHEMA_TEMPLATE = textwrap.dedent(
         '''
@@ -94,7 +96,7 @@ class IndexManagement:
             True if Vespa was configured, False if it was already configured
         """
         app = self.vespa_client.download_application()
-        configured = self._marqo_config_exists(app)
+        configured = self._is_marqo_configured(app)
 
         if not configured:
             self._add_marqo_config(app)
@@ -124,7 +126,7 @@ class IndexManagement:
         """
         with self._deployment_lock_context_manager():
             app = self.vespa_client.download_application(check_for_application_convergence=True)
-            configured = self._marqo_config_exists(app)
+            configured = self._is_marqo_configured(app)
 
             if configured and self.index_exists(marqo_index_request.name):
                 raise IndexExistsError(f"Index {marqo_index_request.name} already exists")
@@ -371,7 +373,7 @@ class IndexManagement:
 
         return _MarqoConfig.parse_raw(response.document.fields['settings']).version
 
-    def _marqo_config_exists(self, app) -> bool:
+    def _is_marqo_configured(self, app) -> bool:
         # For Marqo 2.1+, recording Marqo version is the final stage of configuration, and its absence
         # indicates an incomplete configuration (e.g., interrupted configuration). However, for Marqo 2.0.x,
         # Marqo version is not recorded. Marqo 2.0.x can be detected by an existing Marqo settings schema,
@@ -386,17 +388,39 @@ class IndexManagement:
             return True
 
         if settings_schema_exists and query_profile_exists:
+            # check if marqo_config is written, this is to fix the incomplete bootstrap.
             try:
                 self.vespa_client.get_document(self._MARQO_CONFIG_DOC_ID, self._MARQO_SETTINGS_SCHEMA_NAME)
-                return True
             except VespaStatusError as e:
                 if e.status_code == 404:
                     logger.debug('Marqo config document does not exist. Detected incomplete Marqo configuration')
                     return False
                 raise e
 
+            # check if the component jar file exists and matches the version in marqo release
+            component_jar_file = os.path.join(app, 'components', self._MARQO_CUSTOM_SEARCHERS_JAR)
+            jar_file_with_marqo_release = Path(__file__).parent / f'../../../../vespa/target/{self._MARQO_CUSTOM_SEARCHERS_JAR}'
+            if not os.path.exists(component_jar_file):
+                return False
+            if self._calculate_md5(component_jar_file) == self._calculate_md5(jar_file_with_marqo_release):
+                return True
+
         # Settings schema not found, so Marqo config does not exist
         return False
+
+
+    def _calculate_md5(self, file_path: Union[str, Path]) -> str:
+        with open(file_path, 'rb') as f:
+            # Create an MD5 hash object.
+            md5_hash = hashlib.md5()
+
+            # Read the file in chunks to handle large files efficiently.
+            chunk = 0
+            while chunk != b'':
+                chunk = f.read(1024)  # Read 1024 bytes at a time.
+                md5_hash.update(chunk)
+
+        return md5_hash.hexdigest()
 
     def _add_marqo_config(self, app: str) -> bool:
         """
@@ -461,16 +485,18 @@ class IndexManagement:
     def _add_custom_searchers(self, app: str) -> bool:
         target_path = os.path.join(app, 'components', self._MARQO_CUSTOM_SEARCHERS_JAR)
         if not os.path.exists(target_path):
-            logger.debug('Custom searchers JAR does not exist. Copying from Vespa target directory')
-            current_dir = Path(__file__).parent
-            source_path = current_dir / f'../../../../vespa/target/{self._MARQO_CUSTOM_SEARCHERS_JAR}'
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            shutil.copy(source_path, target_path)
+            logger.debug('Custom searchers JAR does not exist. Copying from Vespa target directory')
+        else:
+            logger.debug('Custom searchers JAR exists. Overriding from Vespa target directory')
 
-            self._add_custom_searchers_to_services(app)
+        source_path = Path(__file__).parent / f'../../../../vespa/target/{self._MARQO_CUSTOM_SEARCHERS_JAR}'
+        shutil.copy(source_path, target_path)
+        self._add_custom_searchers_to_services(app)
+        self._add_index_setting_json_files(app)
+        self._add_index_setting_handler(app)
+        return True
 
-            return True
-        return False
 
     def _add_schema(self, app: str, name: str, schema: str) -> None:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
@@ -572,6 +598,61 @@ class IndexManagement:
                 searcher_element = ET.SubElement(chain, "searcher")
                 searcher_element.set("id", searcher)
                 searcher_element.set("bundle", self._MARQO_CUSTOM_SEARCHERS_BUNDLE)
+
+        tree.write(services_path)
+
+    def _add_index_setting_json_files(self, app: str) -> None:
+        index_path = os.path.join(app, 'marqo_index_settings.json')
+        index_history_path = os.path.join(app, 'marqo_index_settings_history.json')
+        if not os.path.exists(index_path):
+            # TODO for configured indexes, load from marqo__settings
+            # if os.path.exists(os.path.join(app, 'schemas', f'{self._MARQO_SETTINGS_SCHEMA_NAME}.sd')):
+            #     index_settings_json = json.dumps({index.name: index.json() for index in self.get_all_indexes()})
+            # else:
+            index_settings_json = '{}'
+            with open(index_path, 'w') as f:
+                f.write(index_settings_json)
+        if not os.path.exists(index_history_path):
+            with open(index_history_path, 'w') as f:
+                f.write('{}')
+
+    def _add_index_setting_handler(self, app: str) -> None:
+        services_path = os.path.join(app, 'services.xml')
+
+        tree = ET.parse(services_path)
+        root = tree.getroot()
+
+        container_elements = root.findall("container")
+
+        if len(container_elements) > 1:
+            raise InternalError("Multiple container elements found in services.xml. Marqo expects only one "
+                                "Vespa content cluster")
+        if len(container_elements) == 0:
+            raise InternalError("No container element found in services.xml")
+
+        container_element = container_elements[0]
+
+        # add index setting handler
+        if not container_element.find('handler', {'id': 'ai.marqo.index.IndexSettingRequestHandler'}):
+            index_setting_handler = ET.SubElement(container_element, "handler")
+            index_setting_handler.set("id", "ai.marqo.index.IndexSettingRequestHandler")
+            index_setting_handler.set("bundle", self._MARQO_CUSTOM_SEARCHERS_BUNDLE)
+
+            for binding in ["http://*/index-settings/*", "http://*/index-settings"]:
+                binding_element = ET.SubElement(index_setting_handler, "binding")
+                binding_element.text = binding
+
+        # add index setting component
+        if not container_element.find('component', {'id': 'ai.marqo.index.IndexSettings'}):
+            index_setting_component = ET.SubElement(container_element, "component")
+            index_setting_component.set("id", "ai.marqo.index.IndexSettings")
+            index_setting_component.set("bundle", self._MARQO_CUSTOM_SEARCHERS_BUNDLE)
+
+            config_element = ET.SubElement(index_setting_component, "config")
+            config_element.set("name", "ai.marqo.index.index-settings")
+
+            ET.SubElement(config_element, "indexSettingsFile").text = "marqo_index_settings.json"
+            ET.SubElement(config_element, "indexSettingsHistoryFile").text = "marqo_index_settings_history.json"
 
         tree.write(services_path)
 
