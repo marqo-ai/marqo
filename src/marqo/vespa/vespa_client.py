@@ -691,7 +691,7 @@ class VespaClient:
             except JSONDecodeError as e:
                 if resp.status_code == 200:
                     # A 200 response shouldn't reach here
-                    raise ValueError(f"Marqo received an unexpected response from the vector store: {resp.text} with 200 "
+                    raise VespaError(f"Marqo received an unexpected response from the vector store: {resp.text} with 200 "
                                      f"status_code. The response is not in the JSON format and Marqo can not decode "
                                      f"it") from e
                 else:
@@ -710,7 +710,7 @@ class VespaClient:
         handled gracefully in this method for the specific document.
 
         Raises:
-            RuntimeError: If the document is not indexed and the response can not be decoded but has a 200 status code.
+            VespaError: If the document is not indexed and the response can not be decoded but has a 200 status code.
 
         Returns:
             FeedDocumentResponse object
@@ -734,7 +734,7 @@ class VespaClient:
             except JSONDecodeError as e:
                 if resp.status_code == 200:
                     # A 200 response shouldn't reach here
-                    raise ValueError(f"Marqo received an unexpected response from the vector store: {resp.text} with "
+                    raise VespaError(f"Marqo received an unexpected response from the vector store: {resp.text} with "
                                      f"200 status_code. The response is not in the JSON format and Marqo can not "
                                      f"decode it") from e
                 else:
