@@ -20,9 +20,6 @@ class UnstructuredVespaIndex(VespaIndex):
     _RESERVED_FIELD_SUBSTRING = "::"
     _SUPPORTED_FIELD_CONTENT_TYPES = [str, int, float, bool, list, dict]
 
-    def __init__(self, marqo_index: UnstructuredMarqoIndex):
-        self._marqo_index = marqo_index
-
     def get_vespa_id_field(self) -> str:
         return unstructured_common.VESPA_FIELD_ID
 
@@ -72,8 +69,11 @@ class UnstructuredVespaIndex(VespaIndex):
 
         score_modifiers = self._get_score_modifiers(marqo_query)
 
-        ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS if score_modifiers \
-            else unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
+        if self._marqo_index_version < self._VERSION_2_10_0:
+            ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 if score_modifiers \
+                else unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
+        else:
+            ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
         query_inputs = {
             unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
@@ -231,18 +231,18 @@ class UnstructuredVespaIndex(VespaIndex):
 
             if self._marqo_index_version < self._VERSION_2_10_0:
                 return {
-                    common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: mult_tensor,
-                    common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: add_tensor
+                    unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: mult_tensor,
+                    unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: add_tensor
                 }
             elif isinstance(marqo_query, MarqoTensorQuery):
                 return {
-                    common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
-                    common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
+                    unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
+                    unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
                 }
             elif isinstance(marqo_query, MarqoLexicalQuery):
                 return {
-                    common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: mult_tensor,
-                    common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: add_tensor
+                    unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: mult_tensor,
+                    unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: add_tensor
                 }
             else:
                 raise InternalError(f'Unknown query type {type(marqo_query)}')
@@ -304,13 +304,13 @@ class UnstructuredVespaIndex(VespaIndex):
                     raise InternalError(f'Unknown score modifier type {modifier.type}')
             if search_type == constants.MARQO_SEARCH_METHOD_LEXICAL:
                 return {
-                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}": mult_tensor,
-                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}": add_tensor
+                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}": mult_tensor,
+                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}": add_tensor
                 }
             elif search_type == constants.MARQO_SEARCH_METHOD_TENSOR:
                 return {
-                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}": mult_tensor,
-                    f"{common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}": add_tensor
+                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}": mult_tensor,
+                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}": add_tensor
                 }
             else:
                 raise InternalError(f"Unknown search type {search_type}")
@@ -380,8 +380,11 @@ class UnstructuredVespaIndex(VespaIndex):
             else unstructured_common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
 
-        ranking = unstructured_common.RANK_PROFILE_BM25_MODIFIERS if score_modifiers \
-            else unstructured_common.RANK_PROFILE_BM25
+        if self._marqo_index_version < self._VERSION_2_10_0:
+            ranking = unstructured_common.RANK_PROFILE_BM25_MODIFIERS_2_9 if score_modifiers \
+                else unstructured_common.RANK_PROFILE_BM25
+        else:
+            ranking = unstructured_common.RANK_PROFILE_BM25
 
         query_inputs = {}
 

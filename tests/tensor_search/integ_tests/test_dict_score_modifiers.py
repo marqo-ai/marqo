@@ -21,7 +21,6 @@ class TestDictScoreModifiers(MarqoTestCase):
         # UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
-            marqo_version="2.9.0"
         )
 
         # STRUCTURED indexes

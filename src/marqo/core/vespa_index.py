@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional, List
 
 from marqo.core.models import MarqoQuery, MarqoIndex
 from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
+from marqo.core.models.marqo_index import *
 
 
 class VespaIndex(ABC):
@@ -12,6 +13,13 @@ class VespaIndex(ABC):
     Methods in this class do not talk to Vespa directly, but rather transform data and queries to and from a format
     that can be used by a VespaClient.
     """
+
+    _VERSION_2_9_0 = semver.VersionInfo.parse("2.9.0")
+    _VERSION_2_10_0 = semver.VersionInfo.parse("2.10.0")
+
+    def __init__(self, marqo_index: MarqoIndex):
+        self._marqo_index = marqo_index
+        self._marqo_index_version = marqo_index.parsed_marqo_version()
 
     @abstractmethod
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:

@@ -165,10 +165,6 @@ class TestSearch(MarqoTestCase):
         # Any tests that call add_documents, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
         self.device_patcher.start()
-        self.structured_index = mock.MagicMock()
-        self.unstructured_index = mock.MagicMock()
-        self.structured_vespa_index = StructuredVespaIndex(self.structured_index)
-        self.unstructured_vespa_index = UnstructuredVespaIndex(self.unstructured_index)
 
     def tearDown(self) -> None:
         super().tearDown()
@@ -774,10 +770,14 @@ class TestSearch(MarqoTestCase):
                 self.assertTrue(0 < res["hits"][0]["_score"], f"score: {res['hits'][0]['_score']}")
 
     def test_get_lexical_search_term(self):
+        # Create Vespa indexes
+        structured_vespa_index = StructuredVespaIndex(self.structured_default_text_index)
+        unstructured_vespa_index = UnstructuredVespaIndex(self.unstructured_default_text_index)
+
         # List of (VespaIndex, method_name) tuples to test
         indexes_to_test = [
-            (self.structured_vespa_index, '_get_lexical_search_term'),
-            (self.unstructured_vespa_index, '_to_vespa_lexical_query')
+            (structured_vespa_index, '_get_lexical_search_term'),
+            (unstructured_vespa_index, '_to_vespa_lexical_query')
         ]
 
         for index, method_name in indexes_to_test:
