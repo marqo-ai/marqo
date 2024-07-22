@@ -1450,7 +1450,24 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
 
-    def test_hybrid_search_unstructured_searchable_attributes_fails(self):
+    def test_hybrid_search_with_old_version_fails(self):
+        """
+        Hybrid search on an index below version 2.10.0 should fail
+        """
+        index = mock.MagicMock()
+        index.parsed_marqo_version.return_value = semver.VersionInfo.parse("2.9.0")
+        with mock.patch("marqo.tensor_search.index_meta_cache.get_index", return_value=index):
+            with self.assertRaises(core_exceptions.InvalidArgumentError) as e:
+                tensor_search.search(
+                    config=self.config,
+                    index_name="index_name",
+                    text="dogs",
+                    search_method="HYBRID"
+                )
+            self.assertIn(f"Marqo 2.10.0 or later. "
+                          f"This index was created with", str(e.exception))
+
+    def test_hybrid_parameters_with_wrong_search_method_fails(self):
         """
         Test that hybrid search with unstructured index and searchable attributes fails.
         TODO: Remove when this is supported

@@ -12,9 +12,9 @@ import transformers
 import validators
 from PIL import Image, UnidentifiedImageError
 from multilingual_clip import pt_multilingual_clip
+from requests.utils import requote_uri
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from torchvision.transforms import InterpolationMode
-from urllib3.exceptions import HTTPError as urllib3_HTTPError
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
@@ -25,6 +25,7 @@ from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
+from marqo import marqo_docs
 
 logger = get_logger(__name__)
 
@@ -83,7 +84,7 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
     results = []
     for image in images:
         results.append(format_and_load_CLIP_image(image, image_download_headers))
-    
+
     return results
 
 
@@ -116,7 +117,13 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
             if metrics_obj is not None:
                 metrics_obj.stop(f"image_download.{image_path}")
     else:
-        raise UnidentifiedImageError(f"input str of `{image_path}` is not a local file or a valid url")
+        raise UnidentifiedImageError(f"Input str of {image_path} is not a local file or a valid url. "
+                                     f"If you are using Marqo Cloud, please note that images can only be downloaded "
+                                     f"from a URL and local files are not supported. "
+                                     f"If you are running Marqo in a Docker container, you will need to use a Docker "
+                                     f"volume so that your container can access host files. "
+                                     f"For more information, please refer to: "
+                                     f"{marqo_docs.indexing_images()}")
 
     return img
 
@@ -139,10 +146,15 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     if not isinstance(timeout_ms, int):
         raise InternalError(f"timeout must be an integer but received {timeout_ms} of type {type(timeout_ms)}")
 
+    try:
+        encoded_url = encode_url(image_path)
+    except UnicodeEncodeError as e:
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
+                                 f"The url could not be encoded properly. Original error: {e}")
     buffer = BytesIO()
     c = pycurl.Curl()
     c.setopt(c.CAINFO, certifi.where())
-    c.setopt(c.URL, image_path)
+    c.setopt(c.URL, encoded_url)
     c.setopt(c.WRITEDATA, buffer)
     c.setopt(c.TIMEOUT_MS, timeout_ms)
     c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in image_download_headers.items()])
@@ -159,6 +171,26 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     buffer.seek(0)
     return buffer
 
+
+def encode_url(url: str) -> str:
+    """
+    Encode a URL to a valid format with only ASCII characters and reserved characters using percent-encoding.
+
+    In version 2.8, we replaced the requests library with pycurl for image downloads. Consequently, we need to implement
+    the URL encoding function ourselves. This function replicates the encoding behavior of the
+    'requests.utils.requote_uri' function from the requests library.
+
+    Args:
+        url (str): The URL to encode.
+
+    Returns:
+        str: The encoded URL.
+
+    Raises:
+        UnicodeEncodeError: If the URL cannot be encoded properly.
+
+    """
+    return requests.utils.requote_uri(url)
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
                                image_download_headers: dict) -> Union[ImageType, Tensor]:
@@ -196,7 +228,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
     # some logic to determine if something is an image or not
     # assume the batch is the same type
     # maybe we use something like this https://github.com/ahupp/python-magic
-    
+
     _allowed = get_allowed_image_types()
 
     # we assume the batch is this way if a list
@@ -209,15 +241,15 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         thing = inputs[0]
     else:
         thing = inputs
-    
+
     # if it is a string, determine if it is a local file or url
     if isinstance(thing, str):
         name, extension = os.path.splitext(thing.lower())
-        
+
         # if it has the correct extension, asssume yes
         if extension in _allowed:
             return True
-        
+
         # if it is a local file without extension, then raise an error
         if os.path.isfile(thing):
             # we could also read the first part of the file and infer
@@ -228,7 +260,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
             if validators.url(thing):
                 return True
             else:
-                False
+                return False
 
     # if it is an array, then it is an image
     elif isinstance(thing, (ImageType, ndarray, Tensor)):
@@ -238,7 +270,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
 
 
 class CLIP:
-    
+
     """
     conveniance class wrapper to make clip work easily for both text and image encoding
     """
@@ -346,7 +378,7 @@ class CLIP:
         return outputs.norm(dim=-1, keepdim=True)
 
     def encode_text(self, sentence: Union[str, List[str]], normalize = True) -> FloatTensor:
-        
+
         if self.model is None:
             self.load()
 
@@ -412,7 +444,7 @@ class CLIP:
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], 
+    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
                                 default: str = 'text', normalize = True, **kwargs) -> FloatTensor:
 
         infer = kwargs.pop('infer', True)

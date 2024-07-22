@@ -88,16 +88,16 @@ class HybridSearch:
         if isinstance(marqo_index, StructuredMarqoIndex) and \
                 marqo_index_version < constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION:
             raise core_exceptions.UnsupportedFeatureError(
-                f"Hybrid search is only supported for Marqo structured indexes with version >= "
-                f"{constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION}. "
-                f"Current index version is {marqo_index_version}."
+                f"Hybrid search is only supported for Marqo structured indexes created with Marqo "
+                f"{constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION} or later. "
+                f"This index was created with Marqo {marqo_index_version}."
             )
         elif isinstance(marqo_index, UnstructuredMarqoIndex) and \
                 marqo_index_version < constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION:
             raise core_exceptions.UnsupportedFeatureError(
-                f"Hybrid search is only supported for Marqo unstructured indexes with version >= "
-                f"{constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION}. "
-                f"Current index version is {marqo_index_version}."
+                f"Hybrid search is only supported for Marqo unstructured indexes created with Marqo "
+                f"{constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION} or later. "
+                f"This index was created with Marqo {marqo_index_version}."
             )
 
         # Use default hybrid settings if not provided

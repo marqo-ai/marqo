@@ -1,8 +1,15 @@
 from unittest import mock
+from unittest.mock import MagicMock
+
+from fastapi import Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 
 from marqo import exceptions as base_exceptions
 from marqo.api import exceptions as api_exceptions
+from marqo.api.exceptions import UnprocessableEntityError
 from marqo.core import exceptions as core_exceptions
+from marqo.tensor_search.api import api_validation_exception_handler
 from marqo.tensor_search.api import marqo_base_exception_handler
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
@@ -100,3 +107,29 @@ class TestBaseExceptionHandler(MarqoTestCase):
         self.assertNotIn("This should not be propagated.", converted_error.message)
         self.assertIn("unexpected internal error", converted_error.message)
 
+    async def test_validation_exception_handler_CorrectResponseBody(self):
+        """Ensure that the validation exception handler returns the correct response body when 422 is raised."""
+        # Create a mock request
+        mock_request = MagicMock(spec=Request)
+        # Manually create a RequestValidationError
+        errors = [
+            {
+                "loc": ("body", "name"),
+                "msg": "ensure this value has at most 10 characters",
+                "type": "value_error.any_str.max_length",
+                "ctx": {"limit_value": 10}
+            }
+        ]
+        validation_error = RequestValidationError(errors)
+
+        response = await api_validation_exception_handler(mock_request, validation_error)
+        self.assertEqual(422, response.status_code)
+        self.assertEqual(
+            {
+                "detail": jsonable_encoder(validation_error.errors()),
+                "code": UnprocessableEntityError.code,
+                "type": UnprocessableEntityError.error_type,
+                "link": UnprocessableEntityError.link
+            },
+            response.body
+        )

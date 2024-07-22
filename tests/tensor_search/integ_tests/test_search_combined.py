@@ -14,6 +14,8 @@ from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+from marqo.tensor_search.models.api_models import SearchQuery
+from pydantic import ValidationError
 
 
 class TestSearch(MarqoTestCase):
@@ -836,3 +838,34 @@ class TestSearch(MarqoTestCase):
                         result = full_query['yql'].split('where')[1].strip()
 
                     self.assertEqual(result, expected_result)
+
+    def test_search_query_ExpectedErrorRaisedForInvalidSearchMethod(self):
+        """Test that the ValidationError is raised when an incorrect search method is provided."""
+        invalid_search_methods = [
+            ("", "Empty string"),
+            (1, "Integer"),
+            ([], "List"),
+            ({"searchMethod": "LEXICAL"}, "Dictionary"),
+        ]
+        for search_method, search_method_type in invalid_search_methods:
+            with self.subTest(search_method_type=search_method_type):
+                with self.assertRaises(ValidationError) as cm:
+                    _ = SearchQuery(q="test", search_method=search_method)
+                self.assertIn("search_method", str(cm.exception))
+
+    def test_search_query_CanAcceptDifferentSearchMethods(self):
+        """Test that the SearchQuery can accept different search methods."""
+        valid_search_methods = [
+            ("lexical", SearchMethod.LEXICAL, "lowercase lexical"),
+            ("teNsor", SearchMethod.TENSOR, "mixed case tensor"),
+            ("hybrid", SearchMethod.HYBRID, "mixed case hybrid"),
+            (None, SearchMethod.TENSOR, "None"),
+        ]
+        for search_method, expected_search_method, search_method_type in valid_search_methods:
+            with self.subTest(search_method_type=search_method_type):
+                search_query = SearchQuery(q="test", searchMethod=search_method)
+                self.assertEqual(expected_search_method, search_query.searchMethod)
+
+        # A special case for no search method provided
+        search_query = SearchQuery(q="test")
+        self.assertEqual(SearchMethod.TENSOR, search_query.searchMethod)
