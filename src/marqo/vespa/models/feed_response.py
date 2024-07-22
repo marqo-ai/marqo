@@ -20,5 +20,5 @@ class FeedBatchDocumentResponse(BaseModel):
 
 class FeedBatchResponse(BaseModel):
     """A response from feeding a batch of documents to Vespa."""
-    responses: List[FeedDocumentResponse]
+    responses: List[FeedBatchDocumentResponse]
     errors: bool
