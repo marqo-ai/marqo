@@ -685,20 +685,18 @@ class VespaClient:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
                 return UpdateDocumentResponse(**resp.json(), status=resp.status_code)
             except httpx.HTTPError as e:
-                error_message = (f"Marqo has encountered an error while updating this document to Vespa and "
-                                 f"the document is not updated. Original error: {e}. "
-                                 f"This might be a transient network issue and you can "
-                                 f"retry the operation. If the issue persists, please contact Marqo support")
+                error_message = (f"Marqo has encountered an error while updating this document to the vector store and "
+                                 f"the document is not updated. Original error: {e}. ")
                 return UpdateDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
             except JSONDecodeError as e:
                 if resp.status_code == 200:
                     # A 200 response shouldn't reach here
-                    raise ValueError(f"Marqo received an unexpected response from Vespa: {resp.text} with 200 "
+                    raise ValueError(f"Marqo received an unexpected response from the vector store: {resp.text} with 200 "
                                      f"status_code. The response is not in the JSON format and Marqo can not decode "
                                      f"it") from e
                 else:
-                    error_message = (f"Marqo has encountered an error while update this document to Vespa and the "
-                                     f"response can not be decoded. The document is not updated. The response "
+                    error_message = (f"Marqo has encountered an error while update this document to the vector store "
+                                     f"and the response can not be decoded. The document is not updated. The response "
                                      f"text is: {resp.text}")
                     return UpdateDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
 
@@ -730,20 +728,18 @@ class VespaClient:
                 resp = await async_client.post(end_point, json=data, timeout=timeout)
                 return FeedDocumentResponse(**resp.json(), status=resp.status_code)
             except httpx.HTTPError as e:
-                error_message = (f"Marqo has encountered an error while feeding this document to Vespa and "
-                                 f"the document is not indexed. Original error: {e}. "
-                                 f"This might be a transient network issue and you can "
-                                 f"retry the operation. If the issue persists, please contact Marqo support")
+                error_message = (f"Marqo has encountered an error while feeding this document to the vector store and "
+                                 f"the document is not indexed. Original error: {e}. ")
                 return FeedDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
             except JSONDecodeError as e:
                 if resp.status_code == 200:
                     # A 200 response shouldn't reach here
-                    raise ValueError(f"Marqo received an unexpected response from Vespa: {resp.text} with 200 "
-                                       f"status_code. The response is not in the JSON format and Marqo can not decode "
-                                       f"it") from e
+                    raise ValueError(f"Marqo received an unexpected response from the vector store: {resp.text} with "
+                                     f"200 status_code. The response is not in the JSON format and Marqo can not "
+                                     f"decode it") from e
                 else:
-                    error_message = (f"Marqo has encountered an error while feeding this document to Vespa and the "
-                                     f"response can not be decoded. The document is not indexed. The response "
+                    error_message = (f"Marqo has encountered an error while feeding this document to the vector store "
+                                     f"and the response can not be decoded. The document is not indexed. The response "
                                      f"text is: {resp.text}")
                     return FeedDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
 
