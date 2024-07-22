@@ -237,7 +237,7 @@ class VespaClient:
 
         self._raise_for_status(resp)
 
-        return FeedDocumentResponse(**resp.json())
+        return FeedDocumentResponse(**resp.json(), status=resp.status_code)
 
     def feed_batch(self,
                    batch: List[VespaDocument],
