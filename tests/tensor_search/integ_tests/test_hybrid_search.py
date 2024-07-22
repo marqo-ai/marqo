@@ -39,6 +39,15 @@ class TestHybridSearch(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
+        unstructured_index_with_no_model = cls.unstructured_marqo_index_request(
+            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
+            normalize_embeddings=False
+        )
+
+        unstructured_index_2_10 = cls.unstructured_marqo_index_request(
+            marqo_version="2.10.0"
+        )
+
         # STRUCTURED indexes
         structured_default_image_index = cls.structured_marqo_index_request(
             model=Model(name='open_clip/ViT-B-32/laion400m_e31'),
@@ -95,22 +104,35 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=[]
         )
 
+        structured_index_2_9 = cls.structured_marqo_index_request(
+            marqo_version="2.9.0",
+            fields=[],
+            tensor_fields=[]
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
+            unstructured_index_with_no_model,
+            unstructured_index_2_10,
             structured_default_image_index,
             structured_text_index_score_modifiers,
             structured_index_with_no_model,
-            structured_index_empty
+            structured_index_empty,
+            structured_index_2_9
         ])
 
         # Assign to objects so they can be used in tests
         cls.unstructured_default_text_index = cls.indexes[0]
         cls.unstructured_default_image_index = cls.indexes[1]
-        cls.structured_default_image_index = cls.indexes[2]
-        cls.structured_text_index_score_modifiers = cls.indexes[3]
-        cls.structured_index_with_no_model = cls.indexes[4]
-        cls.structured_index_empty = cls.indexes[5]
+        cls.unstructured_index_with_no_model = cls.indexes[2]
+        cls.unstructured_index_2_10 = cls.indexes[3]
+
+        cls.structured_default_image_index = cls.indexes[4]
+        cls.structured_text_index_score_modifiers = cls.indexes[5]
+        cls.structured_index_with_no_model = cls.indexes[6]
+        cls.structured_index_empty = cls.indexes[7]
+        cls.structured_index_2_9 = cls.indexes[8]
 
     def setUp(self) -> None:
         super().setUp()
@@ -148,7 +170,7 @@ class TestHybridSearch(MarqoTestCase):
         Test all hybrid search calls the correct vespa queries.
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 original_query = self.config.vespa_client.query
                 def pass_through_query(*arg, **kwargs):
@@ -169,8 +191,10 @@ class TestHybridSearch(MarqoTestCase):
                             rankingMethod="rrf",
                             alpha=0.6,
                             rrfK=61,
-                            searchableAttributesLexical=["text_field_1", "text_field_2"],
-                            searchableAttributesTensor=["text_field_2", "text_field_3"],
+                            searchableAttributesLexical=["text_field_1", "text_field_2"] \
+                                if isinstance(index, StructuredMarqoIndex) else None,
+                            searchableAttributesTensor=["text_field_2", "text_field_3"] \
+                                if isinstance(index, StructuredMarqoIndex) else None,
                             scoreModifiersLexical={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 1.0},
@@ -197,12 +221,6 @@ class TestHybridSearch(MarqoTestCase):
 
                 vespa_query_kwargs = call_args[0][1]
                 self.assertIn("PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.", vespa_query_kwargs["yql"])
-                self.assertIn("(({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                              "nearestNeighbor(marqo__embeddings_text_field_2, marqo__query_embedding)) OR "
-                              "({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                              "nearestNeighbor(marqo__embeddings_text_field_3, marqo__query_embedding)))",
-                              vespa_query_kwargs["marqo__yql.tensor"])
-                self.assertIn("marqo__lexical_text_field_1 contains \"dogs\" OR marqo__lexical_text_field_2 contains \"dogs\"", vespa_query_kwargs["marqo__yql.lexical"])
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.tensorScoreModifiersPresent"], True)
@@ -216,10 +234,6 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["marqo__ranking.lexical.tensor"], "hybrid_bm25_then_embedding_similarity")
                 self.assertEqual(vespa_query_kwargs["marqo__ranking.tensor.lexical"], "hybrid_embedding_similarity_then_bm25")
 
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_lexical"],
-                                 {'marqo__lexical_text_field_1': 1, 'marqo__lexical_text_field_2': 1})
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"],
-                                 {'marqo__embeddings_text_field_2': 1, 'marqo__embeddings_text_field_3': 1})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__mult_weights_lexical"],
                                  {'mult_field_1': 1.0, 'mult_field_2': 1.0})
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_lexical"], {})
@@ -228,131 +242,273 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_tensor"],
                                  {'add_field_1': 1.0})
 
+                if isinstance(index, StructuredMarqoIndex):
+                    self.assertIn("(({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                                  "nearestNeighbor(marqo__embeddings_text_field_2, marqo__query_embedding)) OR "
+                                  "({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                                  "nearestNeighbor(marqo__embeddings_text_field_3, marqo__query_embedding)))",
+                                  vespa_query_kwargs["marqo__yql.tensor"])
+                    self.assertIn(
+                        "marqo__lexical_text_field_1 contains \"dogs\" OR marqo__lexical_text_field_2 contains \"dogs\"",
+                        vespa_query_kwargs["marqo__yql.lexical"])
+                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_lexical"],
+                                     {'marqo__lexical_text_field_1': 1, 'marqo__lexical_text_field_2': 1})
+                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"],
+                                     {'marqo__embeddings_text_field_2': 1, 'marqo__embeddings_text_field_3': 1})
+
+                elif isinstance(index, UnstructuredMarqoIndex):
+                    self.assertIn("({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                                  "nearestNeighbor(marqo__embeddings, marqo__query_embedding))",
+                                  vespa_query_kwargs["marqo__yql.tensor"])
+                    self.assertIn(
+                        "default contains \"dogs\"",
+                        vespa_query_kwargs["marqo__yql.lexical"])
+                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_lexical"], {})
+                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"], {})
+
                 # TODO: For lexical/tensor and tensor/lexical. Check fields to rank specifically.
                 # TODO: with and without score modifiers
                 # Make sure results are retrieved
                 self.assertIn("hits", res)
 
-    def test_hybrid_search_with_custom_vector_query(self):
+    def test_hybrid_search_structured_with_custom_vector_query(self):
         """
         Tests that using a custom vector query sends the correct arguments to vespa
+        Structured. Uses searchable attributes.
         """
         sample_vector = [0.5 for _ in range(16)]
 
-        for index in [self.structured_index_with_no_model]:
-            with self.subTest(index=index.name):
-                original_query = self.config.vespa_client.query
-                def pass_through_query(*arg, **kwargs):
-                    return original_query(*arg, **kwargs)
+        original_query = self.config.vespa_client.query
+        def pass_through_query(*arg, **kwargs):
+            return original_query(*arg, **kwargs)
 
-                mock_vespa_client_query = unittest.mock.MagicMock()
-                mock_vespa_client_query.side_effect = pass_through_query
+        mock_vespa_client_query = unittest.mock.MagicMock()
+        mock_vespa_client_query.side_effect = pass_through_query
 
-                with self.subTest("Custom vector query, with content, no context"):
-                    @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-                    def run():
-                        res = tensor_search.search(
-                            config=self.config,
-                            index_name=index.name,
-                            text=CustomVectorQuery(
-                                customVector=CustomVectorQuery.CustomVector(
-                                    content= "sample",
-                                    vector=sample_vector
-                                )
-                            ),
-                            search_method="HYBRID",
-                            hybrid_parameters=HybridParameters(
-                                searchableAttributesLexical=["text_field_1"],
-                                searchableAttributesTensor=["text_field_1"]
-                            ),
-                            result_count=3
+        with self.subTest("Custom vector query, with content, no context"):
+            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+            def run():
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_index_with_no_model.name,
+                    text=CustomVectorQuery(
+                        customVector=CustomVectorQuery.CustomVector(
+                            content= "sample",
+                            vector=sample_vector
                         )
-                        return res
+                    ),
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        searchableAttributesLexical=["text_field_1"],
+                        searchableAttributesTensor=["text_field_1"]
+                    ),
+                    result_count=3
+                )
+                return res
 
-                    res = run()
+            res = run()
 
-                    call_args = mock_vespa_client_query.call_args_list
+            call_args = mock_vespa_client_query.call_args_list
 
-                    vespa_query_kwargs = call_args[-1][1]
-                    self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                                  "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
-                                  vespa_query_kwargs["marqo__yql.tensor"])
-                    # Lexical yql has content text, but Tensor uses the sample vector
-                    self.assertIn("marqo__lexical_text_field_1 contains \"sample\"", vespa_query_kwargs["marqo__yql.lexical"])
-                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                                     sample_vector)
-                    self.assertIn("hits", res)
+            vespa_query_kwargs = call_args[-1][1]
+            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                          "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
+                          vespa_query_kwargs["marqo__yql.tensor"])
+            # Lexical yql has content text, but Tensor uses the sample vector
+            self.assertIn("marqo__lexical_text_field_1 contains \"sample\"", vespa_query_kwargs["marqo__yql.lexical"])
+            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                             sample_vector)
+            self.assertIn("hits", res)
 
-                with self.subTest("Custom vector query, with context, with content"):
-                    @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-                    def run():
-                        res = tensor_search.search(
-                            config=self.config,
-                            index_name=index.name,
-                            text=CustomVectorQuery(
-                                customVector=CustomVectorQuery.CustomVector(
-                                    content= "sample",
-                                    vector=sample_vector
-                                )
-                            ),
-                            search_method="HYBRID",
-                            hybrid_parameters=HybridParameters(
-                                searchableAttributesLexical=["text_field_1"],
-                                searchableAttributesTensor=["text_field_1"]
-                            ),
-                            context=SearchContext(**{"tensor": [{"vector": [i*2 for i in sample_vector],     # Double the sample vector
-                                                                              "weight": 1}], })
+        with self.subTest("Custom vector query, with context, with content"):
+            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+            def run():
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_index_with_no_model.name,
+                    text=CustomVectorQuery(
+                        customVector=CustomVectorQuery.CustomVector(
+                            content= "sample",
+                            vector=sample_vector
                         )
-                        return res
+                    ),
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        searchableAttributesLexical=["text_field_1"],
+                        searchableAttributesTensor=["text_field_1"]
+                    ),
+                    context=SearchContext(**{"tensor": [{"vector": [i*2 for i in sample_vector],     # Double the sample vector
+                                                                      "weight": 1}], })
+                )
+                return res
 
-                    res = run()
+            res = run()
 
-                    call_args = mock_vespa_client_query.call_args_list
+            call_args = mock_vespa_client_query.call_args_list
 
-                    vespa_query_kwargs = call_args[-1][1]
-                    self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                                  "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
-                                  vespa_query_kwargs["marqo__yql.tensor"])
-                    # Lexical yql has content text, but Tensor uses the sample vector
-                    self.assertIn("marqo__lexical_text_field_1 contains \"sample\"",
-                                  vespa_query_kwargs["marqo__yql.lexical"])
-                    self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                                     [i*1.5 for i in sample_vector])    # Should average the query & context vectors
-                    self.assertIn("hits", res)
+            vespa_query_kwargs = call_args[-1][1]
+            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                          "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
+                          vespa_query_kwargs["marqo__yql.tensor"])
+            # Lexical yql has content text, but Tensor uses the sample vector with context
+            self.assertIn("marqo__lexical_text_field_1 contains \"sample\"",
+                          vespa_query_kwargs["marqo__yql.lexical"])
+            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                             [i*1.5 for i in sample_vector])    # Should average the query & context vectors
+            self.assertIn("hits", res)
 
-            with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
-                @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-                def run():
-                    res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text=CustomVectorQuery(
-                            customVector=CustomVectorQuery.CustomVector(
-                                content=None,
-                                vector=sample_vector
-                            )
-                        ),
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrievalMethod="tensor",
-                            rankingMethod="tensor",
-                            searchableAttributesTensor=["text_field_1"]
-                        ),
-                        result_count=3
-                    )
-                    return res
+        with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
+            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+            def run():
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.structured_index_with_no_model.name,
+                    text=CustomVectorQuery(
+                        customVector=CustomVectorQuery.CustomVector(
+                            content=None,
+                            vector=sample_vector
+                        )
+                    ),
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod="tensor",
+                        rankingMethod="tensor",
+                        searchableAttributesTensor=["text_field_1"]
+                    ),
+                    result_count=3
+                )
+                return res
 
-                res = run()
+            res = run()
 
-                call_args = mock_vespa_client_query.call_args_list
+            call_args = mock_vespa_client_query.call_args_list
 
-                vespa_query_kwargs = call_args[-1][1]
-                self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                              "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
-                              vespa_query_kwargs["marqo__yql.tensor"])
-                self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
-                                 sample_vector)
-                self.assertIn("hits", res)
+            vespa_query_kwargs = call_args[-1][1]
+            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                          "nearestNeighbor(marqo__embeddings_text_field_1, marqo__query_embedding)",
+                          vespa_query_kwargs["marqo__yql.tensor"])
+            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                             sample_vector)
+            self.assertIn("hits", res)
+
+    def test_hybrid_search_unstructured_with_custom_vector_query(self):
+        """
+        Tests that using a custom vector query sends the correct arguments to vespa
+        Unstructured. Does not use searchable attributes.
+        """
+        sample_vector = [0.5 for _ in range(16)]
+
+        original_query = self.config.vespa_client.query
+        def pass_through_query(*arg, **kwargs):
+            return original_query(*arg, **kwargs)
+
+        mock_vespa_client_query = unittest.mock.MagicMock()
+        mock_vespa_client_query.side_effect = pass_through_query
+
+        with self.subTest("Custom vector query, with content, no context"):
+            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+            def run():
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.unstructured_index_with_no_model.name,
+                    text=CustomVectorQuery(
+                        customVector=CustomVectorQuery.CustomVector(
+                            content= "sample",
+                            vector=sample_vector
+                        )
+                    ),
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod="disjunction",
+                        rankingMethod="rrf",
+                    ),
+                    result_count=3
+                )
+                return res
+
+            res = run()
+
+            call_args = mock_vespa_client_query.call_args_list
+
+            vespa_query_kwargs = call_args[-1][1]
+            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                          "nearestNeighbor(marqo__embeddings, marqo__query_embedding)",
+                          vespa_query_kwargs["marqo__yql.tensor"])
+            # Lexical yql has content text, but Tensor uses the sample vector
+            self.assertIn("default contains \"sample\"", vespa_query_kwargs["marqo__yql.lexical"])
+            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                             sample_vector)
+            self.assertIn("hits", res)
+
+        with self.subTest("Custom vector query, with context, with content"):
+            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+            def run():
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.unstructured_index_with_no_model.name,
+                    text=CustomVectorQuery(
+                        customVector=CustomVectorQuery.CustomVector(
+                            content= "sample",
+                            vector=sample_vector
+                        )
+                    ),
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod="disjunction",
+                        rankingMethod="rrf",
+                    ),
+                    context=SearchContext(**{"tensor": [{"vector": [i*2 for i in sample_vector],     # Double the sample vector
+                                                                      "weight": 1}], })
+                )
+                return res
+
+            res = run()
+
+            call_args = mock_vespa_client_query.call_args_list
+
+            vespa_query_kwargs = call_args[-1][1]
+            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                          "nearestNeighbor(marqo__embeddings, marqo__query_embedding)",
+                          vespa_query_kwargs["marqo__yql.tensor"])
+            # Lexical yql has content text, but Tensor uses the sample vector with context
+            self.assertIn("default contains \"sample\"",
+                          vespa_query_kwargs["marqo__yql.lexical"])
+            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                             [i*1.5 for i in sample_vector])    # Should average the query & context vectors
+            self.assertIn("hits", res)
+
+        with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
+            @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
+            def run():
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.unstructured_index_with_no_model.name,
+                    text=CustomVectorQuery(
+                        customVector=CustomVectorQuery.CustomVector(
+                            content=None,
+                            vector=sample_vector
+                        )
+                    ),
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod="tensor",
+                        rankingMethod="tensor"
+                    ),
+                    result_count=3
+                )
+                return res
+
+            res = run()
+
+            call_args = mock_vespa_client_query.call_args_list
+
+            vespa_query_kwargs = call_args[-1][1]
+            self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
+                          "nearestNeighbor(marqo__embeddings, marqo__query_embedding)",
+                          vespa_query_kwargs["marqo__yql.tensor"])
+            self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
+                             sample_vector)
+            self.assertIn("hits", res)
 
     def test_hybrid_search_disjunction_rrf_zero_alpha_same_as_lexical(self):
         """
@@ -606,7 +762,6 @@ class TestHybridSearch(MarqoTestCase):
                                     {"field_name": "add_field_1", "weight": 2}
                                 ]
                             },
-                            searchableAttributesLexical=["text_field_1"],
                             verbose=True
                         ),
                         result_count=10,
@@ -855,7 +1010,8 @@ class TestHybridSearch(MarqoTestCase):
         match the ranking top k.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        # TODO: Add unstructured index but without searchable attributes
+        for index in [self.structured_text_index_score_modifiers]:
             with self.subTest(index=index.name):
                 # Add documents
                 tensor_search.add_documents(
@@ -868,26 +1024,34 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                # TODO: get tensor and lexical res outside, in base function
+                # Reference results
+                tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="TENSOR",
+                    searchable_attributes=["text_field_1"],
+                    result_count=20,
+                )
+                lexical_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="LEXICAL",
+                    searchable_attributes=["text_field_1"],
+                    result_count=10,
+                )
+                tensor_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="TENSOR",
+                    result_count=10,
+                    searchable_attributes=["text_field_1"]
+                )
+
                 # Lexical retrieval with Tensor ranking
                 with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
-                    # Basic results (for reference)
-                    tensor_res_all_docs = tensor_search.search( # To get tensor scores of every doc, for reference
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="TENSOR",
-                        searchable_attributes=["text_field_1"],
-                        result_count=20,
-                    )
-                    lexical_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="LEXICAL",
-                        searchable_attributes=["text_field_1"],
-                        result_count=10,
-                    )
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -917,23 +1081,6 @@ class TestHybridSearch(MarqoTestCase):
 
                 # Tensor retrieval with Lexical ranking
                 with self.subTest(retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Lexical):
-                    # Basic results (for reference)
-                    lexical_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="LEXICAL",
-                        searchable_attributes=["text_field_1"],
-                        result_count=10,
-                    )
-                    tensor_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="TENSOR",
-                        result_count=10,
-                        searchable_attributes=["text_field_1"]
-                    )
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -998,17 +1145,6 @@ class TestHybridSearch(MarqoTestCase):
                  "retrievalMethod": "lexical",
                  "rankingMethod": "rrf"
              }, "rankingMethod must be: tensor or lexical"),
-            # Searchable attributes need to match retrieval method
-            ({
-                "retrievalMethod": "tensor",
-                "rankingMethod": "tensor",
-                "searchableAttributesLexical": ["text_field_1"]
-             }, "can only be defined for 'lexical',"),
-            ({
-                "retrievalMethod": "lexical",
-                "rankingMethod": "lexical",
-                "searchableAttributesTensor": ["text_field_1"]
-             }, "can only be defined for 'tensor',"),
             # Score modifiers need to match ranking method
             ({
                  "retrievalMethod": "tensor",
@@ -1035,10 +1171,28 @@ class TestHybridSearch(MarqoTestCase):
             ({"rankingMethod": "something something"},
                 "not a valid enumeration member")
         ]
-        # TODO: add unstructured index
-        for index in [self.structured_text_index_score_modifiers]:
+
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
-                for hybrid_parameters, error_message in test_cases:
+                if isinstance(index, StructuredMarqoIndex):
+                    final_test_cases = test_cases + [
+                        # Searchable attributes need to match retrieval method
+                        ({
+                             "retrievalMethod": "tensor",
+                             "rankingMethod": "tensor",
+                             "searchableAttributesLexical": ["text_field_1"]
+                         }, "can only be defined for 'lexical',"),
+                        ({
+                             "retrievalMethod": "lexical",
+                             "rankingMethod": "lexical",
+                             "searchableAttributesTensor": ["text_field_1"]
+                         }, "can only be defined for 'tensor',")
+                    ]
+                else:
+                    # Unstructured hybrid search cannot have searchable attributes
+                    final_test_cases = test_cases
+
+                for hybrid_parameters, error_message in final_test_cases:
                     with self.subTest(hybrid_parameters=hybrid_parameters):
                         with self.assertRaises(ValueError) as e:
                             tensor_search.search(
@@ -1055,8 +1209,7 @@ class TestHybridSearch(MarqoTestCase):
         Ensure that searchable_attributes and score_modifiers cannot be set in hybrid search.
         """
 
-        # TODO: add unstructured index
-        for index in [self.structured_text_index_score_modifiers]:
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 with self.subTest("searchable_attributes active"):
                     with self.assertRaises(ValueError) as e:
@@ -1139,7 +1292,7 @@ class TestHybridSearch(MarqoTestCase):
         Test hybrid search when no hybrid parameters are provided.
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 original_query = self.config.vespa_client.query
                 def pass_through_query(*arg, **kwargs):
@@ -1228,21 +1381,23 @@ class TestHybridSearch(MarqoTestCase):
             (RetrievalMethod.Lexical, RankingMethod.Lexical)
         ]
 
-        for retrieval_method, ranking_method in test_cases:
-            with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
-                with self.assertRaises(InvalidArgumentError) as e:
-                    tensor_search.search(
-                        config=self.config,
-                        index_name=self.structured_index_with_no_model.name,
-                        text=None,
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrievalMethod=retrieval_method,
-                            rankingMethod=ranking_method,
-                            verbose=True
-                        )
-                    )
-                self.assertIn("unless retrieval_method and ranking_method are both 'tensor'", str(e.exception))
+        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
+            with self.subTest(index=index.name):
+                for retrieval_method, ranking_method in test_cases:
+                    with self.subTest(retrieval=retrieval_method, ranking=ranking_method):
+                        with self.assertRaises(InvalidArgumentError) as e:
+                            tensor_search.search(
+                                config=self.config,
+                                index_name=index.name,
+                                text=None,
+                                search_method="HYBRID",
+                                hybrid_parameters=HybridParameters(
+                                    retrievalMethod=retrieval_method,
+                                    rankingMethod=ranking_method,
+                                    verbose=True
+                                )
+                            )
+                        self.assertIn("unless retrieval_method and ranking_method are both 'tensor'", str(e.exception))
 
     def test_hybrid_search_none_query_with_context_vectors_passes(self):
         """Test to ensure that context vectors work with no_model by setting query as None and providing context
@@ -1270,10 +1425,14 @@ class TestHybridSearch(MarqoTestCase):
             }
         ]
 
-        for index in [self.structured_index_with_no_model]:
+        for index in [self.structured_index_with_no_model, self.unstructured_index_with_no_model]:
             with (self.subTest(index_name=index.name)):
                 add_docs_params = AddDocsParams(index_name=index.name,
-                                                docs=docs)
+                                                docs=docs,
+                                                tensor_fields=["custom_field_1"] \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None,
+                                                mappings={"custom_field_1": {"type": "custom_vector"}} \
+                                                    if isinstance(index, UnstructuredMarqoIndex) else None)
                 _ = tensor_search.add_documents(config=self.config,
                                                 add_docs_params=add_docs_params)
 
@@ -1297,7 +1456,7 @@ class TestHybridSearch(MarqoTestCase):
         TODO: Remove when this is supported
         """
 
-        with self.assertRaises(core_exceptions.InvalidArgumentError) as e:
+        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
             tensor_search.search(
                 config=self.config,
                 index_name=self.unstructured_default_text_index.name,
@@ -1309,9 +1468,10 @@ class TestHybridSearch(MarqoTestCase):
                     searchableAttributesLexical=["text_field_1"]
                 )
             )
-        self.assertIn("searchableAttributesLexical cannot be used with unstructured index", str(e.exception))
+        self.assertIn("does not support `searchableAttributesTensor` or `searchableAttributesLexical`",
+                      str(e.exception))
 
-        with self.assertRaises(core_exceptions.InvalidArgumentError) as e:
+        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
             tensor_search.search(
                 config=self.config,
                 index_name=self.unstructured_default_text_index.name,
@@ -1323,8 +1483,38 @@ class TestHybridSearch(MarqoTestCase):
                     searchableAttributesTensor=["text_field_1"]
                 )
             )
-        self.assertIn("searchableAttributesTensor cannot be used with unstructured index", str(e.exception))
+        self.assertIn("does not support `searchableAttributesTensor` or `searchableAttributesLexical`",
+                      str(e.exception))
 
+    def test_hybrid_search_unstructured_with_2_10_fails(self):
+        """
+        Test that hybrid search with unstructured index with version 2.10.0 fails (version is below the minimum).
+        """
+
+        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_index_2_10.name,
+                text="dogs",
+                search_method="HYBRID",
+            )
+        self.assertIn("only supported for Marqo unstructured indexes with version >= 2.11.0",
+                      str(e.exception))
+
+    def test_hybrid_search_structured_with_2_9_fails(self):
+        """
+        Test that hybrid search with structured index with version 2.9.0 fails (version is below the minimum).
+        """
+
+        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.structured_index_2_9.name,
+                text="dogs",
+                search_method="HYBRID",
+            )
+        self.assertIn("only supported for Marqo structured indexes with version >= 2.10.0",
+                      str(e.exception))
 
     def test_hybrid_parameters_with_wrong_search_method_fails(self):
         """

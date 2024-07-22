@@ -415,7 +415,8 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                     f"The field {field} is a map field and only supported for indexes created with Marqo 2.9.0 or later. "
                     f"See {marqo_docs.map_fields()} and {marqo_docs.mappings()}."
                 )
-
+            # TODO: It's also possible that unstructured custom vector field gets here, and will error out because of
+            # "content" key not being numeric. Make better 400 for this case.
             field_content = validate_map_numeric_field(field_content)
 
     return field_content

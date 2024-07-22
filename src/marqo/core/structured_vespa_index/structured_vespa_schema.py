@@ -242,7 +242,7 @@ class StructuredVespaSchema(VespaSchema):
             lexical_fields
         ])
         bm25_avg_denominator_sum = ' + '.join([f'bm25({field.lexical_field_name})' for field in lexical_fields])
-        bmw25_avg_expression = (f'({bm25_sum_expression}) / if (' +
+        bm25_avg_expression = (f'({bm25_sum_expression}) / if (' +
                                 f' + '.join([f'query({field.lexical_field_name})' for field in lexical_fields]) +
                                 f' == 0, 1, ' +
                                 f'if ({bm25_avg_denominator_sum} == 0, 1, {bm25_avg_denominator_sum}))'
@@ -291,7 +291,7 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'expression: {bm25_sum_expression}')
             rank_profiles.append('}')
             rank_profiles.append('function lexical_score_avg() {')
-            rank_profiles.append(f'expression: {bmw25_avg_expression}')
+            rank_profiles.append(f'expression: {bm25_avg_expression}')
             rank_profiles.append('}')
             rank_profiles.append('function lexical_score_max() {')
             rank_profiles.append(f'expression: {bm25_max_expression}')
