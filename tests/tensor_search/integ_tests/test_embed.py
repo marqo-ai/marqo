@@ -15,7 +15,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
-from marqo.vespa.models import VespaDocument, QueryResult, FeedDocumentResponse, FeedBatchResponse, \
+from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse
 from marqo.vespa.models.query_result import Root, Child, RootFields
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth

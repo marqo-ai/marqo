@@ -14,7 +14,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
-from marqo.vespa.models import VespaDocument, QueryResult, FeedDocumentResponse, FeedBatchResponse, \
+from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse
 import os
 import pprint
@@ -131,7 +131,7 @@ class TestCustomVectorField(MarqoTestCase):
         for index in self.indexes:
             mock_feed_batch = mock.MagicMock()
             mock_feed_batch.return_value = FeedBatchResponse(
-                responses=[FeedDocumentResponse(
+                responses=[FeedBatchDocumentResponse(
                     status=200,
                     pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
                     id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)
@@ -188,7 +188,7 @@ class TestCustomVectorField(MarqoTestCase):
         for index in self.indexes:
             mock_feed_batch = mock.MagicMock()
             mock_feed_batch.return_value = FeedBatchResponse(
-                responses=[FeedDocumentResponse(
+                responses=[FeedBatchDocumentResponse(
                     status=200,
                     pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
                     id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)
@@ -259,7 +259,7 @@ class TestCustomVectorField(MarqoTestCase):
         for index in self.indexes:
             mock_feed_batch = mock.MagicMock()
             mock_feed_batch.return_value = FeedBatchResponse(
-                responses=[FeedDocumentResponse(
+                responses=[FeedBatchDocumentResponse(
                     status=200,
                     pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
                     id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)

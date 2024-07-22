@@ -16,7 +16,7 @@ import marqo.vespa.concurrency as conc
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError)
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchResponse, \
-    FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse
+    FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
     DeleteBatchResponse, DeleteAllDocumentsResponse
@@ -237,7 +237,7 @@ class VespaClient:
 
         self._raise_for_status(resp)
 
-        return FeedDocumentResponse(**resp.json(), status=resp.status_code)
+        return FeedDocumentResponse(**resp.json())
 
     def feed_batch(self,
                    batch: List[VespaDocument],
@@ -702,7 +702,7 @@ class VespaClient:
 
     async def _feed_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                    document: VespaDocument, schema: str,
-                                   timeout: int) -> FeedDocumentResponse:
+                                   timeout: int) -> FeedBatchDocumentResponse:
         """An async method to feed a document to Vespa.
 
         Note: This method is used by the async feed batch method to feed documents concurrently. Unhandled exceptions
@@ -726,11 +726,11 @@ class VespaClient:
 
             try:
                 resp = await async_client.post(end_point, json=data, timeout=timeout)
-                return FeedDocumentResponse(**resp.json(), status=resp.status_code)
+                return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
             except httpx.HTTPError as e:
                 error_message = (f"Marqo has encountered an error while feeding this document to the vector store and "
                                  f"the document is not indexed. Original error: {e}. ")
-                return FeedDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
+                return FeedBatchDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
             except JSONDecodeError as e:
                 if resp.status_code == 200:
                     # A 200 response shouldn't reach here
@@ -741,10 +741,10 @@ class VespaClient:
                     error_message = (f"Marqo has encountered an error while feeding this document to the vector store "
                                      f"and the response can not be decoded. The document is not indexed. The response "
                                      f"text is: {resp.text}")
-                    return FeedDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
+                    return FeedBatchDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
-                            timeout: int) -> FeedDocumentResponse:
+                            timeout: int) -> FeedBatchDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
 
@@ -752,7 +752,7 @@ class VespaClient:
 
         resp = sync_client.post(end_point, json=data, timeout=timeout)
 
-        return FeedDocumentResponse(**resp.json(), status=resp.status_code)
+        return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
 
     async def _get_batch_async(self,
                                ids: List[str],
