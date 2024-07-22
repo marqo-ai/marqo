@@ -41,7 +41,7 @@ class IndexManagement:
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
     _MARQO_CUSTOM_SEARCHERS_JAR = 'marqo-custom-components-deploy.jar'
     _MARQO_CUSTOM_SEARCHERS_ID = 'marqo'
-    _MARQO_CUSTOM_SEARCHERS_BUNDLE = 'marqo-custom-components'  # artifact id
+    _MARQO_CUSTOM_SEARCHERS_BUNDLE = 'marqo-custom-components'
     _MARQO_CUSTOM_SEARCHERS = ['ai.marqo.search.HybridSearcher']
     _MARQO_SETTINGS_SCHEMA_TEMPLATE = textwrap.dedent(
         '''
