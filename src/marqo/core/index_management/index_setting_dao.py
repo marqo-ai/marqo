@@ -102,8 +102,8 @@ class VespaAppPkgIndexSettingDao:
 
     def save(self, index_setting: MarqoIndex, app: VespaApplicationPackage) -> None:
         file_path = [self._MARQO_SETTINGS_FOLDER, f'{index_setting.name}.json']
-        app.save_txt_file(file_path, index_setting.json())
+        app._save_txt_file(file_path, index_setting.json())
 
     def delete(self, index_setting: MarqoIndex, app: VespaApplicationPackage) -> None:
         file_path = [self._MARQO_SETTINGS_FOLDER, f'{index_setting.name}.json']
-        app.delete_file(file_path)
+        app._delete_file(file_path)
