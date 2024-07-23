@@ -707,10 +707,16 @@ class VespaClient:
 
         Note: This method is used by the async feed batch method to feed documents concurrently. Unhandled exceptions
         will be raised in the main thread and leads a 500 error for the whole batch. Therefore, exceptions should be
-        handled gracefully in this method for the specific document.
+        handled gracefully in this method for the specific document. We should keep the error message as similar as the
+        Vespa error messages since this is a low level method. Overwrite the error message in higher level methods.
+
+        Exceptions that are handled in this method:
+        1. httpx.RequestError: We convert this error to a 500 error for the specific document and put 'Network Error' in
+        the message.
+        2.
 
         Raises:
-            VespaError: If the document is not indexed and the response can not be decoded but has a 200 status code.
+            VespaError: If the Vespa response is 200 but the response can not be decoded.
 
         Returns:
             FeedDocumentResponse object
@@ -720,28 +726,26 @@ class VespaClient:
 
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}'
-
-            # only used for documents that are not indexed
-            error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
-
+            # Handle httpx.RequestError
             try:
                 resp = await async_client.post(end_point, json=data, timeout=timeout)
+            except httpx.RequestError as e:
+                logger.error(e, exc_info=True)
+                return FeedBatchDocumentResponse(status=500, message="Network Error", id=doc_id)
+
+            # Handle other exceptions
+            try:
                 return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
-            except httpx.HTTPError as e:
-                error_message = (f"Marqo has encountered an error while feeding this document to the vector store and "
-                                 f"the document is not indexed. Original error: {e}. ")
-                return FeedBatchDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
             except JSONDecodeError as e:
                 if resp.status_code == 200:
-                    # A 200 response shouldn't reach here
-                    raise VespaError(f"Marqo received an unexpected response from the vector store: {resp.text} with "
-                                     f"200 status_code. The response is not in the JSON format and Marqo can not "
-                                     f"decode it") from e
-                else:
-                    error_message = (f"Marqo has encountered an error while feeding this document to the vector store "
-                                     f"and the response can not be decoded. The document is not indexed. The response "
-                                     f"text is: {resp.text}")
-                    return FeedBatchDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
+                    # A 200 response shouldn't reach here, so we error out the whole batch
+                    raise VespaError(cause=e, message="Unexpected response from Vespa") from e
+
+                try:
+                    self._raise_for_status(resp)
+                except VespaStatusError as e:
+                    logger.error(e, exc_info=True)
+                    return FeedBatchDocumentResponse(status=resp.status_code, message=e.message, id=doc_id)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
                             timeout: int) -> FeedBatchDocumentResponse:
@@ -878,6 +882,14 @@ class VespaClient:
                 raise VespaStatusError(message=resp.text, cause=e) from e
 
     def _raise_for_status(self, resp: httpx.Response) -> None:
+        """Take the response and raise an VespaStatusError if the status code is not 2xx.
+
+        Args:
+            resp: The response object from the httpx client
+
+        Raises:
+            VespaStatusError: If the status code is not 2xx
+        """
         try:
             resp.raise_for_status()
         except httpx.HTTPStatusError as e:

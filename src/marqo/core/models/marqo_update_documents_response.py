@@ -6,7 +6,7 @@ from marqo.base_model import MarqoBaseModel
 
 
 class MarqoUpdateDocumentsItem(MarqoBaseModel):
-    id: str = Field(alias="_id")
+    id: Optional[str] = Field(alias="_id", default=None)
     status: int
     message: Optional[str] = None
     error: Optional[str] = None
@@ -15,7 +15,10 @@ class MarqoUpdateDocumentsItem(MarqoBaseModel):
     def check_status_and_message(cls, values):
         status = values.get('status')
         message = values.get('message')
-        if status >= 400 and message:
+        if status == 412:
+            values["message"] = "Document does not exist in the index."
+            values["status"] = 404
+        if isinstance(status, int) and status > 400 and message:
             values["error"] = message
         return values
 

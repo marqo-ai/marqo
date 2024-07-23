@@ -6,6 +6,8 @@ from marqo.core.exceptions import UnsupportedFeatureError, ParsingError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
+from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
@@ -102,7 +104,7 @@ class Document:
             except ParsingError as e:
                 unsuccessful_docs.append(
                     (index, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''), error=e.message,
-                                                     status=int(api_exceptions.InvalidArgError.status_code))))
+                                                         status=int(api_exceptions.InvalidArgError.status_code))))
 
         vespa_res: UpdateDocumentsBatchResponse = (
             self.vespa_client.update_documents_batch(vespa_documents,
@@ -132,15 +134,15 @@ class Document:
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
-                item = MarqoUpdateDocumentsItem(
+                new_item = MarqoUpdateDocumentsItem(
                     id=doc_id, status=resp.status, message=resp.message
                 )
-                new_items.append(item)
+                new_items.append(new_item)
 
         for loc, error_info in unsuccessful_docs:
             new_items.insert(loc, error_info)
 
-        return MarqoUpdateDocumentsResponse(index_name=index_name, items=new_items,
+        return MarqoUpdateDocumentsResponse(index_name=index_name, new_items=new_items,
                                             processingTimeMs=(timer() - start_time) * 1000)
 
     def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
@@ -171,3 +173,36 @@ class Document:
         # Reverse to preserve order in request
         docs.reverse()
         return docs, doc_ids
+
+    def translate_add_documents_response(self, responses: FeedBatchResponse,
+                                         index_name: str,
+                                         unsuccessful_docs: List,
+                                         add_docs_processing_time: float) \
+            -> MarqoAddDocumentsResponse:
+        """Translate Vespa response dict into MarqoAddDocumentsResponse.
+
+        Args:
+            responses: The response from Vespa
+            index_name: The name of the index
+            unsuccessful_docs: The list of unsuccessful documents
+            add_docs_processing_time: The processing time of the add documents operation, in seconds
+
+        Return:
+            MarqoAddDocumentsResponse: The response of the add documents operation
+        """
+
+        new_items: List[MarqoAddDocumentsItem] = []
+
+        if responses is not None:
+            for resp in responses.responses:
+                doc_id = resp.id.split('::')[-1] if resp.id else None
+                new_item = MarqoAddDocumentsItem(
+                    id=doc_id, status=resp.status, message=resp.message
+                )
+                new_items.append(new_item)
+
+        for loc, error_info in unsuccessful_docs:
+            new_items.insert(loc, error_info)
+
+        return MarqoAddDocumentsResponse(index_name=index_name, items=new_items,
+                                         processingTimeMs=add_docs_processing_time)

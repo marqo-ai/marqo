@@ -514,35 +514,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates Vespa response dict into Marqo dict"""
-            result_dict = {}
-            new_items = []
+        response = config.document.translate_add_documents_response(
+            index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
+            add_docs_processing_time=t1 - t0
+        )
 
-            if responses is not None:
-                result_dict['errors'] = responses.errors
-
-                for resp in responses.responses:
-                    id = resp.id.split('::')[-1] if resp.id else None
-                    new_items.append({'status': resp.status})
-                    if id:
-                        new_items[-1].update({'_id': id})
-                    if resp.message:
-                        new_items[-1].update({'message': resp.message})
-
-            if unsuccessful_docs:
-                result_dict['errors'] = True
-
-            for loc, error_info in unsuccessful_docs:
-                new_items.insert(loc, error_info)
-
-            result_dict["processingTimeMs"] = time_diff * 1000
-            result_dict["index_name"] = add_docs_params.index_name
-            result_dict["items"] = new_items
-
-            return result_dict
-
-        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
+        return response.dict(exclude_none=True, by_alias=True)
 
 
 def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
@@ -979,35 +956,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates Vespa response dict into Marqo dict"""
-            result_dict = {}
-            new_items: List[Dict] = []
+        response = config.document.translate_add_documents_response(
+            index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
+            add_docs_processing_time=t1 - t0
+        )
 
-            if responses is not None:
-                result_dict['errors'] = responses.errors
-
-                for resp in responses.responses:
-                    id = resp.id.split('::')[-1] if resp.id else None
-                    new_items.append({'status': resp.status})
-                    if id:
-                        new_items[-1].update({'_id': id})
-                    if resp.message:
-                        new_items[-1].update({'message': resp.message})
-
-            if unsuccessful_docs:
-                result_dict['errors'] = True
-
-            for loc, error_info in unsuccessful_docs:
-                new_items.insert(loc, error_info)
-
-            result_dict["processingTimeMs"] = time_diff * 1000
-            result_dict["index_name"] = add_docs_params.index_name
-            result_dict["items"] = new_items
-
-            return result_dict
-
-        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
+        return response.dict(exclude_none=True, by_alias=True)
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
