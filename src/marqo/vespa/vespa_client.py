@@ -536,7 +536,7 @@ class VespaClient:
 
         self._raise_for_status(resp)
 
-        return MarqoIndex(**resp.json())
+        return MarqoIndex.parse_obj(resp.json())
 
     def get_all_index_settings(self) -> List[MarqoIndex]:
         try:
@@ -548,7 +548,7 @@ class VespaClient:
 
         index_list = resp.json()
         if isinstance(index_list, list):
-            return [MarqoIndex(**item) for item in index_list]
+            return [MarqoIndex.parse_obj(item) for item in index_list]
 
         raise VespaError(f'Get all index settings returns invalid response: {index_list}')
 
