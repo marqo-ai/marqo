@@ -319,14 +319,14 @@ class TestIndexManagement(MarqoTestCase):
         self.assertEqual(index.model.text_query_prefix, "test query: ")
         self.assertEqual(index.model.text_chunk_prefix, "test passage: ")
 
-        self.index_management.delete_index(index)
+        self.index_management.delete_index_by_name(index.name)
 
         # test batch_create_index
         indexes = self.index_management.batch_create_indexes([marqo_index_request])
         self.assertEqual(indexes[0].model.text_query_prefix, "test query: ")
         self.assertEqual(indexes[0].model.text_chunk_prefix, "test passage: ")
 
-        self.index_management.delete_index(indexes[0])
+        self.index_management.delete_index_by_name(indexes[0].name)
 
     def test_get_marqo_version_successful(self):
         """
