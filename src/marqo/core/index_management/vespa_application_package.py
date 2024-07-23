@@ -2,6 +2,8 @@ import json
 import os
 import shutil
 import textwrap
+from typing import Optional, List
+
 import semver
 from datetime import datetime
 
@@ -10,6 +12,7 @@ from pathlib import Path
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.exceptions import InternalError
 from marqo.core.models import MarqoIndex
+from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
 import marqo.logging
 import marqo.vespa.vespa_client
@@ -22,8 +25,6 @@ class ServiceXml:
     """
     Represents a Vespa service XML file.
     """
-    _MARQO_CUSTOM_SEARCHERS_BUNDLE = 'marqo-custom-components'
-
     def __init__(self, path: str):
         if not os.path.exists(path):
             raise InternalError('Could not find file %s' % path)
@@ -106,7 +107,7 @@ class ServiceXml:
         ET.SubElement(config_element, 'indexSettingsHistoryFile').text = 'marqo_index_settings_history.json'
 
     @staticmethod
-    def _add_component(parent: ET.Element, tag: str, name: str, bundle: str = _MARQO_CUSTOM_SEARCHERS_BUNDLE):
+    def _add_component(parent: ET.Element, tag: str, name: str, bundle: str = 'marqo-custom-components'):
         element = ET.SubElement(parent, tag)
         element.set('id', name)
         element.set('bundle', bundle)
@@ -162,6 +163,26 @@ class IndexSettingStore:
 class MarqoConfig(ImmutableBaseModel):
     version: str
 
+    class Config(ImmutableBaseModel.Config):
+        extra = "allow"
+
+
+class MarqoConfigStore:
+    def __init__(self, marqo_config_json: str) -> None:
+        self._config = MarqoConfig.parse_obj(json.loads(marqo_config_json)) if marqo_config_json else None
+
+    def get(self) -> MarqoConfig:
+        return self._config
+
+    def update_version(self, version: str) -> None:
+        self._config = MarqoConfig(version)
+
+    def save_to_file(self, path: str) -> None:
+        if self._config is None:
+            raise InternalError(f"Cannot save Marqo config to {path}, it is not set")
+        with open(path, "w") as f:
+            f.write(self._config.json())
+
 
 class VespaApplicationPackage:
     """
@@ -173,54 +194,64 @@ class VespaApplicationPackage:
         self._vespa_client = vespa_client
         self._app_root_path = vespa_client.download_application(check_for_application_convergence=True)
         self._service_xml = ServiceXml(self._full_path('services.xml'))
+        self.has_marqo_config = os.path.exists(self._full_path('marqo_config.json'))
+        self._marqo_config_store = MarqoConfigStore(self._load_json_from_file('marqo_config.json'))
         self._index_setting_store = IndexSettingStore(
-            self._load_json_from_file('marqo_index_settings.json', created_if_not_exist=True),
-            self._load_json_from_file('marqo_index_settings_history.json', created_if_not_exist=True))
+            self._load_json_from_file('marqo_index_settings.json', default_value='{}'),
+            self._load_json_from_file('marqo_index_settings_history.json', default_value='{}'))
 
     def _full_path(self, *paths: str) -> str:
         return os.path.join(self._app_root_path, *paths)
 
-    def _load_json_from_file(self, path: str, default_value: str = '{}', created_if_not_exist: bool = False) -> str:
+    def _load_json_from_file(self, path: str, default_value: Optional[str] = None) -> str:
         full_path = self._full_path(path)
         if not os.path.exists(full_path):
-            if created_if_not_exist:
-                with open(full_path, 'w') as file:
-                    file.write(default_value)
             return default_value
         with open(full_path, 'r') as file:
             return file.read()
 
     def deploy(self, deployment_timeout=60, convergence_timeout=120) -> None:
         self._service_xml.save()
+        self._marqo_config_store.save_to_file(self._full_path('marqo_config.json'))
         self._index_setting_store.save_to_files(self._full_path('marqo_index_settings.json'),
                                                 self._full_path('marqo_index_settings_history.json'))
         self._vespa_client.deploy_application(self._app_root_path, timeout=deployment_timeout)
         self._vespa_client.wait_for_application_convergence(timeout=convergence_timeout)
 
-    def bootstrap(self, marqo_version: str, allow_downgrade: bool = False, ) -> bool:
+    def bootstrap(self, marqo_version: str, allow_downgrade: bool = False,
+                  marqo_config_doc: Optional[MarqoConfig] = None,
+                  existing_index_settings: List[MarqoIndex] = ()) -> bool:
         marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
-        app_sem_version = semver.VersionInfo.parse(self._get_version(), optional_minor_and_patch=True)
+        app_sem_version = semver.VersionInfo.parse(self._get_version(marqo_config_doc), optional_minor_and_patch=True)
 
         if app_sem_version >= marqo_sem_version and not allow_downgrade:
             return False
 
-        self._add_default_query_profile()
-        self._update_components()
+        if not self.has_marqo_config and existing_index_settings:
+            for index in existing_index_settings:
+                self._index_setting_store.save_index_setting(index.copy(update={'version': 1}, deep=True))
 
-        # TODO bootstrap
-        # copy index settings if necessary
-        # set version
+        self._add_default_query_profile()
+        self._copy_components_jar()
+        self._service_xml.config_components()
+        self._marqo_config_store.update_version(marqo_version)
 
         return True
 
-    def _get_version(self) -> str:
+    def _get_version(self, marqo_config_doc: Optional[MarqoConfig]) -> str:
         """
         Returns the version of the application package. This should match the version of Marqo which bootstraps the
         application package. Going forward, we will upgrade the application package in each Marqo release.
-        It tries to retrieve version from the marqo_config.json file first. This file exists after v2.11.0
-        If the file does not exist, it tries to get it from marqo__config doc in marqo__settings schema. This approach
-        is used after v2.1.0. If it fails again, then return the default version 2.0.0
+        It tries to retrieve version from the marqo_config.json file first. This file exists after v2.12.0
+        If the file does not exist, it uses the version from marqo__config doc in marqo__settings schema. This version
+        is passed in and is present for all bootstrapped Marqo instance used after v2.1.0.
+        If it is not present either, it means either this application package hasn't been bootstrapped or it is prior to
+        v2.1.0. In this case, we return the default versio '2.0.0'
         """
+        if self.has_marqo_config:
+            return self._marqo_config_store.get().version
+        if marqo_config_doc:
+            return marqo_config_doc.version
         return '2.0.0'
 
     def _add_default_query_profile(self) -> None:
@@ -234,15 +265,18 @@ class VespaApplicationPackage:
         )
         self._save_txt_file(content, 'search/query-profiles', 'default.xml')
 
-    def _update_components(self) -> None:
+    def _copy_components_jar(self) -> None:
         vespa_jar_folder = Path(__file__).parent / '../../../../vespa/target'
         components_jar_files = ['marqo-custom-components-deploy.jar']
-        self._delete_file('components')
 
+        # delete the whole components folder
+        components_path = self._full_path('components')
+        shutil.rmtree(components_path)
+        os.makedirs(components_path)
+
+        # copy the components jar file to the empty folder
         for file in components_jar_files:
-            self._copy_file(str(vespa_jar_folder/file), self._full_path('components', file))
-
-        self._service_xml.config_components()
+            shutil.copy(vespa_jar_folder/file, self._full_path('components', file))
 
     def add_schema(self, name: str, schema: str) -> None:
         self._save_txt_file(schema, 'schemas', f'{name}.sd')
@@ -254,6 +288,7 @@ class VespaApplicationPackage:
         self._add_schema_removal_override()
 
     def _add_schema_removal_override(self) -> None:
+        # FIXME we should set a time only a few min in the future to allow minimum window for schema deletion
         content = textwrap.dedent(
             f'''
             <validation-overrides>
@@ -278,12 +313,4 @@ class VespaApplicationPackage:
         if not os.path.exists(path):
             logger.warn(f"{path} does not exist in application package, nothing to delete")
         else:
-            if os.path.isdir(path):
-                os.removedirs(path)
-            else:
-                os.remove(path)
-
-    def _copy_file(self, source_path: str, target_path: str) -> None:
-        if not os.path.exists(target_path):
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        shutil.copy(source_path, target_path)
+            os.remove(path)
