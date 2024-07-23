@@ -56,7 +56,6 @@ class IndexManagement:
         '''
     )
    
-    # Use the env var values here
     _DEFAULT_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
         '''
         <query-profile id="default">
