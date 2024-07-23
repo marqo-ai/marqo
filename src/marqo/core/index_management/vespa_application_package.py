@@ -258,6 +258,9 @@ class VespaApplicationPackage:
         with open(full_path, 'r') as file:
             return file.read()
 
+    def get_marqo_config(self) -> MarqoConfig:
+        return self._marqo_config_store.get()
+
     def skip_deployment(self):
         self._skip_deployment = True
 
