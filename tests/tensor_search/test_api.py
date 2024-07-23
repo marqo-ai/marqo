@@ -229,6 +229,7 @@ class TestApiCustomEnvVars(MarqoTestCase):
             self.assertIn(f'<field name="maxOffset">{custom_offset}</field>', written_content)
 
             # Test the actual api
+            importlib.reload(sys.modules['marqo.tensor_search.api'])
             self.client = TestClient(api.app)
 
             with self.subTest(search_method="TENSOR"):
@@ -240,6 +241,8 @@ class TestApiCustomEnvVars(MarqoTestCase):
                             "limit": custom_limit,
                             "offset": custom_offset,
                         })
+                        print(res)
+                        print(res.json())
                         self.assertEqual(res.status_code, 200)
 
                         res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={

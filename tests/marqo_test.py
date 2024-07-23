@@ -14,6 +14,7 @@ from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, 
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
+import os
 
 
 class MarqoTestCase(unittest.TestCase):
@@ -37,11 +38,15 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        os.environ['MARQO_MAX_SEARCH_LIMIT'] = "1000"
+        os.environ['MARQO_MAX_SEARCH_OFFSET'] = "10000"
         vespa_client = VespaClient(
             "http://localhost:19071",
             "http://localhost:8080",
             "http://localhost:8080",
             content_cluster_name="content_default",
+            max_search_limit=1000,
+            max_search_offset=10000,
         )
         zookeeper_client = ZookeeperClient(hosts="localhost:2181", zookeeper_connection_timeout=10)
         cls.configure_request_metrics()
