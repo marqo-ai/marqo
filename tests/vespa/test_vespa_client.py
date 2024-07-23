@@ -88,7 +88,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(2, len(res.responses))
         for r in res.responses:
             self.assertEqual(r.status, 500)
-            self.assertIn("Marqo has encountered an error while feeding this document to Vespa", r.message)
+            self.assertIn("Network Error", r.message)
 
     @patch.object(concurrency, "_run_coroutine_in_thread", wraps=concurrency._run_coroutine_in_thread)
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
@@ -422,4 +422,4 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(2, len(batch_response.responses))
         for r in batch_response.responses:
             self.assertEqual(r.status, 500)
-            self.assertIn("Marqo has encountered an error while feeding this document", r.message)
+            self.assertIn("Network Error", r.message)

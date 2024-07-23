@@ -69,9 +69,9 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ids = [response.id.split("::")[-1] for response in batch_response.responses if response.status == 200]
         messages = [response.message for response in batch_response.responses]
 
-        self.assertEqual(statuses, [404, 404])
-        self.assertEqual(path_ids, ["doc1", "doc2"])
-        self.assertEqual(ids, [])
+        self.assertEqual([412, 412], statuses)
+        self.assertEqual(["doc1", "doc2"], path_ids)
+        self.assertEqual([], ids)
         self.assertIn("not exist", messages[0])
         self.assertIn("not exist", messages[1])
 
