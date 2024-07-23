@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.exceptions import InternalError
+from marqo.core.exceptions import InternalError, OperationConflictError
 from marqo.core.models import MarqoIndex
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
@@ -118,6 +118,31 @@ class IndexSettingStore:
     """
     Index settings are now stored in a json file within the application package. Up to 3 historical versions of each
     index setting are stored in another json file. This class handles the creation and management of index settings
+
+    Index settings json file format:
+    {
+        "index1": {
+            "name": "index1",
+            "version": 1,
+            ...
+        }
+    }
+
+    Index settings history json file format:
+    {
+        "index2": [
+            {
+                "name": "index2",
+                "version": 2,
+               ...
+            },
+            {
+                "name": "index2",
+                "version": 1,
+               ...
+            }
+        ]
+    }
     """
     _HISTORY_VERSION_LIMIT = 3
 
@@ -135,14 +160,25 @@ class IndexSettingStore:
                        key, history in self._index_settings_history.items()}, f)
 
     def save_index_setting(self, index_setting: MarqoIndex) -> None:
-        if index_setting.name in self._index_settings:
-            # update the index setting, TODO check if the version matches first
-            self._move_to_history(index_setting.name)
+        target_version = (index_setting.version or 0) + 1
+        name = index_setting.name
+
+        if name in self._index_settings:
+            current_version = self._index_settings[name].version
+            if current_version + 1 != target_version:
+                raise OperationConflictError(f'Conflict in version detected while saving index {name}. '
+                                             f'Current version {current_version}, new version {target_version}.')
+            self._move_to_history(name)
         else:
-            # create a new index setting with version 1, TODO check if the version is actually 1
-            if index_setting.name in self._index_settings_history:
-                del self._index_settings_history[index_setting.name]
-            self._index_settings[index_setting.name] = index_setting
+            if target_version != 1:
+                raise OperationConflictError(f'Conflict in version detected while saving index {name}. '
+                                             f'The index does not exist or has been deleted, and we are trying to '
+                                             f'upgrade it to version {target_version}')
+            # If the name exists in history, it means index with the same name was deleted. Clean the history
+            if name in self._index_settings_history:
+                del self._index_settings_history[name]
+
+        self._index_settings[name] = index_setting.copy(deep=True, update={'version': target_version})
 
     def delete_index_setting(self, index_setting_name: str) -> None:
         if index_setting_name not in self._index_settings:
@@ -168,6 +204,14 @@ class MarqoConfig(ImmutableBaseModel):
 
 
 class MarqoConfigStore:
+    """
+    Store Marqo configuration in a JSON file in the application package
+    Index settings json file format:
+    {
+        "version": "2.11.0"
+        ...
+    }
+    """
     def __init__(self, marqo_config_json: str) -> None:
         self._config = MarqoConfig.parse_obj(json.loads(marqo_config_json)) if marqo_config_json else None
 
@@ -229,7 +273,7 @@ class VespaApplicationPackage:
 
         if not self.has_marqo_config and existing_index_settings:
             for index in existing_index_settings:
-                self._index_setting_store.save_index_setting(index.copy(update={'version': 1}, deep=True))
+                self._index_setting_store.save_index_setting(index)
 
         self._add_default_query_profile()
         self._copy_components_jar()
@@ -248,7 +292,7 @@ class VespaApplicationPackage:
         If it is not present either, it means either this application package hasn't been bootstrapped or it is prior to
         v2.1.0. In this case, we return the default versio '2.0.0'
         """
-        if self.has_marqo_config:
+        if self.has_marqo_config and self._marqo_config_store.get():
             return self._marqo_config_store.get().version
         if marqo_config_doc:
             return marqo_config_doc.version
