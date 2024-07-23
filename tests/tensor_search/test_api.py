@@ -202,14 +202,14 @@ class TestApiCustomEnvVars(MarqoTestCase):
 
     def test_custom_search_limits(self):
         custom_limit = 2000
-        custom_offset = 20000
+        custom_offset = 2000
 
         with mock.patch.dict(os.environ, {
             EnvVars.MARQO_MAX_SEARCH_LIMIT: str(custom_limit),
             EnvVars.MARQO_MAX_SEARCH_OFFSET: str(custom_offset)
         }):
             importlib.reload(sys.modules['marqo.tensor_search.api'])
-            
+
             # Explicitly call generate_config to trigger initialization
             new_config = api.generate_config()
 
@@ -227,6 +227,47 @@ class TestApiCustomEnvVars(MarqoTestCase):
             # Check if the custom limits were correctly set in the query profile
             self.assertIn(f'<field name="maxHits">{custom_limit}</field>', written_content)
             self.assertIn(f'<field name="maxOffset">{custom_offset}</field>', written_content)
+
+            # Test the actual api
+            self.client = TestClient(api.app)
+
+            with self.subTest(search_method="TENSOR"):
+                for index in [self.unstructured_index, self.structured_index]:
+                    with self.subTest(index=index.name):
+                        res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                            "q": "irrelevant",
+                            "searchMethod": "TENSOR",
+                            "limit": custom_limit,
+                            "offset": custom_offset,
+                        })
+                        self.assertEqual(res.status_code, 200)
+
+                        res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                            "q": "irrelevant",
+                            "searchMethod": "TENSOR",
+                            "limit": custom_limit + 1,
+                            "offset": custom_offset + 1,
+                        })
+                        self.assertEqual(res.status_code, 400)
+
+            with self.subTest(search_method="HYBRID"):
+                for index in [self.structured_index]:   # TODO: add unstructured when supported
+                    with self.subTest(index=index.name):
+                        res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                            "q": "irrelevant",
+                            "searchMethod": "HYBRID",
+                            "limit": custom_limit,
+                            "offset": custom_offset,
+                        })
+                        self.assertEqual(res.status_code, 200)
+
+                        res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
+                            "q": "irrelevant",
+                            "searchMethod": "HYBRID",
+                            "limit": custom_limit + 1,
+                            "offset": custom_offset + 1,
+                        })
+                        self.assertEqual(res.status_code, 400)
 
 
 class TestApiErrors(MarqoTestCase):
