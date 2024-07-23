@@ -1,6 +1,6 @@
 import uuid
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
 
 from fastapi.testclient import TestClient
 
@@ -9,6 +9,7 @@ from marqo import exceptions as base_exceptions
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
@@ -198,6 +199,34 @@ class TestApiCustomEnvVars(MarqoTestCase):
                         self.assertEqual(res.status_code, 504)
                         self.assertEqual(res.json()["code"], "vector_store_timeout")
                         self.assertEqual(res.json()["type"], "invalid_request")
+
+    def test_custom_search_limits(self):
+        custom_limit = 2000
+        custom_offset = 20000
+
+        with mock.patch.dict(os.environ, {
+            EnvVars.MARQO_MAX_SEARCH_LIMIT: str(custom_limit),
+            EnvVars.MARQO_MAX_SEARCH_OFFSET: str(custom_offset)
+        }):
+            importlib.reload(sys.modules['marqo.tensor_search.api'])
+            
+            # Explicitly call generate_config to trigger initialization
+            new_config = api.generate_config()
+
+            # Initialize a new IndexManagement object with the new config
+            index_management = IndexManagement(new_config.vespa_client)
+
+            # Mock the open function to capture the written content
+            mock_open_result = mock.mock_open()
+            with mock.patch('builtins.open', mock_open_result):
+                index_management._add_default_query_profile('dummy_path')
+
+            # Get the written content
+            written_content = mock_open_result().write.call_args[0][0]
+
+            # Check if the custom limits were correctly set in the query profile
+            self.assertIn(f'<field name="maxHits">{custom_limit}</field>', written_content)
+            self.assertIn(f'<field name="maxOffset">{custom_offset}</field>', written_content)
 
 
 class TestApiErrors(MarqoTestCase):
