@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.exceptions import InternalError, OperationConflictError
+from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
@@ -187,6 +187,9 @@ class IndexSettingStore:
             self._move_to_history(index_setting_name)
             del self._index_settings[index_setting_name]
 
+    def get_index(self, index_setting_name: str) -> MarqoIndex:
+        return self._index_settings[index_setting_name] if index_setting_name in self._index_settings else None
+
     def _move_to_history(self, index_setting_name):
         if index_setting_name in self._index_settings_history:
             self._index_settings_history[index_setting_name].insert(0, self._index_settings[index_setting_name])
@@ -237,6 +240,7 @@ class VespaApplicationPackage:
     def __init__(self, vespa_client: VespaClient):
         self._vespa_client = vespa_client
         self._app_root_path = vespa_client.download_application(check_for_application_convergence=True)
+        self._skip_deployment = False
         self._service_xml = ServiceXml(self._full_path('services.xml'))
         self.has_marqo_config = os.path.exists(self._full_path('marqo_config.json'))
         self._marqo_config_store = MarqoConfigStore(self._load_json_from_file('marqo_config.json'))
@@ -254,7 +258,13 @@ class VespaApplicationPackage:
         with open(full_path, 'r') as file:
             return file.read()
 
+    def skip_deployment(self):
+        self._skip_deployment = True
+
     def deploy(self, deployment_timeout=60, convergence_timeout=120) -> None:
+        if self._skip_deployment:
+            logger.info("Skip app deployment since the skip deployment flag is set")
+            return
         self._service_xml.save()
         self._marqo_config_store.save_to_file(self._full_path('marqo_config.json'))
         self._index_setting_store.save_to_files(self._full_path('marqo_index_settings.json'),
@@ -262,15 +272,30 @@ class VespaApplicationPackage:
         self._vespa_client.deploy_application(self._app_root_path, timeout=deployment_timeout)
         self._vespa_client.wait_for_application_convergence(timeout=convergence_timeout)
 
-    def bootstrap(self, marqo_version: str, allow_downgrade: bool = False,
-                  marqo_config_doc: Optional[MarqoConfig] = None,
-                  existing_index_settings: List[MarqoIndex] = ()) -> bool:
+    def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None,
+                           allow_downgrade: bool = False) -> bool:
+        """
+        Bootstrapping is needed when
+        - the version of Marqo is higher than the version of the deployed application
+        - the version of Marqo is lower but allow downgrade is enabled (used for rollback)
+        The version of the application is retrieved in the following order:
+        - from the 'marqo_config.json' file (Post v2.12.0)
+        - from the marqo_config_doc passed in which is marqo__config doc saved in marqo__settings schema (Post v2.1.0)
+        - if neither is available, return 2.0.0 as default (Pre v2.1.0 or not bootstrapped yet)
+        """
+        if self.has_marqo_config and self._marqo_config_store.get():
+            app_version = self._marqo_config_store.get().version
+        elif marqo_config_doc:
+            app_version = marqo_config_doc.version
+        else:
+            app_version = '2.0.0'
+
         marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
-        app_sem_version = semver.VersionInfo.parse(self._get_version(marqo_config_doc), optional_minor_and_patch=True)
+        app_sem_version = semver.VersionInfo.parse(app_version, optional_minor_and_patch=True)
 
-        if app_sem_version >= marqo_sem_version and not allow_downgrade:
-            return False
+        return (app_sem_version < marqo_sem_version) or (app_sem_version > marqo_sem_version and allow_downgrade)
 
+    def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
         if not self.has_marqo_config and existing_index_settings:
             for index in existing_index_settings:
                 self._index_setting_store.save_index_setting(index)
@@ -279,24 +304,6 @@ class VespaApplicationPackage:
         self._copy_components_jar()
         self._service_xml.config_components()
         self._marqo_config_store.update_version(marqo_version)
-
-        return True
-
-    def _get_version(self, marqo_config_doc: Optional[MarqoConfig]) -> str:
-        """
-        Returns the version of the application package. This should match the version of Marqo which bootstraps the
-        application package. Going forward, we will upgrade the application package in each Marqo release.
-        It tries to retrieve version from the marqo_config.json file first. This file exists after v2.12.0
-        If the file does not exist, it uses the version from marqo__config doc in marqo__settings schema. This version
-        is passed in and is present for all bootstrapped Marqo instance used after v2.1.0.
-        If it is not present either, it means either this application package hasn't been bootstrapped or it is prior to
-        v2.1.0. In this case, we return the default versio '2.0.0'
-        """
-        if self.has_marqo_config and self._marqo_config_store.get():
-            return self._marqo_config_store.get().version
-        if marqo_config_doc:
-            return marqo_config_doc.version
-        return '2.0.0'
 
     def _add_default_query_profile(self) -> None:
         content = textwrap.dedent(
@@ -322,14 +329,26 @@ class VespaApplicationPackage:
         for file in components_jar_files:
             shutil.copy(vespa_jar_folder/file, self._full_path('components', file))
 
-    def add_schema(self, name: str, schema: str) -> None:
-        self._save_txt_file(schema, 'schemas', f'{name}.sd')
-        self._service_xml.add_schema(name)
+    def add_index_setting_and_schema(self, index_setting: MarqoIndex, schema: str) -> None:
+        self._index_setting_store.save_index_setting(index_setting)
+        self._save_txt_file(schema, 'schemas', f'{index_setting.schema_name}.sd')
+        self._service_xml.add_schema(index_setting.schema_name)
 
-    def remove_schema(self, name: str) -> None:
-        self._delete_file('schemas', f'{name}.sd')
-        self._service_xml.remove_schema(name)
+    def delete_index_setting_and_schema(self, index_name: str) -> None:
+        index = self._index_setting_store.get_index(index_name)
+        if index is None:
+            raise IndexNotFoundError(f"Index {index_name} not found")
+
+        self._index_setting_store.delete_index_setting(index.name)
+        self._delete_file('schemas', f'{index.schema_name}.sd')
+        self._service_xml.remove_schema(index.schema_name)
         self._add_schema_removal_override()
+
+    def has_schema(self, name: str) -> bool:
+        return os.path.exists(self._full_path('schemas', f'{name}.sd'))
+
+    def has_index(self, name: str) -> bool:
+        return self._index_setting_store.get_index(name) is not None
 
     def _add_schema_removal_override(self) -> None:
         # FIXME we should set a time only a few min in the future to allow minimum window for schema deletion
