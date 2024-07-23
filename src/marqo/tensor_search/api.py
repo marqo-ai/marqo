@@ -54,6 +54,10 @@ def generate_config() -> config.Config:
         get_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_GET_POOL_SIZE),
         delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
         partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
+        # MARQO_MAX_SEARCH_LIMIT
+        max_search_limit=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_LIMIT),
+        #MARQO_MAX_SEARCH_OFFSET
+        max_search_offset=utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_OFFSET)
     )
 
     # Zookeeper is only instantiated if the hosts are provided
