@@ -129,7 +129,9 @@ class Document:
             MarqoUpdateDocumentsResponse containing the response of the partial update operation
         """
 
-        new_items: List[MarqoUpdateDocumentsItem] = []
+        items: List[MarqoUpdateDocumentsItem] = []
+
+        errors = False
 
         if responses is not None:
             for resp in responses.responses:
@@ -137,12 +139,15 @@ class Document:
                 new_item = MarqoUpdateDocumentsItem(
                     id=doc_id, status=resp.status, message=resp.message
                 )
-                new_items.append(new_item)
+                if new_item.error:
+                    errors = True
+                items.append(new_item)
 
         for loc, error_info in unsuccessful_docs:
-            new_items.insert(loc, error_info)
+            items.insert(loc, error_info)
+            errors = True
 
-        return MarqoUpdateDocumentsResponse(index_name=index_name, new_items=new_items,
+        return MarqoUpdateDocumentsResponse(errors=errors, erroindex_name=index_name, items=items,
                                             processingTimeMs=(timer() - start_time) * 1000)
 
     def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
@@ -179,7 +184,7 @@ class Document:
                                          unsuccessful_docs: List,
                                          add_docs_processing_time: float) \
             -> MarqoAddDocumentsResponse:
-        """Translate Vespa response dict into MarqoAddDocumentsResponse.
+        """Translate Vespa FeedBatchResponse into MarqoAddDocumentsResponse.
 
         Args:
             responses: The response from Vespa
@@ -192,6 +197,7 @@ class Document:
         """
 
         new_items: List[MarqoAddDocumentsItem] = []
+        errors = False
 
         if responses is not None:
             for resp in responses.responses:
@@ -199,10 +205,13 @@ class Document:
                 new_item = MarqoAddDocumentsItem(
                     id=doc_id, status=resp.status, message=resp.message
                 )
+                if new_item.error:
+                    errors = True
                 new_items.append(new_item)
 
         for loc, error_info in unsuccessful_docs:
             new_items.insert(loc, error_info)
+            errors = True
 
-        return MarqoAddDocumentsResponse(index_name=index_name, items=new_items,
+        return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
                                          processingTimeMs=add_docs_processing_time)

@@ -28,14 +28,3 @@ class MarqoUpdateDocumentsResponse(MarqoBaseModel):
     index_name: str
     items: List[MarqoUpdateDocumentsItem]
     processingTimeMs: float
-
-    @root_validator(pre=True)
-    def check_errors(cls, values):
-        items = values.get('items')
-        errors = False
-        for item in items:
-            if item.error:
-                errors = True
-                break
-        values["errors"] = errors
-        return values
