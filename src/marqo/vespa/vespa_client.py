@@ -40,7 +40,7 @@ class VespaClient:
     def __init__(self, config_url: str, document_url: str, query_url: str,
                  content_cluster_name: str, default_search_timeout_ms: int = 1000, pool_size: int = 10,
                  feed_pool_size: int = 10, get_pool_size: int = 10, delete_pool_size: int = 10,
-                 partial_update_pool_size: int = 10):
+                 partial_update_pool_size: int = 10, max_search_offset: int = 10000, max_search_limit: int = 1000):
         """
         Create a VespaClient object.
         Args:
@@ -65,6 +65,8 @@ class VespaClient:
         self.get_pool_size = get_pool_size
         self.delete_pool_size = delete_pool_size
         self.partial_pool_size = partial_update_pool_size
+        self.max_search_offset = max_search_offset
+        self.max_search_limit = max_search_limit
 
     def close(self):
         """
