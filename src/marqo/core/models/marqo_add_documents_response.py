@@ -36,5 +36,5 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
 class MarqoAddDocumentsResponse(MarqoBaseModel):
     errors: bool
     processingTimeMs: float
-    index_name: str
+    index_name: str # TODO Change this to camelCase in the future (Breaking change!)
     items: List[MarqoAddDocumentsItem]
