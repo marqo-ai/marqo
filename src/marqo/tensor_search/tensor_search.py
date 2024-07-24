@@ -65,6 +65,7 @@ from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.clip_utils import _is_image
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
@@ -89,7 +90,7 @@ from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
 logger = get_logger(__name__)
 
 
-def add_documents(config: Config, add_docs_params: AddDocsParams):
+def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDocumentsResponse:
     """
     Args:
         config: Config object
@@ -113,7 +114,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
 
-def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: UnstructuredMarqoIndex):
+def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: UnstructuredMarqoIndex)\
+        -> MarqoAddDocumentsResponse:
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
     unstructured_vespa_index = UnstructuredVespaIndex(marqo_index)
@@ -514,12 +516,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        response = config.document.translate_add_documents_response(
+        return config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
             add_docs_processing_time=t1 - t0
         )
-
-        return response.dict(exclude_none=True, by_alias=True)
 
 
 def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
@@ -956,12 +956,10 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        response = config.document.translate_add_documents_response(
+        return config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
             add_docs_processing_time=t1 - t0
         )
-
-        return response.dict(exclude_none=True, by_alias=True)
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):

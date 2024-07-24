@@ -4,7 +4,7 @@ from typing import List
 
 import pydantic
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -317,9 +317,18 @@ def add_or_replace_documents(
                                                              device=device)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        return tensor_search.add_documents(
+        res = tensor_search.add_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
+
+        headers = {
+            "x-add-doc-error-count": str(res.get_error_count()),
+            "x-add-doc-correct-count": str(res.get_success_count())
+        }
+
+        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=headers)
+
+
 
 
 @app.post("/indexes/{index_name}/embed")

@@ -137,7 +137,7 @@ class Document:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
                 new_item = MarqoUpdateDocumentsItem(
-                    id=doc_id, status=resp.status, message=resp.message
+                    id=doc_id, status=resp.status, message=resp.message, _is_from_vespa_response=True
                 )
                 if new_item.error:
                     errors = True
@@ -147,7 +147,7 @@ class Document:
             items.insert(loc, error_info)
             errors = True
 
-        return MarqoUpdateDocumentsResponse(errors=errors, erroindex_name=index_name, items=items,
+        return MarqoUpdateDocumentsResponse(errors=errors, index_name=index_name, items=items,
                                             processingTimeMs=(timer() - start_time) * 1000)
 
     def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
@@ -203,7 +203,7 @@ class Document:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
                 new_item = MarqoAddDocumentsItem(
-                    id=doc_id, status=resp.status, message=resp.message
+                    id=doc_id, status=resp.status, message=resp.message, _is_from_vespa_response=True
                 )
                 if new_item.error:
                     errors = True
