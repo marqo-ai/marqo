@@ -10,7 +10,7 @@ class MarqoUpdateDocumentsItem(MarqoBaseModel):
     status: int
     message: Optional[str] = None
     error: Optional[str] = None
-    _is_from_vespa_response: bool = False
+    _is_from_vespa_response: Field(type=bool, exclude=True, default=False)
 
     @root_validator(pre=True)
     def check_status_and_message(cls, values):
@@ -24,15 +24,18 @@ class MarqoUpdateDocumentsItem(MarqoBaseModel):
                 message = "Document does not exist in the index."
                 status = 404
 
-        # Put the message to error if status is 4xx or 5xx no matter it's from Vespa or not
-        if status >= 400 and message:
-            values["error"] = values["message"]
-            values["message"] = None
-        return values
+        # We should put the put error message in both message and error field now as we are not allowed to have
+        # break changes. message will be our primary field in the future.
+        # TODO remove error in the future
+        if error is None:
+            error = message
+        elif message is None:
+            message = error
 
-    def dict(self, *args, **kwargs) -> dict:
-        """Override dict method to only include the necessary fields."""
-        return super().dict(*args, **kwargs, include={'id', 'status', 'message', 'error'})
+        values["status"] = status
+        values["message"] = message
+        values["error"] = error
+        return values
 
 
 class MarqoUpdateDocumentsResponse(MarqoBaseModel):
@@ -40,8 +43,8 @@ class MarqoUpdateDocumentsResponse(MarqoBaseModel):
     index_name: str
     items: List[MarqoUpdateDocumentsItem]
     processingTimeMs: float
-    _success_count: int = 0
-    _error_count: int = 0
+    _success_count: Field(exclude=True, default=0)
+    _error_count: Field(exclude=True, default=0)
 
     @root_validator(skip_on_failure=True)
     def calculate_success_and_error_count(cls, values):
@@ -65,8 +68,3 @@ class MarqoUpdateDocumentsResponse(MarqoBaseModel):
 
     def get_error_count(self) -> int:
         return self._error_count
-
-    def dict(self, *args, **kwargs) -> dict:
-        """Override dict method to only include the necessary fields."""
-        return super().dict(*args, **kwargs, include={'errors', 'processingTimeMs', 'index_name', 'items'})
-

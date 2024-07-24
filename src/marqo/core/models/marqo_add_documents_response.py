@@ -14,31 +14,38 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     message: Optional[str] = None
     error: Optional[str] = None
-    _is_from_vespa_response: bool = False
+    _is_from_vespa_response: Field(type=bool, exclude=True, default=False)
 
     @root_validator(pre=True)
     def check_status_and_message(cls, values):
         status = values.get('status')
         message = values.get('message')
+        error = values.get('error')
         is_from_vespa_response = values.get('_is_from_vespa_response', False)
         # We only want to check the status and message if the response is from Vespa
         if is_from_vespa_response:
             if not isinstance(status, int):
                 raise ValueError(f"status must be an integer, got {status}")
             if status == 200:
-                return values
+                pass
             elif status == 429:
-                values["error"] = "Marqo vector store receives too many requests. Please try again later."
+                message = "Marqo vector store receives too many requests. Please try again later."
             elif status == 507:
-                values["error"] = "Marqo vector store is out of memory or disk space."
+                message = "Marqo vector store is out of memory or disk space."
             else:
-                values["status"] = 500
-                values["error"] = message
-        return values
+                status = 500
 
-    def dict(self, *args, **kwargs) -> dict:
-        """Override dict method to only include the necessary fields."""
-        return super().dict(*args, **kwargs, include={'id', 'status', 'message', 'error'})
+        # We should put the put error message in both message and error field now as we are not allowed to have
+        # break changes. message will be our primary field in the future.
+        if error is None:
+            error = message
+        elif message is None:
+            message = error
+
+        values["status"] = status
+        values["message"] = message
+        values["error"] = error
+        return values
 
 
 class MarqoAddDocumentsResponse(MarqoBaseModel):
@@ -46,8 +53,8 @@ class MarqoAddDocumentsResponse(MarqoBaseModel):
     processingTimeMs: float
     index_name: str  # TODO Change this to camelCase in the future (Breaking change!)
     items: List[MarqoAddDocumentsItem]
-    _success_count: int = 0
-    _error_count: int = 0
+    _success_count: Field(type=int, exclude=True, default=0)
+    _error_count: Field(type=int, exclude=True, default=0)
 
     @root_validator(skip_on_failure=True)
     def calculate_success_and_error_count(cls, values):
@@ -71,7 +78,3 @@ class MarqoAddDocumentsResponse(MarqoBaseModel):
 
     def get_error_count(self) -> int:
         return self._error_count
-
-    def dict(self, *args, **kwargs) -> dict:
-        """Override dict method to only include the necessary fields."""
-        return super().dict(*args, **kwargs, include={'errors', 'processingTimeMs', 'index_name', 'items'})
