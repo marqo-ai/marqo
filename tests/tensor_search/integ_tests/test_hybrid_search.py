@@ -894,7 +894,6 @@ class TestHybridSearch(MarqoTestCase):
     def test_hybrid_search_with_filter(self):
         """
         Tests that filter is applied correctly in hybrid search.
-        TODO: Fix
         """
 
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
@@ -939,6 +938,8 @@ class TestHybridSearch(MarqoTestCase):
     def test_hybrid_search_with_images(self):
         """
         Tests that hybrid search is accurate with images, both in query and in documents.
+        Note: For unstructured, both image and link are indexed, thus the doc will have a lexical and tensor score.
+        For structured, only the image is indexed, thus the doc will ONLY have a tensor score.
         """
 
         for index in [self.structured_default_image_index, self.unstructured_default_image_index]:
@@ -977,7 +978,6 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertIn("hits", hybrid_res)
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "hippo text")
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "hippo text low relevance")
-                    # TODO: Fix, lexical score doesn't get set for images
 
                 with self.subTest("disjunction image search"):
                     hybrid_res = tensor_search.search(
@@ -993,13 +993,12 @@ class TestHybridSearch(MarqoTestCase):
                         result_count=4
                     )
 
-                    # TODO: Fix unstructured timeout issue
                     self.assertIn("hits", hybrid_res)
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "hippo image")
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "random image")
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "hippo text")
 
-    def test_hybrid_search_opposite_retrieval_and_ranking(self):
+    def test_hybrid_search_structured_opposite_retrieval_and_ranking(self):
         """
         Tests that hybrid search with:
         retrievalMethod = "lexical", rankingMethod = "tensor" and
@@ -1008,111 +1007,282 @@ class TestHybridSearch(MarqoTestCase):
         have expected results. The documents themselves should exactly match retrieval method, but the scores
         should match the ranking method. This is only consistent for single-field search, as retrieval top k will
         match the ranking top k.
+
+        Uses structured index, so we have searchable attributes.
         """
 
-        # TODO: Add unstructured index but without searchable attributes
-        for index in [self.structured_text_index_score_modifiers]:
-            with self.subTest(index=index.name):
-                # Add documents
-                tensor_search.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=self.docs_list,
-                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] \
-                            if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
+        # Add documents
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.structured_text_index_score_modifiers.name,
+                docs=self.docs_list
+            )
+        )
 
-                # Reference results
-                tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
-                    config=self.config,
-                    index_name=index.name,
-                    text="dogs",
-                    search_method="TENSOR",
-                    searchable_attributes=["text_field_1"],
-                    result_count=20,
-                )
-                lexical_res = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text="dogs",
-                    search_method="LEXICAL",
-                    searchable_attributes=["text_field_1"],
-                    result_count=10,
-                )
-                tensor_res = tensor_search.search(
-                    config=self.config,
-                    index_name=index.name,
-                    text="dogs",
-                    search_method="TENSOR",
-                    result_count=10,
-                    searchable_attributes=["text_field_1"]
-                )
+        # Reference results
+        tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
+            config=self.config,
+            index_name=self.structured_text_index_score_modifiers.name,
+            text="dogs",
+            search_method="TENSOR",
+            searchable_attributes=["text_field_1"],
+            result_count=20,
+        )
+        lexical_res = tensor_search.search(
+            config=self.config,
+            index_name=self.structured_text_index_score_modifiers.name,
+            text="dogs",
+            search_method="LEXICAL",
+            searchable_attributes=["text_field_1"],
+            result_count=10,
+        )
+        tensor_res = tensor_search.search(
+            config=self.config,
+            index_name=self.structured_text_index_score_modifiers.name,
+            text="dogs",
+            search_method="TENSOR",
+            result_count=10,
+            searchable_attributes=["text_field_1"]
+        )
 
-                # Lexical retrieval with Tensor ranking
-                with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
-                    hybrid_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrievalMethod=RetrievalMethod.Lexical,
-                            rankingMethod=RankingMethod.Tensor,
-                            searchableAttributesLexical=["text_field_1"],
-                            searchableAttributesTensor=["text_field_1"],
-                            verbose=True
-                        ),
-                        result_count=10
-                    )
-                    self.assertIn("hits", hybrid_res)
+        # Lexical retrieval with Tensor ranking
+        with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
+            hybrid_res = tensor_search.search(
+                config=self.config,
+                index_name=self.structured_text_index_score_modifiers.name,
+                text="dogs",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Lexical,
+                    rankingMethod=RankingMethod.Tensor,
+                    searchableAttributesLexical=["text_field_1"],
+                    searchableAttributesTensor=["text_field_1"],
+                    verbose=True
+                ),
+                result_count=10
+            )
+            self.assertIn("hits", hybrid_res)
 
-                    # RETRIEVAL: 10 documents must match the 10 from lexical search (order may differ)
-                    self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
-                    lexical_res_ids = [doc["_id"] for doc in lexical_res["hits"]]
-                    for hybrid_hit in hybrid_res["hits"]:
-                        self.assertIn(hybrid_hit["_id"], lexical_res_ids)
+            # RETRIEVAL: 10 documents must match the 10 from lexical search (order may differ)
+            self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
+            lexical_res_ids = [doc["_id"] for doc in lexical_res["hits"]]
+            for hybrid_hit in hybrid_res["hits"]:
+                self.assertIn(hybrid_hit["_id"], lexical_res_ids)
 
-                    # RANKING: scores must match the tensor search scores
-                    for hybrid_hit in hybrid_res["hits"]:
-                        tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
-                        self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
+            # RANKING: scores must match the tensor search scores
+            for hybrid_hit in hybrid_res["hits"]:
+                tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
+                self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
 
-                # Tensor retrieval with Lexical ranking
-                with self.subTest(retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Lexical):
-                    hybrid_res = tensor_search.search(
-                        config=self.config,
-                        index_name=index.name,
-                        text="dogs",
-                        search_method="HYBRID",
-                        hybrid_parameters=HybridParameters(
-                            retrievalMethod=RetrievalMethod.Tensor,
-                            rankingMethod=RankingMethod.Lexical,
-                            searchableAttributesLexical=["text_field_1"],
-                            searchableAttributesTensor=["text_field_1"],
-                            verbose=True
-                        ),
-                        result_count=10
-                    )
+        # Tensor retrieval with Lexical ranking
+        with self.subTest(retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Lexical):
+            hybrid_res = tensor_search.search(
+                config=self.config,
+                index_name=self.structured_text_index_score_modifiers.name,
+                text="dogs",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Tensor,
+                    rankingMethod=RankingMethod.Lexical,
+                    searchableAttributesLexical=["text_field_1"],
+                    searchableAttributesTensor=["text_field_1"],
+                    verbose=True
+                ),
+                result_count=10
+            )
 
-                    self.assertIn("hits", hybrid_res)
+            self.assertIn("hits", hybrid_res)
 
-                    # RETRIEVAL: 10 documents must match the 10 from tensor search (order may differ)
-                    self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
-                    tensor_res_ids = [doc["_id"] for doc in tensor_res["hits"]]
-                    for hybrid_hit in hybrid_res["hits"]:
-                        self.assertIn(hybrid_hit["_id"], tensor_res_ids)
+            # RETRIEVAL: 10 documents must match the 10 from tensor search (order may differ)
+            self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
+            tensor_res_ids = [doc["_id"] for doc in tensor_res["hits"]]
+            for hybrid_hit in hybrid_res["hits"]:
+                self.assertIn(hybrid_hit["_id"], tensor_res_ids)
 
-                    # RANKING: scores must match the lexical search scores
-                    for hybrid_hit in hybrid_res["hits"]:
-                        if hybrid_hit["_score"] > 0:
-                            # Score should match its counterpart in lexical search
-                            lexical_hit = next(doc for doc in lexical_res["hits"] if doc["_id"] == hybrid_hit["_id"])
-                            self.assertEqual(hybrid_hit["_score"], lexical_hit["_score"])
-                        else:
-                            # If score is 0, it should not be in lexical search results
-                            self.assertNotIn(hybrid_hit["_id"], [doc["_id"] for doc in lexical_res["hits"]])
+            # RANKING: scores must match the lexical search scores
+            for hybrid_hit in hybrid_res["hits"]:
+                if hybrid_hit["_score"] > 0:
+                    # Score should match its counterpart in lexical search
+                    lexical_hit = next(doc for doc in lexical_res["hits"] if doc["_id"] == hybrid_hit["_id"])
+                    self.assertEqual(hybrid_hit["_score"], lexical_hit["_score"])
+                else:
+                    # If score is 0, it should not be in lexical search results
+                    self.assertNotIn(hybrid_hit["_id"], [doc["_id"] for doc in lexical_res["hits"]])
+
+    def test_hybrid_search_unstructured_opposite_retrieval_and_ranking(self):
+        """
+        Tests that hybrid search with:
+        retrievalMethod = "lexical", rankingMethod = "tensor" and
+        retrievalMethod = "tensor", rankingMethod = "lexical"
+
+        have expected results. The documents themselves should exactly match retrieval method, but the scores
+        should match the ranking method. This is only consistent for single-field search, as retrieval top k will
+        match the ranking top k.
+
+        Uses unstructured index, so we do not use searchable attributes
+        """
+
+        # Add documents
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.unstructured_default_image_index.name,
+                docs=self.docs_list,
+                tensor_fields=["text_field_1", "text_field_2"]
+            )
+        )
+
+        # Reference results
+        tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
+            config=self.config,
+            index_name=self.unstructured_default_image_index.name,
+            text="dogs",
+            search_method="TENSOR",
+            result_count=20,
+        )
+        lexical_res = tensor_search.search(
+            config=self.config,
+            index_name=self.unstructured_default_image_index.name,
+            text="dogs",
+            search_method="LEXICAL",
+            result_count=10,
+        )
+        tensor_res = tensor_search.search(
+            config=self.config,
+            index_name=self.unstructured_default_image_index.name,
+            text="dogs",
+            search_method="TENSOR",
+            result_count=10,
+        )
+
+        # Lexical retrieval with Tensor ranking
+        with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
+            hybrid_res = tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_default_image_index.name,
+                text="dogs",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Lexical,
+                    rankingMethod=RankingMethod.Tensor,
+                    verbose=True
+                ),
+                result_count=10
+            )
+            self.assertIn("hits", hybrid_res)
+
+            # RETRIEVAL: 10 documents must match the 10 from lexical search (order may differ)
+            self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
+            lexical_res_ids = [doc["_id"] for doc in lexical_res["hits"]]
+            for hybrid_hit in hybrid_res["hits"]:
+                self.assertIn(hybrid_hit["_id"], lexical_res_ids)
+
+            # RANKING: scores must match the tensor search scores
+            for hybrid_hit in hybrid_res["hits"]:
+                tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
+                self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
+
+        # Tensor retrieval with Lexical ranking
+        with self.subTest(retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Lexical):
+            hybrid_res = tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_default_image_index.name,
+                text="dogs",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Tensor,
+                    rankingMethod=RankingMethod.Lexical,
+                    verbose=True
+                ),
+                result_count=10
+            )
+
+            self.assertIn("hits", hybrid_res)
+
+            # RETRIEVAL: 10 documents must match the 10 from tensor search (order may differ)
+            self.assertEqual(len(hybrid_res["hits"]), len(tensor_res["hits"]))
+            tensor_res_ids = [doc["_id"] for doc in tensor_res["hits"]]
+            for hybrid_hit in hybrid_res["hits"]:
+                self.assertIn(hybrid_hit["_id"], tensor_res_ids)
+
+            # RANKING: scores must match the lexical search scores
+            for hybrid_hit in hybrid_res["hits"]:
+                if hybrid_hit["_score"] > 0:
+                    # Score should match its counterpart in lexical search
+                    lexical_hit = next(doc for doc in lexical_res["hits"] if doc["_id"] == hybrid_hit["_id"])
+                    self.assertEqual(hybrid_hit["_score"], lexical_hit["_score"])
+                else:
+                    # If score is 0, it should not be in lexical search results
+                    self.assertNotIn(hybrid_hit["_id"], [doc["_id"] for doc in lexical_res["hits"]])
+
+    def test_hybrid_search_unstructured_highlights_for_lexical_tensor(self):
+        """
+        Tests that hybrid search with highlights:
+        retrievalMethod = "lexical", rankingMethod = "tensor"
+
+        has expected results and highlights even on results that have a non-tensor field.
+        No highlights on the results retrieved from the non-tensor field (text_field_2 in this case),
+        so list should be empty.
+        """
+
+        # Add documents
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.unstructured_default_image_index.name,
+                docs=self.docs_list,
+                tensor_fields=["text_field_1"]
+            )
+        )
+
+        # Reference results
+        tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
+            config=self.config,
+            index_name=self.unstructured_default_image_index.name,
+            text="dogs",
+            search_method="TENSOR",
+            result_count=20,
+        )
+        lexical_res = tensor_search.search(
+            config=self.config,
+            index_name=self.unstructured_default_image_index.name,
+            text="dogs",
+            search_method="LEXICAL",
+            result_count=10,
+        )
+
+        # Lexical retrieval with Tensor ranking
+        with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
+            hybrid_res = tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_default_image_index.name,
+                text="dogs",
+                search_method="HYBRID",
+                hybrid_parameters=HybridParameters(
+                    retrievalMethod=RetrievalMethod.Lexical,
+                    rankingMethod=RankingMethod.Tensor,
+                    verbose=True
+                ),
+                result_count=10
+            )
+            self.assertIn("hits", hybrid_res)
+
+            # RETRIEVAL: 10 documents must match the 10 from lexical search (order may differ)
+            self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
+            lexical_res_ids = [doc["_id"] for doc in lexical_res["hits"]]
+            for hybrid_hit in hybrid_res["hits"]:
+                self.assertIn(hybrid_hit["_id"], lexical_res_ids)
+
+            # RANKING: scores must match the tensor search scores
+            for hybrid_hit in hybrid_res["hits"]:
+                # All docs have highlights (text_field_1) except doc11 (from text_field_2)
+                if hybrid_hit["_id"] == "doc11":
+                    self.assertEqual(hybrid_hit["_highlights"], [])
+                else:
+                    self.assertIn("text_field_1", hybrid_hit["_highlights"][0])
+                    tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
+                    self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
 
     def test_hybrid_search_invalid_parameters_fails(self):
         test_cases = [
@@ -1450,7 +1620,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
 
-    def test_hybrid_parameters_with_wrong_search_method_fails(self):
+    def test_hybrid_search_unstructured_with_searchable_attributes_fails(self):
         """
         Test that hybrid search with unstructured index and searchable attributes fails.
         TODO: Remove when this is supported
