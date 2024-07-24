@@ -15,8 +15,10 @@ import com.yahoo.tensor.TensorAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -25,8 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This searcher takes the YQL for both a lexical and tensor search from the query,
- * Creates 2 clone queries
+ * This searcher takes the YQL for both a lexical and tensor search from the
+ * query, Creates 2 clone queries
  *
  */
 @Before("ExternalYql")
@@ -113,9 +115,16 @@ public class HybridSearcher extends Searcher {
                 logIfVerbose("RRF Fused Hit Group", verbose);
                 logHitGroup(fusedHitList, verbose);
                 return new Result(query, fusedHitList);
+            } else if (rankingMethod.equals("copeland")) {
+                HitGroup fusedHitList =
+                        copelandFusion(resultTensor.hits(), resultLexical.hits(), verbose);
+                logIfVerbose("Copeland Fused Hit Group", verbose);
+                logHitGroup(fusedHitList, verbose);
+                return new Result(query, fusedHitList);
             } else {
                 throw new RuntimeException(
-                        "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
+                        "For retrievalMethod='disjunction', rankingMethod must be 'rrf' or"
+                                + " 'copeland'.");
             }
 
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
@@ -139,6 +148,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Implement feature score scaling and normalization
+     *
      * @param hitsTensor
      * @param hitsLexical
      * @param k
@@ -160,7 +170,6 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("k is %d", k), verbose);
 
         // Iterate through tensor hits list
-
         int rank = 1;
         if (alpha > 0.0) {
             logIfVerbose(
@@ -268,7 +277,115 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Extracts mapped Tensor Address from cell then adds it as key to rank features, with cell value as the value.
+     * Implement copeland based fusion as proposed here https://dl.acm.org/doi/pdf/10.1145/3626772.3657912
+     *
+     * @param hitsTensor
+     * @param hitsLexical
+     * @param verbose
+     */
+    HitGroup copelandFusion(HitGroup hitsTensor, HitGroup hitsLexical, boolean verbose) {
+        int finalLength = Math.max(hitsTensor.size(), hitsLexical.size());
+
+        // Store the unique hits
+        Set<Hit> combinedHitSet = new LinkedHashSet<>();
+
+        // loop over tensor hits and update the raw scores
+        for (int i = 0; i < hitsTensor.size(); i++) {
+            Hit hit = hitsTensor.get(i);
+            hit.setField("marqo__raw_tensor_score", hit.getRelevance().getScore());
+            Hit correspondingLexicalHit = hitsLexical.get(hit.getId().toString());
+            if (correspondingLexicalHit != null) {
+                hit.setField(
+                        "marqo__raw_lexical_score",
+                        correspondingLexicalHit.getRelevance().getScore());
+            }
+            combinedHitSet.add(hit);
+        }
+        // complete with any extra lexical hits
+        for (int i = 0; i < hitsLexical.size(); i++) {
+            Hit hit = hitsLexical.get(i);
+            if (combinedHitSet.contains(hit)) {
+                continue;
+            }
+            hit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());
+            combinedHitSet.add(hit);
+        }
+
+        // convert back to list
+        List<Hit> uniqueHits = new ArrayList<>(combinedHitSet);
+
+        // Initialize rank maps
+        HashMap<String, Integer> idToRankTensor = new HashMap<>();
+        for (int i = 0; i < hitsTensor.size(); i++) {
+            idToRankTensor.put(hitsTensor.get(i).getId().toString(), i);
+        }
+
+        HashMap<String, Integer> idToRankLexical = new HashMap<>();
+        for (int i = 0; i < hitsLexical.size(); i++) {
+            idToRankLexical.put(hitsLexical.get(i).getId().toString(), i);
+        }
+
+        // Calculate Copeland scores
+        HashMap<String, Integer> copelandScores = new HashMap<>();
+        for (Hit hit1 : uniqueHits) {
+            String hitId1 = hit1.getId().toString();
+            int wins = 0;
+            int losses = 0;
+            for (Hit hit2 : uniqueHits) {
+                if (hit1.equals(hit2)) continue;
+                String hitId2 = hit2.getId().toString();
+
+                int rank1Tensor = idToRankTensor.getOrDefault(hitId1, Integer.MAX_VALUE);
+                int rank1Lexical = idToRankLexical.getOrDefault(hitId1, Integer.MAX_VALUE);
+                int rank2Tensor = idToRankTensor.getOrDefault(hitId2, Integer.MAX_VALUE);
+                int rank2Lexical = idToRankLexical.getOrDefault(hitId2, Integer.MAX_VALUE);
+
+                int winsForHit1 = 0;
+                int lossesForHit1 = 0;
+                if (rank1Tensor < rank2Tensor) winsForHit1++;
+                if (rank1Tensor > rank2Tensor) lossesForHit1++;
+                if (rank1Lexical < rank2Lexical) winsForHit1++;
+                if (rank1Lexical > rank2Lexical) lossesForHit1++;
+
+                if (winsForHit1 > lossesForHit1) {
+                    wins++;
+                } else if (lossesForHit1 > winsForHit1) {
+                    losses++;
+                }
+            }
+            copelandScores.put(hitId1, wins - losses);
+        }
+
+        // set relevance scores and sort hits
+        for (Hit hit : uniqueHits) {
+            String hitId = hit.getId().toString();
+            int score = copelandScores.getOrDefault(hitId, 0);
+            hit.setRelevance(score);
+        }
+
+        // create and populate the final results
+        HitGroup result = new HitGroup();
+        result.addAll(uniqueHits);
+
+        logIfVerbose("Combined list (UNSORTED)", verbose);
+        logHitGroup(result, verbose);
+
+        // sort and trim to final length
+        result.sort();
+        logIfVerbose("Combined list (SORTED)", verbose);
+        logHitGroup(result, verbose);
+
+        result.trim(0, finalLength);
+        logIfVerbose("Combined list (TRIMMED)", verbose);
+        logHitGroup(result, verbose);
+
+        return result;
+    }
+
+    /**
+     * Extracts mapped Tensor Address from cell then adds it as key to rank
+     * features, with cell value as the value.
+     *
      * @param cell
      * @param query
      * @param verbose
@@ -289,13 +406,11 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Creates custom sub-query from the original query.
-     * Clone original query, Update the following:
-     * 'yql' (based on RETRIEVAL method)
-     * 'ranking.profile'    (based on RANKING method)
-     * 'ranking.features'
-     *      fields to search  (based on ??? method)
-     *      score modifiers (based on RANKING method)
+     * Creates custom sub-query from the original query. Clone original query,
+     * Update the following: 'yql' (based on RETRIEVAL method) 'ranking.profile'
+     * (based on RANKING method) 'ranking.features' fields to search (based on
+     * ??? method) score modifiers (based on RANKING method)
+     *
      * @param query
      * @param retrievalMethod
      * @param rankingMethod
@@ -357,6 +472,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Print human-readable list of hits with relevances.
+     *
      * @param hits
      * @param verbose
      */
@@ -378,6 +494,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Log to info if the verbose flag is turned on.
+     *
      * @param str
      * @param verbose
      */
@@ -389,6 +506,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Extract a tensor rank feature, throwing an error if it does not exist
+     *
      * @param query
      * @param featureName
      */
@@ -407,6 +525,7 @@ public class HybridSearcher extends Searcher {
 
     /**
      * Enclose string in query()
+     *
      * @param str
      */
     String addQueryWrapper(String str) {

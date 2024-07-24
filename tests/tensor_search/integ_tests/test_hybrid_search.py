@@ -1205,6 +1205,7 @@ class TestHybridSearch(MarqoTestCase):
         """
         custom_vector = [0.655 for _ in range(16)]
         test_cases = [
+            (RetrievalMethod.Disjunction, RankingMethod.Copeland),
             (RetrievalMethod.Disjunction, RankingMethod.RRF),
             (RetrievalMethod.Tensor, RankingMethod.Lexical),
             (RetrievalMethod.Lexical, RankingMethod.Tensor),

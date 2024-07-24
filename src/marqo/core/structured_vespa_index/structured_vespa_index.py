@@ -572,10 +572,10 @@ class StructuredVespaIndex(VespaIndex):
         }
         query = {k: v for k, v in query.items() if v is not None}
 
-        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}: # TODO: Add NormalizeLinear
+        if marqo_query.hybrid_parameters.rankingMethod in [RankingMethod.RRF]: # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
 
-        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:
+        if marqo_query.hybrid_parameters.rankingMethod in [RankingMethod.RRF]:
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
 
         return query

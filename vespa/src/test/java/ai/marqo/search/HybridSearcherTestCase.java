@@ -5,10 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.yahoo.component.chain.Chain;
-import com.yahoo.search.*;
+import com.yahoo.search.Query;
+import com.yahoo.search.Result;
+import com.yahoo.search.Searcher;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
-import com.yahoo.search.searchchain.*;
+import com.yahoo.search.searchchain.Execution;
+import com.yahoo.search.searchchain.SearchChainRegistry;
 import java.util.List;
 import java.util.Map;
 import org.junit.Before;
@@ -101,10 +104,8 @@ public class HybridSearcherTestCase {
         // Lower alpha (stack results)
         // invalid alpha (should throw exception) < 0 or > 1
         // alpha is 0, alpha is 1
-
         // Use nested classes to group tests (eg testAlpha)
         // Each case is 1 method
-
         // Create tensor hits
         HitGroup hitsTensor = new HitGroup();
         hitsTensor.add(new Hit("tensor1", 1.0));
@@ -160,6 +161,62 @@ public class HybridSearcherTestCase {
                 .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
         assertThat(result.get(5).fields())
                 .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+    }
+
+    @Test
+    public void testCopeland() {
+        // Create Hybrid Searcher
+        HybridSearcher testSearcher = new HybridSearcher();
+
+        // Create tensor hits
+        HitGroup hitsTensor = new HitGroup();
+        hitsTensor.add(new Hit("tensor1", 1.0));
+        hitsTensor.add(new Hit("tensor2", 0.8));
+        hitsTensor.add(new Hit("tensor3", 0.6));
+        hitsTensor.add(new Hit("both1", 0.55));
+        hitsTensor.add(new Hit("tensor4", 0.5));
+        hitsTensor.add(new Hit("both2", 0.3));
+
+        // Create lexical hits
+        HitGroup hitsLexical = new HitGroup();
+        hitsLexical.add(new Hit("lexical1", 1.0));
+        hitsLexical.add(new Hit("lexical2", 0.7));
+        hitsLexical.add(new Hit("lexical3", 0.5));
+        hitsLexical.add(new Hit("both1", 0.45));
+        hitsLexical.add(new Hit("both2", 0.44));
+
+        // Set parameters
+        boolean verbose = false;
+
+        // Call the rrf function
+        HitGroup result = testSearcher.copelandFusion(hitsTensor, hitsLexical, verbose);
+
+        // Check that the result size is correct
+        assertThat(result.asList()).hasSize(6);
+
+        // Check that result order and scores are correct
+        assertThat(result.asList())
+                .containsExactly(
+                        new Hit("tensor1", 3),
+                        new Hit("lexical1", 2),
+                        new Hit("both1", 2),
+                        new Hit("tensor2", 1),
+                        new Hit("lexical2", 0),
+                        new Hit("tensor3", -1));
+
+        assertThat(result.get(0).fields())
+                .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
+        assertThat(result.get(1).fields())
+                .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
+        assertThat(result.get(2).fields())
+                .containsAllEntriesOf(
+                        Map.of("marqo__raw_lexical_score", 0.45, "marqo__raw_tensor_score", 0.55));
+        assertThat(result.get(3).fields())
+                .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+        assertThat(result.get(4).fields())
+                .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
+        assertThat(result.get(5).fields())
+                .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
     }
 
     @Test
