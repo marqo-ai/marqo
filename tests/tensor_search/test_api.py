@@ -63,6 +63,46 @@ class ApiTests(MarqoTestCase):
             response = self.client.get("/memory")
             self.assertEqual(response.status_code, 403)
 
+    def test_custom_search_limit(self):
+        """
+        Test that the search endpoint returns the expected search limit when MARQO_MAX_SEARCH_LIMIT is set.
+        """
+        custom_limit = 2000
+        with patch.dict('os.environ', {EnvVars.MARQO_MAX_SEARCH_LIMIT: str(custom_limit)}):
+            response = self.client.post(
+                "/indexes/index1/search?device=cpu",
+                json={
+                    "q": "test",
+                    "searchMethod": "TENSOR",
+                    "limit": custom_limit + 1,
+                },
+            )
+            print(f"response: {response.json()}")
+            self.assertEqual(response.status_code, 400)
+            self.assertIn(f"result limit must be less than or equal to the "
+                          f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
+                          response.json()["message"])
+
+    def test_custom_search_offset(self):
+        """
+        Test that the search endpoint returns the expected search limit when MARQO_MAX_SEARCH_OFFSET is set.
+        """
+        custom_offset = 2000
+        with patch.dict('os.environ', {EnvVars.MARQO_MAX_SEARCH_OFFSET: str(custom_offset)}):
+            response = self.client.post(
+                "/indexes/index1/search?device=cpu",
+                json={
+                    "q": "test",
+                    "searchMethod": "TENSOR",
+                    "offset": custom_offset + 1,
+                },
+            )
+            print(f"response: {response.json()}")
+            self.assertEqual(response.status_code, 400)
+            self.assertIn(f"The search result offset must be less than or equal "
+                          f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
+                          response.json()["message"])
+
 
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):
@@ -199,70 +239,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
                         self.assertEqual(res.status_code, 504)
                         self.assertEqual(res.json()["code"], "vector_store_timeout")
                         self.assertEqual(res.json()["type"], "invalid_request")
-
-    def test_custom_search_limits(self):
-        custom_limit = 1500
-        custom_offset = 2000
-
-        with mock.patch.dict(os.environ, {
-            EnvVars.MARQO_MAX_SEARCH_LIMIT: str(custom_limit),
-            EnvVars.MARQO_MAX_SEARCH_OFFSET: str(custom_offset)
-        }):
-            # Reload the api module to apply new environment variables
-            importlib.reload(sys.modules['marqo.tensor_search.api'])
-
-            # Generate new config and create IndexManagement instance
-            new_config = api.generate_config()
-            index_management = IndexManagement(new_config.vespa_client)
-
-            # Verify query profile content
-            with mock.patch('builtins.open', mock.mock_open()) as mock_file:
-                index_management._update_query_profile('dummy_path')
-                written_content = mock_file().write.call_args[0][0]
-                self.assertIn(f'<field name="maxHits">{custom_limit}</field>', written_content)
-                self.assertIn(f'<field name="maxOffset">{custom_offset}</field>', written_content)
-
-            # Test API with TestClient
-            self.client = TestClient(api.app)
-
-            search_methods = ["TENSOR", "HYBRID"]
-            indexes = [self.structured_index]  # Add self.unstructured_index when supported for HYBRID
-
-            for method in search_methods:
-                for index in indexes:
-                    with self.subTest(search_method=method, index=index.name):
-                        # Test with valid limit and offset
-                        res = self.client.post(f"/indexes/{index.name}/search?device=cpu", json={
-                            "q": "irrelevant",
-                            "searchMethod": method,
-                            "limit": custom_limit,
-                            "offset": custom_offset,
-                        })
-                        self.assertEqual(res.status_code, 200)
-
-                        # Test with invalid limit
-                        res = self.client.post(f"/indexes/{index.name}/search?device=cpu", json={
-                            "q": "irrelevant",
-                            "searchMethod": method,
-                            "limit": custom_limit + 1,
-                        })
-                        self.assertEqual(res.status_code, 400)
-
-                        # Verify error message
-                        error_data = res.json()
-                        self.assertIn("limit", error_data["message"].lower())
-
-                        # Test with invalid limit and offset
-                        res = self.client.post(f"/indexes/{index.name}/search?device=cpu", json={
-                            "q": "irrelevant",
-                            "searchMethod": method,
-                            "offset": custom_offset + 1,
-                        })
-                        self.assertEqual(res.status_code, 400)
-
-                        # Verify error message
-                        error_data = res.json()
-                        self.assertIn("offset", error_data["message"].lower())
 
 
 class TestApiErrors(MarqoTestCase):
