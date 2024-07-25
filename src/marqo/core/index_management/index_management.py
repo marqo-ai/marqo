@@ -99,7 +99,7 @@ class IndexManagement:
         app = self.vespa_client.download_application()
         configured = self._marqo_config_exists(app)
 
-        self._update_query_profile(app)
+        query_profile_updated = self._update_query_profile(app)
 
         if not configured:
             self._add_marqo_config(app)
@@ -107,7 +107,7 @@ class IndexManagement:
             self.vespa_client.wait_for_application_convergence()
             self._save_marqo_version(version.get_version())
             return True
-        else:
+        elif query_profile_updated:
             self.vespa_client.deploy_application(app)
             self.vespa_client.wait_for_application_convergence()
 
@@ -469,15 +469,23 @@ class IndexManagement:
             return True
         return False
 
-    def _update_query_profile(self, app: str) -> None:
+    def _update_query_profile(self, app: str) -> bool:
         profile_path = os.path.join(app, 'search/query-profiles', 'default.xml')
-        query_profile = self._DEFAULT_QUERY_PROFILE_TEMPLATE.format(
+        new_query_profile = self._DEFAULT_QUERY_PROFILE_TEMPLATE.format(
             max_hits=self._max_search_limit,
             max_offset=self._max_search_offset
         )
+        
+        if os.path.exists(profile_path):
+            with open(profile_path, 'r') as f:
+                existing_content = f.read()
+            if existing_content == new_query_profile:
+                return False
+
         os.makedirs(os.path.dirname(profile_path), exist_ok=True)
         with open(profile_path, 'w') as f:
-            f.write(query_profile)
+            f.write(new_query_profile)
+        return True
 
     def _add_custom_searchers(self, app: str) -> bool:
         target_path = os.path.join(app, 'components', self._MARQO_CUSTOM_SEARCHERS_JAR)
