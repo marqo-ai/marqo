@@ -77,7 +77,7 @@ class ApiTests(MarqoTestCase):
                     "limit": custom_limit + 1,
                 },
             )
-            print(f"response: {response.json()}")
+
             self.assertEqual(response.status_code, 400)
             self.assertIn(f"result limit must be less than or equal to the "
                           f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
@@ -97,7 +97,7 @@ class ApiTests(MarqoTestCase):
                     "offset": custom_offset + 1,
                 },
             )
-            print(f"response: {response.json()}")
+            
             self.assertEqual(response.status_code, 400)
             self.assertIn(f"The search result offset must be less than or equal "
                           f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
