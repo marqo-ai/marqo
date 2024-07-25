@@ -732,8 +732,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
-                 "text_query_prefix": "query: ",
-                 "text_chunk_prefix": "passage: ",
+                 "text_query_prefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ",
                  "notes": ""},
             "hf/GIST-large-Embedding-v0":
                 {"name": 'avsolatorio/GIST-large-Embedding-v0',
@@ -746,36 +745,42 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 384,
                  "tokens": 512,
                  "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-base-en-v1.5":
                 {"name": 'BAAI/bge-base-en-v1.5',
                  "dimensions": 768,
                  "tokens": 512,
                  "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-large-en-v1.5":
                 {"name": 'BAAI/bge-large-en-v1.5',
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-small-zh-v1.5":
                 {"name": 'BAAI/bge-small-zh-v1.5',
                  "dimensions": 512,
                  "tokens": 512,
                  "type": "hf",
+                 "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             "hf/bge-base-zh-v1.5":
                 {"name": 'BAAI/bge-base-zh-v1.5',
                  "dimensions": 768,
                  "tokens": 512,
                  "type": "hf",
+                 "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             "hf/bge-large-zh-v1.5":
                 {"name": 'BAAI/bge-large-zh-v1.5',
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
+                 "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             # Uncomment when fix is implemented.
             #"hf/gte-base-en-v1.5":
@@ -796,11 +801,26 @@ def _get_hf_properties() -> Dict:
             #     "tokens": 8192,
             #     "type": "hf",
             #     "notes": ""},
+            "hf/snowflake-arctic-embed-m-v1.5":
+                {"name": 'Snowflake/snowflake-arctic-embed-m-v1.5',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "notes": ""},
+            "hf/snowflake-arctic-embed-m":
+                {"name": 'Snowflake/snowflake-arctic-embed-m',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "notes": ""},
             "hf/snowflake-arctic-embed-l":
                 {"name": 'Snowflake/snowflake-arctic-embed-l',
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/ember-v1":
                 {"name": 'llmrails/ember-v1',
@@ -821,6 +841,12 @@ def _get_sbert_onnx_properties() -> Dict:
                 "notes": ""},
             "onnx/all-MiniLM-L6-v2":
                 {"name": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimensions": 384,
+                "tokens":256,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all-MiniLM-L12-v2":
+                {"name": "sentence-transformers/all-MiniLM-L12-v2",
                 "dimensions": 384,
                 "tokens":256,
                 "type":"sbert_onnx",
