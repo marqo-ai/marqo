@@ -494,6 +494,12 @@ def _get_sbert_properties() -> Dict:
                 "tokens":256,
                 "type":"sbert",
                 "notes": ""},
+            "sentence-transformers/all-MiniLM-L12-v2":
+                {"name": "sentence-transformers/all-MiniLM-L12-v2",
+                "dimensions": 384,
+                "tokens":256,
+                "type":"sbert",
+                "notes": ""},
             "sentence-transformers/all-mpnet-base-v1":
                 {"name": "sentence-transformers/all-mpnet-base-v1",
                 "dimensions": 768,
@@ -841,12 +847,6 @@ def _get_sbert_onnx_properties() -> Dict:
                 "notes": ""},
             "onnx/all-MiniLM-L6-v2":
                 {"name": "sentence-transformers/all-MiniLM-L6-v2",
-                "dimensions": 384,
-                "tokens":256,
-                "type":"sbert_onnx",
-                "notes": ""},
-            "onnx/all-MiniLM-L12-v2":
-                {"name": "sentence-transformers/all-MiniLM-L12-v2",
                 "dimensions": 384,
                 "tokens":256,
                 "type":"sbert_onnx",
