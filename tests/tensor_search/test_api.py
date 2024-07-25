@@ -201,7 +201,7 @@ class TestApiCustomEnvVars(MarqoTestCase):
                         self.assertEqual(res.json()["type"], "invalid_request")
 
     def test_custom_search_limits(self):
-        custom_limit = 2000
+        custom_limit = 1500
         custom_offset = 2000
 
         with mock.patch.dict(os.environ, {
@@ -241,8 +241,6 @@ class TestApiCustomEnvVars(MarqoTestCase):
                             "limit": custom_limit,
                             "offset": custom_offset,
                         })
-                        print(res)
-                        print(res.json())
                         self.assertEqual(res.status_code, 200)
 
                         res = self.client.post("/indexes/" + index.name + "/search?device=cpu", json={
