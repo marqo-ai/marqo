@@ -16,8 +16,6 @@ apt update \
     supervisor \
     && rm -rf /var/lib/apt/list/*
 
-apt-get install -y wget
-
 export DOCKER_CHANNEL=stable \
   DOCKER_VERSION=20.10.18 \
 	DOCKER_COMPOSE_VERSION=1.29.2 \
@@ -54,7 +52,6 @@ set -eux; \
 	docker --version
 
 cp /app/scripts/dind_setup/deps/modprobe /usr/local/bin/
-mkdir -p /etc/supervisor/conf.d/
 cp -r /app/scripts/dind_setup/deps/supervisor/ /etc/supervisor/conf.d/
 mkdir -p /opt/bash-utils
 cp -r /app/scripts/dind_setup/deps/logger.sh /opt/bash-utils/logger.sh
