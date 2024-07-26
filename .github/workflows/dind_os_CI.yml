@@ -89,10 +89,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Set up Environment
+      - name: Get branch name from PR
+        id: get_branch
+        run: |
+          BRANCH_NAME=${GITHUB_HEAD_REF}
+          echo "MQ_API_TEST_BRANCH=${BRANCH_NAME}" >> $GITHUB_ENV
+
+      - name: Set up Other Environment
         run: |
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> $GITHUB_ENV
-          export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           echo "MQ_API_TEST_BRANCH=$MQ_API_TEST_BRANCH" >> $GITHUB_ENV
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
