@@ -7,7 +7,7 @@ import marqo.vespa.vespa_client
 from marqo import version
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
+from marqo.core.exceptions import IndexExistsError, IndexNotFoundError, ApplicationNotInitializedError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig
@@ -69,29 +69,20 @@ class IndexManagement:
         Returns:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
-        with self._vespa_application_package_deployment() as app:
+        with self._vespa_deployment_lock():
+            app_root_path = self.vespa_client.download_application(check_for_application_convergence=True)
+            app = VespaApplicationPackage(app_root_path)
             marqo_version = version.get_version()
             has_marqo_settings_schema = app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
             marqo_config_doc = self._get_marqo_config() if has_marqo_settings_schema else None
 
-            if app.need_bootstrapping(marqo_version, marqo_config_doc):
-                existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else None
-                app.bootstrap(marqo_version, existing_indexes)
-                return True
-            else:
-                app.skip_deployment()
+            if not app.need_bootstrapping(marqo_version, marqo_config_doc):
                 return False
 
-    def _get_marqo_config(self) -> Optional[MarqoConfig]:
-        try:
-            response = self.vespa_client.get_document(self._MARQO_CONFIG_DOC_ID, self._MARQO_SETTINGS_SCHEMA_NAME)
-        except VespaStatusError as e:
-            if e.status_code == 404:
-                logger.warn(f'Marqo config document is not found in {self._MARQO_SETTINGS_SCHEMA_NAME}')
-                return None
-            raise e
-
-        return MarqoConfig.parse_raw(response.document.fields['settings'])
+            existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else None
+            app.bootstrap(marqo_version, existing_indexes)
+            self._deploy_app(app)
+            return True
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
@@ -110,8 +101,9 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
-        with self._vespa_application_package_deployment() as app:
-            return self._create_one_index(app, marqo_index_request)
+        with self._vespa_deployment_lock():
+            with self._vespa_application() as app:
+                return self._create_one_index(app, marqo_index_request)
 
     @staticmethod
     def _create_one_index(app, marqo_index_request):
@@ -147,8 +139,9 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
-        with self._vespa_application_package_deployment() as app:
-            return [self._create_one_index(app, request) for request in marqo_index_requests]
+        with self._vespa_deployment_lock():
+            with self._vespa_application() as app:
+                return [self._create_one_index(app, request) for request in marqo_index_requests]
 
     def delete_index_by_name(self, index_name: str) -> None:
         """
@@ -162,8 +155,9 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
-        with self._vespa_application_package_deployment() as app:
-            app.delete_index_setting_and_schema(index_name)
+        with self._vespa_deployment_lock():
+            with self._vespa_application() as app:
+                app.delete_index_setting_and_schema(index_name)
 
     def batch_delete_indexes_by_name(self, index_names: List[str]) -> None:
         """
@@ -176,13 +170,15 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
-        with self._vespa_application_package_deployment() as app:
-            for index_name in index_names:
-                app.delete_index_setting_and_schema(index_name)
+        with self._vespa_deployment_lock():
+            with self._vespa_application() as app:
+                for index_name in index_names:
+                    app.delete_index_setting_and_schema(index_name)
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
-        Get all Marqo indexes.
+        Get all Marqo indexes storing in _MARQO_SETTINGS_SCHEMA_NAME schema (used prior to Marqo v2.12.0).
+        This method is now only used to retrieve the existing indexes for bootstrapping from v2.12.0
 
         Returns:
             List of Marqo indexes
@@ -197,6 +193,21 @@ class IndexManagement:
             for document in batch_response.documents
             if not document.id.split('::')[-1].startswith(constants.MARQO_RESERVED_PREFIX)
         ]
+
+    def _get_marqo_config(self) -> Optional[MarqoConfig]:
+        """
+        We store Marqo config in _MARQO_CONFIG_DOC_ID doc prior to Marqo v2.12.0
+        This method is now only used to retrieve the existing marqo config for bootstrapping
+        """
+        try:
+            response = self.vespa_client.get_document(self._MARQO_CONFIG_DOC_ID, self._MARQO_SETTINGS_SCHEMA_NAME)
+        except VespaStatusError as e:
+            if e.status_code == 404:
+                logger.warn(f'Marqo config document is not found in {self._MARQO_SETTINGS_SCHEMA_NAME}')
+                return None
+            raise e
+
+        return MarqoConfig.parse_raw(response.document.fields['settings'])
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         """
@@ -227,20 +238,36 @@ class IndexManagement:
         This method is only used during upgrade and rollback, it might not be needed anymore
         TODO check if this is still needed
         """
-        with self._vespa_application_package_deployment() as app:
-            app.skip_deployment()
+        with self._vespa_application() as app:
             return app.get_marqo_config().version
 
     @contextmanager
-    def _vespa_application_package_deployment(self):
-        """A context manager that manages a vespa application deployment. .
+    def _vespa_application(self):
+        """
+        A context manager handles a deployment session of the Vespa application package
+        """
+        app_root_path = self.vespa_client.download_application(check_for_application_convergence=True)
+        app = VespaApplicationPackage(app_root_path)
+        if not app.is_configured:
+            raise ApplicationNotInitializedError()
+
+        yield app
+
+        self._deploy_app(app)
+
+    def _deploy_app(self, app):
+        app.save_to_disk()
+        self.vespa_client.deploy_application(app.app_root_path)
+        self.vespa_client.wait_for_application_convergence()
+
+    @contextmanager
+    def _vespa_deployment_lock(self):
+        """A context manager that manages an optional distributed lock.
 
         If the _enable_index_operations flag is set to True, the context manager tries to acquire the deployment lock.
-            If the lock is acquired, the context manager yields the application downloaded from Vespa, and deploys
-              the application to Vespa before exits.
+            If the lock is acquired, the context manager yields
             If the lock cannot be acquired before the timeout, it raises an OperationConflictError.
-            If the lock is None, the context manager downloads and deploys an application without a lock. Please note
-              that this might cause rase condition and is not recommended in production envs
+            If the lock is None, the context manager yields without locking
         If the _enable_index_operations flag is set to False, the context manager raises an InternalError during
             index operations.
 
@@ -255,17 +282,12 @@ class IndexManagement:
         if self._zookeeper_deployment_lock is None:
             logger.warning(f"No Zookeeper client provided. "
                            f"Concurrent index operations may result in race conditions. ")
-            app = VespaApplicationPackage(self.vespa_client)
-            yield app  # No lock, proceed without locking
-            # we only deploy if no exception was raised
-            app.deploy()
+            yield  # No lock, proceed without locking
         else:
             try:
                 with self._zookeeper_deployment_lock:
-                    app = VespaApplicationPackage(self.vespa_client)
-                    yield app
-                    # we only deploy if no exception was raised
-                    app.deploy()
+                    logger.info(f"Retrieved the distributed lock for index operations. ")
+                    yield
             except ZookeeperLockNotAcquiredError:
                 raise OperationConflictError("Another index creation/deletion operation is in progress. "
                                              "Your request is rejected. Please try again later")

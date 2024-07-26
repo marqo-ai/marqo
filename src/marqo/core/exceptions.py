@@ -8,6 +8,14 @@ class InternalError(MarqoError):
     pass
 
 
+class ApplicationNotInitializedError(MarqoError):
+    """
+    This exception is raised when the Vespa application is not bootstrapped when receiving
+    index operation requests.
+    """
+    pass
+
+
 class IndexExistsError(MarqoError):
     pass
 
