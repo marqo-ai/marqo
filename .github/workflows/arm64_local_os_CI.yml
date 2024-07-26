@@ -95,13 +95,17 @@ jobs:
         run: |
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-          
-      - name: Run Integration Tests - ARM64 local_os
-        run: |
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           export MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git
+          
+          echo "Marqo Branch: $MQ_API_TEST_BRANCH"
+          echo "API Test branch: 1.4.x"
+          echo "Py-marqo branch: 1.4.x"
+
+      - name: Run Integration Tests - ARM64 local_os
+        run: |
           tox -e py3-arm64_local_os
   
   Stop-Runner:
