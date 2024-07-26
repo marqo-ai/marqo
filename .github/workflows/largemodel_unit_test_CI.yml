@@ -4,7 +4,11 @@ name: largemodel_unit_test_CI
 on:
   workflow_call:
   workflow_dispatch:
-
+  push:
+    branches:
+      - 'releases/1.5.x'
+    paths-ignore:
+      - '**.md'
 permissions:
   contents: read
 

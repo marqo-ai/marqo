@@ -13,7 +13,14 @@ on:
           Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
-      mainline
+      - 'releases/1.5.x'
+      - 'releases/1.4.x'
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    branches:
+      - 'releases/1.5.x'
+      - 'releases/1.4.x'
     paths-ignore:
       - '**.md'
 
@@ -79,20 +86,34 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-api-tests
+          ref: 1.4.x
           
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
+      - name: Get branch name from PR
+        id: get_branch
+        run: |
+          BRANCH_NAME=${GITHUB_HEAD_REF}
+          echo "MQ_API_TEST_BRANCH=${BRANCH_NAME}" >> $GITHUB_ENV
           
       - name: Set up Environment
         run: |
           # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-          
-      - name: Run Integration Tests - ARM64 local_os
-        run: |
-          export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
+          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> $GITHUB_ENV
+          echo "MQ_API_TEST_BRANCH=$MQ_API_TEST_BRANCH" >> $GITHUB_ENV
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
+          echo "MQ_API_TEST_IMG=$MQ_API_TEST_IMG" >> $GITHUB_ENV
+          export MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git
+          echo "MQ_PY_MARQO_BRANCH=$MQ_PY_MARQO_BRANCH" >> $GITHUB_ENV
+          
+          echo "Marqo Branch: $MQ_API_TEST_BRANCH"
+          echo "API Test branch: 1.4.x"
+          echo "Py-marqo branch: 1.4.x"
+
+      - name: Run Integration Tests - ARM64 local_os
+        run: |
           tox -e py3-arm64_local_os
   
   Stop-Runner:

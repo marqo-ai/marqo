@@ -8,8 +8,12 @@ fi
 set -e
 
 apt update \
-    && apt install -y ca-certificates openssh-client \
-    wget curl iptables supervisor \
+    && apt install -y ca-certificates \
+    openssh-client \
+    wget \
+    curl \
+    iptables \
+    supervisor \
     && rm -rf /var/lib/apt/list/*
 
 export DOCKER_CHANNEL=stable \
