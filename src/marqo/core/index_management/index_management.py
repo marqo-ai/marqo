@@ -109,6 +109,7 @@ class IndexManagement:
         elif query_profile_updated:
             self.vespa_client.deploy_application(app)
             self.vespa_client.wait_for_application_convergence()
+            return True
 
         return False
 
