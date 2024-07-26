@@ -9,6 +9,7 @@ from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
+import semver
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -55,6 +56,8 @@ class StructuredVespaIndex(VespaIndex):
 
     _MAX_LONG = 9223372036854775807
     _MIN_LONG = -9223372036854775808
+
+    _HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse(constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION)
 
     def get_vespa_id_field(self) -> str:
         return common.FIELD_ID
@@ -411,7 +414,7 @@ class StructuredVespaIndex(VespaIndex):
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
 
-        if self._marqo_index_version < self._VERSION_2_10_0:
+        if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
             ranking = common.RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 if score_modifiers \
                 else common.RANK_PROFILE_EMBEDDING_SIMILARITY
         else:
@@ -457,7 +460,7 @@ class StructuredVespaIndex(VespaIndex):
         summary = common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets else common.SUMMARY_ALL_NON_VECTOR
         score_modifiers = self._get_score_modifiers(marqo_query)
 
-        if self._marqo_index_version < self._VERSION_2_10_0:
+        if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
             ranking = common.RANK_PROFILE_BM25_MODIFIERS_2_9 if score_modifiers \
                 else common.RANK_PROFILE_BM25
         else:
@@ -595,7 +598,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-        if self._marqo_index_version < self._VERSION_2_10_0:
+        if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
             return fields_to_search
         else:
             return [self._marqo_index.tensor_field_map[f].embeddings_field_name
@@ -624,7 +627,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.lexically_searchable_fields_names
 
-        if self._marqo_index_version < self._VERSION_2_10_0:
+        if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
             return fields_to_search
         else:
             return [self._marqo_index.field_map[f].lexical_field_name
@@ -803,7 +806,7 @@ class StructuredVespaIndex(VespaIndex):
                 else:
                     raise InternalError(f'Unknown score modifier type {modifier.type}')
 
-            if self._marqo_index_version < self._VERSION_2_10_0:
+            if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
                 return {
                     common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: mult_tensor,
                     common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: add_tensor
