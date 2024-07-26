@@ -1,13 +1,14 @@
+import json
+import time
+from collections import defaultdict
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Callable, Dict, List, Optional, Union
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
-from typing import Any, Callable, Dict, List, Optional, Union
-import json
-from collections import defaultdict
-from contextlib import contextmanager
-import time
-from contextvars import ContextVar
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+
 from marqo.tensor_search.tensor_search_logging import get_logger
 
 logger = get_logger(__name__)
@@ -31,7 +32,7 @@ class Timer:
 
     def stop(self) -> float:
         """Stop the timer, and report the elapsed time
-        
+
         Return time is in Ms.
         """
         if self.start_time is None:
@@ -68,7 +69,7 @@ class RequestMetrics:
         self.timers: Dict[str, Timer] = defaultdict(Timer)
 
     def increment_counter(self, k: str):
-        self.counter[k]+=1
+        self.counter[k] += 1
 
     @contextmanager
     def time(self, k: str, callback: Optional[Callable[[float], None]] = None):
@@ -106,7 +107,7 @@ class RequestMetrics:
             logger.warn(f"timer {k} stopped incorrectly. Time not recorded.")
 
     def increment_counter(self, k: str, v: int = 1):
-        self.counter[k]+=v
+        self.counter[k] += v
 
     def json(self):
         return {
@@ -117,7 +118,7 @@ class RequestMetrics:
 
 class RequestMetricsStore():
     current_request: ContextVar[Request] = ContextVar('current_request')
-    
+
     METRIC_STORES: Dict[Request, RequestMetrics] = {}
 
     @classmethod
@@ -132,7 +133,7 @@ class RequestMetricsStore():
     def for_request(cls, r: Optional[Request] = None) -> RequestMetrics:
         if r is None:
             r = cls._get_request()
-            
+
         return cls.METRIC_STORES[r]
 
     @classmethod
@@ -147,19 +148,21 @@ class RequestMetricsStore():
     @classmethod
     def clear_metrics_for(cls, r: Request) -> None:
         cls.METRIC_STORES.pop(r, None)
+        cls.current_request.set(None)
 
 
 class TelemetryMiddleware(BaseHTTPMiddleware):
     """
-    Responsible for starting a request-level metric object, capturing telemetry and injecting 
+    Responsible for starting a request-level metric object, capturing telemetry and injecting
     it into the Response payload. Metrics are only returned if the `DEFAULT_TELEMETRY_QUERY_PARAM`
-    query parameter is provided and it is  "true". Otherwise the request is not altered.    
+    query parameter is provided and it is  "true". Otherwise the request is not altered.
     """
 
     DEFAULT_TELEMETRY_QUERY_PARAM = "telemetry"
 
-    def __init__(self, app, **options):    
-        self.telemetry_flag: Optional[str] = options.pop("telemetery_flag", TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM)
+    def __init__(self, app, **options):
+        self.telemetry_flag: Optional[str] = options.pop("telemetery_flag",
+                                                         TelemetryMiddleware.DEFAULT_TELEMETRY_QUERY_PARAM)
         super().__init__(app, **options)
 
     def telemetry_enabled_for_request(self, request: Request) -> bool:
@@ -182,34 +185,37 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
 
         """
         RequestMetricsStore.set_in_request(request)
+        try:
+            response = await call_next(request)
 
-        response = await call_next(request)
+            # Early exit if opentelemetry is not to be injected into response.
+            if not self.telemetry_enabled_for_request(request):
+                return response
 
-        # Early exit if opentelemetry is not to be injected into response.
-        if not self.telemetry_enabled_for_request(request):
-            return response
+            data = await self.get_response_json(response)
 
-        data = await self.get_response_json(response)
+            # Inject telemetry and fix content-length header
+            if isinstance(data, dict):
+                telemetry = RequestMetricsStore.for_request(request).json()
+                if len(telemetry["timesMs"]) == 0:
+                    telemetry.pop("timesMs")
+                if len(telemetry["counter"]) == 0:
+                    telemetry.pop("counter")
+                data["telemetry"] = telemetry
+            else:
+                get_logger(__name__).warning(
+                    f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
+                )
+                get_logger(__name__).info(
+                    f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
 
-        # Inject telemetry and fix content-length header
-        if isinstance(data, dict):
-            telemetry = RequestMetricsStore.for_request(request).json()
-            if len(telemetry["timesMs"]) == 0:
-                telemetry.pop("timesMs")
-            if len(telemetry["counter"]) == 0:
-                telemetry.pop("counter")
-            data["telemetry"] = telemetry
-        else:
-            get_logger(__name__).warning(
-                f"{self.telemetry_flag} set but response payload is not Dict. telemetry not returned"
-            )
-            get_logger(__name__).info(f"Telemetry data={json.dumps(RequestMetricsStore.for_request(request).json(), indent=2)}")
-
-        RequestMetricsStore.clear_metrics_for(request)
+        finally:
+            logger.debug('Clearing metrics for request')
+            RequestMetricsStore.clear_metrics_for(request)
 
         body = json.dumps(data).encode()
         response.headers["content-length"] = str(len(body))
-        
+
         return Response(
             content=body,
             status_code=response.status_code,
