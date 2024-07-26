@@ -23,6 +23,7 @@ from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContext
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
 from marqo.vespa.exceptions import VespaStatusError
+import semver
 
 
 class HybridSearch:
@@ -86,14 +87,14 @@ class HybridSearch:
         # Version checks (different for structured and unstructured)
         marqo_index_version = marqo_index.parsed_marqo_version()
         if isinstance(marqo_index, StructuredMarqoIndex) and \
-                marqo_index_version < constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION:
+                marqo_index_version < semver.VersionInfo.parse(constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION):
             raise core_exceptions.UnsupportedFeatureError(
                 f"Hybrid search is only supported for Marqo structured indexes created with Marqo "
                 f"{constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION} or later. "
                 f"This index was created with Marqo {marqo_index_version}."
             )
         elif isinstance(marqo_index, UnstructuredMarqoIndex) and \
-                marqo_index_version < constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION:
+                marqo_index_version < semver.VersionInfo.parse(constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION):
             raise core_exceptions.UnsupportedFeatureError(
                 f"Hybrid search is only supported for Marqo unstructured indexes created with Marqo "
                 f"{constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION} or later. "
