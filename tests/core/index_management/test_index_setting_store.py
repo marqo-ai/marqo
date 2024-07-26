@@ -39,17 +39,14 @@ class TestIndexSettingStore(MarqoTestCase):
         self.assertEqual(len(store._index_settings_history), 1)
         self.assertEqual(store._index_settings_history[index.name][0], index)
 
-    def test_save_to_file(self):
+    def test_to_json_strings(self):
         index = self.index1
 
         index_json_string = json.dumps({index.name: json.loads(index.json())})
         index_history_json_string = json.dumps({index.name: [json.loads(index.json())]})
 
         store = IndexSettingStore(index_json_string, index_history_json_string)
-        store.save_to_files('temp_file_index.json', 'temp_file_index_history.json')
-        with open('temp_file_index.json', 'r') as f:
-            self.assertEqual(f.read(), index_json_string)
-        with open('temp_file_index_history.json', 'r') as f:
-            self.assertEqual(f.read(), index_history_json_string)
-        os.remove('temp_file_index.json')
-        os.remove('temp_file_index_history.json')
+        output_index, output_index_history = store.to_json_strings()
+
+        self.assertEqual(output_index, index_json_string)
+        self.assertEqual(output_index_history, index_history_json_string)
