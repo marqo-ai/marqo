@@ -170,8 +170,7 @@ class UnstructuredVespaSchema(VespaSchema):
         )
 
         # Add rank profiles
-        rank_profile_list = self._generate_rank_profiles(marqo_index)
-        schema += "\n".join(rank_profile_list)
+        schema += self._generate_rank_profiles(marqo_index)
 
         # Add summaries
         schema += textwrap.dedent(
@@ -207,129 +206,89 @@ class UnstructuredVespaSchema(VespaSchema):
         return schema
 
     def _generate_rank_profiles(self, marqo_index: UnstructuredMarqoIndex):
-        rank_profiles: List[str] = list()
         model_dim = marqo_index.model.get_dimension()
 
         # generate base rank profile
-        rank_profiles.extend(self._generate_base_rank_profile(marqo_index))
+        rank_profiles = self._generate_base_rank_profile(marqo_index)
 
-        # generate bm25 profile (from base)
-        rank_profiles.append(f'rank-profile {unstructured_common.RANK_PROFILE_BM25} '
-                             f'inherits {unstructured_common.RANK_PROFILE_BASE} {{')
-        rank_profiles.append('first-phase {')
-        rank_profiles.append(
-            f'expression: modify(lexical_score(), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL})'
-            f')'
+        rank_profiles += textwrap.dedent(
+            f"""
+            rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(lexical_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                }}
+            }}
+            
+            rank-profile {self._RANK_PROFILE_EMBEDDING_SIMILARITY} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(embedding_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
+                }}
+                match-features: closest({self._EMBEDDINGS})
+            }}
+            
+            rank-profile {unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{
+                inputs {{
+                    query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])
+                    query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR}) tensor<int8>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                }}
+            }}
+            
+            rank-profile {unstructured_common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(lexical_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                }}
+                second-phase {{
+                    expression: modify(embedding_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
+                }}
+                match-features: closest({self._EMBEDDINGS})
+            }}
+            
+            rank-profile {unstructured_common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(lexical_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                }}
+            }}
+            """
         )
-        rank_profiles.append('}}')
-
-        # generate embedding similarity profile (from base)
-        rank_profiles.append(f'rank-profile {unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY} '
-                             f'inherits {unstructured_common.RANK_PROFILE_BASE} {{')
-        rank_profiles.append('first-phase {')
-        rank_profiles.append(f'expression: modify(embedding_score(), '
-                             f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), '
-                             f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR})'
-                             f')')
-        rank_profiles.append('}')
-        rank_profiles.append(f'match-features: closest({self._EMBEDDINGS})')
-        rank_profiles.append('}')
-
-        # hybrid custom searcher profile
-        # Temp parameters to pass into respective queries (lexical and tensor)
-        rank_profiles.append(f'rank-profile {unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{')
-        rank_profiles.append('inputs {')
-        rank_profiles.append(f'query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-        rank_profiles.append(f'query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})')
-        rank_profiles.append(f'query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR}) tensor<int8>(p{{}})')
-        rank_profiles.append(
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
-        rank_profiles.append(
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
-        rank_profiles.append(
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
-        rank_profiles.append(
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
-        rank_profiles.append('}')
-        rank_profiles.append('}')
-
-        # hybrid bm25 and embedding_similarity rank profiles
-        # HYBRID SEARCH LEXICAL THEN TENSOR
-        rank_profiles.append(
-            f'rank-profile {unstructured_common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY} inherits '
-            f'{unstructured_common.RANK_PROFILE_BASE} {{'
-        )
-
-        rank_profiles.append('first-phase {')  # First phase ranks on LEXICAL
-        rank_profiles.append(
-            f'expression: modify(lexical_score(), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))'
-        )
-        rank_profiles.append('}')
-        rank_profiles.append('second-phase {')  # Second phase ranks on TENSOR
-        rank_profiles.append(
-            f'expression: modify(embedding_score(), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))'
-        )
-        rank_profiles.append('}')
-        rank_profiles.append(f'match-features: closest({self._EMBEDDINGS})')
-        rank_profiles.append('}')
-
-        # HYBRID SEARCH TENSOR THEN LEXICAL
-        # Only 1 phase ranking (lexical only)
-        rank_profiles.append(
-            f'rank-profile {unstructured_common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25} inherits '
-            f'{unstructured_common.RANK_PROFILE_BASE} {{'
-        )
-        rank_profiles.append('first-phase {')  # First phase ranks on LEXICAL
-        rank_profiles.append(
-            f'expression: modify(lexical_score(), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
-            f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))')
-        rank_profiles.append('}}')
 
         return rank_profiles
 
     def _generate_base_rank_profile(self, marqo_index: UnstructuredMarqoIndex):
-        base_rank_profile: List[str] = list()
         model_dim = marqo_index.model.get_dimension()
-
-        base_rank_profile.append(f'rank-profile {unstructured_common.RANK_PROFILE_BASE} inherits default {{')
-
-        # inputs
-        base_rank_profile.append('inputs {')
-        base_rank_profile.append(f'query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
-        base_rank_profile.append(f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
-        base_rank_profile.append(f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
-        base_rank_profile.append(f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
-        base_rank_profile.append(f'query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
-        base_rank_profile.append('}')
-
-        # modifiers function
         score_modifier_expression = (
             f'if (count(mult_weights * attribute({self._SCORE_MODIFIERS})) == 0, '
             f'  1, reduce(mult_weights * attribute({self._SCORE_MODIFIERS}), prod)) '
             f'* score '
             f'+ reduce(add_weights * attribute({self._SCORE_MODIFIERS}), sum)'
         )
-        base_rank_profile.append('function modify(score, mult_weights, add_weights) {')
-        base_rank_profile.append(f'    expression: {score_modifier_expression}')
-        base_rank_profile.append('}')
 
-        # lexical score function
-        base_rank_profile.append('function lexical_score() {')
-        base_rank_profile.append(f'expression: bm25({self._STRINGS})')
-        base_rank_profile.append('}')
+        return textwrap.dedent(
+            f"""
+            rank-profile {unstructured_common.RANK_PROFILE_BASE} inherits default {{
+                inputs {{
+                    query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                }}
 
-        # embedding score function
-        base_rank_profile.append('function embedding_score() {')
-        base_rank_profile.append(f'expression: closeness(field, {self._EMBEDDINGS})')
-        base_rank_profile.append('}')
+                function modify(score, mult_weights, add_weights) {{
+                    expression: {score_modifier_expression}
+                }}
 
-        base_rank_profile.append('}')
+                function lexical_score() {{
+                    expression: bm25({self._STRINGS})
+                }}
 
-        return base_rank_profile
+                function embedding_score() {{
+                    expression: closeness(field, {self._EMBEDDINGS})
+                }}
+            }}
+            """
+        )
