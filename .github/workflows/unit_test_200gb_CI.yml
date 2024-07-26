@@ -6,14 +6,15 @@ on:
   workflow_dispatch:
   push:
     branches:
-      mainline
+      - 'releases/1.5.x'
     paths-ignore:
       - '**.md'
   pull_request:
     branches:
-      - mainline
+      - 'releases/1.5.x'
     paths-ignore:
       - '**.md'
+
 
 permissions:
   contents: read
