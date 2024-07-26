@@ -15,7 +15,7 @@ from marqo.s2_inference.s2_inference import (
 
 from tests.marqo_test import MarqoTestCase
 
-@unittest.skip
+# @unittest.skip
 class TestGenericModelSupport(MarqoTestCase):
 
     def setUp(self):

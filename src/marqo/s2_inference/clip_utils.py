@@ -27,6 +27,8 @@ from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
 from marqo import marqo_docs
 
+from typing import Callable
+
 logger = get_logger(__name__)
 
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
@@ -538,7 +540,7 @@ class OPEN_CLIP(CLIP):
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
             self.model, self.preprocess = self.custom_clip_load()
-            self.tokenizer = self.load_tokenizer()
+            self.tokenizer = self.load_tokenizer(self.model_properties.get("model_name", None))
 
             self.model.eval()
 
@@ -590,14 +592,16 @@ class OPEN_CLIP(CLIP):
                     f"You can find more details at `https://docs.marqo.ai/0.0.21/Models-Reference/bring_your_own_model/#bring-your-own-clip-model`"
                 )
 
-    def load_tokenizer(self):
+    def load_tokenizer(self, architecture: str = None) -> Callable:
+        if architecture in open_clip.list_models():
+            return open_clip.get_tokenizer(architecture)
+        
         tokenizer_name = self.model_properties.get("tokenizer", "clip")
-
         if tokenizer_name == "clip":
             return open_clip.tokenize
-        else:
-            logger.info(f"Custom HFTokenizer is provided. Loading...")
-            return HFTokenizer(tokenizer_name)
+    
+        logger.info(f"Custom HFTokenizer is provided. Loading...")
+        return HFTokenizer(tokenizer_name)
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
                      image_download_headers: Optional[Dict] = None,

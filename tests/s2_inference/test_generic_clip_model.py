@@ -16,7 +16,7 @@ from marqo.s2_inference.s2_inference import (
 from tests.marqo_test import MarqoTestCase
 from unittest import mock
 
-@unittest.skip
+# @unittest.skip
 class TestGenericModelSupport(MarqoTestCase):
 
     def setUp(self):
@@ -240,6 +240,71 @@ class TestGenericModelSupport(MarqoTestCase):
         assert search_res["hits"][0]["_score"] > score_threshold
         assert search_res["hits"][0]["_id"] == "123"
 
+    def test_pipeline_with_generic_open_clip_model_properties_localpath_non_default_tokenizer(self):
+        """index should get created with custom model_properties
+        """
+        score_threshold = 0.6
+        # this is the pretrained checkpoint from openclip
+        url = "https://marqo-public-testing-models.s3.amazonaws.com/xlm-roberta-base-ViT-B-32-laion5b_s13b_b90k.pt"
+        target_model = download_pretrained_from_url(url)
+
+        model_name = 'test-model-xlm'
+        model_properties = {"name": "xlm-roberta-base-ViT-B-32",
+                            "dimensions": 512,
+                            "localpath": target_model,
+                            "type": "open_clip",
+                            }
+        tensor_search.create_vector_index(
+            index_name=self.index_name_1, config=self.config,
+            index_settings={
+                "index_defaults": {
+                    'model': model_name,
+                    'model_properties': model_properties
+                }
+            }
+        )
+
+        docs = [
+            {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }]
+
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs, device="cpu"))
+
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="123") == {
+                "_id": "123",
+                "title 1": "content 1",
+                "desc 2": "content 2. blah blah blah"
+            }
+
+        docs2 = [
+            {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
+            }]
+
+        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            index_name=self.index_name_1, docs=docs2, device="cpu"))
+
+        assert tensor_search.get_document_by_id(
+            config=self.config, index_name=self.index_name_1,
+            document_id="321") == {
+                "_id": "321",
+                "title 1": "test test test",
+                "desc 2": "test again test again test again"
+               }
+
+        # Step3 - Search
+        search_res = tensor_search.search(config=self.config, index_name=self.index_name_1, text="content 2. blah blah blah", result_count=1)
+        assert len(search_res['hits']) == 1
+        assert search_res["hits"][0]["_score"] > score_threshold
+        assert search_res["hits"][0]["_id"] == "123"
 
     def test_vectorise_with_generic_open_clip_model_properties_invalid_localpath(self):
         """index should get created with custom model_properties
