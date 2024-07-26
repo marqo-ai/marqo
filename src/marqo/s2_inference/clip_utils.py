@@ -540,7 +540,6 @@ class OPEN_CLIP(CLIP):
             self.mean = self.model_properties.get("mean", None)
             self.std = self.model_properties.get("std", None)
             self.model, self.preprocess = self.custom_clip_load()
-            print(self.model_properties)
             self.tokenizer = self.load_tokenizer(self.model_properties.get("name", None))
 
             self.model.eval()
@@ -594,8 +593,6 @@ class OPEN_CLIP(CLIP):
                 )
 
     def load_tokenizer(self, architecture: str = None) -> Callable:
-        print("Loading tokenizer")
-        print(architecture)
         if architecture in open_clip.list_models():
             return open_clip.get_tokenizer(architecture)
         
