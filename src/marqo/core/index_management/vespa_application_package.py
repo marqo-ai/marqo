@@ -26,15 +26,16 @@ class ServiceXml:
     def __init__(self, path: str):
         if not os.path.exists(path):
             raise InternalError('Could not find file %s' % path)
-        self._path = path
-        self._tree = ET.parse(path)
-        self._root = self._tree.getroot()
+        self._root = ET.parse(path).getroot()
         self._documents = self._ensure_only_one('content/documents')
 
-    def save(self) -> None:
-        self._tree.write(self._path)
+    def __str__(self) -> str:
+        return self.to_xml_str()
 
-    def _ensure_only_one(self, xml_path: str):
+    def to_xml_str(self) -> str:
+        return ET.tostring(self._root).decode('utf-8')
+
+    def _ensure_only_one(self, xml_path: str) -> ET.Element:
         elements = self._root.findall(xml_path)
 
         if len(elements) > 1:
@@ -149,13 +150,13 @@ class IndexSettingStore:
         self._index_settings_history = {key: [MarqoIndex.parse_obj(value) for value in history_array]
                                         for key, history_array in json.loads(index_settings_history_json).items()}
 
-    def save_to_files(self, json_file: str, history_json_file: str) -> None:
-        with open(json_file, 'w') as f:
-            # Pydantic 1.x does not support creating jsonable dict. `json.loads(index.json())` is a workaround
-            json.dump({key: json.loads(index.json()) for key, index in self._index_settings.items()}, f)
-        with open(history_json_file, 'w') as f:
-            json.dump({key: [json.loads(index.json()) for index in history] for
-                       key, history in self._index_settings_history.items()}, f)
+    def to_json_strings(self) -> (str, str):
+        # Pydantic 1.x does not support creating jsonable dict. `json.loads(index.json())` is a workaround
+        json_str = json.dumps({key: json.loads(index.json()) for key, index in self._index_settings.items()})
+        history_str = json.dumps({key: [json.loads(index.json()) for index in history] for
+                                  key, history in self._index_settings_history.items()})
+
+        return json_str, history_str
 
     def save_index_setting(self, index_setting: MarqoIndex) -> None:
         target_version = (index_setting.version or 0) + 1
@@ -222,12 +223,6 @@ class MarqoConfigStore:
     def update_version(self, version: str) -> None:
         self._config = MarqoConfig(version=version)
 
-    def save_to_file(self, path: str) -> None:
-        if self._config is None:
-            raise InternalError(f"Cannot save Marqo config to {path}, it is not set")
-        with open(path, "w") as f:
-            f.write(self._config.json())
-
 
 class VespaApplicationPackage:
     """
@@ -258,10 +253,11 @@ class VespaApplicationPackage:
         return self._marqo_config_store.get()
 
     def save_to_disk(self) -> None:
-        self._service_xml.save()
-        self._marqo_config_store.save_to_file(self._full_path('marqo_config.json'))
-        self._index_setting_store.save_to_files(self._full_path('marqo_index_settings.json'),
-                                                self._full_path('marqo_index_settings_history.json'))
+        self._save_txt_file(self._service_xml.to_xml_str(), 'services.xml')
+        self._save_txt_file(self._marqo_config_store.get().json(), 'marqo_config.json')
+        index_setting_json, index_setting_history_json = self._index_setting_store.to_json_strings()
+        self._save_txt_file(index_setting_json, 'marqo_index_settings.json')
+        self._save_txt_file(index_setting_history_json, 'marqo_index_settings_history.json')
 
     def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None,
                            allow_downgrade: bool = False) -> bool:
