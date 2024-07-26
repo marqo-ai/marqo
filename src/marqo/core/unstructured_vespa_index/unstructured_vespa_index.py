@@ -216,21 +216,31 @@ class UnstructuredVespaIndex(VespaIndex):
         if marqo_query.filter is not None:
             return tree_to_filter_string(marqo_query.filter.root)
 
+    def _convert_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> Dict[
+        str, Dict[str, float]]:
+        """
+        Helper function that converts a list of score modifiers into 2 dictionaries:
+        These dictionaries are 'mult' and 'add' weights.
+        """
+        mult_tensor = {}
+        add_tensor = {}
+        for modifier in score_modifiers:
+            if modifier.type == ScoreModifierType.Multiply:
+                mult_tensor[modifier.field] = modifier.weight
+            elif modifier.type == ScoreModifierType.Add:
+                add_tensor[modifier.field] = modifier.weight
+            else:
+                raise InternalError(f'Unknown score modifier type {modifier.type}')
+
+        return mult_tensor, add_tensor
+
     def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
         """
         Returns classic score modifiers (from tensor or lexical queries) as a dictionary of dictionaries.
         Split between 'mult' and 'add' weights.
         """
         if marqo_query.score_modifiers:
-            mult_tensor = {}
-            add_tensor = {}
-            for modifier in marqo_query.score_modifiers:
-                if modifier.type == ScoreModifierType.Multiply:
-                    mult_tensor[modifier.field] = modifier.weight
-                elif modifier.type == ScoreModifierType.Add:
-                    add_tensor[modifier.field] = modifier.weight
-                else:
-                    raise InternalError(f'Unknown score modifier type {modifier.type}')
+            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(marqo_query.score_modifiers)
 
             if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
                 return {
@@ -286,49 +296,19 @@ class UnstructuredVespaIndex(VespaIndex):
             constants.MARQO_SEARCH_METHOD_TENSOR: None
         }
 
-        def _convert_score_modifiers_to_tensors(score_modifiers: List[ScoreModifier], search_type: str) -> Dict[
-            str, Dict[str, float]]:
-            """
-            Helper function that converts a list of score modifiers into a dictionary of dictionaries.
-            The dictionaries are split between 'mult' and 'add' weights.
-
-            search_type: 'lexical' or 'tensor'. It will be added to the end of the
-            dictionary key to be parsed out in custom searcher. This allows the 2 score modifiers lists to be used
-            separately in the custom searcher.
-            """
-            mult_tensor = {}
-            add_tensor = {}
-            for modifier in score_modifiers:
-                if modifier.type == ScoreModifierType.Multiply:
-                    mult_tensor[modifier.field] = modifier.weight
-                elif modifier.type == ScoreModifierType.Add:
-                    add_tensor[modifier.field] = modifier.weight
-                else:
-                    raise InternalError(f'Unknown score modifier type {modifier.type}')
-            if search_type == constants.MARQO_SEARCH_METHOD_LEXICAL:
-                return {
-                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}": mult_tensor,
-                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}": add_tensor
-                }
-            elif search_type == constants.MARQO_SEARCH_METHOD_TENSOR:
-                return {
-                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}": mult_tensor,
-                    f"{unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}": add_tensor
-                }
-            else:
-                raise InternalError(f"Unknown search type {search_type}")
-
         if hybrid_query.score_modifiers_lexical:
-            result[constants.MARQO_SEARCH_METHOD_LEXICAL] = _convert_score_modifiers_to_tensors(
-                hybrid_query.score_modifiers_lexical,
-                constants.MARQO_SEARCH_METHOD_LEXICAL
-            )
+            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(hybrid_query.score_modifiers_lexical)
+            result[constants.MARQO_SEARCH_METHOD_LEXICAL] = {
+                unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: mult_tensor,
+                unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: add_tensor
+            }
 
         if hybrid_query.score_modifiers_tensor:
-            result[constants.MARQO_SEARCH_METHOD_TENSOR] = _convert_score_modifiers_to_tensors(
-                hybrid_query.score_modifiers_tensor,
-                constants.MARQO_SEARCH_METHOD_TENSOR
-            )
+            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(hybrid_query.score_modifiers_tensor)
+            result[constants.MARQO_SEARCH_METHOD_TENSOR] = {
+                unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
+                unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
+            }
 
         return result
 
