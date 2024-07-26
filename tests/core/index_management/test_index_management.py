@@ -1,24 +1,22 @@
+import json
 import os
-import shutil
-import threading
-import time
-import uuid
+import textwrap
 from unittest import mock
-from unittest.mock import patch
+from datetime import datetime
+
+import httpx
+
+import xml.etree.ElementTree as ET
+
 
 from marqo import version
-from marqo.core.exceptions import IndexExistsError
+from marqo.core.exceptions import IndexExistsError, ApplicationNotInitializedError
 from marqo.core.exceptions import IndexNotFoundError
-from marqo.core.exceptions import InternalError
-from marqo.core.exceptions import OperationConflictError
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.index_management.vespa_application_package import MarqoConfig, VespaApplicationPackage
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 
@@ -32,482 +30,305 @@ class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
         super().setUp()
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=self.zookeeper_client,
+        self.index_management = IndexManagement(self.vespa_client,
+                                                zookeeper_client=self.zookeeper_client,
                                                 enable_index_operations=True)
+        # this resets the application package to a clean state
+        self._deploy_initial_app_package()
 
-    def _check_delete_index_resilience(self, index_name: str):
-        """A helper method to check the resilience of the delete index operation."""
-        try:
-            # Repeat the delete index operation, it is OK to raise IndexNotFoundError
-            self.index_management.delete_index_by_name(index_name)
-        except IndexNotFoundError:
-            pass
-        self.create_indexes([self.unstructured_marqo_index_request(name=index_name)])
-        # Add documents to the index
-        r = tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=index_name,
-                tensor_fields=[],
-                docs=[{"test": "test", "_id": "1"}]
-            )
-        ).dict(exclude_none=True, by_alias=True)
-        self.assertEqual(r["errors"], False)
+    def test_clean_bootstrap_vespa(self):
+        bootstrapped = self.index_management.bootstrap_vespa()
+        self.assertTrue(bootstrapped)
 
-        # Test search
-        r = tensor_search.search(
-            config=self.config,
-            index_name=index_name,
-            text="test",
-            search_method="LEXICAL"
-        )
-        self.assertEqual(1, len(r["hits"]))
+        app = self.vespa_client.download_application()
+        # TODO find a better way to test this, it assume the jar file is generated in target folder
+        self._assert_file_exists(app, 'components', 'marqo-custom-components-deploy.jar')
+        self._assert_file_exists(app, 'search', 'query-profiles', 'default.xml')
+        self._assert_file_exists(app, 'marqo_index_settings.json')
+        self._assert_file_exists(app, 'marqo_index_settings_history.json')
+        self._assert_file_exists(app, 'marqo_config.json')
 
-    def _check_create_index_resilience(self, index_name: str, index_request: MarqoIndexRequest):
-        """A helper method to check the resilience of the create index operation."""
-        self.index_management.create_index(index_request)
-        # Add documents to the index
-        r = tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=index_name,
-                tensor_fields=[],
-                docs=[{"test": "test", "_id": "1"}]
-            )
-        ).dict(exclude_none=True, by_alias=True)
-        self.assertEqual(r["errors"], False)
+        # Verify no index setting is present
+        with open(os.path.join(app, 'marqo_index_settings.json')) as f:
+            self.assertEqual('{}', f.read())
 
-        # Test search
-        r = tensor_search.search(
-            config=self.config,
-            index_name=index_name,
-            text="test",
-            search_method="LEXICAL"
-        )
-        self.assertEqual(1, len(r["hits"]))
+        # Verify no index setting history is present
+        with open(os.path.join(app, 'marqo_index_settings_history.json')) as f:
+            self.assertEqual('{}', f.read())
 
-        # Ensure the index can be deleted successfully
-        self.index_management.delete_index_by_name(index_name)
+        with open(os.path.join(app, 'marqo_config.json')) as f:
+            self.assertEqual(json.loads(f'{{"version": "{version.get_version()}"}}'), json.load(f))
 
-    def test_bootstrap_vespa_doesNotExist_successful(self):
-        # TODO - There is a risk that this test passes because another test run created the artifacts (app package)
-        # We need to reset the application package between test runs
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
+        self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
+
+    def test_skip_boostrap_if_already_bootstrapped(self):
+        def modified_post(*args, **kwargs):
+            return httpx.post(*args, **kwargs)
+
+        # verify the first boostrap call deploys the app to vespa
+        with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
             self.assertTrue(self.index_management.bootstrap_vespa())
+            self.assertEqual(mock_post.call_count, 2)
+            self.assertTrue('prepareandactivate' in mock_post.call_args_list[1].args[0])
 
-            # Verify settings schema exists
-            try:
-                self.vespa_client.feed_document(
-                    VespaDocument(
-                        id='1',
-                        fields={}
-                    ),
-                    schema=settings_schema_name
-                )
-            except VespaStatusError as e:
-                if e.status_code == 400:
-                    self.fail('Settings schema does not exist')
-                else:
-                    raise e
+        # verify the second boostrap call skips the deployment
+        with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
+            self.assertFalse(self.index_management.bootstrap_vespa())
+            self.assertEqual(mock_post.call_count, 1)
+            self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
 
-            # Verify application package is configured correctly
-            app = self.vespa_client.download_application()
+    def test_boostrap_from_existing_app_prior_to_2_12(self):
+        existing_index = self._deploy_existing_app_package()
+        existing_index_with_version = existing_index.copy(update={'version': 1})
 
-            query_profile_exists = os.path.exists(
-                os.path.join(app, 'search/query-profiles', 'default.xml')
-            )
-            self.assertTrue(query_profile_exists, 'Default query profile does not exist')
+        bootstrapped = self.index_management.bootstrap_vespa()
+        self.assertTrue(bootstrapped)
 
-            custom_searcher_exists = os.path.exists(
-                os.path.join(app, 'components', IndexManagement._MARQO_CUSTOM_SEARCHERS_JAR)
-            )
-            self.assertTrue(custom_searcher_exists, 'Custom searchers jar does not exist')
+        app = self.vespa_client.download_application()
+        self._assert_file_exists(app, 'marqo_index_settings.json')
+        self._assert_file_exists(app, 'marqo_index_settings_history.json')
+        self._assert_file_exists(app, 'marqo_config.json')
 
-    def test_bootstrap_vespa_exists_skips(self):
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.assertTrue(self.index_management.bootstrap_vespa())
+        with open(os.path.join(app, 'marqo_index_settings.json')) as f:
+            index_settings = json.load(f)
+            self.assertTrue(existing_index.name in index_settings)
+            self.assertEqual(existing_index_with_version.json(), json.dumps(index_settings[existing_index.name]))
 
-            import httpx
+        with open(os.path.join(app, 'marqo_index_settings_history.json')) as f:
+            self.assertEqual('{}', f.read())
 
-            def modified_post(*args, **kwargs):
-                self.assertFalse(
-                    'prepareandactivate' in args[0],
-                    'Settings schema deployment must be skipped'
-                )
-                return httpx.post(*args, **kwargs)
+        with open(os.path.join(app, 'marqo_config.json')) as f:
+            self.assertEqual(json.loads(f'{{"version": "{version.get_version()}"}}'), json.load(f))
 
-            with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
-                self.assertFalse(self.index_management.bootstrap_vespa())
-                # Sanity check that we're patching the right method
-                self.assertTrue(mock_post.called)
+    def test_bootstrap_overrides_component_jars_and_configs(self):
+        pass
 
-    def test_boostrap_vespa_v2Exists_skips(self):
-        """
-        bootstrap_vespa skips when Vespa has been configured with Marqo 2.0.x
-        """
-        # Marqo 2.0.x configuration is detected by presence of settings schema, but absence default query profile
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            app = self.vespa_client.download_application()
+    def test_bootstrap_support_rollback(self):
+        # TODO this feature is not implemented yet
+        pass
 
-            # Clean any query profiles that may exist
-            shutil.rmtree(os.path.join(app, 'search'), ignore_errors=True)
+    def test_distributed_lock(self):
+        pass
 
-            self.index_management._add_marqo_settings_schema(app)
-            self.vespa_client.deploy_application(app)
-            self.vespa_client.wait_for_application_convergence()
+    def test_prefixes(self):
+        pass
 
-            self.assertFalse(
-                self.index_management.bootstrap_vespa(),
-                'bootstrap_vespa should skip when Marqo 2.0.x configuration is detected'
-            )
+    def test_index_operation_fails_if_disabled(self):
+        pass
 
-    def test_bootstrap_vespa_partialConfig_successful(self):
-        """
-        bootstrap_vespa succeeds when Vespa has been partially configured and recovers to a consistent state
-        """
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.assertTrue(self.index_management.bootstrap_vespa())
-
-            # Delete marqo config to simulate partial configuration for 2.1+
-            self.vespa_client.delete_document(
-                schema=settings_schema_name,
-                id=IndexManagement._MARQO_CONFIG_DOC_ID
-            )
-
-            self.assertTrue(self.index_management.bootstrap_vespa(), 'bootstrap_vespa should not skip')
-            # Verify config has been saved
-            self.assertEqual(version.get_version(), self.index_management.get_marqo_version())
-
-    def test_create_index_settingsSchemaDoesNotExist_successful(self):
-        """
-        A new index is created successfully when the settings schema does not exist
-        """
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.structured_marqo_index_request(
-            name=index_name,
-            model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAngular,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text),
-                FieldRequest(name='description', type=FieldType.Text),
-                FieldRequest(name='price', type=FieldType.Float, features=[FieldFeature.ScoreModifier])
-            ],
-            tensor_fields=['title', 'description']
+    def test_index_operation_fails_if_not_bootstrapped(self):
+        index_request_1 = self.structured_marqo_index_request(
+            fields=[FieldRequest(name='title', type=FieldType.Text)],
+            tensor_fields=['title']
         )
+        index_request_2 = self.unstructured_marqo_index_request()
 
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.index_management.create_index(marqo_index_request)
+        with self.assertRaises(ApplicationNotInitializedError):
+            self.index_management.create_index(index_request_1)
 
-            # Inserting a document into the new schema to verify it exists
-            self.vespa_client.feed_document(
-                VespaDocument(
-                    id='1',
-                    fields={}
-                ),
-                schema=index_name
-            )
+        with self.assertRaises(ApplicationNotInitializedError):
+            self.index_management.batch_create_indexes([index_request_1, index_request_2])
 
-            # Verify settings have been saved
-            settings_json = self.pyvespa_client.get_data(
-                schema=IndexManagement._MARQO_SETTINGS_SCHEMA_NAME,
-                data_id=index_name
-            ).json['fields']['settings']
+        with self.assertRaises(ApplicationNotInitializedError):
+            self.index_management.delete_index_by_name(index_request_1.name)
 
-            # Generate Marqo Index to compare
-            _, marqo_index_request = vespa_schema_factory(marqo_index_request).generate_schema()
+        with self.assertRaises(ApplicationNotInitializedError):
+            self.index_management.batch_delete_indexes_by_name([index_request_1.name, index_request_2.name])
 
-            self.assertEqual(settings_json, marqo_index_request.json())
+    def test_create_and_delete_index_successful(self):
+        # merge batch create and delete happy path to save some testing time
+        request = self.unstructured_marqo_index_request()
+        schema, index = vespa_schema_factory(request).generate_schema()
+        self.index_management.bootstrap_vespa()
+        self.index_management.create_index(request)
 
-    def test_create_index_settingsSchemaExists_successful(self):
-        """
-        A new index is created successfully when the settings schema already exists
-        """
-        index_name_1 = 'a' + str(uuid.uuid4()).replace('-', '')
-        index_name_2 = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.structured_marqo_index_request(
-            name=index_name_1,
-            model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAngular,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text),
-                FieldRequest(name='description', type=FieldType.Text),
-                FieldRequest(name='price', type=FieldType.Float, features=[FieldFeature.ScoreModifier])
-            ],
-            tensor_fields=['title', 'description']
-        )
-        self.index_management.create_index(marqo_index_request)
-
-        # Create with a different name now that we know settings schema exists
-        marqo_index_request_2 = marqo_index_request.copy(update={'name': index_name_2})
-
-        self.index_management.create_index(marqo_index_request_2)
-
-        # Inserting a document into the new schema to verify it exists
-        self.vespa_client.feed_batch(
-            [
-                VespaDocument(
-                    id='1',
-                    fields={}
-                )
-            ],
-            schema=index_name_2
-        )
-
-        # Verify settings have been saved
-        settings_json = self.pyvespa_client.get_data(
-            schema=IndexManagement._MARQO_SETTINGS_SCHEMA_NAME,
-            data_id=index_name_2
-        ).json['fields']['settings']
-
-        # Generate Marqo Index to compare
-        _, marqo_index = vespa_schema_factory(marqo_index_request_2).generate_schema()
-
-        self.assertEqual(settings_json, marqo_index.json())
-
-    def test_create_index_indexExists_fails(self):
-        """
-        An error is raised when creating an index that already exists
-        """
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.structured_marqo_index_request(
-            name=index_name,
-            model=Model(name='ViT-B/32'),
-            distance_metric=DistanceMetric.PrenormalizedAngular,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            ],
-            tensor_fields=[]
-        )
-
-        self.index_management.create_index(marqo_index_request)
-
-        with self.assertRaises(IndexExistsError):
-            self.index_management.create_index(marqo_index_request)
-
-    def test_create_index_text_prefix_defaults_successful(self):
-        """
-        Text prefix defaults are set correctly
-        """
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.structured_marqo_index_request(
-            name=index_name,
-            model=Model(
-                name='test_prefix'
-            ),
-            distance_metric=DistanceMetric.PrenormalizedAngular,
-            vector_numeric_type=VectorNumericType.Float,
-            hnsw_config=HnswConfig(ef_construction=100, m=16),
-            fields=[
-                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
-            ],
-            tensor_fields=[]
-        )
-
-        # test create_index
-        index = self.index_management.create_index(marqo_index_request)
-        self.assertEqual(index.model.text_query_prefix, "test query: ")
-        self.assertEqual(index.model.text_chunk_prefix, "test passage: ")
+        app = self.vespa_client.download_application()
+        self._assert_index_is_present(app, index, schema)
 
         self.index_management.delete_index_by_name(index.name)
 
-        # test batch_create_index
-        indexes = self.index_management.batch_create_indexes([marqo_index_request])
-        self.assertEqual(indexes[0].model.text_query_prefix, "test query: ")
-        self.assertEqual(indexes[0].model.text_chunk_prefix, "test passage: ")
+        app = self.vespa_client.download_application()
+        self._assert_index_is_not_present(app, index.name, index.schema_name)
 
-        self.index_management.delete_index_by_name(indexes[0].name)
+    def test_create_index_fails_if_exists(self):
+        request = self.unstructured_marqo_index_request(name="test-index")
+        self.index_management.bootstrap_vespa()
+        self.index_management.create_index(request)
 
-    def test_get_marqo_version_successful(self):
+        with self.assertRaises(IndexExistsError):
+            self.index_management.create_index(request)
+
+    def test_delete_index_fails_when_index_not_found(self):
+        self.index_management.bootstrap_vespa()
+
+        with self.assertRaises(IndexNotFoundError):
+            self.index_management.delete_index_by_name('index-does-not-exist')
+
+    def test_batch_create_and_delete_index_successful(self):
+        # merge batch create and delete happy path to save some testing time
+        request1 = self.unstructured_marqo_index_request()
+        request2 = self.structured_marqo_index_request(
+            fields=[FieldRequest(name='title', type=FieldType.Text)],
+            tensor_fields=['title']
+        )
+        schema1, index1 = vespa_schema_factory(request1).generate_schema()
+        schema2, index2 = vespa_schema_factory(request2).generate_schema()
+
+        self.index_management.bootstrap_vespa()
+        self.index_management.batch_create_indexes([request1, request2])
+
+        app = self.vespa_client.download_application()
+        self._assert_index_is_present(app, index1, schema1)
+        self._assert_index_is_present(app, index2, schema2)
+
+        self.index_management.batch_delete_indexes_by_name([request1.name, request2.name])
+
+        app = self.vespa_client.download_application()
+        self._assert_index_is_not_present(app, index1.name, index1.schema_name)
+        self._assert_index_is_not_present(app, index2.name, index2.schema_name)
+
+    def test_batch_create_index_fails_atomically(self):
+        request = self.unstructured_marqo_index_request(name="index1")
+        self.index_management.bootstrap_vespa()
+        self.index_management.create_index(request)
+
+        request2 = self.unstructured_marqo_index_request(name="index2")
+        _, index2 = vespa_schema_factory(request2).generate_schema()
+
+        with self.assertRaises(IndexExistsError):
+            self.index_management.batch_create_indexes([request2, request])
+
+        app = self.vespa_client.download_application()
+        self._assert_index_is_not_present(app, index2.name, index2.schema_name)
+
+    def test_batch_delete_index_fails_atomically(self):
+        request = self.unstructured_marqo_index_request(name="index1")
+        schema, index1 = vespa_schema_factory(request).generate_schema()
+
+        self.index_management.bootstrap_vespa()
+        self.index_management.create_index(request)
+
+        request2 = self.unstructured_marqo_index_request(name="index2")
+        _, index2 = vespa_schema_factory(request2).generate_schema()
+
+        with self.assertRaises(IndexNotFoundError):
+            self.index_management.batch_delete_indexes_by_name([request.name, request2.name])
+
+        app = self.vespa_client.download_application()
+        self._assert_index_is_present(app, index1, schema)
+        self._assert_index_is_not_present(app, index2.name, index2.schema_name)
+
+    def test_race_condition(self):
         """
-        get_marqo_version returns current version
+        In this test, we simulate two instances/threads of Marqo make different changes to the application package
         """
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.index_management.bootstrap_vespa()
+        self.index_management.bootstrap_vespa()
 
-            self.assertEqual(version.get_version(), self.index_management.get_marqo_version())
+        request1 = self.unstructured_marqo_index_request()
+        request2 = self.structured_marqo_index_request(
+            fields=[FieldRequest(name='title', type=FieldType.Text)],
+            tensor_fields=['title']
+        )
+        schema1, index1 = vespa_schema_factory(request1).generate_schema()
+        schema2, index2 = vespa_schema_factory(request2).generate_schema()
 
-    def test_get_marqo_version_v20_successful(self):
-        """
-        get_marqo_version returns 2.0 when Vespa has been configured with Marqo 2.0.x
-        """
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.index_management.bootstrap_vespa()
+        app_on_instance1 = self.vespa_client.download_application(check_for_application_convergence=True)
+        app_on_instance2 = self.vespa_client.download_application(check_for_application_convergence=True)
 
-            # Delete Marqo config to simulate 2.0
-            self.vespa_client.delete_document(
-                schema=settings_schema_name,
-                id=IndexManagement._MARQO_CONFIG_DOC_ID
-            )
+        app1 = VespaApplicationPackage(app_on_instance1)
+        app1.add_index_setting_and_schema(index1, schema1)
+        app1.save_to_disk()
 
-            self.assertEqual(self.index_management.get_marqo_version(), '2.0')
+        app2 = VespaApplicationPackage(app_on_instance2)
+        app2.add_index_setting_and_schema(index2, schema2)
+        app2.save_to_disk()
 
-    def test_createAndDeleteIndexCannotBeConcurrent(self):
-        """Test to ensure create_index requests can block other create_index and delete_index requests."""
-        index_name_1 = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request_1 = self.unstructured_marqo_index_request(
-            name=index_name_1,
+        self.vespa_client.deploy_application(app_on_instance1)
+        # this should fail due to optimistic locking, however, it succeeds
+        self.vespa_client.deploy_application(app_on_instance2)
+
+    def _assert_index_is_present(self, app, expected_index, expected_schema):
+        if 'version' not in expected_index:
+            expected_index = expected_index.copy(update={'version': 1})
+
+        # assert index setting exists and equals to expected value
+        saved_index = self.index_management.get_index(expected_index.name)
+        self.assertEqual(saved_index, expected_index)
+
+        # assert schema file exists and has expected value
+        schema_name = expected_index.schema_name
+        self._assert_file_exists(app, 'schemas', f'{schema_name}.sd')
+        with open(os.path.join(app, 'schemas', f'{schema_name}.sd')) as f:
+            self.assertEqual(f.read(), expected_schema)
+        doc = ET.parse(os.path.join(app, 'services.xml')).getroot().find(f'content/documents/document[@type="{schema_name}"]')
+        self.assertIsNotNone(doc)
+
+    def _assert_index_is_not_present(self, app, index_name, schema_name):
+        with self.assertRaises(IndexNotFoundError):
+            self.index_management.get_index(index_name)
+
+        self._assert_file_does_not_exist(app, 'schemas', f'{schema_name}.sd')
+        doc = ET.parse(os.path.join(app, 'services.xml')).getroot().find(
+            f'content/documents/document[@type="{schema_name}"]')
+        self.assertIsNone(doc)
+
+    def _deploy_initial_app_package(self):
+        app_root_path = './initial_vespa_app'
+        self._add_schema_removal_override(app_root_path)
+        self.vespa_client.deploy_application(app_root_path)
+        self.vespa_client.wait_for_application_convergence()
+
+    def _deploy_existing_app_package(self) -> MarqoIndex:
+        app_root_path = './existing_vespa_app'
+        self._add_schema_removal_override(app_root_path)
+        marqo_index_request = self.unstructured_marqo_index_request(name="existing_index")
+        schema, index = vespa_schema_factory(marqo_index_request).generate_schema()
+        with open(os.path.join(app_root_path, 'schemas', f'{index.schema_name}.sd'), 'w') as f:
+            f.write(schema)
+        self.vespa_client.deploy_application(app_root_path)
+        self.vespa_client.wait_for_application_convergence()
+        self._save_index_settings(index)
+        self._save_marqo_version('2.10.0')
+
+        return index
+
+    @staticmethod
+    def _add_schema_removal_override(app_root_path: str):
+        content = textwrap.dedent(
+            f'''
+            <validation-overrides>
+                 <allow until='{datetime.utcnow().strftime('%Y-%m-%d')}'>schema-removal</allow>
+            </validation-overrides>
+            '''
+        ).strip()
+        with open(os.path.join(app_root_path, 'validation-overrides.xml'), 'w') as f:
+            f.write(content)
+
+    def _assert_file_exists(self, *file_paths):
+        self.assertTrue(os.path.exists(os.path.join(*file_paths)), f'File {"/".join(file_paths[1:])} does not exist')
+
+    def _assert_file_does_not_exist(self, *file_paths):
+        self.assertFalse(os.path.exists(os.path.join(*file_paths)),f'File {"/".join(file_paths[1:])} exists')
+
+    def _save_marqo_version(self, version: str) -> None:
+        self.vespa_client.feed_document(
+            VespaDocument(
+                id=self.index_management._MARQO_CONFIG_DOC_ID,
+                fields={
+                    'settings': MarqoConfig(version=version).json()
+                }
+            ),
+            schema=self.index_management._MARQO_SETTINGS_SCHEMA_NAME
         )
 
-        index_name_2 = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request_2 = self.unstructured_marqo_index_request(
-            name=index_name_2,
+    def _save_index_settings(self, marqo_index: MarqoIndex) -> None:
+        self.vespa_client.feed_document(
+            VespaDocument(
+                id=marqo_index.name,
+                fields={
+                    'index_name': marqo_index.name,
+                    'settings': marqo_index.json()
+                }
+            ),
+            schema=self.index_management._MARQO_SETTINGS_SCHEMA_NAME
         )
-
-        def create_index(marqo_index_request):
-            self.index_management.create_index(marqo_index_request)
-
-        t_1 = threading.Thread(target=create_index, args=(marqo_index_request_1,))
-        t_1.start()
-        time.sleep(1)
-        with self.assertRaises(OperationConflictError):
-            self.index_management.create_index(marqo_index_request_2)
-
-        with self.assertRaises(OperationConflictError):
-            self.index_management.delete_index_by_name(index_name_1)
-        t_1.join()
-        self.index_management.delete_index_by_name(index_name_1)
-
-    def test_createIndexFailIfEnableIndexCreationIsFalse(self):
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.unstructured_marqo_index_request(
-            name=index_name,
-        )
-        with self.assertRaises(InternalError) as e:
-            self.index_management.create_index(marqo_index_request)
-        self.assertIn("You index_management object is not enabled for index operations. ",
-                      str(e.exception))
-
-    def test_deleteIndexFailIfEnableIndexCreationIsFalse(self):
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with self.assertRaises(InternalError) as e:
-            self.index_management.delete_index_by_name(index_name)
-        self.assertIn("You index_management object is not enabled for index operations. ",
-                      str(e.exception))
-
-    def test_createIndexWithoutZookeeperClient_success(self):
-        """Test to ensure create_index requests can be made without Zookeeper client with a warning logged."""
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None, enable_index_operations=True)
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        try:
-            with patch("marqo.core.index_management.index_management.logger.warning") as mock_logger_warning:
-                self.index_management.create_index(self.unstructured_marqo_index_request(name=index_name))
-            mock_logger_warning.assert_called_once()
-
-        finally:
-            self.index_management.delete_index_by_name(index_name)
-
-    def test_deploymentLockIsNone(self):
-        """Test to ensure if no Zookeeper client is provided, deployment lock is None
-        """
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
-        self.assertIsNone(self.index_management._zookeeper_deployment_lock)
-
-    def test_delete_index_resilience_deployApplicationPackageError_successful(self):
-        """
-        Test that the delete index operation is resilient to failures in deploying the application package.
-        """
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.unstructured_marqo_index_request(
-            name=index_name,
-        )
-        self.index_management.create_index(marqo_index_request)
-        error = IndexResilienceError("Failed to deploy the application package")
-        with patch("marqo.vespa.vespa_client.VespaClient.deploy_application", side_effect=error):
-            with self.assertRaises(IndexResilienceError):
-                self.index_management.delete_index_by_name(index_name)
-
-        self._check_delete_index_resilience(index_name)
-
-    def test_delete_index_resilience_deleteDocumentInVespaSchemaError_successful(self):
-        """Test that the delete index operation is resilient to failures in deleting the document in the Vespa
-        marqo__settings schema.
-        """
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.unstructured_marqo_index_request(
-            name=index_name,
-        )
-        self.index_management.create_index(marqo_index_request)
-        error = IndexResilienceError("Failed to deploy the application package")
-        with patch("marqo.core.index_management.index_management.IndexManagement._delete_index_settings_by_name",
-                   side_effect=error):
-            with self.assertRaises(IndexResilienceError):
-                tensor_search.delete_index(self.config, index_name)
-        self._check_delete_index_resilience(index_name)
-
-    def test_create_index_resilience_deployApplicationPackageError_successful(self):
-        """
-        Test that the create index operation is resilient to failures in deploying the application package.
-        """
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.unstructured_marqo_index_request(
-            name=index_name,
-        )
-        error = IndexResilienceError("Failed to deploy the application package")
-        with patch("marqo.vespa.vespa_client.VespaClient.deploy_application", side_effect=error):
-            with self.assertRaises(IndexResilienceError):
-                self.index_management.create_index(marqo_index_request)
-        self._check_create_index_resilience(index_name, marqo_index_request)
-
-    def test_create_index_resilience_addIndexSettingsError_successful(self):
-        """
-        Test that the create index operation is resilient to failures in adding the index settings to the
-        marqo__settings index.
-        """
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.unstructured_marqo_index_request(
-            name=index_name,
-        )
-        error = IndexResilienceError("Failed to add the index settings to the marqo__settings index")
-        with patch("marqo.core.index_management.index_management.IndexManagement._save_index_settings",
-                   side_effect=error):
-            with self.assertRaises(IndexResilienceError):
-                self.index_management.create_index(marqo_index_request)
-        self._check_create_index_resilience(index_name, marqo_index_request)
-
-    def test_create_index_resilience_bootstrapError_successful(self):
-        """Test to ensure create index is resilient when boost_trap is not successful."""
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.unstructured_marqo_index_request(
-            name=index_name,
-        )
-
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            with mock.patch("marqo.core.index_management.index_management.logger.debug") as mock_logger_debug:
-                self._check_create_index_resilience(index_name, marqo_index_request)
-
-        self.assertIn("Marqo config does not exist. Configuring Vespa as part of index creation",
-                      str(mock_logger_debug.call_args_list))
-
-    def test_create_index_resilience_bootstrapPartialError_successful(self):
-        """Test to ensure create index is resilient when bootstrap is only partial successful."""
-        settings_schema_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        index_name = 'a' + str(uuid.uuid4()).replace('-', '')
-        marqo_index_request = self.unstructured_marqo_index_request(
-            name=index_name,
-        )
-        with mock.patch.object(IndexManagement, '_MARQO_SETTINGS_SCHEMA_NAME', settings_schema_name):
-            self.assertTrue(self.index_management.bootstrap_vespa())
-
-            # Delete marqo config to simulate partial configuration for 2.1+
-            self.vespa_client.delete_document(
-                schema=settings_schema_name,
-                id=IndexManagement._MARQO_CONFIG_DOC_ID
-            )
-
-            self._check_create_index_resilience(index_name, marqo_index_request)

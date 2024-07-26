@@ -12,8 +12,6 @@ from pathlib import Path
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
-from marqo.vespa.exceptions import VespaError
-from marqo.vespa.vespa_client import VespaClient
 import marqo.logging
 import marqo.vespa.vespa_client
 import xml.etree.ElementTree as ET
@@ -222,7 +220,7 @@ class MarqoConfigStore:
         return self._config
 
     def update_version(self, version: str) -> None:
-        self._config = MarqoConfig(version)
+        self._config = MarqoConfig(version=version)
 
     def save_to_file(self, path: str) -> None:
         if self._config is None:
@@ -237,19 +235,17 @@ class VespaApplicationPackage:
     Provides convenient methods to manage various configs to the application package.
     """
 
-    def __init__(self, vespa_client: VespaClient):
-        self._vespa_client = vespa_client
-        self._app_root_path = vespa_client.download_application(check_for_application_convergence=True)
-        self._skip_deployment = False
+    def __init__(self, app_root_path: str):
+        self.app_root_path = app_root_path
+        self.is_configured = os.path.exists(self._full_path('marqo_config.json'))
         self._service_xml = ServiceXml(self._full_path('services.xml'))
-        self.has_marqo_config = os.path.exists(self._full_path('marqo_config.json'))
         self._marqo_config_store = MarqoConfigStore(self._load_json_from_file('marqo_config.json'))
         self._index_setting_store = IndexSettingStore(
             self._load_json_from_file('marqo_index_settings.json', default_value='{}'),
             self._load_json_from_file('marqo_index_settings_history.json', default_value='{}'))
 
     def _full_path(self, *paths: str) -> str:
-        return os.path.join(self._app_root_path, *paths)
+        return os.path.join(self.app_root_path, *paths)
 
     def _load_json_from_file(self, path: str, default_value: Optional[str] = None) -> str:
         full_path = self._full_path(path)
@@ -261,19 +257,11 @@ class VespaApplicationPackage:
     def get_marqo_config(self) -> MarqoConfig:
         return self._marqo_config_store.get()
 
-    def skip_deployment(self):
-        self._skip_deployment = True
-
-    def deploy(self, deployment_timeout=60, convergence_timeout=120) -> None:
-        if self._skip_deployment:
-            logger.info("Skip app deployment since the skip deployment flag is set")
-            return
+    def save_to_disk(self) -> None:
         self._service_xml.save()
         self._marqo_config_store.save_to_file(self._full_path('marqo_config.json'))
         self._index_setting_store.save_to_files(self._full_path('marqo_index_settings.json'),
                                                 self._full_path('marqo_index_settings_history.json'))
-        self._vespa_client.deploy_application(self._app_root_path, timeout=deployment_timeout)
-        self._vespa_client.wait_for_application_convergence(timeout=convergence_timeout)
 
     def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None,
                            allow_downgrade: bool = False) -> bool:
@@ -286,7 +274,7 @@ class VespaApplicationPackage:
         - from the marqo_config_doc passed in which is marqo__config doc saved in marqo__settings schema (Post v2.1.0)
         - if neither is available, return 2.0.0 as default (Pre v2.1.0 or not bootstrapped yet)
         """
-        if self.has_marqo_config and self._marqo_config_store.get():
+        if self.is_configured and self._marqo_config_store.get():
             app_version = self._marqo_config_store.get().version
         elif marqo_config_doc:
             app_version = marqo_config_doc.version
@@ -299,7 +287,7 @@ class VespaApplicationPackage:
         return (app_sem_version < marqo_sem_version) or (app_sem_version > marqo_sem_version and allow_downgrade)
 
     def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
-        if not self.has_marqo_config and existing_index_settings:
+        if not self.is_configured and existing_index_settings:
             for index in existing_index_settings:
                 self._index_setting_store.save_index_setting(index)
 
@@ -325,7 +313,8 @@ class VespaApplicationPackage:
 
         # delete the whole components folder
         components_path = self._full_path('components')
-        shutil.rmtree(components_path)
+        if os.path.exists(components_path):
+            shutil.rmtree(components_path)
         os.makedirs(components_path)
 
         # copy the components jar file to the empty folder
