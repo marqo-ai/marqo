@@ -92,11 +92,14 @@ jobs:
       - name: Set up Environment
         run: |
           # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
+          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> $GITHUB_ENV
           export MQ_API_TEST_BRANCH=$(echo "${GITHUB_REF}" | cut -d'/' -f3-)
+          echo "MQ_API_TEST_BRANCH=$MQ_API_TEST_BRANCH" >> $GITHUB_ENV
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
+          echo "MQ_API_TEST_IMG=$MQ_API_TEST_IMG" >> $GITHUB_ENV
           export MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git
+          echo "MQ_PY_MARQO_BRANCH=$MQ_PY_MARQO_BRANCH" >> $GITHUB_ENV
           
           echo "Marqo Branch: $MQ_API_TEST_BRANCH"
           echo "API Test branch: 1.4.x"
