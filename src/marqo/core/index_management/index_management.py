@@ -55,7 +55,6 @@ class IndexManagement:
         }
         '''
     )
-   
     _DEFAULT_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
         '''
         <query-profile id="default">
@@ -475,7 +474,7 @@ class IndexManagement:
             max_hits=self._max_search_limit,
             max_offset=self._max_search_offset
         )
-        
+
         if os.path.exists(profile_path):
             with open(profile_path, 'r') as f:
                 existing_content = f.read()
