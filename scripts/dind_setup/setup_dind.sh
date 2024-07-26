@@ -16,7 +16,7 @@ apt update \
     supervisor \
     && rm -rf /var/lib/apt/list/*
 
-sudo apt-get install -y wget
+apt-get install -y wget
 
 export DOCKER_CHANNEL=stable \
   DOCKER_VERSION=20.10.18 \
