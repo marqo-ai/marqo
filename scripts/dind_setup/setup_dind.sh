@@ -54,6 +54,7 @@ set -eux; \
 	docker --version
 
 cp /app/scripts/dind_setup/deps/modprobe /usr/local/bin/
+mkdir -p /etc/supervisor/conf.d/
 cp -r /app/scripts/dind_setup/deps/supervisor/ /etc/supervisor/conf.d/
 mkdir -p /opt/bash-utils
 cp -r /app/scripts/dind_setup/deps/logger.sh /opt/bash-utils/logger.sh
