@@ -46,7 +46,7 @@ class TestIndexSettingStore(MarqoTestCase):
         index_history_json_string = json.dumps({index.name: [json.loads(index.json())]})
 
         store = IndexSettingStore(index_json_string, index_history_json_string)
-        output_index, output_index_history = store.to_json_strings()
+        output_index, output_index_history = store.to_json()
 
         self.assertEqual(output_index, index_json_string)
         self.assertEqual(output_index_history, index_history_json_string)

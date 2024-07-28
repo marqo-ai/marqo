@@ -10,7 +10,8 @@ from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deploymen
 from marqo.core.exceptions import IndexExistsError, IndexNotFoundError, ApplicationNotInitializedError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
-from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig
+from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig, \
+    VespaApplicationFileStore, ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
@@ -70,19 +71,20 @@ class IndexManagement:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
         with self._vespa_deployment_lock():
-            app_root_path = self.vespa_client.download_application(check_for_application_convergence=True)
-            app = VespaApplicationPackage(app_root_path)
-            marqo_version = version.get_version()
-            has_marqo_settings_schema = app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
-            marqo_config_doc = self._get_marqo_config() if has_marqo_settings_schema else None
+            application = self._vespa_application(check_configured=False)
+            with application as app:
 
-            if not app.need_bootstrapping(marqo_version, marqo_config_doc):
-                return False
+                marqo_version = version.get_version()
+                has_marqo_settings_schema = app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
+                marqo_config_doc = self._get_marqo_config() if has_marqo_settings_schema else None
 
-            existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else None
-            app.bootstrap(marqo_version, existing_indexes)
-            self._deploy_app(app)
-            return True
+                if not app.need_bootstrapping(marqo_version, marqo_config_doc):
+                    application.gen.send(False)  # tell context manager to skip deployment
+                    return False
+
+                existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else None
+                app.bootstrap(marqo_version, existing_indexes)
+                return True
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
@@ -102,7 +104,7 @@ class IndexManagement:
                 in progress and the lock cannot be acquired
         """
         with self._vespa_deployment_lock():
-            with self._vespa_application() as app:
+            with self._vespa_application_with_deployment_session() as app:
                 return self._create_one_index(app, marqo_index_request)
 
     @staticmethod
@@ -140,7 +142,7 @@ class IndexManagement:
                 in progress and the lock cannot be acquired
         """
         with self._vespa_deployment_lock():
-            with self._vespa_application() as app:
+            with self._vespa_application_with_deployment_session() as app:
                 return [self._create_one_index(app, request) for request in marqo_index_requests]
 
     def delete_index_by_name(self, index_name: str) -> None:
@@ -156,7 +158,7 @@ class IndexManagement:
                 in progress and the lock cannot be acquired
         """
         with self._vespa_deployment_lock():
-            with self._vespa_application() as app:
+            with self._vespa_application_with_deployment_session() as app:
                 app.delete_index_setting_and_schema(index_name)
 
     def batch_delete_indexes_by_name(self, index_names: List[str]) -> None:
@@ -171,7 +173,7 @@ class IndexManagement:
                 in progress and the lock cannot be acquired
         """
         with self._vespa_deployment_lock():
-            with self._vespa_application() as app:
+            with self._vespa_application_with_deployment_session() as app:
                 for index_name in index_names:
                     app.delete_index_setting_and_schema(index_name)
 
@@ -238,27 +240,54 @@ class IndexManagement:
         This method is only used during upgrade and rollback, it might not be needed anymore
         TODO check if this is still needed
         """
-        with self._vespa_application() as app:
-            return app.get_marqo_config().version
+        application = self._vespa_application_with_deployment_session()
+        with application as app:
+            marqo_version = app.get_marqo_config().version
+            application.gen.send(False)
+            return marqo_version
 
     @contextmanager
-    def _vespa_application(self):
+    def _vespa_application(self, check_configured: bool = True):
         """
         A context manager handles a deployment session of the Vespa application package
         """
         app_root_path = self.vespa_client.download_application(check_for_application_convergence=True)
-        app = VespaApplicationPackage(app_root_path)
-        if not app.is_configured:
+        app = VespaApplicationPackage(VespaApplicationFileStore(app_root_path))
+
+        if check_configured and not app.is_configured:
             raise ApplicationNotInitializedError()
 
-        yield app
+        should_deploy = yield app
 
-        self._deploy_app(app)
+        if should_deploy is None or should_deploy is True:
+            app.save_to_disk()
+            self.vespa_client.deploy_application(app_root_path)
+            self.vespa_client.wait_for_application_convergence()
 
-    def _deploy_app(self, app):
-        app.save_to_disk()
-        self.vespa_client.deploy_application(app.app_root_path)
-        self.vespa_client.wait_for_application_convergence()
+        if should_deploy is not None:
+            yield
+
+    @contextmanager
+    def _vespa_application_with_deployment_session(self, check_configured: bool = True):
+        with self.vespa_client.deployment_session() as (session_id, httpx_client):
+            store = ApplicationPackageDeploymentSessionStore(session_id, httpx_client, self.vespa_client)
+            app = VespaApplicationPackage(store)
+
+            if check_configured and not app.is_configured:
+                raise ApplicationNotInitializedError()
+
+            should_deploy = yield app
+
+            if should_deploy is None or should_deploy is True:
+                app.save_to_disk()
+                self.vespa_client.prepare(session_id, httpx_client)
+                # TODO handle prepare configChangeActions
+                # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
+                self.vespa_client.activate(session_id, httpx_client)
+                self.vespa_client.wait_for_application_convergence()
+
+            if should_deploy is not None:
+                yield
 
     @contextmanager
     def _vespa_deployment_lock(self):

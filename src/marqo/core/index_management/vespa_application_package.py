@@ -1,20 +1,22 @@
 import json
 import os
-import shutil
 import textwrap
-from typing import Optional, List
+from abc import ABC, abstractmethod
+from typing import Optional, List, Union
 
+import httpx
 import semver
 from datetime import datetime
 
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 from marqo.base_model import ImmutableBaseModel
 from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 import marqo.logging
-import marqo.vespa.vespa_client
-import xml.etree.ElementTree as ET
+from marqo.vespa.vespa_client import VespaClient
+
 
 logger = marqo.logging.get_logger(__name__)
 
@@ -23,16 +25,14 @@ class ServiceXml:
     """
     Represents a Vespa service XML file.
     """
-    def __init__(self, path: str):
-        if not os.path.exists(path):
-            raise InternalError('Could not find file %s' % path)
-        self._root = ET.parse(path).getroot()
+    def __init__(self, xml_str: str):
+        self._root = ET.fromstring(xml_str)
         self._documents = self._ensure_only_one('content/documents')
 
     def __str__(self) -> str:
-        return self.to_xml_str()
+        return self.to_xml()
 
-    def to_xml_str(self) -> str:
+    def to_xml(self) -> str:
         return ET.tostring(self._root).decode('utf-8')
 
     def _ensure_only_one(self, xml_path: str) -> ET.Element:
@@ -150,7 +150,7 @@ class IndexSettingStore:
         self._index_settings_history = {key: [MarqoIndex.parse_obj(value) for value in history_array]
                                         for key, history_array in json.loads(index_settings_history_json).items()}
 
-    def to_json_strings(self) -> (str, str):
+    def to_json(self) -> (str, str):
         # Pydantic 1.x does not support creating jsonable dict. `json.loads(index.json())` is a workaround
         json_str = json.dumps({key: json.loads(index.json()) for key, index in self._index_settings.items()})
         history_str = json.dumps({key: [json.loads(index.json()) for index in history] for
@@ -224,40 +224,108 @@ class MarqoConfigStore:
         self._config = MarqoConfig(version=version)
 
 
-class VespaApplicationPackage:
-    """
-    Represents a Vespa application package. Downloads the application package from Vespa when initialised.
-    Provides convenient methods to manage various configs to the application package.
-    """
+class VespaApplicationStore(ABC):
 
+    @abstractmethod
+    def file_exists(self, *paths: str) -> bool:
+        pass
+
+    @abstractmethod
+    def read_file(self, path: str, default_value: Optional[str] = None) -> str:
+        pass
+
+    @abstractmethod
+    def save_file(self, content: Union[str, bytes], *paths: str) -> None:
+        pass
+
+    @abstractmethod
+    def remove_file(self, *paths: str) -> None:
+        pass
+
+
+class VespaApplicationFileStore(VespaApplicationStore):
     def __init__(self, app_root_path: str):
-        self.app_root_path = app_root_path
-        self.is_configured = os.path.exists(self._full_path('marqo_config.json'))
-        self._service_xml = ServiceXml(self._full_path('services.xml'))
-        self._marqo_config_store = MarqoConfigStore(self._load_json_from_file('marqo_config.json'))
-        self._index_setting_store = IndexSettingStore(
-            self._load_json_from_file('marqo_index_settings.json', default_value='{}'),
-            self._load_json_from_file('marqo_index_settings_history.json', default_value='{}'))
+        self._app_root_path = app_root_path
 
     def _full_path(self, *paths: str) -> str:
-        return os.path.join(self.app_root_path, *paths)
+        return os.path.join(self._app_root_path, *paths)
 
-    def _load_json_from_file(self, path: str, default_value: Optional[str] = None) -> str:
+    def file_exists(self, *paths: str) -> bool:
+        return os.path.exists(self._full_path(*paths))
+
+    def read_file(self, path: str, default_value: Optional[str] = None) -> str:
         full_path = self._full_path(path)
         if not os.path.exists(full_path):
             return default_value
         with open(full_path, 'r') as file:
             return file.read()
 
+    def save_file(self, content: Union[str, bytes], *paths: str) -> None:
+        path = self._full_path(*paths)
+        if os.path.exists(path):
+            logger.warn(f"{path} already exists in application package, overwriting")
+        else:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        mode = 'w' if isinstance(content, str) else 'wb'
+        with open(path, mode) as f:
+            f.write(content)
+
+    def remove_file(self, *paths: str) -> None:
+        path = self._full_path(*paths)
+        if not os.path.exists(path):
+            logger.warn(f"{path} does not exist in application package, nothing to delete")
+        else:
+            os.remove(path)
+
+
+class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
+    def __init__(self, session_id: int, http_client: httpx.Client, vespa_client: VespaClient):
+        self._session_id = session_id
+        self._http_client = http_client
+        self._vespa_client = vespa_client
+        self._all_contents = vespa_client.list_contents(session_id, http_client)
+
+    def file_exists(self, *paths: str) -> bool:
+        content_url = self._vespa_client.get_content_url(self._session_id, *paths)
+        return content_url in self._all_contents
+
+    def read_file(self, path: str, default_value: Optional[str] = None) -> str:
+        if not self.file_exists(path):
+            return default_value
+        return self._vespa_client.get_content(self._session_id, self._http_client, path)
+
+    def save_file(self, content: str, *paths: str) -> None:
+        self._vespa_client.put_content(self._session_id, self._http_client, content, *paths)
+
+    def remove_file(self, *paths: str) -> None:
+        self._vespa_client.delete_content(self._session_id, self._http_client, *paths)
+
+
+class VespaApplicationPackage:
+    """
+    Represents a Vespa application package. Downloads the application package from Vespa when initialised.
+    Provides convenient methods to manage various configs to the application package.
+    """
+
+    def __init__(self, store: VespaApplicationStore):
+        self._store = store
+        self.is_configured = self._store.file_exists('marqo_config.json')
+        self._service_xml = ServiceXml(self._store.read_file('services.xml'))
+        self._marqo_config_store = MarqoConfigStore(self._store.read_file('marqo_config.json'))
+        self._index_setting_store = IndexSettingStore(
+            self._store.read_file('marqo_index_settings.json', default_value='{}'),
+            self._store.read_file('marqo_index_settings_history.json', default_value='{}'))
+
     def get_marqo_config(self) -> MarqoConfig:
         return self._marqo_config_store.get()
 
     def save_to_disk(self) -> None:
-        self._save_txt_file(self._service_xml.to_xml_str(), 'services.xml')
-        self._save_txt_file(self._marqo_config_store.get().json(), 'marqo_config.json')
-        index_setting_json, index_setting_history_json = self._index_setting_store.to_json_strings()
-        self._save_txt_file(index_setting_json, 'marqo_index_settings.json')
-        self._save_txt_file(index_setting_history_json, 'marqo_index_settings_history.json')
+        self._store.save_file(self._service_xml.to_xml(), 'services.xml')
+        self._store.save_file(self._marqo_config_store.get().json(), 'marqo_config.json')
+        index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
+        self._store.save_file(index_setting_json, 'marqo_index_settings.json')
+        self._store.save_file(index_setting_history_json, 'marqo_index_settings_history.json')
 
     def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None,
                            allow_downgrade: bool = False) -> bool:
@@ -301,25 +369,20 @@ class VespaApplicationPackage:
             </query-profile>
             '''
         )
-        self._save_txt_file(content, 'search/query-profiles', 'default.xml')
+        self._store.save_file(content, 'search/query-profiles', 'default.xml')
 
     def _copy_components_jar(self) -> None:
         vespa_jar_folder = Path(__file__).parent / '../../../../vespa/target'
         components_jar_files = ['marqo-custom-components-deploy.jar']
 
-        # delete the whole components folder
-        components_path = self._full_path('components')
-        if os.path.exists(components_path):
-            shutil.rmtree(components_path)
-        os.makedirs(components_path)
-
-        # copy the components jar file to the empty folder
+        # copy the components jar files to the empty folder
         for file in components_jar_files:
-            shutil.copy(vespa_jar_folder/file, self._full_path('components', file))
+            with open(vespa_jar_folder/file, 'rb') as f:
+                self._store.save_file(f.read(), 'components', file)
 
     def add_index_setting_and_schema(self, index_setting: MarqoIndex, schema: str) -> None:
         self._index_setting_store.save_index_setting(index_setting)
-        self._save_txt_file(schema, 'schemas', f'{index_setting.schema_name}.sd')
+        self._store.save_file(schema, 'schemas', f'{index_setting.schema_name}.sd')
         self._service_xml.add_schema(index_setting.schema_name)
 
     def delete_index_setting_and_schema(self, index_name: str) -> None:
@@ -328,12 +391,12 @@ class VespaApplicationPackage:
             raise IndexNotFoundError(f"Index {index_name} not found")
 
         self._index_setting_store.delete_index_setting(index.name)
-        self._delete_file('schemas', f'{index.schema_name}.sd')
+        self._store.remove_file('schemas', f'{index.schema_name}.sd')
         self._service_xml.remove_schema(index.schema_name)
         self._add_schema_removal_override()
 
     def has_schema(self, name: str) -> bool:
-        return os.path.exists(self._full_path('schemas', f'{name}.sd'))
+        return self._store.file_exists('schemas', f'{name}.sd')
 
     def has_index(self, name: str) -> bool:
         return self._index_setting_store.get_index(name) is not None
@@ -347,21 +410,4 @@ class VespaApplicationPackage:
             </validation-overrides>
             '''
         ).strip()
-        self._save_txt_file(content, 'validation-overrides.xml')
-
-    def _save_txt_file(self, content: str, *paths: str) -> None:
-        path = self._full_path(*paths)
-        if os.path.exists(path):
-            logger.warn(f"{path} already exists in application package, overwriting")
-        else:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-
-        with open(path, 'w') as f:
-            f.write(content)
-
-    def _delete_file(self, *paths: str) -> None:
-        path = self._full_path(*paths)
-        if not os.path.exists(path):
-            logger.warn(f"{path} does not exist in application package, nothing to delete")
-        else:
-            os.remove(path)
+        self._store.save_file(content, 'validation-overrides.xml')
