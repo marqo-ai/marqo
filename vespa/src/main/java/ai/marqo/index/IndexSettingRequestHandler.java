@@ -14,6 +14,8 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.yahoo.jdisc.http.HttpRequest.Method.GET;
+
 public class IndexSettingRequestHandler extends ThreadedHttpRequestHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(IndexSettingRequestHandler.class);
@@ -30,6 +32,10 @@ public class IndexSettingRequestHandler extends ThreadedHttpRequestHandler {
 
     @Override
     public HttpResponse handle(HttpRequest httpRequest) {
+        if (!httpRequest.getMethod().equals(GET)) {
+            return JsonResponse.error(405, "Only GET requests are allowed");
+        }
+
         String path = httpRequest.getUri().getPath();
         if (path.equals("/index-settings")) {
             return JsonResponse.success(indexSettings.getAllIndexSettings());
