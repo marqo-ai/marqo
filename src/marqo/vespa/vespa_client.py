@@ -5,8 +5,10 @@ import tarfile
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from json import JSONDecodeError
-from typing import Dict, Any, List, Optional
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Union
 from urllib.parse import urlparse
 
 import httpx
@@ -15,8 +17,8 @@ import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
-                                    VespaTimeoutError, VespaNotConvergedError)
-from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchResponse, \
+                                    VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
+from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
@@ -29,7 +31,8 @@ logger = marqo.logging.get_logger(__name__)
 
 class VespaClient:
     _VESPA_ERROR_CODE_TO_EXCEPTION = {
-        'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError
+        'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError,
+        'ACTIVATION_CONFLICT': VespaActivationConflictError
     }
 
     class _ConvergenceStatus:
@@ -39,8 +42,8 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, default_search_timeout_ms: int = 1000, 
-                 pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10, 
+                 content_cluster_name: str, default_search_timeout_ms: int = 1000,
+                 pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10,
                  delete_pool_size: int = 10, partial_update_pool_size: int = 10):
         """
         Create a VespaClient object.
@@ -92,6 +95,20 @@ class VespaClient:
         )
 
         self._raise_for_status(response)
+
+    @contextmanager
+    def deployment_session(self):
+        self.check_for_application_convergence()
+        # FIXME: The session created in step 1 is local to the config node, check why
+        # If this can be fixed, we can just return the session id
+        with httpx.Client() as httpx_client:
+            session_id = self._create_deploy_session(httpx_client)
+            yield session_id, httpx_client
+
+    # TODO test if this works without a dedicated client
+    def create_deployment_session(self):
+        self.check_for_application_convergence()
+        return self._create_deploy_session(self.http_client)
 
     def download_application(self, check_for_application_convergence: bool = False) -> str:
         """
@@ -552,7 +569,6 @@ class VespaClient:
 
         raise VespaError(f'Get all index settings returns invalid response: {index_list}')
 
-
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:
             return url
@@ -585,6 +601,59 @@ class VespaClient:
         self._raise_for_status(response)
 
         return response.json()['session-id']
+
+    def get_content_url(self, session_id: int, *path: str) -> str:
+        return f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+
+    def list_contents(self, session_id: int, httpx_client: httpx.Client) -> List[str]:
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
+
+        response = httpx_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.json()
+
+    def get_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> str:
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+
+        response = httpx_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.text
+
+    def put_content(self, session_id: int, httpx_client: httpx.Client, content: Union[str, bytes], *path: str) -> None:
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+
+        response = httpx_client.put(endpoint, content=content)
+
+        self._raise_for_status(response)
+
+    def delete_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> None:
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+
+        response = httpx_client.delete(endpoint)
+
+        self._raise_for_status(response)
+
+    def prepare(self, session_id: int, httpx_client: httpx.Client):
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/prepared'
+
+        response = httpx_client.put(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.json()
+
+    def activate(self, session_id: int, httpx_client: httpx.Client):
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/active'
+
+        response = httpx_client.put(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.json()
 
     def _download_application(self, session_id: int, httpx_client: httpx.Client) -> str:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'

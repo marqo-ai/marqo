@@ -10,13 +10,15 @@ import xml.etree.ElementTree as ET
 
 
 from marqo import version
-from marqo.core.exceptions import IndexExistsError, ApplicationNotInitializedError
+from marqo.core.exceptions import IndexExistsError, ApplicationNotInitializedError, InternalError
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.index_management.vespa_application_package import MarqoConfig, VespaApplicationPackage
+from marqo.core.index_management.vespa_application_package import MarqoConfig, VespaApplicationPackage, \
+    ApplicationPackageDeploymentSessionStore
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 
@@ -114,7 +116,25 @@ class TestIndexManagement(MarqoTestCase):
         pass
 
     def test_index_operation_fails_if_disabled(self):
-        pass
+        # Create an index management instance with index operation disabled (by default)
+        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
+        index_request_1 = self.structured_marqo_index_request(
+            fields=[FieldRequest(name='title', type=FieldType.Text)],
+            tensor_fields=['title']
+        )
+        index_request_2 = self.unstructured_marqo_index_request()
+
+        with self.assertRaises(InternalError):
+            self.index_management.create_index(index_request_1)
+
+        with self.assertRaises(InternalError):
+            self.index_management.batch_create_indexes([index_request_1, index_request_2])
+
+        with self.assertRaises(InternalError):
+            self.index_management.delete_index_by_name(index_request_1.name)
+
+        with self.assertRaises(InternalError):
+            self.index_management.batch_delete_indexes_by_name([index_request_1.name, index_request_2.name])
 
     def test_index_operation_fails_if_not_bootstrapped(self):
         index_request_1 = self.structured_marqo_index_request(
@@ -232,20 +252,27 @@ class TestIndexManagement(MarqoTestCase):
         schema1, index1 = vespa_schema_factory(request1).generate_schema()
         schema2, index2 = vespa_schema_factory(request2).generate_schema()
 
-        app_on_instance1 = self.vespa_client.download_application(check_for_application_convergence=True)
-        app_on_instance2 = self.vespa_client.download_application(check_for_application_convergence=True)
+        with self.vespa_client.deployment_session() as (session1, client1):
+            store1 = ApplicationPackageDeploymentSessionStore(session1, client1, self.vespa_client)
+            app1 = VespaApplicationPackage(store1)
 
-        app1 = VespaApplicationPackage(app_on_instance1)
-        app1.add_index_setting_and_schema(index1, schema1)
-        app1.save_to_disk()
+            with self.vespa_client.deployment_session() as (session2, client2):
+                store2 = ApplicationPackageDeploymentSessionStore(session2, client2, self.vespa_client)
+                app2 = VespaApplicationPackage(store2)
 
-        app2 = VespaApplicationPackage(app_on_instance2)
-        app2.add_index_setting_and_schema(index2, schema2)
-        app2.save_to_disk()
+                app1.add_index_setting_and_schema(index1, schema1)
+                app1.save_to_disk()
 
-        self.vespa_client.deploy_application(app_on_instance1)
-        # this should fail due to optimistic locking, however, it succeeds
-        self.vespa_client.deploy_application(app_on_instance2)
+                app2.add_index_setting_and_schema(index2, schema2)
+                app2.save_to_disk()
+
+                self.vespa_client.prepare(session1, client1)
+                self.vespa_client.activate(session1, client1)
+
+                self.vespa_client.prepare(session2, client2)
+                # this should fail due to optimistic locking
+                with self.assertRaises(VespaActivationConflictError):
+                    self.vespa_client.activate(session2, client2)
 
     def _assert_index_is_present(self, app, expected_index, expected_schema):
         if 'version' not in expected_index:
