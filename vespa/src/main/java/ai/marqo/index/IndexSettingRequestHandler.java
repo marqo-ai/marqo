@@ -1,5 +1,7 @@
 package ai.marqo.index;
 
+import static com.yahoo.jdisc.http.HttpRequest.Method.GET;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yahoo.container.jdisc.HttpRequest;
@@ -13,8 +15,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.yahoo.jdisc.http.HttpRequest.Method.GET;
 
 public class IndexSettingRequestHandler extends ThreadedHttpRequestHandler {
 
