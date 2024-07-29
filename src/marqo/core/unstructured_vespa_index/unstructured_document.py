@@ -34,13 +34,22 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     def extract_highlights(self) -> List[Dict[str, str]]:
         if not self.match_features:
             raise VespaDocumentParsingError("No match features found in the document")
-        try:
-            chunk_index: int = int(list(self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"] \
-                                            ["cells"].keys())[0])
-        except KeyError:
-            raise VespaDocumentParsingError("No match features found in the document")
-        field_name, content = self.vespa_chunks[chunk_index].split("::", 1)
-        return [{field_name: content}]
+
+        if self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"]["cells"] == {}:
+            # No match feature found, return empty highlights
+            return []
+        else:
+            if not self.vespa_chunks:
+                raise VespaDocumentParsingError(f"Document {self.fields.marqo__id} does not have any chunks. "
+                                                f"No highlights can be extracted.")
+
+            try:
+                chunk_index: int = int(list(self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"] \
+                                                ["cells"].keys())[0])
+            except KeyError:
+                raise VespaDocumentParsingError("No match features found in the document")
+            field_name, content = self.vespa_chunks[chunk_index].split("::", 1)
+            return [{field_name: content}]
 
 
 class UnstructuredVespaDocument(MarqoBaseModel):
@@ -187,14 +196,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                     json.loads(serialized_multimodal_params)
 
         if return_highlights and self.fields.match_features:
-            if self.fields.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"]["cells"] == {}:
-                # No match feature found, return empty highlights
-                marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = []
-            else:
-                if not self.fields.vespa_chunks:
-                    raise VespaDocumentParsingError(f"Document {self.fields.marqo__id} does not have any chunks. "
-                                                    f"No highlights can be extracted.")
-                marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.fields.extract_highlights()
+            marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.fields.extract_highlights()
 
         # Hybrid search raw scores
         if self.raw_tensor_score is not None:
