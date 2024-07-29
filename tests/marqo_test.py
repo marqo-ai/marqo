@@ -75,6 +75,7 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
+        cls.index_management.bootstrap_vespa()
         indexes = cls.index_management.batch_create_indexes(index_requests)
         cls.indexes = indexes
 
