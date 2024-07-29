@@ -1,6 +1,7 @@
 import textwrap
 import semver
 
+from marqo.core import constants
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.unstructured_vespa_index import common as unstructured_common
@@ -215,13 +216,13 @@ class UnstructuredVespaSchema(VespaSchema):
             f"""
             rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits {unstructured_common.RANK_PROFILE_BASE} {{
                 first-phase {{
-                    expression: modify(lexical_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                    expression: modify(lexical_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
                 }}
             }}
             
             rank-profile {self._RANK_PROFILE_EMBEDDING_SIMILARITY} inherits {unstructured_common.RANK_PROFILE_BASE} {{
                 first-phase {{
-                    expression: modify(embedding_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
+                    expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
                 }}
                 match-features: closest({self._EMBEDDINGS})
             }}
@@ -231,26 +232,26 @@ class UnstructuredVespaSchema(VespaSchema):
                     query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])
                     query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})
                     query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR}) tensor<int8>(p{{}})
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
                 }}
             }}
             
             rank-profile {unstructured_common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY} inherits {unstructured_common.RANK_PROFILE_BASE} {{
                 first-phase {{
-                    expression: modify(lexical_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                    expression: modify(lexical_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
                 }}
                 second-phase {{
-                    expression: modify(embedding_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
+                    expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
                 }}
                 match-features: closest({self._EMBEDDINGS})
             }}
             
             rank-profile {unstructured_common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25} inherits {unstructured_common.RANK_PROFILE_BASE} {{
                 first-phase {{
-                    expression: modify(lexical_score(), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                    expression: modify(lexical_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
                 }}
             }}
             """
@@ -272,10 +273,10 @@ class UnstructuredVespaSchema(VespaSchema):
             rank-profile {unstructured_common.RANK_PROFILE_BASE} inherits default {{
                 inputs {{
                     query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
-                    query({unstructured_common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
                 }}
 
                 function modify(score, mult_weights, add_weights) {{

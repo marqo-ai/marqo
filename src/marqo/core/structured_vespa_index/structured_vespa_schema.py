@@ -1,5 +1,6 @@
 from typing import List
 
+from marqo.core import constants
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex, FieldFeature, Field, TensorField, MarqoIndex
 from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest
 from marqo.core.structured_vespa_index import common
@@ -275,10 +276,10 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'query({field.embeddings_field_name}): 0')
         rank_profiles.append(f'query({common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])')
         rank_profiles.append(f'query({common.QUERY_INPUT_BM25_AGGREGATOR}): 0')
-        rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
-        rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
-        rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
-        rank_profiles.append(f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
+        rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
+        rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
+        rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
+        rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
 
         rank_profiles.append('}')
 
@@ -316,8 +317,8 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('first-phase {')
             rank_profiles.append(
                 f'expression: modify(lexical_score(), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL})'
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL})'
                 f')'
             )
             rank_profiles.append('}}')
@@ -328,8 +329,8 @@ class StructuredVespaSchema(VespaSchema):
 
             rank_profiles.append('first-phase {')
             rank_profiles.append(f'expression: modify(embedding_score(), '
-                                 f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), '
-                                 f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR})'
+                                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), '
+                                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR})'
                                  f')')
             rank_profiles.append('}')
             rank_profiles.append(embedding_match_features_expression)
@@ -349,13 +350,13 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append(f'query({common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})')
             rank_profiles.append(f'query({common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR}) tensor<int8>(p{{}})')
             rank_profiles.append(
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
             rank_profiles.append(
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
             rank_profiles.append(
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
             rank_profiles.append(
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
 
             rank_profiles.append('}')
             rank_profiles.append('}')
@@ -370,15 +371,15 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('first-phase {')  # First phase ranks on LEXICAL
             rank_profiles.append(
                 f'expression: modify(lexical_score(), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))'
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))'
             )
             rank_profiles.append('}')
             rank_profiles.append('second-phase {')  # Second phase ranks on TENSOR
             rank_profiles.append(
                 f'expression: modify(embedding_score(), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))'
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), '
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))'
             )
             rank_profiles.append('}')
             rank_profiles.append(embedding_match_features_expression)
@@ -393,8 +394,8 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('first-phase {')  # First phase ranks on LEXICAL
             rank_profiles.append(
                 f'expression: modify(lexical_score(), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
-                f'query({common.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))')
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), '
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))')
             rank_profiles.append('}}')
 
         return rank_profiles

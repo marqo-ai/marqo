@@ -42,12 +42,6 @@ RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 = 'embedding_similarity_modifier
 # QUERY_INPUT_EMBEDDING = 'embedding_query'
 QUERY_INPUT_EMBEDDING = "marqo__query_embedding"    # TODO: see if this change from 'embedding_query' to 'embedding_query' changes anything
 QUERY_INPUT_BM25_AGGREGATOR = 'marqo__bm25_aggregator'
-QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9 = 'marqo__mult_weights'
-QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9 = 'marqo__add_weights'
-QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL = 'marqo__mult_weights_lexical'
-QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL = 'marqo__add_weights_lexical'
-QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR = 'marqo__mult_weights_tensor'
-QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR = 'marqo__add_weights_tensor'
 
 # For hybrid search
 RANK_PROFILE_HYBRID_CUSTOM_SEARCHER = 'hybrid_custom_searcher'
