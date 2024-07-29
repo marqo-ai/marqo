@@ -2,6 +2,7 @@ package ai.marqo.search;
 
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
+import com.yahoo.net.URI;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
@@ -15,10 +16,10 @@ import com.yahoo.tensor.TensorAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -286,54 +287,44 @@ public class HybridSearcher extends Searcher {
     HitGroup copelandFusion(HitGroup hitsTensor, HitGroup hitsLexical, boolean verbose) {
         int finalLength = Math.max(hitsTensor.size(), hitsLexical.size());
 
-        // Store the unique hits
-        Set<Hit> combinedHitSet = new LinkedHashSet<>();
-
-        // loop over tensor hits and update the raw scores
-        for (int i = 0; i < hitsTensor.size(); i++) {
-            Hit hit = hitsTensor.get(i);
+        // Combine hits from both lists and update the raw score attributes
+        Map<URI, Hit> combinedHitsMap = new LinkedHashMap<>();
+        for (Hit hit : hitsTensor) {
             hit.setField("marqo__raw_tensor_score", hit.getRelevance().getScore());
-            Hit correspondingLexicalHit = hitsLexical.get(hit.getId().toString());
-            if (correspondingLexicalHit != null) {
-                hit.setField(
-                        "marqo__raw_lexical_score",
-                        correspondingLexicalHit.getRelevance().getScore());
-            }
-            combinedHitSet.add(hit);
+            combinedHitsMap.put(hit.getId(), hit);
         }
-        // complete with any extra lexical hits
-        for (int i = 0; i < hitsLexical.size(); i++) {
-            Hit hit = hitsLexical.get(i);
-            if (combinedHitSet.contains(hit)) {
-                continue;
+        for (Hit hit : hitsLexical) {
+            if (combinedHitsMap.containsKey(hit.getId())) {
+                Hit tensorHit = combinedHitsMap.get(hit.getId());
+                tensorHit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());
+            } else {
+                hit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());
+                combinedHitsMap.put(hit.getId(), hit);
             }
-            hit.setField("marqo__raw_lexical_score", hit.getRelevance().getScore());
-            combinedHitSet.add(hit);
         }
 
-        // convert back to list
-        List<Hit> uniqueHits = new ArrayList<>(combinedHitSet);
+        List<Hit> uniqueHits = new ArrayList<>(combinedHitsMap.values());
 
         // Initialize rank maps
-        HashMap<String, Integer> idToRankTensor = new HashMap<>();
+        HashMap<URI, Integer> idToRankTensor = new HashMap<>();
         for (int i = 0; i < hitsTensor.size(); i++) {
-            idToRankTensor.put(hitsTensor.get(i).getId().toString(), i);
+            idToRankTensor.put(hitsTensor.get(i).getId(), i);
         }
 
-        HashMap<String, Integer> idToRankLexical = new HashMap<>();
+        HashMap<URI, Integer> idToRankLexical = new HashMap<>();
         for (int i = 0; i < hitsLexical.size(); i++) {
-            idToRankLexical.put(hitsLexical.get(i).getId().toString(), i);
+            idToRankLexical.put(hitsLexical.get(i).getId(), i);
         }
 
         // Calculate Copeland scores
-        HashMap<String, Integer> copelandScores = new HashMap<>();
+        HashMap<URI, Integer> copelandScores = new HashMap<>();
         for (Hit hit1 : uniqueHits) {
-            String hitId1 = hit1.getId().toString();
+            URI hitId1 = hit1.getId();
             int wins = 0;
             int losses = 0;
             for (Hit hit2 : uniqueHits) {
                 if (hit1.equals(hit2)) continue;
-                String hitId2 = hit2.getId().toString();
+                URI hitId2 = hit2.getId();
 
                 int rank1Tensor = idToRankTensor.getOrDefault(hitId1, Integer.MAX_VALUE);
                 int rank1Lexical = idToRankLexical.getOrDefault(hitId1, Integer.MAX_VALUE);
@@ -358,7 +349,7 @@ public class HybridSearcher extends Searcher {
 
         // set relevance scores and sort hits
         for (Hit hit : uniqueHits) {
-            String hitId = hit.getId().toString();
+            URI hitId = hit.getId();
             int score = copelandScores.getOrDefault(hitId, 0);
             hit.setRelevance(score);
         }
