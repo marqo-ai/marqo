@@ -249,7 +249,13 @@ class IndexManagement:
     @contextmanager
     def _vespa_application(self, check_configured: bool = True):
         """
-        A context manager handles a deployment session of the Vespa application package
+        A context manager that handles the deployment of a Vespa application package by downloading
+        all contents in one session and deploying the updated app in another session.
+        This is only used for bootstrapping. A better way is to use _vespa_application_with_deployment_session.
+        We need to upload a component jar file during bootstrapping. Due to a bug in Vespa, the better
+        approach does not support uploading binary files. Therefore, we still need this method.
+        With the protection of the distributed lock context manager, we would not run into race condition, unless
+        the connection to zookeeper is lost, and more than one instance holds the lock. This should happen very rarely.
         """
         app_root_path = self.vespa_client.download_application(check_for_application_convergence=True)
         app = VespaApplicationPackage(VespaApplicationFileStore(app_root_path))
@@ -268,13 +274,19 @@ class IndexManagement:
             yield
 
     @contextmanager
-    def _vespa_application_with_deployment_session(self):
+    def _vespa_application_with_deployment_session(self, check_configured: bool = True):
+        """
+        A context manager that handles the deployment of a Vespa application package in a deployment session
+        This is a recommended way to deploy a Vespa application package. It leverages the optimistic locking mechanism
+        to avoid race conditions. Changes to the application package that do not touch any binary files should use
+        this context manager for deployment.
+        """
         with self.vespa_client.deployment_session() as (session_id, httpx_client):
             store = ApplicationPackageDeploymentSessionStore(session_id, httpx_client, self.vespa_client)
             app = VespaApplicationPackage(store)
 
-            if not app.is_configured:
-                app.bootstrap(version.get_version())
+            if check_configured and not app.is_configured:
+                raise ApplicationNotInitializedError()
 
             should_deploy = yield app
 
