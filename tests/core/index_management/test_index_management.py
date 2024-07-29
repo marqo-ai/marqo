@@ -36,6 +36,7 @@ class TestIndexManagement(MarqoTestCase):
                                                 zookeeper_client=self.zookeeper_client,
                                                 enable_index_operations=True)
         # this resets the application package to a clean state
+        self._test_dir = os.path.dirname(os.path.abspath(__file__))
         self._deploy_initial_app_package()
 
     def test_clean_bootstrap_vespa(self):
@@ -274,6 +275,9 @@ class TestIndexManagement(MarqoTestCase):
                 with self.assertRaises(VespaActivationConflictError):
                     self.vespa_client.activate(session2, client2)
 
+    def test_os_path(self):
+        print(os.path.join('.'))
+
     def _assert_index_is_present(self, app, expected_index, expected_schema):
         if 'version' not in expected_index:
             expected_index = expected_index.copy(update={'version': 1})
@@ -300,13 +304,13 @@ class TestIndexManagement(MarqoTestCase):
         self.assertIsNone(doc)
 
     def _deploy_initial_app_package(self):
-        app_root_path = './initial_vespa_app'
+        app_root_path = os.path.join(self._test_dir, 'initial_vespa_app')
         self._add_schema_removal_override(app_root_path)
         self.vespa_client.deploy_application(app_root_path)
         self.vespa_client.wait_for_application_convergence()
 
     def _deploy_existing_app_package(self) -> MarqoIndex:
-        app_root_path = './existing_vespa_app'
+        app_root_path = os.path.join(self._test_dir, 'existing_vespa_app')
         self._add_schema_removal_override(app_root_path)
         marqo_index_request = self.unstructured_marqo_index_request(name="existing_index")
         schema, index = vespa_schema_factory(marqo_index_request).generate_schema()
