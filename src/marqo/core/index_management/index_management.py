@@ -268,13 +268,13 @@ class IndexManagement:
             yield
 
     @contextmanager
-    def _vespa_application_with_deployment_session(self, check_configured: bool = True):
+    def _vespa_application_with_deployment_session(self):
         with self.vespa_client.deployment_session() as (session_id, httpx_client):
             store = ApplicationPackageDeploymentSessionStore(session_id, httpx_client, self.vespa_client)
             app = VespaApplicationPackage(store)
 
-            if check_configured and not app.is_configured:
-                raise ApplicationNotInitializedError()
+            if not app.is_configured:
+                app.bootstrap(version.get_version())
 
             should_deploy = yield app
 
