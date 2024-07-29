@@ -670,6 +670,60 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_lexical_score"], base_lexical_score * -10 * 3)
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -10 * 3)
+            
+            with self.subTest("retrieval: disjunction, ranking: copeland"):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="HELLO WORLD",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.Copeland,
+                            scoreModifiersLexical={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": 10},
+                                    {"field_name": "mult_field_2", "weight": -10}
+                                ],
+                                "add_to_score": [
+                                    {"field_name": "add_field_1", "weight": 5}
+                                ]
+                            },
+                            scoreModifiersTensor={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": 10},
+                                    {"field_name": "mult_field_2", "weight": -10}
+                                ],
+                                "add_to_score": [
+                                    {"field_name": "add_field_1", "weight": 5}
+                                ]
+                            },
+                            verbose=True
+                        ),
+                        result_count=10
+                    )
+                    self.assertIn("hits", hybrid_res)
+
+                    # Score without score modifiers
+                    self.assertEqual(hybrid_res["hits"][3]["_id"], "doc6")  # (score)
+                    base_lexical_score = hybrid_res["hits"][3]["_lexical_score"]
+                    base_tensor_score = hybrid_res["hits"][3]["_tensor_score"]
+
+                    self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
+                    self.assertAlmostEqual(hybrid_res["hits"][0]["_lexical_score"], base_lexical_score * 10 * 3)
+                    self.assertEqual(hybrid_res["hits"][0]["_tensor_score"], base_tensor_score * 10 * 3)
+
+                    self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # (score*10*2)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_lexical_score"], base_lexical_score * 10 * 2)
+                    self.assertAlmostEqual(hybrid_res["hits"][1]["_tensor_score"], base_tensor_score * 10 * 2)
+
+                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_lexical_score"], base_lexical_score + 5*1)
+                    self.assertAlmostEqual(hybrid_res["hits"][2]["_tensor_score"], base_tensor_score + 5*1)
+
+                    self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_lexical_score"], base_lexical_score * -10 * 3)
+                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -10 * 3)
 
 
     def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):
@@ -745,6 +799,7 @@ class TestHybridSearch(MarqoTestCase):
 
                 test_cases = [
                     (RetrievalMethod.Disjunction, RankingMethod.RRF),
+                    (RetrievalMethod.Disjunction, RankingMethod.Copeland),
                     (RetrievalMethod.Lexical, RankingMethod.Lexical),
                     (RetrievalMethod.Tensor, RankingMethod.Tensor)
                 ]
@@ -791,7 +846,7 @@ class TestHybridSearch(MarqoTestCase):
                     )
                 )
 
-                with self.subTest("disjunction text search"):
+                with self.subTest("disjunction rrf text search"):
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -810,7 +865,7 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][1]["_id"], "hippo text low relevance")
                     self.assertEqual(hybrid_res["hits"][2]["_id"], "random text")
 
-                with self.subTest("disjunction image search"):
+                with self.subTest("disjunction rrf image search"):
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -819,6 +874,44 @@ class TestHybridSearch(MarqoTestCase):
                         hybrid_parameters=HybridParameters(
                             retrievalMethod="disjunction",
                             rankingMethod="rrf",
+                            verbose=True
+                        ),
+                        result_count=4
+                    )
+
+                    self.assertIn("hits", hybrid_res)
+                    self.assertEqual(hybrid_res["hits"][0]["_id"], "hippo image")
+                    self.assertEqual(hybrid_res["hits"][1]["_id"], "random image")
+                    self.assertEqual(hybrid_res["hits"][2]["_id"], "hippo text")
+                
+                with self.subTest("disjunction copeland text search"):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="hippo",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod="disjunction",
+                            rankingMethod="copeland",
+                            verbose=True
+                        ),
+                        result_count=4
+                    )
+
+                    self.assertIn("hits", hybrid_res)
+                    self.assertEqual(hybrid_res["hits"][0]["_id"], "hippo text")
+                    self.assertEqual(hybrid_res["hits"][1]["_id"], "hippo text low relevance")
+                    self.assertEqual(hybrid_res["hits"][2]["_id"], "random text")
+
+                with self.subTest("disjunction copeland image search"):
+                    hybrid_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod="disjunction",
+                            rankingMethod="copeland",
                             verbose=True
                         ),
                         result_count=4
@@ -972,7 +1065,7 @@ class TestHybridSearch(MarqoTestCase):
             ({
                 "retrievalMethod": "disjunction",
                 "rankingMethod": "lexical"
-            }, "rankingMethod must be: rrf"),
+            }, "rankingMethod must be: rrf or copeland"),
             ({
                  "retrievalMethod": "tensor",
                  "rankingMethod": "rrf"
@@ -1078,6 +1171,7 @@ class TestHybridSearch(MarqoTestCase):
         # Non-lexical field
         test_cases = [
             ("disjunction", "rrf"),
+            ("disjunction", "copeland"),
             ("lexical", "lexical"),
             ("lexical", "tensor")
         ]
@@ -1100,6 +1194,7 @@ class TestHybridSearch(MarqoTestCase):
         # Non-tensor field
         test_cases = [
             ("disjunction", "rrf"),
+            ("disjunction", "copeland"),
             ("tensor", "tensor"),
             ("tensor", "lexical")
         ]
