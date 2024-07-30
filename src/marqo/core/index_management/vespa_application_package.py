@@ -15,6 +15,7 @@ from marqo.base_model import ImmutableBaseModel
 from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError
 from marqo.core.models import MarqoIndex
 import marqo.logging
+from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient
 
 
@@ -77,7 +78,7 @@ class ServiceXml:
         for child in container_element.findall('*'):
             if child.tag in ['document-api', 'search']:
                 child.clear()
-            elif child.tag != 'node':
+            elif child.tag != 'nodes':
                 container_element.remove(child)
 
     def _config_search(self):
@@ -295,7 +296,13 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
             return default_value
         return self._vespa_client.get_content(self._session_id, self._http_client, path)
 
-    def save_file(self, content: str, *paths: str) -> None:
+    def save_file(self, content: Union[str, bytes], *paths: str) -> None:
+        """
+        Saves the given content to the given path in the application package. Please note that the binary content
+        is not supported due to this Vespa bug: https://github.com/vespa-engine/vespa/issues/32016
+        """
+        if isinstance(content, bytes):
+            raise VespaError("Uploading binary content to Vespa deployment session is not supported")
         self._vespa_client.put_content(self._session_id, self._http_client, content, *paths)
 
     def remove_file(self, *paths: str) -> None:
@@ -402,7 +409,6 @@ class VespaApplicationPackage:
         return self._index_setting_store.get_index(name) is not None
 
     def _add_schema_removal_override(self) -> None:
-        # FIXME we should set a time only a few min in the future to allow minimum window for schema deletion
         content = textwrap.dedent(
             f'''
             <validation-overrides>
