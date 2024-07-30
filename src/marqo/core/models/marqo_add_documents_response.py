@@ -14,6 +14,7 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     message: Optional[str] = None
     error: Optional[str] = None
+    code: Optional[str] = None
     _is_from_vespa_response: Field(type=bool, exclude=True, default=False)
 
     @root_validator(pre=True)

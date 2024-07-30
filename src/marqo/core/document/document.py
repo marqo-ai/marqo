@@ -1,5 +1,5 @@
 from timeit import default_timer as timer
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import marqo.api.exceptions as api_exceptions
 from marqo.core.exceptions import UnsupportedFeatureError, ParsingError
@@ -14,6 +14,10 @@ from marqo.vespa.models.delete_document_response import DeleteAllDocumentsRespon
 from marqo.vespa.vespa_client import VespaClient
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.logging import get_logger
+from marqo.vespa.models.get_document_response import GetBatchResponse
+from marqo.core.models.marqo_get_documents_by_id_response import MarqoGetDocumentsByIdsResponse, MarqoGetDocumentsByIdsItem
+from marqo.core.vespa_index import VespaIndex
+
 
 logger = get_logger(__name__)
 
