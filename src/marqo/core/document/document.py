@@ -182,7 +182,7 @@ class Document:
         docs.reverse()
         return docs, doc_ids
 
-    def translate_add_documents_response(self, responses: FeedBatchResponse,
+    def translate_add_documents_response(self, responses: Optional[FeedBatchResponse],
                                          index_name: str,
                                          unsuccessful_docs: List,
                                          add_docs_processing_time: float) \
@@ -200,7 +200,7 @@ class Document:
         """
 
         new_items: List[MarqoAddDocumentsItem] = []
-        errors = responses.errors
+        errors = responses.errors if responses is not None else False
 
         if responses is not None:
             for resp in responses.responses:
