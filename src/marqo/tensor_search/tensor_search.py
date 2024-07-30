@@ -537,10 +537,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        return config.document.translate_add_documents_response(
+        marqo_add_documents_response = config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
             add_docs_processing_time=t1 - t0
         )
+        return marqo_add_documents_response.dict(exclude_none=True, by_alias=True)
 
 
 def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
@@ -1013,10 +1014,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        return config.document.translate_add_documents_response(
+        marqo_add_documents_response = config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
             add_docs_processing_time=t1 - t0
         )
+        return marqo_add_documents_response.dict(exclude_none=True, by_alias=True)
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
