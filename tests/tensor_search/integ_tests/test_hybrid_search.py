@@ -844,7 +844,7 @@ class TestHybridSearch(MarqoTestCase):
         """
 
         for index in [self.structured_text_index_score_modifiers]:
-            with self.subTest(index=index.name):
+            with self.subTest(index=type(index)):
                 # Add documents
                 tensor_search.add_documents(
                     config=self.config,
@@ -856,7 +856,9 @@ class TestHybridSearch(MarqoTestCase):
                             {"_id": "doc8", "text_field_1": "HELLO WORLD", "mult_field_1": 2.0},    # OUT (negative)
                             {"_id": "doc9", "text_field_1": "HELLO WORLD", "mult_field_1": 3.0},    # OUT (negative)
                             {"_id": "doc10", "text_field_1": "HELLO WORLD", "mult_field_2": 3.0},   # Top result
-                        ]
+                        ],
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) \
+                        else None
                     )
                 )
 
@@ -887,12 +889,12 @@ class TestHybridSearch(MarqoTestCase):
                     result_count=3
                 )
                 self.assertIn("hits", hybrid_res)
-                self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")      # highest score (score*10*3)
-                self.assertEqual(hybrid_res["hits"][0]["_score"], 30.0)
-                self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")      # (score*10*2)
-                self.assertEqual(hybrid_res["hits"][1]["_score"], 20.0)
-                self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")      # (score + 5*1)
-                self.assertEqual(hybrid_res["hits"][2]["_score"], 6.0)
+                self.assertEqual(hybrid_res["hits"][0]["_id"], "doc8")      # (score*10*2)
+                self.assertEqual(hybrid_res["hits"][0]["_score"], 20.0)
+                self.assertEqual(hybrid_res["hits"][1]["_id"], "doc7")      # (score + 5*1)
+                self.assertEqual(hybrid_res["hits"][1]["_score"], 6.0)
+                self.assertEqual(hybrid_res["hits"][2]["_id"], "doc6")      # (score)
+                self.assertEqual(hybrid_res["hits"][2]["_score"], 1.0)
 
 
     def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):
