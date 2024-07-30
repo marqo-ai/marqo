@@ -250,6 +250,7 @@ class MarqoTestCase(unittest.TestCase):
                 m=16
             ),
             treat_urls_and_pointers_as_images: bool = False,
+            filter_string_max_length: int = 50,
             marqo_version=version.get_version(),
             created_at=time.time(),
             updated_at=time.time(),
@@ -265,7 +266,7 @@ class MarqoTestCase(unittest.TestCase):
             name=name,
             model=model,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
-            filter_string_max_length=20,
+            filter_string_max_length=filter_string_max_length,
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
             image_preprocessing=image_preprocessing,
