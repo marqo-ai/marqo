@@ -159,7 +159,7 @@ class IndexSettingStore:
         return json_str, history_str
 
     def save_index_setting(self, index_setting: MarqoIndex) -> None:
-        target_version = (index_setting.version or 0) + 1
+        target_version = index_setting.version or 1
         name = index_setting.name
 
         if name in self._index_settings:
