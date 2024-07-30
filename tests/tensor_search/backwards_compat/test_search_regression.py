@@ -52,12 +52,18 @@ class TestSearchRegression(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
         )
 
+        unstructured_text_index = cls.unstructured_marqo_index_request(
+            model=Model(name="sentence-transformers/all-MiniLM-L6-v2")
+        )
+
         cls.indexes = cls.create_indexes([
             structured_text_index_score_modifiers,
+            unstructured_text_index
         ])
 
         # Assign to objects so they can be used in tests
         cls.structured_text_index_score_modifiers = cls.indexes[0]
+        cls.unstructured_text_index = cls.indexes[1]
 
     def setUp(self) -> None:
         super().setUp()
@@ -96,14 +102,16 @@ class TestSearchRegression(MarqoTestCase):
         of Marqo 2.9.0
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
-            with self.subTest(index=index.name):
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_text_index]:
+            with self.subTest(index=type(index)):
                 # Add documents
                 tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=self.docs_list
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] if \
+                            isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 
