@@ -416,11 +416,7 @@ class TestPrefix(MarqoTestCase):
                 self.assertEqual(len(call_args), 1)
 
                 vespa_query_kwargs = call_args[0].kwargs
-                if isinstance(index, UnstructuredMarqoIndex):
-                    embedding_key = "embedding_query"
-                elif isinstance(index, StructuredMarqoIndex):
-                    embedding_key = "marqo__query_embedding"
-                search_query_embedding = vespa_query_kwargs["query_features"][embedding_key]
+                search_query_embedding = vespa_query_kwargs["query_features"]["marqo__query_embedding"]
 
                 # Embed request the same text
                 embed_res = embed(

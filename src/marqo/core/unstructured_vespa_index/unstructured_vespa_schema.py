@@ -1,6 +1,7 @@
 import textwrap
 import semver
 
+from marqo.core import constants
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.unstructured_vespa_index import common as unstructured_common
@@ -63,38 +64,30 @@ class UnstructuredVespaSchema(VespaSchema):
             filter_string_max_length=self._index_request.filter_string_max_length,
         )
 
-    @classmethod
-    def _generate_unstructured_schema(cls, marqo_index: UnstructuredMarqoIndex) -> str:
+    def _generate_unstructured_schema(self, marqo_index: UnstructuredMarqoIndex) -> str:
         """This function generates the Vespa schema for an unstructured Marqo index."""
         dimension = str(marqo_index.model.get_dimension())
 
-        _score_modifier_expression = (
-            f'if (count(query(marqo__mult_weights) * attribute(marqo__score_modifiers)) == 0, '
-            f'  1, reduce(query(marqo__mult_weights) * attribute(marqo__score_modifiers), prod)) '
-            f'* score '
-            f'+ reduce(query(marqo__add_weights) * attribute(marqo__score_modifiers), sum)'
-        )
-
-        return textwrap.dedent(
+        schema = textwrap.dedent(
             f"""
             schema {marqo_index.schema_name} {{
                 document {{
-                    field {cls._FIELD_ID} type string {{
+                    field {self._FIELD_ID} type string {{
                         indexing: attribute | summary
                         attribute: fast-search
                         rank: filter
                     }}
 
-                    field {cls._STRINGS} type array<string>{{
+                    field {self._STRINGS} type array<string>{{
                         indexing: index
                         index: enable-bm25
                     }}
 
-                    field {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{
+                    field {self._LONGS_STRINGS_FIELDS} type map<string, string> {{
                         indexing: summary
                     }}
 
-                    field {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{
+                    field {self._SHORT_STRINGS_FIELDS} type map<string, string> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -104,7 +97,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                               rank: filter }}
                     }}
 
-                    field {cls._STRING_ARRAY} type array<string> {{
+                    field {self._STRING_ARRAY} type array<string> {{
                         indexing: attribute | summary
                         attribute: fast-search
                         rank: filter
@@ -114,7 +107,7 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: summary
                     }}
 
-                    field {cls._INT_FIELDS} type map<string, long> {{
+                    field {self._INT_FIELDS} type map<string, long> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -124,7 +117,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                            rank: filter }}
                     }}
                     
-                    field {cls._BOOL_FIELDS} type map<string, byte> {{
+                    field {self._BOOL_FIELDS} type map<string, byte> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                             attribute: fast-search
@@ -134,7 +127,7 @@ class UnstructuredVespaSchema(VespaSchema):
                                               rank: filter }}
                         }}
                                                     
-                    field {cls._FLOAT_FIELDS} type map<string, double> {{
+                    field {self._FLOAT_FIELDS} type map<string, double> {{
                         indexing: summary
                         struct-field key {{ indexing : attribute
                                            attribute: fast-search
@@ -145,11 +138,11 @@ class UnstructuredVespaSchema(VespaSchema):
                                            rank: filter }}
                     }}
 
-                    field {cls._SCORE_MODIFIERS} type tensor<double>(p{{}}) {{
+                    field {self._SCORE_MODIFIERS} type tensor<double>(p{{}}) {{
                         indexing: attribute | summary
                     }}
 
-                    field {cls._CHUNKS} type array<string> {{
+                    field {self._CHUNKS} type array<string> {{
                         indexing: summary
                     }}
                     
@@ -157,10 +150,10 @@ class UnstructuredVespaSchema(VespaSchema):
                         indexing: attribute | summary
                     }}
                     
-                    field {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
+                    field {self._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{
                         indexing: attribute | index | summary
                         attribute {{
-                            distance-metric: {cls._get_distance_metric(cls, marqo_index.distance_metric)}
+                            distance-metric: {self._get_distance_metric(marqo_index.distance_metric)}
                         }}
                         index {{
                             hnsw {{
@@ -172,80 +165,130 @@ class UnstructuredVespaSchema(VespaSchema):
                 }}
 
                 fieldset default {{
-                    fields: {cls._STRINGS}
+                    fields: {self._STRINGS}
+                }}
+            """
+        )
+
+        # Add rank profiles
+        schema += self._generate_rank_profiles(marqo_index)
+
+        # Add summaries
+        schema += textwrap.dedent(
+            f"""
+                document-summary {self._SUMMARY_ALL_NON_VECTOR} {{
+                    summary {self._FIELD_ID} type string {{}}
+                    summary {self._STRINGS} type array<string> {{}}
+                    summary {self._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._STRING_ARRAY} type array<string> {{}}
+                    summary {self._BOOL_FIELDS} type map<string, byte> {{}}
+                    summary {self._INT_FIELDS} type map<string, long> {{}}
+                    summary {self._FLOAT_FIELDS} type map<string, double> {{}}
+                    summary {self._CHUNKS} type array<string> {{}}
                 }}
 
-                rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY} inherits default {{
-                    inputs {{
-                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
-                    }}
-                    first-phase {{
-                        expression: closeness(field, {cls._EMBEDDINGS})
-                    }}
-                    match-features: closest({cls._EMBEDDINGS})
+                document-summary {self._SUMMARY_ALL_VECTOR} {{
+                    summary {self._FIELD_ID} type string {{}}
+                    summary {self._STRINGS} type array<string> {{}}
+                    summary {self._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
+                    summary {self._STRING_ARRAY} type array<string> {{}}
+                    summary {self._BOOL_FIELDS} type map<string, byte> {{}}
+                    summary {self._INT_FIELDS} type map<string, long> {{}}
+                    summary {self._FLOAT_FIELDS} type map<string, double> {{}}
+                    summary {self._CHUNKS} type array<string> {{}}
+                    summary {self._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{}}
+                }}
+            }}
+            """
+        )
+
+        return schema
+
+    def _generate_rank_profiles(self, marqo_index: UnstructuredMarqoIndex):
+        model_dim = marqo_index.model.get_dimension()
+
+        # generate base rank profile
+        rank_profiles = self._generate_base_rank_profile(marqo_index)
+
+        rank_profiles += textwrap.dedent(
+            f"""
+            rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(lexical_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                }}
+            }}
+            
+            rank-profile {self._RANK_PROFILE_EMBEDDING_SIMILARITY} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
+                }}
+                match-features: closest({self._EMBEDDINGS})
+            }}
+            
+            rank-profile {unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{
+                inputs {{
+                    query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])
+                    query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL}) tensor<int8>(p{{}})
+                    query({unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR}) tensor<int8>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                }}
+            }}
+            
+            rank-profile {unstructured_common.RANK_PROFILE_HYBRID_BM25_THEN_EMBEDDING_SIMILARITY} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(lexical_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                }}
+                second-phase {{
+                    expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
+                }}
+                match-features: closest({self._EMBEDDINGS})
+            }}
+            
+            rank-profile {unstructured_common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25} inherits {unstructured_common.RANK_PROFILE_BASE} {{
+                first-phase {{
+                    expression: modify(lexical_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}))
+                }}
+            }}
+            """
+        )
+
+        return rank_profiles
+
+    def _generate_base_rank_profile(self, marqo_index: UnstructuredMarqoIndex):
+        model_dim = marqo_index.model.get_dimension()
+        score_modifier_expression = (
+            f'if (count(mult_weights * attribute({self._SCORE_MODIFIERS})) == 0, '
+            f'  1, reduce(mult_weights * attribute({self._SCORE_MODIFIERS}), prod)) '
+            f'* score '
+            f'+ reduce(add_weights * attribute({self._SCORE_MODIFIERS}), sum)'
+        )
+
+        return textwrap.dedent(
+            f"""
+            rank-profile {unstructured_common.RANK_PROFILE_BASE} inherits default {{
+                inputs {{
+                    query({unstructured_common.QUERY_INPUT_EMBEDDING}) tensor<float>(x[{model_dim}])
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
                 }}
 
-                rank-profile {unstructured_common.RANK_PROFILE_BM25} inherits default {{
-                    first-phase {{
-                        expression: bm25({cls._STRINGS})
-                    }}
-                }}
-                
-                rank-profile modifiers inherits default {{
-                    inputs {{
-                        query(marqo__mult_weights) tensor<double>(p{{}})
-                        query(marqo__add_weights) tensor<double>(p{{}})
-                    }}
-                    function modify(score) {{
-                        expression: {_score_modifier_expression}
-                   }}
-                }}
-                
-                rank-profile {unstructured_common.RANK_PROFILE_BM25_MODIFIERS} inherits modifiers {{
-                    inputs {{
-                        query(marqo__mult_weights) tensor<double>(p{{}})
-                        query(marqo__add_weights) tensor<double>(p{{}})
-                    }}
-                    first-phase {{
-                        expression: modify(bm25({cls._STRINGS}))
-                    }}
-                }}
-                
-                rank-profile {cls._RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS} inherits modifiers {{
-                    inputs {{
-                        query(marqo__mult_weights) tensor<double>(p{{}})
-                        query(marqo__add_weights) tensor<double>(p{{}})
-                        query({cls._QUERY_INPUT_EMBEDDING}) tensor<float>(x[{dimension}])
-                    }}
-                    first-phase {{
-                        expression: modify(closeness(field, {cls._EMBEDDINGS}))
-                    }}
-                    match-features: closest({cls._EMBEDDINGS})
+                function modify(score, mult_weights, add_weights) {{
+                    expression: {score_modifier_expression}
                 }}
 
-                document-summary {cls._SUMMARY_ALL_NON_VECTOR} {{
-                    summary {cls._FIELD_ID} type string {{}}
-                    summary {cls._STRINGS} type array<string> {{}}
-                    summary {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._STRING_ARRAY} type array<string> {{}}
-                    summary {cls._BOOL_FIELDS} type map<string, byte> {{}}
-                    summary {cls._INT_FIELDS} type map<string, long> {{}}
-                    summary {cls._FLOAT_FIELDS} type map<string, double> {{}}
-                    summary {cls._CHUNKS} type array<string> {{}}
+                function lexical_score() {{
+                    expression: bm25({self._STRINGS})
                 }}
 
-                document-summary {cls._SUMMARY_ALL_VECTOR} {{
-                    summary {cls._FIELD_ID} type string {{}}
-                    summary {cls._STRINGS} type array<string> {{}}
-                    summary {cls._LONGS_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._SHORT_STRINGS_FIELDS} type map<string, string> {{}}
-                    summary {cls._STRING_ARRAY} type array<string> {{}}
-                    summary {cls._BOOL_FIELDS} type map<string, byte> {{}}
-                    summary {cls._INT_FIELDS} type map<string, long> {{}}
-                    summary {cls._FLOAT_FIELDS} type map<string, double> {{}}
-                    summary {cls._CHUNKS} type array<string> {{}}
-                    summary {cls._EMBEDDINGS} type tensor<float>(p{{}}, x[{dimension}]) {{}}
+                function embedding_score() {{
+                    expression: closeness(field, {self._EMBEDDINGS})
                 }}
             }}
             """
