@@ -127,7 +127,8 @@ class MarqoTestCase(unittest.TestCase):
             ),
             marqo_version=version.get_version(),
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
+            version=None
     ) -> StructuredMarqoIndex:
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndex.
@@ -148,7 +149,8 @@ class MarqoTestCase(unittest.TestCase):
             tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            version=version
         )
 
     @classmethod
@@ -187,7 +189,8 @@ class MarqoTestCase(unittest.TestCase):
             updated_at=time.time(),
             treat_urls_and_pointers_as_images=True,
             treat_urls_and_pointers_as_media=True,
-            filter_string_max_length=100
+            filter_string_max_length=100,
+            version=None
     ) -> UnstructuredMarqoIndex:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndex.
@@ -211,7 +214,8 @@ class MarqoTestCase(unittest.TestCase):
             updated_at=updated_at,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
             treat_urls_and_pointers_as_media=treat_urls_and_pointers_as_media,
-            filter_string_max_length=filter_string_max_length
+            filter_string_max_length=filter_string_max_length,
+            version=version
         )
 
     @classmethod
