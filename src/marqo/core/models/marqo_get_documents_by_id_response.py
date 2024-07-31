@@ -5,6 +5,7 @@ from pydantic import Field, root_validator
 from marqo.base_model import MarqoBaseModel
 from marqo.tensor_search.enums import TensorField
 
+
 class MarqoGetDocumentsByIdsItem(MarqoBaseModel):
     """A pydantic model for item in MarqoGetDocumentsByIdsResponse.results.
 
@@ -14,7 +15,7 @@ class MarqoGetDocumentsByIdsItem(MarqoBaseModel):
     id: Optional[str] = Field(alias="_id", default=None)
     status: int
     message: Optional[str] = None
-    found: Optional[bool] = Field(aliase=str(TensorField.found), default=None)
+    found: Optional[bool] = Field(alias=str(TensorField.found), default=None)
 
 
 class MarqoGetDocumentsByIdsResponse(MarqoBaseModel):

@@ -358,11 +358,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 unsuccessful_docs.append(
                                     (i, MarqoAddDocumentsItem(
                                         id=doc_id if doc_id is not None else '',
-                                        error=err.message,
-                                        message=err.message,
-                                        status=int(err.status_code),
-                                        code=err.code)
-                                     )
+                                        error=e.message,
+                                        message=e.message,
+                                        status=int(errors.InvalidArgError.status_code),
+                                        code=errors.InvalidArgError.code)
+                                )
                                 )
                                 break
 
@@ -669,6 +669,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             code=api_exceptions.InvalidArgError.code)
                          )
                     )
+                    break
                 if marqo_field.type == FieldType.MultimodalCombination:
                     message = f"Field {field} is a multimodal combination field and cannot be assigned a value."
                     document_is_valid = False
@@ -808,7 +809,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     (i, MarqoAddDocumentsItem(
                                         id=doc_id if doc_id is not None else '',
                                         error=e.message,
-                                        message=err.message,
+                                        message=e.message,
                                         status=int(errors.InvalidArgError.status_code),
                                         code=errors.InvalidArgError.code)
                                      )

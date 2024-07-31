@@ -1,23 +1,19 @@
 from timeit import default_timer as timer
-from typing import Dict, List, Tuple, Union, Optional
+from typing import Dict, List, Tuple, Optional
 
 import marqo.api.exceptions as api_exceptions
+from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import UnsupportedFeatureError, ParsingError
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import IndexType
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
-from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
-from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.logging import get_logger
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
+from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
-from marqo.core.constants import MARQO_DOC_ID
-from marqo.logging import get_logger
-from marqo.vespa.models.get_document_response import GetBatchResponse
-from marqo.core.models.marqo_get_documents_by_id_response import MarqoGetDocumentsByIdsResponse, \
-    MarqoGetDocumentsByIdsItem
-from marqo.core.vespa_index import VespaIndex
 
 logger = get_logger(__name__)
 
@@ -141,7 +137,7 @@ class Document:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
                 status, message = self._translate_vespa_document_response(resp.status)
-                new_item = MarqoUpdateDocumentsItem(id=doc_id, status=status, message=message)
+                new_item = MarqoUpdateDocumentsItem(id=doc_id, status=status, message=message, error=message)
                 if new_item.error:
                     errors = True
                 items.append(new_item)
@@ -231,7 +227,10 @@ class Document:
         if status == 200:
             return 200, None
         elif status == 404:
-            return 404, "Document not found in the index"
+            return 404, "Document does not exist in the index"
+        # Update documents get 412 from Vespa for document not found as we use condition
+        elif status == 412:
+            return 404, "Document does not exist in the index"
         elif status == 429:
             return 429, "Marqo vector store receives too many requests. Please try again later"
         elif status == 507:
