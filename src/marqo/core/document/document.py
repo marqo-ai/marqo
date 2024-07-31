@@ -136,7 +136,7 @@ class Document:
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
-                status, message = self._translate_vespa_document_response(resp.status)
+                status, message = self.translate_vespa_document_response(resp.status)
                 new_item = MarqoUpdateDocumentsItem(id=doc_id, status=status, message=message, error=message)
                 if new_item.error:
                     errors = True
@@ -201,7 +201,7 @@ class Document:
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
-                status, message = self._translate_vespa_document_response(resp.status)
+                status, message = self.translate_vespa_document_response(resp.status)
                 new_item = MarqoAddDocumentsItem(id=doc_id, status=status, message=message)
                 if new_item.error:
                     errors = True
@@ -214,7 +214,7 @@ class Document:
         return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
                                          processingTimeMs=add_docs_processing_time)
 
-    def _translate_vespa_document_response(self, status: int) -> Tuple[int, Optional[str]]:
+    def translate_vespa_document_response(self, status: int) -> Tuple[int, Optional[str]]:
         """A helper function to translate Vespa document response into the expected status, message that
         is used in Marqo document API responses.
 

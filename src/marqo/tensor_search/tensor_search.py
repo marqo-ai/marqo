@@ -1165,30 +1165,13 @@ def get_documents_by_ids(
                     **marqo_document
                 }
             )
-        elif response.status == 404:
-            results.append(MarqoGetDocumentsByIdsItem(
-                id=_get_id_from_vespa_id(response.id), status=404,
-                found=False, message="Document not found in the index")
-            )
-        elif response.status == 429:
-            results.append(MarqoGetDocumentsByIdsItem(
-                id=_get_id_from_vespa_id(response.id), status=429,
-                found=False, message="Marqo vector is receiving too many requests. "
-                                     "Pleas try again later.")
-            )
-        elif response.status == 507:
-            results.append(MarqoGetDocumentsByIdsItem(
-                id=_get_id_from_vespa_id(response.id), status=507,
-                found=False, message="Marqo vector store does not have enough memory or storage." )
-            )
-
         else:
-            results.append(MarqoGetDocumentsByIdsItem(
-                id=_get_id_from_vespa_id(response.id), status=500,
-                found=False, message="Marqo encountered an internal error when getting this document" )
+            status, message = config.document.translate_vespa_document_response(response.status)
+            results.append(
+                MarqoGetDocumentsByIdsItem(
+                    id=_get_id_from_vespa_id(response.id), status=status,
+                    found=False, message=message)
             )
-            logger.error(f"Unexpected response status code {response.status} for document {response.id}. "
-                         f"Vespa error message: {response.message}")
 
     # Insert the error documents at the correct locations
     for loc, error_info in unsuccessful_docs:

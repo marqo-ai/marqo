@@ -766,7 +766,7 @@ class TestUpdate(MarqoTestCase):
                 self.assertIn("index_name", r)
                 self.assertIn("processingTimeMs", r)
 
-    def test_update_documents_response_succesCounts(self):
+    def test_update_documents_response_successCounts(self):
         test_cases = [
             ([
                 MarqoUpdateDocumentsItem(status=200),
