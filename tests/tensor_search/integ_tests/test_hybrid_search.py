@@ -886,7 +886,7 @@ class TestHybridSearch(MarqoTestCase):
                         },
                         verbose=True
                     ),
-                    result_count=3
+                    result_count=5
                 )
                 self.assertIn("hits", hybrid_res)
                 self.assertEqual(hybrid_res["hits"][0]["_id"], "doc8")      # (score*10*2)
