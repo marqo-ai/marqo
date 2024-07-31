@@ -131,7 +131,7 @@ class Document:
 
         items: List[MarqoUpdateDocumentsItem] = []
 
-        errors = UpdateDocumentsBatchResponse.errors
+        errors = responses.errors
 
         if responses is not None:
             for resp in responses.responses:
