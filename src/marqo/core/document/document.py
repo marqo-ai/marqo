@@ -131,15 +131,13 @@ class Document:
 
         items: List[MarqoUpdateDocumentsItem] = []
 
-        errors = False
+        errors = UpdateDocumentsBatchResponse.errors
 
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
                 status, message = self.translate_vespa_document_response(resp.status)
                 new_item = MarqoUpdateDocumentsItem(id=doc_id, status=status, message=message, error=message)
-                if new_item.error:
-                    errors = True
                 items.append(new_item)
 
         for loc, error_info in unsuccessful_docs:
@@ -196,15 +194,14 @@ class Document:
         """
 
         new_items: List[MarqoAddDocumentsItem] = []
-        errors = responses.errors if responses is not None else False
+        # A None response means all documents are errors
+        errors = responses.errors if responses is not None else True
 
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
                 status, message = self.translate_vespa_document_response(resp.status)
                 new_item = MarqoAddDocumentsItem(id=doc_id, status=status, message=message)
-                if new_item.error:
-                    errors = True
                 new_items.append(new_item)
 
         for loc, error_info in unsuccessful_docs:

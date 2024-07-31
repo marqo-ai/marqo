@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, root_validator
 
 class UpdateDocumentResponse(BaseModel):
     status: int
-    path_id: str = Field(alias='pathId')
+    path_id: Optional[str] = Field(default=None, alias='pathId')
     id: Optional[str]
     message: Optional[str]
 
