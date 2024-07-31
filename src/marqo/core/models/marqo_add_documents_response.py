@@ -22,9 +22,9 @@ class MarqoAddDocumentsResponse(MarqoBaseModel):
     processingTimeMs: float
     index_name: str  # TODO Change this to camelCase in the future (Breaking change!)
     items: List[MarqoAddDocumentsItem]
-    _success_count: int = Field(exclude=True, default=0)
-    _error_count: int = Field(exclude=True, default=0)
-    _fail_count: int = Field(exclude=True, default=0)
+    success_count: int = Field(exclude=True, default=0)
+    error_count: int = Field(exclude=True, default=0)
+    failure_count: int = Field(exclude=True, default=0)
 
     @root_validator(pre=False, skip_on_failure=True)
     def count_items(cls, values):
@@ -32,11 +32,11 @@ class MarqoAddDocumentsResponse(MarqoBaseModel):
         if items:
             for item in items:
                 if item.status in range(200, 300):
-                    values["_success_count"] += 1
+                    values["success_count"] += 1
                 elif item.status in range(400, 500):
-                    values["_fail_count"] += 1
+                    values["failure_count"] += 1
                 elif item.status >= 500:
-                    values["_error_count"] += 1
+                    values["error_count"] += 1
                 else:
                     raise ValueError(f"Unexpected status code: {item.status}")
         return values

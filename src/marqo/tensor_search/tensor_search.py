@@ -1089,7 +1089,7 @@ def _get_marqo_documents_by_ids(
 def get_documents_by_ids(
         config: Config, index_name: str, document_ids: typing.Collection[str],
         show_vectors: bool = False, ignore_invalid_ids: bool = False
-) -> Dict[str, Any]:
+) -> MarqoGetDocumentsByIdsResponse:
     """
     Returns documents by their IDs.
 
@@ -1129,7 +1129,7 @@ def get_documents_by_ids(
                 logger.debug(f'Invalid document ID {doc_id} ignored')
 
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
-        return MarqoGetDocumentsByIdsResponse(errors=False, results=[]).dict(exclude_none=True, by_alias=True)
+        return MarqoGetDocumentsByIdsResponse(errors=False, results=[])
 
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
@@ -1191,7 +1191,7 @@ def get_documents_by_ids(
         results.insert(loc, error_info)
         errors = True
 
-    return MarqoGetDocumentsByIdsResponse(errors=errors, results=results).dict(exclude_none=True, by_alias=True)
+    return MarqoGetDocumentsByIdsResponse(errors=errors, results=results)
 
 
 def _get_id_from_vespa_id(vespa_id: str) -> str:

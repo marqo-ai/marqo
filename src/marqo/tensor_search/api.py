@@ -322,8 +322,9 @@ def add_or_replace_documents(
         )
 
         headers = {
-            "x-add-doc-error-count": str(res.get_error_count()),
-            "x-add-doc-correct-count": str(res.get_success_count())
+            "x-success-count": str(res.success_count),
+            "x-failure-count": str(res.failure_count),
+            "x-error-count": str(res.error_count)
         }
 
         return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=headers)
@@ -356,7 +357,13 @@ def update_documents(
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
 
-    return res.dict(exclude_none=True, by_alias=True)
+    headers = {
+        "x-success-count": str(res.success_count),
+        "x-failure-count": str(res.failure_count),
+        "x-error-count": str(res.error_count)
+    }
+
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=headers)
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
@@ -374,10 +381,18 @@ def get_documents_by_ids(
         index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False):
-    return tensor_search.get_documents_by_ids(
+    res = tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
         show_vectors=expose_facets
     )
+
+    headers = {
+        "x-success-count": str(res.success_count),
+        "x-failure-count": str(res.failure_count),
+        "x-error-count": str(res.error_count)
+    }
+
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=headers)
 
 
 @app.get("/indexes/{index_name}/stats")
