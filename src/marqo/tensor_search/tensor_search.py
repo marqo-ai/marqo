@@ -396,13 +396,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
-                                (i, MarqoAddDocumentsItem(
-                                    id=doc_id if doc_id is not None else '',
-                                    error=err.message,
-                                    message=err.message,
-                                    status=int(err.status_code),
-                                    code=err.code)
-                                 )
+                                (
+                                    i, MarqoAddDocumentsItem(
+                                        id=doc_id if doc_id is not None else '',
+                                        error=e.message,
+                                        message=e.message,
+                                        status=int(errors.InvalidArgError.status_code),
+                                        code=errors.InvalidArgError.code
+                                    )
+                                )
                             )
                             break
 

@@ -703,7 +703,7 @@ class TestUpdate(MarqoTestCase):
         with self.assertRaises(UnsupportedFeatureError) as cm:
             r = self.config.document.partial_update_documents_by_index_name(
                 partial_documents=[updated_doc],
-                index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
+                index_name=self.test_unstructured_index_name).dict(exclude_none=True, by_alias=True)
 
         self.assertIn("is not supported for unstructured indexes", str(cm.exception))
 

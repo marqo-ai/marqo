@@ -66,7 +66,7 @@ class TestGetDocuments(MarqoTestCase):
                 )
                 res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name, document_ids=['1', '2', '3'],
-                    show_vectors=True)
+                    show_vectors=True).dict(exclude_none=True, by_alias=True)
                 
                 # Check that the documents are found and have the correct content
                 for i in range(3):
@@ -89,7 +89,7 @@ class TestGetDocuments(MarqoTestCase):
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None))
                 get_res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name,
-                    document_ids=["123", "5678"], show_vectors=True)['results']
+                    document_ids=["123", "5678"], show_vectors=True)['results'].dict(exclude_none=True, by_alias=True)
                 assert len(get_res) == 2
                 for i, retrieved_doc in enumerate(get_res):
                     assert enums.TensorField.tensor_facets in retrieved_doc
@@ -118,7 +118,7 @@ class TestGetDocuments(MarqoTestCase):
                         res = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name, document_ids=ids,
                             show_vectors=is_vector_shown
-                        )
+                        ).dict(exclude_none=True, by_alias=True)
                         assert {ii['_id'] for ii in res['results']} == set(id_reqs[i])
                         for doc_res in res['results']:
                             assert not doc_res['_found']
@@ -142,7 +142,7 @@ class TestGetDocuments(MarqoTestCase):
                         res = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name, document_ids=ids,
                             show_vectors=is_vector_shown
-                        )
+                        ).dict(exclude_none=True, by_alias=True)
                         assert [ii['_id'] for ii in res['results']] == id_reqs[i][0]
                         for j, doc_res in enumerate(res['results']):
                             assert doc_res['_id'] == ids[j]
@@ -161,7 +161,7 @@ class TestGetDocuments(MarqoTestCase):
                             res = tensor_search.get_documents_by_ids(
                                 config=self.config, index_name=index.name, document_ids=bad_get,
                                 show_vectors=show_vectors_option
-                            )
+                            ).dict(exclude_none=True, by_alias=True)
 
     def test_get_documents_env_limit(self):
         for index in self.indexes:
@@ -180,20 +180,24 @@ class TestGetDocuments(MarqoTestCase):
                     def run():
                         half_search = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name,
-                            document_ids=[docs[i]['_id'] for i in range(max_doc // 2)])
+                            document_ids=[docs[i]['_id'] for i in range(max_doc // 2)]
+                        ).dict(exclude_none=True, by_alias=True)
                         self.assertEqual(len(half_search['results']),max_doc // 2)
                         limit_search = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name,
-                            document_ids=[docs[i]['_id'] for i in range(max_doc)])
+                            document_ids=[docs[i]['_id'] for i in range(max_doc)]
+                        ).dict(exclude_none=True, by_alias=True)
                         self.assertEqual(len(limit_search['results']), max_doc)
                         with self.assertRaises(IllegalRequestedDocCount):
                             oversized_search = tensor_search.get_documents_by_ids(
                                 config=self.config, index_name=index.name,
-                                document_ids=[docs[i]['_id'] for i in range(max_doc + 1)])
+                                document_ids=[docs[i]['_id'] for i in range(max_doc + 1)]
+                            ).dict(exclude_none=True, by_alias=True)
                         with self.assertRaises(IllegalRequestedDocCount):
                             very_oversized_search = tensor_search.get_documents_by_ids(
                                 config=self.config, index_name=index.name,
-                                document_ids=[docs[i]['_id'] for i in range(max_doc * 2)])
+                                document_ids=[docs[i]['_id'] for i in range(max_doc * 2)]
+                            ).dict(exclude_none=True, by_alias=True)
                         return True
                 assert run()
 
@@ -217,7 +221,8 @@ class TestGetDocuments(MarqoTestCase):
                         sample_size = 500
                         limit_search = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name,
-                            document_ids=[docs[i]['_id'] for i in range(sample_size)])
+                            document_ids=[docs[i]['_id'] for i in range(sample_size)]
+                        ).dict(exclude_none=True, by_alias=True)
                         assert len(limit_search['results']) == sample_size
                         return True
 
