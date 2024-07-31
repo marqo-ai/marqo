@@ -243,7 +243,7 @@ class IndexManagement:
         application = self._vespa_application_with_deployment_session()
         with application as app:
             marqo_version = app.get_marqo_config().version
-            application.gen.send(False)
+            application.gen.send(False)  # do not deploy
             return marqo_version
 
     @contextmanager
@@ -266,7 +266,7 @@ class IndexManagement:
         should_deploy = yield app
 
         if should_deploy is None or should_deploy is True:
-            app.save_to_disk()
+            app.save_to_store()
             self.vespa_client.deploy_application(app_root_path)
             self.vespa_client.wait_for_application_convergence()
 
@@ -291,7 +291,7 @@ class IndexManagement:
             should_deploy = yield app
 
             if should_deploy is None or should_deploy is True:
-                app.save_to_disk()
+                app.save_to_store()
                 self.vespa_client.prepare(session_id, httpx_client)
                 # TODO handle prepare configChangeActions
                 # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session

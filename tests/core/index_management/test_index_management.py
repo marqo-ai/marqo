@@ -262,10 +262,10 @@ class TestIndexManagement(MarqoTestCase):
                 app2 = VespaApplicationPackage(store2)
 
                 app1.add_index_setting_and_schema(index1, schema1)
-                app1.save_to_disk()
+                app1.save_to_store()
 
                 app2.add_index_setting_and_schema(index2, schema2)
-                app2.save_to_disk()
+                app2.save_to_store()
 
                 self.vespa_client.prepare(session1, client1)
                 self.vespa_client.activate(session1, client1)

@@ -311,28 +311,49 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
 
 class VespaApplicationPackage:
     """
-    Represents a Vespa application package. Downloads the application package from Vespa when initialised.
-    Provides convenient methods to manage various configs to the application package.
+    Represents a Vespa application package. This class provides useful methods to manage contents in the application
+    package. A Vespa application package usually contains the following contents
+    app-root
+      | -- services.xml   # contains configuration for container components, and schemas in content nodes
+      | -- hosts.xml
+      | -- schemas
+             | -- schema_name1.sd
+             \ -- marqo__settings.sd    # this is used to store index settings prior to v2.12.0
+      | -- search
+             \ -- query-profiles
+                    \ -- default.xml    # default query profile
+      | -- components
+             \ -- marqo-custom-searchers-deploy.jar
+      | -- validation-overrides.xml
+      | -- marqo_index_settings.json          # NEW, stores index settings after v2.12.0
+      | -- marqo_index_settings_history.json  # NEW, stores history of index
+      \ -- marqo_config.json                  # NEW, stores marqo config (version info)
     """
+
+    _SERVICES_XML_FILE = 'services.xml'
+    _MARQO_CONFIG_FILE = 'marqo_config.json'
+    _MARQO_INDEX_SETTINGS_FILE = 'marqo_index_settings.json'
+    _MARQO_INDEX_SETTINGS_HISTORY_FILE = 'marqo_index_settings_history.json'
 
     def __init__(self, store: VespaApplicationStore):
         self._store = store
-        self.is_configured = self._store.file_exists('marqo_config.json')
-        self._service_xml = ServiceXml(self._store.read_file('services.xml'))
-        self._marqo_config_store = MarqoConfigStore(self._store.read_file('marqo_config.json'))
+        self.is_configured = self._store.file_exists(self._MARQO_CONFIG_FILE)
+        self._service_xml = ServiceXml(self._store.read_file(self._SERVICES_XML_FILE))
+        self._marqo_config_store = MarqoConfigStore(self._store.read_file(self._MARQO_CONFIG_FILE))
         self._index_setting_store = IndexSettingStore(
-            self._store.read_file('marqo_index_settings.json', default_value='{}'),
-            self._store.read_file('marqo_index_settings_history.json', default_value='{}'))
+            self._store.read_file(self._MARQO_INDEX_SETTINGS_FILE, default_value='{}'),
+            self._store.read_file(self._MARQO_INDEX_SETTINGS_HISTORY_FILE, default_value='{}'))
+
+    def save_to_store(self) -> None:
+        self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
+        self._store.save_file(self._marqo_config_store.get().json(), self._MARQO_CONFIG_FILE)
+
+        index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
+        self._store.save_file(index_setting_json, self._MARQO_INDEX_SETTINGS_FILE)
+        self._store.save_file(index_setting_history_json, self._MARQO_INDEX_SETTINGS_HISTORY_FILE)
 
     def get_marqo_config(self) -> MarqoConfig:
         return self._marqo_config_store.get()
-
-    def save_to_disk(self) -> None:
-        self._store.save_file(self._service_xml.to_xml(), 'services.xml')
-        self._store.save_file(self._marqo_config_store.get().json(), 'marqo_config.json')
-        index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
-        self._store.save_file(index_setting_json, 'marqo_index_settings.json')
-        self._store.save_file(index_setting_history_json, 'marqo_index_settings_history.json')
 
     def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None,
                            allow_downgrade: bool = False) -> bool:
@@ -345,8 +366,8 @@ class VespaApplicationPackage:
         - from the marqo_config_doc passed in which is marqo__config doc saved in marqo__settings schema (Post v2.1.0)
         - if neither is available, return 2.0.0 as default (Pre v2.1.0 or not bootstrapped yet)
         """
-        if self.is_configured and self._marqo_config_store.get():
-            app_version = self._marqo_config_store.get().version
+        if self.is_configured and self.get_marqo_config() is not None:
+            app_version = self.get_marqo_config().version
         elif marqo_config_doc:
             app_version = marqo_config_doc.version
         else:
@@ -358,6 +379,7 @@ class VespaApplicationPackage:
         return (app_sem_version < marqo_sem_version) or (app_sem_version > marqo_sem_version and allow_downgrade)
 
     def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
+        # Migrate existing index settings from previous versions of Marqo
         if not self.is_configured and existing_index_settings:
             for index in existing_index_settings:
                 self._index_setting_store.save_index_setting(index)
