@@ -168,7 +168,7 @@ class TestCustomVectorField(MarqoTestCase):
 
             if isinstance(index, UnstructuredMarqoIndex):
                 self.assertEqual(vespa_fields["marqo__strings"], ["custom content is here!!"])
-                self.assertEqual(vespa_fields["marqo__long_string_fields"], {"my_custom_vector": "custom content is here!!"})
+                self.assertEqual(vespa_fields["marqo__short_string_fields"], {"my_custom_vector": "custom content is here!!"})
                 self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!'])
                 self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
 
@@ -302,10 +302,9 @@ class TestCustomVectorField(MarqoTestCase):
                                   'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
                                   'custom content is here!!'])
                 self.assertEqual(vespa_fields["marqo__long_string_fields"],
-                                 {'multimodal_image': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
-                                  'my_custom_vector': 'custom content is here!!'})
+                                 {'multimodal_image': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'})
                 self.assertEqual(vespa_fields["marqo__short_string_fields"],
-                                 {'multimodal_text': 'blah'})
+                                 {'multimodal_text': 'blah', 'my_custom_vector': 'custom content is here!!'})
                 self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!',
                                                                  'my_multimodal::{"multimodal_text": "blah", "multimodal_image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}'])
                 self.assertEqual(vespa_fields["marqo__embeddings"]["0"], self.random_vector_1), # First vector is custom vector
