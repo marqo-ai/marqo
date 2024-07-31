@@ -366,10 +366,6 @@ class UnstructuredVespaIndex(VespaIndex):
 
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
-            'marqo__hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers[
-                constants.MARQO_SEARCH_METHOD_TENSOR] else False,
-            'marqo__hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers[
-                constants.MARQO_SEARCH_METHOD_LEXICAL] else False,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
         query = {k: v for k, v in query.items() if v is not None}
