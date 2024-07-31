@@ -15,6 +15,7 @@ from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from tests.marqo_test import MarqoTestCase
+from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 
 
 class TestUpdate(MarqoTestCase):
@@ -523,7 +524,6 @@ class TestUpdate(MarqoTestCase):
                     partial_documents=[updated_doc],
                     index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(expected_error, r["errors"])
-                print(r)
                 if expected_error:
                     self.assertEqual(True, r["errors"])
                     self.assertTrue(r["items"][0]["status"] >= 400)
@@ -765,3 +765,37 @@ class TestUpdate(MarqoTestCase):
                 self.assertEqual(expected_id, r["items"][0]["_id"])
                 self.assertIn("index_name", r)
                 self.assertIn("processingTimeMs", r)
+
+    def test_update_documents_response_succesCounts(self):
+        test_cases = [
+            ([
+                MarqoUpdateDocumentsItem(status=200),
+                MarqoUpdateDocumentsItem(status=201),
+                MarqoUpdateDocumentsItem(status=204)
+            ], 3, 0, 0),
+            ([
+                MarqoUpdateDocumentsItem(status=400),
+                MarqoUpdateDocumentsItem(status=404)
+            ], 0, 2, 0),
+            ([
+                MarqoUpdateDocumentsItem(status=500),
+                MarqoUpdateDocumentsItem(status=502),
+                MarqoUpdateDocumentsItem(status=503)
+            ], 0, 0, 3),
+            ([
+                MarqoUpdateDocumentsItem(status=200),
+                MarqoUpdateDocumentsItem(status=404),
+                MarqoUpdateDocumentsItem(status=500),
+                MarqoUpdateDocumentsItem(status=201),
+                MarqoUpdateDocumentsItem(status=503)
+            ], 2, 1, 2)
+        ]
+        for items, expected_success, expected_failure, expected_error in test_cases:
+            with self.subTest(items=items):
+                update_documents_response = MarqoUpdateDocumentsResponse(
+                    items=items, index_name="index_name", errors=False,
+                    processingTimeMs=1000
+                )
+                self.assertEqual(update_documents_response.success_count, expected_success)
+                self.assertEqual(update_documents_response.failure_count, expected_failure)
+                self.assertEqual(update_documents_response.error_count, expected_error)
