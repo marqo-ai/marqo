@@ -541,10 +541,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
             add_docs_processing_time=t1 - t0
         )
-        return marqo_add_documents_response.dict(exclude_none=True, by_alias=True)
+        return marqo_add_documents_response
 
 
-def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
+def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex) \
+        -> MarqoAddDocumentsResponse:
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
     vespa_index = StructuredVespaIndex(marqo_index)
@@ -1018,7 +1019,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
             add_docs_processing_time=t1 - t0
         )
-        return marqo_add_documents_response.dict(exclude_none=True, by_alias=True)
+        return marqo_add_documents_response
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
