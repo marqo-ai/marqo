@@ -89,8 +89,8 @@ class TestGetDocuments(MarqoTestCase):
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None))
                 get_res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name,
-                    document_ids=["123", "5678"], show_vectors=True)['results'].dict(exclude_none=True, by_alias=True)
-                assert len(get_res) == 2
+                    document_ids=["123", "5678"], show_vectors=True).dict(exclude_none=True, by_alias=True)['results']
+                self.assertEqual(2, len(get_res))
                 for i, retrieved_doc in enumerate(get_res):
                     assert enums.TensorField.tensor_facets in retrieved_doc
                     assert len(retrieved_doc[enums.TensorField.tensor_facets]) == 2
