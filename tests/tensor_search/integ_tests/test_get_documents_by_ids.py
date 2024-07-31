@@ -151,17 +151,49 @@ class TestGetDocuments(MarqoTestCase):
                                 assert enums.TensorField.tensor_facets in doc_res
                                 assert 'title1' in doc_res or 'desc2' in doc_res
 
-    def test_get_document_vectors_failures(self):
+    def test_get_documents_by_ids_RaiseErrorWithWrongIds(self):
+        test_cases = [
+            (None, "None is not a valid document id"),
+            (dict(), "dict() is not a valid document id"),
+            (123, "integer is not a valid document id"),
+            (1.23, "float is not a valid document id"),
+            ([], "empty list is not a valid document id"),
+        ]
         for index in self.indexes:
-            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                for show_vectors_option in (True, False):
-                    for bad_get in [[123], [None], [set()], list(), 1.3, dict(),
-                                    None, 123, ['123', 456], ['123', 45, '445'], [14, '58']]:
-                        with self.assertRaises((InvalidDocumentIdError, InvalidArgError)):
-                            res = tensor_search.get_documents_by_ids(
-                                config=self.config, index_name=index.name, document_ids=bad_get,
+            for show_vectors_option in (True, False):
+                for document_ids, msg in test_cases:
+                    with self.subTest(f"Index type: {index.type}. Index name: {index.name}. Msg: {msg}"):
+                        with self.assertRaises(InvalidArgError) as e:
+                            tensor_search.get_documents_by_ids(
+                                config=self.config, index_name=index.name, document_ids=document_ids,
                                 show_vectors=show_vectors_option
-                            ).dict(exclude_none=True, by_alias=True)
+                            )
+                            if not document_ids == []:
+                                self.assertIn("Get documents must be passed a collection of IDs!",
+                                              str(e.exception))
+                            else:
+                                self.assertIn("Can't get empty collection of IDs!", str(e.exception))
+
+    def test_get_documents_by_ids_InvalidIdsResponse(self):
+        test_cases = [
+            (["123", 2], (1,), "2 is not a valid document id"),
+            (["123", None], (1,), "None is not a valid document id"),
+            ([dict(), 2.3], (0, 1), "dict() and floats not a valid document id"),
+        ]
+        for index in self.indexes:
+            for show_vectors_option in (True, False):
+                for document_ids, error_index, msg in test_cases:
+                    with self.subTest(f"Index type: {index.type}. Index name: {index.name}. Msg: {msg}"):
+                        r = tensor_search.get_documents_by_ids(
+                            config=self.config, index_name=index.name, document_ids=document_ids,
+                            show_vectors=show_vectors_option
+                        )
+                        for i in error_index:
+                            item = r.results[i]
+                            self.assertEqual(item.id, document_ids[i])
+                            self.assertEqual(item.status, 400)
+                            self.assertIn("Document _id must be a string type!", item.message)
+                            self.assertEqual(item.found, None)
 
     def test_get_documents_env_limit(self):
         for index in self.indexes:

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from pydantic import Field, root_validator
 
@@ -11,7 +11,8 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
     This model takes the response from Marqo vector store and translate it to a user-friendly response.
     """
     status: int
-    id: Optional[str] = Field(alias="_id", default=None)
+    # This id can be any type as it might be used to hold an invalid id response
+    id: Any = Field(alias="_id", default=None)
     message: Optional[str] = None
     error: Optional[str] = None
     code: Optional[str] = None

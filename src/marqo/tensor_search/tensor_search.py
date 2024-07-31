@@ -1122,7 +1122,8 @@ def get_documents_by_ids(
                 unsuccessful_docs.append(
                     (
                         loc, MarqoGetDocumentsByIdsItem(
-                            id=doc_id,
+                            # Invalid IDs are not returned in the response
+                            id = doc_id,
                             message=e.message,
                             status=int(e.status_code)
                         )
@@ -1132,7 +1133,7 @@ def get_documents_by_ids(
                 logger.debug(f'Invalid document ID {doc_id} ignored')
 
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
-        return MarqoGetDocumentsByIdsResponse(errors=False, results=[])
+        return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)

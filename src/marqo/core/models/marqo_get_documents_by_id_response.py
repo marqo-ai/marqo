@@ -1,4 +1,4 @@
-from typing import Optional, Union, List, Dict
+from typing import Optional, Union, List, Dict, Any
 
 from pydantic import Field, root_validator
 
@@ -12,7 +12,8 @@ class MarqoGetDocumentsByIdsItem(MarqoBaseModel):
     Only invalid request errors are handled here.
     Valid request should return a dictionary containing the document.
     """
-    id: Optional[str] = Field(alias="_id", default=None)
+    # This id can be any type as it might be used to hold an invalid id response
+    id: Any = Field(alias="_id", default=None)
     status: int
     message: Optional[str] = None
     found: Optional[bool] = Field(alias=str(TensorField.found), default=None)
