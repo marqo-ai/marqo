@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 
-from marqo.core.models import MarqoQuery, MarqoIndex
+from marqo.core import constants
+from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery, MarqoIndex
 from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
+from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
+from marqo.core.models.marqo_index import *
 
 
 class VespaIndex(ABC):
@@ -12,6 +15,13 @@ class VespaIndex(ABC):
     Methods in this class do not talk to Vespa directly, but rather transform data and queries to and from a format
     that can be used by a VespaClient.
     """
+
+    _VERSION_2_9_0 = semver.VersionInfo.parse("2.9.0")
+    _VERSION_2_10_0 = semver.VersionInfo.parse("2.10.0")
+
+    def __init__(self, marqo_index: MarqoIndex):
+        self._marqo_index = marqo_index
+        self._marqo_index_version = marqo_index.parsed_marqo_version()
 
     @abstractmethod
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
@@ -91,6 +101,102 @@ class VespaIndex(ABC):
         """
         Get the name of the id field in Vespa documents, inside the 'fields' dictionary."""
         pass
+
+    def _convert_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> Dict[
+        str, Dict[str, float]]:
+        """
+        Helper function that converts a list of score modifiers into 2 dictionaries:
+        These dictionaries are 'mult' and 'add' weights.
+        """
+        mult_tensor = {}
+        add_tensor = {}
+        for modifier in score_modifiers:
+            if modifier.type == ScoreModifierType.Multiply:
+                mult_tensor[modifier.field] = modifier.weight
+            elif modifier.type == ScoreModifierType.Add:
+                add_tensor[modifier.field] = modifier.weight
+            else:
+                raise InternalError(f'Unknown score modifier type {modifier.type}')
+
+        return mult_tensor, add_tensor
+
+    def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
+        """
+        Returns classic score modifiers (from tensor or lexical queries) as a dictionary of dictionaries.
+        Split between 'mult' and 'add' weights.
+        """
+        if marqo_query.score_modifiers:
+            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(marqo_query.score_modifiers)
+
+            if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
+                return {
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: add_tensor
+                }
+            elif isinstance(marqo_query, MarqoTensorQuery):
+                return {
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
+                }
+            elif isinstance(marqo_query, MarqoLexicalQuery):
+                return {
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: add_tensor
+                }
+            else:
+                raise InternalError(f'Unknown query type {type(marqo_query)}')
+
+        return None
+
+    def _get_hybrid_score_modifiers(self, hybrid_query: MarqoHybridQuery) -> \
+            Optional[Dict[str, Dict[str, Dict[str, float]]]]:
+
+        """
+        Specifically for hybrid queries.
+        Returns a dictionary with 2 keys: 'lexical' and 'tensor'.
+        Each key points to a dictionary containing the score modifiers for the respective field types.
+
+        Example:
+        {
+            'lexical': {
+                'marqo__mult_weights_lexical': {
+                    'field1': 0.5, 'field2': 0.4
+                },
+                'marqo__add_weights_lexical': {
+                    'field3': 23, 'field4': 12
+                }
+            },
+            'tensor': {
+                'marqo__mult_weights_tensor': {
+                    'field5': 0.5, 'field6': 0.4
+                },
+                'marqo__add_weights_tensor': {
+                    'field7': 23, 'field8': 12
+                }
+            }
+        }
+        """
+
+        result = {
+            constants.MARQO_SEARCH_METHOD_LEXICAL: None,
+            constants.MARQO_SEARCH_METHOD_TENSOR: None
+        }
+
+        if hybrid_query.score_modifiers_lexical:
+            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(hybrid_query.score_modifiers_lexical)
+            result[constants.MARQO_SEARCH_METHOD_LEXICAL] = {
+                constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: mult_tensor,
+                constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: add_tensor
+            }
+
+        if hybrid_query.score_modifiers_tensor:
+            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(hybrid_query.score_modifiers_tensor)
+            result[constants.MARQO_SEARCH_METHOD_TENSOR] = {
+                constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
+                constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
+            }
+
+        return result
 
 
 def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
