@@ -614,7 +614,7 @@ class VespaClient:
 
         return response.json()
 
-    def get_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> str:
+    def get_text_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> str:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
 
         response = httpx_client.get(endpoint)
@@ -622,6 +622,15 @@ class VespaClient:
         self._raise_for_status(response)
 
         return response.text
+
+    def get_binary_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> bytes:
+        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+
+        response = httpx_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.content
 
     def put_content(self, session_id: int, httpx_client: httpx.Client, content: Union[str, bytes], *path: str) -> None:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'

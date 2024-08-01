@@ -1,8 +1,12 @@
+import contextlib
 import json
 import os
+import tarfile
+import tempfile
 import textwrap
+import zipfile
 from abc import ABC, abstractmethod
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Tuple, io
 
 import httpx
 import semver
@@ -232,7 +236,11 @@ class VespaApplicationStore(ABC):
         pass
 
     @abstractmethod
-    def read_file(self, path: str, default_value: Optional[str] = None) -> str:
+    def read_text_file(self, *paths: str) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    def read_binary_file(self, *paths: str) -> Optional[bytes]:
         pass
 
     @abstractmethod
@@ -254,11 +262,16 @@ class VespaApplicationFileStore(VespaApplicationStore):
     def file_exists(self, *paths: str) -> bool:
         return os.path.exists(self._full_path(*paths))
 
-    def read_file(self, path: str, default_value: Optional[str] = None) -> str:
-        full_path = self._full_path(path)
-        if not os.path.exists(full_path):
-            return default_value
-        with open(full_path, 'r') as file:
+    def read_text_file(self, *paths: str) -> Optional[str]:
+        if not self.file_exists(*paths):
+            return None
+        with open(self._full_path(*paths), 'r') as file:
+            return file.read()
+
+    def read_binary_file(self, *paths: str) -> Optional[bytes]:
+        if not self.file_exists(*paths):
+            return None
+        with open(self._full_path(*paths), 'rb') as file:
             return file.read()
 
     def save_file(self, content: Union[str, bytes], *paths: str) -> None:
@@ -291,10 +304,15 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
         content_url = self._vespa_client.get_content_url(self._session_id, *paths)
         return content_url in self._all_contents
 
-    def read_file(self, path: str, default_value: Optional[str] = None) -> str:
-        if not self.file_exists(path):
-            return default_value
-        return self._vespa_client.get_content(self._session_id, self._http_client, path)
+    def read_text_file(self, *paths: str) -> Optional[str]:
+        if not self.file_exists(*paths):
+            return None
+        return self._vespa_client.get_text_content(self._session_id, self._http_client, *paths)
+
+    def read_binary_file(self, *paths: str) -> Optional[bytes]:
+        if not self.file_exists(*paths):
+            return None
+        return self._vespa_client.get_binary_content(self._session_id, self._http_client, *paths)
 
     def save_file(self, content: Union[str, bytes], *paths: str) -> None:
         """
@@ -307,6 +325,67 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
 
     def remove_file(self, *paths: str) -> None:
         self._vespa_client.delete_content(self._session_id, self._http_client, *paths)
+
+
+class VespaAppBackup:
+    _REMOVE_FILE_LIST = "files_to_remove.json"
+
+    def __init__(self, backup_zip_file_content: Optional[bytes] = None) -> None:
+        self._dir = tempfile.mkdtemp()
+        self._removal_mark_file = os.path.join(self._dir, self._REMOVE_FILE_LIST)
+        self._files_to_remove = []
+
+        if backup_zip_file_content is not None:
+            self._extract_gzip_from_bytes(backup_zip_file_content)
+            if os.path.isfile(self._removal_mark_file):
+                self._files_to_remove = json.load(open(self._removal_mark_file))
+                os.remove(self._removal_mark_file)
+
+    @contextlib.contextmanager
+    def files_to_rollback(self):
+        for root, dirs, files in os.walk(self._dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                relpath = os.path.relpath(file_path, self._dir)
+                with open(file_path, "r") as f:
+                    yield relpath, f.read()
+
+    @contextlib.contextmanager
+    def files_to_remove(self):
+        for paths in self._files_to_remove:
+            yield paths
+
+    def backup_file(self, content: Union[str, bytes], *paths: str) -> None:
+        path = os.path.join(self._dir, *paths)
+        if not os.path.exists(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        mode = 'w' if isinstance(content, str) else 'wb'
+        with open(path, mode) as f:
+            f.write(content)
+
+    def mark_for_removal(self, *paths: str) -> None:
+        self._files_to_remove.append(paths)
+
+    def to_zip_stream(self) -> io.BytesIO:
+        with open(self._removal_mark_file, 'w') as f:
+            f.write(json.dumps(self._files_to_remove))
+
+        byte_stream = io.BytesIO()
+        with tarfile.open(fileobj=byte_stream, mode='w:gz') as tar:
+            for root, dirs, files in os.walk(self._dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    archive_name = os.path.relpath(file_path, self._dir)  # archive name should be relative
+                    tar.add(file_path, arcname=archive_name)
+
+        byte_stream.seek(0)
+        return byte_stream
+
+    def _extract_gzip_from_bytes(self, content: bytes) -> None:
+        with tarfile.open(fileobj=(io.BytesIO(content)), mode='r:gz') as tar:
+            for member in tar.getmembers():
+                tar.extract(member, path=self._dir)
 
 
 class VespaApplicationPackage:
@@ -334,15 +413,16 @@ class VespaApplicationPackage:
     _MARQO_CONFIG_FILE = 'marqo_config.json'
     _MARQO_INDEX_SETTINGS_FILE = 'marqo_index_settings.json'
     _MARQO_INDEX_SETTINGS_HISTORY_FILE = 'marqo_index_settings_history.json'
+    _BACKUP_FILE = 'app_bak.zip'
 
     def __init__(self, store: VespaApplicationStore):
         self._store = store
         self.is_configured = self._store.file_exists(self._MARQO_CONFIG_FILE)
-        self._service_xml = ServiceXml(self._store.read_file(self._SERVICES_XML_FILE))
-        self._marqo_config_store = MarqoConfigStore(self._store.read_file(self._MARQO_CONFIG_FILE))
+        self._service_xml = ServiceXml(self._store.read_text_file(self._SERVICES_XML_FILE))
+        self._marqo_config_store = MarqoConfigStore(self._store.read_text_file(self._MARQO_CONFIG_FILE))
         self._index_setting_store = IndexSettingStore(
-            self._store.read_file(self._MARQO_INDEX_SETTINGS_FILE, default_value='{}'),
-            self._store.read_file(self._MARQO_INDEX_SETTINGS_HISTORY_FILE, default_value='{}'))
+            self._store.read_text_file(self._MARQO_INDEX_SETTINGS_FILE, default_value='{}'),
+            self._store.read_text_file(self._MARQO_INDEX_SETTINGS_HISTORY_FILE, default_value='{}'))
 
     def save_to_store(self) -> None:
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
@@ -355,8 +435,7 @@ class VespaApplicationPackage:
     def get_marqo_config(self) -> MarqoConfig:
         return self._marqo_config_store.get()
 
-    def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None,
-                           allow_downgrade: bool = False) -> bool:
+    def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None) -> bool:
         """
         Bootstrapping is needed when
         - the version of Marqo is higher than the version of the deployed application
@@ -376,7 +455,7 @@ class VespaApplicationPackage:
         marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
         app_sem_version = semver.VersionInfo.parse(app_version, optional_minor_and_patch=True)
 
-        return (app_sem_version < marqo_sem_version) or (app_sem_version > marqo_sem_version and allow_downgrade)
+        return app_sem_version < marqo_sem_version
 
     def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
         # Migrate existing index settings from previous versions of Marqo
@@ -384,10 +463,55 @@ class VespaApplicationPackage:
             for index in existing_index_settings:
                 self._index_setting_store.save_index_setting(index)
 
+        self._backup()
         self._add_default_query_profile()
         self._copy_components_jar()
         self._service_xml.config_components()
         self._marqo_config_store.update_version(marqo_version)
+
+    def _backup(self) -> None:
+        backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
+        files_to_backup = [(self._SERVICES_XML_FILE),
+                           (self._MARQO_CONFIG_FILE),
+                           ('search', 'query-profiles', 'default.xml')]
+        # TODO derive this based on the file added in the bootstrap phase
+        files_to_remove = []
+        for file in files_to_backup:
+            backup.backup_file(self._store.read_text_file(*file), *file)
+
+        for file in files_to_remove:
+            backup.mark_for_removal(*file)
+
+        self._store.save_file(backup.to_zip_stream().read(), self._BACKUP_FILE)
+
+    def rollback(self, marqo_version: str) -> None:
+        if not self._store.file_exists(self._BACKUP_FILE):
+            logger.error(f"{self._BACKUP_FILE} does not exist in current session, failed to rollback")
+            return
+
+        to_version = MarqoConfigStore(self._store.read_text_file(self._BACKUP_FILE, self._MARQO_CONFIG_FILE)).get().version
+        if to_version != marqo_version:
+            logger.warn(f"Cannot rollback to {to_version}, current Marqo version is {marqo_version}")
+            return
+
+        backupOfBackup = VespaAppBackup()
+        backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
+        with backup.files_to_remove as paths:
+            if self._store.file_exists(*paths):
+                # TODO Check the file type and then call the appropriate method
+                backupOfBackup.backup_file(self._store.read_text_file(*paths), *paths)
+                self._store.remove_file(*paths)
+
+        with backup.files_to_rollback as (path, file_content):
+            # TODO Add logic to check the contents of each file to make sure they are valid
+            if not self._store.file_exists(*path):
+                # this file will be added, so we need to mark it for removal in backup
+                backupOfBackup.mark_for_removal(*path)
+            else:
+                backupOfBackup.backup_file(self._store.read_text_file(*paths), *paths)
+            self._store.save_file(file_content, path)
+
+        self._store.save_file(backupOfBackup.to_zip_stream().read(), self._BACKUP_FILE)
 
     def _add_default_query_profile(self) -> None:
         content = textwrap.dedent(
