@@ -107,7 +107,7 @@ class TestPagination(MarqoTestCase):
         batch_size = 100
 
         # TODO: Add unstructured index when supported
-        for index in [self.index_structured]:
+        for index in [self.index_structured, self.index_unstructured]:
             for _ in range(0, num_docs, batch_size):
                 r = tensor_search.add_documents(
                     config=self.config,

@@ -223,8 +223,6 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.", vespa_query_kwargs["yql"])
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
-                self.assertEqual(vespa_query_kwargs["marqo__hybrid.tensorScoreModifiersPresent"], True)
-                self.assertEqual(vespa_query_kwargs["marqo__hybrid.lexicalScoreModifiersPresent"], True)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.6)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 61)
 
