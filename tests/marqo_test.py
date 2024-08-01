@@ -14,7 +14,6 @@ from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, 
 from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
-import os
 
 
 class MarqoTestCase(unittest.TestCase):
