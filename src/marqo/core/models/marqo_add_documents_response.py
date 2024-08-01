@@ -26,8 +26,8 @@ class BatchResponseStats(MarqoBaseModel):
     def get_header_dict(self) -> Dict[str, str]:
         return {
             "x-count-success": str(self.success_count),
-            "x-count-error": str(self.error_count),
             "x-count-failure": str(self.failure_count),
+            "x-count-error": str(self.error_count),
         }
 
 
