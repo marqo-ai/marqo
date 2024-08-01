@@ -796,5 +796,5 @@ class TestUpdate(MarqoTestCase):
                     items=items, index_name="index_name", errors=False,
                     processingTimeMs=1000
                 )
-                self.assertEqual(list(update_documents_response.get_header_dict()),
+                self.assertEqual(list(update_documents_response.get_header_dict().values()),
                                  [expected_success, expected_failure, expected_error])

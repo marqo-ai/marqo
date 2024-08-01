@@ -348,12 +348,6 @@ def update_documents(
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
 
-    headers = {
-        "x-success-count": str(res.success_count),
-        "x-failure-count": str(res.failure_count),
-        "x-error-count": str(res.error_count)
-    }
-
     return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 

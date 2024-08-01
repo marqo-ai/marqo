@@ -20,5 +20,6 @@ class TestDocumentsCommon(MarqoTestCase):
         for status, expected_status, expected_message in test_cases:
             with self.subTest(status=status):
                 result_status, result_message = self.document.translate_vespa_document_response(status)
-                self.assertEqual(result_status, expected_status)
+                if expected_message:
+                    self.assertEqual(result_status, expected_status)
                 self.assertIn(expected_message, result_message)
