@@ -67,41 +67,49 @@ class ApiTests(MarqoTestCase):
         """
         Test that the search endpoint returns the expected search limit when MARQO_MAX_SEARCH_LIMIT is set.
         """
-        custom_limit = 2000
-        with patch.dict('os.environ', {EnvVars.MARQO_MAX_SEARCH_LIMIT: str(custom_limit)}):
-            response = self.client.post(
-                "/indexes/index1/search?device=cpu",
-                json={
-                    "q": "test",
-                    "searchMethod": "TENSOR",
-                    "limit": custom_limit + 1,
-                },
-            )
+        custom_limits = [2000, 1000000]
+        for custom_limit in custom_limits:
+            with patch.dict('os.environ', {
+                EnvVars.MARQO_MAX_SEARCH_LIMIT: str(custom_limit),
+                EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(custom_limit + 1000000)
+            }):
+                response = self.client.post(
+                    "/indexes/index1/search?device=cpu",
+                    json={
+                        "q": "test",
+                        "searchMethod": "TENSOR",
+                        "limit": custom_limit + 1,
+                    },
+                )
 
-            self.assertEqual(response.status_code, 400)
-            self.assertIn(f"result limit must be less than or equal to the "
-                          f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
-                          response.json()["message"])
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(f"result limit must be less than or equal to the "
+                                f"MARQO_MAX_SEARCH_LIMIT limit of [{custom_limit}]",
+                                response.json()["message"])
 
     def test_custom_search_offset(self):
         """
         Test that the search endpoint returns the expected search limit when MARQO_MAX_SEARCH_OFFSET is set.
         """
-        custom_offset = 2000
-        with patch.dict('os.environ', {EnvVars.MARQO_MAX_SEARCH_OFFSET: str(custom_offset)}):
-            response = self.client.post(
-                "/indexes/index1/search?device=cpu",
-                json={
-                    "q": "test",
-                    "searchMethod": "TENSOR",
-                    "offset": custom_offset + 1,
-                },
-            )
-            
-            self.assertEqual(response.status_code, 400)
-            self.assertIn(f"The search result offset must be less than or equal "
-                          f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
-                          response.json()["message"])
+        custom_offsets = [2000, 1000000]
+        for custom_offset in custom_offsets:
+            with patch.dict('os.environ', {
+                EnvVars.MARQO_MAX_SEARCH_OFFSET: str(custom_offset),
+                EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: str(custom_offset + 1000000)
+            }):
+                response = self.client.post(
+                    "/indexes/index1/search?device=cpu",
+                    json={
+                        "q": "test",
+                        "searchMethod": "TENSOR",
+                        "offset": custom_offset + 1,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(f"The search result offset must be less than or equal "
+                                f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
+                                response.json()["message"])
 
 
 class ValidationApiTests(MarqoTestCase):

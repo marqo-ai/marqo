@@ -58,8 +58,8 @@ class IndexManagement:
     _DEFAULT_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
         '''
         <query-profile id="default">
-            <field name="maxHits">{max_hits}</field>
-            <field name="maxOffset">{max_offset}</field>
+            <field name="maxHits">1000000</field>
+            <field name="maxOffset">1000000</field>
         </query-profile>
         '''
     )
@@ -78,8 +78,6 @@ class IndexManagement:
         self._zookeeper_client = zookeeper_client
         self._zookeeper_deployment_lock: Optional[ZookeeperDistributedLock] = self._instantiate_deployment_lock()
         self._enable_index_operations = enable_index_operations
-        self._max_search_limit = vespa_client.max_search_limit
-        self._max_search_offset = vespa_client.max_search_offset
 
     def _instantiate_deployment_lock(self) -> Optional[ZookeeperDistributedLock]:
         """Instantiate a ZookeeperDistributedLock."""
@@ -452,10 +450,7 @@ class IndexManagement:
         if not os.path.exists(profile_path):
             logger.debug('Default query profile does not exist. Creating it')
 
-            query_profile = self._DEFAULT_QUERY_PROFILE_TEMPLATE.format(
-                max_hits=self._max_search_limit,
-                max_offset=self._max_search_offset
-            )
+            query_profile = self._DEFAULT_QUERY_PROFILE_TEMPLATE
             os.makedirs(os.path.dirname(profile_path), exist_ok=True)
             with open(profile_path, 'w') as f:
                 f.write(query_profile)
