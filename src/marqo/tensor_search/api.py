@@ -320,16 +320,7 @@ def add_or_replace_documents(
         res = tensor_search.add_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
-
-        headers = {
-            "x-success-count": str(res.success_count),
-            "x-failure-count": str(res.failure_count),
-            "x-error-count": str(res.error_count)
-        }
-
-        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=headers)
-
-
+        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/embed")
@@ -363,7 +354,7 @@ def update_documents(
         "x-error-count": str(res.error_count)
     }
 
-    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=headers)
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
@@ -385,14 +376,7 @@ def get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
         show_vectors=expose_facets
     )
-
-    headers = {
-        "x-success-count": str(res.success_count),
-        "x-failure-count": str(res.failure_count),
-        "x-error-count": str(res.error_count)
-    }
-
-    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=headers)
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/stats")

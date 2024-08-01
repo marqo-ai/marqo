@@ -683,22 +683,24 @@ class VespaClient:
             data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
-                return UpdateDocumentResponse(**resp.json(), status=resp.status_code)
-            except httpx.HTTPError as e:
-                error_message = (f"Marqo has encountered an error while updating this document to the vector store and "
-                                 f"the document is not updated. Original error: {e}. ")
-                return UpdateDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
-            except JSONDecodeError as e:
-                if resp.status_code == 200:
-                    # A 200 response shouldn't reach here
-                    raise VespaError(f"Marqo received an unexpected response from the vector store: {resp.text} with 200 "
-                                     f"status_code. The response is not in the JSON format and Marqo can not decode "
-                                     f"it") from e
-                else:
-                    error_message = (f"Marqo has encountered an error while update this document to the vector store "
-                                     f"and the response can not be decoded. The document is not updated. The response "
-                                     f"text is: {resp.text}")
-                    return UpdateDocumentResponse(status=500, message=error_message, pathId=error_doc_path_id, id=doc_id)
+            except httpx.RequestError as e:
+                logger.error(e, exc_info=True)
+                return UpdateDocumentResponse(status=500, message="Network Error", id=doc_id, path_id=error_doc_path_id)
+
+        # Handle other exceptions
+        try:
+            return UpdateDocumentResponse(**resp.json(), status=resp.status_code)
+        except JSONDecodeError as e:
+            if resp.status_code == 200:
+                # A 200 response shouldn't reach here, so we error out the whole batch
+                raise VespaError(cause=e, message="Unexpected response from Vespa") from e
+
+            try:
+                self._raise_for_status(resp)
+            except VespaStatusError as e:
+                logger.error(e, exc_info=True)
+                return UpdateDocumentResponse(status=resp.status_code, message=e.message, id=doc_id,
+                                              error_doc_path_id=error_doc_path_id)
 
     async def _feed_document_async(self, semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                    document: VespaDocument, schema: str,
@@ -713,7 +715,10 @@ class VespaClient:
         Exceptions that are handled in this method:
         1. httpx.RequestError: We convert this error to a 500 error for the specific document and put 'Network Error' in
         the message.
-        2.
+        2. JSONDecodeError: If the Vespa response is 200 but the response can not be decoded, we raise a VespaError and
+        this will block the whole batch as this indicates an unexpected response from Vespa.
+        3. httpx.status_codes.HTTPStatusError: We catch the error and return it to marqo.core.document methods to handle
+        it.
 
         Raises:
             VespaError: If the Vespa response is 200 but the response can not be decoded.
@@ -733,19 +738,19 @@ class VespaClient:
                 logger.error(e, exc_info=True)
                 return FeedBatchDocumentResponse(status=500, message="Network Error", id=doc_id)
 
-            # Handle other exceptions
-            try:
-                return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
-            except JSONDecodeError as e:
-                if resp.status_code == 200:
-                    # A 200 response shouldn't reach here, so we error out the whole batch
-                    raise VespaError(cause=e, message="Unexpected response from Vespa") from e
+        # Handle other exceptions
+        try:
+            return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
+        except JSONDecodeError as e:
+            if resp.status_code == 200:
+                # A 200 response shouldn't reach here, so we error out the whole batch
+                raise VespaError(cause=e, message="Unexpected response from Vespa") from e
 
-                try:
-                    self._raise_for_status(resp)
-                except VespaStatusError as e:
-                    logger.error(e, exc_info=True)
-                    return FeedBatchDocumentResponse(status=resp.status_code, message=e.message, id=doc_id)
+            try:
+                self._raise_for_status(resp)
+            except VespaStatusError as e:
+                logger.error(e, exc_info=True)
+                return FeedBatchDocumentResponse(status=resp.status_code, message=e.message, id=doc_id)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
                             timeout: int) -> FeedBatchDocumentResponse:
