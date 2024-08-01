@@ -1,6 +1,6 @@
 import uuid
 from unittest import mock
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
