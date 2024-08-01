@@ -35,7 +35,7 @@ def run_test_vectorize(models):
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
     device = "cuda"
     eps = 1e-9
-    with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "6"}):
+    with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
         def run():
             for name in models:
                 model_properties = get_model_properties_from_registry(name)
