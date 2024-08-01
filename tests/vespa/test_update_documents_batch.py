@@ -113,4 +113,4 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         self.assertEqual(2, len(batch_response.responses))
         for r in batch_response.responses:
             self.assertEqual(r.status, 500)
-            self.assertIn("Marqo has encountered an error while updating this document", r.message)
+            self.assertIn("Network Error", r.message)
