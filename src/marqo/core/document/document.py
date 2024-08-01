@@ -236,4 +236,6 @@ class Document:
         elif status == 400 and isinstance(message, str) and "could not parse field" in message:
             return 400, f"The document contains invalid characters in the fields. Original error: {message} "
         else:
+            logger.error(f"An unexpected error occurred from the Vespa document response. "
+                         f"status: {status}, message: {message}")
             return 500, f"Marqo vector store returns an unexpected error with this document. Original error: {message}"
