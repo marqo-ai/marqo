@@ -58,8 +58,8 @@ class IndexManagement:
     _DEFAULT_QUERY_PROFILE_TEMPLATE = textwrap.dedent(
         '''
         <query-profile id="default">
-            <field name="maxHits">1000</field>
-            <field name="maxOffset">10000</field>
+            <field name="maxHits">1000000</field>
+            <field name="maxOffset">1000000</field>
         </query-profile>
         '''
     )

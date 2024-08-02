@@ -15,6 +15,7 @@ from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
 from tests.marqo_test import MarqoTestCase
+from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 
 
 class TestUpdate(MarqoTestCase):
@@ -201,8 +202,9 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "I can't be updated",
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
-                             index_name=self.structured_index_name, marqo_config=self.config)
+        r = self.config.document.partial_update_documents_by_index_name(
+            partial_documents=[updated_doc],
+            index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
         self.assertEqual(True, r["errors"])
         self.assertIn("as this is a tensor field", r["items"][0]["error"])
 
@@ -405,8 +407,9 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
-                             index_name=self.structured_index_name, marqo_config=self.config)
+        r = self.config.document.partial_update_documents_by_index_name(
+            partial_documents=[updated_doc],
+            index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
         self.assertEqual(True, r["errors"])
         self.assertIn("dependent field", r["items"][0]["error"])
 
@@ -446,8 +449,10 @@ class TestUpdate(MarqoTestCase):
             "text_field": "updated text field",
             "_id": "1"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
-                             index_name=self.structured_index_name, marqo_config=self.config)
+        r = self.config.document.partial_update_documents_by_index_name(
+            partial_documents=[updated_doc],
+            index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
+
         self.assertEqual(True, r["errors"])
         self.assertIn("Document does not exist in the index", r["items"][0]["error"])
         self.assertEqual(404, r["items"][0]["status"])
@@ -457,8 +462,9 @@ class TestUpdate(MarqoTestCase):
         updated_doc = {
             "text_field": "updated text field"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
-                             index_name=self.structured_index_name, marqo_config=self.config)
+        r = self.config.document.partial_update_documents_by_index_name(
+            partial_documents=[updated_doc],
+            index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
         self.assertEqual(True, r["errors"])
         self.assertIn("'_id' is a required field but it does not exist", r["items"][0]["error"])
         self.assertEqual(400, r["items"][0]["status"])
@@ -488,8 +494,9 @@ class TestUpdate(MarqoTestCase):
             "_id": "1",
             "non_existent_field": "some value"
         }
-        r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
-                             index_name=self.structured_index_name, marqo_config=self.config)
+        r = self.config.document.partial_update_documents_by_index_name(
+            partial_documents=[updated_doc],
+            index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
         self.assertEqual(True, r["errors"])
         self.assertIn("Invalid field name", r["items"][0]["error"])
         self.assertEqual(400, r["items"][0]["status"])
@@ -513,10 +520,10 @@ class TestUpdate(MarqoTestCase):
             if "_id" not in updated_doc:
                 updated_doc["_id"] = "1"
             with self.subTest(f"{updated_doc} - {msg}"):
-                r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
-                                     index_name=self.structured_index_name, marqo_config=self.config)
+                r = self.config.document.partial_update_documents_by_index_name(
+                    partial_documents=[updated_doc],
+                    index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(expected_error, r["errors"])
-                print(r)
                 if expected_error:
                     self.assertEqual(True, r["errors"])
                     self.assertTrue(r["items"][0]["status"] >= 400)
@@ -694,8 +701,9 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
         with self.assertRaises(UnsupportedFeatureError) as cm:
-            r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
-                                 index_name=self.test_unstructured_index_name, marqo_config=self.config)
+            r = self.config.document.partial_update_documents_by_index_name(
+                partial_documents=[updated_doc],
+                index_name=self.test_unstructured_index_name).dict(exclude_none=True, by_alias=True)
 
         self.assertIn("is not supported for unstructured indexes", str(cm.exception))
 
@@ -724,9 +732,9 @@ class TestUpdate(MarqoTestCase):
             }
         ]
         for i in range(10):
-
-            r = update_documents(body=UpdateDocumentsBodyParams(documents=update_docs),
-                                 index_name=self.structured_index_name, marqo_config=self.config)
+            r = self.config.document.partial_update_documents_by_index_name(
+                partial_documents=update_docs,
+                index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
 
             updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, "1")
 
@@ -746,9 +754,9 @@ class TestUpdate(MarqoTestCase):
         ]
         for update_docs, expected_error, expected_status, expected_id in test_cases:
             with self.subTest(f"{update_docs} - {expected_error} - {expected_status} - {expected_id}"):
-                r = update_documents(body=UpdateDocumentsBodyParams(documents=update_docs),
-                                     index_name=self.structured_index_name,
-                                     marqo_config=self.config)
+                r = self.config.document.partial_update_documents_by_index_name(
+                    partial_documents=update_docs,
+                    index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
 
                 if expected_status >= 400:
                     self.assertIn("error", r["items"][0])
@@ -757,3 +765,36 @@ class TestUpdate(MarqoTestCase):
                 self.assertEqual(expected_id, r["items"][0]["_id"])
                 self.assertIn("index_name", r)
                 self.assertIn("processingTimeMs", r)
+
+    def test_update_documents_response_successCounts(self):
+        test_cases = [
+            ([
+                MarqoUpdateDocumentsItem(status=200),
+                MarqoUpdateDocumentsItem(status=201),
+                MarqoUpdateDocumentsItem(status=204)
+            ], 3, 0, 0),
+            ([
+                MarqoUpdateDocumentsItem(status=400),
+                MarqoUpdateDocumentsItem(status=404)
+            ], 0, 2, 0),
+            ([
+                MarqoUpdateDocumentsItem(status=500),
+                MarqoUpdateDocumentsItem(status=502),
+                MarqoUpdateDocumentsItem(status=503)
+            ], 0, 0, 3),
+            ([
+                MarqoUpdateDocumentsItem(status=200),
+                MarqoUpdateDocumentsItem(status=404),
+                MarqoUpdateDocumentsItem(status=500),
+                MarqoUpdateDocumentsItem(status=201),
+                MarqoUpdateDocumentsItem(status=503)
+            ], 2, 1, 2)
+        ]
+        for items, expected_success, expected_failure, expected_error in test_cases:
+            with self.subTest(items=items):
+                update_documents_response = MarqoUpdateDocumentsResponse(
+                    items=items, index_name="index_name", errors=False,
+                    processingTimeMs=1000
+                )
+                self.assertEqual(list(update_documents_response.get_header_dict().values()),
+                                 [str(expected_success), str(expected_failure), str(expected_error)])

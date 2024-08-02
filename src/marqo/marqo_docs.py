@@ -59,3 +59,7 @@ def query_reference():
 
 def indexing_images():
     return _build_url('Guides/Advanced-Usage/images/')
+
+
+def api_reference_document_body():
+    return _build_url('API-Reference/Documents/add_or_replace_documents/#body')
