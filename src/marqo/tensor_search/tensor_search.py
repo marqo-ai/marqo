@@ -65,6 +65,7 @@ from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.clip_utils import _is_image
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
@@ -85,11 +86,14 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
+from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
+                                                                  MarqoGetDocumentsByIdsItem)
 
 logger = get_logger(__name__)
 
 
-def add_documents(config: Config, add_docs_params: AddDocsParams):
+def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDocumentsResponse:
     """
     Args:
         config: Config object
@@ -113,7 +117,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams):
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
 
-def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: UnstructuredMarqoIndex):
+def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, marqo_index: UnstructuredMarqoIndex)\
+        -> MarqoAddDocumentsResponse:
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
     unstructured_vespa_index = UnstructuredVespaIndex(marqo_index)
@@ -136,7 +141,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     if len(add_docs_params.docs) == 0:
         raise errors.BadRequestError(message="Received empty add documents request")
 
-    unsuccessful_docs = []
+    unsuccessful_docs: List[Tuple[int, MarqoAddDocumentsItem]] = []
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
     image_repo = {}
@@ -211,8 +216,13 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
             except errors.__InvalidRequestError as err:
                 unsuccessful_docs.append(
-                    (i, {'_id': doc_id if doc_id is not None else '',
-                         'error': err.message, 'status': int(err.status_code), 'code': err.code})
+                    (i, MarqoAddDocumentsItem(
+                        id=doc_id if doc_id is not None else '',
+                        error=err.message,
+                        message=err.message,
+                        status=int(err.status_code),
+                        code=err.code)
+                    )
                 )
                 continue
 
@@ -238,8 +248,13 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 except (errors.InvalidArgError, core_exceptions.MarqoDocumentParsingError) as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
-                             'code': err.code})
+                        (i, MarqoAddDocumentsItem(
+                            id=doc_id if doc_id is not None else '',
+                            error=err.message,
+                            message=err.message,
+                            status=int(err.status_code),
+                            code=err.code)
+                        )
                     )
                     break
 
@@ -341,9 +356,13 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             except s2_inference_errors.S2InferenceError as e:
                                 document_is_valid = False
                                 unsuccessful_docs.append(
-                                    (i, {'_id': doc_id, 'error': e.message,
-                                         'status': int(errors.InvalidArgError.status_code),
-                                         'code': errors.InvalidArgError.code})
+                                    (i, MarqoAddDocumentsItem(
+                                        id=doc_id if doc_id is not None else '',
+                                        error=e.message,
+                                        message=e.message,
+                                        status=int(errors.InvalidArgError.status_code),
+                                        code=errors.InvalidArgError.code)
+                                )
                                 )
                                 break
 
@@ -377,9 +396,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
-                                (i, {'_id': doc_id, 'error': e.message,
-                                     'status': int(errors.InvalidArgError.status_code),
-                                     'code': errors.InvalidArgError.code})
+                                (
+                                    i, MarqoAddDocumentsItem(
+                                        id=doc_id if doc_id is not None else '',
+                                        error=e.message,
+                                        message=e.message,
+                                        status=int(errors.InvalidArgError.status_code),
+                                        code=errors.InvalidArgError.code
+                                    )
+                                )
                             )
                             break
 
@@ -514,38 +539,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates Vespa response dict into Marqo dict"""
-            result_dict = {}
-            new_items = []
-
-            if responses is not None:
-                result_dict['errors'] = responses.errors
-
-                for resp in responses.responses:
-                    id = resp.id.split('::')[-1] if resp.id else None
-                    new_items.append({'status': resp.status})
-                    if id:
-                        new_items[-1].update({'_id': id})
-                    if resp.message:
-                        new_items[-1].update({'message': resp.message})
-
-            if unsuccessful_docs:
-                result_dict['errors'] = True
-
-            for loc, error_info in unsuccessful_docs:
-                new_items.insert(loc, error_info)
-
-            result_dict["processingTimeMs"] = time_diff * 1000
-            result_dict["index_name"] = add_docs_params.index_name
-            result_dict["items"] = new_items
-
-            return result_dict
-
-        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
+        marqo_add_documents_response = config.document.translate_add_documents_response(
+            index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
+            add_docs_processing_time=t1 - t0
+        )
+        return marqo_add_documents_response
 
 
-def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
+def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex) \
+        -> MarqoAddDocumentsResponse:
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
     vespa_index = StructuredVespaIndex(marqo_index)
@@ -569,7 +571,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     if len(add_docs_params.docs) == 0:
         raise api_exceptions.BadRequestError(message="Received empty add documents request")
 
-    unsuccessful_docs = []
+    unsuccessful_docs: List[Tuple[int, MarqoAddDocumentsItem]] = []
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)  # use length before deduplication
     image_repo = {}
@@ -641,8 +643,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 [validation.validate_field_name(field) for field in copied]
             except api_exceptions.__InvalidRequestError as err:
                 unsuccessful_docs.append(
-                    (i, {'_id': doc_id if doc_id is not None else '',
-                         'error': err.message, 'status': int(err.status_code), 'code': err.code})
+                    (i, MarqoAddDocumentsItem(
+                        id=doc_id if doc_id is not None else '',
+                        error=err.message,
+                        message=err.message,
+                        status=int(err.status_code),
+                        code=err.code)
+                     )
                 )
                 continue
 
@@ -656,16 +663,26 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
                     document_is_valid = False
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': message, 'status': int(api_exceptions.InvalidArgError.status_code),
-                             'code': api_exceptions.InvalidArgError.code})
+                        (i, MarqoAddDocumentsItem(
+                            id=doc_id if doc_id is not None else '',
+                            error=message,
+                            message=message,
+                            status=int(api_exceptions.InvalidArgError.status_code),
+                            code=api_exceptions.InvalidArgError.code)
+                         )
                     )
                     break
                 if marqo_field.type == FieldType.MultimodalCombination:
                     message = f"Field {field} is a multimodal combination field and cannot be assigned a value."
                     document_is_valid = False
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': message, 'status': int(api_exceptions.InvalidArgError.status_code),
-                             'code': api_exceptions.InvalidArgError.code})
+                        (i, MarqoAddDocumentsItem(
+                            id=doc_id if doc_id is not None else '',
+                            error=message,
+                            message=message,
+                            status=int(api_exceptions.InvalidArgError.status_code),
+                            code=api_exceptions.InvalidArgError.code)
+                         )
                     )
                     break
 
@@ -685,8 +702,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 except api_exceptions.InvalidArgError as err:
                     document_is_valid = False
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': err.message, 'status': int(err.status_code),
-                             'code': err.code})
+                        (i, MarqoAddDocumentsItem(
+                            id=doc_id if doc_id is not None else '',
+                            error=err.message,
+                            message=err.message,
+                            status=int(err.status_code),
+                            code=err.code)
+                         )
                     )
                     break
 
@@ -786,10 +808,15 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             except s2_inference_errors.S2InferenceError as e:
                                 document_is_valid = False
                                 unsuccessful_docs.append(
-                                    (i, {'_id': doc_id, 'error': e.message,
-                                         'status': int(errors.InvalidArgError.status_code),
-                                         'code': errors.InvalidArgError.code})
+                                    (i, MarqoAddDocumentsItem(
+                                        id=doc_id if doc_id is not None else '',
+                                        error=e.message,
+                                        message=e.message,
+                                        status=int(errors.InvalidArgError.status_code),
+                                        code=errors.InvalidArgError.code)
+                                     )
                                 )
+
                                 break
 
                         normalize_embeddings = marqo_index.normalize_embeddings
@@ -822,9 +849,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
-                                (i,
-                                 {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
-                                  'code': errors.InvalidArgError.code})
+                                (i, MarqoAddDocumentsItem(
+                                    id=doc_id if doc_id is not None else '',
+                                    error=e.message,
+                                    message=e.message,
+                                    status=int(errors.InvalidArgError.status_code),
+                                    code=errors.InvalidArgError.code)
+                                 )
                             )
                             break
 
@@ -842,9 +873,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         e = api_exceptions.InvalidArgError(
                             f'Invalid type {type(field_content)} for tensor field {field}')
                         unsuccessful_docs.append(
-                            (i, {'_id': doc_id, 'error': e.message,
-                                 'status': int(api_exceptions.InvalidArgError.status_code),
-                                 'code': api_exceptions.InvalidArgError.code})
+                            (i, MarqoAddDocumentsItem(
+                                id=doc_id if doc_id is not None else '',
+                                error=e.message,
+                                message=e.message,
+                                status=int(api_exceptions.InvalidArgError.status_code),
+                                code=api_exceptions.InvalidArgError.code)
+                             )
                         )
                         break
 
@@ -947,9 +982,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 except core_exceptions.MarqoDocumentParsingError as e:
                     document_is_valid = False
                     unsuccessful_docs.append(
-                        (i, {'_id': doc_id, 'error': e.message,
-                             'status': int(api_exceptions.InvalidArgError.status_code),
-                             'code': api_exceptions.InvalidArgError.code})
+                        (i, MarqoAddDocumentsItem(
+                            id = doc_id if doc_id is not None else '',
+                            error = e.message,
+                            message = e.message,
+                            status = int(api_exceptions.InvalidArgError.status_code),
+                            code = api_exceptions.InvalidArgError.code)
+                        )
                     )
 
     total_preproc_time = 0.001 * RequestMetricsStore.for_request().stop(
@@ -979,35 +1018,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     with RequestMetricsStore.for_request().time("add_documents.postprocess"):
         t1 = timer()
 
-        def translate_add_doc_response(responses: Optional[FeedBatchResponse], time_diff: float) -> dict:
-            """translates Vespa response dict into Marqo dict"""
-            result_dict = {}
-            new_items: List[Dict] = []
-
-            if responses is not None:
-                result_dict['errors'] = responses.errors
-
-                for resp in responses.responses:
-                    id = resp.id.split('::')[-1] if resp.id else None
-                    new_items.append({'status': resp.status})
-                    if id:
-                        new_items[-1].update({'_id': id})
-                    if resp.message:
-                        new_items[-1].update({'message': resp.message})
-
-            if unsuccessful_docs:
-                result_dict['errors'] = True
-
-            for loc, error_info in unsuccessful_docs:
-                new_items.insert(loc, error_info)
-
-            result_dict["processingTimeMs"] = time_diff * 1000
-            result_dict["index_name"] = add_docs_params.index_name
-            result_dict["items"] = new_items
-
-            return result_dict
-
-        return translate_add_doc_response(index_responses, time_diff=t1 - t0)
+        marqo_add_documents_response = config.document.translate_add_documents_response(
+            index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
+            add_docs_processing_time=t1 - t0
+        )
+        return marqo_add_documents_response
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
@@ -1077,7 +1092,7 @@ def _get_marqo_documents_by_ids(
 def get_documents_by_ids(
         config: Config, index_name: str, document_ids: typing.Collection[str],
         show_vectors: bool = False, ignore_invalid_ids: bool = False
-) -> Dict[str, Any]:
+) -> MarqoGetDocumentsByIdsResponse:
     """
     Returns documents by their IDs.
 
@@ -1096,30 +1111,40 @@ def get_documents_by_ids(
             f"{len(document_ids)} documents were requested, which is more than the allowed limit of [{max_docs_limit}], "
             f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
 
+    unsuccessful_docs: List[Tuple[int, MarqoGetDocumentsByIdsItem]] = []
+
     validated_ids = []
-    for doc_id in document_ids:
+    for loc, doc_id in enumerate(document_ids):
         try:
             validated_ids.append(validation.validate_id(doc_id))
         except api_exceptions.InvalidDocumentIdError as e:
             if not ignore_invalid_ids:
-                raise e
-            logger.debug(f'Invalid document ID {doc_id} ignored')
+                unsuccessful_docs.append(
+                    (
+                        loc, MarqoGetDocumentsByIdsItem(
+                            # Invalid IDs are not returned in the response
+                            id = doc_id,
+                            message=e.message,
+                            status=int(e.status_code)
+                        )
+                    )
+                )
+            else:
+                logger.debug(f'Invalid document ID {doc_id} ignored')
 
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
-        return {"results": []}
+        return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
     marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
-    to_return = {
-        "results": []
-    }
+    results: List[Union[MarqoGetDocumentsByIdsItem, Dict]] = []
+    errors = batch_get.errors
 
     for response in batch_get.responses:
         if response.status == 200:
             marqo_document = vespa_index.to_marqo_document(response.document.dict())
-
             if show_vectors:
                 if constants.MARQO_DOC_TENSORS in marqo_document:
                     marqo_document[TensorField.tensor_facets] = _get_tensor_facets(
@@ -1134,24 +1159,26 @@ def get_documents_by_ids(
             if constants.MARQO_DOC_TENSORS in marqo_document:
                 del marqo_document[constants.MARQO_DOC_TENSORS]
 
-            to_return['results'].append(
+            results.append(
                 {
                     TensorField.found: True,
                     **marqo_document
                 }
             )
-        elif response.status == 404:
-            to_return['results'].append(
-                {
-                    TensorField.found: False,
-                    '_id': _get_id_from_vespa_id(response.id)
-                }
+        else:
+            status, message = config.document.translate_vespa_document_response(response.status)
+            results.append(
+                MarqoGetDocumentsByIdsItem(
+                    id=_get_id_from_vespa_id(response.id), status=status,
+                    found=False, message=message)
             )
-        else:  # If not 200 or 404, it should have been raised by the client
-            raise api_exceptions.InternalError(
-                f"Unexpected response status code {response.status} for document {response.id}")
 
-    return to_return
+    # Insert the error documents at the correct locations
+    for loc, error_info in unsuccessful_docs:
+        results.insert(loc, error_info)
+        errors = True
+
+    return MarqoGetDocumentsByIdsResponse(errors=errors, results=results)
 
 
 def _get_id_from_vespa_id(vespa_id: str) -> str:
@@ -2073,11 +2100,17 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                 except s2_inference_errors.S2InferenceError as e:
                     combo_document_is_valid = False
                     unsuccessful_doc_to_append = \
-                        (doc_index, {'_id': doc_id, 'error': e.message,
-                                     'status': int(errors.InvalidArgError.status_code),
-                                     'code': errors.InvalidArgError.code})
+                        (doc_index, MarqoAddDocumentsItem(
+                            id = doc_id,
+                            error = e.message,
+                            message = e.message,
+                            status= int(errors.InvalidArgError.status_code),
+                            code = errors.InvalidArgError.code
+                        )
+                    )
 
-                    return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
+                    return (combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append,
+                            combo_vectorise_time_to_add)
 
     try:
         start_time = timer()
@@ -2113,8 +2146,15 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
     except s2_inference_errors.S2InferenceError as e:
         combo_document_is_valid = False
         unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
-                         'code': errors.InvalidArgError.code})
+            (doc_index, MarqoAddDocumentsItem(
+                id=doc_id,
+                error=e.message,
+                message=e.message,
+                status=int(errors.InvalidArgError.status_code),
+                code=errors.InvalidArgError.code
+            )
+        )
+
 
         return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
@@ -2213,9 +2253,14 @@ def vectorise_multimodal_combination_field_structured(
             except s2_inference_errors.S2InferenceError as e:
                 combo_document_is_valid = False
                 unsuccessful_doc_to_append = \
-                    (doc_index, {'_id': doc_id, 'error': e.message,
-                                 'status': int(api_exceptions.InvalidArgError.status_code),
-                                 'code': api_exceptions.InvalidArgError.code})
+                    (doc_index, MarqoAddDocumentsItem(
+                        id=doc_id,
+                        error=e.message,
+                        message=e.message,
+                        status=int(errors.InvalidArgError.status_code),
+                        code=api_exceptions.InvalidArgError.code
+                    )
+                )
 
                 return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
@@ -2253,8 +2298,14 @@ def vectorise_multimodal_combination_field_structured(
     except s2_inference_errors.S2InferenceError as e:
         combo_document_is_valid = False
         unsuccessful_doc_to_append = \
-            (doc_index, {'_id': doc_id, 'error': e.message, 'status': int(errors.InvalidArgError.status_code),
-                         'code': errors.InvalidArgError.code})
+            (doc_index, MarqoAddDocumentsItem(
+                id=doc_id,
+                error=e.message,
+                message=e.message,
+                status=int(errors.InvalidArgError.status_code),
+                code=errors.InvalidArgError.code
+            )
+        )
 
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 

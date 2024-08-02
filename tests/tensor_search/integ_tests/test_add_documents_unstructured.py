@@ -212,7 +212,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 ],
                 device="cpu", tensor_fields=[]
             )
-        )
+        ).dict(exclude_none=True, by_alias=True)
         assert "errors" in add_res
         assert "processingTimeMs" in add_res
         assert "index_name" in add_res
@@ -261,7 +261,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                             use_existing_tensors=use_existing_tensors_flag, device="cpu",
                             tensor_fields=["title"]
                         )
-                    )
+                    ).dict(exclude_none=True, by_alias=True)
                     assert add_res['errors'] is True
                     assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
                     assert all([item['status'] == 200
@@ -293,7 +293,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                             index_name=self.default_text_index, docs=bad_doc_arg[0],
                             use_existing_tensors=use_existing_tensors_flag, device="cpu", tensor_fields=["title"]
                         )
-                    )
+                    ).dict(exclude_none=True, by_alias=True)
                     assert add_res[
                                'errors'] is True, f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'
                     succeeded_count = 0
@@ -317,7 +317,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     device="cpu",
                     tensor_fields=[],
                 )
-            )
+            ).dict(exclude_none=True, by_alias=True)
             assert add_res['errors'] is False
 
     def test_add_documents_list_data_type_validation(self):
@@ -337,7 +337,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         device="cpu",
                         tensor_fields=[],
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 assert add_res['errors'] is True
                 assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
@@ -441,7 +441,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         index_name=self.default_text_index, docs=docs,
                         device="cpu", tensor_fields=[]
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(len(expected_results), len(expected_results))
                 for i, res_dict in enumerate(add_res['items']):
                     # if the expected id is None, then it assumed the id is
@@ -479,7 +479,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         {"_id": "456", "desc": "exc " * (max_size // 4)},
                     ],
                     device="cpu", tensor_fields=["desc"]
-                ))
+                )).dict(exclude_none=True, by_alias=True)
             items = update_res['items']
             assert update_res['errors']
             assert 'error' in items[0] and 'error' in items[2]
@@ -502,7 +502,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         {"_id": "123", 'desc': "edf " * (max_size // 4)},
                     ],
                     use_existing_tensors=True, device="cpu", tensor_fields=[])
-            )
+            ).dict(exclude_none=True, by_alias=True)
             items = update_res['items']
             assert update_res['errors']
             assert 'error' in items[0]
@@ -525,7 +525,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                             {"_id": "123", 'desc': "Some content"},
                         ],
                         use_existing_tensors=True, device="cpu", tensor_fields=["desc"]
-                    ))
+                    )).dict(exclude_none=True, by_alias=True)
                 items = update_res['items']
                 assert not update_res['errors']
                 assert 'error' not in items[0]
@@ -596,7 +596,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                                              tensor_fields=[],
                                              device="cpu"
                                          )
-                                     )['errors']
+                                     ).dict(exclude_none=True, by_alias=True)['errors']
                                      )
 
     def test_no_tensor_field_on_empty_ix(self):
@@ -643,7 +643,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                 config=self.config, index_name=self.image_index_with_random_model,
                 document_ids=[str(n) for n in (0, approx_half, doc_count - 1)],
                 show_vectors=True
-            )
+            ).dict(exclude_none=True, by_alias=True)
             for d in get_res['results']:
                 assert d['_found'] is True
                 assert d['title'] == title_value
@@ -673,7 +673,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     index_name=self.image_index_with_random_model, device="cpu",
                     tensor_fields=["title", "location"]
                 )
-            )
+            ).dict(exclude_none=True, by_alias=True)
             self.assertEqual(
                 c,
                 self.config.monitoring.get_index_stats_by_name(
@@ -722,7 +722,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                         index_name=self.default_text_index, docs=[doc], device="cpu",
                         tensor_fields=[]
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 print(res)
                 self.assertEqual(res['errors'], error)
 
@@ -747,7 +747,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                                                 add_docs_params=AddDocsParams(
                                                     index_name=self.default_text_index, docs=documents,
                                                     device="cpu", tensor_fields=["text_field"]
-                                                ))
+                                                )).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(1, len(r["items"]))
                 number_of_docs_in_index = self.config.monitoring.get_index_stats_by_name(
                     index_name=self.default_text_index).number_of_documents

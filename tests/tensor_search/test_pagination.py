@@ -72,7 +72,7 @@ class TestPagination(MarqoTestCase):
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
                                                   )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertFalse(r['errors'], "Errors in add documents call")
 
             for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
@@ -118,7 +118,7 @@ class TestPagination(MarqoTestCase):
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
                                                   )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertFalse(r['errors'], "Errors in add documents call")
 
             test_cases = [
@@ -190,7 +190,7 @@ class TestPagination(MarqoTestCase):
                                                       tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                       else None,
                                                       )
-                    )
+                    ).dict(exclude_none=True, by_alias=True)
                     self.assertFalse(r['errors'], "Errors in add documents call")
 
                 for search_method in [SearchMethod.TENSOR, SearchMethod.LEXICAL]:

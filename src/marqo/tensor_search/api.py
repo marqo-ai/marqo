@@ -4,7 +4,7 @@ from typing import List
 
 import pydantic
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -317,9 +317,10 @@ def add_or_replace_documents(
                                                              device=device)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        return tensor_search.add_documents(
+        res = tensor_search.add_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
+        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/embed")
@@ -347,7 +348,7 @@ def update_documents(
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
 
-    return res.dict(exclude_none=True, by_alias=True)
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
@@ -365,10 +366,11 @@ def get_documents_by_ids(
         index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False):
-    return tensor_search.get_documents_by_ids(
+    res = tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
         show_vectors=expose_facets
     )
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/stats")

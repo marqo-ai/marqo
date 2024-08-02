@@ -51,7 +51,7 @@ class TestIndexManagement(MarqoTestCase):
                 tensor_fields=[],
                 docs=[{"test": "test", "_id": "1"}]
             )
-        )
+        ).dict(exclude_none=True, by_alias=True)
         self.assertEqual(r["errors"], False)
 
         # Test search
@@ -74,7 +74,7 @@ class TestIndexManagement(MarqoTestCase):
                 tensor_fields=[],
                 docs=[{"test": "test", "_id": "1"}]
             )
-        )
+        ).dict(exclude_none=True, by_alias=True)
         self.assertEqual(r["errors"], False)
 
         # Test search
