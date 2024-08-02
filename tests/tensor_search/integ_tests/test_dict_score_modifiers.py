@@ -407,7 +407,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
 
                 # Expected
                 expected = {"1": 200, "2": 200, "3": 400, "4": 200, "5": 200}
@@ -453,7 +453,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                             "my_custom_audio_vector_1": {"type": "custom_vector"},
                         },
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
 
                 # Expected
                 expected_results = {

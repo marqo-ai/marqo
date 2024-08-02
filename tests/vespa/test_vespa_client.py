@@ -84,8 +84,11 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
             VespaDocument(id="doc2", fields={"title": "Title 2"}),
         ]
 
-        with self.assertRaises(VespaError):
-            feed_client.feed_batch(documents, self.TEST_SCHEMA)
+        res = feed_client.feed_batch(documents, self.TEST_SCHEMA)
+        self.assertEqual(2, len(res.responses))
+        for r in res.responses:
+            self.assertEqual(r.status, 500)
+            self.assertIn("Network Error", r.message)
 
     @patch.object(concurrency, "_run_coroutine_in_thread", wraps=concurrency._run_coroutine_in_thread)
     async def test_feed_batch_existingEventLoop_successful(self, mock_executor):
@@ -405,4 +408,18 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         with self.assertRaises(VespaError):
             self.client.deploy_application(os.path.abspath(os.path.curdir))
 
+    def test_feed_batch_documents_DocumentTimeOut_response_format(self):
+        documents = [
+            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
+            VespaDocument(id="doc2", fields={"title": "Title 2"}),
+        ]
 
+        with patch("marqo.vespa.vespa_client.httpx.AsyncClient.post",
+                   side_effect = httpx.TimeoutException("Timeout")):
+            batch_response = self.client.feed_batch(documents, self.TEST_SCHEMA)
+
+        self.assertEqual(batch_response.errors, True)
+        self.assertEqual(2, len(batch_response.responses))
+        for r in batch_response.responses:
+            self.assertEqual(r.status, 500)
+            self.assertIn("Network Error", r.message)

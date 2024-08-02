@@ -373,7 +373,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 ],
                 device="cpu"
             )
-        )
+        ).dict(exclude_none=True, by_alias=True)
         assert "errors" in add_res
         assert "processingTimeMs" in add_res
         assert "index_name" in add_res
@@ -422,7 +422,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                             index_name=self.index_name_1, docs=bad_doc_arg,
                             use_existing_tensors=use_existing_tensors_flag, device="cpu"
                         )
-                    )
+                    ).dict(exclude_none=True, by_alias=True)
                     assert add_res['errors'] is True
                     assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
                     assert all([item['status'] == 200
@@ -454,7 +454,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                             index_name=self.index_name_1, docs=bad_doc_arg[0],
                             use_existing_tensors=use_existing_tensors_flag, device="cpu"
                         )
-                    )
+                    ).dict(exclude_none=True, by_alias=True)
                     assert add_res['errors'] is True
                     succeeded_count = 0
                     for item in add_res['items']:
@@ -476,7 +476,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     docs=bad_doc_arg,
                     device="cpu"
                 )
-            )
+            ).dict(exclude_none=True, by_alias=True)
             assert add_res['errors'] is False
 
     def test_add_documents_list_data_type_validation(self):
@@ -494,7 +494,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                         docs=bad_doc_arg,
                         device="cpu"
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 assert add_res['errors'] is True
                 assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
 
@@ -599,7 +599,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                         index_name=self.index_name_1, docs=docs,
                         device="cpu"
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 assert len(add_res['items']) == len(expected_results)
                 for i, res_dict in enumerate(add_res['items']):
                     # if the expected id is None, then it assumed the id is
@@ -635,7 +635,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                         {"_id": "456", "desc": "exc " * (max_size // 4)},
                     ],
                     device="cpu"
-                ))
+                )).dict(exclude_none=True, by_alias=True)
             items = update_res['items']
             assert update_res['errors']
             assert 'error' in items[0] and 'error' in items[2]
@@ -658,7 +658,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                         {"_id": "123", 'desc': "edf " * (max_size // 4)},
                     ],
                     use_existing_tensors=True, device="cpu")
-            )
+            ).dict(exclude_none=True, by_alias=True)
             items = update_res['items']
             assert update_res['errors']
             assert 'error' in items[0]
@@ -681,7 +681,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                             {"_id": "123", 'desc': "Some content"},
                         ],
                         use_existing_tensors=True, device="cpu"
-                    ))
+                    )).dict(exclude_none=True, by_alias=True)
                 items = update_res['items']
                 assert not update_res['errors']
                 assert 'error' not in items[0]
@@ -725,7 +725,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                                              }] * count,
                                              device="cpu"
                                          )
-                                     )['errors']
+                                     ).dict(exclude_none=True, by_alias=True)['errors']
                                      )
 
     def test_remove_tensor_field(self):
@@ -748,7 +748,8 @@ class TestAddDocumentsStructured(MarqoTestCase):
             )
         )
         doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+            self.config, index_name=self.index_name_1, document_id='123',
+            show_vectors=True)
         assert doc_w_facets[enums.TensorField.tensor_facets] == []
         assert 'title' not in doc_w_facets
 
@@ -764,7 +765,8 @@ class TestAddDocumentsStructured(MarqoTestCase):
             )
         )
         doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+            self.config, index_name=self.index_name_1, document_id='123',
+            show_vectors=True)
         assert doc_w_facets[enums.TensorField.tensor_facets] == []
         assert 'desc' in doc_w_facets
 
@@ -781,7 +783,8 @@ class TestAddDocumentsStructured(MarqoTestCase):
             )
         )
         doc_w_facets = tensor_search.get_document_by_id(
-            self.config, index_name=self.index_name_1, document_id='123', show_vectors=True)
+            self.config, index_name=self.index_name_1, document_id='123',
+            show_vectors=True)
         assert len(doc_w_facets[enums.TensorField.tensor_facets]) == 1
         assert 'title' in doc_w_facets[enums.TensorField.tensor_facets][0]
         assert 'desc' not in doc_w_facets[enums.TensorField.tensor_facets][0]
@@ -797,7 +800,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 config=self.config, index_name=self.index_name_img_random,
                 document_ids=[str(n) for n in (0, approx_half, doc_count - 1)],
                 show_vectors=True
-            )
+            ).dict(exclude_none=True, by_alias=True)
             for d in get_res['results']:
                 assert d['_found'] is True
                 assert d['title'] == title_value
@@ -826,7 +829,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                            "title": "blah"} for doc_num in range(c)],
                     index_name=self.index_name_img_random, device="cpu"
                 )
-            )
+            ).dict(exclude_none=True, by_alias=True)
             self.assertEqual(
                 c,
                 self.config.monitoring.get_index_stats_by_name(
@@ -877,7 +880,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[doc], device="cpu",
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(res['errors'], error)
                 if error:
                     self.assertIn("Invalid value", res['items'][0]['error'])
@@ -906,7 +909,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[doc], device="cpu",
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertFalse(res['errors'])
                 document_id = doc["_id"]
                 returned_doc = tensor_search.get_document_by_id(

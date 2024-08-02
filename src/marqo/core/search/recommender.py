@@ -101,7 +101,7 @@ class Recommender:
         marqo_documents = tensor_search.get_documents_by_ids(
             config.Config(self.vespa_client),
             index_name, document_ids, show_vectors=True
-        )
+        ).dict(exclude_none=True, by_alias=True)
 
         # Make sure all documents were found
         not_found = []
