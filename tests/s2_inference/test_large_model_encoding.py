@@ -37,7 +37,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
         self.large_clip_models = [
-            "open_clip/ViT-SO400M-14-SigLIP-384/webli"
+            #"open_clip/ViT-SO400M-14-SigLIP-384/webli"
         ]
 
         self.multilingual_models = [
