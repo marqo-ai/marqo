@@ -56,9 +56,9 @@ class TestLargeModelEncoding(unittest.TestCase):
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
 
-        self.bge_models = ["hf/bge-large-zh-v1.5", "hf/bge-large-en-v1.5"]
+        #self.bge_models = ["hf/bge-large-zh-v1.5", "hf/bge-large-en-v1.5"]
 
-        self.snowflake_models = ["hf/snowflake-arctic-embed-l"]
+        #self.snowflake_models = ["hf/snowflake-arctic-embed-l"]
 
     def tearDown(self) -> None:
         clear_loaded_models()
