@@ -17,19 +17,20 @@ from marqo.s2_inference.configs import ModelCache
 import shutil
 
 
-def remove_cached_clip_files():
+def remove_cached_model_files():
     '''
-    This function removes all the cached models from the clip cache path to save disk space
+    This function removes all the cached models from the cache paths to save disk space
     '''
-    clip_cache_path = ModelCache.clip_cache_path
-    if os.path.exists(clip_cache_path):
-        for item in os.listdir(clip_cache_path):
-            item_path = os.path.join(clip_cache_path, item)
-            # Check if the item is a file or directory
-            if os.path.isfile(item_path):
-                os.remove(item_path)
-            elif os.path.isdir(item_path):
-                shutil.rmtree(item_path)
+    cache_paths = ModelCache.get_all_cache_paths()
+    for cache_path in cache_paths:
+        if os.path.exists(cache_path):
+            for item in os.listdir(cache_path):
+                item_path = os.path.join(cache_path, item)
+                # Check if the item is a file or directory
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
 
 def run_test_vectorize(models):
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -134,12 +135,13 @@ class TestLargeClipModels(unittest.TestCase):
         clear_loaded_models()
 
     @classmethod
-    def setUpClass(cls):
-        remove_cached_clip_files()
+    def setUpClass(cls) -> None:
+        remove_cached_model_files()
 
     @classmethod
-    def tearDownClass(cls):
-        remove_cached_clip_files()
+    def tearDownClass(cls) -> None:
+        remove_cached_model_files()
+
 
     def test_vectorize(self):
         run_test_vectorize(self.models)
@@ -191,6 +193,14 @@ class TestE5Models(unittest.TestCase):
     def tearDown(self):
         clear_loaded_models()
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_model_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        remove_cached_model_files()
+
     def test_vectorize(self):
         run_test_vectorize(self.models)
 
@@ -214,6 +224,14 @@ class TestBGEModels1(unittest.TestCase):
     def tearDown(self):
         clear_loaded_models()
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_model_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        remove_cached_model_files()
+
     def test_vectorize(self):
         run_test_vectorize(self.models)
 
@@ -236,6 +254,14 @@ class TestSnowflakeModels(unittest.TestCase):
     
     def tearDown(self):
         clear_loaded_models()
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_model_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        remove_cached_model_files()
 
     def test_vectorize(self):
         run_test_vectorize(self.models)
@@ -263,6 +289,14 @@ class TestMultilingualE5Models(unittest.TestCase):
 
     def tearDown(self):
         clear_loaded_models()
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_model_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        remove_cached_model_files()
 
     def test_vectorize(self):
         run_test_vectorize(self.models)
