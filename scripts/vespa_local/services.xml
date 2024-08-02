@@ -5,6 +5,7 @@
         <document-api/>
         <search/>
         <nodes>
+            <jvm options="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" />
             <node hostalias="node1"/>
         </nodes>
     </container>
