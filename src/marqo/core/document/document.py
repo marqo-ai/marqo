@@ -194,7 +194,7 @@ class Document:
         """
 
         new_items: List[MarqoAddDocumentsItem] = []
-        # A None response no documents are sent to Vespa
+        # A None response means no documents are sent to Vespa. Probably all documents are invalid and blocked in Marqo.
         errors = responses.errors if responses is not None else True
 
         if responses is not None:
