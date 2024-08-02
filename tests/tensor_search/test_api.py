@@ -13,6 +13,7 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 import importlib
 import sys
 import os
@@ -24,6 +25,17 @@ class ApiTests(MarqoTestCase):
 
     def test_add_or_replace_documents_tensor_fields(self):
         with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
+            mock_add_documents.return_value = MarqoAddDocumentsResponse(
+                errors=False,
+                processingTimeMs=0.0,
+                index_name="index1",
+                items=[
+                    MarqoAddDocumentsItem(
+                        status=200,
+                        id="1",
+                    )
+                ],
+            )
             response = self.client.post(
                 "/indexes/index1/documents?device=cpu",
                 json={

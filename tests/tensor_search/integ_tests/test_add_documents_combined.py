@@ -80,10 +80,13 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["image_field_1", "text_field_1"] if index_name == self.unstructured_marqo_index_name \
                 else None
             with self.subTest(f"test add documents with truncated image for {index_name}"):
-                r = tensor_search.add_documents(config=self.config,
-                                                add_docs_params=AddDocsParams(index_name=index_name,
-                                                                              docs=documents,
-                                                                              tensor_fields=tensor_fields))
+                r = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=documents,
+                        tensor_fields=tensor_fields)
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(True, r["errors"])
                 self.assertEqual(2, len(r["items"]))
                 self.assertEqual(200, r["items"][0]["status"])
@@ -104,10 +107,13 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 else None
             with self.subTest(index_name):
                 with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
-                    r = tensor_search.add_documents(config=self.config,
-                                                    add_docs_params=AddDocsParams(index_name=index_name,
-                                                                                  docs=documents,
-                                                                                  tensor_fields=tensor_fields))
+                    r = tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=documents,
+                            tensor_fields=tensor_fields)
+                    ).dict(exclude_none=True, by_alias=True)
                     mock_vectorise.assert_called_once()
                     args, kwargs = mock_vectorise.call_args
                     self.assertFalse("enable_cache" in kwargs, "enable_cache should not be passed to "
@@ -132,10 +138,13 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 with patch("marqo.s2_inference.clip_utils.requests.get", side_effect=error) \
                         as mock_requests_get:
                     with self.assertRaises(Exception) as e:
-                        r = tensor_search.add_documents(config=self.config,
-                                                        add_docs_params=AddDocsParams(index_name=index_name,
-                                                                                      docs=documents,
-                                                                                      tensor_fields=tensor_fields))
+                        r = tensor_search.add_documents(
+                            config=self.config,
+                            add_docs_params=AddDocsParams(
+                                index_name=index_name,
+                                docs=documents,
+                                tensor_fields=tensor_fields)
+                        ).dict(exclude_none=True, by_alias=True)
                         self.assertIn("Unexpected error during image download", str(e.exception))
 
     def test_addDocumentsPassTensorToVectorise(self):
@@ -153,10 +162,13 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 else None
             with self.subTest(index_name):
                 with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
-                    r = tensor_search.add_documents(config=self.config,
-                                                    add_docs_params=AddDocsParams(index_name=index_name,
-                                                                                  docs=documents,
-                                                                                  tensor_fields=tensor_fields))
+                    r = tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index_name,
+                            docs=documents,
+                            tensor_fields=tensor_fields)
+                    ).dict(exclude_none=True, by_alias=True)
                     mock_vectorise.assert_called_once()
                     args, kwargs = mock_vectorise.call_args
                     self.assertIn("content", kwargs)
@@ -189,7 +201,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                                 image_download_thread_count=thread_count,
                                 tensor_fields=tensor_fields
                             )
-                        )
+                        ).dict(exclude_none=True, by_alias=True)
 
                         self.assertEqual(thread_count, mock_download_images.call_count)
 
@@ -287,7 +299,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 for docs, expected_results in docs_results:
                     with self.subTest(f'{expected_results} - {index_name}'):
                         add_res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                            index_name=index_name, docs=docs, device="cpu", tensor_fields=tensor_fields))
+                            index_name=index_name, docs=docs, device="cpu", tensor_fields=tensor_fields)).dict(
+                            exclude_none=True, by_alias=True)
                         self.assertEqual(len(expected_results), len(add_res['items']))
                         for i, res_dict in enumerate(add_res['items']):
                             self.assertEqual(expected_results[i][0], res_dict["_id"], res_dict)
@@ -429,10 +442,13 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["image_field_1", "text_field_1"] if index_name == self.unstructured_marqo_index_name \
                 else None
             with self.subTest(index_name):
-                r = tensor_search.add_documents(config=self.config,
-                                            add_docs_params=AddDocsParams(index_name=index_name,
-                                                                          docs=test_docs,
-                                                                          tensor_fields=tensor_fields))
+                r = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=test_docs,
+                        tensor_fields=tensor_fields)
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(True, r["errors"])
                 self.assertEqual(4, len(r["items"]))
                 self.assertEqual(200, r["items"][0]["status"])
