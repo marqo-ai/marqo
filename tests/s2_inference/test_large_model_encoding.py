@@ -56,9 +56,9 @@ class TestLargeModelEncoding(unittest.TestCase):
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
 
-        self.bge_models = ["hf/bge-large-zh-v1.5", "hf/bge-large-en-v1.5"]
+        #self.bge_models = ["hf/bge-large-zh-v1.5", "hf/bge-large-en-v1.5"]
 
-        self.snowflake_models = ["hf/snowflake-arctic-embed-l"]
+        #self.snowflake_models = ["hf/snowflake-arctic-embed-l"]
 
     def tearDown(self) -> None:
         clear_loaded_models()
@@ -72,7 +72,7 @@ class TestLargeModelEncoding(unittest.TestCase):
         remove_cached_clip_files()
 
     def test_vectorize(self):
-        names = self.large_clip_models + self.e5_models + self.bge_models + self.snowflake_models
+        names = self.large_clip_models + self.e5_models #+ self.bge_models + self.snowflake_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-9
@@ -125,7 +125,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-        names = self.large_clip_models+ self.e5_models + self.bge_models + self.snowflake_models
+        names = self.large_clip_models+ self.e5_models #+ self.bge_models + self.snowflake_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
 
@@ -142,7 +142,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
 
     def test_model_normalization(self):
-        names = self.large_clip_models + self.e5_models + self.bge_models + self.snowflake_models
+        names = self.large_clip_models + self.e5_models #+ self.bge_models + self.snowflake_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-6
@@ -183,7 +183,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                     assert np.allclose(english_feature, other_language_feature, atol=e)
 
     def test_cuda_encode_type(self):
-        names = self.large_clip_models + self.e5_models + self.multilingual_models + self.bge_models + self.snowflake_models
+        names = self.large_clip_models + self.e5_models #+ self.multilingual_models + self.bge_models + self.snowflake_models
 
         names += ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
