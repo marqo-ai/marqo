@@ -12,13 +12,8 @@ import com.yahoo.search.searchchain.*;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
-import com.yahoo.tensor.Tensor.Cell;
-
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalDouble;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -78,8 +73,8 @@ public class HybridSearcherTestCase {
         assertThat(allQueries.get(1).properties().get("yql")).isEqualTo("tensor yql");
     }
 
-    private static Query getHybridQuery(int k, double alpha, String queryString,
-                                        String retrievalMethod, String rankingMethod) {
+    private static Query getHybridQuery(
+            int k, double alpha, String queryString, String retrievalMethod, String rankingMethod) {
         Query query = new Query("search/?query=" + queryString);
         query.properties().set("marqo__hybrid.retrievalMethod", retrievalMethod);
         query.properties().set("marqo__hybrid.rankingMethod", rankingMethod);
@@ -89,23 +84,27 @@ public class HybridSearcherTestCase {
         query.properties().set("marqo__yql.tensor", "tensor yql");
 
         // Define the tensor type
-        TensorType tensorType = new TensorType.Builder()
-                .mapped("test_tensor")
-                .build();
+        TensorType tensorType = new TensorType.Builder().mapped("test_tensor").build();
 
         // Create the tensor using the map
-        Tensor fields_to_rank_lexical = Tensor.Builder.of(tensorType)
-                .cell(TensorAddress.ofLabels("marqo__lexical_text_field_1"), 1.0)
-                .cell(TensorAddress.ofLabels("marqo__lexical_text_field_2"), 1.0)
-                .build();
+        Tensor fields_to_rank_lexical =
+                Tensor.Builder.of(tensorType)
+                        .cell(TensorAddress.ofLabels("marqo__lexical_text_field_1"), 1.0)
+                        .cell(TensorAddress.ofLabels("marqo__lexical_text_field_2"), 1.0)
+                        .build();
 
-        Tensor fields_to_rank_tensor = Tensor.Builder.of(tensorType)
-                .cell(TensorAddress.ofLabels("marqo__embeddings_text_field_1"), 1.0)
-                .cell(TensorAddress.ofLabels("marqo__embeddings_text_field_2"), 1.0)
-                .build();
+        Tensor fields_to_rank_tensor =
+                Tensor.Builder.of(tensorType)
+                        .cell(TensorAddress.ofLabels("marqo__embeddings_text_field_1"), 1.0)
+                        .cell(TensorAddress.ofLabels("marqo__embeddings_text_field_2"), 1.0)
+                        .build();
 
-        query.getRanking().getFeatures().put("query(marqo__fields_to_rank_lexical)", fields_to_rank_lexical);
-        query.getRanking().getFeatures().put("query(marqo__fields_to_rank_tensor)", fields_to_rank_tensor);
+        query.getRanking()
+                .getFeatures()
+                .put("query(marqo__fields_to_rank_lexical)", fields_to_rank_lexical);
+        query.getRanking()
+                .getFeatures()
+                .put("query(marqo__fields_to_rank_tensor)", fields_to_rank_tensor);
         return query;
     }
 
@@ -197,10 +196,10 @@ public class HybridSearcherTestCase {
         HybridSearcher testSearcher = new HybridSearcher();
 
         String[][] testCases = {
-                {"lexical", "lexical"},
-                {"tensor", "tensor"},
-                {"lexical", "tensor"},
-                {"tensor", "lexical"}
+            {"lexical", "lexical"},
+            {"tensor", "tensor"},
+            {"lexical", "tensor"},
+            {"tensor", "lexical"}
         };
 
         for (String[] testCase : testCases) {
@@ -211,17 +210,36 @@ public class HybridSearcherTestCase {
             Query query = getHybridQuery(60, 0.5, "test", retrievalMethod, rankingMethod);
 
             // Create sub query
-            Query subQuery = testSearcher.createSubQuery(query, retrievalMethod, rankingMethod, true);
+            Query subQuery =
+                    testSearcher.createSubQuery(query, retrievalMethod, rankingMethod, true);
             if (retrievalMethod.equals("lexical") || rankingMethod.equals("lexical")) {
-                assertThat(subQuery.getRanking().getFeatures().getDouble("query(marqo__lexical_text_field_1)").getAsDouble()).isEqualTo(1.0);
-                assertThat(subQuery.getRanking().getFeatures().getDouble("query(marqo__lexical_text_field_2)").getAsDouble()).isEqualTo(1.0);
+                assertThat(
+                                subQuery.getRanking()
+                                        .getFeatures()
+                                        .getDouble("query(marqo__lexical_text_field_1)")
+                                        .getAsDouble())
+                        .isEqualTo(1.0);
+                assertThat(
+                                subQuery.getRanking()
+                                        .getFeatures()
+                                        .getDouble("query(marqo__lexical_text_field_2)")
+                                        .getAsDouble())
+                        .isEqualTo(1.0);
             }
             if (retrievalMethod.equals("tensor") || rankingMethod.equals("tensor")) {
-                assertThat(subQuery.getRanking().getFeatures().getDouble("query(marqo__embeddings_text_field_1)").getAsDouble()).isEqualTo(1.0);
-                assertThat(subQuery.getRanking().getFeatures().getDouble("query(marqo__embeddings_text_field_2)").getAsDouble()).isEqualTo(1.0);
+                assertThat(
+                                subQuery.getRanking()
+                                        .getFeatures()
+                                        .getDouble("query(marqo__embeddings_text_field_1)")
+                                        .getAsDouble())
+                        .isEqualTo(1.0);
+                assertThat(
+                                subQuery.getRanking()
+                                        .getFeatures()
+                                        .getDouble("query(marqo__embeddings_text_field_2)")
+                                        .getAsDouble())
+                        .isEqualTo(1.0);
             }
         }
-
-
     }
 }
