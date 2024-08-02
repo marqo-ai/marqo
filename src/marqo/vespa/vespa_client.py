@@ -693,7 +693,7 @@ class VespaClient:
         except JSONDecodeError as e:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here, so we error out the whole batch
-                raise VespaError(cause=e, message="Unexpected response from Vespa") from e
+                raise VespaError(cause=e, message=f"Unexpected response from Vespa: {resp.text}") from e
 
             try:
                 self._raise_for_status(resp)
@@ -744,7 +744,7 @@ class VespaClient:
         except JSONDecodeError as e:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here, so we error out the whole batch
-                raise VespaError(cause=e, message="Unexpected response from Vespa") from e
+                raise VespaError(cause=e, message=f"Unexpected response from Vespa: {resp.text}") from e
 
             try:
                 self._raise_for_status(resp)
