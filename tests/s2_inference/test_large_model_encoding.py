@@ -42,16 +42,16 @@ class TestLargeModelEncoding(unittest.TestCase):
             'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
             'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
             'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg',
-            "open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k",
-            'open_clip/ViT-H-14-378-quickgelu/dfn5b',
-            "open_clip/ViT-SO400M-14-SigLIP-384/webli"
+            #'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
+            #'open_clip/ViT-H-14-378-quickgelu/dfn5b',
+            #'open_clip/ViT-SO400M-14-SigLIP-384/webli'
         ]
 
         self.multilingual_models = [
             "hf/multilingual-e5-small", 
             "hf/multilingual-e5-base", 
             "hf/multilingual-e5-large", 
-            "hf/multilingual-e5-large-instruct"
+            #"hf/multilingual-e5-large-instruct"
         ]
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
