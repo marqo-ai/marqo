@@ -38,9 +38,9 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, default_search_timeout_ms: int = 1000, pool_size: int = 10,
-                 feed_pool_size: int = 10, get_pool_size: int = 10, delete_pool_size: int = 10,
-                 partial_update_pool_size: int = 10):
+                 content_cluster_name: str, default_search_timeout_ms: int = 1000, 
+                 pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10, 
+                 delete_pool_size: int = 10, partial_update_pool_size: int = 10):
         """
         Create a VespaClient object.
         Args:
