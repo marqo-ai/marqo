@@ -1070,7 +1070,7 @@ def _get_marqo_documents_by_ids(
         config: Config, index_name: str, document_ids, ignore_invalid_ids: bool = False
 ):
     validated_ids = []
-    for i, doc_id in enumerate(document_ids):
+    for doc_id in document_ids:
         try:
             validated_ids.append(validation.validate_id(doc_id))
         except api_exceptions.InvalidDocumentIdError as e:
