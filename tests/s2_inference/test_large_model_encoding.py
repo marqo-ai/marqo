@@ -213,8 +213,7 @@ class TestE5Models(unittest.TestCase):
     def test_cuda_encode_type(self):
         run_test_cuda_encode_type(self.models)
 
-# Skip Test for now
-@pytest.mark.skip(reason="This test is failing")
+#@pytest.mark.skip(reason="This test is failing")
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestBGEModels1(unittest.TestCase):
@@ -244,8 +243,7 @@ class TestBGEModels1(unittest.TestCase):
     def test_cuda_encode_type(self):
         run_test_cuda_encode_type(self.models)
 
-# Skip Test for now
-@pytest.mark.skip(reason="This test is failing")
+#@pytest.mark.skip(reason="This test is failing")
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
 class TestSnowflakeModels(unittest.TestCase):
