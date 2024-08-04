@@ -95,7 +95,7 @@ class IndexManagement:
                     return True
                 except ApplicationRollbackError as e:
                     logger.error(e.message)
-                    application.gen.send(False)
+                    application.gen.send(False)  # tell context manager to skip deployment
                     return False
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:

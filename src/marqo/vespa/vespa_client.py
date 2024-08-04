@@ -105,7 +105,6 @@ class VespaClient:
             session_id = self._create_deploy_session(httpx_client)
             yield session_id, httpx_client
 
-    # TODO test if this works without a dedicated client
     def create_deployment_session(self):
         self.check_for_application_convergence()
         return self._create_deploy_session(self.http_client)
@@ -602,8 +601,8 @@ class VespaClient:
 
         return response.json()['session-id']
 
-    def get_content_url(self, session_id: int, *path: str) -> str:
-        return f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+    def get_content_url(self, session_id: int, *paths: str) -> str:
+        return f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(paths)}'
 
     def list_contents(self, session_id: int, httpx_client: httpx.Client) -> List[str]:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
