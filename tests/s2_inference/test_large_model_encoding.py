@@ -137,6 +137,7 @@ class TestLargeClipModels(unittest.TestCase):
 
     def tearDown(self):
         clear_loaded_models()
+        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -145,7 +146,6 @@ class TestLargeClipModels(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         remove_cached_model_files()
-
 
     def test_vectorize(self):
         # For GPU Memory Optimization, we shouldn't load all models at once
@@ -204,6 +204,7 @@ class TestE5Models(unittest.TestCase):
 
     def tearDown(self):
         clear_loaded_models()
+        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -242,6 +243,7 @@ class TestBGEModels1(unittest.TestCase):
 
     def tearDown(self):
         clear_loaded_models()
+        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -280,6 +282,7 @@ class TestSnowflakeModels(unittest.TestCase):
     
     def tearDown(self):
         clear_loaded_models()
+        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
