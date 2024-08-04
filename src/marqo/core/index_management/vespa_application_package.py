@@ -1,12 +1,11 @@
-import contextlib
 import json
 import os
+import io
 import tarfile
 import tempfile
 import textwrap
-import zipfile
 from abc import ABC, abstractmethod
-from typing import Optional, List, Union, Tuple, io
+from typing import Optional, List, Union, Tuple, Generator
 
 import httpx
 import semver
@@ -16,7 +15,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError
+from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError, IndexExistsError
 from marqo.core.models import MarqoIndex
 import marqo.logging
 from marqo.vespa.exceptions import VespaError
@@ -226,105 +225,10 @@ class MarqoConfigStore:
         return self._config
 
     def update_version(self, version: str) -> None:
-        self._config = MarqoConfig(version=version)
-
-
-class VespaApplicationStore(ABC):
-
-    @abstractmethod
-    def file_exists(self, *paths: str) -> bool:
-        pass
-
-    @abstractmethod
-    def read_text_file(self, *paths: str) -> Optional[str]:
-        pass
-
-    @abstractmethod
-    def read_binary_file(self, *paths: str) -> Optional[bytes]:
-        pass
-
-    @abstractmethod
-    def save_file(self, content: Union[str, bytes], *paths: str) -> None:
-        pass
-
-    @abstractmethod
-    def remove_file(self, *paths: str) -> None:
-        pass
-
-
-class VespaApplicationFileStore(VespaApplicationStore):
-    def __init__(self, app_root_path: str):
-        self._app_root_path = app_root_path
-
-    def _full_path(self, *paths: str) -> str:
-        return os.path.join(self._app_root_path, *paths)
-
-    def file_exists(self, *paths: str) -> bool:
-        return os.path.exists(self._full_path(*paths))
-
-    def read_text_file(self, *paths: str) -> Optional[str]:
-        if not self.file_exists(*paths):
-            return None
-        with open(self._full_path(*paths), 'r') as file:
-            return file.read()
-
-    def read_binary_file(self, *paths: str) -> Optional[bytes]:
-        if not self.file_exists(*paths):
-            return None
-        with open(self._full_path(*paths), 'rb') as file:
-            return file.read()
-
-    def save_file(self, content: Union[str, bytes], *paths: str) -> None:
-        path = self._full_path(*paths)
-        if os.path.exists(path):
-            logger.warn(f"{path} already exists in application package, overwriting")
+        if self._config is None:
+            self._config = MarqoConfig(version=version)
         else:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-
-        mode = 'w' if isinstance(content, str) else 'wb'
-        with open(path, mode) as f:
-            f.write(content)
-
-    def remove_file(self, *paths: str) -> None:
-        path = self._full_path(*paths)
-        if not os.path.exists(path):
-            logger.warn(f"{path} does not exist in application package, nothing to delete")
-        else:
-            os.remove(path)
-
-
-class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
-    def __init__(self, session_id: int, http_client: httpx.Client, vespa_client: VespaClient):
-        self._session_id = session_id
-        self._http_client = http_client
-        self._vespa_client = vespa_client
-        self._all_contents = vespa_client.list_contents(session_id, http_client)
-
-    def file_exists(self, *paths: str) -> bool:
-        content_url = self._vespa_client.get_content_url(self._session_id, *paths)
-        return content_url in self._all_contents
-
-    def read_text_file(self, *paths: str) -> Optional[str]:
-        if not self.file_exists(*paths):
-            return None
-        return self._vespa_client.get_text_content(self._session_id, self._http_client, *paths)
-
-    def read_binary_file(self, *paths: str) -> Optional[bytes]:
-        if not self.file_exists(*paths):
-            return None
-        return self._vespa_client.get_binary_content(self._session_id, self._http_client, *paths)
-
-    def save_file(self, content: Union[str, bytes], *paths: str) -> None:
-        """
-        Saves the given content to the given path in the application package. Please note that the binary content
-        is not supported due to this Vespa bug: https://github.com/vespa-engine/vespa/issues/32016
-        """
-        if isinstance(content, bytes):
-            raise VespaError("Uploading binary content to Vespa deployment session is not supported")
-        self._vespa_client.put_content(self._session_id, self._http_client, content, *paths)
-
-    def remove_file(self, *paths: str) -> None:
-        self._vespa_client.delete_content(self._session_id, self._http_client, *paths)
+            self._config = self._config.copy(update={'version': version})
 
 
 class VespaAppBackup:
@@ -341,17 +245,22 @@ class VespaAppBackup:
                 self._files_to_remove = json.load(open(self._removal_mark_file))
                 os.remove(self._removal_mark_file)
 
-    @contextlib.contextmanager
-    def files_to_rollback(self):
+    def read_text_file(self, *paths: str) -> Optional[str]:
+        path = os.path.join(self._dir, *paths)
+        if not os.path.isfile(path):
+            return None
+        with open(path, 'r') as f:
+            return f.read()
+
+    def files_to_rollback(self) -> Generator[Tuple[Tuple[str, ...], bytes], None, None]:
         for root, dirs, files in os.walk(self._dir):
             for file in files:
                 file_path = os.path.join(root, file)
                 relpath = os.path.relpath(file_path, self._dir)
-                with open(file_path, "r") as f:
-                    yield relpath, f.read()
+                with open(file_path, "rb") as f:
+                    yield os.path.split(relpath), f.read()
 
-    @contextlib.contextmanager
-    def files_to_remove(self):
+    def files_to_remove(self) -> Generator[Tuple[str, ...], None, None]:
         for paths in self._files_to_remove:
             yield paths
 
@@ -388,6 +297,119 @@ class VespaAppBackup:
                 tar.extract(member, path=self._dir)
 
 
+class VespaApplicationStore(ABC):
+
+    @abstractmethod
+    def file_exists(self, *paths: str) -> bool:
+        pass
+
+    @abstractmethod
+    def read_text_file(self, *paths: str) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    def read_binary_file(self, *paths: str) -> Optional[bytes]:
+        pass
+
+    @abstractmethod
+    def save_file(self, content: Union[str, bytes], *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        pass
+
+    @abstractmethod
+    def remove_file(self, *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        pass
+
+
+class VespaApplicationFileStore(VespaApplicationStore):
+    def __init__(self, app_root_path: str):
+        self._app_root_path = app_root_path
+
+    def _full_path(self, *paths: str) -> str:
+        return os.path.join(self._app_root_path, *paths)
+
+    def file_exists(self, *paths: str) -> bool:
+        return os.path.exists(self._full_path(*paths))
+
+    def read_text_file(self, *paths: str) -> Optional[str]:
+        if not self.file_exists(*paths):
+            return None
+        with open(self._full_path(*paths), 'r') as file:
+            return file.read()
+
+    def read_binary_file(self, *paths: str) -> Optional[bytes]:
+        if not self.file_exists(*paths):
+            return None
+        with open(self._full_path(*paths), 'rb') as file:
+            return file.read()
+
+    def save_file(self, content: Union[str, bytes], *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        path = self._full_path(*paths)
+        if os.path.exists(path):
+            logger.warn(f"{path} already exists in application package, overwriting")
+            if backup is not None:
+                backup.backup_file(self.read_binary_file(*paths), *paths)
+        else:  # add file
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            if backup is not None:
+                backup.mark_for_removal(*paths)
+
+        mode = 'w' if isinstance(content, str) else 'wb'
+        with open(path, mode) as f:
+            f.write(content)
+
+    def remove_file(self, *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        path = self._full_path(*paths)
+        if not os.path.exists(path):
+            logger.warn(f"{path} does not exist in application package, nothing to delete")
+        else:
+            if backup is not None:
+                backup.backup_file(self.read_binary_file(*paths), *paths)
+            os.remove(path)
+
+
+class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
+    def __init__(self, session_id: int, http_client: httpx.Client, vespa_client: VespaClient):
+        self._session_id = session_id
+        self._http_client = http_client
+        self._vespa_client = vespa_client
+        self._all_contents = vespa_client.list_contents(session_id, http_client)
+
+    def file_exists(self, *paths: str) -> bool:
+        content_url = self._vespa_client.get_content_url(self._session_id, *paths)
+        return content_url in self._all_contents
+
+    def read_text_file(self, *paths: str) -> Optional[str]:
+        if not self.file_exists(*paths):
+            return None
+        return self._vespa_client.get_text_content(self._session_id, self._http_client, *paths)
+
+    def read_binary_file(self, *paths: str) -> Optional[bytes]:
+        if not self.file_exists(*paths):
+            return None
+        return self._vespa_client.get_binary_content(self._session_id, self._http_client, *paths)
+
+    def save_file(self, content: Union[str, bytes], *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        """
+        Saves the given content to the given path in the application package. Please note that the binary content
+        is not supported due to this Vespa bug: https://github.com/vespa-engine/vespa/issues/32016
+        """
+        if isinstance(content, bytes):
+            raise VespaError("Uploading binary content to Vespa deployment session is currently not supported")
+        if backup is not None:
+            if not self.file_exists(*paths):
+                backup.backup_file(self.read_binary_file(*paths), *paths)
+            else:
+                backup.mark_for_removal(*paths)
+
+        self._vespa_client.put_content(self._session_id, self._http_client, content, *paths)
+
+    def remove_file(self, *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        if self.file_exists(*paths):
+            if backup is not None:
+                backup.backup_file(self.read_binary_file(*paths), *paths)
+            self._vespa_client.delete_content(self._session_id, self._http_client, *paths)
+
+
 class VespaApplicationPackage:
     """
     Represents a Vespa application package. This class provides useful methods to manage contents in the application
@@ -421,16 +443,8 @@ class VespaApplicationPackage:
         self._service_xml = ServiceXml(self._store.read_text_file(self._SERVICES_XML_FILE))
         self._marqo_config_store = MarqoConfigStore(self._store.read_text_file(self._MARQO_CONFIG_FILE))
         self._index_setting_store = IndexSettingStore(
-            self._store.read_text_file(self._MARQO_INDEX_SETTINGS_FILE, default_value='{}'),
-            self._store.read_text_file(self._MARQO_INDEX_SETTINGS_HISTORY_FILE, default_value='{}'))
-
-    def save_to_store(self) -> None:
-        self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
-        self._store.save_file(self._marqo_config_store.get().json(), self._MARQO_CONFIG_FILE)
-
-        index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
-        self._store.save_file(index_setting_json, self._MARQO_INDEX_SETTINGS_FILE)
-        self._store.save_file(index_setting_history_json, self._MARQO_INDEX_SETTINGS_HISTORY_FILE)
+            self._store.read_text_file(self._MARQO_INDEX_SETTINGS_FILE) or '{}',
+            self._store.read_text_file(self._MARQO_INDEX_SETTINGS_HISTORY_FILE) or '{}')
 
     def get_marqo_config(self) -> MarqoConfig:
         return self._marqo_config_store.get()
@@ -459,70 +473,58 @@ class VespaApplicationPackage:
 
     def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
         # Migrate existing index settings from previous versions of Marqo
-        if not self.is_configured and existing_index_settings:
+        if not self.is_configured:
             for index in existing_index_settings:
                 self._index_setting_store.save_index_setting(index)
+            self._persist_index_settings()
 
-        self._backup()
-        self._add_default_query_profile()
-        self._copy_components_jar()
+        backup = VespaAppBackup()
+        self._config_query_profiles(backup)
+        self._copy_components_jar()  # we do not back jar file
         self._service_xml.config_components()
         self._marqo_config_store.update_version(marqo_version)
 
-    def _backup(self) -> None:
-        backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
-        files_to_backup = [(self._SERVICES_XML_FILE),
-                           (self._MARQO_CONFIG_FILE),
-                           ('search', 'query-profiles', 'default.xml')]
-        # TODO derive this based on the file added in the bootstrap phase
-        files_to_remove = []
-        for file in files_to_backup:
-            backup.backup_file(self._store.read_text_file(*file), *file)
-
-        for file in files_to_remove:
-            backup.mark_for_removal(*file)
-
+        self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE, backup=backup)
+        self._store.save_file(self._marqo_config_store.get().json(), self._MARQO_CONFIG_FILE, backup=backup)
         self._store.save_file(backup.to_zip_stream().read(), self._BACKUP_FILE)
 
-    def rollback(self, marqo_version: str) -> None:
+    def _persist_index_settings(self):
+        index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
+        self._store.save_file(index_setting_json, self._MARQO_INDEX_SETTINGS_FILE)
+        self._store.save_file(index_setting_history_json, self._MARQO_INDEX_SETTINGS_HISTORY_FILE)
+
+    def rollback(self, marqo_version: str) -> bool:
         if not self._store.file_exists(self._BACKUP_FILE):
             logger.error(f"{self._BACKUP_FILE} does not exist in current session, failed to rollback")
-            return
+            return False
 
-        to_version = MarqoConfigStore(self._store.read_text_file(self._BACKUP_FILE, self._MARQO_CONFIG_FILE)).get().version
-        if to_version != marqo_version:
-            logger.warn(f"Cannot rollback to {to_version}, current Marqo version is {marqo_version}")
-            return
+        old_backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
 
-        backupOfBackup = VespaAppBackup()
-        backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
-        with backup.files_to_remove as paths:
-            if self._store.file_exists(*paths):
-                # TODO Check the file type and then call the appropriate method
-                backupOfBackup.backup_file(self._store.read_text_file(*paths), *paths)
-                self._store.remove_file(*paths)
+        marqo_config_json = old_backup.read_text_file(self._MARQO_CONFIG_FILE)
+        rollback_version = MarqoConfigStore(marqo_config_json).get().version
+        if rollback_version != marqo_version:
+            logger.warn(f"Cannot rollback to {rollback_version}, current Marqo version is {marqo_version}")
+            return False
 
-        with backup.files_to_rollback as (path, file_content):
-            # TODO Add logic to check the contents of each file to make sure they are valid
-            if not self._store.file_exists(*path):
-                # this file will be added, so we need to mark it for removal in backup
-                backupOfBackup.mark_for_removal(*path)
-            else:
-                backupOfBackup.backup_file(self._store.read_text_file(*paths), *paths)
-            self._store.save_file(file_content, path)
+        new_backup = VespaAppBackup()
+        for paths in old_backup.files_to_remove():
+            self._store.remove_file(*paths, backup=new_backup)
 
-        self._store.save_file(backupOfBackup.to_zip_stream().read(), self._BACKUP_FILE)
+        for (paths, file_content) in old_backup.files_to_rollback():
+            self._store.save_file(file_content, *paths, backup=new_backup)
 
-    def _add_default_query_profile(self) -> None:
+        self._store.save_file(new_backup.to_zip_stream().read(), self._BACKUP_FILE)
+
+    def _config_query_profiles(self, backup: VespaAppBackup) -> None:
         content = textwrap.dedent(
             '''
             <query-profile id="default">
-                <field name="maxHits">1000</field>
-                <field name="maxOffset">10000</field>
+                <field name="maxHits">1000000</field>
+                <field name="maxOffset">1000000</field>
             </query-profile>
             '''
         )
-        self._store.save_file(content, 'search/query-profiles', 'default.xml')
+        self._store.save_file(content, 'search', 'query-profiles', 'default.xml', backup=backup)
 
     def _copy_components_jar(self) -> None:
         vespa_jar_folder = Path(__file__).parent / '../../../../vespa/target'
@@ -533,20 +535,33 @@ class VespaApplicationPackage:
             with open(vespa_jar_folder/file, 'rb') as f:
                 self._store.save_file(f.read(), 'components', file)
 
-    def add_index_setting_and_schema(self, index_setting: MarqoIndex, schema: str) -> None:
-        self._index_setting_store.save_index_setting(index_setting)
-        self._store.save_file(schema, 'schemas', f'{index_setting.schema_name}.sd')
-        self._service_xml.add_schema(index_setting.schema_name)
+    def batch_add_index_setting_and_schema(self, indexes: List[Tuple[str, MarqoIndex]]) -> None:
+        for schema, index in indexes:
+            if self.has_index(index.name):
+                raise IndexExistsError(f"Index {index.name} already exists")
+
+            self._index_setting_store.save_index_setting(index)
+            self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
+            self._service_xml.add_schema(index.schema_name)
+
+        self._persist_index_settings()
+        self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
 
     def delete_index_setting_and_schema(self, index_name: str) -> None:
-        index = self._index_setting_store.get_index(index_name)
-        if index is None:
-            raise IndexNotFoundError(f"Index {index_name} not found")
+        self.batch_delete_index_setting_and_schema([index_name])
 
-        self._index_setting_store.delete_index_setting(index.name)
-        self._store.remove_file('schemas', f'{index.schema_name}.sd')
-        self._service_xml.remove_schema(index.schema_name)
+    def batch_delete_index_setting_and_schema(self, index_names: List[str]) -> None:
+        for name in index_names:
+            index = self._index_setting_store.get_index(name)
+            if index is None:
+                raise IndexNotFoundError(f"Index {name} not found")
+            self._index_setting_store.delete_index_setting(index.name)
+            self._store.remove_file('schemas', f'{index.schema_name}.sd')
+            self._service_xml.remove_schema(index.schema_name)
+
         self._add_schema_removal_override()
+        self._persist_index_settings()
+        self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
 
     def has_schema(self, name: str) -> bool:
         return self._store.file_exists('schemas', f'{name}.sd')
