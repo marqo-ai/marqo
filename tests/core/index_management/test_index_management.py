@@ -106,8 +106,7 @@ class TestIndexManagement(MarqoTestCase):
     def test_bootstrap_overrides_component_jars_and_configs(self):
         pass
 
-    def test_bootstrap_support_rollback(self):
-        # TODO this feature is not implemented yet
+    def test_rollback(self):
         pass
 
     def test_distributed_lock(self):
@@ -261,11 +260,8 @@ class TestIndexManagement(MarqoTestCase):
                 store2 = ApplicationPackageDeploymentSessionStore(session2, client2, self.vespa_client)
                 app2 = VespaApplicationPackage(store2)
 
-                app1.add_index_setting_and_schema(index1, schema1)
-                app1.save_to_store()
-
-                app2.add_index_setting_and_schema(index2, schema2)
-                app2.save_to_store()
+                app1.batch_add_index_setting_and_schema([(schema1, index1)])
+                app2.batch_add_index_setting_and_schema([(schema2, index2)])
 
                 self.vespa_client.prepare(session1, client1)
                 self.vespa_client.activate(session1, client1)
@@ -274,9 +270,6 @@ class TestIndexManagement(MarqoTestCase):
                 # this should fail due to optimistic locking
                 with self.assertRaises(VespaActivationConflictError):
                     self.vespa_client.activate(session2, client2)
-
-    def test_os_path(self):
-        print(os.path.join('.'))
 
     def _assert_index_is_present(self, app, expected_index, expected_schema):
         if 'version' not in expected_index:
