@@ -5,7 +5,7 @@ import tarfile
 import tempfile
 import textwrap
 from abc import ABC, abstractmethod
-from typing import Optional, List, Union, Tuple, Generator
+from typing import Optional, List, Union, Tuple, Generator, Dict
 
 import httpx
 import semver
@@ -15,7 +15,8 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError, IndexExistsError
+from marqo.core.exceptions import InternalError, OperationConflictError, IndexNotFoundError, IndexExistsError, \
+    ApplicationRollbackError
 from marqo.core.models import MarqoIndex
 import marqo.logging
 from marqo.vespa.exceptions import VespaError
@@ -29,6 +30,8 @@ class ServiceXml:
     """
     Represents a Vespa service XML file.
     """
+    _CUSTOM_COMPONENT_BUNDLE_NAME = "marqo-custom-searchers"
+
     def __init__(self, xml_str: str):
         self._root = ET.fromstring(xml_str)
         self._documents = self._ensure_only_one('content/documents')
@@ -109,12 +112,25 @@ class ServiceXml:
         ET.SubElement(config_element, 'indexSettingsFile').text = 'marqo_index_settings.json'
         ET.SubElement(config_element, 'indexSettingsHistoryFile').text = 'marqo_index_settings_history.json'
 
-    @staticmethod
-    def _add_component(parent: ET.Element, tag: str, name: str, bundle: str = 'marqo-custom-components'):
+    def _add_component(self, parent: ET.Element, tag: str, name: str):
         element = ET.SubElement(parent, tag)
         element.set('id', name)
-        element.set('bundle', bundle)
+        element.set('bundle', self._CUSTOM_COMPONENT_BUNDLE_NAME)
         return element
+
+    def compare_element(self, other: 'ServiceXml', xml_path: str) -> bool:
+        def normalize(elem: ET.Element):
+            # Sort attributes and child elements to normalize
+            normalized = ET.Element(elem.tag, dict(sorted(elem.attrib.items())))
+            children = [normalize(child) for child in elem.findall('*')]
+            for child in sorted(children, key=lambda x: (x.tag, x.attrib)):
+                normalized.append(child)
+            return normalized
+
+        elements_self = sorted([ET.tostring(normalize(elem), encoding='unicode') for elem in self._root.findall(xml_path)])
+        elements_other = sorted([ET.tostring(normalize(elem), encoding='unicode') for elem in other._root.findall(xml_path)])
+
+        return len(elements_self) == len(elements_other) and all(x == y for x, y in zip(elements_self, elements_other))
 
 
 class IndexSettingStore:
@@ -150,9 +166,12 @@ class IndexSettingStore:
     _HISTORY_VERSION_LIMIT = 3
 
     def __init__(self, index_settings_json: str, index_settings_history_json: str):
-        self._index_settings = {key: MarqoIndex.parse_obj(value) for key, value in json.loads(index_settings_json).items()}
-        self._index_settings_history = {key: [MarqoIndex.parse_obj(value) for value in history_array]
-                                        for key, history_array in json.loads(index_settings_history_json).items()}
+        self._index_settings: Dict[str, MarqoIndex] = \
+            {key: MarqoIndex.parse_obj(value) for key, value in json.loads(index_settings_json).items()}
+
+        self._index_settings_history: Dict[str, List[MarqoIndex]] = \
+            {key: [MarqoIndex.parse_obj(value) for value in history_array]
+             for key, history_array in json.loads(index_settings_history_json).items()}
 
     def to_json(self) -> (str, str):
         # Pydantic 1.x does not support creating jsonable dict. `json.loads(index.json())` is a workaround
@@ -488,52 +507,27 @@ class VespaApplicationPackage:
         self._store.save_file(self._marqo_config_store.get().json(), self._MARQO_CONFIG_FILE, backup=backup)
         self._store.save_file(backup.to_zip_stream().read(), self._BACKUP_FILE)
 
-    def _persist_index_settings(self):
-        index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
-        self._store.save_file(index_setting_json, self._MARQO_INDEX_SETTINGS_FILE)
-        self._store.save_file(index_setting_history_json, self._MARQO_INDEX_SETTINGS_HISTORY_FILE)
-
-    def rollback(self, marqo_version: str) -> bool:
+    def rollback(self, marqo_version: str) -> None:
         if not self._store.file_exists(self._BACKUP_FILE):
-            logger.error(f"{self._BACKUP_FILE} does not exist in current session, failed to rollback")
-            return False
+            raise ApplicationRollbackError(f"{self._BACKUP_FILE} does not exist in current session, failed to rollback")
 
         old_backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
 
         marqo_config_json = old_backup.read_text_file(self._MARQO_CONFIG_FILE)
         rollback_version = MarqoConfigStore(marqo_config_json).get().version
         if rollback_version != marqo_version:
-            logger.warn(f"Cannot rollback to {rollback_version}, current Marqo version is {marqo_version}")
-            return False
+            raise ApplicationRollbackError(f"Cannot rollback to {rollback_version}, current Marqo version is {marqo_version}")
 
         new_backup = VespaAppBackup()
         for paths in old_backup.files_to_remove():
             self._store.remove_file(*paths, backup=new_backup)
 
         for (paths, file_content) in old_backup.files_to_rollback():
+            if paths[-1] == self._SERVICES_XML_FILE:
+                self._validate_services_xml_for_rollback(file_content.decode('utf-8'))
             self._store.save_file(file_content, *paths, backup=new_backup)
 
         self._store.save_file(new_backup.to_zip_stream().read(), self._BACKUP_FILE)
-
-    def _config_query_profiles(self, backup: VespaAppBackup) -> None:
-        content = textwrap.dedent(
-            '''
-            <query-profile id="default">
-                <field name="maxHits">1000000</field>
-                <field name="maxOffset">1000000</field>
-            </query-profile>
-            '''
-        )
-        self._store.save_file(content, 'search', 'query-profiles', 'default.xml', backup=backup)
-
-    def _copy_components_jar(self) -> None:
-        vespa_jar_folder = Path(__file__).parent / '../../../../vespa/target'
-        components_jar_files = ['marqo-custom-components-deploy.jar']
-
-        # copy the components jar files to the empty folder
-        for file in components_jar_files:
-            with open(vespa_jar_folder/file, 'rb') as f:
-                self._store.save_file(f.read(), 'components', file)
 
     def batch_add_index_setting_and_schema(self, indexes: List[Tuple[str, MarqoIndex]]) -> None:
         for schema, index in indexes:
@@ -546,9 +540,6 @@ class VespaApplicationPackage:
 
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
-
-    def delete_index_setting_and_schema(self, index_name: str) -> None:
-        self.batch_delete_index_setting_and_schema([index_name])
 
     def batch_delete_index_setting_and_schema(self, index_names: List[str]) -> None:
         for name in index_names:
@@ -569,6 +560,29 @@ class VespaApplicationPackage:
     def has_index(self, name: str) -> bool:
         return self._index_setting_store.get_index(name) is not None
 
+    def _persist_index_settings(self):
+        index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
+        self._store.save_file(index_setting_json, self._MARQO_INDEX_SETTINGS_FILE)
+        self._store.save_file(index_setting_history_json, self._MARQO_INDEX_SETTINGS_HISTORY_FILE)
+
+    def _config_query_profiles(self, backup: VespaAppBackup) -> None:
+        content = textwrap.dedent(
+            '''
+            <query-profile id="default">
+                <field name="maxHits">1000000</field>
+                <field name="maxOffset">1000000</field>
+            </query-profile>
+            '''
+        )
+        self._store.save_file(content, 'search', 'query-profiles', 'default.xml', backup=backup)
+
+    def _copy_components_jar(self) -> None:
+        vespa_jar_folder = Path(__file__).parent / '../../../../vespa/target'
+        components_jar_file = 'marqo-custom-searchers-deploy.jar'
+
+        with open(vespa_jar_folder/components_jar_file, 'rb') as f:
+            self._store.save_file(f.read(), 'components', components_jar_file)
+
     def _add_schema_removal_override(self) -> None:
         content = textwrap.dedent(
             f'''
@@ -578,3 +592,10 @@ class VespaApplicationPackage:
             '''
         ).strip()
         self._store.save_file(content, 'validation-overrides.xml')
+
+    def _validate_services_xml_for_rollback(self, services_xml_backup: str) -> None:
+        services_xml_old = ServiceXml(services_xml_backup)
+        if not self._service_xml.compare_element(services_xml_old, 'content/documents'):
+            raise ApplicationRollbackError('Indexes have been added or removed since last backup. Aborting rollback.')
+        if not self._service_xml.compare_element(services_xml_old, '*/nodes'):
+            raise ApplicationRollbackError('Nodes have been added or removed since last backup. Aborting rollback.')

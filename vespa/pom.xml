@@ -6,8 +6,7 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ai.marqo</groupId>
-    <!-- FIXME might be safer to keep the name as is-->
-    <artifactId>marqo-custom-components</artifactId>  <!-- Note: When changing this, also change bundle names in services.xml -->
+    <artifactId>marqo-custom-searchers</artifactId>  <!-- Note: When changing this, also change bundle names in services.xml -->
     <version>1.0.0</version>
     <packaging>container-plugin</packaging>
 
