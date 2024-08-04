@@ -273,8 +273,7 @@ public class HybridSearcher extends Searcher {
      * @param query
      * @param verbose
      */
-    void addFieldToRankFeatures(
-            Cell cell, Query query, String retrievalMethod, String rankingMethod, boolean verbose) {
+    void addFieldToRankFeatures(Cell cell, Query query, boolean verbose) {
         TensorAddress cellKey = cell.getKey();
         String queryInputString;
         int dimensions = cellKey.size();
@@ -329,16 +328,29 @@ public class HybridSearcher extends Searcher {
         Query queryNew = query.clone();
         queryNew.properties().set("yql", yqlNew);
 
-        // Set fields to rank (extract using RANKING method)
+        // Set fields to rank
+        // Extract using RETRIEVAL method (first-phase)
         String featureNameFieldsToRank =
-                addQueryWrapper(QUERY_INPUT_FIELDS_TO_RANK + "_" + rankingMethod);
-        logIfVerbose("Using fields to rank from " + featureNameFieldsToRank, verbose);
+                addQueryWrapper(QUERY_INPUT_FIELDS_TO_RANK + "_" + retrievalMethod);
+        logIfVerbose(
+                "Extracting using fields to rank from RETRIEVAL method: " + featureNameFieldsToRank,
+                verbose);
         Tensor fieldsToRank = extractTensorRankFeature(query, featureNameFieldsToRank);
         Iterator<Cell> cells = fieldsToRank.cellIterator();
-        cells.forEachRemaining(
-                (cell) ->
-                        addFieldToRankFeatures(
-                                cell, queryNew, retrievalMethod, rankingMethod, verbose));
+        cells.forEachRemaining((cell) -> addFieldToRankFeatures(cell, queryNew, verbose));
+
+        // Extract using RANKING method (second-phase)
+        if (!(retrievalMethod.equals(rankingMethod))) {
+            featureNameFieldsToRank =
+                    addQueryWrapper(QUERY_INPUT_FIELDS_TO_RANK + "_" + rankingMethod);
+            logIfVerbose(
+                    "Extracting using fields to rank from RANKING method: "
+                            + featureNameFieldsToRank,
+                    verbose);
+            fieldsToRank = extractTensorRankFeature(query, featureNameFieldsToRank);
+            cells = fieldsToRank.cellIterator();
+            cells.forEachRemaining((cell) -> addFieldToRankFeatures(cell, queryNew, verbose));
+        }
 
         // Set rank profile (using RANKING method)
         queryNew.getRanking().setProfile(rankProfileNew);

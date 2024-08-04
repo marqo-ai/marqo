@@ -347,6 +347,7 @@ class UnstructuredVespaIndex(VespaIndex):
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
+            'ranking.rerankCount': marqo_query.limit,  # limits the number of results going to phase 2
 
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
@@ -365,10 +366,6 @@ class UnstructuredVespaIndex(VespaIndex):
 
             'marqo__hybrid.retrievalMethod': marqo_query.hybrid_parameters.retrievalMethod,
             'marqo__hybrid.rankingMethod': marqo_query.hybrid_parameters.rankingMethod,
-            'marqo__hybrid.tensorScoreModifiersPresent': True if hybrid_score_modifiers[
-                constants.MARQO_SEARCH_METHOD_TENSOR] else False,
-            'marqo__hybrid.lexicalScoreModifiersPresent': True if hybrid_score_modifiers[
-                constants.MARQO_SEARCH_METHOD_LEXICAL] else False,
             'marqo__hybrid.verbose': marqo_query.hybrid_parameters.verbose
         }
         query = {k: v for k, v in query.items() if v is not None}

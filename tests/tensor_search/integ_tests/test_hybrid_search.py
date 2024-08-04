@@ -223,8 +223,6 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.", vespa_query_kwargs["yql"])
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.retrievalMethod"], RetrievalMethod.Disjunction)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
-                self.assertEqual(vespa_query_kwargs["marqo__hybrid.tensorScoreModifiersPresent"], True)
-                self.assertEqual(vespa_query_kwargs["marqo__hybrid.lexicalScoreModifiersPresent"], True)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.6)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 61)
 
@@ -834,6 +832,72 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -10 * 3)
 
 
+    def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):
+        """
+        Tests that if we do hybrid search with lexical retrieval and tensor ranking, we can use both lexical and tensor
+        score modifiers.
+
+        The lexical score modifiers should affect the actual result set, while the tensor score modifiers should
+        affect the order and score.
+        """
+
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+            with self.subTest(index=type(index)):
+                # Add documents
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc4", "text_field_1": "HELLO WORLD",
+                             "mult_field_1": 0.5, "add_field_1": 20},                               # OUT (negative)
+                            {"_id": "doc5", "text_field_1": "HELLO WORLD", "mult_field_1": 1.0},    # OUT (negative)
+                            {"_id": "doc6", "text_field_1": "HELLO WORLD"},                         # Top result
+                            {"_id": "doc7", "text_field_1": "HELLO WORLD", "add_field_1": 1.0},     # Top result
+                            {"_id": "doc8", "text_field_1": "HELLO WORLD", "mult_field_1": 2.0},    # OUT (negative)
+                            {"_id": "doc9", "text_field_1": "HELLO WORLD", "mult_field_1": 3.0},    # OUT (negative)
+                            {"_id": "doc10", "text_field_1": "HELLO WORLD", "mult_field_2": 3.0},   # Top result
+                        ],
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) \
+                        else None
+                    )
+                )
+
+                hybrid_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="HELLO WORLD",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor,
+                        scoreModifiersLexical={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": -10},  # Will bring down doc8 and doc9. Keep doc6, doc7, doc10
+                            ]
+                        },
+                        scoreModifiersTensor={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 10},
+                                {"field_name": "mult_field_2", "weight": -10}
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        },
+                        verbose=True
+                    ),
+                    result_count=3
+                )
+                self.assertIn("hits", hybrid_res)
+                self.assertEqual(hybrid_res["hits"][0]["_id"], "doc7")      # (score + 5*1)
+                self.assertEqual(hybrid_res["hits"][0]["_score"], 6.0)
+                self.assertEqual(hybrid_res["hits"][1]["_id"], "doc6")      # (score)
+                self.assertEqual(hybrid_res["hits"][1]["_score"], 1.0)
+                self.assertEqual(hybrid_res["hits"][2]["_id"], "doc10")     # (score*-10*3)
+                self.assertEqual(hybrid_res["hits"][2]["_score"], -30.0)
+
+
     def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):
         """
         Tests that hybrid search with:
@@ -1325,6 +1389,15 @@ class TestHybridSearch(MarqoTestCase):
                      ]
                  },
              }, "can only be defined for 'lexical',"),
+            ({      # tensor/lexical can only have lexical score modifiers
+                 "retrievalMethod": "tensor",
+                 "rankingMethod": "lexical",
+                 "scoreModifiersTensor": {
+                     "multiply_score_by": [
+                         {"field_name": "mult_field_1", "weight": 1.0}
+                     ]
+                 },
+             }, "can only be defined for 'tensor',"),
             ({
                  "retrievalMethod": "lexical",
                  "rankingMethod": "lexical",
