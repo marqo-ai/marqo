@@ -7,7 +7,7 @@ import marqo.vespa.vespa_client
 from marqo import version
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
+from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, ApplicationRollbackError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig, \
@@ -90,9 +90,13 @@ class IndexManagement:
         with self._vespa_deployment_lock():
             application = self._vespa_application()
             with application as app:
-                app_changed = app.rollback(version.get_version())
-                application.gen.send(app_changed)
-                return app_changed
+                try:
+                    app.rollback(version.get_version())
+                    return True
+                except ApplicationRollbackError as e:
+                    logger.error(e.message)
+                    application.gen.send(False)
+                    return False
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """

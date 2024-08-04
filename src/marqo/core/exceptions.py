@@ -16,6 +16,10 @@ class ApplicationNotInitializedError(MarqoError):
     pass
 
 
+class ApplicationRollbackError(MarqoError):
+    pass
+
+
 class IndexExistsError(MarqoError):
     pass
 
