@@ -318,7 +318,7 @@ class TestMultilingualE5Models(unittest.TestCase):
         ]
         e = 1
         with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
-            for model_name in self.multilingual_models:
+            for model_name in self.models:
                 english_feature = np.array(
                     vectorise(model_name=model_name, content=english_text, normalize_embeddings=True, device=device))
                 for other_language_text in other_language_texts:
