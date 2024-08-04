@@ -56,6 +56,7 @@ def run_test_vectorize(models):
                     assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
                 clear_loaded_models()
+                torch.cuda.empty_cache()
                 # delete the model to free up memory,
                 # it is hacked loading from _load_model, so we need to delete it manually
                 del model
@@ -78,6 +79,7 @@ def run_test_model_outputs(models):
 
         del model
         clear_loaded_models()
+        torch.cuda.empty_cache()
 
 def run_test_model_normalization(models):
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -99,6 +101,7 @@ def run_test_model_normalization(models):
 
         del model
         clear_loaded_models()
+        torch.cuda.empty_cache()
 
 def run_test_cuda_encode_type(models):
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -114,6 +117,7 @@ def run_test_cuda_encode_type(models):
 
         del model
         clear_loaded_models()
+        torch.cuda.empty_cache()
 
 
 @pytest.mark.largemodel
@@ -144,8 +148,10 @@ class TestLargeClipModels(unittest.TestCase):
 
 
     def test_vectorize(self):
-        run_test_vectorize(self.models)
-
+        # For GPU Memory Optimization, we shouldn't load all models at once
+        for model_name in self.models:
+            run_test_vectorize(models=[model_name])
+        
     def test_load_clip_text_model(self):
         device = "cuda"
         eps = 1e-9
@@ -163,13 +169,19 @@ class TestLargeClipModels(unittest.TestCase):
             clear_loaded_models()
 
     def test_model_outputs(self):
-        run_test_model_outputs(self.models)
+        for model_name in self.models:
+            run_test_model_outputs([model_name])
+        #run_test_model_outputs(self.models)
 
     def test_model_normalization(self):
-        run_test_model_normalization(self.models)
+        for model_name in self.models:
+            run_test_model_normalization([model_name])
+        #run_test_model_normalization(self.models)
 
     def test_cuda_encode_type(self):
-        run_test_cuda_encode_type(self.models)
+        for model_name in self.models:
+            run_test_cuda_encode_type([model_name])
+        #run_test_cuda_encode_type(self.models)
 
     @patch("torch.cuda.amp.autocast")
     def test_autocast_called_in_open_clip(self, mock_autocast):
@@ -202,16 +214,24 @@ class TestE5Models(unittest.TestCase):
         remove_cached_model_files()
 
     def test_vectorize(self):
-        run_test_vectorize(self.models)
+        # For GPU Memory Optimization, we shouldn't load all models at once
+        for model_name in self.models:
+            run_test_vectorize(models=[model_name])
 
     def test_model_outputs(self):
-        run_test_model_outputs(self.models)
+        for model_name in self.models:
+            run_test_model_outputs([model_name])
+        #run_test_model_outputs(self.models)
 
     def test_model_normalization(self):
-        run_test_model_normalization(self.models)
+        for model_name in self.models:
+            run_test_model_normalization([model_name])
+        #run_test_model_normalization(self.models)
 
     def test_cuda_encode_type(self):
-        run_test_cuda_encode_type(self.models)
+        for model_name in self.models:
+            run_test_cuda_encode_type([model_name])
+        #run_test_cuda_encode_type(self.models)
 
 #@pytest.mark.skip(reason="This test is failing")
 @pytest.mark.largemodel
@@ -232,16 +252,24 @@ class TestBGEModels1(unittest.TestCase):
         remove_cached_model_files()
 
     def test_vectorize(self):
-        run_test_vectorize(self.models)
+        # For GPU Memory Optimization, we shouldn't load all models at once
+        for model_name in self.models:
+            run_test_vectorize(models=[model_name])
 
     def test_model_outputs(self):
-        run_test_model_outputs(self.models)
+        for model_name in self.models:
+            run_test_model_outputs([model_name])
+        #run_test_model_outputs(self.models)
 
     def test_model_normalization(self):
-        run_test_model_normalization(self.models)
+        for model_name in self.models:
+            run_test_model_normalization([model_name])
+        #run_test_model_normalization(self.models)
 
     def test_cuda_encode_type(self):
-        run_test_cuda_encode_type(self.models)
+        for model_name in self.models:
+            run_test_cuda_encode_type([model_name])
+        #run_test_cuda_encode_type(self.models)
 
 #@pytest.mark.skip(reason="This test is failing")
 @pytest.mark.largemodel
@@ -262,16 +290,24 @@ class TestSnowflakeModels(unittest.TestCase):
         remove_cached_model_files()
 
     def test_vectorize(self):
-        run_test_vectorize(self.models)
+        # For GPU Memory Optimization, we shouldn't load all models at once
+        for model_name in self.models:
+            run_test_vectorize(models=[model_name])
 
     def test_model_outputs(self):
-        run_test_model_outputs(self.models)
+        for model_name in self.models:
+            run_test_model_outputs([model_name])
+        #run_test_model_outputs(self.models)
 
     def test_model_normalization(self):
-        run_test_model_normalization(self.models)
+        for model_name in self.models:
+            run_test_model_normalization([model_name])
+        #run_test_model_normalization(self.models)
 
     def test_cuda_encode_type(self):
-        run_test_cuda_encode_type(self.models)
+        for model_name in self.models:
+            run_test_cuda_encode_type([model_name])
+        #run_test_cuda_encode_type(self.models)
 
 
 @pytest.mark.largemodel
@@ -297,13 +333,19 @@ class TestMultilingualE5Models(unittest.TestCase):
         remove_cached_model_files()
 
     def test_vectorize(self):
-        run_test_vectorize(self.models)
+        # For GPU Memory Optimization, we shouldn't load all models at once
+        for model_name in self.models:
+            run_test_vectorize(models=[model_name])
 
     def test_model_outputs(self):
-        run_test_model_outputs(self.models)
+        for model_name in self.models:
+            run_test_model_outputs([model_name])
+        #run_test_model_outputs(self.models)
 
     def test_model_normalization(self):
-        run_test_model_normalization(self.models)
+        for model_name in self.models:
+            run_test_model_normalization([model_name])
+        #run_test_model_normalization(self.models)
 
     def test_multilingual_e5_model_performance(self):
         clear_loaded_models()
