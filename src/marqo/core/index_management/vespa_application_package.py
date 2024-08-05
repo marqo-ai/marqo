@@ -5,9 +5,8 @@ import tarfile
 import tempfile
 import textwrap
 from abc import ABC, abstractmethod
-from typing import Optional, List, Union, Tuple, Generator, Dict, Callable
+from typing import Optional, List, Union, Tuple, Generator, Dict
 
-import httpx
 import semver
 from datetime import datetime
 
@@ -277,7 +276,8 @@ class VespaAppBackup:
                 file_path = os.path.join(root, file)
                 relpath = os.path.relpath(file_path, self._dir)
                 with open(file_path, "rb") as f:
-                    yield os.path.split(relpath), f.read()
+                    # TODO verify if this works on windows
+                    yield relpath, f.read()
 
     def files_to_remove(self) -> Generator[Tuple[str, ...], None, None]:
         for paths in self._files_to_remove:
@@ -411,8 +411,10 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
         Saves the given content to the given path in the application package. Please note that the binary content
         is not supported due to this Vespa bug: https://github.com/vespa-engine/vespa/issues/32016
         """
+        # TODO remove this code branch after upgrading Vespa to 8.382.22+
         if isinstance(content, bytes):
             raise VespaError("Uploading binary content to Vespa deployment session is currently not supported")
+
         if backup is not None:
             if not self.file_exists(*paths):
                 backup.backup_file(self.read_binary_file(*paths), *paths)
@@ -530,10 +532,10 @@ class VespaApplicationPackage:
         for paths in old_backup.files_to_remove():
             self._store.remove_file(*paths, backup=new_backup)
 
-        for (paths, file_content) in old_backup.files_to_rollback():
-            if paths[-1] == self._SERVICES_XML_FILE:
+        for (path, file_content) in old_backup.files_to_rollback():
+            if path == self._SERVICES_XML_FILE:
                 self._validate_services_xml_for_rollback(file_content.decode('utf-8'))
-            self._store.save_file(file_content, *paths, backup=new_backup)
+            self._store.save_file(file_content, path, backup=new_backup)
 
         self._store.save_file(new_backup.to_zip_stream().read(), self._BACKUP_FILE)
 
