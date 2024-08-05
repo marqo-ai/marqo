@@ -3,7 +3,11 @@
 <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
     <container id="default" version="1.0">
         <document-api/>
-        <search/>
+        <search>
+            <chain id="marqo" inherits="vespa">
+                <searcher id="ai.marqo.search.HybridSearcher" bundle="marqo-custom-searchers"/>
+            </chain>
+        </search>
         <nodes>
             <node hostalias="node1"/>
         </nodes>

@@ -453,7 +453,8 @@ class VespaApplicationPackage:
     _MARQO_CONFIG_FILE = 'marqo_config.json'
     _MARQO_INDEX_SETTINGS_FILE = 'marqo_index_settings.json'
     _MARQO_INDEX_SETTINGS_HISTORY_FILE = 'marqo_index_settings_history.json'
-    _BACKUP_FILE = 'app_bak.zip'
+    _BACKUP_FILE = 'app_bak.tgz'
+    _COMPONENTS_JAR_FOLDER = Path(__file__).parent / '../../../../vespa/target'
 
     def __init__(self, store: VespaApplicationStore):
         self._store = store
@@ -507,15 +508,23 @@ class VespaApplicationPackage:
         self._store.save_file(backup.to_zip_stream().read(), self._BACKUP_FILE)
 
     def rollback(self, marqo_version: str) -> None:
+        marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
+        app_sem_version = semver.VersionInfo.parse(self.get_marqo_config().version, optional_minor_and_patch=True)
+        if marqo_sem_version > app_sem_version:
+            raise ApplicationRollbackError(f"Cannot rollback from ${app_sem_version} to ${marqo_sem_version}, "
+                                           f"since the target version is higher")
+
         if not self._store.file_exists(self._BACKUP_FILE):
             raise ApplicationRollbackError(f"{self._BACKUP_FILE} does not exist in current session, failed to rollback")
 
         old_backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
 
-        marqo_config_json = old_backup.read_text_file(self._MARQO_CONFIG_FILE)
-        rollback_version = MarqoConfigStore(marqo_config_json).get().version
-        if rollback_version != marqo_version:
-            raise ApplicationRollbackError(f"Cannot rollback to {rollback_version}, current Marqo version is {marqo_version}")
+        marqo_config = MarqoConfigStore(old_backup.read_text_file(self._MARQO_CONFIG_FILE)).get()
+        if marqo_config is not None and marqo_config.version != marqo_version:
+            raise ApplicationRollbackError(f"Cannot rollback to {marqo_config.version}, current Marqo version is {marqo_version}")
+
+        # Copy components jar files from the old Marqo version
+        self._copy_components_jar()
 
         new_backup = VespaAppBackup()
         for paths in old_backup.files_to_remove():
@@ -576,10 +585,9 @@ class VespaApplicationPackage:
         self._store.save_file(content, 'search', 'query-profiles', 'default.xml', backup=backup)
 
     def _copy_components_jar(self) -> None:
-        vespa_jar_folder = Path(__file__).parent / '../../../../vespa/target'
         components_jar_file = 'marqo-custom-searchers-deploy.jar'
 
-        with open(vespa_jar_folder/components_jar_file, 'rb') as f:
+        with open(self._COMPONENTS_JAR_FOLDER/components_jar_file, 'rb') as f:
             self._store.save_file(f.read(), 'components', components_jar_file)
 
     def _add_schema_removal_override(self) -> None:

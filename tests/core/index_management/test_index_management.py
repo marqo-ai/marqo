@@ -1,8 +1,13 @@
+import filecmp
 import json
 import os
+import tarfile
+import tempfile
 import textwrap
+from pathlib import Path
 from unittest import mock
 from datetime import datetime
+from unittest.mock import patch
 
 import httpx
 
@@ -36,7 +41,7 @@ class TestIndexManagement(MarqoTestCase):
                                                 zookeeper_client=self.zookeeper_client,
                                                 enable_index_operations=True)
         # this resets the application package to a clean state
-        self._test_dir = os.path.dirname(os.path.abspath(__file__))
+        self._test_dir = str(os.path.dirname(os.path.abspath(__file__)))
         self._deploy_initial_app_package()
 
     def test_clean_bootstrap_vespa(self):
@@ -80,7 +85,7 @@ class TestIndexManagement(MarqoTestCase):
             self.assertEqual(mock_post.call_count, 1)
             self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
 
-    def test_boostrap_from_existing_app_prior_to_2_12(self):
+    def test_boostrap_from_existing_app_prior_to_2_12_should_populate_index_settings(self):
         existing_index = self._deploy_existing_app_package()
         existing_index_with_version = existing_index.copy(update={'version': 1})
 
@@ -97,17 +102,92 @@ class TestIndexManagement(MarqoTestCase):
             self.assertTrue(existing_index.name in index_settings)
             self.assertEqual(existing_index_with_version.json(), json.dumps(index_settings[existing_index.name]))
 
+        # Verify no index setting history is present
         with open(os.path.join(app, 'marqo_index_settings_history.json')) as f:
             self.assertEqual('{}', f.read())
 
         with open(os.path.join(app, 'marqo_config.json')) as f:
             self.assertEqual(json.loads(f'{{"version": "{version.get_version()}"}}'), json.load(f))
 
-    def test_bootstrap_overrides_component_jars_and_configs(self):
-        pass
+    def test_bootstrap_overrides_and_backup_configs(self):
+        self._deploy_existing_app_package()
+        self.index_management.bootstrap_vespa()
+
+        app = str(self.vespa_client.download_application())
+        self._assert_file_exists(app, 'app_bak.tgz')
+        backup_dir = tempfile.mkdtemp()
+        with tarfile.open(os.path.join(app, 'app_bak.tgz'), mode='r:gz') as tar:
+            for member in tar.getmembers():
+                tar.extract(member, path=backup_dir)
+
+        # Assert that following files are changed
+        expected_updated_files = [
+            ['services.xml'],
+            ['components', 'marqo-custom-searchers-deploy.jar'],
+            ['search', 'query-profiles', 'default.xml'],
+        ]
+        for file in expected_updated_files:
+            self._assert_files_not_equal(
+                os.path.join(app, *file),
+                os.path.join(self._test_dir, 'existing_vespa_app', *file)
+            )
+
+        # Assert that following files are backed up, note that binary files won't be backed up
+        expected_backup_files = [
+            ['services.xml'],
+            ['search', 'query-profiles', 'default.xml'],
+        ]
+        for file in expected_backup_files:
+            self._assert_files_equal(
+                os.path.join(backup_dir, *file),
+                os.path.join(self._test_dir, 'existing_vespa_app', *file)
+            )
 
     def test_rollback(self):
-        pass
+        self._deploy_existing_app_package()
+        self.index_management.bootstrap_vespa()
+
+        latest_version = str(self.vespa_client.download_application())
+
+        # before we roll back, we'll mock the app session to use the previous version and jar files
+        components_jar_folder = Path(__file__).parent / 'existing_vespa_app' / 'components'
+        with mock.patch.object(VespaApplicationPackage, '_COMPONENTS_JAR_FOLDER', components_jar_folder):
+            with mock.patch.object(version, 'get_version', return_value='2.10.0'):
+                self.index_management.rollback_vespa()
+
+        rolled_back_version = str(self.vespa_client.download_application())
+        self._assert_file_does_not_exist(rolled_back_version, 'marqo_config.json')
+
+        # rollback will back up the content in the latest version
+        # TODO how to test added config?
+        self._assert_file_exists(rolled_back_version, 'app_bak.tgz')
+        backup_dir = tempfile.mkdtemp()
+        with tarfile.open(os.path.join(rolled_back_version, 'app_bak.tgz'), mode='r:gz') as tar:
+            for member in tar.getmembers():
+                tar.extract(member, path=backup_dir)
+
+        # Test the rollback rolls back the configs and component jar files to previous version
+        expected_rolled_back_files = [
+            ['services.xml'],
+            ['components', 'marqo-custom-searchers-deploy.jar'],
+            ['search', 'query-profiles', 'default.xml'],
+        ]
+        for file in expected_rolled_back_files:
+            self._assert_files_equal(
+                os.path.join(rolled_back_version, *file),
+                os.path.join(self._test_dir, 'existing_vespa_app', *file)
+            )
+
+        # Test the rollback backs up file in the latest version
+        expected_backup_files = [
+            ['services.xml'],
+            ['search', 'query-profiles', 'default.xml'],
+        ]
+        for file in expected_backup_files:
+            self._assert_files_equal(
+                os.path.join(backup_dir, *file),
+                os.path.join(latest_version, *file)
+            )
 
     def test_distributed_lock(self):
         pass
@@ -271,6 +351,20 @@ class TestIndexManagement(MarqoTestCase):
         with self.assertRaises(VespaActivationConflictError):
             self.vespa_client.activate(prepare_res2['activate'])
 
+    def _assert_file_exists(self, *file_paths: str):
+        self.assertTrue(os.path.exists(os.path.join(*file_paths)), f'File {"/".join(file_paths[1:])} does not exist')
+
+    def _assert_file_does_not_exist(self, *file_paths: str):
+        self.assertFalse(os.path.exists(os.path.join(*file_paths)),f'File {"/".join(file_paths[1:])} exists')
+
+    def _assert_files_equal(self, path1: str, path2: str):
+        self.assertTrue(filecmp.cmp(path1, path2),
+                        f'Expect file {path1} and {path2} to have same content, but they differ')
+
+    def _assert_files_not_equal(self, path1: str, path2: str):
+        self.assertFalse(filecmp.cmp(path1, path2),
+                         f'Expect file {path1} and {path2} to have different content, but they are the same')
+
     def _assert_index_is_present(self, app, expected_index, expected_schema):
         if 'version' not in expected_index:
             expected_index = expected_index.copy(update={'version': 1})
@@ -303,21 +397,19 @@ class TestIndexManagement(MarqoTestCase):
         self.vespa_client.wait_for_application_convergence()
 
     def _deploy_existing_app_package(self) -> MarqoIndex:
+        _, index = vespa_schema_factory(self.unstructured_marqo_index_request(name="existing_index")).generate_schema()
+
         app_root_path = os.path.join(self._test_dir, 'existing_vespa_app')
         self._add_schema_removal_override(app_root_path)
-        marqo_index_request = self.unstructured_marqo_index_request(name="existing_index")
-        schema, index = vespa_schema_factory(marqo_index_request).generate_schema()
-        with open(os.path.join(app_root_path, 'schemas', f'{index.schema_name}.sd'), 'w') as f:
-            f.write(schema)
         self.vespa_client.deploy_application(app_root_path)
         self.vespa_client.wait_for_application_convergence()
-        self._save_index_settings(index)
-        self._save_marqo_version('2.10.0')
+
+        self._save_index_settings_to_vespa(index)
+        self._save_marqo_version_to_vespa('2.10.0')
 
         return index
 
-    @staticmethod
-    def _add_schema_removal_override(app_root_path: str):
+    def _add_schema_removal_override(self, app_root_path: str):
         content = textwrap.dedent(
             f'''
             <validation-overrides>
@@ -328,31 +420,20 @@ class TestIndexManagement(MarqoTestCase):
         with open(os.path.join(app_root_path, 'validation-overrides.xml'), 'w') as f:
             f.write(content)
 
-    def _assert_file_exists(self, *file_paths):
-        self.assertTrue(os.path.exists(os.path.join(*file_paths)), f'File {"/".join(file_paths[1:])} does not exist')
-
-    def _assert_file_does_not_exist(self, *file_paths):
-        self.assertFalse(os.path.exists(os.path.join(*file_paths)),f'File {"/".join(file_paths[1:])} exists')
-
-    def _save_marqo_version(self, version: str) -> None:
+    def _save_marqo_version_to_vespa(self, version: str) -> None:
         self.vespa_client.feed_document(
             VespaDocument(
                 id=self.index_management._MARQO_CONFIG_DOC_ID,
-                fields={
-                    'settings': MarqoConfig(version=version).json()
-                }
+                fields={'settings': MarqoConfig(version=version).json()}
             ),
             schema=self.index_management._MARQO_SETTINGS_SCHEMA_NAME
         )
 
-    def _save_index_settings(self, marqo_index: MarqoIndex) -> None:
+    def _save_index_settings_to_vespa(self, marqo_index: MarqoIndex) -> None:
         self.vespa_client.feed_document(
             VespaDocument(
                 id=marqo_index.name,
-                fields={
-                    'index_name': marqo_index.name,
-                    'settings': marqo_index.json()
-                }
+                fields={'index_name': marqo_index.name, 'settings': marqo_index.json()}
             ),
             schema=self.index_management._MARQO_SETTINGS_SCHEMA_NAME
         )
