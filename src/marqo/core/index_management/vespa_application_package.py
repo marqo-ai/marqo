@@ -123,7 +123,7 @@ class ServiceXml:
             # Sort attributes and child elements to normalize
             normalized = ET.Element(elem.tag, dict(sorted(elem.attrib.items())))
             children = [normalize(child) for child in elem.findall('*')]
-            for child in sorted(children, key=lambda x: (x.tag, x.attrib)):
+            for child in sorted(children, key=lambda x: str((x.tag, x.attrib))):
                 normalized.append(child)
             return normalized
 
