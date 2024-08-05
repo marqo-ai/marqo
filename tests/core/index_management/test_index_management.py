@@ -45,7 +45,7 @@ class TestIndexManagement(MarqoTestCase):
 
         app = self.vespa_client.download_application()
         # TODO find a better way to test this, it assume the jar file is generated in target folder
-        self._assert_file_exists(app, 'components', 'marqo-custom-components-deploy.jar')
+        self._assert_file_exists(app, 'components', 'marqo-custom-searchers-deploy.jar')
         self._assert_file_exists(app, 'search', 'query-profiles', 'default.xml')
         self._assert_file_exists(app, 'marqo_index_settings.json')
         self._assert_file_exists(app, 'marqo_index_settings_history.json')
@@ -252,24 +252,24 @@ class TestIndexManagement(MarqoTestCase):
         schema1, index1 = vespa_schema_factory(request1).generate_schema()
         schema2, index2 = vespa_schema_factory(request2).generate_schema()
 
-        with self.vespa_client.deployment_session() as (session1, client1):
-            store1 = ApplicationPackageDeploymentSessionStore(session1, client1, self.vespa_client)
-            app1 = VespaApplicationPackage(store1)
+        content_base_url1, prepare_url1 = self.vespa_client.create_deployment_session()
+        store1 = ApplicationPackageDeploymentSessionStore(content_base_url1, self.vespa_client)
+        app1 = VespaApplicationPackage(store1)
 
-            with self.vespa_client.deployment_session() as (session2, client2):
-                store2 = ApplicationPackageDeploymentSessionStore(session2, client2, self.vespa_client)
-                app2 = VespaApplicationPackage(store2)
+        content_base_url2, prepare_url2 = self.vespa_client.create_deployment_session()
+        store2 = ApplicationPackageDeploymentSessionStore(content_base_url2, self.vespa_client)
+        app2 = VespaApplicationPackage(store2)
 
-                app1.batch_add_index_setting_and_schema([(schema1, index1)])
-                app2.batch_add_index_setting_and_schema([(schema2, index2)])
+        app1.batch_add_index_setting_and_schema([(schema1, index1)])
+        app2.batch_add_index_setting_and_schema([(schema2, index2)])
 
-                self.vespa_client.prepare(session1, client1)
-                self.vespa_client.activate(session1, client1)
+        prepare_res1 = self.vespa_client.prepare(prepare_url1)
+        self.vespa_client.activate(prepare_res1['activate'])
 
-                self.vespa_client.prepare(session2, client2)
-                # this should fail due to optimistic locking
-                with self.assertRaises(VespaActivationConflictError):
-                    self.vespa_client.activate(session2, client2)
+        prepare_res2 = self.vespa_client.prepare(prepare_url2)
+        # this should fail due to optimistic locking
+        with self.assertRaises(VespaActivationConflictError):
+            self.vespa_client.activate(prepare_res2['activate'])
 
     def _assert_index_is_present(self, app, expected_index, expected_schema):
         if 'version' not in expected_index:

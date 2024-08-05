@@ -5,7 +5,7 @@ import tarfile
 import tempfile
 import textwrap
 from abc import ABC, abstractmethod
-from typing import Optional, List, Union, Tuple, Generator, Dict
+from typing import Optional, List, Union, Tuple, Generator, Dict, Callable
 
 import httpx
 import semver
@@ -387,25 +387,24 @@ class VespaApplicationFileStore(VespaApplicationStore):
 
 
 class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
-    def __init__(self, session_id: int, http_client: httpx.Client, vespa_client: VespaClient):
-        self._session_id = session_id
-        self._http_client = http_client
+    def __init__(self, content_base_url: str, vespa_client: VespaClient):
+        self._content_base_url = content_base_url
         self._vespa_client = vespa_client
-        self._all_contents = vespa_client.list_contents(session_id, http_client)
+        self._all_contents = vespa_client.list_contents(content_base_url)
 
     def file_exists(self, *paths: str) -> bool:
-        content_url = self._vespa_client.get_content_url(self._session_id, *paths)
+        content_url = self._vespa_client.get_content_url(self._content_base_url, *paths)
         return content_url in self._all_contents
 
     def read_text_file(self, *paths: str) -> Optional[str]:
         if not self.file_exists(*paths):
             return None
-        return self._vespa_client.get_text_content(self._session_id, self._http_client, *paths)
+        return self._vespa_client.get_text_content(self._content_base_url, *paths)
 
     def read_binary_file(self, *paths: str) -> Optional[bytes]:
         if not self.file_exists(*paths):
             return None
-        return self._vespa_client.get_binary_content(self._session_id, self._http_client, *paths)
+        return self._vespa_client.get_binary_content(self._content_base_url, *paths)
 
     def save_file(self, content: Union[str, bytes], *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
         """
@@ -420,13 +419,13 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
             else:
                 backup.mark_for_removal(*paths)
 
-        self._vespa_client.put_content(self._session_id, self._http_client, content, *paths)
+        self._vespa_client.put_content(self._content_base_url, content, *paths)
 
     def remove_file(self, *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
         if self.file_exists(*paths):
             if backup is not None:
                 backup.backup_file(self.read_binary_file(*paths), *paths)
-            self._vespa_client.delete_content(self._session_id, self._http_client, *paths)
+            self._vespa_client.delete_content(self._content_base_url, *paths)
 
 
 class VespaApplicationPackage:

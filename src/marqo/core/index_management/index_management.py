@@ -284,24 +284,24 @@ class IndexManagement:
         to avoid race conditions. Changes to the application package that do not touch any binary files should use
         this context manager for deployment.
         """
-        with self.vespa_client.deployment_session() as (session_id, httpx_client):
-            store = ApplicationPackageDeploymentSessionStore(session_id, httpx_client, self.vespa_client)
-            app = VespaApplicationPackage(store)
+        content_base_url, prepare_url = self.vespa_client.create_deployment_session()
+        store = ApplicationPackageDeploymentSessionStore(content_base_url, self.vespa_client)
+        app = VespaApplicationPackage(store)
 
-            if check_configured and not app.is_configured:
-                raise ApplicationNotInitializedError()
+        if check_configured and not app.is_configured:
+            raise ApplicationNotInitializedError()
 
-            should_deploy = yield app
+        should_deploy = yield app
 
-            if should_deploy is None or should_deploy is True:
-                self.vespa_client.prepare(session_id, httpx_client)
-                # TODO handle prepare configChangeActions
-                # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
-                self.vespa_client.activate(session_id, httpx_client)
-                self.vespa_client.wait_for_application_convergence()
+        if should_deploy is None or should_deploy is True:
+            prepare_response = self.vespa_client.prepare(prepare_url)
+            # TODO handle prepare configChangeActions
+            # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
+            self.vespa_client.prepare(prepare_response['activate'])
+            self.vespa_client.wait_for_application_convergence()
 
-            if should_deploy is not None:
-                yield
+        if should_deploy is not None:
+            yield
 
     @contextmanager
     def _vespa_deployment_lock(self):
