@@ -1,6 +1,7 @@
 import math
 import os
 import random
+import string
 import unittest
 from unittest import mock
 
@@ -10,6 +11,7 @@ from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import (
     IllegalRequestedDocCount
 )
+from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index import FieldType, FieldFeature, IndexType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search, utils
@@ -33,9 +35,23 @@ class TestPagination(MarqoTestCase):
                     name='desc',
                     type=FieldType.Text,
                     features=[FieldFeature.LexicalSearch]
-                )
+                ),
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field_2", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field_3", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="add_field_1", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="add_field_2", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="mult_field_1", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="mult_field_2", type=FieldType.Float,
+                             features=[FieldFeature.ScoreModifier])
             ],
-            tensor_fields=['title']
+            tensor_fields=['title', 'text_field_1', 'text_field_2', 'text_field_3']
         )
         index_request_unstructured = cls.unstructured_marqo_index_request()
 
@@ -57,17 +73,51 @@ class TestPagination(MarqoTestCase):
     def tearDown(self):
         self.device_patcher.stop()
 
+    def generate_random_string(self, length):
+        # Generate a random string of given length
+        letters = string.ascii_lowercase
+        return ''.join(random.choice(letters) for _ in range(length))
+
+    def generate_unique_strings(self, num_strings):
+        """
+        Generate strings that will have different bm25 scores, to confirm pagination works as expected
+        """
+        unique_strings = set()
+        while len(unique_strings) < num_strings:
+            # Vary content and length
+            length = random.randint(1, 5)  # Random length between 1 and 5
+            rand_str = self.generate_random_string(length)
+
+            # Vary term frequency by repeating some words
+            words = rand_str.split()
+            if len(words) > 1 and random.random() > 0.5:
+                rand_str += " " + random.choice(words)
+
+            unique_strings.add(rand_str)
+
+        return list(unique_strings)
+
     def test_pagination_single_field(self):
         num_docs = 400
         batch_size = 100
 
         for index in [self.index_structured, self.index_unstructured]:
             for _ in range(0, num_docs, batch_size):
+                docs = []
+                for i in range(batch_size):
+                    title = "my title"
+                    for j in range(i):
+                        title += " ".join(self.generate_unique_strings(j))
+                    doc = {"_id": str(i),
+                           "title": title,
+                           'desc': 'my description'}
+                    docs.append(doc)
+
                 r = tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
-                                                  docs=[{"title": 'my title', 'desc': 'my title'} for i in
-                                                        range(batch_size)],
+                                                  # Add docs with increasing title word count, so each will have unique tensor and lexical scores
+                                                  docs=docs,
                                                   device="cpu",
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
@@ -94,26 +144,36 @@ class TestPagination(MarqoTestCase):
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=index.name,
-                                text='my title',
+                                text='my title ',
                                 result_count=lim, offset=off)
 
                             paginated_search_results["hits"].extend(page_res["hits"])
 
                         # Compare paginated to full results (length only for now)
                         self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
+                        for i in range(len(full_search_results["hits"])):
+                            self.assertEqual(full_search_results["hits"][i]["_id"], paginated_search_results["hits"][i]["_id"])
+                            self.assertEqual(full_search_results["hits"][i]["_score"], paginated_search_results["hits"][i]["_score"])
 
     def test_pagination_hybrid(self):
         num_docs = 400
         batch_size = 100
 
-        # TODO: Add unstructured index when supported
         for index in [self.index_structured, self.index_unstructured]:
             for _ in range(0, num_docs, batch_size):
+                docs = []
+                for i in range(batch_size):
+                    title = "my title"
+                    for j in range(i):
+                        title += " ".join(self.generate_unique_strings(j))
+                    doc = {"_id": str(i),
+                           "title": title,
+                           'desc': 'my description'}
+                    docs.append(doc)
                 r = tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
-                                                  docs=[{"title": 'my title', 'desc': 'my title'} for i in
-                                                        range(batch_size)],
+                                                  docs=docs,
                                                   device="cpu",
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
@@ -128,35 +188,131 @@ class TestPagination(MarqoTestCase):
             ]
 
             for retrieval_method, ranking_method in test_cases:
-                full_search_results = tensor_search.search(
-                    search_method="HYBRID",
-                    hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
-                                                       rankingMethod=ranking_method),
+                with self.subTest(retrieval_method=retrieval_method, ranking_method=ranking_method):
+                    full_search_results = tensor_search.search(
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
+                                                           rankingMethod=ranking_method),
+                        config=self.config,
+                        index_name=index.name,
+                        text='my title',
+                        result_count=num_docs)
+
+                    for page_size in [5, 10, 100, 200]:
+                        with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
+                            paginated_search_results = {"hits": []}
+
+                            for page_num in range(math.ceil(num_docs / page_size)):
+                                lim = page_size
+                                off = page_num * page_size
+                                page_res = tensor_search.search(
+                                    search_method="HYBRID",
+                                    hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
+                                                                       rankingMethod=ranking_method),
+                                    config=self.config,
+                                    index_name=index.name,
+                                    text='my title',
+                                    result_count=lim, offset=off)
+
+                                paginated_search_results["hits"].extend(page_res["hits"])
+
+                            # Compare paginated to full results (length only for now)
+                            self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
+                            # Scores need to match, except for disjunction/rrf (where scores are determined by rank)
+                            if (retrieval_method, ranking_method) != ("disjunction", "rrf"):
+                                for i in range(len(full_search_results["hits"])):
+                                    self.assertEqual(full_search_results["hits"][i]["_score"],
+                                                     paginated_search_results["hits"][i]["_score"])
+
+    def test_pagination_hybrid_lexical_tensor_with_modifiers(self):
+        """
+        Show that pagination is consistent when using hybrid search with lexical retrieval, tensor ranking,
+        with lexical score modifiers eliminating some results.
+        """
+        for index in [self.index_structured, self.index_unstructured]:
+            with self.subTest(index=type(index)):
+                # Add documents
+                add_docs_res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc4", "text_field_1": "HELLO WORLD",
+                             "mult_field_1": 0.5, "add_field_1": 20},  # OUT (negative)
+                            {"_id": "doc5", "text_field_1": "HELLO WORLD", "mult_field_1": 1.0},  # OUT (negative)
+                            {"_id": "doc6", "text_field_1": "HELLO WORLD"},  # Top result
+                            {"_id": "doc7", "text_field_1": "HELLO WORLD", "add_field_1": 1.0},  # Top result
+                            {"_id": "doc8", "text_field_1": "HELLO WORLD", "mult_field_1": 2.0},  # OUT (negative)
+                            {"_id": "doc9", "text_field_1": "HELLO WORLD", "mult_field_1": 3.0},  # OUT (negative)
+                            {"_id": "doc10", "text_field_1": "HELLO WORLD", "mult_field_2": 3.0},  # Top result
+                        ],
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) \
+                            else None
+                    )
+                )
+
+                full_res = tensor_search.search(
                     config=self.config,
                     index_name=index.name,
-                    text='my title',
-                    result_count=400)
+                    text="HELLO WORLD",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor,
+                        scoreModifiersLexical={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": -10},
+                                # Will bring down doc8 and doc9. Keep doc6, doc7, doc10
+                            ]
+                        },
+                        scoreModifiersTensor={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 10},
+                                {"field_name": "mult_field_2", "weight": -10}
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        },
+                        verbose=True
+                    ),
+                    result_count=3
+                )
 
-                for page_size in [5, 10, 100, 200]:
-                    with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
-                        paginated_search_results = {"hits": []}
+                # Paginate (3 pages of 1 result each)
+                paginated_res = []
+                for i in range(3):
+                    paginated_res.extend(tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="HELLO WORLD",
+                        search_method="HYBRID",
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Lexical,
+                            rankingMethod=RankingMethod.Tensor,
+                            scoreModifiersLexical={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": -10},
+                                    # Will bring down doc8 and doc9. Keep doc6, doc7, doc10
+                                ]
+                            },
+                            scoreModifiersTensor={
+                                "multiply_score_by": [
+                                    {"field_name": "mult_field_1", "weight": 10},
+                                    {"field_name": "mult_field_2", "weight": -10}
+                                ],
+                                "add_to_score": [
+                                    {"field_name": "add_field_1", "weight": 5}
+                                ]
+                            },
+                            verbose=True
+                        ),
+                        result_count=1,
+                        offset=i
+                    )["hits"])
 
-                        for page_num in range(math.ceil(num_docs / page_size)):
-                            lim = page_size
-                            off = page_num * page_size
-                            page_res = tensor_search.search(
-                                search_method="HYBRID",
-                                hybrid_parameters=HybridParameters(retrievalMethod=retrieval_method,
-                                                                   rankingMethod=ranking_method),
-                                config=self.config,
-                                index_name=index.name,
-                                text='my title',
-                                result_count=lim, offset=off)
-
-                            paginated_search_results["hits"].extend(page_res["hits"])
-
-                        # Compare paginated to full results (length only for now)
-                        self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
+                # Compare full results to paginated results
+                self.assertEqual(full_res["hits"], paginated_res)
 
     def test_pagination_high_limit_offset(self):
         """
