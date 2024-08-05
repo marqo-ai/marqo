@@ -7,34 +7,9 @@ permissions:
   contents: read
 
 jobs:
-  Start-Runner:
-    name: Start self-hosted EC2 runner
-    runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.start-ec2-runner.outputs.label }}
-      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Start EC2 runner
-        id: start-ec2-runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: start
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ${{ secrets.AMD_EC2_IMAGE_ID }}
-          ec2-instance-type: t3.xlarge
-          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
-          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
-
   Test-Documentation:
     name: Run Documentation Tests
-    needs: Start-Runner
-    runs-on: ${{ needs.start-runner.outputs.label }}
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
@@ -57,25 +32,3 @@ jobs:
         run: |
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
           pytest marqo/tests/test_documentation.py
-
-  Stop-Runner:
-    name: Stop self-hosted EC2 runner
-    needs:
-      - Start-Runner
-      - Test-Documentation
-    runs-on: ubuntu-latest
-    if: ${{ always() }}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Stop EC2 runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: stop
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          label: ${{ needs.start-runner.outputs.label }}
-          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
