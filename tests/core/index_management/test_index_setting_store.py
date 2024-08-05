@@ -5,7 +5,7 @@ import pytest
 
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.index_management.vespa_application_package import IndexSettingStore
-from marqo.core.models.marqo_index import Field, FieldType, MarqoIndex
+from marqo.core.models.marqo_index import Field, FieldType, MarqoIndex, Model
 from tests.marqo_test import MarqoTestCase
 
 
@@ -16,6 +16,7 @@ class TestIndexSettingStore(MarqoTestCase):
         return self.structured_marqo_index(
             name=index_name,
             schema_name="schema1",
+            model=Model(name='hf/e5-small'),
             fields=[
                 Field(name='title', type=FieldType.Text)
             ],

@@ -7,32 +7,29 @@ import textwrap
 from pathlib import Path
 from unittest import mock
 from datetime import datetime
-from unittest.mock import patch
 
 import httpx
 
 import xml.etree.ElementTree as ET
 
+import pytest
 
 from marqo import version
 from marqo.core.exceptions import IndexExistsError, ApplicationNotInitializedError, InternalError
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.index_management.vespa_application_package import MarqoConfig, VespaApplicationPackage, \
-    ApplicationPackageDeploymentSessionStore
+from marqo.core.index_management.vespa_application_package import (MarqoConfig, VespaApplicationPackage,
+                                                                   ApplicationPackageDeploymentSessionStore)
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 
 
-class IndexResilienceError(Exception):
-    """A custom exception to raise when an error is encountered during the index resilience test."""
-    pass
-
-
+@pytest.mark.slowtest
 class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):
@@ -156,16 +153,6 @@ class TestIndexManagement(MarqoTestCase):
                 self.index_management.rollback_vespa()
 
         rolled_back_version = str(self.vespa_client.download_application())
-        self._assert_file_does_not_exist(rolled_back_version, 'marqo_config.json')
-
-        # rollback will back up the content in the latest version
-        # TODO how to test added config?
-        self._assert_file_exists(rolled_back_version, 'app_bak.tgz')
-        backup_dir = tempfile.mkdtemp()
-        with tarfile.open(os.path.join(rolled_back_version, 'app_bak.tgz'), mode='r:gz') as tar:
-            for member in tar.getmembers():
-                tar.extract(member, path=backup_dir)
-
         # Test the rollback rolls back the configs and component jar files to previous version
         expected_rolled_back_files = [
             ['services.xml'],
@@ -177,6 +164,15 @@ class TestIndexManagement(MarqoTestCase):
                 os.path.join(rolled_back_version, *file),
                 os.path.join(self._test_dir, 'existing_vespa_app', *file)
             )
+        # marqo_config.json does not exist in the previous version, and it gets deleted
+        self._assert_file_does_not_exist(rolled_back_version, 'marqo_config.json')
+
+        # rollback backs up the content in the latest version,
+        self._assert_file_exists(rolled_back_version, 'app_bak.tgz')
+        backup_dir = tempfile.mkdtemp()
+        with tarfile.open(os.path.join(rolled_back_version, 'app_bak.tgz'), mode='r:gz') as tar:
+            for member in tar.getmembers():
+                tar.extract(member, path=backup_dir)
 
         # Test the rollback backs up file in the latest version
         expected_backup_files = [
@@ -188,12 +184,6 @@ class TestIndexManagement(MarqoTestCase):
                 os.path.join(backup_dir, *file),
                 os.path.join(latest_version, *file)
             )
-
-    def test_distributed_lock(self):
-        pass
-
-    def test_prefixes(self):
-        pass
 
     def test_index_operation_fails_if_disabled(self):
         # Create an index management instance with index operation disabled (by default)
@@ -237,7 +227,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_create_and_delete_index_successful(self):
         # merge batch create and delete happy path to save some testing time
-        request = self.unstructured_marqo_index_request()
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
         schema, index = vespa_schema_factory(request).generate_schema()
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
@@ -366,12 +356,18 @@ class TestIndexManagement(MarqoTestCase):
                          f'Expect file {path1} and {path2} to have different content, but they are the same')
 
     def _assert_index_is_present(self, app, expected_index, expected_schema):
-        if 'version' not in expected_index:
-            expected_index = expected_index.copy(update={'version': 1})
-
         # assert index setting exists and equals to expected value
         saved_index = self.index_management.get_index(expected_index.name)
-        self.assertEqual(saved_index, expected_index)
+        exclude_fields = {'model', 'version'}
+        self.assertEqual(saved_index.dict(exclude=exclude_fields), expected_index.dict(exclude=exclude_fields))
+        self.assertEqual(saved_index.version, 1)
+
+        # asser that the prefixes are set correctly
+        model_properties = get_model_properties_from_registry(saved_index.model.name)
+        if 'text_chunk_prefix' in model_properties:
+            self.assertEqual(saved_index.model.text_chunk_prefix, model_properties['text_chunk_prefix'])
+        if 'text_query_prefix' in model_properties:
+            self.assertEqual(saved_index.model.text_query_prefix, model_properties['text_query_prefix'])
 
         # assert schema file exists and has expected value
         schema_name = expected_index.schema_name
