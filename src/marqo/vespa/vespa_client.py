@@ -5,10 +5,8 @@ import tarfile
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
 from json import JSONDecodeError
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 from urllib.parse import urlparse
 
 import httpx
@@ -96,18 +94,23 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-    @contextmanager
-    def deployment_session(self):
-        self.check_for_application_convergence()
-        # FIXME: The session created in step 1 is local to the config node, check why
-        # If this can be fixed, we can just return the session id
-        with httpx.Client() as httpx_client:
-            session_id = self._create_deploy_session(httpx_client)
-            yield session_id, httpx_client
+    def create_deployment_session(self) -> Tuple[str, str]:
+        """
+        Create a Vespa deployment session.
+        Returns:
+            Tuple[str, str]:
+             - content_base_url is the base url for contents in this session
+             - prepare_url is the url for prepare this session
 
-    def create_deployment_session(self):
+        Please note that the session created is local in one config server and will be replicated to multiple servers
+        via Zookeeper. Following requests should use content_base_url and prepare_url to make sure it can hit the right
+        config server that this session is created on.
+        """
         self.check_for_application_convergence()
-        return self._create_deploy_session(self.http_client)
+        res = self._create_deploy_session(self.http_client)
+        content_base_url = res['content']
+        prepare_url = res['prepared']
+        return content_base_url, prepare_url
 
     def download_application(self, check_for_application_convergence: bool = False) -> str:
         """
@@ -136,7 +139,7 @@ class VespaClient:
             self.check_for_application_convergence()
 
         with httpx.Client() as httpx_client:
-            session_id = self._create_deploy_session(httpx_client)
+            session_id = self._create_deploy_session(httpx_client)['session-id']
             return self._download_application(session_id, httpx_client)
 
     def check_for_application_convergence(self) -> None:
@@ -590,7 +593,7 @@ class VespaClient:
         byte_stream.seek(0)
         return byte_stream
 
-    def _create_deploy_session(self, httpx_client: httpx.Client) -> int:
+    def _create_deploy_session(self, httpx_client: httpx.Client) -> Dict:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session?from=' \
                    f'{self.config_url}/application/v2/tenant/default/application/default/environment' \
                    f'/default/region/default/instance/default'
@@ -599,65 +602,61 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-        return response.json()['session-id']
+        return response.json()
 
-    def get_content_url(self, session_id: int, *paths: str) -> str:
-        return f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(paths)}'
+    def get_content_url(self, content_base_url: str, *paths: str) -> str:
+        return f'{content_base_url}{"/".join(paths)}'
 
-    def list_contents(self, session_id: int, httpx_client: httpx.Client) -> List[str]:
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
+    def list_contents(self, content_base_url: str) -> List[str]:
+        endpoint = f'{content_base_url}?recursive=true'
 
-        response = httpx_client.get(endpoint)
+        response = self.http_client.get(endpoint)
 
         self._raise_for_status(response)
 
         return response.json()
 
-    def get_text_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> str:
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+    def get_text_content(self, content_base_url: str, *path: str) -> str:
+        endpoint = f'{content_base_url}{"/".join(path)}'
 
-        response = httpx_client.get(endpoint)
+        response = self.http_client.get(endpoint)
 
         self._raise_for_status(response)
 
         return response.text
 
-    def get_binary_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> bytes:
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+    def get_binary_content(self, content_base_url: str, *path: str) -> bytes:
+        endpoint = f'{content_base_url}{"/".join(path)}'
 
-        response = httpx_client.get(endpoint)
+        response = self.http_client.get(endpoint)
 
         self._raise_for_status(response)
 
         return response.content
 
-    def put_content(self, session_id: int, httpx_client: httpx.Client, content: Union[str, bytes], *path: str) -> None:
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
+    def put_content(self, content_base_url: str, content: Union[str, bytes], *path: str) -> None:
+        endpoint = f'{content_base_url}{"/".join(path)}'
 
-        response = httpx_client.put(endpoint, content=content)
-
-        self._raise_for_status(response)
-
-    def delete_content(self, session_id: int, httpx_client: httpx.Client, *path: str) -> None:
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/{"/".join(path)}'
-
-        response = httpx_client.delete(endpoint)
+        response = self.http_client.put(endpoint, content=content)
 
         self._raise_for_status(response)
 
-    def prepare(self, session_id: int, httpx_client: httpx.Client):
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/prepared'
+    def delete_content(self, content_base_url: str, *path: str) -> None:
+        endpoint = f'{content_base_url}{"/".join(path)}'
 
-        response = httpx_client.put(endpoint)
+        response = self.http_client.delete(endpoint)
+
+        self._raise_for_status(response)
+
+    def prepare(self, prepare_url: str):
+        response = self.http_client.put(prepare_url)
 
         self._raise_for_status(response)
 
         return response.json()
 
-    def activate(self, session_id: int, httpx_client: httpx.Client):
-        endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/active'
-
-        response = httpx_client.put(endpoint)
+    def activate(self, activate_url: str):
+        response = self.http_client.put(activate_url)
 
         self._raise_for_status(response)
 
