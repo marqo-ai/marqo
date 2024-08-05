@@ -71,6 +71,7 @@ class IndexManagement:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
         with self._vespa_deployment_lock():
+            # TODO Change to self._vespa_application_with_deployment_session after upgrading Vespa to 8.382.22+
             application = self._vespa_application(check_configured=False)
             with application as app:
 
@@ -88,6 +89,7 @@ class IndexManagement:
 
     def rollback_vespa(self) -> bool:
         with self._vespa_deployment_lock():
+            # TODO Change to self._vespa_application_with_deployment_session after upgrading Vespa to 8.382.22+
             application = self._vespa_application()
             with application as app:
                 try:
