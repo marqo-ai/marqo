@@ -39,7 +39,7 @@ RANK_PROFILE_BM25_MODIFIERS_2_9 = 'bm25_modifiers'
 RANK_PROFILE_EMBEDDING_SIMILARITY_MODIFIERS_2_9 = 'embedding_similarity_modifiers'
 
 # Note field names are also used as query inputs, so make sure these reserved names have a marqo__ prefix
-# QUERY_INPUT_EMBEDDING = 'embedding_query'
+QUERY_INPUT_EMBEDDING_2_10 = 'embedding_query'      # Keep for backwards compatibility
 QUERY_INPUT_EMBEDDING = "marqo__query_embedding"    # TODO: see if this change from 'embedding_query' to 'embedding_query' changes anything
 QUERY_INPUT_BM25_AGGREGATOR = 'marqo__bm25_aggregator'
 
