@@ -4,6 +4,8 @@ import os
 import tarfile
 import tempfile
 import textwrap
+import threading
+import time
 from pathlib import Path
 from unittest import mock
 from datetime import datetime
@@ -15,7 +17,8 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from marqo import version
-from marqo.core.exceptions import IndexExistsError, ApplicationNotInitializedError, InternalError
+from marqo.core.exceptions import IndexExistsError, ApplicationNotInitializedError, InternalError, \
+    ApplicationRollbackError, OperationConflictError
 from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.index_management.vespa_application_package import (MarqoConfig, VespaApplicationPackage,
@@ -185,6 +188,34 @@ class TestIndexManagement(MarqoTestCase):
                 os.path.join(latest_version, *file)
             )
 
+    def test_rollback_should_fail_when_target_version_is_current_version(self):
+        self.index_management.bootstrap_vespa()
+        with self.assertRaises(ApplicationRollbackError) as e:
+            self.index_management.rollback_vespa()
+        self.assertIn("The target version must be lower than the current one", str(e.exception))
+
+    def test_rollback_should_fail_when_target_version_does_not_match_backup_version(self):
+        with mock.patch.object(version, 'get_version', return_value='2.12.0'):
+            self.index_management.bootstrap_vespa()  # writes 2.12.0 to marqo_config
+        with mock.patch.object(version, 'get_version', return_value='2.14.0'):
+            self.index_management.bootstrap_vespa()  # backs up 2.12.0
+
+        with mock.patch.object(version, 'get_version', return_value='2.13.0'):
+            # rolling back to 2.13.0 should raise error
+            with self.assertRaises(ApplicationRollbackError) as e:
+                self.index_management.rollback_vespa()
+            self.assertEqual("Cannot rollback to 2.12.0, current Marqo version is 2.13.0", str(e.exception))
+
+    def test_rollback_should_fail_when_schemas_are_changed(self):
+        self.index_management.bootstrap_vespa()
+
+        self.index_management.create_index(self.unstructured_marqo_index_request())
+
+        with mock.patch.object(version, 'get_version', return_value='2.10.0'):
+            with self.assertRaises(ApplicationRollbackError) as e:
+                self.index_management.rollback_vespa()
+            self.assertEqual("Indexes have been added or removed since last backup. Aborting rollback.", str(e.exception))
+
     def test_index_operation_fails_if_disabled(self):
         # Create an index management instance with index operation disabled (by default)
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
@@ -271,11 +302,19 @@ class TestIndexManagement(MarqoTestCase):
         self._assert_index_is_present(app, index1, schema1)
         self._assert_index_is_present(app, index2, schema2)
 
+        all_indexes = {index.name: index for index in self.index_management.get_all_indexes()}
+        self.assertEqual(2, len(all_indexes))
+        exclude_fields = {'model', 'version'}
+        for index in [index1, index2]:
+            self.assertEqual(all_indexes[index.name].dict(exclude=exclude_fields), index.dict(exclude=exclude_fields))
+
         self.index_management.batch_delete_indexes_by_name([request1.name, request2.name])
 
         app = self.vespa_client.download_application()
         self._assert_index_is_not_present(app, index1.name, index1.schema_name)
         self._assert_index_is_not_present(app, index2.name, index2.schema_name)
+
+        self.assertEqual(0, len(self.index_management.get_all_indexes()))
 
     def test_batch_create_index_fails_atomically(self):
         request = self.unstructured_marqo_index_request(name="index1")
@@ -308,6 +347,29 @@ class TestIndexManagement(MarqoTestCase):
         self._assert_index_is_present(app, index1, schema)
         self._assert_index_is_not_present(app, index2.name, index2.schema_name)
 
+    def test_concurrent_updates_is_prevented_by_distributed_locking(self):
+        def worker1():
+            request = self.unstructured_marqo_index_request(name="index1")
+            self.index_management.create_index(request)
+
+        def worker2():
+            with self.assertRaises(OperationConflictError) as e:
+                request = self.unstructured_marqo_index_request(name="index2")
+                self.index_management.create_index(request)
+            self.assertEqual("Another index creation/deletion operation is in progress.", str(e.exception))
+
+        self.index_management.bootstrap_vespa()
+        thread1 = threading.Thread(target=worker1)
+        thread2 = threading.Thread(target=worker2)
+
+        thread1.start()
+        time.sleep(1)
+        thread2.start()
+        thread1.join()
+        thread2.join()
+
+
+    @pytest.mark.skip(reason="This test case is just used to verify the optimistic locking mechanism works")
     def test_race_condition(self):
         """
         In this test, we simulate two instances/threads of Marqo make different changes to the application package

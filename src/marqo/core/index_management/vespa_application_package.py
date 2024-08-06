@@ -517,9 +517,9 @@ class VespaApplicationPackage:
     def rollback(self, marqo_version: str) -> None:
         marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
         app_sem_version = semver.VersionInfo.parse(self.get_marqo_config().version, optional_minor_and_patch=True)
-        if marqo_sem_version > app_sem_version:
-            raise ApplicationRollbackError(f"Cannot rollback from ${app_sem_version} to ${marqo_sem_version}, "
-                                           f"since the target version is higher")
+        if marqo_sem_version >= app_sem_version:
+            raise ApplicationRollbackError(f"Cannot rollback from ${app_sem_version} to ${marqo_sem_version}. "
+                                           f"The target version must be lower than the current one.")
 
         if not self._store.file_exists(self._BACKUP_FILE):
             raise ApplicationRollbackError(f"{self._BACKUP_FILE} does not exist in current session, failed to rollback")
