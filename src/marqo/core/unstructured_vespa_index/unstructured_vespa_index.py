@@ -78,8 +78,13 @@ class UnstructuredVespaIndex(VespaIndex):
         else:
             ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
+        if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
+        else:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING_2_10
+
         query_inputs = {
-            unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+            query_input_embedding_parameter: marqo_query.vector_query
         }
 
         if score_modifiers:
@@ -323,14 +328,9 @@ class UnstructuredVespaIndex(VespaIndex):
         summary = unstructured_common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets \
             else unstructured_common.SUMMARY_ALL_NON_VECTOR
 
-        if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
-            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
-        else:
-            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING_2_10
-
         # Assign parameters to query
         query_inputs = {
-            query_input_embedding_parameter: marqo_query.vector_query,
+            unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query,
             unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {},
             unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {}
         }
