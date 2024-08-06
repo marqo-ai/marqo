@@ -270,8 +270,8 @@ class VespaAppBackup:
                 os.remove(self._removal_mark_file)
 
     def __repr__(self):
-        return (f'<VespaAppBackup files_to_rollback={[os.path.join(paths) for paths in self._files_to_rollback]} '
-                f'files_to_remove={[os.path.join(paths) for paths in self._files_to_remove]}>')
+        return (f'<VespaAppBackup files_to_rollback={[os.path.join(*paths) for paths in self._files_to_rollback]} '
+                f'files_to_remove={[os.path.join(*paths) for paths in self._files_to_remove]}>')
 
     def read_text_file(self, *paths: str) -> Optional[str]:
         path = os.path.join(self._dir, *paths)
