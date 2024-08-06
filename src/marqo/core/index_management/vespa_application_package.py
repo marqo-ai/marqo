@@ -35,11 +35,16 @@ class ServiceXml:
         self._root = ET.fromstring(xml_str)
         self._documents = self._ensure_only_one('content/documents')
 
-    def __str__(self) -> str:
-        return self.to_xml()
+    def __repr__(self) -> str:
+        return f'ServiceXml({self.to_xml()})'
 
     def to_xml(self) -> str:
-        return ET.tostring(self._root).decode('utf-8')
+        # Add the namespace attribute to the root element
+        self._root.set('xmlns:deploy', 'vespa')
+        self._root.set('xmlns:preprocess', 'properties')
+
+        xml_declaration = '<?xml version="1.0" encoding="utf-8" ?>\n'
+        return xml_declaration + ET.tostring(self._root).decode('utf-8')
 
     def _ensure_only_one(self, xml_path: str) -> ET.Element:
         elements = self._root.findall(xml_path)
@@ -52,7 +57,7 @@ class ServiceXml:
         return elements[0]
 
     def add_schema(self, name: str) -> None:
-        if self._documents.find(f'document[@type="{name}"]'):
+        if self._documents.find(f'document[@type="{name}"]') is not None:
             logger.warn(f'Schema {name} already exists in services.xml, nothing to add')
         else:
             new_document = ET.SubElement(self._documents, 'document')
