@@ -12,7 +12,7 @@ from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.core.vespa_index import VespaIndex
 from marqo.core import constants
-from marqo.exceptions import InternalError, InvalidArgumentError
+
 import semver
 
 
@@ -113,6 +113,11 @@ class UnstructuredVespaIndex(VespaIndex):
             target_hits = marqo_query.limit + marqo_query.offset
             additional_hits = 0
 
+        if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
+        else:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING_2_10
+
         return (
             f"("
             f"{{"
@@ -120,7 +125,7 @@ class UnstructuredVespaIndex(VespaIndex):
             f"approximate:{str(marqo_query.approximate)}, "
             f'hnsw.exploreAdditionalHits:{additional_hits}'
             f"}}"
-            f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING})"
+            f"nearestNeighbor({field_to_search}, {query_input_embedding_parameter})"
             f")"
         )
 
@@ -318,9 +323,14 @@ class UnstructuredVespaIndex(VespaIndex):
         summary = unstructured_common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets \
             else unstructured_common.SUMMARY_ALL_NON_VECTOR
 
+        if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
+        else:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING_2_10
+
         # Assign parameters to query
         query_inputs = {
-            unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query,
+            query_input_embedding_parameter: marqo_query.vector_query,
             unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {},
             unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {}
         }

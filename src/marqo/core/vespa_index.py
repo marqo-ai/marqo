@@ -6,6 +6,7 @@ from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, Ma
 from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
+from marqo.exceptions import InternalError
 
 
 class VespaIndex(ABC):
