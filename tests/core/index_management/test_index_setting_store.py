@@ -9,7 +9,7 @@ from marqo.core.models.marqo_index import Field, FieldType, MarqoIndex, Model
 from tests.marqo_test import MarqoTestCase
 
 
-@pytest.mark.unnittest
+@pytest.mark.unittest
 class TestIndexSettingStore(MarqoTestCase):
 
     def _get_index(self, index_name: str = 'index1', version: Optional[int] = None) -> MarqoIndex:
