@@ -107,8 +107,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
         return query
 
-    @staticmethod
-    def _get_tensor_search_term(marqo_query: MarqoTensorQuery) -> str:
+    def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
         if marqo_query.ef_search is not None:
