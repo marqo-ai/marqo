@@ -54,6 +54,33 @@ class TestIndexSettingStore(unittest.TestCase):
                 self.assertFalse(ServiceXml(xml1).compare_element(ServiceXml(xml2), 'content/documents'))
                 self.assertFalse(ServiceXml(xml1).compare_element(ServiceXml(xml2), 'content/documents/document'))
 
+    def test_compare_element_should_detect_any_difference_in_multiple_elements(self):
+        xml1 = """<?xml version="1.0" encoding="utf-8" ?>
+                    <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                        <container id="default" version="1.0">
+                            <nodes><node hostalias="node1"/></nodes>
+                        </container>
+                        <content id="content_default" version="1.0">
+                            <documents><document type="marqo__existing_00index" mode="index"/></documents>
+                            <nodes><node hostalias="node2"/></nodes>
+                        </content>
+                    </services>
+                """
+        # added node3 in content element
+        xml2 = """<?xml version="1.0" encoding="utf-8" ?>
+                    <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                        <container id="default" version="1.0">
+                            <nodes><node hostalias="node1"/></nodes>
+                        </container>
+                        <content id="content_default" version="1.0">
+                            <documents><document type="marqo__existing_00index" mode="index"/></documents>
+                            <nodes><node hostalias="node2"/><node hostalias="node3"/></nodes>
+                        </content>
+                    </services>
+                """
+
+        self.assertFalse(ServiceXml(xml1).compare_element(ServiceXml(xml2), '*/nodes'))
+
     def test_should_not_have_more_than_one_content_documents_element(self):
         xml = """<?xml version="1.0" encoding="utf-8" ?>
             <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">

@@ -87,18 +87,17 @@ class IndexManagement:
                 app.bootstrap(marqo_version, existing_indexes)
                 return True
 
-    def rollback_vespa(self) -> bool:
+    def rollback_vespa(self) -> None:
         with self._vespa_deployment_lock():
             # TODO Change to self._vespa_application_with_deployment_session after upgrading Vespa to 8.382.22+
             application = self._vespa_application()
             with application as app:
                 try:
                     app.rollback(version.get_version())
-                    return True
                 except ApplicationRollbackError as e:
                     logger.error(e.message)
                     application.gen.send(False)  # tell context manager to skip deployment
-                    return False
+                    raise e
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
