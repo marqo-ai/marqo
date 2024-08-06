@@ -106,6 +106,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.OperationConflictError,
          api_exceptions.OperationConflictError, None),
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None),
+        (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None),
 
         # Vespa client exceptions
         (
@@ -501,6 +502,16 @@ def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(g
     """An internal API used for testing processes. Not to be used by users."""
     rollback_runner = RollbackRunner(marqo_config.vespa_client, marqo_config.index_management)
     rollback_runner.rollback(from_version=req.from_version, to_version=req.to_version)
+
+
+@app.post("/rollback-vespa")
+@utils.enable_upgrade_api()
+def rollback_vespa_app_to_current_version(marqo_config: config.Config = Depends(get_config)):
+    marqo_config.index_management.rollback_vespa()
+    return JSONResponse(
+        content={"version": version.get_version()},
+        status_code=200
+    )
 
 
 if __name__ == "__main__":
