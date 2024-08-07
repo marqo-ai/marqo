@@ -78,8 +78,13 @@ class UnstructuredVespaIndex(VespaIndex):
         else:
             ranking = unstructured_common.RANK_PROFILE_EMBEDDING_SIMILARITY
 
+        if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
+        else:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING_2_10
+
         query_inputs = {
-            unstructured_common.QUERY_INPUT_EMBEDDING: marqo_query.vector_query
+            query_input_embedding_parameter: marqo_query.vector_query
         }
 
         if score_modifiers:
@@ -102,8 +107,7 @@ class UnstructuredVespaIndex(VespaIndex):
 
         return query
 
-    @staticmethod
-    def _get_tensor_search_term(marqo_query: MarqoTensorQuery) -> str:
+    def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
         if marqo_query.ef_search is not None:
@@ -113,6 +117,11 @@ class UnstructuredVespaIndex(VespaIndex):
             target_hits = marqo_query.limit + marqo_query.offset
             additional_hits = 0
 
+        if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
+        else:
+            query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING_2_10
+
         return (
             f"("
             f"{{"
@@ -120,7 +129,7 @@ class UnstructuredVespaIndex(VespaIndex):
             f"approximate:{str(marqo_query.approximate)}, "
             f'hnsw.exploreAdditionalHits:{additional_hits}'
             f"}}"
-            f"nearestNeighbor({field_to_search}, {unstructured_common.QUERY_INPUT_EMBEDDING})"
+            f"nearestNeighbor({field_to_search}, {query_input_embedding_parameter})"
             f")"
         )
 
@@ -347,7 +356,7 @@ class UnstructuredVespaIndex(VespaIndex):
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            'ranking.rerankCount': marqo_query.limit,  # limits the number of results going to phase 2
+            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,  # limits the number of results going to phase 2
 
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
