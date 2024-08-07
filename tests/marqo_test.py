@@ -2,6 +2,7 @@ import time
 import unittest
 import uuid
 from unittest.mock import patch, Mock
+import multiprocessing
 
 import vespa.application as pyvespa
 
@@ -18,6 +19,8 @@ from marqo.vespa.vespa_client import VespaClient
 
 class MarqoTestCase(unittest.TestCase):
     indexes = []
+    create_lock = multiprocessing.Lock()
+    delete_lock = multiprocessing.Lock()
 
     @classmethod
     def configure_request_metrics(cls):
@@ -32,8 +35,28 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
+        
+        """if cls.indexes:
+            with cls.delete_lock:
+                try:
+                    cls.index_management.batch_delete_indexes(cls.indexes)
+                except Exception as e:
+                    print(f"Error deleting indexes: {e}")"""
+        max_retries = 25
+        initial_wait_time = 120 # seconds
+        max_wait_time = 1000  # seconds
         if cls.indexes:
-            cls.index_management.batch_delete_indexes(cls.indexes)
+            for attempt in range(max_retries):
+                try:
+                    with cls.delete_lock:
+                        cls.index_management.batch_delete_indexes(cls.indexes)
+                        break
+                except Exception as e: # TODO: Change this exception to something more specific
+                    if attempt < max_retries - 1:
+                        wait_time = min(initial_wait_time * (2 ** attempt), max_wait_time)
+                        time.sleep(wait_time)
+                    else:
+                        raise e
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -54,13 +77,36 @@ class MarqoTestCase(unittest.TestCase):
 
         cls.pyvespa_client = pyvespa.Vespa(url="http://localhost", port=8080)
         cls.CONTENT_CLUSTER = 'content_default'
+        #cls.indexes = []
 
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
-        indexes = cls.index_management.batch_create_indexes(index_requests)
-        cls.indexes = indexes
-
-        return indexes
+        """with cls.create_lock:
+            try:
+                indexes = cls.index_management.batch_create_indexes(index_requests)
+                cls.indexes = indexes
+                return indexes
+            except Exception as e:
+                print(f"Error creating indexes: {e}")
+                return []"""
+        max_retries = 25
+        initial_wait_time = 120 # seconds
+        max_wait_time = 1000  # seconds
+        for attempt in range(max_retries):
+            try:
+                with cls.create_lock:
+                    indexes = cls.index_management.batch_create_indexes(index_requests)
+                    cls.indexes = indexes
+                    break
+            except Exception as e: # TODO: Change this exception to something more specific
+                if attempt < max_retries - 1:
+                    wait_time = min(initial_wait_time * (2 ** attempt), max_wait_time)
+                    time.sleep(wait_time)
+                else:
+                    raise e
+        #indexes = cls.index_management.batch_create_indexes(index_requests)
+        
+            
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
