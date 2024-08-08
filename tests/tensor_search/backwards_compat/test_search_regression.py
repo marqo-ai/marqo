@@ -105,9 +105,12 @@ class TestSearchRegression(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_text_index]:
             with self.subTest(index=type(index)):
 
+                docs_with_same_bm25_score = [("doc8", "doc9")]
+
                 # Select results
                 if isinstance(index, UnstructuredMarqoIndex):
                     expected_results = results_2_9.search_results_unstructured
+                    docs_with_same_bm25_score.append(("doc7", "doc11"))
                 elif isinstance(index, StructuredMarqoIndex):
                     expected_results = results_2_9.search_results_structured
 
@@ -133,12 +136,17 @@ class TestSearchRegression(MarqoTestCase):
                             result_count=10
                         )
 
-                        docs_with_same_bm25_score = {"doc8", "doc9"}
+
                         self.assertEqual(len(search_res["hits"]), len(expected_results[search_method]))
                         for i in range(len(search_res["hits"])):
                             # Docs with same bm25 score are interchangeable in order
-                            if (search_res["hits"][i]["_id"] in docs_with_same_bm25_score) and (search_method == SearchMethod.LEXICAL):
-                                self.assertIn(expected_results[search_method][i]["_id"], docs_with_same_bm25_score)
+                            same_score_group = ()
+                            for group in docs_with_same_bm25_score:
+                                if search_res["hits"][i]["_id"] in group:
+                                    same_score_group = group
+
+                            if (search_res["hits"][i]["_id"] in same_score_group) and (search_method == SearchMethod.LEXICAL):
+                                self.assertIn(expected_results[search_method][i]["_id"], same_score_group)
                             else:
                                 self.assertEqual(search_res["hits"][i]["_id"], expected_results[search_method][i]["_id"])
                             self.assertTrue(np.allclose(search_res["hits"][i]["_score"], expected_results[search_method][i]["_score"], atol=1e-6))
