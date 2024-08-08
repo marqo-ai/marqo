@@ -1,3 +1,30 @@
+# Release 2.11.0
+
+## New features
+
+- Hybrid Search for unstructured indexes (`"searchMethod": "HYBRID”`) ([#912](https://github.com/marqo-ai/marqo/pull/912)). Marqo now supports hybrid search for unstructured indexes, combining lexical and tensor search (e.g., using reciprocal rank fusion - RRF) to provide the best relevance possible. See usage [here](https://docs.marqo.ai/2.11/API-Reference/Search/search/#example-2-creating-and-searching-an-unstructured-index-hybrid-search-with-model-deployed-within-marqo). Please note that hybrid search only works on a fresh Marqo 2.11.0 instance without state transfer for now. This is a limitation that we will address in the next release.
+- [Marqo Terraform provider](https://github.com/marqo-ai/terraform-provider-marqo) is now available on both [OpenTofu Registry](https://github.com/opentofu/registry/blob/main/providers/m/marqo-ai/marqo.json) and [Terraform Registry](https://registry.terraform.io/providers/marqo-ai/marqo/latest). See usage [here](https://docs.marqo.ai/2.11/Cloud-Reference/opentofu_provider/)
+
+## Bug fixes and minor changes
+
+- Improve the error handling of batch add/update/get documents API ([#911](https://github.com/marqo-ai/marqo/pull/911)). Now each document in a batch request has its individual response status with detailed error message. See details [here](https://docs.marqo.ai/2.11/API-Reference/Documents/add_or_replace_documents/#response)
+- Fix incorrect or missing prefixes for some models in the registry ([#917](https://github.com/marqo-ai/marqo/pull/917)). This change improves all BGE models, all Snowflake models, and multilingual-e5-large-instruct. For example, `snowflake-arctic-embed-l` model has 34% improvement in NDCG@10 on the Arguana benchmark and 153% improvement in NDCG@10 on the FIQA benchmark.
+- Increase the maxHits and maxOffset limit to 1,000,000 in the default query profile. ([#914](https://github.com/marqo-ai/marqo/pull/914)). This allows user to override `MARQO_MAX_SEARCH_LIMIT` and `MARQO_MAX_SEARCH_OFFSET` environment variables to large values up to one million. Please note that this is an advanced setting and very large values aren’t normally recommended.
+- Fix a bug that causes 400 error when using hybrid search with LEXICAL retrieval method and TENSOR ranking method and `scoreModifiersLexical` ([#922](https://github.com/marqo-ai/marqo/pull/922)).
+
+## Contributor shout-outs
+
+- Huge shoutout to all our 4.4k stargazers! We’ve come a long way as a team and as a community, so a huge thanks to everyone who continues to support Marqo.
+- Feel free to keep on sharing questions and feedback on our [forum](https://community.marqo.ai/) and [Slack channel](https://marqo-community.slack.com/join/shared_invite/zt-2b4nsvbd2-TDf8agPszzWH5hYKBMIgDA#/shared-invite/email)! If you have any more inquiries or thoughts, please don’t hesitate to reach out.
+
+# Release 2.10.1
+
+## Bug fixes and minor changes
+- Improve the clarity of the error message when Marqo can not download the provided image ([#905](https://github.com/marqo-ai/marqo/pull/905)).
+- Improve the error message in hybrid search to avoid confusion ([#900](https://github.com/marqo-ai/marqo/pull/900)).
+- Fix a bug where a `500` error is returned when an unsupported search method is provided. Marqo now correctly returns a `400` error ([#899](https://github.com/marqo-ai/marqo/pull/899)).
+- Fix a bug where a `500` error is returned when an invalid image URL with non-ASCII characters is provided. Marqo now encodes the image URL correctly ([#908](https://github.com/marqo-ai/marqo/pull/908)).
+
 # Release 2.10.0
 
 ## New features
