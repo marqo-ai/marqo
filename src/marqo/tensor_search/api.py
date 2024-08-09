@@ -4,14 +4,17 @@ from typing import List
 
 import pydantic
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 from marqo import config
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
-from marqo.api.exceptions import InvalidArgError
+from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
 from marqo.api.models.embed_request import EmbedRequest
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.recommend_query import RecommendQuery
@@ -19,7 +22,6 @@ from marqo.api.models.rollback_request import RollbackRequest
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.api.route import MarqoCustomRoute
 from marqo.core import exceptions as core_exceptions
-from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
@@ -35,6 +37,7 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = get_logger(__name__)
 
@@ -153,6 +156,26 @@ def marqo_api_exception_handler(request: Request, exc: api_exceptions.MarqoWebEr
         )
     else:
         return JSONResponse(content=body, status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def api_validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Catch FastAPI validation errors and return a 422 error with the error messages.
+
+    Note: The Pydantic Validation error that happens at the API will be caught here and returned as a 422 error.
+    However, the Pydantic Validation error that happens in the core will be caught by the MarqoError handler above and
+    converted to an API error in validation_exception_handler
+    """
+    body = {
+        "detail": jsonable_encoder(exc.errors()),
+        "code": UnprocessableEntityError.code,
+        "type": UnprocessableEntityError.error_type,
+        "link": UnprocessableEntityError.link
+    }
+    return JSONResponse(
+        status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+        content=body
+    )
 
 
 @app.exception_handler(pydantic.ValidationError)
@@ -294,9 +317,10 @@ def add_or_replace_documents(
                                                              device=device)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        return tensor_search.add_documents(
+        res = tensor_search.add_documents(
             config=marqo_config, add_docs_params=add_docs_params
         )
+        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.post("/indexes/{index_name}/embed")
@@ -324,7 +348,7 @@ def update_documents(
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
 
-    return res.dict(exclude_none=True, by_alias=True)
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/documents/{document_id}")
@@ -342,10 +366,11 @@ def get_documents_by_ids(
         index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False):
-    return tensor_search.get_documents_by_ids(
+    res = tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
         show_vectors=expose_facets
     )
+    return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
 @app.get("/indexes/{index_name}/stats")

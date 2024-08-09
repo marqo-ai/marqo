@@ -152,7 +152,7 @@ class TestPrefix(MarqoTestCase):
                 res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name, document_ids=["doc_a", "doc_b", "doc_c"],
                     show_vectors=True
-                )["results"]
+                ).dict(exclude_none=True, by_alias=True)["results"]
                 retrieved_doc_a = res[0]
                 retrieved_doc_b = res[1]
                 retrieved_doc_c = res[2]
@@ -212,7 +212,7 @@ class TestPrefix(MarqoTestCase):
                 res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name, document_ids=["doc_a", "doc_b", "doc_c"],
                     show_vectors=True
-                )["results"]
+                ).dict(exclude_none=True, by_alias=True)["results"]
                 retrieved_doc_a = res[0]
                 retrieved_doc_b = res[1]
                 retrieved_doc_c = res[2]
@@ -305,7 +305,7 @@ class TestPrefix(MarqoTestCase):
                 res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name, document_ids=["1", "2", "3"],
                     show_vectors=True
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 
                 # Assert that the text field remains the same stored
                 self.assertEqual(res["results"][0]["text_field"], "hello")
@@ -373,7 +373,7 @@ class TestPrefix(MarqoTestCase):
         res = tensor_search.get_documents_by_ids(
             config=self.config, index_name=self.unstructured_index_with_override.name, document_ids=["doc_a"],
             show_vectors=True
-        )
+        ).dict(exclude_none=True, by_alias=True)
 
         # we hardcode the prefix into the text chunk and embed
         embed_res = embed(
@@ -416,11 +416,7 @@ class TestPrefix(MarqoTestCase):
                 self.assertEqual(len(call_args), 1)
 
                 vespa_query_kwargs = call_args[0].kwargs
-                if isinstance(index, UnstructuredMarqoIndex):
-                    embedding_key = "embedding_query"
-                elif isinstance(index, StructuredMarqoIndex):
-                    embedding_key = "marqo__query_embedding"
-                search_query_embedding = vespa_query_kwargs["query_features"][embedding_key]
+                search_query_embedding = vespa_query_kwargs["query_features"]["marqo__query_embedding"]
 
                 # Embed request the same text
                 embed_res = embed(

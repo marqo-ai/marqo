@@ -415,7 +415,6 @@ def validate_dict(field: str, field_content: Dict, is_non_tensor_field: bool, ma
                     f"The field {field} is a map field and only supported for indexes created with Marqo 2.9.0 or later. "
                     f"See {marqo_docs.map_fields()} and {marqo_docs.mappings()}."
                 )
-
             field_content = validate_map_numeric_field(field_content)
 
     return field_content
@@ -433,7 +432,7 @@ def validate_map_numeric_field(field_content):
     # Validate that the field content is a dict
     if not isinstance(field_content, dict):
         raise InvalidArgError(
-            f"The field content `{field_content}` is of type `{type(field_content).__name__}`, which is not a valid type for a map field."
+            f"The field content '{field_content}' is of type '{type(field_content).__name__}', which is not a valid type for a map field."
             f"A map field must be a dictionary."
         )
 
@@ -447,11 +446,13 @@ def validate_map_numeric_field(field_content):
     for key, value in field_content.items():
         if not isinstance(key, str):
             raise InvalidArgError(
-                f"Key `{key}` in map field is not a string. All keys must be strings."
+                f"Key '{key}' in map field is not a string. All keys must be strings."
             )
         if not isinstance(value, (int, float)):
             raise InvalidArgError(
-                f"Value `{value}` for key `{key}` in map field is not of type int or float."
+                f"Value '{value}' for key '{key}' in map field is not of type int or float. If you are using an "
+                f"unstructured index and attempting to index another type of object field (e.g. custom_vector field), "
+                f"please use the 'mappings' object. See '{marqo_docs.mappings()}' for more info on object fields."
             )
 
     return field_content

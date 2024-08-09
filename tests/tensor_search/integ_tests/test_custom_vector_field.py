@@ -1,26 +1,18 @@
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search import enums
-from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifierLists
-from tests.marqo_test import MarqoTestCase
-from marqo.tensor_search.tensor_search import add_documents
-from marqo.tensor_search.models.search import SearchContext
-import numpy as np
-import requests
-import json
-from unittest import mock
-from unittest.mock import patch
-from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
-import marqo.exceptions as base_exceptions
-from marqo.core.models.marqo_index import *
-from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
-    FeedDocumentResponse
 import os
-import pprint
 import unittest
-import httpx
-import uuid
+from unittest import mock
+
+import numpy as np
+
+from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.tensor_search import enums
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.tensor_search.models.api_models import ScoreModifierLists
+from marqo.tensor_search.models.search import SearchContext
+from marqo.vespa.models import VespaDocument, FeedBatchDocumentResponse, FeedBatchResponse
+from tests.marqo_test import MarqoTestCase
 
 
 class TestCustomVectorField(MarqoTestCase):
@@ -168,7 +160,7 @@ class TestCustomVectorField(MarqoTestCase):
 
             if isinstance(index, UnstructuredMarqoIndex):
                 self.assertEqual(vespa_fields["marqo__strings"], ["custom content is here!!"])
-                self.assertEqual(vespa_fields["marqo__long_string_fields"], {"my_custom_vector": "custom content is here!!"})
+                self.assertEqual(vespa_fields["marqo__short_string_fields"], {"my_custom_vector": "custom content is here!!"})
                 self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!'])
                 self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
 
@@ -290,7 +282,7 @@ class TestCustomVectorField(MarqoTestCase):
             assert run()
 
             call_args = mock_feed_batch.call_args_list
-            assert len(call_args) == 1
+            self.assertEqual(1, len(call_args))
             self.maxDiff = None
             feed_batch_args = call_args[0].args
             self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
@@ -302,10 +294,9 @@ class TestCustomVectorField(MarqoTestCase):
                                   'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
                                   'custom content is here!!'])
                 self.assertEqual(vespa_fields["marqo__long_string_fields"],
-                                 {'multimodal_image': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png',
-                                  'my_custom_vector': 'custom content is here!!'})
+                                 {'multimodal_image': 'https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png'})
                 self.assertEqual(vespa_fields["marqo__short_string_fields"],
-                                 {'multimodal_text': 'blah'})
+                                 {'multimodal_text': 'blah', 'my_custom_vector': 'custom content is here!!'})
                 self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!',
                                                                  'my_multimodal::{"multimodal_text": "blah", "multimodal_image": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png"}'])
                 self.assertEqual(vespa_fields["marqo__embeddings"]["0"], self.random_vector_1), # First vector is custom vector
@@ -471,12 +462,12 @@ class TestCustomVectorField(MarqoTestCase):
                         mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
                         tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
 
                 # Confirm get_document_by_id returns correct content
                 res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name,
-                    document_ids=["0", "1", "2"], show_vectors=True)
+                    document_ids=["0", "1", "2"], show_vectors=True).dict(exclude_none=True, by_alias=True)
 
                 assert len(res["results"]) == 3
 
@@ -1030,7 +1021,7 @@ class TestCustomVectorField(MarqoTestCase):
                     }
                 }
             )
-        )
+        ).dict(exclude_none=True, by_alias=True)
 
         self.assertEqual(add_docs_res["errors"], True)
         self.assertEqual(add_docs_res["items"][0]["code"], "invalid_argument")

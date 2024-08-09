@@ -21,7 +21,6 @@ class TestDictScoreModifiers(MarqoTestCase):
         # UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
-            marqo_version="2.9.0"
         )
 
         # STRUCTURED indexes
@@ -408,12 +407,12 @@ class TestDictScoreModifiers(MarqoTestCase):
                         ],
                         tensor_fields=["text_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
 
                 # Expected
                 expected = {"1": 200, "2": 200, "3": 400, "4": 200, "5": 200}
                 expected_doc_3_error = {
-                    "invalid_argument": "Value `hello` for key `text` in map field is not of type int or float."}
+                    "invalid_argument": "Value 'hello' for key 'text' in map field is not of type int or float."}
 
                 # Get actual returned document add status
                 actual = {item["_id"]: item["status"] for item in res["items"]}
@@ -421,7 +420,7 @@ class TestDictScoreModifiers(MarqoTestCase):
 
                 # Assert that expected and actual status codes are equal
                 self.assertEqual(expected, actual)
-                self.assertEqual(expected_doc_3_error, actual_doc3)
+                self.assertIn(expected_doc_3_error["invalid_argument"], actual_doc3["invalid_argument"])
 
     def test_unstructured_wrong_map_numerical_format(self):
         """
@@ -454,7 +453,7 @@ class TestDictScoreModifiers(MarqoTestCase):
                             "my_custom_audio_vector_1": {"type": "custom_vector"},
                         },
                     )
-                )
+                ).dict(exclude_none=True, by_alias=True)
 
                 # Expected
                 expected_results = {

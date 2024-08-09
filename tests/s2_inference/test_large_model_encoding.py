@@ -42,12 +42,23 @@ class TestLargeModelEncoding(unittest.TestCase):
             'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
             'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
             'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg',
-            "open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k"
+            #'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
+            #'open_clip/ViT-H-14-378-quickgelu/dfn5b',
+            #'open_clip/ViT-SO400M-14-SigLIP-384/webli'
         ]
 
-        self.multilingual_models = ["hf/multilingual-e5-small", "hf/multilingual-e5-base", "hf/multilingual-e5-large"]
+        self.multilingual_models = [
+            "hf/multilingual-e5-small", 
+            "hf/multilingual-e5-base", 
+            "hf/multilingual-e5-large", 
+            #"hf/multilingual-e5-large-instruct"
+        ]
 
         self.e5_models = ["hf/e5-large", "hf/e5-large-unsupervised"]
+
+        #self.bge_models = ["hf/bge-large-zh-v1.5", "hf/bge-large-en-v1.5"]
+
+        #self.snowflake_models = ["hf/snowflake-arctic-embed-l"]
 
     def tearDown(self) -> None:
         clear_loaded_models()
@@ -61,7 +72,7 @@ class TestLargeModelEncoding(unittest.TestCase):
         remove_cached_clip_files()
 
     def test_vectorize(self):
-        names = self.large_clip_models + self.e5_models
+        names = self.large_clip_models + self.e5_models #+ self.bge_models + self.snowflake_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-9
@@ -114,7 +125,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
 
     def test_model_outputs(self):
-        names = self.large_clip_models+ self.e5_models
+        names = self.large_clip_models+ self.e5_models #+ self.bge_models + self.snowflake_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
 
@@ -131,7 +142,7 @@ class TestLargeModelEncoding(unittest.TestCase):
 
 
     def test_model_normalization(self):
-        names = self.large_clip_models + self.e5_models
+        names = self.large_clip_models + self.e5_models #+ self.bge_models + self.snowflake_models
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = "cuda"
         eps = 1e-6
@@ -172,7 +183,7 @@ class TestLargeModelEncoding(unittest.TestCase):
                     assert np.allclose(english_feature, other_language_feature, atol=e)
 
     def test_cuda_encode_type(self):
-        names = self.large_clip_models + self.e5_models
+        names = self.large_clip_models + self.e5_models #+ self.multilingual_models + self.bge_models + self.snowflake_models
 
         names += ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
                  "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",

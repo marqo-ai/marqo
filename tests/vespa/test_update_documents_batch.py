@@ -69,9 +69,9 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ids = [response.id.split("::")[-1] for response in batch_response.responses if response.status == 200]
         messages = [response.message for response in batch_response.responses]
 
-        self.assertEqual(statuses, [404, 404])
-        self.assertEqual(path_ids, ["doc1", "doc2"])
-        self.assertEqual(ids, [])
+        self.assertEqual([412, 412], statuses)
+        self.assertEqual(["doc1", "doc2"], path_ids)
+        self.assertEqual([], ids)
         self.assertIn("not exist", messages[0])
         self.assertIn("not exist", messages[1])
 
@@ -95,18 +95,22 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         ids = [response.id.split("::")[-1] for response in batch_response.responses if response.status == 200]
         messages = [response.message for response in batch_response.responses]
 
-        self.assertEqual(statuses, [200, 400])
-        self.assertEqual(path_ids, ["doc1", "doc2"])
-        self.assertEqual(ids, ["doc1"])
+        self.assertEqual([200, 400], statuses)
+        self.assertEqual(["doc1", "doc2"], path_ids)
+        self.assertEqual(["doc1"], ids)
         self.assertIsNone(messages[0])
         self.assertIsNotNone(messages[1])
 
-    @patch("httpx.AsyncClient.put", side_effect=httpx.NetworkError("Network failure"))
-    def test_update_documents_batch_network_error(self, mock_put):
+    def test_update_documents_batch_network_error(self):
         update_documents = [
             VespaDocument(id="doc1", fields={"title": {"assign": "Network Failure Test"}}),
+            VespaDocument(id="doc2", fields={"title": {"assign": "Network Failure Test"}})
         ]
+        with patch("httpx.AsyncClient.put", side_effect=httpx.NetworkError("Network failure")):
+            batch_response = self.client.update_documents_batch(update_documents, self.TEST_SCHEMA)
 
-        with self.assertRaises(VespaError) as context:
-            self.client.update_documents_batch(update_documents, self.TEST_SCHEMA)
-        self.assertIn("Network failure", str(context.exception))
+        self.assertEqual(batch_response.errors, True)
+        self.assertEqual(2, len(batch_response.responses))
+        for r in batch_response.responses:
+            self.assertEqual(r.status, 500)
+            self.assertIn("Network Error", r.message)
