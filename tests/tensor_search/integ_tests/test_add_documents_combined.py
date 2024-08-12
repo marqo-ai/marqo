@@ -85,8 +85,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=index_name,
                         docs=documents,
-                        tensor_fields=tensor_fields)
+                        tensor_fields=tensor_fields,)
                 ).dict(exclude_none=True, by_alias=True)
+                print(f"response: {r}")
                 self.assertEqual(True, r["errors"])
                 self.assertEqual(2, len(r["items"]))
                 self.assertEqual(200, r["items"][0]["status"])
@@ -192,8 +193,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
             with self.subTest(index_name):
                 for thread_count in [2, 5]:
                     with patch.object(
-                            add_docs, 'threaded_download_and_preprocess_images',
-                            wraps=add_docs.threaded_download_and_preprocess_images
+                            add_docs, 'threaded_download_and_preprocess_content',
+                            wraps=add_docs.threaded_download_and_preprocess_content
                     ) as mock_download_images:
                         tensor_search.add_documents(
                             config=self.config, add_docs_params=AddDocsParams(
@@ -213,7 +214,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             'field_2': good_url
         }
 
-        add_docs.threaded_download_and_preprocess_images(
+        add_docs.threaded_download_and_preprocess_content(
             allocated_docs=[test_doc],
             image_repo=image_repo,
             tensor_fields=['field_1', 'field_2'],
@@ -231,12 +232,12 @@ class TestAddDocumentsCombined(MarqoTestCase):
             'field_2': good_url
         }
 
-        add_docs.threaded_download_and_preprocess_images(
+        add_docs.threaded_download_and_preprocess_content(
             allocated_docs=[test_doc],
             image_repo=image_repo,
             tensor_fields=['field_1', 'field_2'],
             image_download_headers={},
-            preprocessor=lambda x: torch.randn(3, 224, 224),
+            preprocessors={'image': lambda x: torch.randn(3, 224, 224)},
             device='cpu'
         )
         assert len(image_repo) == 2
@@ -250,7 +251,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         @mock.patch('requests.get', mock_get)
         def run():
             image_repo = dict()
-            add_docs.threaded_download_and_preprocess_images(
+            add_docs.threaded_download_and_preprocess_content(
                 allocated_docs=[
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
                 image_repo=image_repo,
@@ -337,7 +338,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         ]
         for docs, expected_repo_structure in examples:
             image_repo = dict()
-            add_docs.threaded_download_and_preprocess_images(
+            add_docs.threaded_download_and_preprocess_content(
                 allocated_docs=docs,
                 image_repo=image_repo,
                 tensor_fields=['field_1', 'field_2'],
@@ -387,7 +388,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         for docs, expected_repo_structure in examples:
             with mock.patch('PIL.Image.Image.close') as mock_close:
-                with add_docs.download_and_preprocess_images(
+                with add_docs.download_and_preprocess_content(
                     docs=docs,
                     thread_count=20,
                     tensor_fields=['field_1', 'field_2'],
@@ -399,6 +400,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 ) as image_repo:
                     self.assertEqual(len(expected_repo_structure), len(image_repo))
                     for k in expected_repo_structure:
+                        print(f"expected_repo_structure[k] = {expected_repo_structure[k]}")
+                        print(f"image_repo[k] = {image_repo[k]}")
                         self.assertIsInstance(image_repo[k], expected_repo_structure[k])
 
             # Images should not be closed as they are Tensor instead of ImageType

@@ -166,7 +166,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     if add_docs_params.tensor_fields else []
                 tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
                 image_repo = exit_stack.enter_context(
-                    add_docs.download_and_preprocess_images(
+                    add_docs.download_and_preprocess_content(
                         docs=docs, thread_count=add_docs_params.image_download_thread_count,
                         tensor_fields=tensor_fields_and_multimodal_subfields,
                         image_download_headers=add_docs_params.image_download_headers,
@@ -597,7 +597,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     raise api_exceptions.BadRequestError(message="`_id` field cannot be an image pointer field.")
 
                 image_repo = exit_stack.enter_context(
-                    add_docs.download_and_preprocess_images(
+                    add_docs.download_and_preprocess_content(
                         docs=docs, thread_count=add_docs_params.image_download_thread_count,
                         tensor_fields=image_fields,
                         image_download_headers=add_docs_params.image_download_headers,

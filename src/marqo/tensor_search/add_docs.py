@@ -18,7 +18,8 @@ from io import BytesIO
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference import clip_utils
-from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, infer_modality, Modality
+from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
+    infer_modality, Modality
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
@@ -29,7 +30,7 @@ class MemoryPool:
         self.total_size = total_size
         self.chunk_size = chunk_size
         self.pool = Queue(maxsize=total_size // chunk_size)
-        
+
         for _ in range(self.pool.maxsize):
             self.pool.put(bytearray(chunk_size))
 
@@ -39,11 +40,16 @@ class MemoryPool:
     def return_chunk(self, chunk):
         self.pool.put(chunk)
 
-def threaded_download_and_preproces_content(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
-                             image_download_headers: dict,
-                             device: str = None,
-                             metric_obj: Optional[RequestMetrics] = None,
-                             preprocessor: Optional[Compose] = None) -> None:
+
+def threaded_download_and_preprocess_content(allocated_docs: List[dict], 
+                                                image_repo: dict, 
+                                                tensor_fields: List[str],
+                                                image_download_headers: dict,
+                                                device: str = None,
+                                                memory_pool: Optional[MemoryPool] = None, # Optional for now
+                                                download_headers: Optional[Dict] = None,  # Optional for now
+                                                metric_obj: Optional[RequestMetrics] = None,
+                                                preprocessors: Optional[Dict[str, Compose]] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -88,18 +94,21 @@ def threaded_download_and_preproces_content(allocated_docs: List[dict], image_re
                             continue
                         try:
                             image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
-                                                                                    timeout_ms=int(TIMEOUT_SECONDS * 1000),
-                                                                                    metrics_obj=metric_obj)
+                                                                                     timeout_ms=int(
+                                                                                         TIMEOUT_SECONDS * 1000),
+                                                                                     metrics_obj=metric_obj)
                         except PIL.UnidentifiedImageError as e:
                             image_repo[doc[field]] = e
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
-                        if preprocessor:
-                            if not device:
+                        if preprocessors and 'image' in preprocessors:
+                            print(f"device: {device}")
+                            if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                image_repo[doc[field]] = preprocessor(image_repo[doc[field]]).to(device)
+                                image_repo[doc[field]] = preprocessors['image'](image_repo[doc[field]]).to(device)
+                                print(f"image_repo[doc[field]]: {image_repo[doc[field]]}")
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     image_repo[doc[field]] = e
@@ -107,6 +116,7 @@ def threaded_download_and_preproces_content(allocated_docs: List[dict], image_re
                                     continue
                                 else:
                                     raise e
+
                     if modality in [Modality.VIDEO, Modality.AUDIO]:
                         chunks = download_and_chunk_media(doc[field], download_headers, memory_pool, modality)
                         content_repo[doc[field]] = chunks
@@ -161,6 +171,7 @@ def download_and_chunk_media(url: str, headers: dict, memory_pool: MemoryPool, m
 
     return chunks
 
+
 def process_chunk(chunk: bytearray, modality: Modality) -> np.ndarray:
     if modality == Modality.VIDEO:
         return extract_frames(chunk)
@@ -169,16 +180,18 @@ def process_chunk(chunk: bytearray, modality: Modality) -> np.ndarray:
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
+
 @contextmanager
 def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                    download_headers: dict,
-                    model_name: str,
-                    normalize_embeddings: bool,
-                    model_properties: Optional[Dict] = None,
-                    model_auth: Optional[ModelAuth] = None,
-                    device: Optional[str] = None,
-                    patch_method_exists: bool = False
-                    ) -> ContextManager[dict]:
+                                    image_download_headers: dict,
+                                    model_name: str,
+                                    normalize_embeddings: bool,
+                                    download_headers: Optional[Dict] = None,  # Optional for now
+                                    model_properties: Optional[Dict] = None,
+                                    model_auth: Optional[ModelAuth] = None,
+                                    device: Optional[str] = None,
+                                    patch_method_exists: bool = False
+                                    ) -> ContextManager[dict]:
     content_repo = {}  # for image/video/audio
     memory_pool = MemoryPool(total_size=500 * 1024 * 1024, chunk_size=20 * 1024 * 1024)  # 500 MB total, 20 MB chunks
 
@@ -199,11 +212,20 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     try:
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
+        download_headers={}
         with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
             futures = [executor.submit(threaded_download_and_preprocess_content,
-                                       allocation, content_repo, tensor_fields,
-                                       download_headers, memory_pool, device, m[i], preprocessors)
-                       for i, allocation in enumerate(thread_allocated_docs)]
+                           allocation, 
+                           content_repo, 
+                           tensor_fields,
+                           image_download_headers, 
+                           device,
+                           memory_pool, 
+                           download_headers, 
+                           m[i], 
+                           preprocessors)
+           for i, allocation in enumerate(thread_allocated_docs)]
+
 
             # Unhandled exceptions will be raised here.
             # We only raise the first exception if there are multiple exceptions
@@ -222,18 +244,18 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
             elif isinstance(p, (list, np.ndarray)):
                 # Clean up video/audio chunks if necessary
                 pass
-    yield content_repo
+
 
 #@contextmanager
 def download_and_preprocess_images_old(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                    image_download_headers: dict,
-                    model_name: str,
-                    normalize_embeddings: bool,
-                    model_properties: Optional[Dict] = None,
-                    model_auth: Optional[ModelAuth] = None,
-                    device: Optional[str] = None,
-                    patch_method_exists: bool = False
-                    ) -> ContextManager[dict]:
+                                       image_download_headers: dict,
+                                       model_name: str,
+                                       normalize_embeddings: bool,
+                                       model_properties: Optional[Dict] = None,
+                                       model_auth: Optional[ModelAuth] = None,
+                                       device: Optional[str] = None,
+                                       patch_method_exists: bool = False
+                                       ) -> ContextManager[dict]:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
@@ -335,13 +357,15 @@ def determine_document_dict_field_type(field_name: str, field_content, mappings:
 
     if isinstance(field_content, dict):
         if field_name not in mappings:
-            raise base_exceptions.InternalError(f"Invalid dict field {field_name}. Could not find field in mappings object.")
+            raise base_exceptions.InternalError(
+                f"Invalid dict field {field_name}. Could not find field in mappings object.")
 
         if mappings[field_name]["type"] == enums.MappingsObjectType.multimodal_combination:
-            return enums.MappingsObjectType.multimodal_combination 
+            return enums.MappingsObjectType.multimodal_combination
         elif mappings[field_name]["type"] == enums.MappingsObjectType.custom_vector:
             return enums.MappingsObjectType.custom_vector
         else:
-            raise base_exceptions.InternalError(f"Invalid dict field type: '{mappings[field_name]['type']}' for field: '{field_name}' in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
+            raise base_exceptions.InternalError(
+                f"Invalid dict field type: '{mappings[field_name]['type']}' for field: '{field_name}' in mappings. Must be one of {[t.value for t in enums.MappingsObjectType]}")
     else:
         return None

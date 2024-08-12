@@ -148,7 +148,9 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
 
     try:
         encoded_url = encode_url(image_path)
+        print(f"encoded url: {encoded_url}")
     except UnicodeEncodeError as e:
+        print(f"error: {e}")
         raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
                                  f"The url could not be encoded properly. Original error: {e}")
     buffer = BytesIO()
