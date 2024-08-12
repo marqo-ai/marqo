@@ -10,6 +10,9 @@ from PIL import UnidentifiedImageError
 from PIL.Image import Image
 from torch import Tensor
 from torchvision.transforms import Compose
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
+from enum import Enum
 
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
@@ -40,7 +43,83 @@ _marqo_inference_cache = MarqoInferenceCache(cache_size=read_env_vars_and_defaul
                                              cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
 
 
-def vectorise(model_name: str, content: Union[str, List[str], List[Image]],
+class Modality(str, Enum):
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+
+class MultimodalModelProperties(BaseModel):
+    name: str
+    loader: str
+    supported_modalities: List[Modality]
+    dimensions: int
+    type: str = "multimodal"
+    video_chunk_length: int = 20  # in seconds
+    frames_to_extract_per_chunk: int = 8
+    video_frame_rate: float = 1  # frames per second
+
+class MultimodalModel:
+    def __init__(self, model_name: str, model_properties: Dict[str, Any], device: str):
+        self.model_name = model_name
+        self.properties = MultimodalModelProperties(**model_properties)
+        self.device = device
+        self.model = self._load_model()
+
+    def _load_model(self):
+        if self.properties.loader == "languagebind":
+            # Load LanguageBind model
+            pass
+        elif self.properties.loader == "imagebind":
+            # Load ImageBind model
+            pass
+        else:
+            raise ValueError(f"Unsupported loader: {self.properties.loader}")
+
+    def encode_text(self, text: str) -> List[float]:
+        # Implement text encoding
+        pass
+
+    def encode_image(self, image_path: str) -> List[float]:
+        # Implement image encoding
+        pass
+
+    def encode_video(self, video_path: str) -> List[List[float]]:
+        # Implement video encoding with chunking
+        pass
+
+    def encode_audio(self, audio_path: str) -> List[float]:
+        # Implement audio encoding
+        pass
+
+def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
+    # THIS IS POC, we can use python-magic to infer content type
+    if isinstance(content, str):
+        extension = content.split('.')[-1].lower()
+        if extension in ['jpg', 'jpeg', 'png', 'gif']:
+            return Modality.IMAGE
+        elif extension in ['mp4', 'avi', 'mov']:
+            return Modality.VIDEO
+        elif extension in ['mp3', 'wav', 'ogg']:
+            return Modality.AUDIO
+        else:
+            return Modality.TEXT
+    elif isinstance(content, bytes):
+        # Use python-magic to infer content type
+        import magic
+        mime = magic.from_buffer(content, mime=True)
+        if mime.startswith('image/'):
+            return Modality.IMAGE
+        elif mime.startswith('video/'):
+            return Modality.VIDEO
+        elif mime.startswith('audio/'):
+            return Modality.AUDIO
+        else:
+            return Modality.TEXT
+    else:
+        raise ValueError(f"Unsupported content type: {type(content)}")
+
+def vectorise_old(model_name: str, content: Union[str, List[str], List[Image]],
               model_properties: dict = None,
               device: str = None, normalize_embeddings: bool = get_default_normalization(),
               model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs) -> List[List[float]]:
@@ -123,8 +202,101 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image]],
     else:
         return _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
 
+def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
+              model_properties: dict = None,
+              device: str = None, normalize_embeddings: bool = get_default_normalization(),
+              model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs) -> List[List[float]]:
+    if not device:
+        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
-def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image]],
+    validated_model_properties = validate_model_properties(model_name, model_properties)
+    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
+
+    _update_available_models(
+        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
+        model_auth=model_auth
+    )
+
+    model = _available_models[model_cache_key][AvailableModelsKey.model]
+
+    if _marqo_inference_cache.is_enabled() and enable_cache:
+        return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs)
+    else:
+        return _vectorise_without_cache(model, content, normalize_embeddings, **kwargs)
+
+def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs):
+    if isinstance(content, str):
+        vectorised = _marqo_inference_cache.get(model_cache_key, content)
+        if vectorised is None:
+            vectorised = _encode_without_cache(model, content, normalize_embeddings, **kwargs)
+            _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
+        else:
+            vectorised = _convert_cached_embeddings_to_output(vectorised)
+        return vectorised
+    elif isinstance(content, list):
+        return _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs)
+    else:
+        raise TypeError(f"Unsupported content type: {type(content).__name__}")
+
+def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs):
+    contents_to_vectorise = []
+    cached_output = []
+
+    # Collect the content that needs to be vectorised
+    for loc, content_item in enumerate(content):
+        if isinstance(content_item, str):
+            vectorised = _marqo_inference_cache.get(model_cache_key, content_item)
+            if vectorised is None:
+                contents_to_vectorise.append(content_item)
+            else:
+                cached_output.append((loc, vectorised))
+        else:
+            contents_to_vectorise.append(content_item)
+
+    if contents_to_vectorise:
+        vectorised_outputs = _encode_without_cache(model, contents_to_vectorise, normalize_embeddings, **kwargs)
+        # Cache the vectorised outputs
+        for content_item, vectorised_output in zip(contents_to_vectorise, vectorised_outputs):
+            if isinstance(content_item, str):
+                _marqo_inference_cache.set(model_cache_key, content_item, vectorised_output)
+        # Insert the cached outputs back into the vectorised outputs
+        for loc, cached_vector in cached_output:
+            vectorised_outputs.insert(loc, cached_vector)
+    else:
+        vectorised_outputs = [vector for _, vector in cached_output]
+
+    return vectorised_outputs
+
+def _vectorise_without_cache(model, content, normalize_embeddings, **kwargs):
+    return _encode_without_cache(model, content, normalize_embeddings, **kwargs)
+
+def infer_modality(content: Union[str, bytes]) -> Modality:
+    if isinstance(content, str):
+        extension = content.split('.')[-1].lower()
+        if extension in ['jpg', 'jpeg', 'png', 'gif']:
+            return Modality.IMAGE
+        elif extension in ['mp4', 'avi', 'mov']:
+            return Modality.VIDEO
+        elif extension in ['mp3', 'wav', 'ogg']:
+            return Modality.AUDIO
+        else:
+            return Modality.TEXT
+    elif isinstance(content, bytes):
+        import magic
+        mime = magic.from_buffer(content, mime=True)
+        if mime.startswith('image/'):
+            return Modality.IMAGE
+        elif mime.startswith('video/'):
+            return Modality.VIDEO
+        elif mime.startswith('audio/'):
+            return Modality.AUDIO
+        else:
+            return Modality.TEXT
+    else:
+        raise ValueError(f"Unsupported content type: {type(content)}")
+
+
+def _encode_without_cache_old(model_cache_key: str, content: Union[str, List[str], List[Image]],
                           normalize_embeddings: bool, **kwargs) -> List[List[float]]:
     try:
         if isinstance(content, str):
@@ -156,6 +328,49 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
             raise e
     return _convert_vectorized_output(vectorised)
 
+def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+                          normalize_embeddings: bool, **kwargs) -> List[List[float]]:
+    try:
+        model = _available_models[model_cache_key][AvailableModelsKey.model]
+        
+        if isinstance(content, str):
+            vectorised = model.encode(content, normalize=normalize_embeddings, **kwargs)
+        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
+            vectorised = model.encode(content, normalize=normalize_embeddings, **kwargs)
+        else:
+            vector_batches = []
+            batch_size = _get_max_vectorise_batch_size()
+            
+            for batch in generate_batches(content, batch_size=batch_size):
+                modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
+                
+                if modality == Modality.TEXT:
+                    encoded_batch = model.encode_text(batch, normalize=normalize_embeddings, **kwargs)
+                elif modality == Modality.IMAGE:
+                    encoded_batch = model.encode_image(batch, normalize=normalize_embeddings, **kwargs)
+                elif modality == Modality.VIDEO:
+                    encoded_batch = model.encode_video(batch, normalize=normalize_embeddings, **kwargs)
+                elif modality == Modality.AUDIO:
+                    encoded_batch = model.encode_audio(batch, normalize=normalize_embeddings, **kwargs)
+                else:
+                    encoded_batch = model.encode(batch, normalize=normalize_embeddings, **kwargs)
+                
+                vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
+            
+            if not vector_batches or all(len(batch) == 0 for batch in vector_batches):
+                raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
+            else:
+                vectorised = np.concatenate(vector_batches, axis=0)
+        
+    except (UnidentifiedImageError, OSError) as e:
+        if isinstance(e, UnidentifiedImageError) or "image file is truncated" in str(e):
+            raise VectoriseError(f"Could not process given image: {content}. Original Error message: {e}") from e
+        else:
+            raise e
+    
+    return _convert_vectorized_output(vectorised)
+
+
 
 def get_available_models() -> Dict:
     """Returns the available models in the cache."""
@@ -174,30 +389,34 @@ def is_preprocess_image_model(model_properties: dict = None) -> bool:
     model_type = model_properties.get("type", None)
     return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
 
+def load_multimodal_model(model_name: str, model_properties: Dict[str, Any], device: str) -> MultimodalModel:
+    return MultimodalModel(model_name, model_properties, device)
 
-def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_properties: Optional[dict] = None,
+def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
                                                      device: Optional[str] = None,
                                                      model_auth: Optional[ModelAuth] = None,
                                                      normalize_embeddings: bool = get_default_normalization()) \
         -> Optional[Compose]:
-    """Load the multimodal model and return the image preprocessor.
+    """Load the model and return preprocessors for different modalities.
+
     Args:
-        model_name (str): The name of the multimodal model to load.
-        model_properties (dict): The validated properties of the multimodal model.
-            The model properties should have been validated in marqo_index
+        model_name (str): The name of the model to load.
+        model_properties (dict): The validated properties of the model.
         device (str): The device to load the model on.
         model_auth: Authorisation details for downloading a model (if required)
         normalize_embeddings (bool): Whether to normalize the embeddings.
 
     Returns:
-        Optional[Compose]: The image preprocessor in the loaded model. If not found, returns None.
+        Tuple[Any, Dict[str, Optional[Compose]]]: The loaded model and a dictionary of preprocessors for different modalities.
 
     Raises:
         InternalError: If the device is not set.
-        InternalError: If the model is not a model that requires preload image preprocessor.
     """
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
+
+    if model_properties.get("type") == "multimodal":
+        model = load_multimodal_model(model_name, model_properties, device)
 
     if not is_preprocess_image_model(model_properties):
         raise InternalError(message=f"Model {model_name} is not a model that requires preload image preprocessor.")
@@ -209,7 +428,17 @@ def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_prop
         model_auth=model_auth
     )
 
-    return getattr(_available_models[model_cache_key][AvailableModelsKey.model], "preprocess", None)
+    model = _available_models[model_cache_key][AvailableModelsKey.model]
+
+    preprocessors = {
+        "image": getattr(model, "preprocess", None),
+        "video": None, # Future preprocessor
+        "audio": None, # Future preprocessor
+        "text": None # Future preprocessor
+    }
+
+    return model, preprocessors
+    #return getattr(_available_models[model_cache_key][AvailableModelsKey.model], "preprocess", None)
 
 
 def _get_max_vectorise_batch_size() -> int:
@@ -353,6 +582,8 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
                             ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
             pass
+        elif model_properties.get("type") == "multimodal":
+            MultimodalModelProperties(**properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
                                               f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
@@ -501,6 +732,8 @@ def _load_model(
     if calling_func not in ["unit_test", "_update_available_models"]:
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
+    if model_properties['type'] == 'multimodal':
+        return MultimodalModel(model_name, model_properties, device)    
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
@@ -513,6 +746,13 @@ def _load_model(
     model.load()
     return model
 
+def chunk_video(video_path: str, chunk_length: int, frames_per_chunk: int) -> List[List[Image]]:
+    # Implement video chunking and frame extraction
+    pass
+
+def chunk_audio(audio_path: str, chunk_length: int) -> List[np.ndarray]:
+    # Implement audio chunking
+    pass
 
 def clear_loaded_models() -> None:
     """ clears the loaded model cache

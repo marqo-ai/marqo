@@ -6,21 +6,39 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import ContextManager
 import threading
+from queue import Queue
 
 import PIL
 from PIL.ImageFile import ImageFile
 from torchvision.transforms import Compose
+import pycurl
+from io import BytesIO
 
 import marqo.exceptions as base_exceptions
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference import clip_utils
-from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_image_preprocessor
+from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, infer_modality
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 
-def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
+class MemoryPool:
+    def __init__(self, total_size: int, chunk_size: int):
+        self.total_size = total_size
+        self.chunk_size = chunk_size
+        self.pool = Queue(maxsize=total_size // chunk_size)
+        
+        for _ in range(self.pool.maxsize):
+            self.pool.put(bytearray(chunk_size))
+
+    def get_chunk(self):
+        return self.pool.get()
+
+    def return_chunk(self, chunk):
+        self.pool.put(chunk)
+
+def threaded_download_and_preproces_content(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
                              image_download_headers: dict,
                              device: str = None,
                              metric_obj: Optional[RequestMetrics] = None,
@@ -61,30 +79,37 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
             for field in list(doc):
                 if field not in tensor_fields:
                     continue
-                if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
-                    if doc[field] in image_repo:
-                        continue
-                    try:
-                        image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
-                                                                                 timeout_ms=int(TIMEOUT_SECONDS * 1000),
-                                                                                 metrics_obj=metric_obj)
-                    except PIL.UnidentifiedImageError as e:
-                        image_repo[doc[field]] = e
-                        metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
-                        continue
-                    # preprocess image to tensor
-                    if preprocessor:
-                        if not device:
-                            raise ValueError("Device must be provided for preprocessing images")
+                if isinstance(doc[field], str):
+                    modality = infer_modality(doc[field])
+                    if modality == Modality.IMAGE or clip_utils._is_image(doc[field]):
+                        # Existing logic
+                        if doc[field] in image_repo:
+                            continue
                         try:
-                            image_repo[doc[field]] = preprocessor(image_repo[doc[field]]).to(device)
-                        except OSError as e:
-                            if "image file is truncated" in str(e):
-                                image_repo[doc[field]] = e
-                                metric_obj.increment_counter(f"{doc.get(field, '')}.OSError")
-                                continue
-                            else:
-                                raise e
+                            image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
+                                                                                    timeout_ms=int(TIMEOUT_SECONDS * 1000),
+                                                                                    metrics_obj=metric_obj)
+                        except PIL.UnidentifiedImageError as e:
+                            image_repo[doc[field]] = e
+                            metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
+                            continue
+                        # preprocess image to tensor
+                        if preprocessor:
+                            if not device:
+                                raise ValueError("Device must be provided for preprocessing images")
+                            try:
+                                image_repo[doc[field]] = preprocessor(image_repo[doc[field]]).to(device)
+                            except OSError as e:
+                                if "image file is truncated" in str(e):
+                                    image_repo[doc[field]] = e
+                                    metric_obj.increment_counter(f"{doc.get(field, '')}.OSError")
+                                    continue
+                                else:
+                                    raise e
+                    if modality in [Modality.VIDEO, Modality.AUDIO]:
+                        chunks = download_and_chunk_media(doc[field], download_headers, memory_pool, modality)
+                        content_repo[doc[field]] = chunks
+
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
                     for sub_field in list(doc[field].values()):
@@ -104,8 +129,102 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
                                 continue
 
 
+def download_and_chunk_media(url: str, headers: dict, memory_pool: MemoryPool, modality: Modality) -> List[np.ndarray]:
+    chunks = []
+    buffer = BytesIO()
+
+    def write_function(data):
+        buffer.write(data)
+        if buffer.tell() >= memory_pool.chunk_size:
+            chunk = memory_pool.get_chunk()
+            buffer.seek(0)
+            chunk[:len(buffer.getvalue())] = buffer.getvalue()
+            chunks.append(process_chunk(chunk, modality))
+            memory_pool.return_chunk(chunk)
+            buffer.seek(0)
+            buffer.truncate()
+
+    c = pycurl.Curl()
+    c.setopt(c.URL, url)
+    c.setopt(c.WRITEFUNCTION, write_function)
+    for key, value in headers.items():
+        c.setopt(c.HTTPHEADER, [f"{key}: {value}"])
+    c.perform()
+    c.close()
+
+    if buffer.tell() > 0:
+        chunk = memory_pool.get_chunk()
+        chunk[:buffer.tell()] = buffer.getvalue()
+        chunks.append(process_chunk(chunk[:buffer.tell()], modality))
+        memory_pool.return_chunk(chunk)
+
+    return chunks
+
+def process_chunk(chunk: bytearray, modality: Modality) -> np.ndarray:
+    if modality == Modality.VIDEO:
+        return extract_frames(chunk)
+    elif modality == Modality.AUDIO:
+        return extract_spectrogram(chunk)
+    else:
+        raise ValueError(f"Unsupported modality: {modality}")
+
 @contextmanager
-def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_fields: List[str],
+def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_fields: List[str],
+                    download_headers: dict,
+                    model_name: str,
+                    normalize_embeddings: bool,
+                    model_properties: Optional[Dict] = None,
+                    model_auth: Optional[ModelAuth] = None,
+                    device: Optional[str] = None,
+                    patch_method_exists: bool = False
+                    ) -> ContextManager[dict]:
+    content_repo = {}  # for image/video/audio
+    memory_pool = MemoryPool(total_size=500 * 1024 * 1024, chunk_size=20 * 1024 * 1024)  # 500 MB total, 20 MB chunks
+
+    docs_per_thread = math.ceil(len(docs) / thread_count)
+    copied = copy.deepcopy(docs)
+
+    model, preprocessors = load_multimodal_model_and_get_preprocessors(
+        model_name=model_name,
+        model_properties=model_properties,
+        device=device,
+        model_auth=model_auth,
+        normalize_embeddings=normalize_embeddings
+    )
+
+    if not is_preprocess_image_model(model_properties) or patch_method_exists:
+        preprocessors['image'] = None
+
+    try:
+        m = [RequestMetrics() for i in range(thread_count)]
+        thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
+        with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
+            futures = [executor.submit(threaded_download_and_preprocess_content,
+                                       allocation, content_repo, tensor_fields,
+                                       download_headers, memory_pool, device, m[i], preprocessors)
+                       for i, allocation in enumerate(thread_allocated_docs)]
+
+            # Unhandled exceptions will be raised here.
+            # We only raise the first exception if there are multiple exceptions
+            for future in concurrent.futures.as_completed(futures):
+                _ = future.result()
+
+        # Fix up metric_obj to make it not mention thread-ids
+        metric_obj = RequestMetricsStore.for_request()
+        metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
+        metric_obj.times = reduce_thread_metrics(metric_obj.times)
+        yield content_repo
+    finally:
+        for p in content_repo.values():
+            if isinstance(p, ImageFile):
+                p.close()
+            elif isinstance(p, (list, np.ndarray)):
+                # Clean up video/audio chunks if necessary
+                pass
+    yield content_repo
+
+#@contextmanager
+def download_and_preprocess_images_old(docs: List[dict], thread_count: int, tensor_fields: List[str],
                     image_download_headers: dict,
                     model_name: str,
                     normalize_embeddings: bool,
