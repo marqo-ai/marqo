@@ -102,7 +102,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
-                        if preprocessors and 'image' in preprocessors:
+                        if preprocessors and preprocessors['image'] is not None:
                             print(f"device: {device}")
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")

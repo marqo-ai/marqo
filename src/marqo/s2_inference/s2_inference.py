@@ -97,6 +97,25 @@ class ModelEncoder(ABC):
         pass
 
 
+class DefaultEncoder(ModelEncoder):
+    def __init__(self, model):
+        self.model = model
+
+    def encode_text(self, text, **kwargs):
+        return self.model.encode(text)
+
+    def encode_image(self, image, **kwargs):
+        return self.model.encode(image) # Fix the random models being recognized as modality image.
+        # Likely problem in infer_modality
+        #raise NotImplementedError("Image encoding not supported for this model")
+
+    def encode_video(self, video, **kwargs):
+        raise NotImplementedError("Video encoding not supported for this model")
+
+    def encode_audio(self, audio, **kwargs):
+        raise NotImplementedError("Audio encoding not supported for this model")
+
+
 class ClipEncoder(ModelEncoder):
     def __init__(self, model):
         self.model = model
@@ -403,7 +422,8 @@ def get_encoder(model):
     elif isinstance(model, MultimodalModel):
         return MultimodalEncoder(model)
     else:
-        raise ValueError(f"Unsupported model type: {type(model)}")
+        return DefaultEncoder(model)
+        #raise ValueError(f"Unsupported model type: {type(model)}")
 
 
 def is_preprocess_image_model(model_properties: dict = None) -> bool:
@@ -442,8 +462,8 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     if model_properties.get("type") == "multimodal":
         model = load_multimodal_model(model_name, model_properties, device)
 
-    if not is_preprocess_image_model(model_properties):
-        raise InternalError(message=f"Model {model_name} is not a model that requires preload image preprocessor.")
+    #if not is_preprocess_image_model(model_properties):
+    #    raise InternalError(message=f"Model {model_name} is not a model that requires preload image preprocessor.")
 
     model_cache_key = _create_model_cache_key(model_name, device, model_properties)
 
@@ -453,13 +473,15 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
+    print(f"is_preprocess_image_model(model_properties): {is_preprocess_image_model(model_properties)}")
 
     preprocessors = {
-        "image": getattr(model, "preprocess", None),
+        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
         "video": None, # Future preprocessor
         "audio": None, # Future preprocessor
         "text": None # Future preprocessor
     }
+    print(f"preprocessors: {preprocessors}")
 
     return model, preprocessors
     #return getattr(_available_models[model_cache_key][AvailableModelsKey.model], "preprocess", None)
