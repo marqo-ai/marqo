@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import ContextManager
 import threading
 from queue import Queue
+import numpy as np
 
 import PIL
 from PIL.ImageFile import ImageFile
