@@ -3,9 +3,13 @@ from unittest.mock import patch, MagicMock
 
 import pycurl
 import pytest
+from starlette.applications import Starlette
+from starlette.responses import Response
+from starlette.routing import Route
 
 from marqo.s2_inference.clip_utils import encode_url, download_image_from_url
 from marqo.s2_inference.errors import ImageDownloadError
+from tests.marqo_test import MockHttpServer
 
 
 @pytest.mark.unittest
@@ -75,3 +79,14 @@ class TestImageDownloading(TestCase):
             with self.subTest(headers=headers, expected_headers=expected_headers, msg=msg):
                 download_image_from_url('http://example.com/image.jpg', image_download_headers=headers)
                 mock_curl_instance.setopt.assert_called_with(pycurl.HTTPHEADER, expected_headers)
+
+    def test_download_image_from_url_handlesRedirection(self):
+        image_content = b'\x00\x00\x00\xff'
+        app = Starlette(routes=[
+            Route('/missing_image.jpg', lambda _: Response(status_code=301, headers={'Location': '/image.jpg'})),
+            Route('/image.jpg', lambda _: Response(image_content, media_type='image/png')),
+        ])
+
+        with MockHttpServer(app).run_in_thread() as base_url:
+            result = download_image_from_url(f'{base_url}/missing_image.jpg', image_download_headers={})
+            self.assertEqual(result.getvalue(), image_content)

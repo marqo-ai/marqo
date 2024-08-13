@@ -158,6 +158,7 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     c.setopt(pycurl.URL, encoded_url)
     c.setopt(pycurl.WRITEDATA, buffer)
     c.setopt(pycurl.TIMEOUT_MS, timeout_ms)
+    c.setopt(pycurl.FOLLOWLOCATION, 1)
 
     headers = DEFAULT_HEADERS.copy()
     headers.update(image_download_headers)
