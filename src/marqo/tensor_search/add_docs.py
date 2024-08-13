@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import ContextManager
 import threading
 from queue import Queue
+
 import numpy as np
 
 import PIL
@@ -42,7 +43,7 @@ class MemoryPool:
 
 
 def threaded_download_and_preprocess_content(allocated_docs: List[dict], 
-                                                image_repo: dict, 
+                                                content_repo: dict, 
                                                 tensor_fields: List[str],
                                                 image_download_headers: dict,
                                                 device: str = None,
@@ -90,15 +91,15 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     modality = infer_modality(doc[field])
                     if modality == Modality.IMAGE or clip_utils._is_image(doc[field]):
                         # Existing logic
-                        if doc[field] in image_repo:
+                        if doc[field] in content_repo:
                             continue
                         try:
-                            image_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
+                            content_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
                                                                                      timeout_ms=int(
                                                                                          TIMEOUT_SECONDS * 1000),
                                                                                      metrics_obj=metric_obj)
                         except PIL.UnidentifiedImageError as e:
-                            image_repo[doc[field]] = e
+                            content_repo[doc[field]] = e
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
@@ -107,11 +108,11 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                image_repo[doc[field]] = preprocessors['image'](image_repo[doc[field]]).to(device)
-                                print(f"image_repo[doc[field]]: {image_repo[doc[field]]}")
+                                content_repo[doc[field]] = preprocessors['image'](content_repo[doc[field]]).to(device)
+                                print(f"image_repo[doc[field]]: {content_repo[doc[field]]}")
                             except OSError as e:
                                 if "image file is truncated" in str(e):
-                                    image_repo[doc[field]] = e
+                                    content_repo[doc[field]] = e
                                     metric_obj.increment_counter(f"{doc.get(field, '')}.OSError")
                                     continue
                                 else:
@@ -125,17 +126,17 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                 elif isinstance(doc[field], dict):
                     for sub_field in list(doc[field].values()):
                         if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
-                            if sub_field in image_repo:
+                            if sub_field in content_repo:
                                 continue
                             try:
-                                image_repo[sub_field] = clip_utils.load_image_from_path(
+                                content_repo[sub_field] = clip_utils.load_image_from_path(
                                     sub_field,
                                     image_download_headers,
                                     timeout=TIMEOUT_SECONDS,
                                     metrics_obj=metric_obj
                                 )
                             except PIL.UnidentifiedImageError as e:
-                                image_repo[sub_field] = e
+                                content_repo[sub_field] = e
                                 metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                                 continue
 
@@ -180,6 +181,32 @@ def process_chunk(chunk: bytearray, modality: Modality) -> np.ndarray:
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
+def extract_frames(chunk: bytearray) -> np.ndarray:
+    """
+    Extracts frames from a video chunk
+    :param chunk: video chunk
+    :return: list of frames
+    """
+    pass
+"""
+    video = #cv2.VideoCapture(BytesIO(chunk)) # Fix this
+    frames = []
+    while True:
+        ret, frame = video.read()
+        if not ret:
+            break
+        frames.append(frame)
+    return np.array(frames)"""
+
+def extract_spectrogram(chunk: bytearray) -> np.ndarray:
+        """
+        Extracts spectrogram from an audio chunk
+        :param chunk: audio chunk
+        :return: spectrogram
+        """
+        audio = AudioSegment.from_file(BytesIO(chunk))
+        spectrogram = audio.get_spectrogram()
+        return spectrogram
 
 @contextmanager
 def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_fields: List[str],
