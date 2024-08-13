@@ -462,7 +462,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
-    if model_properties.get("type") == "multimodal":
+    if model_properties.get("type") in ['languagebind', 'imagebind']:
         model = load_multimodal_model(model_name, model_properties, device)
 
     #if not is_preprocess_image_model(model_properties):
@@ -631,7 +631,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
                             ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
             pass
-        elif model_properties.get("type") == "multimodal":
+        elif model_properties.get("type") in ['languagebind', 'imagebind']:
             MultimodalModelProperties(**properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "

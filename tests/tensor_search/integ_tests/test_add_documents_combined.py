@@ -122,7 +122,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 mock_vectorise.reset_mock()
 
     def test_imageRepoHandleThreadHandleError_successfully(self):
-        """Ensure image_repo can catch an unexpected error right in thread."""
+        """Ensure content_repo can catch an unexpected error right in thread."""
         documents = [
             {
                 "image_field_1": "https://raw.githubusercontent.com/marqo-ai/"
@@ -207,7 +207,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertEqual(thread_count, mock_download_images.call_count)
 
     def test_imageDownloadWithoutPreprocessor(self):
-        image_repo = dict()
+        content_repo = dict()
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         test_doc = {
             'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
@@ -216,16 +216,16 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         add_docs.threaded_download_and_preprocess_content(
             allocated_docs=[test_doc],
-            image_repo=image_repo,
+            content_repo=content_repo,
             tensor_fields=['field_1', 'field_2'],
             image_download_headers={},
         )
-        assert len(image_repo) == 2
-        assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
-        assert isinstance(image_repo[good_url], types.ImageType)
+        assert len(content_repo) == 2
+        assert isinstance(content_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
+        assert isinstance(content_repo[good_url], types.ImageType)
 
     def test_imageDownloadWithPreprocessor(self):
-        image_repo = dict()
+        content_repo = dict()
         good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
         test_doc = {
             'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
@@ -234,15 +234,15 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         add_docs.threaded_download_and_preprocess_content(
             allocated_docs=[test_doc],
-            image_repo=image_repo,
+            content_repo=content_repo,
             tensor_fields=['field_1', 'field_2'],
             image_download_headers={},
             preprocessors={'image': lambda x: torch.randn(3, 224, 224)},
             device='cpu'
         )
-        assert len(image_repo) == 2
-        assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
-        assert isinstance(image_repo[good_url], Tensor)
+        assert len(content_repo) == 2
+        assert isinstance(content_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
+        assert isinstance(content_repo[good_url], Tensor)
 
     def test_image_download_timeout(self):
         mock_get = mock.MagicMock()
@@ -250,16 +250,16 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         @mock.patch('requests.get', mock_get)
         def run():
-            image_repo = dict()
+            content_repo = dict()
             add_docs.threaded_download_and_preprocess_content(
                 allocated_docs=[
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
-                image_repo=image_repo,
+                content_repo=content_repo,
                 tensor_fields=['Title', 'Desc', 'Loc'],
                 image_download_headers={}
             )
-            assert list(image_repo.keys()) == ['https://google.com/my_dog.png']
-            assert isinstance(image_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
+            assert list(content_repo.keys()) == ['https://google.com/my_dog.png']
+            assert isinstance(content_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
             return True
 
         assert run()
@@ -337,16 +337,16 @@ class TestAddDocumentsCombined(MarqoTestCase):
              }),
         ]
         for docs, expected_repo_structure in examples:
-            image_repo = dict()
+            content_repo = dict()
             add_docs.threaded_download_and_preprocess_content(
                 allocated_docs=docs,
-                image_repo=image_repo,
+                content_repo=content_repo,
                 tensor_fields=['field_1', 'field_2'],
                 image_download_headers={}
             )
-            assert len(expected_repo_structure) == len(image_repo)
+            assert len(expected_repo_structure) == len(content_repo)
             for k in expected_repo_structure:
-                assert isinstance(image_repo[k], expected_repo_structure[k])
+                assert isinstance(content_repo[k], expected_repo_structure[k])
 
     def test_download_images_non_tensor_field(self):
         """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
@@ -397,12 +397,12 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     normalize_embeddings=True,
                     model_properties=model_properties,
                     device="cpu"
-                ) as image_repo:
-                    self.assertEqual(len(expected_repo_structure), len(image_repo))
+                ) as content_repo:
+                    self.assertEqual(len(expected_repo_structure), len(content_repo))
                     for k in expected_repo_structure:
                         print(f"expected_repo_structure[k] = {expected_repo_structure[k]}")
-                        print(f"image_repo[k] = {image_repo[k]}")
-                        self.assertIsInstance(image_repo[k], expected_repo_structure[k])
+                        print(f"content_repo[k] = {content_repo[k]}")
+                        self.assertIsInstance(content_repo[k], expected_repo_structure[k])
 
             # Images should not be closed as they are Tensor instead of ImageType
             mock_close.assert_not_called()
