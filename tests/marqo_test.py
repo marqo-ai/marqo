@@ -317,7 +317,7 @@ class AsyncMarqoTestCase(unittest.IsolatedAsyncioTestCase, MarqoTestCase):
 
 class MockHttpServer:
     """
-    A MockHttpServer that takes a Starlette app as input, start the unvicorn server
+    A MockHttpServer that takes a Starlette app as input, start the uvicorn server
     in a thread, and yield the server url (with random port binding). After the test,
     it automatically shuts down the server.
 
