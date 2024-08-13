@@ -106,7 +106,7 @@ class DefaultEncoder(ModelEncoder):
 
     def encode_image(self, image, **kwargs):
         return self.model.encode(image) # Fix the random models being recognized as modality image.
-        # Likely problem in infer_modality
+        # Likely problem in infer_modality, or maybe we can include modality in model registry
         #raise NotImplementedError("Image encoding not supported for this model")
 
     def encode_video(self, video, **kwargs):
@@ -286,7 +286,7 @@ def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings,
     if isinstance(content, str):
         vectorised = _marqo_inference_cache.get(model_cache_key, content)
         if vectorised is None:
-            vectorised = _encode_without_cache(model, content, normalize_embeddings, **kwargs)
+            vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
             _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
         else:
             vectorised = _convert_cached_embeddings_to_output(vectorised)
@@ -312,7 +312,7 @@ def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embedd
             contents_to_vectorise.append(content_item)
 
     if contents_to_vectorise:
-        vectorised_outputs = _encode_without_cache(model, contents_to_vectorise, normalize_embeddings, **kwargs)
+        vectorised_outputs = _encode_without_cache(model_cache_key, contents_to_vectorise, normalize_embeddings, **kwargs)
         # Cache the vectorised outputs
         for content_item, vectorised_output in zip(contents_to_vectorise, vectorised_outputs):
             if isinstance(content_item, str):
@@ -364,6 +364,8 @@ def _encode_without_cache_old(model_cache_key: str, content: Union[str, List[str
 def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
                           normalize_embeddings: bool, **kwargs) -> List[List[float]]:
     try:
+        print(f"model_cache_key: {model_cache_key}")
+        print(f"available_models: {_available_models}")
         model = _available_models[model_cache_key][AvailableModelsKey.model]
         encoder = get_encoder(model)
         
@@ -420,6 +422,7 @@ def get_encoder(model):
     if isinstance(model, OPEN_CLIP):
         return ClipEncoder(model)
     elif isinstance(model, MultimodalModel):
+        print(f"model: {model}")
         return MultimodalEncoder(model)
     else:
         return DefaultEncoder(model)
