@@ -475,6 +475,12 @@ def _get_open_clip_properties() -> Dict:
             "note": "open_clip model: ViT-B-32-256/datacomp_s34b_b86k",
             "type": "open_clip",
             "pretrained": "datacomp_s34b_b86k"
+        },
+        "open_clip/ViT-B-16/marqo-fashionCLIP": {
+            "name": "open_clip/ViT-B-16/marqo-fashionCLIP",
+            "dimensions": 512,
+            "url": "https://marqo-gcl-public.s3.us-west-2.amazonaws.com/marqo-fashionCLIP/marqo_fashionCLIP.pt",
+            "type": "open_clip"
         }
     }
     return OPEN_CLIP_MODEL_PROPERTIES
