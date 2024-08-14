@@ -1,9 +1,15 @@
+import contextlib
+import socket
+import threading
 import time
 import unittest
 import uuid
+from typing import Generator
 from unittest.mock import patch, Mock
 
+import uvicorn
 import vespa.application as pyvespa
+from starlette.applications import Starlette
 
 from marqo import config, version
 from marqo.vespa.zookeeper_client import ZookeeperClient
@@ -307,3 +313,38 @@ class MarqoTestCase(unittest.TestCase):
 
 class AsyncMarqoTestCase(unittest.IsolatedAsyncioTestCase, MarqoTestCase):
     pass
+
+
+class MockHttpServer:
+    """
+    A MockHttpServer that takes a Starlette app as input, start the uvicorn server
+    in a thread, and yield the server url (with random port binding). After the test,
+    it automatically shuts down the server.
+
+    This can be used in individual tests, or as a test fixture in class or module scope.
+    Example usage:
+
+    app = Starlette(routes=[
+        Route('/path1', lambda _: Response({"a":"b"}, status_code=200)),
+        Route('/image.jpg', lambda _: Response(b'\x00\x00\x00\xff', media_type='image/png')),
+    ])
+
+    with MockHttpServer(app).run_in_thread() as base_url:
+        run_some_tests
+    """
+    def __init__(self, app: Starlette):
+        self.server = uvicorn.Server(config=uvicorn.Config(app=app))
+
+    @contextlib.contextmanager
+    def run_in_thread(self) -> Generator[str, None, None]:
+        (sock := socket.socket()).bind(("127.0.0.1", 0))
+        thread = threading.Thread(target=self.server.run, kwargs={"sockets": [sock]})
+        thread.start()
+        try:
+            while not self.server.started:
+                time.sleep(1)
+            address, port = sock.getsockname()
+            yield f'http://{address}:{port}'
+        finally:
+            self.server.should_exit = True
+            thread.join()

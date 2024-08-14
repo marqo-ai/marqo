@@ -32,6 +32,7 @@ logger = get_logger(__name__)
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 BICUBIC = InterpolationMode.BICUBIC
+DEFAULT_HEADERS = {'User-Agent': 'Marqobot/1.0'}
 
 
 def get_allowed_image_types():
@@ -153,16 +154,20 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
                                  f"The url could not be encoded properly. Original error: {e}")
     buffer = BytesIO()
     c = pycurl.Curl()
-    c.setopt(c.CAINFO, certifi.where())
-    c.setopt(c.URL, encoded_url)
-    c.setopt(c.WRITEDATA, buffer)
-    c.setopt(c.TIMEOUT_MS, timeout_ms)
-    c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in image_download_headers.items()])
+    c.setopt(pycurl.CAINFO, certifi.where())
+    c.setopt(pycurl.URL, encoded_url)
+    c.setopt(pycurl.WRITEDATA, buffer)
+    c.setopt(pycurl.TIMEOUT_MS, timeout_ms)
+    c.setopt(pycurl.FOLLOWLOCATION, 1)
+
+    headers = DEFAULT_HEADERS.copy()
+    headers.update(image_download_headers)
+    c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
 
     try:
         c.perform()
-        if c.getinfo(c.RESPONSE_CODE) != 200:
-            raise ImageDownloadError(f"image url `{image_path}` returned {c.getinfo(c.RESPONSE_CODE)}")
+        if c.getinfo(pycurl.RESPONSE_CODE) != 200:
+            raise ImageDownloadError(f"image url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}")
     except pycurl.error as e:
         raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
                                  f"The original error is: {e}")
