@@ -106,7 +106,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
     """
     if os.path.isfile(image_path):
         img = Image.open(image_path)
-    elif validators.url(image_path):
+    elif validators.url(image_path) or validators.url(encode_url(image_path)):
         if metrics_obj is not None:
             metrics_obj.start(f"image_download.{image_path}")
         try:
