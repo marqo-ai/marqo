@@ -262,7 +262,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         else:
             # if it is not a local file and does not have an extension
             # check if url
-            if validators.url(thing):
+            if validators.url(thing) or validators.url(encode_url(thing)):
                 return True
             else:
                 return False
