@@ -74,8 +74,7 @@ evaluate==0.4.0
 ftfy==6.1.1
 iopath==0.1.10
 peft @ git+https://github.com/huggingface/peft@08cb3dde577747f6ca6638c884fd66fd16cf2e9d
-pytorchvideo
-torchaudio
+pytorchvideo @ git+https://github.com/facebookresearch/pytorchvideo.git@28fe037d212663c6a24f373b94cc5d478c8c1a1d
 scipy==1.10.1
 tensorboardX==2.6.1
 tokenizers
