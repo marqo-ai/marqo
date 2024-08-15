@@ -8,7 +8,7 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
@@ -23,6 +23,7 @@ from marqo.tensor_search.models.search import Qidx, SearchContext, SearchContext
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search import run_vectorise_pipeline, gather_documents_from_response, logger
 from marqo.vespa.exceptions import VespaStatusError
+import semver
 
 
 class HybridSearch:
@@ -83,23 +84,35 @@ class HybridSearch:
 
         marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
 
-        # TODO: Remove when we support unstructured.
-        if isinstance(marqo_index, UnstructuredMarqoIndex):
-            raise core_exceptions.UnsupportedFeatureError(
-                "Unstructured indexes are not yet supported for hybrid search. "
-                "Please use a structured index.")
-
+        # Version checks (different for structured and unstructured)
         marqo_index_version = marqo_index.parsed_marqo_version()
-        if marqo_index_version < constants.MARQO_HYBRID_SEARCH_MINIMUM_VERSION:
+        if isinstance(marqo_index, StructuredMarqoIndex) and \
+                marqo_index_version < semver.VersionInfo.parse(constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION):
             raise core_exceptions.UnsupportedFeatureError(
-                f"Hybrid search is only supported for Marqo indexes created with Marqo "
-                f"{constants.MARQO_HYBRID_SEARCH_MINIMUM_VERSION} or later. This index was created with Marqo "
-                f"{marqo_index_version}."
+                f"Hybrid search is only supported for Marqo structured indexes created with Marqo "
+                f"{constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION} or later. "
+                f"This index was created with Marqo {marqo_index_version}."
+            )
+        elif isinstance(marqo_index, UnstructuredMarqoIndex) and \
+                marqo_index_version < semver.VersionInfo.parse(constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"Hybrid search is only supported for Marqo unstructured indexes created with Marqo "
+                f"{constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION} or later. "
+                f"This index was created with Marqo {marqo_index_version}."
             )
 
         # Use default hybrid settings if not provided
         if hybrid_parameters is None:
             hybrid_parameters = HybridParameters()
+
+        # TODO: Remove when unstructured searchable attributes are supported
+        if isinstance(marqo_index, UnstructuredMarqoIndex) and \
+                (hybrid_parameters.searchableAttributesTensor is not None or \
+                hybrid_parameters.searchableAttributesLexical is not None):
+            raise core_exceptions.UnsupportedFeatureError(
+                f"Hybrid search for unstructured indexes currently does not support `searchableAttributesTensor` or "
+                f"`searchableAttributesLexical`. Please set these attributes to None."
+            )
 
         # Determine the text query prefix
         text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)

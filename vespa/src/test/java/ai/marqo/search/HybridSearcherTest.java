@@ -2,39 +2,44 @@ package ai.marqo.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.yahoo.component.chain.Chain;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.query.ranking.RankFeatures;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.Execution;
 import com.yahoo.search.searchchain.SearchChainRegistry;
+import com.yahoo.tensor.Tensor;
+import com.yahoo.tensor.TensorAddress;
+import com.yahoo.tensor.TensorType;
 import java.util.List;
 import java.util.Map;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
 
-@RunWith(MockitoJUnitRunner.class)
-public class HybridSearcherTestCase {
+class HybridSearcherTest {
 
     private HybridSearcher hybridSearcher;
 
-    @Mock private Searcher downstreamSearcher;
+    private Searcher downstreamSearcher;
 
-    @Before
-    public void setUp() {
+    @BeforeEach
+    void setUp() {
         hybridSearcher = new HybridSearcher();
+        downstreamSearcher = mock(Searcher.class);
     }
 
     @Test
-    public void testHybridSearcher() {
+    void testHybridSearcher() {
         Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
         Execution.Context context = Execution.Context.createContextStub((SearchChainRegistry) null);
         Execution execution = new Execution(searchChain, context);
@@ -42,7 +47,7 @@ public class HybridSearcherTestCase {
         int k = 60;
         double alpha = 0.5;
 
-        Query query = getHybridQuery(k, alpha, "test");
+        Query query = getHybridQuery(k, alpha, "test", "disjunction", "rrf");
 
         HitGroup hitsTensor = new HitGroup();
         hitsTensor.add(new Hit("tensor1", 1.0));
@@ -73,21 +78,8 @@ public class HybridSearcherTestCase {
         assertThat(allQueries.get(1).properties().get("yql")).isEqualTo("tensor yql");
     }
 
-    private static Query getHybridQuery(int k, double alpha, String queryString) {
-        Query query = new Query("search/?query=" + queryString);
-        query.properties().set("marqo__hybrid.retrievalMethod", "disjunction");
-        query.properties().set("marqo__hybrid.rankingMethod", "rrf");
-        query.properties().set("marqo__hybrid.rrf_k", k);
-        query.properties().set("marqo__hybrid.alpha", alpha);
-        query.properties().set("marqo__yql.lexical", "lexical yql");
-        query.properties().set("marqo__yql.tensor", "tensor yql");
-        query.getRanking().getFeatures().put("query(marqo__fields_to_rank_lexical)", 0.1);
-        query.getRanking().getFeatures().put("query(marqo__fields_to_rank_tensor)", 0.1);
-        return query;
-    }
-
     @Test
-    public void testRRF() {
+    void testRRF() {
         // Create Hybrid Searcher
         HybridSearcher testSearcher = new HybridSearcher();
 
@@ -219,9 +211,81 @@ public class HybridSearcherTestCase {
                 .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
     }
 
-    @Test
-    public void testCreateSubQuery() {
-        // Create Hybrid Searcher
-        HybridSearcher testSearcher = new HybridSearcher();
+    @Nested
+    class FieldsToRankTest {
+
+        @ParameterizedTest
+        @CsvSource(value = {"lexical,tensor", "tensor,lexical"})
+        void shouldIncludeAllRankFieldsWhenRetrievalMethodAndRankMethodDiffer(
+                String retrievalMethod, String rankingMethod) {
+            Query query = getHybridQuery(60, 0.5, "test", retrievalMethod, rankingMethod);
+            Query subQuery =
+                    hybridSearcher.createSubQuery(query, retrievalMethod, rankingMethod, true);
+            RankFeatures features = subQuery.getRanking().getFeatures();
+
+            assertThat(features.getDouble("query(marqo__lexical_text_field_1)")).hasValue(1.0);
+            assertThat(features.getDouble("query(marqo__lexical_text_field_2)")).hasValue(1.0);
+            assertThat(features.getDouble("query(marqo__embeddings_text_field_1)")).hasValue(1.0);
+            assertThat(features.getDouble("query(marqo__embeddings_text_field_2)")).hasValue(1.0);
+        }
+
+        @Test
+        void shouldOnlyIncludeTensorRankFieldsWhenRetrieveAndRankByTensor() {
+            Query query = getHybridQuery(60, 0.5, "test", "tensor", "tensor");
+            Query subQuery = hybridSearcher.createSubQuery(query, "tensor", "tensor", true);
+            RankFeatures features = subQuery.getRanking().getFeatures();
+
+            assertThat(features.getDouble("query(marqo__embeddings_text_field_1)")).hasValue(1.0);
+            assertThat(features.getDouble("query(marqo__embeddings_text_field_2)")).hasValue(1.0);
+            assertThat(features.getDouble("query(marqo__lexical_text_field_1)")).isEmpty();
+            assertThat(features.getDouble("query(marqo__lexical_text_field_2)")).isEmpty();
+        }
+
+        @Test
+        void shouldOnlyIncludeLexicalRankFieldsRetrieveAndRankByLexical() {
+            Query query = getHybridQuery(60, 0.5, "test", "lexical", "lexical");
+            Query subQuery = hybridSearcher.createSubQuery(query, "lexical", "lexical", true);
+            RankFeatures features = subQuery.getRanking().getFeatures();
+
+            assertThat(features.getDouble("query(marqo__lexical_text_field_1)")).hasValue(1.0);
+            assertThat(features.getDouble("query(marqo__lexical_text_field_2)")).hasValue(1.0);
+            assertThat(features.getDouble("query(marqo__embeddings_text_field_1)")).isEmpty();
+            assertThat(features.getDouble("query(marqo__embeddings_text_field_2)")).isEmpty();
+        }
+    }
+
+    private static Query getHybridQuery(
+            int k, double alpha, String queryString, String retrievalMethod, String rankingMethod) {
+        Query query = new Query("search/?query=" + queryString);
+        query.properties().set("marqo__hybrid.retrievalMethod", retrievalMethod);
+        query.properties().set("marqo__hybrid.rankingMethod", rankingMethod);
+        query.properties().set("marqo__hybrid.rrf_k", k);
+        query.properties().set("marqo__hybrid.alpha", alpha);
+        query.properties().set("marqo__yql.lexical", "lexical yql");
+        query.properties().set("marqo__yql.tensor", "tensor yql");
+
+        // Define the tensor type
+        TensorType tensorType = new TensorType.Builder().mapped("test_tensor").build();
+
+        // Create the tensor using the map
+        Tensor fieldsToRankLexical =
+                Tensor.Builder.of(tensorType)
+                        .cell(TensorAddress.ofLabels("marqo__lexical_text_field_1"), 1.0)
+                        .cell(TensorAddress.ofLabels("marqo__lexical_text_field_2"), 1.0)
+                        .build();
+
+        Tensor fieldsToRankTensor =
+                Tensor.Builder.of(tensorType)
+                        .cell(TensorAddress.ofLabels("marqo__embeddings_text_field_1"), 1.0)
+                        .cell(TensorAddress.ofLabels("marqo__embeddings_text_field_2"), 1.0)
+                        .build();
+
+        query.getRanking()
+                .getFeatures()
+                .put("query(marqo__fields_to_rank_lexical)", fieldsToRankLexical);
+        query.getRanking()
+                .getFeatures()
+                .put("query(marqo__fields_to_rank_tensor)", fieldsToRankTensor);
+        return query;
     }
 }

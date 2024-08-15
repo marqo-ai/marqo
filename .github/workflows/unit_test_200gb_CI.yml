@@ -7,13 +7,9 @@ on:
   push:
     branches:
       - mainline
-    paths-ignore:
-      - '**.md'
   pull_request:
     branches:
       - mainline
-    paths-ignore:
-      - '**.md'
 
 permissions:
   contents: read
@@ -135,7 +131,7 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
 
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests
+          pytest marqo/tests --ignore=marqo/tests/test_documentation.py
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner

@@ -13,7 +13,7 @@ def start(args):
     os.system("docker run --detach "
               "--name vespa "
               "--hostname vespa-container "
-              "--publish 8080:8080 --publish 19071:19071 --publish 2181:2181 "
+              "--publish 8080:8080 --publish 19071:19071 --publish 2181:2181 --publish 127.0.0.1:5005:5005 "
               "vespaengine/vespa:8.367.14")
 
 

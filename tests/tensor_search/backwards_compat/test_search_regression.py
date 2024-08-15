@@ -52,12 +52,18 @@ class TestSearchRegression(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
         )
 
+        unstructured_text_index = cls.unstructured_marqo_index_request(
+            model=Model(name="sentence-transformers/all-MiniLM-L6-v2")
+        )
+
         cls.indexes = cls.create_indexes([
             structured_text_index_score_modifiers,
+            unstructured_text_index
         ])
 
         # Assign to objects so they can be used in tests
         cls.structured_text_index_score_modifiers = cls.indexes[0]
+        cls.unstructured_text_index = cls.indexes[1]
 
     def setUp(self) -> None:
         super().setUp()
@@ -96,14 +102,26 @@ class TestSearchRegression(MarqoTestCase):
         of Marqo 2.9.0
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
-            with self.subTest(index=index.name):
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_text_index]:
+            with self.subTest(index=type(index)):
+
+                docs_with_same_bm25_score = [("doc8", "doc9")]
+
+                # Select results
+                if isinstance(index, UnstructuredMarqoIndex):
+                    expected_results = results_2_9.search_results_unstructured
+                    docs_with_same_bm25_score.append(("doc7", "doc11"))
+                elif isinstance(index, StructuredMarqoIndex):
+                    expected_results = results_2_9.search_results_structured
+
                 # Add documents
                 tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=self.docs_list
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] if \
+                            isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 
@@ -118,15 +136,20 @@ class TestSearchRegression(MarqoTestCase):
                             result_count=10
                         )
 
-                        docs_with_same_bm25_score = {"doc8", "doc9"}
-                        self.assertEqual(len(search_res["hits"]), len(results_2_9.search_results[search_method]))
+
+                        self.assertEqual(len(search_res["hits"]), len(expected_results[search_method]))
                         for i in range(len(search_res["hits"])):
                             # Docs with same bm25 score are interchangeable in order
-                            if (search_res["hits"][i]["_id"] in docs_with_same_bm25_score) and (search_method == SearchMethod.LEXICAL):
-                                self.assertIn(results_2_9.search_results[search_method][i]["_id"], docs_with_same_bm25_score)
+                            same_score_group = ()
+                            for group in docs_with_same_bm25_score:
+                                if search_res["hits"][i]["_id"] in group:
+                                    same_score_group = group
+
+                            if (search_res["hits"][i]["_id"] in same_score_group) and (search_method == SearchMethod.LEXICAL):
+                                self.assertIn(expected_results[search_method][i]["_id"], same_score_group)
                             else:
-                                self.assertEqual(search_res["hits"][i]["_id"], results_2_9.search_results[search_method][i]["_id"])
-                            self.assertTrue(np.allclose(search_res["hits"][i]["_score"], results_2_9.search_results[search_method][i]["_score"], atol=1e-6))
+                                self.assertEqual(search_res["hits"][i]["_id"], expected_results[search_method][i]["_id"])
+                            self.assertTrue(np.allclose(search_res["hits"][i]["_score"], expected_results[search_method][i]["_score"], atol=1e-6))
 
     def test_document_vectors_match_2_9(self):
         """
@@ -134,14 +157,16 @@ class TestSearchRegression(MarqoTestCase):
         of Marqo 2.9.0
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
+        for index in [self.structured_text_index_score_modifiers, self.unstructured_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=self.docs_list
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] if \
+                            isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 

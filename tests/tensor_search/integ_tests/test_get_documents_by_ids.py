@@ -66,7 +66,7 @@ class TestGetDocuments(MarqoTestCase):
                 )
                 res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name, document_ids=['1', '2', '3'],
-                    show_vectors=True)
+                    show_vectors=True).dict(exclude_none=True, by_alias=True)
                 
                 # Check that the documents are found and have the correct content
                 for i in range(3):
@@ -89,8 +89,8 @@ class TestGetDocuments(MarqoTestCase):
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None))
                 get_res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index.name,
-                    document_ids=["123", "5678"], show_vectors=True)['results']
-                assert len(get_res) == 2
+                    document_ids=["123", "5678"], show_vectors=True).dict(exclude_none=True, by_alias=True)['results']
+                self.assertEqual(2, len(get_res))
                 for i, retrieved_doc in enumerate(get_res):
                     assert enums.TensorField.tensor_facets in retrieved_doc
                     assert len(retrieved_doc[enums.TensorField.tensor_facets]) == 2
@@ -118,7 +118,7 @@ class TestGetDocuments(MarqoTestCase):
                         res = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name, document_ids=ids,
                             show_vectors=is_vector_shown
-                        )
+                        ).dict(exclude_none=True, by_alias=True)
                         assert {ii['_id'] for ii in res['results']} == set(id_reqs[i])
                         for doc_res in res['results']:
                             assert not doc_res['_found']
@@ -142,7 +142,7 @@ class TestGetDocuments(MarqoTestCase):
                         res = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name, document_ids=ids,
                             show_vectors=is_vector_shown
-                        )
+                        ).dict(exclude_none=True, by_alias=True)
                         assert [ii['_id'] for ii in res['results']] == id_reqs[i][0]
                         for j, doc_res in enumerate(res['results']):
                             assert doc_res['_id'] == ids[j]
@@ -151,17 +151,49 @@ class TestGetDocuments(MarqoTestCase):
                                 assert enums.TensorField.tensor_facets in doc_res
                                 assert 'title1' in doc_res or 'desc2' in doc_res
 
-    def test_get_document_vectors_failures(self):
+    def test_get_documents_by_ids_RaiseErrorWithWrongIds(self):
+        test_cases = [
+            (None, "None is not a valid document id"),
+            (dict(), "dict() is not a valid document id"),
+            (123, "integer is not a valid document id"),
+            (1.23, "float is not a valid document id"),
+            ([], "empty list is not a valid document id"),
+        ]
         for index in self.indexes:
-            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                for show_vectors_option in (True, False):
-                    for bad_get in [[123], [None], [set()], list(), 1.3, dict(),
-                                    None, 123, ['123', 456], ['123', 45, '445'], [14, '58']]:
-                        with self.assertRaises((InvalidDocumentIdError, InvalidArgError)):
-                            res = tensor_search.get_documents_by_ids(
-                                config=self.config, index_name=index.name, document_ids=bad_get,
+            for show_vectors_option in (True, False):
+                for document_ids, msg in test_cases:
+                    with self.subTest(f"Index type: {index.type}. Index name: {index.name}. Msg: {msg}"):
+                        with self.assertRaises(InvalidArgError) as e:
+                            tensor_search.get_documents_by_ids(
+                                config=self.config, index_name=index.name, document_ids=document_ids,
                                 show_vectors=show_vectors_option
                             )
+                            if not document_ids == []:
+                                self.assertIn("Get documents must be passed a collection of IDs!",
+                                              str(e.exception))
+                            else:
+                                self.assertIn("Can't get empty collection of IDs!", str(e.exception))
+
+    def test_get_documents_by_ids_InvalidIdsResponse(self):
+        test_cases = [
+            (["123", 2], (1,), "2 is not a valid document id"),
+            (["123", None], (1,), "None is not a valid document id"),
+            ([dict(), 2.3], (0, 1), "dict() and floats not a valid document id"),
+        ]
+        for index in self.indexes:
+            for show_vectors_option in (True, False):
+                for document_ids, error_index, msg in test_cases:
+                    with self.subTest(f"Index type: {index.type}. Index name: {index.name}. Msg: {msg}"):
+                        r = tensor_search.get_documents_by_ids(
+                            config=self.config, index_name=index.name, document_ids=document_ids,
+                            show_vectors=show_vectors_option
+                        )
+                        for i in error_index:
+                            item = r.results[i]
+                            self.assertEqual(item.id, document_ids[i])
+                            self.assertEqual(item.status, 400)
+                            self.assertIn("Document _id must be a string type!", item.message)
+                            self.assertEqual(item.found, None)
 
     def test_get_documents_env_limit(self):
         for index in self.indexes:
@@ -180,20 +212,24 @@ class TestGetDocuments(MarqoTestCase):
                     def run():
                         half_search = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name,
-                            document_ids=[docs[i]['_id'] for i in range(max_doc // 2)])
+                            document_ids=[docs[i]['_id'] for i in range(max_doc // 2)]
+                        ).dict(exclude_none=True, by_alias=True)
                         self.assertEqual(len(half_search['results']),max_doc // 2)
                         limit_search = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name,
-                            document_ids=[docs[i]['_id'] for i in range(max_doc)])
+                            document_ids=[docs[i]['_id'] for i in range(max_doc)]
+                        ).dict(exclude_none=True, by_alias=True)
                         self.assertEqual(len(limit_search['results']), max_doc)
                         with self.assertRaises(IllegalRequestedDocCount):
                             oversized_search = tensor_search.get_documents_by_ids(
                                 config=self.config, index_name=index.name,
-                                document_ids=[docs[i]['_id'] for i in range(max_doc + 1)])
+                                document_ids=[docs[i]['_id'] for i in range(max_doc + 1)]
+                            ).dict(exclude_none=True, by_alias=True)
                         with self.assertRaises(IllegalRequestedDocCount):
                             very_oversized_search = tensor_search.get_documents_by_ids(
                                 config=self.config, index_name=index.name,
-                                document_ids=[docs[i]['_id'] for i in range(max_doc * 2)])
+                                document_ids=[docs[i]['_id'] for i in range(max_doc * 2)]
+                            ).dict(exclude_none=True, by_alias=True)
                         return True
                 assert run()
 
@@ -217,7 +253,8 @@ class TestGetDocuments(MarqoTestCase):
                         sample_size = 500
                         limit_search = tensor_search.get_documents_by_ids(
                             config=self.config, index_name=index.name,
-                            document_ids=[docs[i]['_id'] for i in range(sample_size)])
+                            document_ids=[docs[i]['_id'] for i in range(sample_size)]
+                        ).dict(exclude_none=True, by_alias=True)
                         assert len(limit_search['results']) == sample_size
                         return True
 

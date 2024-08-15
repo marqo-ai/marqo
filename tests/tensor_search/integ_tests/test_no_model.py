@@ -119,11 +119,14 @@ class TestNoModel(MarqoTestCase):
                     index_name == self.unstructured_index_with_no_model else None
                 mappings = {"custom_field_1": {"type": "custom_vector"}} if \
                     index_name == self.unstructured_index_with_no_model else None
-                r = tensor_search.add_documents(config=self.config,
-                                                add_docs_params=AddDocsParams(index_name=index_name,
-                                                                          docs=documents,
-                                                                          tensor_fields=tensor_fields,
-                                                                          mappings=mappings))
+                r = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=documents,
+                        tensor_fields=tensor_fields,
+                        mappings=mappings)
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertEqual(r["errors"], True)
                 self.assertIn("Cannot vectorise anything with 'no_model'", r["items"][0]["error"])
                 self.assertEqual(400, r["items"][0]["status"])

@@ -5,6 +5,7 @@ import numpy as np
 from pydantic import BaseModel, validator
 from pydantic import Field
 
+from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
@@ -86,7 +87,7 @@ class AddDocsParams(BaseModel):
                 message=f"Number of docs in add documents request ({doc_count}) exceeds limit of {max_doc}. "
                         f"If using the Python client, break up your `add_documents` request into smaller batches using "
                         f"its `client_batch_size` parameter. "
-                        f"See https://marqo.pages.dev/2.0.0/API-Reference/documents/#body for more details."
+                        f"See {marqo_docs.api_reference_document_body()} for more details."
             )
 
         return docs
