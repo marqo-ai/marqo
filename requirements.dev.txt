@@ -78,7 +78,7 @@ pytorchvideo @ git+https://github.com/facebookresearch/pytorchvideo.git@28fe037d
 torchaudio
 scipy==1.10.1
 tensorboardX==2.6.1
-tokenizers==0.19.1
+tokenizers
 tqdm==4.65.0
 scikit-learn==1.3.0
 braceexpand==0.1.7
