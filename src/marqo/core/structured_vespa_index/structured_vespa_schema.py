@@ -22,7 +22,6 @@ class StructuredVespaSchema(VespaSchema):
         FieldType.ArrayFloat: 'array<float>',
         FieldType.ArrayDouble: 'array<double>',
         FieldType.ImagePointer: 'string',
-        FieldType.MultimodalPointer: 'string',
         FieldType.MultimodalCombination: 'map<string, float>',
         FieldType.CustomVector: 'string',  # Custom Vector "content" is stored as string in backend.
         FieldType.MapInt: 'map<string, int>',
