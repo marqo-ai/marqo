@@ -15,6 +15,13 @@ from pydantic import BaseModel
 from enum import Enum
 from abc import ABC, abstractmethod
 
+from marqo.s2_inference.languagebind import (
+    LanguageBind, LanguageBindVideo, LanguageBindAudio, LanguageBindImage,
+    LanguageBindDepth, LanguageBindThermal,
+    LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
+    LanguageBindDepthProcessor, LanguageBindThermalProcessor, transform_dict, to_device
+)
+
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
 from marqo.s2_inference import constants
@@ -24,6 +31,7 @@ from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError)
 from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
+from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBindImageTokenizer
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
@@ -60,6 +68,7 @@ class MultimodalModelProperties(BaseModel):
     video_chunk_length: int = 20  # in seconds
     frames_to_extract_per_chunk: int = 8
     video_frame_rate: float = 1  # frames per second
+    cache_dir: str = "./cache_dir" # This is temporary. Follow existing conventions for storing weights
 
 class MultimodalModel:
     def __init__(self, model_name: str, model_properties: Dict[str, Any], device: str):
@@ -70,87 +79,84 @@ class MultimodalModel:
 
     def _load_model(self):
         if self.properties.loader == "languagebind":
-            # Load LanguageBind model
-            pass
+            clip_type = { # We can consider only loading the necessary model based on the modality
+                'video': 'LanguageBind_Video_FT',
+                'audio': 'LanguageBind_Audio_FT',
+                'thermal': 'LanguageBind_Thermal',
+                'image': 'LanguageBind_Image',
+                'depth': 'LanguageBind_Depth',
+            }
+            model = LanguageBind(clip_type=clip_type, cache_dir=self.properties.cache_dir)
+            model = model.to(self.device)
+            model.eval()
+            return model
         elif self.properties.loader == "imagebind":
             # Load ImageBind model
             pass
         else:
             raise ValueError(f"Unsupported loader: {self.properties.loader}")
 
+    def encode(self, content, modality, **kwargs):
+        encoder = get_encoder(self)
+        return encoder.encode(content, modality, **kwargs)
+
 
 class ModelEncoder(ABC):
     @abstractmethod
-    def encode_image(self, image, **kwargs):
+    def encode(self, content, modality, **kwargs):
         pass
-
-    @abstractmethod
-    def encode_text(self, text, **kwargs):
-        pass
-
-    @abstractmethod
-    def encode_video(self, video, **kwargs):
-        pass
-
-    @abstractmethod
-    def encode_audio(self, audio, **kwargs):
-        pass
-
 
 class DefaultEncoder(ModelEncoder):
     def __init__(self, model):
         self.model = model
 
-    def encode_text(self, text, **kwargs):
-        return self.model.encode(text)
-
-    def encode_image(self, image, **kwargs):
-        return self.model.encode(image) # Fix the random models being recognized as modality image.
+    def encode(self, content, modality, **kwargs):
+        if modality in [Modality.TEXT, Modality.IMAGE]:
+            return self.model.encode(content) # Fix the random models being recognized as modality image.
         # Likely problem in infer_modality, or maybe we can include modality in model registry
         #raise NotImplementedError("Image encoding not supported for this model")
-
-    def encode_video(self, video, **kwargs):
-        raise NotImplementedError("Video encoding not supported for this model")
-
-    def encode_audio(self, audio, **kwargs):
-        raise NotImplementedError("Audio encoding not supported for this model")
-
+        else:
+            raise NotImplementedError(f"Encoding not supported for modality: {modality}")
 
 class ClipEncoder(ModelEncoder):
     def __init__(self, model):
         self.model = model
 
-    def encode_image(self, image, **kwargs):
-        return self.model.encode_image(image)
+    def encode(self, content, modality, **kwargs):
+        if modality == Modality.TEXT:
+            return self.model.encode_text(content)
+        elif modality == Modality.IMAGE:
+            return self.model.encode_image(content)
+        else:
+            raise NotImplementedError(f"CLIP does not support encoding for modality: {modality}")
 
-    def encode_text(self, text, **kwargs):
-        return self.model.encode_text(text)
-
-    def encode_video(self, video, **kwargs):
-        raise NotImplementedError("CLIP does not support video encoding")
-
-    def encode_audio(self, audio, **kwargs):
-        raise NotImplementedError("CLIP does not support audio encoding")
-
-class MultimodalEncoder(ModelEncoder):
+class LanguageBindEncoder(ModelEncoder):
     def __init__(self, model: MultimodalModel):
         self.model = model
+        self.tokenizer = self._get_tokenizer()
+        self.modality_transform = self._get_modality_transform()
 
-    def encode_image(self, image, **kwargs):
-        return self.model.encode_image(image, **kwargs)
+    def _get_tokenizer(self): # this is used for text only
+        pretrained_ckpt = f'lb203/LanguageBind_Image'
+        return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{self.model.properties.cache_dir}/tokenizer_cache_dir')
 
-    def encode_text(self, text, **kwargs):
-        return self.model.encode_text(text, **kwargs)
+    def _get_modality_transform(self):
+        return {c: transform_dict[c](self.model.model.modality_config[c]) for c in self.model.model.clip_type.keys()}
 
-    def encode_video(self, video, **kwargs):
-        return self.model.encode_video(video, **kwargs)
+    def encode(self, content, modality, **kwargs):
+        inputs = {}
+        if modality == Modality.TEXT:
+            inputs['language'] = to_device(self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'), self.model.device)
+        else:
+            inputs[modality.value] = to_device(self.modality_transform[modality.value](content), self.model.device)
 
-    def encode_audio(self, audio, **kwargs):
-        return self.model.encode_audio(audio, **kwargs)
+        with torch.no_grad():
+            embeddings = self.model.model(inputs)
 
+        return embeddings[modality.value].cpu().numpy()
 
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
-    # THIS IS POC, we can use python-magic to infer content type
+    # THIS IS POC, we can use better python-magic logic to infer content type
     if isinstance(content, str):
         extension = content.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif']:
@@ -379,17 +385,8 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
             
             for batch in generate_batches(content, batch_size=batch_size):
                 modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
-                
-                if modality == Modality.TEXT:
-                    encoded_batch = encoder.encode_text(batch, normalize=normalize_embeddings, **kwargs)
-                elif modality == Modality.IMAGE:
-                    encoded_batch = encoder.encode_image(batch, normalize=normalize_embeddings, **kwargs)
-                elif modality == Modality.VIDEO:
-                    encoded_batch = encoder.encode_video(batch, normalize=normalize_embeddings, **kwargs)
-                elif modality == Modality.AUDIO:
-                    encoded_batch = encoder.encode_audio(batch, normalize=normalize_embeddings, **kwargs)
-                else:
-                    encoded_batch = encoder.encode(batch, normalize=normalize_embeddings, **kwargs)
+
+                encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings, **kwargs)
                 
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
             
@@ -418,14 +415,15 @@ def get_marqo_inference_cache() -> MarqoInferenceCache:
     return _marqo_inference_cache
 
 def get_encoder(model):
-    print(f"model: {model}")
-    if isinstance(model, OPEN_CLIP):
+    if isinstance(model, OPEN_CLIP) or isinstance(model, CLIP):
         return ClipEncoder(model)
     elif isinstance(model, MultimodalModel):
-        print(f"model: {model}")
-        return MultimodalEncoder(model)
-    else:
-        return DefaultEncoder(model)
+        if model.properties.loader == "languagebind":
+            return LanguageBindEncoder(model)
+        elif model.properties.loader == "imagebind":
+            # Return ImageBind encoder when implemented
+            pass
+    return DefaultEncoder(model)
         #raise ValueError(f"Unsupported model type: {type(model)}")
 
 
