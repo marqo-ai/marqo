@@ -1,9 +1,15 @@
 from unittest import TestCase
+from unittest.mock import patch, MagicMock
 
+import pycurl
 import pytest
+from starlette.applications import Starlette
+from starlette.responses import Response
+from starlette.routing import Route
 
 from marqo.s2_inference.clip_utils import encode_url, download_image_from_url
 from marqo.s2_inference.errors import ImageDownloadError
+from tests.marqo_test import MockHttpServer
 
 
 @pytest.mark.unittest
@@ -48,3 +54,39 @@ class TestImageDownloading(TestCase):
             with self.subTest(url=url, expected=expected, msg=msg):
                 with self.assertRaises(ImageDownloadError) as cm:
                     download_image_from_url(image_path=url + ".jpg", image_download_headers={})
+
+    def test_download_image_from_url_handlesUrlRequiringUserAgentHeader(self):
+        url_requiring_user_agent_header = "https://docs.marqo.ai/2.0.0/Examples/marqo.jpg"
+        try:
+            download_image_from_url(image_path=url_requiring_user_agent_header, image_download_headers={})
+        except Exception as e:
+            self.fail(f"Exception was raised when downloading {url_requiring_user_agent_header}: {e}")
+
+    @patch('pycurl.Curl')
+    def test_download_image_from_url_mergesDefaultHeadersWithCustomHeaders(self, mock_curl):
+        mock_curl_instance = mock_curl.return_value
+        mock_curl_instance.setopt = MagicMock()
+        mock_curl_instance.perform = MagicMock()
+        mock_curl_instance.getinfo = MagicMock(return_value=200)
+
+        test_cases = [
+            ({}, ['User-Agent: Marqobot/1.0'], "Empty header"),
+            ({'a': 'b'}, ['User-Agent: Marqobot/1.0', 'a: b'], "Basic headers"),
+            ({'User-Agent': 'Marqobot-Image/1.0'}, ['User-Agent: Marqobot-Image/1.0'], "Headers with override"),
+        ]
+
+        for (headers, expected_headers, msg) in test_cases:
+            with self.subTest(headers=headers, expected_headers=expected_headers, msg=msg):
+                download_image_from_url('http://example.com/image.jpg', image_download_headers=headers)
+                mock_curl_instance.setopt.assert_called_with(pycurl.HTTPHEADER, expected_headers)
+
+    def test_download_image_from_url_handlesRedirection(self):
+        image_content = b'\x00\x00\x00\xff'
+        app = Starlette(routes=[
+            Route('/missing_image.jpg', lambda _: Response(status_code=301, headers={'Location': '/image.jpg'})),
+            Route('/image.jpg', lambda _: Response(image_content, media_type='image/png')),
+        ])
+
+        with MockHttpServer(app).run_in_thread() as base_url:
+            result = download_image_from_url(f'{base_url}/missing_image.jpg', image_download_headers={})
+            self.assertEqual(result.getvalue(), image_content)
