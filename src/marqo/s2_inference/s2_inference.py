@@ -79,8 +79,8 @@ class MultimodalModel:
 
     def _load_model(self):
         if self.properties.loader == "languagebind":
-            clip_type = { # We can consider only loading the necessary model based on the modality
-                'video': 'LanguageBind_Video_FT',
+            clip_type = { 
+                'video': 'LanguageBind_Video_V1.5_FT',
                 'audio': 'LanguageBind_Audio_FT',
                 'thermal': 'LanguageBind_Thermal',
                 'image': 'LanguageBind_Image',

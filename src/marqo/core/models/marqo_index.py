@@ -38,6 +38,7 @@ class FieldType(str, Enum):
     ArrayFloat = 'array<float>'
     ArrayDouble = 'array<double>'
     ImagePointer = 'image_pointer'
+    MultimodalPointer = 'multimodal_pointer'
     MultimodalCombination = 'multimodal_combination'
     CustomVector = "custom_vector"
     MapInt = 'map<text, int>'

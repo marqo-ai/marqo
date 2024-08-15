@@ -1934,40 +1934,12 @@ def _get_onnx_clip_properties() -> Dict:
 
 def _get_languagebind_properties() -> Dict:
     LANGUAGEBIND_MODEL_PROPERTIES = {
-        'LanguageBind_Video_V1.5_FT': {
-            "name": "LanguageBind_Video_V1.5_FT",
+        'LanguageBind': {
+            "name": "LanguageBind",
             "dimensions": 768,
             "type": "languagebind",
             "loader": "languagebind",
-            "supported_modalities": ["video", "text"],
-        },
-        'LanguageBind_Audio_FT': {
-            "name": "LanguageBind_Audio_FT",
-            "dimensions": 768,
-            "type": "languagebind",
-            "loader": "languagebind",
-            "supported_modalities": ["audio", "text"],
-        },
-        'LanguageBind_Image': {
-            "name": "LanguageBind_Image",
-            "dimensions": 768,
-            "type": "languagebind",
-            "loader": "languagebind",
-            "supported_modalities": ["image", "text"],
-        },
-        'LanguageBind_Depth': {
-            "name": "LanguageBind_Depth",
-            "dimensions": 768,
-            "type": "languagebind",
-            "loader": "languagebind",
-            "supported_modalities": ["depth", "text"],
-        },
-        'LanguageBind_Thermal': {
-            "name": "LanguageBind_Thermal",
-            "dimensions": 768,
-            "type": "languagebind",
-            "loader": "languagebind",
-            "supported_modalities": ["thermal", "text"],
+            "supported_modalities": ["video", "audio", "text", "image", "depth", "thermal"],
         },
     }
     return LANGUAGEBIND_MODEL_PROPERTIES

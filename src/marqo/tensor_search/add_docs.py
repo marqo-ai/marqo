@@ -175,30 +175,22 @@ def download_and_chunk_media(url: str, headers: dict, memory_pool: MemoryPool, m
 
 def process_chunk(chunk: bytearray, modality: Modality) -> np.ndarray:
     if modality == Modality.VIDEO:
-        return extract_frames(chunk)
+        return process_video(chunk)
     elif modality == Modality.AUDIO:
-        return extract_spectrogram(chunk)
+        return process_audio(chunk)
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
-def extract_frames(chunk: bytearray) -> np.ndarray:
+def process_video(chunk: bytearray) -> np.ndarray:
     """
     Extracts frames from a video chunk
     :param chunk: video chunk
     :return: list of frames
     """
     pass
-"""
-    video = #cv2.VideoCapture(BytesIO(chunk)) # Fix this
-    frames = []
-    while True:
-        ret, frame = video.read()
-        if not ret:
-            break
-        frames.append(frame)
-    return np.array(frames)"""
 
-def extract_spectrogram(chunk: bytearray) -> np.ndarray:
+
+def process_audio(chunk: bytearray) -> np.ndarray:
         """
         Extracts spectrogram from an audio chunk
         :param chunk: audio chunk
