@@ -1,7 +1,8 @@
 from typing import List
 
 from marqo.core import constants
-from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex, FieldFeature, Field, TensorField, MarqoIndex
+from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex, FieldFeature, Field, MarqoIndex
+from marqo.core.models.tensor_field import TensorField
 from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_schema import VespaSchema
@@ -129,13 +130,13 @@ class StructuredVespaSchema(VespaSchema):
 
         # tensor fields
         model_dim = self._index_request.model.get_dimension()
-        for tensor_field_request in self._index_request.tensor_fields:
-            chunks_field_name = f'{self._FIELD_CHUNKS_PREFIX}{tensor_field_request}'
-            embedding_field_name = f'{self._FIELD_EMBEDDING_PREFIX}{tensor_field_request}'
-            document.append(f'field {chunks_field_name} type array<string> {{')
+        for field_name in self._index_request.tensor_fields:
+            field = TensorField(name=field_name)
+
+            document.append(f'field {field.chunk_field_name} type array<string> {{')
             document.append('indexing: attribute | summary')
             document.append('}')
-            document.append(f'field {embedding_field_name} type tensor<float>(p{{}}, x[{model_dim}]) {{')
+            document.append(f'field {field.embeddings_field_name} type tensor<float>(p{{}}, x[{model_dim}]) {{')
             document.append('indexing: attribute | index | summary')
             document.append(
                 f'attribute {{ distance-metric: {self._get_distance_metric(self._index_request.distance_metric)} }}')
@@ -145,13 +146,7 @@ class StructuredVespaSchema(VespaSchema):
             document.append('}}')
             document.append('}')
 
-            tensor_fields.append(
-                TensorField(
-                    name=tensor_field_request,
-                    chunk_field_name=chunks_field_name,
-                    embeddings_field_name=embedding_field_name
-                )
-            )
+            tensor_fields.append(field)
 
         # vector count field
         document.append(f'field {common.FIELD_VECTOR_COUNT} type int {{ indexing: attribute | summary }}')

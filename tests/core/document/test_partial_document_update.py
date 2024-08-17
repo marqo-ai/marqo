@@ -8,7 +8,7 @@ import numpy as np
 from marqo.api.exceptions import BadRequestError
 from marqo.api.models.update_documents import UpdateDocumentsBodyParams
 from marqo.core.exceptions import UnsupportedFeatureError
-from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index import FieldType, FieldFeature, Model
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents

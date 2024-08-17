@@ -6,6 +6,7 @@ import numpy as np
 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.core.models.tensor_field import TensorField
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import tensor_search

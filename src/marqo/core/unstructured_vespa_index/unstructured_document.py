@@ -1,9 +1,7 @@
 import json
-from copy import deepcopy
 from typing import List, Dict, Any
-import semver
 
-from pydantic import Field, BaseModel
+from pydantic import Field
 from marqo.base_model import MarqoBaseModel
 
 from marqo.core import constants as index_constants
@@ -23,6 +21,7 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=unstructured_common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=unstructured_common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
+
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,

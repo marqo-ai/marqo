@@ -12,6 +12,7 @@ from pydantic.utils import ROOT_KEY
 
 from marqo.base_model import ImmutableStrictBaseModel, ImmutableBaseModel, StrictBaseModel
 from marqo.core import constants
+from marqo.core.models.tensor_field import TensorField
 from marqo.exceptions import InvalidArgumentError
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
@@ -94,17 +95,6 @@ class Field(ImmutableStrictBaseModel):
         validate_structured_field(values, marqo_index=True)
 
         return values
-
-
-class TensorField(ImmutableStrictBaseModel):
-    """
-    A tensor field that has a corresponding field.
-
-    chunk_field_name and embeddings_field_name must be unique across all tensor fields.
-    """
-    name: str
-    chunk_field_name: str
-    embeddings_field_name: str
 
 
 class HnswConfig(ImmutableStrictBaseModel):
