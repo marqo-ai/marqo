@@ -183,93 +183,10 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
         return Modality.IMAGE # THIS IS HACKY. FIND A WAY TO FIX THIS
         raise ValueError(f"Unsupported content type: {type(content)}")
 
-def vectorise_old(model_name: str, content: Union[str, List[str], List[Image]],
-              model_properties: dict = None,
-              device: str = None, normalize_embeddings: bool = get_default_normalization(),
-              model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs) -> List[List[float]]:
-    """Vectorizes the content by model name.
-
-    Args:
-        model_name (str) : Acts as an identifying alias if model_properties is given.
-                        If model_properties is None then model_name is used to fetch properties from model_registry
-        content (_type_):
-            str: A single string to vectorize, can be text or an image path
-            List[str]: A list of strings to vectorize, can be text or image paths, but not mixed
-            List[Image]: A list of PIL images to vectorize
-        model_properties(dict): {"name": str, "dimensions": int, "tokens": int, "type": str}
-                                if model_properties['name'] is not in model_registry, these properties are used to fetch the model
-                                if model_properties['name'] is in model_registry, default properties are overridden
-                                model_properties can be None only if model_name is a model present in the registry
-        model_auth: Authorisation details for downloading a model (if required)
-        enable_cache: A flag to enable or disable the cache
-
-    Returns:
-        List[List[float]]: _description_
-
-    Raises:
-        VectoriseError: if the content can't be vectorised, for some reason.
-    """
-
-    if not device:
-        raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
-
-    validated_model_properties = validate_model_properties(model_name, model_properties)
-    model_cache_key = _create_model_cache_key(model_name, device, validated_model_properties)
-
-    _update_available_models(
-        model_cache_key, model_name, validated_model_properties, device, normalize_embeddings,
-        model_auth=model_auth
-    )
-
-    if _marqo_inference_cache.is_enabled() and enable_cache:
-        if isinstance(content, str):
-            vectorised = _marqo_inference_cache.get(model_cache_key, content)
-            if vectorised is None:
-                vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
-                _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
-                return vectorised
-            else:
-                return _convert_cached_embeddings_to_output(vectorised)
-        elif isinstance(content, list):
-            contents_to_vectorise = []
-            cached_output: List[Tuple[int, List[float]]] = []
-
-            # Collect the content that needs to be vectorised
-            for loc, content_item in enumerate(content):
-                if not isinstance(content_item, str):
-                    contents_to_vectorise.append(content_item)
-                else:
-                    vectorised = _marqo_inference_cache.get(model_cache_key, content_item)
-                    if vectorised is None:
-                        contents_to_vectorise.append(content_item)
-                    else:
-                        cached_output.append((loc, vectorised))
-
-            if contents_to_vectorise:
-                vectorised_outputs: List[List[float]] = _encode_without_cache(model_cache_key, contents_to_vectorise,
-                                                                              normalize_embeddings, **kwargs)
-
-                # Cache the vectorised outputs
-                for contents_to_vectorise_loc, vectorised_output in enumerate(vectorised_outputs):
-                    if isinstance(content[contents_to_vectorise_loc], str):
-                        _marqo_inference_cache.set(model_cache_key,
-                                                   contents_to_vectorise[contents_to_vectorise_loc], vectorised_output)
-
-                # Insert the cached outputs back into the vectorised outputs
-                for loc, cached_vector in cached_output:
-                    vectorised_outputs.insert(loc, cached_vector)
-            else:
-                vectorised_outputs = [vector for _, vector in cached_output]
-            return vectorised_outputs
-        else:
-            raise TypeError(f"Unsupported content type: {type(content).__name__}")
-    else:
-        return _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
-
 def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
               model_properties: dict = None,
               device: str = None, normalize_embeddings: bool = get_default_normalization(),
-              model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs) -> List[List[float]]:
+              model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs,) -> List[List[float]]:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 

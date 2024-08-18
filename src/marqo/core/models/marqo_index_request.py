@@ -24,6 +24,8 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
     normalize_embeddings: bool
     text_preprocessing: marqo_index.TextPreProcessing
     image_preprocessing: marqo_index.ImagePreProcessing
+    video_preprocessing: marqo_index.VideoPreProcessing
+    audio_preprocessing: marqo_index.AudioPreProcessing
     distance_metric: marqo_index.DistanceMetric
     vector_numeric_type: marqo_index.VectorNumericType
     hnsw_config: marqo_index.HnswConfig

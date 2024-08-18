@@ -9,6 +9,7 @@ import threading
 from queue import Queue
 
 import numpy as np
+import av # add PyAV to requirements
 
 import PIL
 from PIL.ImageFile import ImageFile
@@ -24,6 +25,13 @@ from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_mult
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+
+from marqo.s2_inference.languagebind import (
+    LanguageBind, LanguageBindVideo, LanguageBindAudio, LanguageBindImage,
+    LanguageBindDepth, LanguageBindThermal,
+    LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
+    LanguageBindDepthProcessor, LanguageBindThermalProcessor, transform_dict, to_device
+)
 
 
 class MemoryPool:
@@ -50,7 +58,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                                 memory_pool: Optional[MemoryPool] = None, # Optional for now
                                                 download_headers: Optional[Dict] = None,  # Optional for now
                                                 metric_obj: Optional[RequestMetrics] = None,
-                                                preprocessors: Optional[Dict[str, Compose]] = None) -> None:
+                                                preprocessors: Optional[Dict[str, Compose]] = None,
+                                                marqo_index: Optional[MarqoIndex] = None) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -119,7 +128,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                     raise e
 
                     if modality in [Modality.VIDEO, Modality.AUDIO]:
-                        chunks = download_and_chunk_media(doc[field], download_headers, memory_pool, modality)
+                        chunks = download_and_chunk_media(doc[field], download_headers, memory_pool, modality, marqo_index)
                         content_repo[doc[field]] = chunks
 
                 # For multimodal tensor combination
@@ -141,20 +150,23 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
 
 
-def download_and_chunk_media(url: str, headers: dict, memory_pool: MemoryPool, modality: Modality) -> List[np.ndarray]:
+
+
+def download_and_chunk_media(url: str, headers: dict, memory_pool: MemoryPool, modality: Modality, marqo_index: MarqoIndex) -> List[np.ndarray]:
     chunks = []
     buffer = BytesIO()
 
+    if modality == Modality.VIDEO:
+        split_length = marqo_index.video_preprocessing.split_length
+        split_overlap = marqo_index.video_preprocessing.split_overlap
+    elif modality == Modality.AUDIO:
+        split_length = marqo_index.audio_preprocessing.split_length
+        split_overlap = marqo_index.audio_preprocessing.split_overlap
+    else:
+        raise ValueError(f"Unsupported modality: {modality}")
+
     def write_function(data):
         buffer.write(data)
-        if buffer.tell() >= memory_pool.chunk_size:
-            chunk = memory_pool.get_chunk()
-            buffer.seek(0)
-            chunk[:len(buffer.getvalue())] = buffer.getvalue()
-            chunks.append(process_chunk(chunk, modality))
-            memory_pool.return_chunk(chunk)
-            buffer.seek(0)
-            buffer.truncate()
 
     c = pycurl.Curl()
     c.setopt(c.URL, url)
@@ -164,30 +176,48 @@ def download_and_chunk_media(url: str, headers: dict, memory_pool: MemoryPool, m
     c.perform()
     c.close()
 
-    if buffer.tell() > 0:
-        chunk = memory_pool.get_chunk()
-        chunk[:buffer.tell()] = buffer.getvalue()
-        chunks.append(process_chunk(chunk[:buffer.tell()], modality))
-        memory_pool.return_chunk(chunk)
+    buffer.seek(0)
+    container = av.open(buffer)
+    stream = next(s for s in container.streams if s.type == ('video' if modality == Modality.VIDEO else 'audio'))
+
+    chunk_buffer = bytearray()
+    chunk_duration = 0
+    for packet in container.demux(stream):
+        for frame in packet.decode():
+            frame_data = frame.to_ndarray().tobytes()
+            chunk_buffer.extend(frame_data)
+            chunk_duration += frame.time_base * frame.pts
+
+            if chunk_duration >= split_length:
+                chunk = process_chunk(chunk_buffer, modality)
+                chunks.append(chunk)
+                
+                # Handle overlap
+                if split_overlap > 0:
+                    overlap_size = int(len(chunk_buffer) * (split_overlap / split_length))
+                    chunk_buffer = chunk_buffer[-overlap_size:]
+                    chunk_duration = split_overlap
+                else:
+                    chunk_buffer = bytearray()
+                    chunk_duration = 0
+
+    # Process any remaining data
+    if chunk_buffer:
+        chunk = process_chunk(chunk_buffer, modality)
+        chunks.append(chunk)
 
     return chunks
 
-
 def process_chunk(chunk: bytearray, modality: Modality) -> np.ndarray:
     if modality == Modality.VIDEO:
-        return process_video(chunk)
+        video_processor = LanguageBindVideoProcessor()
+        return video_processor.process(chunk)
     elif modality == Modality.AUDIO:
-        return process_audio(chunk)
+        audio_processor = LanguageBindAudioProcessor()
+        return audio_processor.process(chunk)
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
-def process_video(chunk: bytearray) -> np.ndarray:
-    """
-    Extracts frames from a video chunk
-    :param chunk: video chunk
-    :return: list of frames
-    """
-    pass
 
 
 def process_audio(chunk: bytearray) -> np.ndarray:
@@ -209,7 +239,8 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     model_properties: Optional[Dict] = None,
                                     model_auth: Optional[ModelAuth] = None,
                                     device: Optional[str] = None,
-                                    patch_method_exists: bool = False
+                                    patch_method_exists: bool = False,
+                                    marqo_index: Optional[MarqoIndex] = None,
                                     ) -> ContextManager[dict]:
     content_repo = {}  # for image/video/audio
     memory_pool = MemoryPool(total_size=500 * 1024 * 1024, chunk_size=20 * 1024 * 1024)  # 500 MB total, 20 MB chunks
@@ -242,7 +273,8 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                            memory_pool, 
                            download_headers, 
                            m[i], 
-                           preprocessors)
+                           preprocessors,
+                           marqo_index)
            for i, allocation in enumerate(thread_allocated_docs)]
 
 
@@ -263,68 +295,6 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
             elif isinstance(p, (list, np.ndarray)):
                 # Clean up video/audio chunks if necessary
                 pass
-
-
-#@contextmanager
-def download_and_preprocess_images_old(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                                       image_download_headers: dict,
-                                       model_name: str,
-                                       normalize_embeddings: bool,
-                                       model_properties: Optional[Dict] = None,
-                                       model_auth: Optional[ModelAuth] = None,
-                                       device: Optional[str] = None,
-                                       patch_method_exists: bool = False
-                                       ) -> ContextManager[dict]:
-    """Concurrently downloads images from each doc, storing them into the image_repo dict
-    Args:
-        docs: docs with images to be downloaded. These will be allocated to each thread
-        thread_count: number of threads to spin up
-        tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
-        image_download_headers: A dict of image download headers for authentication.
-    This should be called only if treat URLs as images is True
-        patch_method_exists: If True, the patch method exists in the model. If False, the patch method does not exist.
-            We only preprocess images if the patch method DOES NOT exist.
-
-
-    Returns:
-         An image repo: a dict <image pointer>:<image data>
-    """
-    docs_per_thread = math.ceil(len(docs) / thread_count)
-    copied = copy.deepcopy(docs)
-    image_repo = dict()
-
-    preprocessor = None
-    if is_preprocess_image_model(model_properties) and not patch_method_exists:
-        preprocessor = load_multimodal_model_and_get_image_preprocessor(model_name=model_name,
-                                                                        model_properties=model_properties,
-                                                                        device=device,
-                                                                        model_auth=model_auth,
-                                                                        normalize_embeddings=normalize_embeddings)
-
-    try:
-        m = [RequestMetrics() for i in range(thread_count)]
-        thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-        with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
-            futures = [executor.submit(threaded_download_and_preprocess_images,
-                                       allocation, image_repo, tensor_fields,
-                                       image_download_headers, device, m[i], preprocessor)
-                       for i, allocation in enumerate(thread_allocated_docs)]
-
-            # Unhandled exceptions will be raised here.
-            # We only raise the first exception if there are multiple exceptions
-            for future in concurrent.futures.as_completed(futures):
-                _ = future.result()
-
-        # Fix up metric_obj to make it not mention thread-ids
-        metric_obj = RequestMetricsStore.for_request()
-        metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
-        metric_obj.times = reduce_thread_metrics(metric_obj.times)
-        yield image_repo
-    finally:
-        for p in image_repo.values():
-            if isinstance(p, ImageFile):
-                p.close()
-
 
 def reduce_thread_metrics(data):
     """Reduce the metrics from each thread, as if they were run in a single thread.

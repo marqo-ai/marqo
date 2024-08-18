@@ -54,6 +54,8 @@ class UnstructuredVespaSchema(VespaSchema):
             normalize_embeddings=self._index_request.normalize_embeddings,
             text_preprocessing=self._index_request.text_preprocessing,
             image_preprocessing=self._index_request.image_preprocessing,
+            video_preprocessing=self._index_request.video_preprocessing,
+            audio_preprocessing=self._index_request.audio_preprocessing,
             distance_metric=self._index_request.distance_metric,
             vector_numeric_type=self._index_request.vector_numeric_type,
             hnsw_config=self._index_request.hnsw_config,
