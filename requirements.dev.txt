@@ -6,7 +6,7 @@ fastapi==0.86.0
 uvicorn[standard]
 fastapi-utils==0.2.1
 jsonschema==4.17.1
-typing-extensions==4.5.0
+typing-extensions==4.8.0
 urllib3==1.26.0
 pydantic==1.10.11
 httpx==0.25.0
@@ -53,7 +53,7 @@ flatbuffers==23.5.9
 certifi==2019.11.28
 idna==2.8
 six==1.14.0
-typing-extensions==4.5.0
+typing-extensions==4.8.0
 urllib3==1.26.0
 pydantic==1.10.11
 httpx==0.25.0
