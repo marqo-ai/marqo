@@ -23,7 +23,7 @@ more_itertools
 boto3==1.25.4
 botocore==1.28.4
 nltk==3.7
-torch==2.2.2
+torch==1.13.1
 torchvision==0.17.2
 Pillow==9.3.0
 numpy==1.23.4
@@ -53,7 +53,7 @@ flatbuffers==23.5.9
 certifi==2019.11.28
 idna==2.8
 six==1.14.0
-typing-extensions==4.8.0
+typing-extensions==4.5.0
 urllib3==1.26.0
 pydantic==1.10.11
 httpx==0.25.0
@@ -74,7 +74,7 @@ evaluate==0.4.0
 ftfy==6.1.1
 iopath==0.1.10
 peft @ git+https://github.com/huggingface/peft@08cb3dde577747f6ca6638c884fd66fd16cf2e9d
-pytorchvideo
+pytorchvideo @ git+https://github.com/facebookresearch/pytorchvideo.git@28fe037d212663c6a24f373b94cc5d478c8c1a1d
 scipy==1.10.1
 tensorboardX==2.6.1
 tokenizers
