@@ -27,6 +27,7 @@ class Embed:
         self.index_management = index_management
         self.default_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
         #self.default_device = default_device
+        print(f"From embed __init__, default device is {self.default_device}")
 
     @pydantic.validator('default_device')
     def validate_default_device(cls, value):
