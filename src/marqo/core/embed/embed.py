@@ -68,7 +68,7 @@ class Embed:
         # Set default device if not provided
         if device is None:
             print(f"device is {device}")
-            device = self.default_device
+            device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
             print(f"device: {device}")
 
 
