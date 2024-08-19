@@ -70,7 +70,7 @@ class Embed:
             print(f"device is {device}")
             device = self.default_device
             print(f"device: {device}")
-            device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
+            device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
             print(f"final device: {device}")
 
 
