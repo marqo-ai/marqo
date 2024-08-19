@@ -696,8 +696,8 @@ def _load_model(
     if calling_func not in ["unit_test", "_update_available_models"]:
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
-    if model_properties['type'] == 'multimodal':
-        return MultimodalModel(model_name, model_properties, device)    
+    #if model_properties['type'] == 'multimodal':
+    #    return MultimodalModel(model_name, model_properties, device)    
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)

@@ -35,6 +35,14 @@ class IndexSettings(StrictBaseModel):
     imagePreprocessing: core.ImagePreProcessing = core.ImagePreProcessing(
         patchMethod=None
     )
+    videoPreprocessing: core.VideoPreProcessing = core.VideoPreProcessing(
+        splitLength=20,
+        splitOverlap=1,
+    )
+    audioPreProcessing: core.AudioPreProcessing = core.AudioPreProcessing(
+        splitLength=20,
+        splitOverlap=1,
+    )
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float
     annParameters: AnnParameters = AnnParameters(
         spaceType=core.DistanceMetric.PrenormalizedAngular,
@@ -99,6 +107,8 @@ class IndexSettings(StrictBaseModel):
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,
                 image_preprocessing=self.imagePreprocessing,
+                video_preprocessing=self.videoPreprocessing,
+                audio_preprocessing=self.audioPreProcessing,
                 distance_metric=self.annParameters.spaceType,
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
@@ -140,6 +150,8 @@ class IndexSettings(StrictBaseModel):
                 normalize_embeddings=self.normalizeEmbeddings,
                 text_preprocessing=self.textPreprocessing,
                 image_preprocessing=self.imagePreprocessing,
+                video_preprocessing=self.videoPreprocessing,
+                audio_preprocessing=self.audioPreProcessing,
                 distance_metric=self.annParameters.spaceType,
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,

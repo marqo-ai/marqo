@@ -2222,7 +2222,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id: str, device: str, marqo_index: StructuredMarqoIndex, image_repo, field_map: dict,
+        doc_id: str, device: str, marqo_index: StructuredMarqoIndex, content_repo, field_map: dict,
         model_auth: Optional[ModelAuth] = None,
         text_chunk_prefix: str = None
 ):
