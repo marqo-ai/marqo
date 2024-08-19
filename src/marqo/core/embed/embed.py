@@ -65,6 +65,7 @@ class Embed:
         
         # Set default device if not provided
         if device is None:
+            # TODO: Figure out why device = self.default_device becomes cpu, even when it is set to cuda in __init__
             device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
 
         # Content validation is done in API model layer
