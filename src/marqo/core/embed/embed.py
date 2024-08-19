@@ -13,6 +13,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.core.utils.prefix import determine_text_prefix, DeterminePrefixContentType
 from marqo.vespa.vespa_client import VespaClient
+from marqo.tensor_search import utils
 
 logger = get_logger(__name__)
 
@@ -24,7 +25,8 @@ class Embed:
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, default_device: str):
         self.vespa_client = vespa_client
         self.index_management = index_management
-        self.default_device = default_device
+        self.default_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
+        #self.default_device = default_device
 
     @pydantic.validator('default_device')
     def validate_default_device(cls, value):
@@ -61,10 +63,12 @@ class Embed:
         temp_config = config.Config(
             vespa_client=self.vespa_client,
         )
-
+        
         # Set default device if not provided
         if device is None:
+            print(f"device is {device}")
             device = self.default_device
+            print(f"device: {device}")
 
 
         # Content validation is done in API model layer
