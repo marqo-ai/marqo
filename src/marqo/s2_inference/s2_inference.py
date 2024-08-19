@@ -75,10 +75,11 @@ class MultimodalModel:
         self.model_name = model_name
         self.properties = MultimodalModelProperties(**model_properties)
         self.device = device
-        self.model = self._load_model()
+        self.model = None #self._load_model() currently set to None, will be loaded in _load_model()
 
     def _load_model(self):
         if self.properties.loader == "languagebind":
+            print(f"Loading LanguageBind model: {self.model_name}")
             clip_type = { 
                 'video': 'LanguageBind_Video_V1.5_FT',
                 'audio': 'LanguageBind_Audio_FT',
@@ -89,6 +90,7 @@ class MultimodalModel:
             model = LanguageBind(clip_type=clip_type, cache_dir=self.properties.cache_dir)
             model = model.to(self.device)
             model.eval()
+            print(f"successfully loaded LanguageBind model: {self.model_name}")
             return model
         elif self.properties.loader == "imagebind":
             # Load ImageBind model
@@ -352,7 +354,9 @@ def is_preprocess_image_model(model_properties: dict = None) -> bool:
     return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
 
 def load_multimodal_model(model_name: str, model_properties: Dict[str, Any], device: str) -> MultimodalModel:
-    return MultimodalModel(model_name, model_properties, device)
+    model = MultimodalModel(model_name, model_properties, device)
+    #model.load()
+    return model
 
 def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
                                                      device: Optional[str] = None,
@@ -378,6 +382,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
     if model_properties.get("type") in ['languagebind', 'imagebind']:
+        print(f"from load_multimodal_model_and_get_preprocessors, loading model: {model_name}, model_properties: {model_properties}")
         model = load_multimodal_model(model_name, model_properties, device)
 
     #if not is_preprocess_image_model(model_properties):
@@ -547,7 +552,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                             ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
             pass
         elif model_properties.get("type") in ['languagebind', 'imagebind']:
-            MultimodalModelProperties(**properties)
+            MultimodalModelProperties(**model_properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
                                               f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
@@ -696,8 +701,12 @@ def _load_model(
     if calling_func not in ["unit_test", "_update_available_models"]:
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
-    #if model_properties['type'] == 'multimodal':
-    #    return MultimodalModel(model_name, model_properties, device)    
+
+    if model_properties.get('type') in ['languagebind', 'imagebind']:
+        print(f"loading for: model_name={model_name} and properties={model_properties}")
+        model = MultimodalModel(model_name, model_properties, device)
+        model._load_model()
+        return model
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
@@ -748,7 +757,7 @@ def get_model_properties_from_registry(model_name: str) -> dict:
     Returns:
         dict: a dictionary describing properties of the model.
     """
-
+    print(f"Getting model properties for model={model_name}")
     if model_name not in MODEL_PROPERTIES['models']:
         raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
                                 f"Model is not supported by default.")
@@ -904,6 +913,7 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
     """
 
     model_type = model_properties['type']
+    print(f"getting model loader for model_name={model_name} and model_type={model_type}")
 
     if model_type not in MODEL_PROPERTIES['loaders']:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")

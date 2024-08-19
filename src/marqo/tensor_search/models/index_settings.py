@@ -39,7 +39,7 @@ class IndexSettings(StrictBaseModel):
         splitLength=20,
         splitOverlap=1,
     )
-    audioPreProcessing: core.AudioPreProcessing = core.AudioPreProcessing(
+    audioPreprocessing: core.AudioPreProcessing = core.AudioPreProcessing(
         splitLength=20,
         splitOverlap=1,
     )
@@ -108,7 +108,7 @@ class IndexSettings(StrictBaseModel):
                 text_preprocessing=self.textPreprocessing,
                 image_preprocessing=self.imagePreprocessing,
                 video_preprocessing=self.videoPreprocessing,
-                audio_preprocessing=self.audioPreProcessing,
+                audio_preprocessing=self.audioPreprocessing,
                 distance_metric=self.annParameters.spaceType,
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
@@ -151,7 +151,7 @@ class IndexSettings(StrictBaseModel):
                 text_preprocessing=self.textPreprocessing,
                 image_preprocessing=self.imagePreprocessing,
                 video_preprocessing=self.videoPreprocessing,
-                audio_preprocessing=self.audioPreProcessing,
+                audio_preprocessing=self.audioPreprocessing,
                 distance_metric=self.annParameters.spaceType,
                 vector_numeric_type=self.vectorNumericType,
                 hnsw_config=self.annParameters.parameters,
@@ -183,6 +183,8 @@ class IndexSettings(StrictBaseModel):
                 normalizeEmbeddings=marqo_index.normalize_embeddings,
                 textPreprocessing=marqo_index.text_preprocessing,
                 imagePreprocessing=marqo_index.image_preprocessing,
+                videoPreprocessing=marqo_index.video_preprocessing,
+                audioPreprocessing=marqo_index.audio_preprocessing,
                 vectorNumericType=marqo_index.vector_numeric_type,
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,
@@ -199,6 +201,8 @@ class IndexSettings(StrictBaseModel):
                 normalizeEmbeddings=marqo_index.normalize_embeddings,
                 textPreprocessing=marqo_index.text_preprocessing,
                 imagePreprocessing=marqo_index.image_preprocessing,
+                videoPreprocessing=marqo_index.video_preprocessing,
+                audioPreprocessing=marqo_index.audio_preprocessing,
                 vectorNumericType=marqo_index.vector_numeric_type,
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,

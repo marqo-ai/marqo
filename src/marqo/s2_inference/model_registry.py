@@ -1939,7 +1939,7 @@ def _get_languagebind_properties() -> Dict:
             "dimensions": 768,
             "type": "languagebind",
             "loader": "languagebind",
-            "supported_modalities": ["video", "audio", "text", "image", "depth", "thermal"],
+            "supported_modalities": ["video", "audio", "text", "image"],
         },
     }
     return LANGUAGEBIND_MODEL_PROPERTIES
@@ -2039,7 +2039,7 @@ def load_model_properties() -> Dict:
     multilingual_clip_model_properties = get_multilingual_clip_properties()
     fp16_clip_model_properties = _get_fp16_clip_properties()
     no_model_properties = _get_no_model_properties()
-    #languagebind_model_properties = _get_languagebind_properties()
+    languagebind_model_properties = _get_languagebind_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -2053,7 +2053,7 @@ def load_model_properties() -> Dict:
     model_properties.update(multilingual_clip_model_properties)
     model_properties.update(fp16_clip_model_properties)
     model_properties.update(no_model_properties)
-    #model_properties.update(languagebind_model_properties)
+    model_properties.update(languagebind_model_properties)
 
 
     all_properties = dict()
