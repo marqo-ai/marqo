@@ -48,8 +48,6 @@ class Config:
         self.document = Document(vespa_client, self.index_management)
         self.recommender = Recommender(vespa_client, self.index_management)
         self.embed = Embed(vespa_client, self.index_management, self.default_device)
-        print(f"from Config: default_device={self.default_device}")
-        print(f"from config, embed is {self.embed}")
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

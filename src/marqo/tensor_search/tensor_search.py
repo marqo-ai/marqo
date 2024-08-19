@@ -1329,7 +1329,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
 
     if device is None:
         selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-        print(f"search selected_device: {selected_device}")
         if selected_device is None:
             raise api_exceptions.InternalError("Best available device was not properly determined on Marqo startup.")
         logger.debug(f"No device given for search. Defaulting to best available device: {selected_device}")
@@ -1593,7 +1592,6 @@ def assign_query_to_vector_job(
             "assign_query_to_vector_job() expects param `grouped_content` with 2 elems. Instead received"
             f" `grouped_content` with {len(grouped_content)} elems")
     ptrs = []
-    print(f"from assign_query_to_vector_job, device: {device}")
     for i, grouped_content in enumerate(grouped_content):
         content_type = 'text' if i == 0 else 'image'
         vector_job = VectorisedJobs(
@@ -1651,7 +1649,6 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
     for v in jobs:
         # TODO: Handle exception for single job, and allow others to run.
         try:
-            print(f"from vectorise_jobs, device: {v.device}")
             if v.content:
                 vectors = s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
