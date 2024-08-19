@@ -153,6 +153,22 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
 
 
 def download_and_chunk_media(url: str, headers: dict, memory_pool: MemoryPool, modality: Modality, marqo_index: MarqoIndex) -> List[np.ndarray]:
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
+
+    # Perform HEAD request to check file size
+    c = pycurl.Curl()
+    c.setopt(c.URL, url)
+    c.setopt(c.NOBODY, 1)  # HEAD request
+    for key, value in headers.items():
+        c.setopt(c.HTTPHEADER, [f"{key}: {value}"])
+    c.perform()
+    content_length = c.getinfo(pycurl.CONTENT_LENGTH_DOWNLOAD)
+    c.close()
+
+    if content_length > MAX_FILE_SIZE:
+        raise ValueError(f"File size ({content_length / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
+
+
     chunks = []
     buffer = BytesIO()
 
