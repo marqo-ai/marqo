@@ -25,8 +25,8 @@ class Embed:
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement, default_device: str):
         self.vespa_client = vespa_client
         self.index_management = index_management
-        self.default_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
-        #self.default_device = default_device
+        #self.default_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
+        self.default_device = default_device
         print(f"From embed __init__, default device is {self.default_device}")
 
     @pydantic.validator('default_device')
