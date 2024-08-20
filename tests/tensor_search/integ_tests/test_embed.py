@@ -10,7 +10,7 @@ import numpy as np
 import requests
 import json
 from unittest import mock
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
 import marqo.exceptions as base_exceptions
