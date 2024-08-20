@@ -1,3 +1,16 @@
+# Release 2.10.2
+
+ ## Bug fixes and minor changes
+ - Fix an issue where CUDA was not automatically selected as the default device for the `embed` endpoint, even when available [#941](https://github.com/marqo-ai/marqo/pull/941).
+
+# Release 2.10.1
+
+## Bug fixes and minor changes
+- Improve the clarity of the error message when Marqo can not download the provided image ([#905](https://github.com/marqo-ai/marqo/pull/905)).
+- Improve the error message in hybrid search to avoid confusion ([#900](https://github.com/marqo-ai/marqo/pull/900)).
+- Fix a bug where a `500` error is returned when an unsupported search method is provided. Marqo now correctly returns a `400` error ([#899](https://github.com/marqo-ai/marqo/pull/899)).
+- Fix a bug where a `500` error is returned when an invalid image URL with non-ASCII characters is provided. Marqo now encodes the image URL correctly ([#908](https://github.com/marqo-ai/marqo/pull/908)).
+
 # Release 2.10.0
 
 ## New features
