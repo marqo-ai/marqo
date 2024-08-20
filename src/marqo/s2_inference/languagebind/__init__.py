@@ -74,8 +74,9 @@ class LanguageBind(nn.Module):
 
     def forward(self, inputs):
         outputs = {}
+        print(f"from class LanguageBind, inputs: {inputs}")
         for key, value in inputs.items():
-            value = self.modality_encoder[key](**value)[1]
+            value = self.modality_encoder[key](value)[1]
             value = self.modality_proj[key](value)
             value = value / value.norm(p=2, dim=-1, keepdim=True)
             if self.use_temp:
@@ -86,5 +87,6 @@ class LanguageBind(nn.Module):
 
 def to_device(x, device):
     out_dict = {k: v.to(device) for k, v in x.items()}
+    print(f"out_dict: {out_dict}")
     return out_dict
 

@@ -41,6 +41,10 @@ from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
 
+# Temp
+import tempfile
+import os
+    
 logger = get_logger(__name__)
 
 # The avaiable has the structure:
@@ -75,19 +79,19 @@ class MultimodalModel:
         self.model_name = model_name
         self.properties = MultimodalModelProperties(**model_properties)
         self.device = device
-        self.model = None #self._load_model() currently set to None, will be loaded in _load_model()
-
-    def _load_model(self):
-        if self.properties.loader == "languagebind":
-            print(f"Loading LanguageBind model: {self.model_name}")
-            clip_type = { 
+        self.clip_type = { 
                 'video': 'LanguageBind_Video_V1.5_FT',
                 'audio': 'LanguageBind_Audio_FT',
                 'thermal': 'LanguageBind_Thermal',
                 'image': 'LanguageBind_Image',
                 'depth': 'LanguageBind_Depth',
             }
-            model = LanguageBind(clip_type=clip_type, cache_dir=self.properties.cache_dir)
+        self.model = self._load_model() # Seems inefficient if we also call this in def _load_model
+
+    def _load_model(self):
+        if self.properties.loader == "languagebind":
+            print(f"Loading LanguageBind model: {self.model_name}")
+            model = LanguageBind(clip_type=self.clip_type, cache_dir=self.properties.cache_dir)
             model = model.to(self.device)
             model.eval()
             print(f"successfully loaded LanguageBind model: {self.model_name}")
@@ -145,16 +149,44 @@ class LanguageBindEncoder(ModelEncoder):
         return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{self.model.properties.cache_dir}/tokenizer_cache_dir')
 
     def _get_modality_transform(self):
-        return {c: transform_dict[c](self.model.model.modality_config[c]) for c in self.model.model.clip_type.keys()}
+        modality_transform = {c: transform_dict[c](self.model.model.modality_config[c]) for c in self.model.clip_type.keys()}
+        return modality_transform
 
     def encode(self, content, modality, **kwargs):
         inputs = {}
         if modality == Modality.TEXT:
+            # For text, we still need to tokenize and encode the text
             inputs['language'] = to_device(self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'), self.model.device)
+        elif modality == Modality.IMAGE:
+            # Save the image to a temporary file
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+                temp_filename = temp_file.name
+                content = content[0]
+                if isinstance(content, Image):
+                    content.save(temp_filename, format='PNG')
+                elif isinstance(content, bytes):
+                    temp_file.write(content)
+                else:
+                    raise ValueError(f"Unsupported image content type: {type(content)}")
+            
+            try:
+                # Open the image from the temporary file
+                #with Image.open(temp_filename) as img:
+                # Preprocess the image
+                print(f"temp_filename: {temp_filename}")
+                preprocessed_image = self.modality_transform['image']([temp_filename])
+                print(f"preprocessed_image: {preprocessed_image}")
+                inputs['image'] = to_device(preprocessed_image, self.model.device)['pixel_values']
+                print(f"inputs['image']: {inputs['image']}")
+            finally:
+                # Delete the temporary file
+                os.unlink(temp_filename)
         else:
-            inputs[modality.value] = to_device(self.modality_transform[modality.value](content), self.model.device)
+            # For other modalities, assume the content is already processed in add_docs.py
+            inputs[modality.value] = content[0] # figure out why this is a list
 
         with torch.no_grad():
+            print(inputs)
             embeddings = self.model.model(inputs)
 
         return embeddings[modality.value].cpu().numpy()
@@ -394,7 +426,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     """
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
-
+    
     if model_properties.get("type") in ['languagebind', 'imagebind']:
         print(f"from load_multimodal_model_and_get_preprocessors, loading model: {model_name}, model_properties: {model_properties}")
         model = load_multimodal_model(model_name, model_properties, device)
@@ -410,6 +442,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
+    print(f"from load_multimodal_model_and_get_preprocessors, model: {model}")
     print(f"is_preprocess_image_model(model_properties): {is_preprocess_image_model(model_properties)}")
 
     preprocessors = {

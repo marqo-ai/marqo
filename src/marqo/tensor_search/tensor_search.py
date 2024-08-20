@@ -104,6 +104,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
         marqo_index = index_meta_cache.get_index(
             config=config, index_name=add_docs_params.index_name, force_refresh=True
         )
+        print(f"from add_documents, marqo_index: {marqo_index}")
 
     # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
     except api_exceptions.IndexNotFoundError:
@@ -589,7 +590,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     vespa_client = config.vespa_client
     vespa_index = StructuredVespaIndex(marqo_index)
     index_model_dimensions = marqo_index.model.get_dimension()
-
+    print(f"from _add_documents_structured, marqo_index: {marqo_index}")
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     if add_docs_params.tensor_fields is not None:
@@ -650,9 +651,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
-                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None
+                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None,
+                        marqo_index=marqo_index
                     )
                 )
+                print(f"from tensor_search add_documents_structured, content_repo is {content_repo}")
 
         if add_docs_params.use_existing_tensors:
             existing_docs_dict: Dict[str, dict] = {}
@@ -806,8 +809,10 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
                     if marqo_field.type in [FieldType.VideoPointer, FieldType.AudioPointer]:
+                        print(f"from tensor_search add_documents_structured, marqo_field.type is {marqo_field.type}")
                         try:
                             media_chunks = content_repo[field_content]
+                            print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 chunk_id = f"{field}::{chunk_index}"
                                 chunks.append(chunk_id)
@@ -822,6 +827,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     model_auth=add_docs_params.model_auth
                                 )
                                 embeddings.extend(vector)  # vectorise returns a list of vectors
+                                print(f"from tensor_search add_documents_structured, embeddings is {embeddings}")
                                 
                         except Exception as e:
                             document_is_valid = False
@@ -834,6 +840,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     code=api_exceptions.InvalidArgError.code
                                 ))
                             )
+                            print(f"from tensor_search add_documents_structured, unsuccessful_docs is {unsuccessful_docs}")
                             continue
                     elif isinstance(field_content, (str, Image.Image)):
                         # C) Handle standard fields (text and images)
@@ -1270,6 +1277,7 @@ def _get_tensor_facets(marqo_doc_tensors: Dict[str, Any]) -> List[Dict[str, Any]
     """
     tensor_facets = []
     for tensor_field in marqo_doc_tensors:
+        print(f"from _get_tensor_facets: tensor_field = {tensor_field}")
         chunks = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_CHUNKS]
         embeddings = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_EMBEDDINGS]
         if len(chunks) != len(embeddings):
