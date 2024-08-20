@@ -10,7 +10,7 @@ import numpy as np
 import requests
 import json
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, call
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
 import marqo.exceptions as base_exceptions
@@ -20,6 +20,7 @@ from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResp
 from marqo.vespa.models.query_result import Root, Child, RootFields
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
 from marqo.api.models.embed_request import EmbedRequest
+from marqo.tensor_search import utils
 import os
 import pprint
 import unittest
@@ -149,6 +150,45 @@ class TestEmbed(MarqoTestCase):
     def tearDown(self) -> None:
         super().tearDown()
         self.device_patcher.stop()
+
+    def test_embed_content_cuda_device_as_default(self):
+        """
+        Test that embed_content uses the default device when no device is specified.
+        """
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                expected_device = "cuda"
+                
+                with patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": expected_device}):
+                    with patch('marqo.tensor_search.tensor_search.run_vectorise_pipeline') as mock_vectorise:
+                        mock_vectorise.return_value = {0: [0.1, 0.2, 0.3]}
+
+                        embed_res = embed(
+                            marqo_config=self.config,
+                            index_name=index.name,
+                            embedding_request=EmbedRequest(
+                                content=["This is a test document"]
+                            ),
+                            device=None
+                        )
+                    
+                    # Check that run_vectorise_pipeline was called
+                    mock_vectorise.assert_called_once()
+                    
+                    # Get the arguments passed to run_vectorise_pipeline
+                    args, kwargs = mock_vectorise.call_args
+                    
+                    # Print the args and kwargs for debugging
+                    print(f"args passed to run_vectorise_pipeline: {args}")
+                    print(f"kwargs passed to run_vectorise_pipeline: {kwargs}")
+                    
+                    # Check that the device passed to run_vectorise_pipeline matches the expected value
+                    self.assertEqual(args[2], expected_device)
+
+                    # Check the result
+                    self.assertEqual(embed_res["content"], ["This is a test document"])
+                    self.assertIsInstance(embed_res["embeddings"][0], list)
+                    self.assertEqual(embed_res["embeddings"][0], [0.1, 0.2, 0.3])
 
     def test_embed_equivalent_to_add_docs(self):
         """
