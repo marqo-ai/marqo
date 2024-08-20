@@ -1,3 +1,8 @@
+# Release 2.11.1
+
+## Bug fixes and minor changes
+- Added a default User-Agent header (`Marqobot/1.0`) and enabled automatic redirection handling when downloading images ([#932](https://github.com/marqo-ai/marqo/pull/932)). This enhancement allows Marqo to correctly process image URLs that require a `User-Agent` header or redirection.
+
 # Release 2.11.0
 
 ## New features
