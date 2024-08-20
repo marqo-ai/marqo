@@ -99,7 +99,9 @@ class MultimodalModel:
             raise ValueError(f"Unsupported loader: {self.properties.loader}")
 
     def encode(self, content, modality, **kwargs):
+        print(f"from class MultimodalModel, getting encoder")
         encoder = get_encoder(self)
+        print(f"from class MultimodalModel, getting encoder done, got encoder: {encoder}")
         return encoder.encode(content, modality, **kwargs)
 
 
@@ -159,15 +161,20 @@ class LanguageBindEncoder(ModelEncoder):
 
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     # THIS IS POC, we can use better python-magic logic to infer content type
+    print(f"infer_modality, content: {content}")
     if isinstance(content, str):
         extension = content.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif']:
+            print(f"infer_modality, content is image")
             return Modality.IMAGE
         elif extension in ['mp4', 'avi', 'mov']:
+            print(f"infer_modality, content is video")
             return Modality.VIDEO
         elif extension in ['mp3', 'wav', 'ogg']:
+            print(f"infer_modality, content is audio")
             return Modality.AUDIO
         else:
+            print(f"infer_modality, content is text")
             return Modality.TEXT
     elif isinstance(content, bytes):
         # Use python-magic to infer content type
@@ -201,10 +208,16 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
-
+    print(f"vectorise, model: {model}")
+    print(f"vectorise, model_cache_key: {model_cache_key}")
+    print(f"vectorise, content: {content}")
+    print(f"vectorise, normalize_embeddings: {normalize_embeddings}")
+    print(f"vectorise, kwargs: {kwargs}")
     if _marqo_inference_cache.is_enabled() and enable_cache:
+        print(f"vectorise, _marqo_inference_cache is enabled")
         return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs)
     else:
+        print(f"vectorise, _marqo_inference_cache is not enabled")
         return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
 
 def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs):
@@ -293,7 +306,8 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
         print(f"available_models: {_available_models}")
         model = _available_models[model_cache_key][AvailableModelsKey.model]
         encoder = get_encoder(model)
-        
+        print(f"from _encode_without_cache, model: {model}")
+        print(f"from _encode_without_cache, encoder: {encoder}")
         if isinstance(content, str):
             vectorised = model.encode(content, normalize=normalize_embeddings, **kwargs)
         elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
