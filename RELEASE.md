@@ -1,7 +1,7 @@
 # Release 2.11.2
 
 ## Bug fixes and minor changes
-- Fix a bug where `cuda` is not selected as the default device when available when using the `embed` endpoint [#941](https://github.com/marqo-ai/marqo/pull/941).
+- Fix an issue where CUDA was not automatically selected as the default device for the `embed` endpoint, even when available [#941](https://github.com/marqo-ai/marqo/pull/941).
 
 # Release 2.11.0
 
