@@ -130,11 +130,13 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
-                        if preprocessors and preprocessors['image'] is not None:
+                        if preprocessors['image'] is not None:
+                            print(f"preprocessors['image']: {preprocessors['image']}")
                             print(f"device: {device}")
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
+                                print(f"from threaded_download_and_preprocess_content, trying to preprocess image")
                                 content_repo[doc[field]] = preprocessors['image'](content_repo[doc[field]]).to(device)
                                 print(f"image_repo[doc[field]]: {content_repo[doc[field]]}")
                             except OSError as e:
@@ -148,7 +150,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     if modality in [Modality.VIDEO, Modality.AUDIO]:
                         print(f"from threaded_download_and_preprocess_content, modality is VIDEO or AUDIO")
                         try:
-                            processed_chunks = download_and_chunk_media(doc[field], download_headers, modality, marqo_index)
+                            processed_chunks = download_and_chunk_media(doc[field], download_headers, modality, marqo_index, preprocessors)
                             content_repo[doc[field]] = processed_chunks
                         except Exception as e:
                             logger.error(f"Error processing {modality} file: {str(e)}")
@@ -173,26 +175,28 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
 
 class StreamingMediaProcessor:
-    def __init__(self, url: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex):
+    def __init__(self, url: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex, preprocessors: Dict[str, Compose]):
         self.url = url
         self.headers = headers
         self.modality = modality
         self.marqo_index = marqo_index
+        self.preprocessors = preprocessors
         self.total_size = self.get_file_size()
         self.duration = self.estimate_duration()
+        self.preprocessor = self.preprocessors[modality]
         
         if modality == Modality.VIDEO:
             self.split_length = marqo_index.video_preprocessing.split_length
             self.split_overlap = marqo_index.video_preprocessing.split_overlap
-            pretrained_ckpt = 'LanguageBind/LanguageBind_Video_FT'
-            self.model = LanguageBindVideo.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
-            self.processor = LanguageBindVideoProcessor(self.model.config)
+            #pretrained_ckpt = 'LanguageBind/LanguageBind_Video_FT'
+            #self.model = LanguageBindVideo.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
+            #self.processor = LanguageBindVideoProcessor(self.model.config)
         elif modality == Modality.AUDIO:
             self.split_length = marqo_index.audio_preprocessing.split_length
             self.split_overlap = marqo_index.audio_preprocessing.split_overlap
-            pretrained_ckpt = 'LanguageBind/LanguageBind_Audio_FT'
-            self.model = LanguageBindAudio.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
-            self.processor = LanguageBindAudioProcessor(self.model.config)
+            #pretrained_ckpt = 'LanguageBind/LanguageBind_Audio_FT'
+            #self.model = LanguageBindAudio.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
+           # self.processor = LanguageBindAudioProcessor(self.model.config)
         else:
             raise ValueError(f"Unsupported modality: {modality}")
 
@@ -322,9 +326,9 @@ class StreamingMediaProcessor:
             processed_file_path = f"{temp_file_path}.processed.{'mp4' if self.modality == Modality.VIDEO else 'wav'}"
             
             if self.modality == Modality.VIDEO:
-                processed_chunk = self.processor(processed_file_path, return_tensors='pt')
+                processed_chunk = self.preprocessor(processed_file_path, return_tensors='pt')
             else:  # AUDIO
-                processed_chunk = self.processor(processed_file_path, return_tensors='pt')
+                processed_chunk = self.preprocessor(processed_file_path, return_tensors='pt')
 
             start_time = chunk_number * (self.split_length - self.split_overlap)
             end_time = start_time + self.split_length
@@ -343,10 +347,10 @@ class StreamingMediaProcessor:
                 os.unlink(f"{temp_file_path}.processed.wav")
     
 
-def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_index: MarqoIndex) -> List[Dict[str, torch.Tensor]]:
+def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_index: MarqoIndex, preprocessors = dict) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
-    processor = StreamingMediaProcessor(url, headers, modality, marqo_index)
+    processor = StreamingMediaProcessor(url, headers, modality, marqo_index, preprocessors)
     
     if processor.total_size > MAX_FILE_SIZE:
         raise ValueError(f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")

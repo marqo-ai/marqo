@@ -79,18 +79,20 @@ class MultimodalModel:
         self.model_name = model_name
         self.properties = MultimodalModelProperties(**model_properties)
         self.device = device
-        self.clip_type = { 
+        self.model = None # Seems inefficient if we also call this in def _load_model
+        self.encoder = None #get_encoder(self)
+        print(f"from class MultimodalModel, getting encoder done, got encoder: {self.encoder}")
+
+    def _load_multimodal_model(self):
+        if self.properties.loader == "languagebind":
+            print(f"Loading LanguageBind model: {self.model_name}")
+            self.clip_type = { 
                 'video': 'LanguageBind_Video_V1.5_FT',
                 'audio': 'LanguageBind_Audio_FT',
                 'thermal': 'LanguageBind_Thermal',
                 'image': 'LanguageBind_Image',
                 'depth': 'LanguageBind_Depth',
             }
-        self.model = self._load_model() # Seems inefficient if we also call this in def _load_model
-
-    def _load_model(self):
-        if self.properties.loader == "languagebind":
-            print(f"Loading LanguageBind model: {self.model_name}")
             model = LanguageBind(clip_type=self.clip_type, cache_dir=self.properties.cache_dir)
             model = model.to(self.device)
             model.eval()
@@ -101,12 +103,16 @@ class MultimodalModel:
             pass
         else:
             raise ValueError(f"Unsupported loader: {self.properties.loader}")
+        
+    def preprocessor(self, modality):
+        if self.encoder is None:
+            raise ValueError("Model has not been loaded yet. Call _load_model() first.")
+        return self.encoder.preprocessor(modality)
 
     def encode(self, content, modality, **kwargs):
-        print(f"from class MultimodalModel, getting encoder")
-        encoder = get_encoder(self)
-        print(f"from class MultimodalModel, getting encoder done, got encoder: {encoder}")
-        return encoder.encode(content, modality, **kwargs)
+        if self.encoder is None:
+            raise ValueError("Model has not been loaded yet. Call _load_model() first.")
+        return self.encoder.encode(content, modality, **kwargs)
 
 
 class ModelEncoder(ABC):
@@ -151,6 +157,15 @@ class LanguageBindEncoder(ModelEncoder):
     def _get_modality_transform(self):
         modality_transform = {c: transform_dict[c](self.model.model.modality_config[c]) for c in self.model.clip_type.keys()}
         return modality_transform
+    
+    def preprocessor(self, modality):
+        if modality == Modality.VIDEO:
+            return LanguageBindVideoProcessor(self.model.model.modality_config[Modality.VIDEO])
+        elif modality == Modality.AUDIO:
+            return LanguageBindAudioProcessor(self.model.model.modality_config[Modality.AUDIO])
+        else: # Image
+            return LanguageBindImageProcessor(self.model.model.modality_config[Modality.IMAGE])
+            
 
     def encode(self, content, modality, **kwargs):
         inputs = {}
@@ -160,6 +175,7 @@ class LanguageBindEncoder(ModelEncoder):
             # For text, we still need to tokenize and encode the text
             inputs['language'] = to_device(self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'), self.model.device)['input_ids']
         elif modality == Modality.IMAGE:
+            # TODO: Improve this logic. Do we really have to save to a temp file?
             # Save the image to a temporary file
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
                 temp_filename = temp_file.name
@@ -183,12 +199,7 @@ class LanguageBindEncoder(ModelEncoder):
             finally:
                 # Delete the temporary file
                 os.unlink(temp_filename)
-        elif modality == Modality.AUDIO:
-            print(f"from languagebind encode audio, content: {content}")
-            inputs[modality.value] = content[0]['pixel_values']
-            print(f"inputs[modality.value]: {inputs[modality.value]}")
-        else:
-            # For other modalities, assume the content is already processed in add_docs.py
+        else: # For audio and video
             inputs[modality.value] = content[0]['pixel_values'] # figure out why this is a list
 
         with torch.no_grad():
@@ -377,7 +388,6 @@ def is_preprocess_image_model(model_properties: dict = None) -> bool:
 
 def load_multimodal_model(model_name: str, model_properties: Dict[str, Any], device: str) -> MultimodalModel:
     model = MultimodalModel(model_name, model_properties, device)
-    #model.load()
     return model
 
 def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
@@ -422,9 +432,9 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     print(f"is_preprocess_image_model(model_properties): {is_preprocess_image_model(model_properties)}")
 
     preprocessors = {
-        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
-        "video": None, # Future preprocessor # Pass these from languagebind into add_docs
-        "audio": None, # Future preprocessor
+        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None, # improve this logic for multimodal models
+        "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
+        "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
         "text": None # Future preprocessor
     }
     print(f"preprocessors: {preprocessors}")
@@ -728,7 +738,8 @@ def _load_model(
     if model_properties.get('type') in ['languagebind', 'imagebind']:
         print(f"loading for: model_name={model_name} and properties={model_properties}")
         model = MultimodalModel(model_name, model_properties, device)
-        model._load_model()
+        model.model = model._load_multimodal_model()
+        model.encoder = get_encoder(model)
         return model
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
