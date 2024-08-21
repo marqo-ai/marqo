@@ -13,17 +13,18 @@ import validators
 from PIL import Image, UnidentifiedImageError
 from multilingual_clip import pt_multilingual_clip
 from open_clip.pretrained import _pcfg, _slpcfg, _apcfg, _mccfg
-from open_clip.transform import image_transform_v2, PreprocessCfg
+from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
 from requests.utils import requote_uri
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from torchvision.transforms import InterpolationMode
 
 from marqo import marqo_docs
 from marqo.api.exceptions import InternalError
+from marqo.core.inference.models.abstract_clip_model import AbstractCLIPModel
+from marqo.core.inference.models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
 from marqo.s2_inference.logger import get_logger
-from marqo.s2_inference.models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
@@ -36,7 +37,8 @@ OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 BICUBIC = InterpolationMode.BICUBIC
 DEFAULT_HEADERS = {'User-Agent': 'Marqobot/1.0'}
-
+HF_HUB_PREFIX = "hf-hub:"
+MARQO_OPEN_CLIP_REGISTRY_PREFIX = "open_clip/"
 
 def get_allowed_image_types():
     return set(('.jpg', '.png', '.bmp', '.jpeg'))
@@ -293,9 +295,11 @@ class CLIP:
         if not device:
             raise InternalError("`device` is required for loading CLIP models!")
         self.device = device
+
         self.model = None
         self.tokenizer = None
-        self.processor = None
+        self.preprocess = None
+
         self.embedding_dimension = embedding_dim
         self.truncate = truncate
         self.model_properties = kwargs.get("model_properties", dict())
@@ -504,33 +508,47 @@ class FP16_CLIP(CLIP):
         self.model.eval()
 
 
-class OPEN_CLIP(CLIP):
-    def __init__(self, model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32", device: str = None,
-                 embedding_dim: int = None,
-                 truncate: bool = True, **kwargs) -> None:
-        super().__init__(model_type, device, embedding_dim, truncate, **kwargs)
+class OPEN_CLIP(AbstractCLIPModel):
+    def __init__(
+            self,
+            model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32",
+            device: Optional[str] = None,
+            embedding_dim: Optional[int] = None,
+            truncate: bool = True,
+            model_properties: Optional[Dict] = None,
+            model_auth: Optional[Dict] = None
+    ) -> None:
+
+        super().__init__(model_type, device, embedding_dim, truncate, model_properties)
+
+        # model_auth gets passed through add_docs and search requests:
+        self.model_auth = model_auth
         self.preprocess_config = None
         self.model_name = model_type.split("/", 3)[1] if model_type.startswith("open_clip/") else model_type
         self.pretrained = model_type.split("/", 3)[2] if model_type.startswith("open_clip/") else model_type
         self.model_properties = OpenCLIPModelProperties(**self.model_properties)
 
     def load(self) -> None:
+        """Load the open_clip model and tokenizer."""
         if self.model_properties.url or self.model_properties.model_location:
             self.model, self.preprocess = self._load_model_and_image_preprocessor_from_checkpoint()
             self.tokenizer = self._load_tokenizer_from_checkpoint()
-        elif self.model_type.startswith("open_clip/"):
-            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_open_clip_repo()
-            self.tokenizer = self._load_tokenizer_from_open_clip_repo()
-        elif self.model_type.startswith("hf-hub:"):
+        elif self.model_properties.name.startswith(HF_HUB_PREFIX):
             self.model, self.preprocess = self._load_model_and_image_preprocessor_from_hf_repo()
             self.tokenizer = self._load_tokenizer_from_hf_repo()
+        elif self.model_tag.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
+            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_open_clip_repo()
+            self.tokenizer = self._load_tokenizer_from_open_clip_repo()
         else:
             raise InvalidModelPropertiesError(
                 f"Marqo cannot load the provided open_clip model. "
                 f"Check {marqo_docs.bring_your_own_model()} "
-                f"for more details on how to load a open_clip model "
+                f"for more details on the supported methods to open_clip model "
             )
         self.model.eval()
+
+    def load_tokenizer(self):
+        pass
 
     def _load_image_preprocessor(self) -> Callable:
         return image_transform_v2(self.preprocess_config)
@@ -539,22 +557,23 @@ class OPEN_CLIP(CLIP):
         """Aggregate the image preprocessor configuration for the open_clip model."""
 
         if self.model_properties.image_preprocessor in [ImagePreprocessor.OpenCLIP, ImagePreprocessor.OpenAI]:
-            image_preprocess_config = PreprocessCfg(**_pcfg)
-        elif self.model_properties.image_preprocessor in [ImagePreprocessor.SiCLIP]:
-            image_preprocess_config = PreprocessCfg(**_slpcfg)
+            base_image_preprocess_config = _pcfg()
+        elif self.model_properties.image_preprocessor in [ImagePreprocessor.SigLIP]:
+            base_image_preprocess_config = _slpcfg()
         elif self.model_properties.image_preprocessor in [ImagePreprocessor.CLIPA]:
-            image_preprocess_config = PreprocessCfg(**_apcfg)
+            base_image_preprocess_config = _apcfg()
         elif self.model_properties.image_preprocessor in [ImagePreprocessor.MobileCLIP]:
-            image_preprocess_config = PreprocessCfg(**_mccfg)
+            base_image_preprocess_config = _mccfg()
         else:
             raise ValueError(f"Invalid image preprocessor {self.model_properties.image_preprocessor}")
 
-        if self.model_properties.mean:
-            image_preprocess_config.image_mean = self.model_properties.mean
-        if self.model_properties.std:
-            image_preprocess_config.image_std = self.model_properties.std
+        aggregated_image_preprocess_config = PreprocessCfg(
+            **merge_preprocess_dict(
+                base_image_preprocess_config, self.model_properties.dict(exclude_none=True)
+            )
+        )
 
-        return image_preprocess_config
+        return aggregated_image_preprocess_config
 
     def _load_model_and_image_preprocessor_from_checkpoint(self) -> Tuple[torch.nn.Module, Compose]:
         """Load the model and image preprocessor from a checkpoint file.
@@ -562,9 +581,6 @@ class OPEN_CLIP(CLIP):
         The checkpoint file can be provided through a URL or a model_location object.
         """
         # Load the image preprocessor
-        self.preprocess_config = self._aggregate_image_preprocessor_config()
-        self.preprocess = image_transform_v2(self.preprocess_config, is_train=False)
-
         if self.model_properties.url and self.model_properties.model_location:
             raise InvalidModelPropertiesError(
                 "Only one of url, model_location can be specified in 'model_properties' "
@@ -580,13 +596,13 @@ class OPEN_CLIP(CLIP):
         logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip loader")
 
         try:
-            model, _, preprocess = open_clip.create_model_and_transforms(
-                model_name=self.model_name,
+            self.preprocess_config = self._aggregate_image_preprocessor_config()
+            preprocess = image_transform_v2(self.preprocess_config, is_train=False)
+            model = open_clip.create_model(
+                model_name=self.model_properties.name,
                 jit=self.model_properties.jit,
                 pretrained=self.model_path,
                 precision=self.model_properties.precision,
-                image_mean=self.model_properties.mean,
-                image_std=self.model_properties.std,
                 device=self.device,
                 cache_dir=ModelCache.clip_cache_path
             )
@@ -637,7 +653,7 @@ class OPEN_CLIP(CLIP):
         The hf_repo should be provided in the model properties, and it is a string starting with `hf-hub:`.
         """
         model, _, preprocess = open_clip.create_model_and_transforms(
-            self.model_type,
+            model_name=self.model_properties.name,
             device=self.device,
             cache_dir=ModelCache.clip_cache_path,
         )
@@ -648,11 +664,11 @@ class OPEN_CLIP(CLIP):
 
         The model name should be provided in the model properties, and it is a string starting with `open_clip/`.
         """
-        self.model_name = self.model_type.split("/", 3)[1]
-        self.pretrained = self.model_type.split("/", 3)[2]
+        self.model_name = self.model_tag.split("/", 3)[1]
+        self.pretrained = self.model_tag.split("/", 3)[2]
 
         model, _, preprocess = open_clip.create_model_and_transforms(
-            self.model_name,
+            model_name=self.model_name,
             pretrained=self.pretrained,
             device=self.device,
             cache_dir=ModelCache.clip_cache_path
@@ -661,13 +677,13 @@ class OPEN_CLIP(CLIP):
 
     def _load_tokenizer_from_checkpoint(self) -> Callable:
         if not self.model_properties.tokenizer:
-            return open_clip.get_tokenizer(self.model_name)
+            return open_clip.get_tokenizer(self.model_properties.name)
         else:
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(self.model_properties.tokenizer)
 
     def _load_tokenizer_from_hf_repo(self) -> Callable:
-        return open_clip.get_tokenizer(self.model_type)
+        return open_clip.get_tokenizer(self.model_properties.name)
 
     def _load_tokenizer_from_open_clip_repo(self) -> Callable:
         return open_clip.get_tokenizer(self.model_name)
