@@ -27,12 +27,14 @@ class AbstractCLIPModel(AbstractModel):
         preprocess: The preprocessing pipeline for the model, initialized to `None` and to be set by subclasses.
     """
 
-    def __init__(self, model_type: str,
-                 device: Optional[str] = None,
-                 embedding_dim: Optional[int] = None,
-                 truncate: bool = True,
-                 model_properties: Optional[dict] = None,
-                 **kwargs):
+    def __init__(
+            self, model_type: str,
+            device: Optional[str] = None,
+            embedding_dim: Optional[int] = None,
+            truncate: bool = True,
+            model_properties: Optional[dict] = None,
+            **kwargs
+    ):
         """Instantiate the abstract CLIP model.
 
         Args:

@@ -505,10 +505,12 @@ def _load_model(
     print(f"loading for: model_name={model_name} and properties={model_properties}")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
-    max_sequence_length = model_properties.get('tokens', get_default_seq_length())
     model = loader(
-        model_properties.get('name', None), device=device, embedding_dim=model_properties['dimensions'],
-        max_seq_length=max_sequence_length, model_properties=model_properties, model_auth=model_auth
+        model_properties.get('name', None),
+        device=device,
+        embedding_dim=model_properties['dimensions'],
+        model_properties=model_properties,
+        model_auth=model_auth
     )
     model.load()
     return model

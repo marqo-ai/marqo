@@ -680,7 +680,7 @@ class OPEN_CLIP(AbstractCLIPModel):
             return open_clip.get_tokenizer(self.model_properties.name)
         else:
             logger.info(f"Custom HFTokenizer is provided. Loading...")
-            return HFTokenizer(self.model_properties.tokenizer)
+            return HFTokenizer(self.model_properties.tokenizer, )
 
     def _load_tokenizer_from_hf_repo(self) -> Callable:
         return open_clip.get_tokenizer(self.model_properties.name)
