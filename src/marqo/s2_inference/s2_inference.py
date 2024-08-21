@@ -69,9 +69,8 @@ class MultimodalModelProperties(BaseModel):
     supported_modalities: List[Modality]
     dimensions: int
     type: str = "multimodal"
-    video_chunk_length: int = 20  # in seconds
-    frames_to_extract_per_chunk: int = 8
-    video_frame_rate: float = 1  # frames per second
+    video_chunk_length: int # in seconds
+    audio_chunk_length: int # in seconds
     cache_dir: str = "./cache_dir" # This is temporary. Follow existing conventions for storing weights
 
 class MultimodalModel:
@@ -148,15 +147,10 @@ class LanguageBindEncoder(ModelEncoder):
     def __init__(self, model: MultimodalModel):
         self.model = model
         self.tokenizer = self._get_tokenizer()
-        self.modality_transform = self._get_modality_transform()
 
     def _get_tokenizer(self): # this is used for text only
         pretrained_ckpt = f'lb203/LanguageBind_Image'
         return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{self.model.properties.cache_dir}/tokenizer_cache_dir')
-
-    def _get_modality_transform(self):
-        modality_transform = {c: transform_dict[c](self.model.model.modality_config[c]) for c in self.model.clip_type.keys()}
-        return modality_transform
     
     def preprocessor(self, modality):
         if modality == Modality.VIDEO:
@@ -171,9 +165,9 @@ class LanguageBindEncoder(ModelEncoder):
         inputs = {}
         print(f"from languagebind encode, modality is {modality}")
         if modality == Modality.TEXT:
-            
             # For text, we still need to tokenize and encode the text
             inputs['language'] = to_device(self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'), self.model.device)['input_ids']
+        
         elif modality == Modality.IMAGE:
             # TODO: Improve this logic. Do we really have to save to a temp file?
             # Save the image to a temporary file

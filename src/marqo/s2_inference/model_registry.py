@@ -1940,6 +1940,8 @@ def _get_languagebind_properties() -> Dict:
             "type": "languagebind",
             "loader": "languagebind",
             "supported_modalities": ["video", "audio", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
         },
     }
     return LANGUAGEBIND_MODEL_PROPERTIES

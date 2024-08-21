@@ -188,17 +188,14 @@ class StreamingMediaProcessor:
         if modality == Modality.VIDEO:
             self.split_length = marqo_index.video_preprocessing.split_length
             self.split_overlap = marqo_index.video_preprocessing.split_overlap
-            #pretrained_ckpt = 'LanguageBind/LanguageBind_Video_FT'
-            #self.model = LanguageBindVideo.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
-            #self.processor = LanguageBindVideoProcessor(self.model.config)
         elif modality == Modality.AUDIO:
             self.split_length = marqo_index.audio_preprocessing.split_length
             self.split_overlap = marqo_index.audio_preprocessing.split_overlap
-            #pretrained_ckpt = 'LanguageBind/LanguageBind_Audio_FT'
-            #self.model = LanguageBindAudio.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
-           # self.processor = LanguageBindAudioProcessor(self.model.config)
         else:
             raise ValueError(f"Unsupported modality: {modality}")
+        
+        print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
+        print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
 
         self.chunk_size = self.estimate_chunk_size()
 
