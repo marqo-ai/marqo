@@ -172,173 +172,187 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                                 continue
 
+class StreamingMediaProcessor:
+    def __init__(self, url: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex):
+        self.url = url
+        self.headers = headers
+        self.modality = modality
+        self.marqo_index = marqo_index
+        self.total_size = self.get_file_size()
+        self.duration = self.estimate_duration()
+        
+        if modality == Modality.VIDEO:
+            self.split_length = marqo_index.video_preprocessing.split_length
+            self.split_overlap = marqo_index.video_preprocessing.split_overlap
+            pretrained_ckpt = 'LanguageBind/LanguageBind_Video_FT'
+            self.model = LanguageBindVideo.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
+            self.processor = LanguageBindVideoProcessor(self.model.config)
+        elif modality == Modality.AUDIO:
+            self.split_length = marqo_index.audio_preprocessing.split_length
+            self.split_overlap = marqo_index.audio_preprocessing.split_overlap
+            pretrained_ckpt = 'LanguageBind/LanguageBind_Audio_FT'
+            self.model = LanguageBindAudio.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
+            self.processor = LanguageBindAudioProcessor(self.model.config)
+        else:
+            raise ValueError(f"Unsupported modality: {modality}")
 
+        self.chunk_size = self.estimate_chunk_size()
 
+    def get_file_size(self):
+        c = pycurl.Curl()
+        c.setopt(c.URL, self.url)
+        c.setopt(c.NOBODY, True)
+        c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
+        c.perform()
+        size = int(c.getinfo(c.CONTENT_LENGTH_DOWNLOAD))
+        c.close()
+        return size
+
+    def estimate_duration(self):
+        headers = {}
+        def header_function(header_line):
+            header_line = header_line.decode('iso-8859-1')
+            if ':' not in header_line:
+                return
+            name, value = header_line.split(':', 1)
+            headers[name.strip().lower()] = value.strip()
+
+        c = pycurl.Curl()
+        c.setopt(c.URL, self.url)
+        c.setopt(c.NOBODY, True)
+        c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
+        c.setopt(c.HEADERFUNCTION, header_function)
+        try:
+            c.perform()
+        except pycurl.error as e:
+            logger.error(f"Error fetching headers: {e}")
+        finally:
+            c.close()
+
+        # Check if duration is in headers (this is server-dependent and might not work for all servers)
+        if 'x-duration' in headers:
+            return float(headers['x-duration'])
+
+        # If we can't get duration from headers, we'll estimate it based on file size
+        # This is a rough estimate and may not be accurate for all media types
+        if self.modality == Modality.AUDIO:
+            # Assume 128 kbps bitrate for audio
+            return self.total_size / (128 * 1024 / 8)
+        else:  # VIDEO
+            # Assume 1 Mbps bitrate for video
+            return self.total_size / (1024 * 1024 / 8)
+
+    def estimate_chunk_size(self):
+        if self.duration:
+            return int(self.total_size / self.duration * self.split_length)
+        else:
+            # If we couldn't estimate duration, start with a reasonable chunk size
+            return 1024 * 1024  # 1 MB
+
+    def process_media(self) -> List[Dict[str, torch.Tensor]]:
+        processed_chunks = []
+        chunk_buffer = BytesIO()
+        overlap_size = int(self.chunk_size * (self.split_overlap / self.split_length))
+        total_processed = 0
+        chunk_number = 0
+
+        c = pycurl.Curl()
+        c.setopt(c.URL, self.url)
+        c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
+        c.setopt(c.WRITEFUNCTION, chunk_buffer.write)
+        c.setopt(c.BUFFERSIZE, self.chunk_size)
+        c.setopt(c.NOPROGRESS, 0)
+        c.setopt(c.XFERINFOFUNCTION, self._progress)
+
+        try:
+            c.perform()
+            while True:
+                chunk_buffer.seek(0)
+                chunk_data = chunk_buffer.read(self.chunk_size)
+                if not chunk_data:
+                    break
+
+                processed_chunk = self.process_chunk(chunk_data, chunk_number)
+                if processed_chunk is not None:
+                    processed_chunks.append(processed_chunk)
+
+                # Move the remaining data to the beginning of the buffer
+                remaining_data = chunk_buffer.read()
+                chunk_buffer = BytesIO(remaining_data[-overlap_size:] if len(remaining_data) > overlap_size else remaining_data)
+                chunk_buffer.seek(0, io.SEEK_END)  # Move to the end of the buffer for the next write
+
+                total_processed += len(chunk_data) - overlap_size
+                chunk_number += 1
+
+                if total_processed >= self.total_size:
+                    break
+
+        except pycurl.error as e:
+            logger.error(f"pycurl error: {e}")
+            raise RuntimeError(f"Error streaming media: {e}")
+        finally:
+            c.close()
+
+        return processed_chunks
+
+    def _progress(self, download_total, downloaded, upload_total, uploaded):
+        if download_total > 0:
+            progress = downloaded / download_total * 100
+            print(f"Download progress: {progress:.2f}%")
+
+    def process_chunk(self, chunk_data: bytes, chunk_number: int) -> Optional[Dict[str, torch.Tensor]]:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4' if self.modality == Modality.VIDEO else '.wav') as temp_file:
+            temp_file.write(chunk_data)
+            temp_file_path = temp_file.name
+
+        try:
+            if self.modality == Modality.VIDEO:
+                ffmpeg_cmd = [
+                    'ffmpeg', '-i', temp_file_path, '-c:v', 'libx264', '-c:a', 'aac',
+                    '-movflags', '+faststart', '-y', f"{temp_file_path}.processed.mp4"
+                ]
+            else:  # AUDIO
+                ffmpeg_cmd = [
+                    'ffmpeg', '-i', temp_file_path, '-acodec', 'pcm_s16le', '-ar', '44100',
+                    '-y', f"{temp_file_path}.processed.wav"
+                ]
+
+            subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            processed_file_path = f"{temp_file_path}.processed.{'mp4' if self.modality == Modality.VIDEO else 'wav'}"
+            
+            if self.modality == Modality.VIDEO:
+                processed_chunk = self.processor(processed_file_path, return_tensors='pt')
+            else:  # AUDIO
+                processed_chunk = self.processor(processed_file_path, return_tensors='pt')
+
+            start_time = chunk_number * (self.split_length - self.split_overlap)
+            end_time = start_time + self.split_length
+
+            return processed_chunk
+
+        except Exception as e:
+            logger.error(f"Error processing chunk {chunk_number}: {str(e)}")
+            return None
+
+        finally:
+            os.unlink(temp_file_path)
+            if os.path.exists(f"{temp_file_path}.processed.mp4"):
+                os.unlink(f"{temp_file_path}.processed.mp4")
+            if os.path.exists(f"{temp_file_path}.processed.wav"):
+                os.unlink(f"{temp_file_path}.processed.wav")
+    
 
 def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_index: MarqoIndex) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
-    print(f"Processing {modality} from URL: {url}")
-
-    # 1. Check file size
-    c = pycurl.Curl()
-    c.setopt(c.URL, url)
-    c.setopt(c.NOBODY, True)
-    c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
-    c.perform()
-    content_length = int(c.getinfo(c.CONTENT_LENGTH_DOWNLOAD))
-    c.close()
-
-    print(f"File size: {content_length / 1024 / 1024:.2f} MB")
-
-    if content_length > MAX_FILE_SIZE:
-        raise ValueError(f"File size ({content_length / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
-
-    # 2. Download the whole file
-    buffer = BytesIO()
-    c = pycurl.Curl()
-    c.setopt(c.URL, url)
-    c.setopt(c.WRITEDATA, buffer)
-    c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
-    c.perform()
-    c.close()
-
-    print("File downloaded successfully")
-
-    # 3. Check modality and set appropriate parameters
-    if modality == Modality.VIDEO:
-        print(f"from download_and_chunk_media, modality is VIDEO")
-        split_length = marqo_index.video_preprocessing.split_length
-        split_overlap = marqo_index.video_preprocessing.split_overlap
-        pretrained_ckpt = 'LanguageBind/LanguageBind_Video_FT'
-        model = LanguageBindVideo.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
-        processor = LanguageBindVideoProcessor(model.config)
-        file_extension = '.mp4'
-    elif modality == Modality.AUDIO:
-        print(f"from download_and_chunk_media, modality is AUDIO")
-        split_length = marqo_index.audio_preprocessing.split_length
-        split_overlap = marqo_index.audio_preprocessing.split_overlap
-        pretrained_ckpt = 'LanguageBind/LanguageBind_Audio_FT'
-        model = LanguageBindAudio.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
-        processor = LanguageBindAudioProcessor(model.config)
-        file_extension = '.wav'
-    else:
-        raise ValueError(f"Unsupported modality: {modality}")
-
-    print(f"Split length: {split_length}, Split overlap: {split_overlap}")
-
-    # 4. Chunk logic and preprocessing
-    processed_chunks = []
-    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
-        temp_file.write(buffer.getvalue())
-        temp_file_path = temp_file.name
-
-    print(f"Temporary file created: {temp_file_path}")
-
-    try:
-        # Get total duration using ffprobe
-        duration = get_media_duration(temp_file_path)
-
-        if duration == 0:
-            raise ValueError("Could not determine media duration")
-
-        # Calculate chunk start times
-        chunk_starts = []
-        current_start = 0
-        while current_start < duration:
-            chunk_starts.append(current_start)
-            current_start += (split_length - split_overlap)
-
-        print(f"Number of chunks: {len(chunk_starts)}")
-
-        for i, start in enumerate(chunk_starts):
-            end = min(start + split_length, duration)
-            print(f"Processing chunk {i+1}: start={start}, end={end}")
-            
-            # Create a temporary file for the chunk
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as chunk_file:
-                chunk_file_path = chunk_file.name
-
-            try:
-                # Extract chunk using ffmpeg
-                extract_chunk(temp_file_path, chunk_file_path, start, split_length, modality)
-
-                print(f"Chunk extracted: {chunk_file_path}")
-
-                # Process chunk
-                try:
-                    if modality == Modality.AUDIO:
-                        processed_chunk = processor(chunk_file_path, return_tensors='pt')
-                    else:  # VIDEO
-                        processed_chunk = processor(chunk_file_path, return_tensors='pt')
-                    
-                    chunk_data = {
-                        'start_time': start,
-                        'end_time': end,
-                        'tensor': processed_chunk
-                    }
-                    
-                    processed_chunks.append(processed_chunk)
-                except Exception as process_error:
-                    print(f"Error processing chunk: {str(process_error)}")
-
-            finally:
-                # Delete the temporary chunk file
-                os.unlink(chunk_file_path)
-
-    except Exception as e:
-        print(f"Error in media processing: {str(e)}")
-    finally:
-        # Delete the whole media file
-        os.unlink(temp_file_path)
-
-    print(f"Total processed chunks: {len(processed_chunks)}")
-    return processed_chunks
-
-def get_media_duration(file_path):
-    cmd = [
-        'ffprobe',
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'json',
-        file_path
-    ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output = json.loads(result.stdout)
-    return float(output['format']['duration'])
-
-def extract_chunk(input_file, output_file, start_time, duration, modality):
-    cmd = [
-        'ffmpeg',
-        '-i', input_file,
-        '-ss', str(start_time),
-        '-t', str(duration)
-    ]
+    processor = StreamingMediaProcessor(url, headers, modality, marqo_index)
     
-    if modality == Modality.AUDIO:
-        cmd.extend(['-acodec', 'pcm_s16le'])  # Use PCM format for audio
-    else:  # VIDEO
-        cmd.extend(['-vcodec', 'libx264', '-acodec', 'aac'])
-    
-    cmd.extend(['-y', output_file])
-    
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if processor.total_size > MAX_FILE_SIZE:
+        raise ValueError(f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
 
-def process_audio_chunk(file_path, processor):
-    # Load audio file
-    audio, sr = librosa.load(file_path, sr=16000)  # Resample to 16kHz
-    
-    # Convert to float32 and normalize
-    audio = audio.astype(np.float32)
-    audio = audio / np.max(np.abs(audio))
-    
-    # Convert to tensor
-    #audio_tensor = torch.from_numpy(audio).unsqueeze(0)
-    
-    # Process with LanguageBind processor
-    processed_chunk = processor(file_path, return_tensors='pt')
-    
-    return processed_chunk
+    return processor.process_media()
+
 
 @contextmanager
 def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_fields: List[str],
