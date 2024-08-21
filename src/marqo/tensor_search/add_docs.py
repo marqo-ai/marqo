@@ -70,12 +70,18 @@ class CurlStreamReader:
         self.url = url
         self.headers = headers
         self.chunk_size = chunk_size
-        self.buffer = BytesIO()
+        self.buffer = io.BytesIO()
         self.curl = pycurl.Curl()
         self.curl.setopt(pycurl.URL, self.url)
         self.curl.setopt(pycurl.WRITEFUNCTION, self.buffer.write)
         self.curl.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
         self.curl.setopt(pycurl.BUFFERSIZE, self.chunk_size)
+        self.curl.setopt(pycurl.NOPROGRESS, 0)
+        self.curl.setopt(pycurl.XFERINFOFUNCTION, self._progress)
+        self.total_downloaded = 0
+
+    def _progress(self, download_total, downloaded, upload_total, uploaded):
+        self.total_downloaded = downloaded
 
     def __iter__(self):
         return self
@@ -83,11 +89,12 @@ class CurlStreamReader:
     def __next__(self):
         self.buffer.seek(0)
         self.buffer.truncate(0)
-        self.curl.perform_rb()
+        self.curl.perform()
         data = self.buffer.getvalue()
         if not data:
             self.curl.close()
             raise StopIteration
+        print(f"Downloaded chunk: {len(data)} bytes, Total: {self.total_downloaded} bytes")
         return data
 
 
@@ -210,6 +217,7 @@ def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_
     c.perform()
     content_length = int(c.getinfo(c.CONTENT_LENGTH_DOWNLOAD))
     c.close()
+    print(f"from download_and_chunk_media, content_length: {content_length}")
 
     if content_length > MAX_FILE_SIZE:
         raise ValueError(f"File size ({content_length / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
@@ -230,16 +238,29 @@ def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_
 
     # Stream the file
     stream_reader = CurlStreamReader(url, headers, CHUNK_SIZE)
-    buffer = b""
     for chunk in stream_reader:
         buffer += chunk
-        frames = process_buffer(buffer, modality, marqo_index)
-        for frame in frames:
-            processed_chunk = process_frame(frame, modality, processor, model)
-            processed_chunks.append(processed_chunk)
-        
-        # Keep only the last incomplete packet in the buffer
-        buffer = buffer[-CHUNK_SIZE:]
+        while len(buffer) >= CHUNK_SIZE:
+            chunk_to_process = buffer[:CHUNK_SIZE]
+            buffer = buffer[CHUNK_SIZE:]
+            
+            try:
+                frames = process_buffer(chunk_to_process, modality, marqo_index)
+                for frame in frames:
+                    processed_chunk = process_frame(frame, modality, processor, model)
+                    processed_chunks.append(processed_chunk)
+            except Exception as e:
+                print(f"Error processing chunk: {str(e)}")
+
+    # Process any remaining data in the buffer
+    if buffer:
+        try:
+            frames = process_buffer(buffer, modality, marqo_index)
+            for frame in frames:
+                processed_chunk = process_frame(frame, modality, processor, model)
+                processed_chunks.append(processed_chunk)
+        except Exception as e:
+            print(f"Error processing final buffer: {str(e)}")
 
     return processed_chunks
 
@@ -259,63 +280,30 @@ def process_buffer(buffer: bytes, modality: Modality, marqo_index: MarqoIndex) -
             else:
                 raise ValueError(f"Unsupported modality: {modality}")
 
-            frame_count = 0
-            frame_buffer = []
             for frame in container.decode(stream):
-                frame_buffer.append(frame)
-                frame_count += 1
+                if modality == Modality.VIDEO:
+                    frames.append(frame.to_ndarray(format='rgb24'))
+                else:  # AUDIO
+                    frames.append(frame.to_ndarray())
 
-                if frame_count >= split_length:
-                    processed_frame = process_frames(frame_buffer, modality)
-                    frames.append(processed_frame)
-
-                    # Handle overlap
-                    overlap_frames = int(split_overlap * split_length)
-                    frame_buffer = frame_buffer[-overlap_frames:]
-                    frame_count = len(frame_buffer)
+            # Apply split length and overlap
+            split_frames = []
+            for i in range(0, len(frames), int(split_length * (1 - split_overlap))):
+                split = frames[i:i + split_length]
+                if len(split) == split_length:
+                    split_frames.append(np.stack(split) if modality == Modality.VIDEO else np.concatenate(split))
 
     except av.AVError as e:
         logger.error(f"Error processing media buffer: {str(e)}")
 
-    return frames
-
-def process_frames(frames: List[av.VideoFrame], modality: Modality) -> np.ndarray:
-    if modality == Modality.VIDEO:
-        # Process video frames
-        return np.stack([frame.to_ndarray(format='rgb24') for frame in frames])
-    elif modality == Modality.AUDIO:
-        # Process audio frames
-        return np.concatenate([frame.to_ndarray() for frame in frames])
-    else:
-        raise ValueError(f"Unsupported modality: {modality}")
+    return split_frames
 
 
 def process_frame(frame: np.ndarray, modality: Modality, processor, model) -> torch.Tensor:
     if modality == Modality.VIDEO:
-        # Save the frame as a temporary file
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_file:
-            temp_path = temp_file.name
-            # Use FFmpeg to save the numpy array as a video file
-            (
-                ffmpeg
-                .input('pipe:', format='rawvideo', pix_fmt='rgb24', s=f'{frame.shape[1]}x{frame.shape[0]}')
-                .output(temp_path, vcodec='libx264', pix_fmt='yuv420p', vframes=1)
-                .overwrite_output()
-                .run(input=frame.tobytes(), quiet=True)
-            )
-        
-        # Process the video frame
-        processed = processor([temp_path], return_tensors='pt')
-        os.unlink(temp_path)
+        processed = processor([frame], return_tensors='pt')
     elif modality == Modality.AUDIO:
-        # Save the audio frame as a temporary file
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
-            temp_path = temp_file.name
-            scipy.io.wavfile.write(temp_path, 44100, frame)  # Assuming 44.1kHz sample rate
-        
-        # Process the audio frame
-        processed = processor([temp_path], return_tensors='pt')
-        os.unlink(temp_path)
+        processed = processor([frame], return_tensors='pt', sampling_rate=44100)  # Adjust sampling rate if needed
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
