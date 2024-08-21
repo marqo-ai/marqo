@@ -183,9 +183,13 @@ class LanguageBindEncoder(ModelEncoder):
             finally:
                 # Delete the temporary file
                 os.unlink(temp_filename)
+        elif modality == Modality.AUDIO:
+            print(f"from languagebind encode audio, content: {content}")
+            inputs[modality.value] = content[0]['pixel_values']
+            print(f"inputs[modality.value]: {inputs[modality.value]}")
         else:
             # For other modalities, assume the content is already processed in add_docs.py
-            inputs[modality.value] = content[0] # figure out why this is a list
+            inputs[modality.value] = content[0]['pixel_values'] # figure out why this is a list
 
         with torch.no_grad():
             print(inputs)
@@ -229,7 +233,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
 def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
               model_properties: dict = None,
               device: str = None, normalize_embeddings: bool = get_default_normalization(),
-              model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs,) -> List[List[float]]:
+              model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = None, **kwargs,) -> List[List[float]]:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
@@ -244,31 +248,32 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[
     model = _available_models[model_cache_key][AvailableModelsKey.model]
     print(f"vectorise, model: {model}")
     print(f"vectorise, model_cache_key: {model_cache_key}")
-    print(f"vectorise, content: {content}")
+    #print(f"vectorise, content: {content}")
     print(f"vectorise, normalize_embeddings: {normalize_embeddings}")
+    print(f"vectorise, modality: {modality}")
     print(f"vectorise, kwargs: {kwargs}")
     if _marqo_inference_cache.is_enabled() and enable_cache:
         print(f"vectorise, _marqo_inference_cache is enabled")
-        return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs)
+        return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs)
     else:
         print(f"vectorise, _marqo_inference_cache is not enabled")
-        return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
+        return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
 
-def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs):
+def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs):
     if isinstance(content, str):
         vectorised = _marqo_inference_cache.get(model_cache_key, content)
         if vectorised is None:
-            vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
+            vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
             _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
         else:
             vectorised = _convert_cached_embeddings_to_output(vectorised)
         return vectorised
     elif isinstance(content, list):
-        return _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs)
+        return _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs)
     else:
         raise TypeError(f"Unsupported content type: {type(content).__name__}")
 
-def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, **kwargs):
+def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs):
     contents_to_vectorise = []
     cached_output = []
 
@@ -284,7 +289,7 @@ def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embedd
             contents_to_vectorise.append(content_item)
 
     if contents_to_vectorise:
-        vectorised_outputs = _encode_without_cache(model_cache_key, contents_to_vectorise, normalize_embeddings, **kwargs)
+        vectorised_outputs = _encode_without_cache(model_cache_key, contents_to_vectorise, normalize_embeddings, modality, **kwargs)
         # Cache the vectorised outputs
         for content_item, vectorised_output in zip(contents_to_vectorise, vectorised_outputs):
             if isinstance(content_item, str):
@@ -298,43 +303,11 @@ def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embedd
     return vectorised_outputs
 
 def _vectorise_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
-                             normalize_embeddings: bool, **kwargs) -> List[List[float]]:
-    return _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
-
-def _encode_without_cache_old(model_cache_key: str, content: Union[str, List[str], List[Image]],
-                          normalize_embeddings: bool, **kwargs) -> List[List[float]]:
-    try:
-        if isinstance(content, str):
-            vectorised = _available_models[model_cache_key][AvailableModelsKey.model].encode(content,
-                                                                                             normalize=normalize_embeddings,
-                                                                                             **kwargs)
-        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
-            vectorised = _available_models[model_cache_key][AvailableModelsKey.model].encode(content,
-                                                                                             normalize=normalize_embeddings,
-                                                                                             **kwargs)
-
-        else:
-            vector_batches = []
-            batch_size = _get_max_vectorise_batch_size()
-            for batch in generate_batches(content, batch_size=batch_size):
-                vector_batches.append(_convert_tensor_to_numpy(
-                    _available_models[model_cache_key][AvailableModelsKey.model].encode(batch,
-                                                                                        normalize=normalize_embeddings,
-                                                                                        **kwargs)))
-            if not vector_batches or all(
-                    len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
-                raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
-            else:
-                vectorised = np.concatenate(vector_batches, axis=0)
-    except (UnidentifiedImageError, OSError) as e:
-        if isinstance(e, UnidentifiedImageError) or "image file is truncated" in str(e):
-            raise VectoriseError(f"Could not process given image: {content}. Original Error message: {e}") from e
-        else:
-            raise e
-    return _convert_vectorized_output(vectorised)
+                             normalize_embeddings: bool, modality: Modality, **kwargs) -> List[List[float]]:
+    return _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
 
 def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
-                          normalize_embeddings: bool, **kwargs) -> List[List[float]]:
+                          normalize_embeddings: bool, modality: Modality, **kwargs) -> List[List[float]]:
     try:
         print(f"model_cache_key: {model_cache_key}")
         print(f"available_models: {_available_models}")
@@ -351,7 +324,8 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
             batch_size = _get_max_vectorise_batch_size()
             
             for batch in generate_batches(content, batch_size=batch_size):
-                modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
+                if modality is None:
+                    modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
 
                 encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings, **kwargs)
                 
@@ -449,7 +423,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
 
     preprocessors = {
         "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
-        "video": None, # Future preprocessor
+        "video": None, # Future preprocessor # Pass these from languagebind into add_docs
         "audio": None, # Future preprocessor
         "text": None # Future preprocessor
     }

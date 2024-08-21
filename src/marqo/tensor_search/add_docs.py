@@ -14,12 +14,13 @@ import tempfile
 import io
 import scipy.io.wavfile
 import ffmpeg
-import tempfile
 import os
 import subprocess
-from typing import List
 from urllib.parse import urlparse
 import logging
+from typing import List, Dict
+import json
+import librosa
 
 import numpy as np
 import av # add PyAV to requirements
@@ -63,39 +64,6 @@ class MemoryPool:
 
     def return_chunk(self, chunk):
         self.pool.put(chunk)
-
-
-class CurlStreamReader:
-    def __init__(self, url: str, headers: Dict[str, str], chunk_size: int = 1024 * 1024):
-        self.url = url
-        self.headers = headers
-        self.chunk_size = chunk_size
-        self.buffer = io.BytesIO()
-        self.curl = pycurl.Curl()
-        self.curl.setopt(pycurl.URL, self.url)
-        self.curl.setopt(pycurl.WRITEFUNCTION, self.buffer.write)
-        self.curl.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
-        self.curl.setopt(pycurl.BUFFERSIZE, self.chunk_size)
-        self.curl.setopt(pycurl.NOPROGRESS, 0)
-        self.curl.setopt(pycurl.XFERINFOFUNCTION, self._progress)
-        self.total_downloaded = 0
-
-    def _progress(self, download_total, downloaded, upload_total, uploaded):
-        self.total_downloaded = downloaded
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        self.buffer.seek(0)
-        self.buffer.truncate(0)
-        self.curl.perform()
-        data = self.buffer.getvalue()
-        if not data:
-            self.curl.close()
-            raise StopIteration
-        print(f"Downloaded chunk: {len(data)} bytes, Total: {self.total_downloaded} bytes")
-        return data
 
 
 def threaded_download_and_preprocess_content(allocated_docs: List[dict], 
@@ -205,11 +173,14 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
 
 
-def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_index: MarqoIndex) -> List[torch.Tensor]:
-    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
-    CHUNK_SIZE = 1024 * 1024  # 1 MB
 
-    # Check file size
+
+def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_index: MarqoIndex) -> List[Dict[str, torch.Tensor]]:
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
+
+    print(f"Processing {modality} from URL: {url}")
+
+    # 1. Check file size
     c = pycurl.Curl()
     c.setopt(c.URL, url)
     c.setopt(c.NOBODY, True)
@@ -217,101 +188,157 @@ def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_
     c.perform()
     content_length = int(c.getinfo(c.CONTENT_LENGTH_DOWNLOAD))
     c.close()
-    print(f"from download_and_chunk_media, content_length: {content_length}")
+
+    print(f"File size: {content_length / 1024 / 1024:.2f} MB")
 
     if content_length > MAX_FILE_SIZE:
         raise ValueError(f"File size ({content_length / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
 
-    # Initialize the appropriate LanguageBind model and processor
+    # 2. Download the whole file
+    buffer = BytesIO()
+    c = pycurl.Curl()
+    c.setopt(c.URL, url)
+    c.setopt(c.WRITEDATA, buffer)
+    c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
+    c.perform()
+    c.close()
+
+    print("File downloaded successfully")
+
+    # 3. Check modality and set appropriate parameters
     if modality == Modality.VIDEO:
+        print(f"from download_and_chunk_media, modality is VIDEO")
+        split_length = marqo_index.video_preprocessing.split_length
+        split_overlap = marqo_index.video_preprocessing.split_overlap
         pretrained_ckpt = 'LanguageBind/LanguageBind_Video_FT'
         model = LanguageBindVideo.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
         processor = LanguageBindVideoProcessor(model.config)
+        file_extension = '.mp4'
     elif modality == Modality.AUDIO:
+        print(f"from download_and_chunk_media, modality is AUDIO")
+        split_length = marqo_index.audio_preprocessing.split_length
+        split_overlap = marqo_index.audio_preprocessing.split_overlap
         pretrained_ckpt = 'LanguageBind/LanguageBind_Audio_FT'
         model = LanguageBindAudio.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir')
         processor = LanguageBindAudioProcessor(model.config)
+        file_extension = '.wav'
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
+    print(f"Split length: {split_length}, Split overlap: {split_overlap}")
+
+    # 4. Chunk logic and preprocessing
     processed_chunks = []
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+        temp_file.write(buffer.getvalue())
+        temp_file_path = temp_file.name
 
-    # Stream the file
-    stream_reader = CurlStreamReader(url, headers, CHUNK_SIZE)
-    for chunk in stream_reader:
-        buffer += chunk
-        while len(buffer) >= CHUNK_SIZE:
-            chunk_to_process = buffer[:CHUNK_SIZE]
-            buffer = buffer[CHUNK_SIZE:]
+    print(f"Temporary file created: {temp_file_path}")
+
+    try:
+        # Get total duration using ffprobe
+        duration = get_media_duration(temp_file_path)
+
+        if duration == 0:
+            raise ValueError("Could not determine media duration")
+
+        # Calculate chunk start times
+        chunk_starts = []
+        current_start = 0
+        while current_start < duration:
+            chunk_starts.append(current_start)
+            current_start += (split_length - split_overlap)
+
+        print(f"Number of chunks: {len(chunk_starts)}")
+
+        for i, start in enumerate(chunk_starts):
+            end = min(start + split_length, duration)
+            print(f"Processing chunk {i+1}: start={start}, end={end}")
             
+            # Create a temporary file for the chunk
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as chunk_file:
+                chunk_file_path = chunk_file.name
+
             try:
-                frames = process_buffer(chunk_to_process, modality, marqo_index)
-                for frame in frames:
-                    processed_chunk = process_frame(frame, modality, processor, model)
+                # Extract chunk using ffmpeg
+                extract_chunk(temp_file_path, chunk_file_path, start, split_length, modality)
+
+                print(f"Chunk extracted: {chunk_file_path}")
+
+                # Process chunk
+                try:
+                    if modality == Modality.AUDIO:
+                        processed_chunk = processor(chunk_file_path, return_tensors='pt')
+                    else:  # VIDEO
+                        processed_chunk = processor(chunk_file_path, return_tensors='pt')
+                    
+                    chunk_data = {
+                        'start_time': start,
+                        'end_time': end,
+                        'tensor': processed_chunk
+                    }
+                    
                     processed_chunks.append(processed_chunk)
-            except Exception as e:
-                print(f"Error processing chunk: {str(e)}")
+                except Exception as process_error:
+                    print(f"Error processing chunk: {str(process_error)}")
 
-    # Process any remaining data in the buffer
-    if buffer:
-        try:
-            frames = process_buffer(buffer, modality, marqo_index)
-            for frame in frames:
-                processed_chunk = process_frame(frame, modality, processor, model)
-                processed_chunks.append(processed_chunk)
-        except Exception as e:
-            print(f"Error processing final buffer: {str(e)}")
+            finally:
+                # Delete the temporary chunk file
+                os.unlink(chunk_file_path)
 
+    except Exception as e:
+        print(f"Error in media processing: {str(e)}")
+    finally:
+        # Delete the whole media file
+        os.unlink(temp_file_path)
+
+    print(f"Total processed chunks: {len(processed_chunks)}")
     return processed_chunks
 
+def get_media_duration(file_path):
+    cmd = [
+        'ffprobe',
+        '-v', 'error',
+        '-show_entries', 'format=duration',
+        '-of', 'json',
+        file_path
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output = json.loads(result.stdout)
+    return float(output['format']['duration'])
 
-def process_buffer(buffer: bytes, modality: Modality, marqo_index: MarqoIndex) -> List[np.ndarray]:
-    frames = []
-    try:
-        with av.open(io.BytesIO(buffer)) as container:
-            stream = next(s for s in container.streams if s.type == ('video' if modality == Modality.VIDEO else 'audio'))
-            
-            if modality == Modality.VIDEO:
-                split_length = marqo_index.video_preprocessing.split_length
-                split_overlap = marqo_index.video_preprocessing.split_overlap
-            elif modality == Modality.AUDIO:
-                split_length = marqo_index.audio_preprocessing.split_length
-                split_overlap = marqo_index.audio_preprocessing.split_overlap
-            else:
-                raise ValueError(f"Unsupported modality: {modality}")
+def extract_chunk(input_file, output_file, start_time, duration, modality):
+    cmd = [
+        'ffmpeg',
+        '-i', input_file,
+        '-ss', str(start_time),
+        '-t', str(duration)
+    ]
+    
+    if modality == Modality.AUDIO:
+        cmd.extend(['-acodec', 'pcm_s16le'])  # Use PCM format for audio
+    else:  # VIDEO
+        cmd.extend(['-vcodec', 'libx264', '-acodec', 'aac'])
+    
+    cmd.extend(['-y', output_file])
+    
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            for frame in container.decode(stream):
-                if modality == Modality.VIDEO:
-                    frames.append(frame.to_ndarray(format='rgb24'))
-                else:  # AUDIO
-                    frames.append(frame.to_ndarray())
-
-            # Apply split length and overlap
-            split_frames = []
-            for i in range(0, len(frames), int(split_length * (1 - split_overlap))):
-                split = frames[i:i + split_length]
-                if len(split) == split_length:
-                    split_frames.append(np.stack(split) if modality == Modality.VIDEO else np.concatenate(split))
-
-    except av.AVError as e:
-        logger.error(f"Error processing media buffer: {str(e)}")
-
-    return split_frames
-
-
-def process_frame(frame: np.ndarray, modality: Modality, processor, model) -> torch.Tensor:
-    if modality == Modality.VIDEO:
-        processed = processor([frame], return_tensors='pt')
-    elif modality == Modality.AUDIO:
-        processed = processor([frame], return_tensors='pt', sampling_rate=44100)  # Adjust sampling rate if needed
-    else:
-        raise ValueError(f"Unsupported modality: {modality}")
-
-    # Generate embeddings using the LanguageBind model
-    with torch.no_grad():
-        embeddings = model.get_video_features(**processed) if modality == Modality.VIDEO else model.get_audio_features(**processed)
-
-    return embeddings
+def process_audio_chunk(file_path, processor):
+    # Load audio file
+    audio, sr = librosa.load(file_path, sr=16000)  # Resample to 16kHz
+    
+    # Convert to float32 and normalize
+    audio = audio.astype(np.float32)
+    audio = audio / np.max(np.abs(audio))
+    
+    # Convert to tensor
+    #audio_tensor = torch.from_numpy(audio).unsqueeze(0)
+    
+    # Process with LanguageBind processor
+    processed_chunk = processor(file_path, return_tensors='pt')
+    
+    return processed_chunk
 
 @contextmanager
 def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_fields: List[str],

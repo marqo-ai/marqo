@@ -87,3 +87,4 @@ SoundFile
 
 
 ffmpeg
+librosa

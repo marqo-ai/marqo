@@ -655,7 +655,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         marqo_index=marqo_index
                     )
                 )
-                print(f"from tensor_search add_documents_structured, content_repo is {content_repo}")
+                #print(f"from tensor_search add_documents_structured, content_repo is {content_repo}")
 
         if add_docs_params.use_existing_tensors:
             existing_docs_dict: Dict[str, dict] = {}
@@ -812,7 +812,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         print(f"from tensor_search add_documents_structured, marqo_field.type is {marqo_field.type}")
                         try:
                             media_chunks = content_repo[field_content]
-                            print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
+                            #print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 chunk_id = f"{field}::{chunk_index}"
                                 chunks.append(chunk_id)
@@ -824,7 +824,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     device=add_docs_params.device,
                                     normalize_embeddings=marqo_index.normalize_embeddings,
                                     infer=True,
-                                    model_auth=add_docs_params.model_auth
+                                    model_auth=add_docs_params.model_auth,
+                                    modality=Modality.VIDEO if marqo_field.type == FieldType.VideoPointer else Modality.AUDIO
                                 )
                                 embeddings.extend(vector)  # vectorise returns a list of vectors
                                 print(f"from tensor_search add_documents_structured, embeddings is {embeddings}")
