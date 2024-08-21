@@ -58,7 +58,7 @@ _marqo_inference_cache = MarqoInferenceCache(cache_size=read_env_vars_and_defaul
 
 
 class Modality(str, Enum):
-    TEXT = "text"
+    TEXT = "language"
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
@@ -154,9 +154,11 @@ class LanguageBindEncoder(ModelEncoder):
 
     def encode(self, content, modality, **kwargs):
         inputs = {}
+        print(f"from languagebind encode, modality is {modality}")
         if modality == Modality.TEXT:
+            
             # For text, we still need to tokenize and encode the text
-            inputs['language'] = to_device(self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'), self.model.device)
+            inputs['language'] = to_device(self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'), self.model.device)['input_ids']
         elif modality == Modality.IMAGE:
             # Save the image to a temporary file
             with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
