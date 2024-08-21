@@ -335,6 +335,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
+    treat_urls_and_pointers_as_media: bool
     filter_string_max_length: int
 
     def __init__(self, **data):

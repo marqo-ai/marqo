@@ -41,8 +41,8 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
 
 class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_images: bool
+    treat_urls_and_pointers_as_media: bool
     filter_string_max_length: int
-
 
 class FieldRequest(StrictBaseModel):
     name: str

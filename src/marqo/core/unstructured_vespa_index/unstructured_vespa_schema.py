@@ -63,6 +63,7 @@ class UnstructuredVespaSchema(VespaSchema):
             created_at=self._index_request.created_at,
             updated_at=self._index_request.updated_at,
             treat_urls_and_pointers_as_images=self._index_request.treat_urls_and_pointers_as_images,
+            treat_urls_and_pointers_as_media=self._index_request.treat_urls_and_pointers_as_media,
             filter_string_max_length=self._index_request.filter_string_max_length,
         )
 

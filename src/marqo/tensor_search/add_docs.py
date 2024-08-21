@@ -130,7 +130,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
-                        if preprocessors['image'] is not None:
+                        if preprocessors is not None and preprocessors['image'] is not None:
                             print(f"preprocessors['image']: {preprocessors['image']}")
                             print(f"device: {device}")
                             if not device or not isinstance(device, str):
@@ -200,6 +200,8 @@ class StreamingMediaProcessor:
         self.chunk_size = self.estimate_chunk_size()
 
     def get_file_size(self):
+        # To consider: get file size from header in first chunk instead of a separate header request
+        # to reduce latency (removing a request)
         c = pycurl.Curl()
         c.setopt(c.URL, self.url)
         c.setopt(c.NOBODY, True)

@@ -173,6 +173,7 @@ class MarqoTestCase(unittest.TestCase):
             created_at=time.time(),
             updated_at=time.time(),
             treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True,
             filter_string_max_length=100
     ) -> UnstructuredMarqoIndex:
         """
@@ -196,6 +197,7 @@ class MarqoTestCase(unittest.TestCase):
             created_at=created_at,
             updated_at=updated_at,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
+            treat_urls_and_pointers_as_media=treat_urls_and_pointers_as_media,
             filter_string_max_length=filter_string_max_length
         )
 
@@ -294,6 +296,7 @@ class MarqoTestCase(unittest.TestCase):
                 m=16
             ),
             treat_urls_and_pointers_as_images: bool = False,
+            treat_urls_and_pointers_as_media: bool = False,
             filter_string_max_length: int = 50,
             marqo_version=version.get_version(),
             created_at=time.time(),
@@ -310,6 +313,7 @@ class MarqoTestCase(unittest.TestCase):
             name=name,
             model=model,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
+            treat_urls_and_pointers_as_media=treat_urls_and_pointers_as_media,
             filter_string_max_length=filter_string_max_length,
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
