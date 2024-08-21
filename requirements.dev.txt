@@ -22,7 +22,7 @@ transformers==4.41.2
 more_itertools
 boto3==1.25.4
 botocore==1.28.4
-nltk==3.7
+nltk==3.9
 torch==1.12.1
 torchvision==0.13.1
 Pillow==9.3.0
