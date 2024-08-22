@@ -1068,8 +1068,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
                                     field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
                                     content_repo, mappings, model_auth=add_docs_params.model_auth,
-                                    text_chunk_prefix=text_chunk_prefix, 
-                                    modality=Modality.VIDEO if marqo_field.type == FieldType.VideoPointer else Modality.AUDIO)
+                                    text_chunk_prefix=text_chunk_prefix,
+                                )
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
 
@@ -2336,7 +2336,7 @@ def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
         doc_id: str, device: str, marqo_index: StructuredMarqoIndex, content_repo, field_map: dict,
         model_auth: Optional[ModelAuth] = None,
-        text_chunk_prefix: str = None, modality=None
+        text_chunk_prefix: str = None
 ):
     """
     This function is used to vectorise multimodal combination field. The field content should
@@ -2470,7 +2470,7 @@ def vectorise_multimodal_combination_field_structured(
                     normalize_embeddings=normalize_embeddings,
                     infer=False,
                     model_auth=model_auth,
-                    modality=modality
+                    modality=Modality.TEXT
                 )
                 vectors_list.extend(text_vectors)
                 sub_field_name_list.extend(text_field_names)
@@ -2486,7 +2486,7 @@ def vectorise_multimodal_combination_field_structured(
                     normalize_embeddings=normalize_embeddings,
                     infer=True,
                     model_auth=model_auth,
-                    modality=modality
+                    modality=Modality.IMAGE
                 )
                 vectors_list.extend(image_vectors)
                 sub_field_name_list.extend(image_field_names)
@@ -2502,7 +2502,7 @@ def vectorise_multimodal_combination_field_structured(
                     normalize_embeddings=normalize_embeddings,
                     infer=True,
                     model_auth=model_auth,
-                    modality=modality
+                    modality=Modality.VIDEO
                 )
                 vectors_list.extend(video_vectors)
                 sub_field_name_list.extend(video_field_names)
@@ -2517,7 +2517,8 @@ def vectorise_multimodal_combination_field_structured(
                     device=device,
                     normalize_embeddings=normalize_embeddings,
                     infer=True,
-                    model_auth=model_auth
+                    model_auth=model_auth,
+                    modality=Modality.AUDIO
                 )
                 vectors_list.extend(audio_vectors)
                 sub_field_name_list.extend(audio_field_names)

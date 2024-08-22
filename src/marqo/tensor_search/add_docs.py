@@ -138,7 +138,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             try:
                                 print(f"from threaded_download_and_preprocess_content, trying to preprocess image")
                                 content_repo[doc[field]] = preprocessors['image'](content_repo[doc[field]]).to(device)
-                                print(f"image_repo[doc[field]]: {content_repo[doc[field]]}")
+                                print(f"content_repo[doc[field]]: {content_repo[doc[field]]}")
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     content_repo[doc[field]] = e
