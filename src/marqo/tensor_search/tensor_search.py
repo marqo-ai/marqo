@@ -529,8 +529,9 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                     # Use_existing tensor does not apply, or we didn't find it, then we vectorise
                     if combo_chunk is None:
-
+                        
                         if field_content:  # Check if the subfields are present
+                            modality = infer_modality(field_content)
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                             unsuccessful_doc_to_append,
                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
@@ -2195,7 +2196,8 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_content_to_vectorise = list(field_content.values())
     else:
         for sub_field_name, sub_content in field_content.items():
-            modality = infer_modality(sub_content)
+            if modality is None:
+                modality = infer_modality(sub_content)
             if isinstance(sub_content, str) and not _is_image(sub_content):
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
