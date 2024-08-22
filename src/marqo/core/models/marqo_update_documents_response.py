@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set, Any
 
 from pydantic import Field, root_validator
 
@@ -42,3 +42,17 @@ class MarqoUpdateDocumentsResponse(MarqoBaseModel):
 
     def get_header_dict(self) -> Dict[str, str]:
         return self._batch_response_stats.get_header_dict()
+
+    def dict(self, *args, **kwargs) -> Dict[str, Any]:
+        """Setting default exclude to exclude _batch_response_stats from the response.
+
+        Setting Field(exclude=True) does not work for
+        _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats). So we need
+        to exclude it manually.
+        """
+        exclude: Set[str] = kwargs.get('exclude', set())
+        if not isinstance(exclude, set):
+            raise TypeError("exclude must be a set")
+        exclude = exclude.union({'_batch_response_stats'})
+        kwargs['exclude'] = exclude
+        return super().dict(*args, **kwargs)
