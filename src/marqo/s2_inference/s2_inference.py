@@ -165,11 +165,8 @@ class LanguageBindEncoder(ModelEncoder):
     
     def encode(self, content, modality, **kwargs):
         inputs = {}
-        print(f"from languagebind encode, modality is {modality.value}")
-        #print(f"from languagebind encode, content is {content}")
         
         if modality == Modality.TEXT:
-            print(f"from languagebind encode text, content is {content}")
             inputs[Modality.TEXT] = to_device(
                 self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'),
                 self.model.device
@@ -186,29 +183,29 @@ class LanguageBindEncoder(ModelEncoder):
                 elif isinstance(content, str) and "http" in content:
                     self._download_content(content, temp_filename)
                 else:
-                    print(f"from languagebind encode image to be passed to encode text, content is {content}")
                     return self.encode([content], modality=Modality.TEXT)
                 
                 preprocessed_image = self.preprocessor(Modality.IMAGE)([temp_filename], return_tensors='pt')
-                inputs['image'] = preprocessed_image['pixel_values']
+                inputs['image'] = to_device(preprocessed_image, self.model.device)['pixel_values']
 
         elif modality in [Modality.AUDIO, Modality.VIDEO]:
             if isinstance(content, str) and "http" in content:
+                # If we are only given a url
                 suffix = ".mp4" if modality == Modality.VIDEO else ".wav"
                 with self._temp_file(suffix) as temp_filename:
-                    print(f"downloading video/audio")
                     self._download_content(content, temp_filename)
                     preprocessed_content = self.preprocessor(modality)([temp_filename], return_tensors='pt')
-                    inputs[modality.value] = preprocessed_content['pixel_values']
+                    inputs[modality.value] = to_device(preprocessed_content, self.model.device)['pixel_values']
+
             elif isinstance(content, list) and 'pixel_values' in content[0]:
-                inputs[modality.value] = content[0]['pixel_values']                
+                # If media has already been preprocessed
+                inputs[modality.value] = to_device(content[0], self.model.device)['pixel_values']     
             else:
                 raise ValueError(f"Unsupported {modality.value} content type: {type(content)}, content: {content}")
         
         with torch.no_grad():
             embeddings = self.model.model(inputs)
-        print(f"from languagebind encode, modality is {modality}")
-        print(f"from languagebind encode, modality.value is {modality.value}")
+
         return embeddings[modality.value].cpu().numpy()
 
     def _download_content(self, url, filename):
