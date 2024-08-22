@@ -6,7 +6,7 @@ COPY vespa .
 RUN mvn clean package
 
 # Stage 2: Base image for Python setup
-FROM marqoai/marqo-base:20 as base_image
+FROM 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-base:yihan-almalinux-vespa-8.396.18 as base_image
 
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var
