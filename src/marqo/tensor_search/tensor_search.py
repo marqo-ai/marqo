@@ -832,14 +832,18 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         print(f"from tensor_search add_documents_structured, marqo_field.type is {marqo_field.type}")
                         try:
                             media_chunks = content_repo[field_content]
+                            print(f"from add_docs_structured, media_chunks count is {len(media_chunks)}")
                             #print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
                             for chunk_index, media_chunk in enumerate(media_chunks):
-                                chunk_id = f"{field}::{chunk_index}"
+                                print(f"from add_docs_structured, vectorising chunk {chunk_index}")
+                                chunk_start = media_chunk['start_time']
+                                chunk_end = media_chunk['end_time']
+                                chunk_id = f"{field}::start_{chunk_start:.2f}::end_{chunk_end:.2f}"
                                 chunks.append(chunk_id)
                                 
                                 vector = s2_inference.vectorise(
                                     model_name=marqo_index.model.name,
-                                    content=[media_chunk],  # Wrap in list as vectorise expects an iterable
+                                    content=[media_chunk['tensor']],  # Wrap in list as vectorise expects an iterable
                                     model_properties=marqo_index.model.get_properties(),
                                     device=add_docs_params.device,
                                     normalize_embeddings=marqo_index.normalize_embeddings,

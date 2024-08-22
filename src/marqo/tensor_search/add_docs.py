@@ -21,6 +21,7 @@ import logging
 from typing import List, Dict
 import json
 import librosa
+import shlex
 
 import numpy as np
 import av # add PyAV to requirements
@@ -198,6 +199,10 @@ class StreamingMediaProcessor:
 
         self.chunk_size = self.estimate_chunk_size()
 
+        print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
+        print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
+        print(f"from StreamingMediaProcessor, self.chunk_size: {self.chunk_size}")
+
     def fetch_file_metadata(self):
         headers = {}
         def header_function(header_line):
@@ -221,6 +226,23 @@ class StreamingMediaProcessor:
             duration = None
             if 'x-duration' in headers:
                 duration = float(headers['x-duration'])
+                print(f"from StreamingMediaProcessor, got duration from header: {duration}")
+
+            # If duration is not in headers, use ffprobe with a timeout
+            if duration is None:
+                ffprobe_cmd = f'ffprobe -v quiet -print_format json -show_format -show_streams "{self.url}"'
+                try:
+                    result = subprocess.run(shlex.split(ffprobe_cmd), capture_output=True, text=True, timeout=5)
+                    metadata = json.loads(result.stdout)
+                    
+                    if 'format' in metadata and 'duration' in metadata['format']:
+                        duration = float(metadata['format']['duration'])
+                        print(f"from StreamingMediaProcessor, got duration from ffprobe: {duration}")
+                except subprocess.TimeoutExpired:
+                    logger.warning("ffprobe timed out, falling back to estimation")
+                except (subprocess.SubprocessError, json.JSONDecodeError) as e:
+                    logger.warning(f"Error running ffprobe: {e}, falling back to estimation")
+
             
             # If duration is not in headers, estimate it based on file size
             if duration is None:
@@ -228,8 +250,8 @@ class StreamingMediaProcessor:
                     # Assume 128 kbps bitrate for audio
                     duration = size / (128 * 1024 / 8)
                 else:  # VIDEO
-                    # Assume 1 Mbps bitrate for video
-                    duration = size / (1024 * 1024 / 8)
+                    duration = size / (1024 * 1024)  # Assume 8 Mbps for video
+                    print(f"from StreamingMediaProcessor, got duration from estimate: {duration}")
             
             return size, duration
         
@@ -248,48 +270,45 @@ class StreamingMediaProcessor:
 
     def process_media(self) -> List[Dict[str, torch.Tensor]]:
         processed_chunks = []
-        chunk_buffer = BytesIO()
-        overlap_size = int(self.chunk_size * (self.split_overlap / self.split_length))
-        total_processed = 0
-        chunk_number = 0
+        chunk_duration = self.split_length
+        overlap_duration = self.split_overlap
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for chunk_start in range(0, math.ceil(self.duration), chunk_duration - overlap_duration):
+                chunk_end = min(chunk_start + chunk_duration, self.duration)
+                
+                output_file = os.path.join(temp_dir, f"chunk_{chunk_start}.{'mp4' if self.modality == Modality.VIDEO else 'wav'}")
+                
+                ffmpeg_cmd = [
+                    'ffmpeg',
+                    '-ss', str(chunk_start),
+                    '-i', self.url,
+                    '-t', str(chunk_end - chunk_start),
+                    '-c', 'copy',  # This copies the codec without re-encoding, which is faster
+                    '-y',  # Overwrite output file if it exists
+                    output_file
+                ]
+                
+                try:
+                    subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+                    
+                    if self.modality == Modality.VIDEO:
+                        processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
+                    else:  # AUDIO
+                        processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
 
-        c = pycurl.Curl()
-        c.setopt(c.URL, self.url)
-        c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
-        c.setopt(c.WRITEFUNCTION, chunk_buffer.write)
-        c.setopt(c.BUFFERSIZE, self.chunk_size)
-        c.setopt(c.NOPROGRESS, 0)
-        c.setopt(c.XFERINFOFUNCTION, self._progress)
-
-        try:
-            c.perform()
-            while True:
-                chunk_buffer.seek(0)
-                chunk_data = chunk_buffer.read(self.chunk_size)
-                if not chunk_data:
-                    break
-
-                processed_chunk = self.process_chunk(chunk_data, chunk_number)
-                if processed_chunk is not None:
+                    processed_chunk = {
+                        'tensor': processed_chunk_tensor,
+                        'start_time': chunk_start,
+                        'end_time': chunk_end
+                    }
+                    
                     processed_chunks.append(processed_chunk)
-
-                # Move the remaining data to the beginning of the buffer
-                remaining_data = chunk_buffer.read()
-                chunk_buffer = BytesIO(remaining_data[-overlap_size:] if len(remaining_data) > overlap_size else remaining_data)
-                chunk_buffer.seek(0, io.SEEK_END)  # Move to the end of the buffer for the next write
-
-                total_processed += len(chunk_data) - overlap_size
-                chunk_number += 1
-
-                if total_processed >= self.total_size:
-                    break
-
-        except pycurl.error as e:
-            logger.error(f"pycurl error: {e}")
-            raise RuntimeError(f"Error streaming media: {e}")
-        finally:
-            c.close()
-
+                    
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Error processing chunk starting at {chunk_start}: {e.stderr}")
+                    continue  # Skip this chunk and continue with the next one
+                
         return processed_chunks
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):
@@ -414,7 +433,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
         metric_obj = RequestMetricsStore.for_request()
         metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
         metric_obj.times = reduce_thread_metrics(metric_obj.times)
-        print(f"from download_and_preprocess_content, content_repo: {content_repo}")
+        #print(f"from download_and_preprocess_content, content_repo: {content_repo}")
         yield content_repo
     finally:
         for p in content_repo.values():
