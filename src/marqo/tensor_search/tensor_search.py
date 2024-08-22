@@ -659,7 +659,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 marqo_field = marqo_index.field_map.get(field)
                 tensor_field = marqo_index.tensor_field_map.get(field)
                 is_tensor_field = tensor_field is not None
-                is_image_pointer_field = marqo_field.type == FieldType.ImagePointer
                 if not marqo_field:
                     message = (f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
@@ -760,6 +759,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                      f"Is this a new tensor field?")
 
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
+                    is_image_pointer_field = marqo_field.type == FieldType.ImagePointer
                     if isinstance(field_content, str):
 
                         # TODO: better/consistent handling of a no-op for processing (but still vectorize)
