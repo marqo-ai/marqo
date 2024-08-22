@@ -181,8 +181,7 @@ class StreamingMediaProcessor:
         self.modality = modality
         self.marqo_index = marqo_index
         self.preprocessors = preprocessors
-        self.total_size = self.get_file_size()
-        self.duration = self.estimate_duration()
+        self.total_size, self.duration = self.fetch_file_metadata()
         self.preprocessor = self.preprocessors[modality]
         
         if modality == Modality.VIDEO:
@@ -199,19 +198,7 @@ class StreamingMediaProcessor:
 
         self.chunk_size = self.estimate_chunk_size()
 
-    def get_file_size(self):
-        # To consider: get file size from header in first chunk instead of a separate header request
-        # to reduce latency (removing a request)
-        c = pycurl.Curl()
-        c.setopt(c.URL, self.url)
-        c.setopt(c.NOBODY, True)
-        c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
-        c.perform()
-        size = int(c.getinfo(c.CONTENT_LENGTH_DOWNLOAD))
-        c.close()
-        return size
-
-    def estimate_duration(self):
+    def fetch_file_metadata(self):
         headers = {}
         def header_function(header_line):
             header_line = header_line.decode('iso-8859-1')
@@ -225,25 +212,32 @@ class StreamingMediaProcessor:
         c.setopt(c.NOBODY, True)
         c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
         c.setopt(c.HEADERFUNCTION, header_function)
+        
         try:
             c.perform()
+            size = int(c.getinfo(c.CONTENT_LENGTH_DOWNLOAD))
+            
+            # Try to get duration from headers
+            duration = None
+            if 'x-duration' in headers:
+                duration = float(headers['x-duration'])
+            
+            # If duration is not in headers, estimate it based on file size
+            if duration is None:
+                if self.modality == Modality.AUDIO:
+                    # Assume 128 kbps bitrate for audio
+                    duration = size / (128 * 1024 / 8)
+                else:  # VIDEO
+                    # Assume 1 Mbps bitrate for video
+                    duration = size / (1024 * 1024 / 8)
+            
+            return size, duration
+        
         except pycurl.error as e:
-            logger.error(f"Error fetching headers: {e}")
+            logger.error(f"Error fetching metadata: {e}")
+            raise
         finally:
-            c.close()
-
-        # Check if duration is in headers (this is server-dependent and might not work for all servers)
-        if 'x-duration' in headers:
-            return float(headers['x-duration'])
-
-        # If we can't get duration from headers, we'll estimate it based on file size
-        # This is a rough estimate and may not be accurate for all media types
-        if self.modality == Modality.AUDIO:
-            # Assume 128 kbps bitrate for audio
-            return self.total_size / (128 * 1024 / 8)
-        else:  # VIDEO
-            # Assume 1 Mbps bitrate for video
-            return self.total_size / (1024 * 1024 / 8)
+            c.close()        
 
     def estimate_chunk_size(self):
         if self.duration:
