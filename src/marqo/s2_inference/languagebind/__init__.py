@@ -12,42 +12,25 @@ from .video.modeling_video import LanguageBindVideo
 from .video.tokenization_video import LanguageBindVideoTokenizer
 from .video.processing_video import LanguageBindVideoProcessor
 
-from .depth.configuration_depth import LanguageBindDepthConfig
-from .depth.modeling_depth import LanguageBindDepth
-from .depth.tokenization_depth import LanguageBindDepthTokenizer
-from .depth.processing_depth import LanguageBindDepthProcessor
-
 from .audio.configuration_audio import LanguageBindAudioConfig
 from .audio.modeling_audio import LanguageBindAudio
 from .audio.tokenization_audio import LanguageBindAudioTokenizer
 from .audio.processing_audio import LanguageBindAudioProcessor
 
-from .thermal.configuration_thermal import LanguageBindThermalConfig
-from .thermal.modeling_thermal import LanguageBindThermal
-from .thermal.tokenization_thermal import LanguageBindThermalTokenizer
-from .thermal.processing_thermal import LanguageBindThermalProcessor
-
-
 
 config_dict = {
-    'thermal': LanguageBindThermalConfig,
     'image': LanguageBindImageConfig,
     'video': LanguageBindVideoConfig,
-    'depth': LanguageBindDepthConfig,
     'audio': LanguageBindAudioConfig
 }
 model_dict = {
-    'thermal': LanguageBindThermal,
     'image': LanguageBindImage,
     'video': LanguageBindVideo,
-    'depth': LanguageBindDepth,
     'audio': LanguageBindAudio
 }
 transform_dict = {
     'video': LanguageBindVideoProcessor,
     'audio': LanguageBindAudioProcessor,
-    'depth': LanguageBindDepthProcessor,
-    'thermal': LanguageBindThermalProcessor,
     'image': LanguageBindImageProcessor,
 }
 

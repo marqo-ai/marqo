@@ -43,9 +43,8 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 from marqo.s2_inference.languagebind import (
     LanguageBind, LanguageBindVideo, LanguageBindAudio, LanguageBindImage,
-    LanguageBindDepth, LanguageBindThermal,
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
-    LanguageBindDepthProcessor, LanguageBindThermalProcessor, transform_dict, to_device
+    to_device
 )
 
 logger = logging.getLogger(__name__)

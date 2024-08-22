@@ -16,10 +16,9 @@ from enum import Enum
 from abc import ABC, abstractmethod
 
 from marqo.s2_inference.languagebind import (
-    LanguageBind, LanguageBindVideo, LanguageBindAudio, LanguageBindImage,
-    LanguageBindDepth, LanguageBindThermal,
+    LanguageBind, LanguageBindVideo, LanguageBindAudio, LanguageBindImage, 
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
-    LanguageBindDepthProcessor, LanguageBindThermalProcessor, transform_dict, to_device
+    to_device
 )
 
 from marqo import marqo_docs
@@ -87,9 +86,7 @@ class MultimodalModel:
             self.clip_type = { 
                 'video': 'LanguageBind_Video_V1.5_FT',
                 'audio': 'LanguageBind_Audio_FT',
-                'thermal': 'LanguageBind_Thermal',
                 'image': 'LanguageBind_Image',
-                'depth': 'LanguageBind_Depth',
             }
             model = LanguageBind(clip_type=self.clip_type, cache_dir=self.properties.cache_dir)
             model = model.to(self.device)
