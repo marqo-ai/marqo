@@ -308,6 +308,15 @@ class StreamingMediaProcessor:
                 except subprocess.CalledProcessError as e:
                     logger.error(f"Error processing chunk starting at {chunk_start}: {e.stderr}")
                     continue  # Skip this chunk and continue with the next one
+                finally:
+                    # Clean up temporary files
+                    if os.path.exists(output_file):
+                        os.remove(output_file)
+
+                # Move to the next chunk start, but don't not beyond the file duration
+                if chunk_end == self.duration:
+                    break
+                chunk_start = min(chunk_start + (chunk_duration - overlap_duration), self.duration - overlap_duration)
                 
         return processed_chunks
 
