@@ -1632,22 +1632,42 @@ def construct_vector_input_batches(query: Optional[Union[str, Dict]], index_info
         A tuple of string batches. The first is text content the second is image content.
     """
     # TODO - infer this from model
-    treat_urls_as_images = True
+    treat_urls_as_media = True
+
+    def categorize_content(content: str) -> str:
+        modality = infer_modality(content)
+        if treat_urls_as_media:
+            if modality == Modality.IMAGE:
+                return 'image'
+            elif modality == Modality.VIDEO:  # You need to implement this function
+                return 'video'
+            elif modality == Modality.AUDIO:  # You need to implement this function
+                return 'audio'
+        return 'text'
+
     if isinstance(query, str):
-        if treat_urls_as_images and _is_image(query):
-            return [], [query, ]
-        else:
-            return [query, ], []
-    elif isinstance(query, dict):  # is dict:
-        ordered_queries = list(query.items())
-        if treat_urls_as_images:
-            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
-            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
-            return text_queries, image_queries
-        else:
-            return [k for k, _ in ordered_queries], []
+        category = categorize_content(query)
+        return (
+            [query] if category == 'text' else [],
+            [query] if category == 'image' else [],
+            [query] if category == 'video' else [],
+            [query] if category == 'audio' else []
+        )
+    elif isinstance(query, dict):
+        text_queries, image_queries, video_queries, audio_queries = [], [], [], []
+        for k, _ in query.items():
+            category = categorize_content(k)
+            if category == 'text':
+                text_queries.append(k)
+            elif category == 'image':
+                image_queries.append(k)
+            elif category == 'video':
+                video_queries.append(k)
+            elif category == 'audio':
+                audio_queries.append(k)
+        return text_queries, image_queries, video_queries, audio_queries
     elif query is None:
-        return [], []
+        return [], [], [], []
     else:
         raise ValueError(f"Incorrect type for query: {type(query).__name__}")
 
@@ -1683,7 +1703,7 @@ def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attribu
 
 
 def assign_query_to_vector_job(
-        q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], grouped_content: Tuple[List[str], List[str]],
+        q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs], grouped_content: Tuple[List[str], List[str], List[str], List[str]],
         index_info: MarqoIndex, device: str) -> List[VectorisedJobPointer]:
     """
     For a individual query, assign its content (to be vectorised) to a vector job. If none exist with the correct
@@ -1702,27 +1722,27 @@ def assign_query_to_vector_job(
     Returns:
         A list of pointers to the location in a vector job that will have its vectorised content.
     """
-    if len(grouped_content) != 2:
+    if len(grouped_content) != 4:
         raise RuntimeError(
-            "assign_query_to_vector_job() expects param `grouped_content` with 2 elems. Instead received"
+            "assign_query_to_vector_job() expects param `grouped_content` with 4 elems. Instead received"
             f" `grouped_content` with {len(grouped_content)} elems")
     ptrs = []
-    for i, grouped_content in enumerate(grouped_content):
-        content_type = 'text' if i == 0 else 'image'
+    for i, content in enumerate(grouped_content):
+        content_modality = ['text', 'image', 'video', 'audio'][i]
         vector_job = VectorisedJobs(
             model_name=index_info.model.name,
             model_properties=index_info.model.get_properties(),
-            content=grouped_content,
+            content=content,
             device=device,
             normalize_embeddings=index_info.normalize_embeddings,
             image_download_headers=q.image_download_headers,
-            content_type=content_type,
+            content_modality=content_modality,
             model_auth=q.modelAuth
         )
         # If exists, add content to vector job. Otherwise create new
         if jobs.get(vector_job.groupby_key()) is not None:
             j = jobs.get(vector_job.groupby_key())
-            ptrs.append(j.add_content(grouped_content))
+            ptrs.append(j.add_content(content))
         else:
             jobs[vector_job.groupby_key()] = vector_job
             ptrs.append(VectorisedJobPointer(
@@ -1749,8 +1769,8 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     jobs: Dict[JHash, VectorisedJobs] = {}
     for i, q in enumerate(queries):
         q = queries[i]
-        # split images from text:
-        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
+        # split images, videos, and audio from text:
+        to_be_vectorised: Tuple[List[str], List[str], List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, q.index, device)
 
     return qidx_to_job, jobs
@@ -1765,13 +1785,18 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         # TODO: Handle exception for single job, and allow others to run.
         try:
             if v.content:
+                print(f"from vectorise jobs, v.content is {v.content}")
+                content_to_vectorise = v.content[0] if isinstance(v.content, list) else v.content
+                modality = infer_modality(content_to_vectorise)
+                print(f"from vectorise jobs, modality is {modality}")
                 vectors = s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
-                    content=v.content, device=v.device,
+                    content=content_to_vectorise, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
                     image_download_headers=v.image_download_headers,
                     model_auth=v.model_auth,
-                    enable_cache=True
+                    enable_cache=True,
+                    modality=modality
                 )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
 
@@ -1825,7 +1850,7 @@ def get_query_vectors_from_jobs(
                         possible_jobs=qidx_to_job[qidx],
                         jobs=jobs,
                         job_to_vectors=job_to_vectors,
-                        treat_urls_as_images=True,  # TODO - infer this from model
+                        treat_urls_as_media=True,  # TODO - infer this from model
                         content=content),
                      weight,
                      content
@@ -1859,7 +1884,7 @@ def get_query_vectors_from_jobs(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 jobs=jobs,
                 job_to_vectors=job_to_vectors,
-                treat_urls_as_images=True,  # TODO - infer this from model
+                treat_urls_as_media=True, # TODO - infer this from model
                 content=q.q
             )
         else:
@@ -1869,12 +1894,12 @@ def get_query_vectors_from_jobs(
 
 def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors: Dict[JHash, Dict[str, List[float]]],
                        jobs: Dict[JHash, VectorisedJobs],
-                       treat_urls_as_images: bool, content: str) -> List[float]:
+                       treat_urls_as_media: bool, content: str) -> List[float]:
     """finds the vector associated with a piece of content
 
     Args:
         possible_jobs: The jobs where the target vector may reside
-        treat_urls_as_images: an index_parameter that indicates whether content should be treated as image,
+        treat_urls_as_media: an index_parameter that indicates whether content should be treated as image, audio, video
             if it has a URL structure
         content: The content to search
 
@@ -1883,10 +1908,14 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 
     Raises runtime error if is not found
     """
-    content_type = 'image' if treat_urls_as_images and _is_image(content) else 'text'
+    content_modality = infer_modality(content).value if treat_urls_as_media else 'text'
+    if content_modality == 'language':
+        content_modality = 'text'
+    print(f"from get_content_vector, content_modality: {content_modality}")
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
-        if jobs[vec_job_pointer.job_hash].content_type == content_type:
+        print(f"from get_content_vector, vec_job_pointer: {vec_job_pointer}")
+        if jobs[vec_job_pointer.job_hash].content_modality == content_modality:
             try:
                 return job_to_vectors[vec_job_pointer.job_hash][content]
             except KeyError:
@@ -1949,6 +1978,8 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     # we can still use qidx_to_job. But the jobs structure may need to be different
     vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(
         prefixed_queries, config, device)
+    
+    print(f"from run_vectorise_pipeline, vector_jobs_tuple is {vector_jobs_tuple}")
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -2022,6 +2053,8 @@ def _vector_text_search(
 
     # Determine the text query prefix
     text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
+
+    print(f"from _vector_text_search, query is {query}, image_download_headers is {image_download_headers}")
 
     if isinstance(query, CustomVectorQuery):
         if context is None:
@@ -2190,8 +2223,9 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 
     normalize_embeddings = marqo_index.normalize_embeddings
     infer_if_image = marqo_index.treat_urls_and_pointers_as_images
+    infer_if_media = marqo_index.treat_urls_and_pointers_as_media
 
-    if infer_if_image is False:
+    if infer_if_image is False and infer_if_media is False:
         text_field_names = list(field_content.keys())
         text_content_to_vectorise = list(field_content.values())
     else:

@@ -452,6 +452,7 @@ class TestPrefix(MarqoTestCase):
             ),
             normalize_embeddings=True,
             treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=False,
             filter_string_max_length=1000,
             text_preprocessing=TextPreProcessing(
                 splitLength=6,

@@ -14,6 +14,9 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from enum import Enum
 from abc import ABC, abstractmethod
+import pycurl
+from contextlib import contextmanager
+
 
 from marqo.s2_inference.languagebind import (
     LanguageBind, LanguageBindVideo, LanguageBindAudio, LanguageBindImage, 
@@ -139,62 +142,82 @@ class LanguageBindEncoder(ModelEncoder):
         self.model = model
         self.tokenizer = self._get_tokenizer()
 
+    @contextmanager
+    def _temp_file(self, suffix):
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+                yield temp_file.name
+        finally:
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+
     def _get_tokenizer(self): # this is used for text only
         pretrained_ckpt = f'lb203/LanguageBind_Image'
         return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{self.model.properties.cache_dir}/tokenizer_cache_dir')
     
     def preprocessor(self, modality):
-        if modality == Modality.VIDEO:
-            return LanguageBindVideoProcessor(self.model.model.modality_config[Modality.VIDEO])
-        elif modality == Modality.AUDIO:
-            return LanguageBindAudioProcessor(self.model.model.modality_config[Modality.AUDIO])
-        else: # Image
-            return LanguageBindImageProcessor(self.model.model.modality_config[Modality.IMAGE])
-            
-
+        preprocessors = {
+            Modality.VIDEO: LanguageBindVideoProcessor,
+            Modality.AUDIO: LanguageBindAudioProcessor,
+            Modality.IMAGE: LanguageBindImageProcessor
+        }
+        return preprocessors[modality](self.model.model.modality_config[modality])
+    
     def encode(self, content, modality, **kwargs):
         inputs = {}
-        print(f"from languagebind encode, modality is {modality}")
+        print(f"from languagebind encode, modality is {modality.value}")
+        
         if modality == Modality.TEXT:
-            # For text, we still need to tokenize and encode the text
             print(f"from languagebind encode text, content is {content}")
-            inputs[Modality.TEXT] = to_device(self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'), self.model.device)['input_ids']
-           
+            inputs[Modality.TEXT] = to_device(
+                self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'),
+                self.model.device
+            )['input_ids']
+
         elif modality == Modality.IMAGE:
-            # TODO: Improve this logic. Do we really have to save to a temp file?
-            # Save the image to a temporary file
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
-                #print(f"from languagebind encode, content is {content}")
-                temp_filename = temp_file.name
+            with self._temp_file('.png') as temp_filename:
                 content = content[0]
                 if isinstance(content, Image):
                     content.save(temp_filename, format='PNG')
                 elif isinstance(content, bytes):
-                    temp_file.write(content)
+                    with open(temp_filename, 'wb') as f:
+                        f.write(content)
+                elif isinstance(content, str) and "http" in content:
+                    self._download_content(content, temp_filename)
                 else:
                     print(f"from languagebind encode image to be passed to encode text, content is {content}")
                     return self.encode([content], modality=Modality.TEXT)
-                    #raise ValueError(f"Unsupported image content type: {type(content)}")
-                    # escape elif block
-            
-            try:
-                # Open the image from the temporary file
-                #with Image.open(temp_filename) as img:
-                # Preprocess the image
+                
                 preprocessed_image = self.preprocessor(Modality.IMAGE)([temp_filename], return_tensors='pt')
                 inputs['image'] = preprocessed_image['pixel_values']
-            finally:
-                # Delete the temporary file
-                os.unlink(temp_filename)
-        else: # For audio and video
-            inputs[modality.value] = content[0]['pixel_values'] # figure out why this is a list
 
+        elif modality in [Modality.AUDIO, Modality.VIDEO]:
+            if isinstance(content, str) and "http" in content:
+                suffix = ".mp4" if modality == Modality.VIDEO else ".wav"
+                with self._temp_file(suffix) as temp_filename:
+                    print(f"downloading video/audio")
+                    self._download_content(content, temp_filename)
+                    preprocessed_content = self.preprocessor(modality)([temp_filename], return_tensors='pt')
+                    inputs[modality.value] = preprocessed_content['pixel_values']
+            elif isinstance(content, list) and 'pixel_values' in content[0]:
+                inputs[modality.value] = content[0]['pixel_values']
+            else:
+                raise ValueError(f"Unsupported {modality.value} content type: {type(content)}")
+        
         with torch.no_grad():
             embeddings = self.model.model(inputs)
         print(f"from languagebind encode, modality is {modality}")
         print(f"from languagebind encode, modality.value is {modality.value}")
-        #print(f"from languagebind encode, embeddings is {embeddings}")
         return embeddings[modality.value].cpu().numpy()
+
+    def _download_content(self, url, filename):
+        c = pycurl.Curl()
+        c.setopt(c.URL, url)
+        with open(filename, 'wb') as f:
+            c.setopt(c.WRITEDATA, f)
+            c.perform()
+        c.close()
+        print(f"successfully downloaded {filename}")
 
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
@@ -316,10 +339,12 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
         encoder = get_encoder(model)
         print(f"from _encode_without_cache, model: {model}")
         print(f"from _encode_without_cache, encoder: {encoder}")
+        print(f"from _encode_without_cache, content is {content}")
+        print(f"from _encode_without_cache, modality: {modality}, type(modality): {type(modality)}")
         if isinstance(content, str):
-            vectorised = model.encode(content, normalize=normalize_embeddings, modality=Modality.TEXT, **kwargs)
+            vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
-            vectorised = model.encode(content, normalize=normalize_embeddings, **kwargs)
+            vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
@@ -328,7 +353,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                 if modality is None:
                     print(f"from _encode_without_cache, modality is None")
                     modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
-
+                print(f"from _encode_without_cache, before encoding modality: {modality}, type(modality): {type(modality)}")
                 encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings, **kwargs)
                 
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))

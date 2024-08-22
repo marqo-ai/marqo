@@ -17,7 +17,7 @@ class VectorisedJobPointer(BaseModel):
     end_idx: int
 
 class VectorisedJobs(BaseModel):
-    """A vectorised job describes content (e.q. search queries, images) that can be vectorised (i.e can be sent to 
+    """A vectorised job describes content (e.q. search queries, images, video, audio) that can be vectorised (i.e can be sent to 
     `s2_inference.vectorise`) in a single batch given they share common inference parameters.
 
     """
@@ -27,7 +27,7 @@ class VectorisedJobs(BaseModel):
     device: str
     normalize_embeddings: bool
     image_download_headers: Optional[Dict]
-    content_type: Literal['text', 'image']
+    content_modality: Literal['text', 'image', 'video', 'audio']
     model_auth: Optional[ModelAuth]
 
     def __hash__(self):
@@ -35,7 +35,7 @@ class VectorisedJobs(BaseModel):
 
     def groupby_key(self) -> JHash:
         return VectorisedJobs.get_groupby_key(self.model_name, self.model_properties, self.device,
-                                              self.normalize_embeddings, self.content_type,
+                                              self.normalize_embeddings, self.content_modality,
                                               self.image_download_headers)
 
     @staticmethod
