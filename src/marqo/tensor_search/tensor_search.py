@@ -884,6 +884,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                         if isinstance(field_content, str) and not _is_image(field_content):
                             # text processing pipeline:
+                            modality = Modality.TEXT
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
                             split_overlap = marqo_index.text_preprocessing.split_overlap
@@ -893,6 +894,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             text_chunks = content_chunks
                             content_chunks = text_processor.prefix_text_chunks(content_chunks, text_chunk_prefix)
                         else:
+                            modality = Modality.IMAGE
                             # TODO put the logic for getting field parameters into a function and add per field options
                             image_method = marqo_index.image_preprocessing.patch_method
 
@@ -946,7 +948,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     model_properties=marqo_index.model.get_properties(), content=content_chunks,
                                     device=add_docs_params.device, normalize_embeddings=normalize_embeddings,
                                     infer=marqo_field.type == FieldType.ImagePointer,
-                                    model_auth=add_docs_params.model_auth
+                                    model_auth=add_docs_params.model_auth,
+                                    modality=modality
                                 )
 
                             end_time = timer()
@@ -1634,40 +1637,21 @@ def construct_vector_input_batches(query: Optional[Union[str, Dict]], index_info
     # TODO - infer this from model
     treat_urls_as_media = True
 
-    def categorize_content(content: str) -> str:
-        modality = infer_modality(content)
-        if treat_urls_as_media:
-            if modality == Modality.IMAGE:
-                return 'image'
-            elif modality == Modality.VIDEO:  # You need to implement this function
-                return 'video'
-            elif modality == Modality.AUDIO:  # You need to implement this function
-                return 'audio'
-        return 'text'
-
     if isinstance(query, str):
-        category = categorize_content(query)
-        return (
-            [query] if category == 'text' else [],
-            [query] if category == 'image' else [],
-            [query] if category == 'video' else [],
-            [query] if category == 'audio' else []
-        )
-    elif isinstance(query, dict):
-        text_queries, image_queries, video_queries, audio_queries = [], [], [], []
-        for k, _ in query.items():
-            category = categorize_content(k)
-            if category == 'text':
-                text_queries.append(k)
-            elif category == 'image':
-                image_queries.append(k)
-            elif category == 'video':
-                video_queries.append(k)
-            elif category == 'audio':
-                audio_queries.append(k)
-        return text_queries, image_queries, video_queries, audio_queries
+        if treat_urls_as_media and _is_image(query):
+            return [], [query, ]
+        else:
+            return [query, ], []
+    elif isinstance(query, dict):  # is dict:
+         ordered_queries = list(query.items())
+         if treat_urls_as_media:
+             text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
+             image_queries = [k for k, _ in ordered_queries if _is_image(k)]
+             return text_queries, image_queries
+         else:
+             return [k for k, _ in ordered_queries], []
     elif query is None:
-        return [], [], [], []
+        return [], []
     else:
         raise ValueError(f"Incorrect type for query: {type(query).__name__}")
 
@@ -1722,13 +1706,13 @@ def assign_query_to_vector_job(
     Returns:
         A list of pointers to the location in a vector job that will have its vectorised content.
     """
-    if len(grouped_content) != 4:
+    if len(grouped_content) != 2:
         raise RuntimeError(
-            "assign_query_to_vector_job() expects param `grouped_content` with 4 elems. Instead received"
+            "assign_query_to_vector_job() expects param `grouped_content` with 2 elems. Instead received"
             f" `grouped_content` with {len(grouped_content)} elems")
     ptrs = []
     for i, content in enumerate(grouped_content):
-        content_modality = ['text', 'image', 'video', 'audio'][i]
+        content_type = ['text', 'media'][i]
         vector_job = VectorisedJobs(
             model_name=index_info.model.name,
             model_properties=index_info.model.get_properties(),
@@ -1736,7 +1720,7 @@ def assign_query_to_vector_job(
             device=device,
             normalize_embeddings=index_info.normalize_embeddings,
             image_download_headers=q.image_download_headers,
-            content_modality=content_modality,
+            content_type=content_type,
             model_auth=q.modelAuth
         )
         # If exists, add content to vector job. Otherwise create new
@@ -1769,8 +1753,8 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     jobs: Dict[JHash, VectorisedJobs] = {}
     for i, q in enumerate(queries):
         q = queries[i]
-        # split images, videos, and audio from text:
-        to_be_vectorised: Tuple[List[str], List[str], List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
+        # split images, from text:
+        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, q.index, device)
 
     return qidx_to_job, jobs
@@ -1786,12 +1770,11 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         try:
             if v.content:
                 print(f"from vectorise jobs, v.content is {v.content}")
-                content_to_vectorise = v.content[0] if isinstance(v.content, list) else v.content
-                modality = infer_modality(content_to_vectorise)
+                modality = infer_modality(v.content[0] if isinstance(v.content, list) else v.content)
                 print(f"from vectorise jobs, modality is {modality}")
                 vectors = s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
-                    content=content_to_vectorise, device=v.device,
+                    content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
                     image_download_headers=v.image_download_headers,
                     model_auth=v.model_auth,
@@ -1908,14 +1891,13 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 
     Raises runtime error if is not found
     """
-    content_modality = infer_modality(content).value if treat_urls_as_media else 'text'
-    if content_modality == 'language':
-        content_modality = 'text'
-    print(f"from get_content_vector, content_modality: {content_modality}")
+    content_type = 'text' if infer_modality(content) == Modality.TEXT else 'media'
+    #content_type = 'media' if treat_urls_as_media and
+    print(f"from get_content_vector, content_type: {content_type}")
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
         print(f"from get_content_vector, vec_job_pointer: {vec_job_pointer}")
-        if jobs[vec_job_pointer.job_hash].content_modality == content_modality:
+        if jobs[vec_job_pointer.job_hash].content_type == content_type:
             try:
                 return job_to_vectors[vec_job_pointer.job_hash][content]
             except KeyError:
@@ -2285,7 +2267,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=False, model_auth=model_auth
+                    infer=False, model_auth=model_auth, modality=Modality.TEXT
                 )
                 vectors_list.extend(text_vectors)
                 sub_field_name_list.extend(text_field_names)
@@ -2296,7 +2278,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=image_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=True, model_auth=model_auth, modality=modality
+                    infer=True, model_auth=model_auth, modality=Modality.IMAGE
                 )
                 vectors_list.extend(image_vectors)
                 sub_field_name_list.extend(image_field_names)
@@ -2308,7 +2290,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                         model_name=marqo_index.model.name,
                         model_properties=marqo_index.model.properties, content=video_content,
                         device=device, normalize_embeddings=normalize_embeddings,
-                        infer=True, model_auth=model_auth, modality=modality
+                        infer=True, model_auth=model_auth, modality=Modality.VIDEO
                     )
                     vectors_list.extend(video_vectors)
                     sub_field_name_list.extend([video_field] * len(video_vectors))
@@ -2320,7 +2302,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                         model_name=marqo_index.model.name,
                         model_properties=marqo_index.model.properties, content=audio_content,
                         device=device, normalize_embeddings=normalize_embeddings,
-                        infer=True, model_auth=model_auth, modality=modality
+                        infer=True, model_auth=model_auth, modality=Modality.AUDIO
                     )
                     vectors_list.extend(audio_vectors)
                     sub_field_name_list.extend([audio_field] * len(audio_vectors))

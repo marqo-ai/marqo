@@ -27,7 +27,7 @@ class VectorisedJobs(BaseModel):
     device: str
     normalize_embeddings: bool
     image_download_headers: Optional[Dict]
-    content_modality: Literal['text', 'image', 'video', 'audio']
+    content_type: Literal['text', 'media']
     model_auth: Optional[ModelAuth]
 
     def __hash__(self):
@@ -35,7 +35,7 @@ class VectorisedJobs(BaseModel):
 
     def groupby_key(self) -> JHash:
         return VectorisedJobs.get_groupby_key(self.model_name, self.model_properties, self.device,
-                                              self.normalize_embeddings, self.content_modality,
+                                              self.normalize_embeddings, self.content_type,
                                               self.image_download_headers)
 
     @staticmethod

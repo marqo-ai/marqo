@@ -166,6 +166,7 @@ class LanguageBindEncoder(ModelEncoder):
     def encode(self, content, modality, **kwargs):
         inputs = {}
         print(f"from languagebind encode, modality is {modality.value}")
+        print(f"from languagebind encode, content is {content}")
         
         if modality == Modality.TEXT:
             print(f"from languagebind encode text, content is {content}")
@@ -176,7 +177,7 @@ class LanguageBindEncoder(ModelEncoder):
 
         elif modality == Modality.IMAGE:
             with self._temp_file('.png') as temp_filename:
-                content = content[0]
+                content = content[0] if isinstance(content, list) else content
                 if isinstance(content, Image):
                     content.save(temp_filename, format='PNG')
                 elif isinstance(content, bytes):
@@ -342,6 +343,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
         print(f"from _encode_without_cache, content is {content}")
         print(f"from _encode_without_cache, modality: {modality}, type(modality): {type(modality)}")
         if isinstance(content, str):
+            print(f"from _encode_without_cache, content is string, {content}")
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
