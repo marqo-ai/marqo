@@ -327,13 +327,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         try:
                             media_chunks = content_repo[field_content]
                             for chunk_index, media_chunk in enumerate(media_chunks):
-                                chunk_id = f"{field}::{chunk_index}"
+                                chunk_start = media_chunk['start_time']
+                                chunk_end = media_chunk['end_time']
+                                chunk_id = f"{field}::start_{chunk_start:.2f}::end_{chunk_end:.2f}"
                                 chunks.append(chunk_id)
-                                print(f"from add_docs_unstructured, chunk_id is: {chunk_id}, modality is: {modality}, media_chunk is: {media_chunk}")
+                                #print(f"from add_docs_unstructured, chunk_id is: {chunk_id}, modality is: {modality}, media_chunk is: {media_chunk}")
 
                                 vector = s2_inference.vectorise(
                                     model_name=marqo_index.model.name,
-                                    content=[media_chunk],
+                                    content=[media_chunk['tensor']],
                                     model_properties=marqo_index.model.get_properties(),
                                     device=add_docs_params.device,
                                     normalize_embeddings=marqo_index.normalize_embeddings,
