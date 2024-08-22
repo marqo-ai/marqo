@@ -916,3 +916,25 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     config=self.config, index_name=self.index_name_1, document_id=document_id, show_vectors=False
                 )
                 self.assertEqual(expected_doc, returned_doc)
+
+    def test_add_documents_nonImageContentForAnImageField(self):
+        """Test to ensure a proper error is raised when non-image content is added to an image field"""
+        documents = [
+            {
+                "_id": "1",
+                "image_field": "this is not an image/url/path",
+                "title": "A image field with non-image content"
+            }
+        ]
+
+        r = tensor_search.add_documents(
+            config=self.config, add_docs_params=AddDocsParams(
+                index_name=self.index_name_img_no_chunking, docs=documents
+            )
+        )
+
+        self.assertEqual(True, r.errors)
+        self.assertEqual(1, r._batch_response_stats.failure_count)
+        item = r.items[0]
+        self.assertEqual(400, item.status)
+        self.assertIn("Could not find image at", item.message)

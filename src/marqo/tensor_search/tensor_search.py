@@ -659,6 +659,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 marqo_field = marqo_index.field_map.get(field)
                 tensor_field = marqo_index.tensor_field_map.get(field)
                 is_tensor_field = tensor_field is not None
+                is_image_pointer_field = marqo_field.type == FieldType.ImagePointer
                 if not marqo_field:
                     message = (f"Field {field} is not a valid field for structured index {add_docs_params.index_name}. "
                                f"Valid fields are: {', '.join(marqo_index.field_map.keys())}")
@@ -759,7 +760,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                      f"Is this a new tensor field?")
 
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
-                    if isinstance(field_content, (str, Image.Image)):
+                    if isinstance(field_content, str):
 
                         # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
@@ -770,7 +771,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
                         # 6. if chunking -> then add the extra chunker
 
-                        if isinstance(field_content, str) and not _is_image(field_content):
+                        if not is_image_pointer_field:
                             # text processing pipeline:
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
@@ -793,7 +794,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                         image_data = image_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not find image found at `{field_content}`. \n"
+                                            f"Could not find image at `{field_content}`. \n"
                                             f"Reason: {str(image_repo[field_content])}"
                                         )
                                 else:
@@ -2089,7 +2090,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                             image_data = image_repo[sub_content]
                         else:
                             raise s2_inference_errors.S2InferenceError(
-                                f"Could not find image found at `{sub_content}`. \n"
+                                f"Could not find image at `{sub_content}`. \n"
                                 f"Reason: {str(image_repo[sub_content])}"
                             )
                     else:
@@ -2242,7 +2243,7 @@ def vectorise_multimodal_combination_field_structured(
                         image_data = image_repo[sub_content]
                     else:
                         raise s2_inference_errors.S2InferenceError(
-                            f"Could not find image found at `{sub_content}`. \n"
+                            f"Could not find image at `{sub_content}`. \n"
                             f"Reason: {str(image_repo[sub_content])}"
                         )
                 else:
