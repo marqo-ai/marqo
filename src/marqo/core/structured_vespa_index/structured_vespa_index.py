@@ -659,7 +659,7 @@ class StructuredVespaIndex(VespaIndex):
 
         if marqo_query.ef_search is not None:
             target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
-            additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
+            additional_hits = marqo_query.ef_search - target_hits
         else:
             target_hits = marqo_query.limit + marqo_query.offset
             additional_hits = 0

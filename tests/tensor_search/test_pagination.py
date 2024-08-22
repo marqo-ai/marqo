@@ -131,10 +131,69 @@ class TestPagination(MarqoTestCase):
                     config=self.config,
                     index_name=index.name,
                     text='my title',
-                    result_count=400)
+                    result_count=num_docs)
 
                 # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
                 for page_size in [100, 200]:
+                    with self.subTest(f'Index: {index.type}, Search method: {search_method}, Page size: {page_size}'):
+                        paginated_search_results = {"hits": []}
+
+                        for page_num in range(math.ceil(num_docs / page_size)):
+                            lim = page_size
+                            off = page_num * page_size
+                            page_res = tensor_search.search(
+                                search_method=search_method,
+                                config=self.config,
+                                index_name=index.name,
+                                text='my title',
+                                result_count=lim, offset=off)
+
+                            paginated_search_results["hits"].extend(page_res["hits"])
+
+                        # Compare paginated to full results (length only for now)
+                        self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
+                        for i in range(len(full_search_results["hits"])):
+                            self.assertEqual(full_search_results["hits"][i]["_id"], paginated_search_results["hits"][i]["_id"])
+                            self.assertEqual(full_search_results["hits"][i]["_score"], paginated_search_results["hits"][i]["_score"])
+
+    def test_pagination_inconsistency(self):
+        num_docs = 400
+        batch_size = 100
+
+        for index in [self.index_structured, self.index_unstructured]:
+            for _ in range(0, num_docs, batch_size):
+                docs = []
+                for i in range(batch_size):
+                    title = "my title"
+                    for j in range(i):
+                        title += " ".join(self.generate_unique_strings(j))
+                    doc = {"_id": str(i),
+                           "title": title,
+                           'desc': 'my description'}
+                    docs.append(doc)
+
+                r = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(index_name=index.name,
+                                                  # Add docs with increasing title word count, so each will have unique tensor and lexical scores
+                                                  docs=docs,
+                                                  device="cpu",
+                                                  tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                  else None
+                                                  )
+                ).dict(exclude_none=True, by_alias=True)
+                self.assertFalse(r['errors'], "Errors in add documents call")
+
+            for search_method in (SearchMethod.LEXICAL, SearchMethod.TENSOR):
+                full_search_results = tensor_search.search(
+                    search_method=search_method,
+                    config=self.config,
+                    index_name=index.name,
+                    text='my title',
+                    result_count=num_docs)
+
+                # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
+                for page_size in [1, 2, 3, 5, 10]:
                     with self.subTest(f'Index: {index.type}, Search method: {search_method}, Page size: {page_size}'):
                         paginated_search_results = {"hits": []}
 
