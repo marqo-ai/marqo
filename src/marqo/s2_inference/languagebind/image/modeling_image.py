@@ -626,7 +626,6 @@ class CLIPVisionTransformer(nn.Module):
 
         if pixel_values is None:
             raise ValueError("You have to specify pixel_values")
-        print(f"from CLIPVisionTransformer: {pixel_values}")
         ######################################
         if len(pixel_values.shape) == 7:
             b_new, pair_new, T, bs_new, channel_new, h_new, w_new = pixel_values.shape

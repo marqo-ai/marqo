@@ -80,8 +80,8 @@ class MultimodalModel:
         self.model_name = model_name
         self.properties = MultimodalModelProperties(**model_properties)
         self.device = device
-        self.model = None # Seems inefficient if we also call this in def _load_model
-        self.encoder = None #get_encoder(self)
+        self.model = None 
+        self.encoder = None 
 
     def _load_multimodal_model(self):
         if self.properties.loader == "languagebind":
@@ -166,7 +166,7 @@ class LanguageBindEncoder(ModelEncoder):
     def encode(self, content, modality, **kwargs):
         inputs = {}
         print(f"from languagebind encode, modality is {modality.value}")
-        print(f"from languagebind encode, content is {content}")
+        #print(f"from languagebind encode, content is {content}")
         
         if modality == Modality.TEXT:
             print(f"from languagebind encode text, content is {content}")
@@ -201,9 +201,9 @@ class LanguageBindEncoder(ModelEncoder):
                     preprocessed_content = self.preprocessor(modality)([temp_filename], return_tensors='pt')
                     inputs[modality.value] = preprocessed_content['pixel_values']
             elif isinstance(content, list) and 'pixel_values' in content[0]:
-                inputs[modality.value] = content[0]['pixel_values']
+                inputs[modality.value] = content[0]['pixel_values']                
             else:
-                raise ValueError(f"Unsupported {modality.value} content type: {type(content)}")
+                raise ValueError(f"Unsupported {modality.value} content type: {type(content)}, content: {content}")
         
         with torch.no_grad():
             embeddings = self.model.model(inputs)
@@ -340,7 +340,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
         encoder = get_encoder(model)
         print(f"from _encode_without_cache, model: {model}")
         print(f"from _encode_without_cache, encoder: {encoder}")
-        print(f"from _encode_without_cache, content is {content}")
+        #print(f"from _encode_without_cache, content is {content}")
         print(f"from _encode_without_cache, modality: {modality}, type(modality): {type(modality)}")
         if isinstance(content, str):
             print(f"from _encode_without_cache, content is string, {content}")
@@ -570,6 +570,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         InvalidModelPropertiesError: if the model_properties are invalid
         UnknownModelError: if the model_name is not in the model registry
     """
+    print(f"validate_model_properties")
     if model_properties is not None:
         """checks model dict to see if all required keys are present
         """
@@ -590,6 +591,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                 if key not in model_properties:
                     model_properties[key] = value
         elif model_type in (ModelType.OpenCLIP, ModelType.CLIP):
+            print(f"model_type is {model_type}")
             required_keys = ["name", "dimensions"]
         elif model_type in (ModelType.HF_MODEL, ):
             required_keys = ["dimensions"]
@@ -602,7 +604,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
                             ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
             pass
-        elif model_properties.get("type") in ['languagebind', 'imagebind']:
+        elif model_type in [ModelType.LanguageBind]:
             MultimodalModelProperties(**model_properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
@@ -620,6 +622,7 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                                                   f"{marqo_docs.bring_your_own_model()} for more info")
 
     else:
+        print(f"model_properties is None, getting from registry")
         model_properties = get_model_properties_from_registry(model_name)
 
     _validate_model_properties_dimension(model_properties.get("dimensions", None))
@@ -753,7 +756,7 @@ def _load_model(
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    if model_properties.get('type') in ['languagebind', 'imagebind']:
+    if model_properties.get('type') in [ModelType.LanguageBind]:
         print(f"loading for: model_name={model_name} and properties={model_properties}")
         model = MultimodalModel(model_name, model_properties, device)
         model.model = model._load_multimodal_model()
@@ -762,12 +765,14 @@ def _load_model(
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
+    print(f"loader is {loader}")
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
     model = loader(
         model_properties.get('name', None), device=device, embedding_dim=model_properties['dimensions'],
         max_seq_length=max_sequence_length, model_properties=model_properties, model_auth=model_auth
     )
+    print(f"model is {model}")
     model.load()
     return model
 
@@ -816,6 +821,7 @@ def get_model_properties_from_registry(model_name: str) -> dict:
 
     model_properties = MODEL_PROPERTIES['models'][model_name]
 
+    print(f"validating model_properties is {model_properties}")
     validate_model_properties(model_name, model_properties)
 
     return model_properties
@@ -965,11 +971,10 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
     """
 
     model_type = model_properties['type']
-    print(f"getting model loader for model_name={model_name} and model_type={model_type}")
 
     if model_type not in MODEL_PROPERTIES['loaders']:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
-
+    
     return MODEL_PROPERTIES['loaders'][model_type]
 
 

@@ -184,7 +184,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         marqo_index=marqo_index 
                     )
                 )
-                print(f"from add_docs_unstructured, content_repo: {content_repo}")
 
         if add_docs_params.use_existing_tensors:
             existing_docs_dict: Dict[str, dict] = {}
@@ -532,6 +531,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         
                         if field_content:  # Check if the subfields are present
                             modality = infer_modality(field_content)
+                            print(f"from vectorise_multimodal_combination_field_unstructured, modality is {modality}")
+                            print(f"from vectorise_multimodal_combination_field_unstructured, field_content is {field_content}")
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                             unsuccessful_doc_to_append,
                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
@@ -539,7 +540,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 field_content, i, doc_id, add_docs_params.device, marqo_index,
                                 content_repo, multimodal_params, model_auth=add_docs_params.model_auth,
                                 text_chunk_prefix=text_chunk_prefix,
-                                modality=modality
                                 )
 
                             total_vectorise_time = total_vectorise_time + combo_vectorise_time_to_add
@@ -855,7 +855,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     modality=Modality.VIDEO if marqo_field.type == FieldType.VideoPointer else Modality.AUDIO
                                 )
                                 embeddings.extend(vector)  # vectorise returns a list of vectors
-                                print(f"from tensor_search add_documents_structured, embeddings is {embeddings}")
+                                #print(f"from tensor_search add_documents_structured, embeddings is {embeddings}")
                                 
                         except Exception as e:
                             document_is_valid = False
@@ -2183,6 +2183,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
             index properties
 
     '''
+
     combo_document_is_valid = True
     combo_vectorise_time_to_add = 0
     combo_chunk = {}
@@ -2212,9 +2213,9 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_content_to_vectorise = list(field_content.values())
     else:
         for sub_field_name, sub_content in field_content.items():
-            if modality is None:
-                modality = infer_modality(sub_content)
-            if isinstance(sub_content, str) and not _is_image(sub_content):
+            modality = infer_modality(sub_content)
+
+            if isinstance(sub_content, str) and modality == Modality.TEXT:
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
             else:
@@ -2234,10 +2235,10 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                         image_content_to_vectorise.append(media_data)
                         image_field_names.append(sub_field_name)
                     elif modality == Modality.VIDEO:
-                        video_content_to_vectorise.append(media_data)
+                        video_content_to_vectorise.append(media_data[0]['tensor'])
                         video_field_names.append(sub_field_name)
                     elif modality == Modality.AUDIO:
-                        audio_content_to_vectorise.append(media_data)
+                        audio_content_to_vectorise.append(media_data[0]['tensor'])
                         audio_field_names.append(sub_field_name)
 
                 except s2_inference_errors.S2InferenceError as e:
@@ -2288,7 +2289,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                 for video_field, video_content in zip(video_field_names, video_content_to_vectorise):
                     video_vectors = s2_inference.vectorise(
                         model_name=marqo_index.model.name,
-                        model_properties=marqo_index.model.properties, content=video_content,
+                        model_properties=marqo_index.model.properties, content=[video_content],
                         device=device, normalize_embeddings=normalize_embeddings,
                         infer=True, model_auth=model_auth, modality=Modality.VIDEO
                     )
@@ -2300,7 +2301,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                 for audio_field, audio_content in zip(audio_field_names, audio_content_to_vectorise):
                     audio_vectors = s2_inference.vectorise(
                         model_name=marqo_index.model.name,
-                        model_properties=marqo_index.model.properties, content=audio_content,
+                        model_properties=marqo_index.model.properties, content=[audio_content],
                         device=device, normalize_embeddings=normalize_embeddings,
                         infer=True, model_auth=model_auth, modality=Modality.AUDIO
                     )
@@ -2327,10 +2328,8 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                 code=errors.InvalidArgError.code
             )
         )
-
-
         return combo_chunk, combo_embeddings, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
-
+    
     if not len(sub_field_name_list) == len(vectors_list):
         raise errors.BatchInferenceSizeError(
             message=f"Batch inference size does not match content for multimodal field {field}")
@@ -2418,7 +2417,7 @@ def vectorise_multimodal_combination_field_structured(
                         image_field_names.append(sub_field_name)
                     elif sub_field_name in video_fields:
                         if not isinstance(content_repo[sub_content], Exception):
-                            video_data = content_repo[sub_content]
+                            video_data = content_repo[sub_content][0]['tensor']
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not find video at `{sub_content}`. \n"
@@ -2428,7 +2427,7 @@ def vectorise_multimodal_combination_field_structured(
                         video_field_names.append(sub_field_name)
                     elif sub_field_name in audio_fields:
                         if not isinstance(content_repo[sub_content], Exception):
-                            audio_data = content_repo[sub_content]
+                            audio_data = content_repo[sub_content][0]['tensor']
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not find audio at `{sub_content}`. \n"
@@ -2446,10 +2445,10 @@ def vectorise_multimodal_combination_field_structured(
                         image_content_to_vectorise.append(sub_content)
                         image_field_names.append(sub_field_name)
                     elif sub_field_name in video_fields:
-                        video_content_to_vectorise.append(sub_content)
+                        video_content_to_vectorise.append(sub_content[0]['tensor'])
                         video_field_names.append(sub_field_name)
                     elif sub_field_name in audio_fields:
-                        audio_content_to_vectorise.append(sub_content)
+                        audio_content_to_vectorise.append(sub_content[0]['tensor'])
                         audio_field_names.append(sub_field_name)
                     else:
                         raise s2_inference_errors.S2InferenceError(
@@ -2510,34 +2509,28 @@ def vectorise_multimodal_combination_field_structured(
         # Process video content
         if video_content_to_vectorise:
             with RequestMetricsStore.for_request().time("create_vectors.video"):
-                video_vectors = s2_inference.vectorise(
-                    model_name=marqo_index.model.name,
-                    model_properties=marqo_index.model.get_properties(),
-                    content=video_content_to_vectorise,
-                    device=device,
-                    normalize_embeddings=normalize_embeddings,
-                    infer=True,
-                    model_auth=model_auth,
-                    modality=Modality.VIDEO
-                )
-                vectors_list.extend(video_vectors)
-                sub_field_name_list.extend(video_field_names)
+                for video_field, video_content in zip(video_field_names, video_content_to_vectorise):
+                    video_vectors = s2_inference.vectorise(
+                        model_name=marqo_index.model.name,
+                        model_properties=marqo_index.model.properties, content=[video_content],
+                        device=device, normalize_embeddings=normalize_embeddings,
+                        infer=True, model_auth=model_auth, modality=Modality.VIDEO
+                    )
+                    vectors_list.extend(video_vectors)
+                    sub_field_name_list.extend([video_field] * len(video_vectors))
 
         # Process audio content
         if audio_content_to_vectorise:
-            with RequestMetricsStore.for_request().time("create_vectors.audio"):
-                audio_vectors = s2_inference.vectorise(
-                    model_name=marqo_index.model.name,
-                    model_properties=marqo_index.model.get_properties(),
-                    content=audio_content_to_vectorise,
-                    device=device,
-                    normalize_embeddings=normalize_embeddings,
-                    infer=True,
-                    model_auth=model_auth,
-                    modality=Modality.AUDIO
-                )
-                vectors_list.extend(audio_vectors)
-                sub_field_name_list.extend(audio_field_names)
+            with RequestMetricsStore.for_request().time(f"create_vectors.audio"):
+                for audio_field, audio_content in zip(audio_field_names, audio_content_to_vectorise):
+                    audio_vectors = s2_inference.vectorise(
+                        model_name=marqo_index.model.name,
+                        model_properties=marqo_index.model.properties, content=[audio_content],
+                        device=device, normalize_embeddings=normalize_embeddings,
+                        infer=True, model_auth=model_auth, modality=Modality.AUDIO
+                    )
+                    vectors_list.extend(audio_vectors)
+                    sub_field_name_list.extend([audio_field] * len(audio_vectors))
 
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
@@ -2563,6 +2556,8 @@ def vectorise_multimodal_combination_field_structured(
         )
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
+    print(f"len(sub_field_name_list) {len(sub_field_name_list)}")
+    print(f"len(vectors_list) {len(vectors_list)}")
     if not len(sub_field_name_list) == len(vectors_list):
         raise api_exceptions.BatchInferenceSizeError(
             message=f"Batch inference size does not match content for multimodal field {field}"

@@ -43,7 +43,7 @@ class Recommender:
         Args:
             index_name: Name of the index to search
             documents: A list of document IDs or a dictionary where the keys are document IDs and the values are weights
-            tensor_fields: List of tensor fields to use for recommendation
+            tensor_fields: List of tensor fields to use for recommendation (can include text, image, audio, and video fields)
             interpolation_method: Interpolation method to use for combining vectors
             exclude_input_documents: Whether to exclude the input documents from the search results
             result_count: Number of results to return
