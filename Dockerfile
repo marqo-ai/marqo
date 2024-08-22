@@ -1,12 +1,12 @@
 # Stage 1: Build the Java package using Maven
-FROM maven:3.8.7-openjdk-18-slim as maven_build
+FROM maven:3.8.7-openjdk-18-slim AS maven_build
 
 WORKDIR /app/vespa
 COPY vespa .
 RUN mvn clean package
 
 # Stage 2: Base image for Python setup
-FROM 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-base:yihan-almalinux-vespa-8.396.18 as base_image
+FROM 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-base:yihan-vespa-8.396.18 AS base_image
 
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var
@@ -14,7 +14,7 @@ VOLUME /opt/vespa/var
 VOLUME /opt/vespa/logs
 # This is required when mounting var folder from an older version of vespa (>30 minor version gap)
 # See https://docs.vespa.ai/en/operations-selfhosted/live-upgrade.html for details
-ENV VESPA_SKIP_UPGRADE_CHECK true
+ENV VESPA_SKIP_UPGRADE_CHECK=true
 
 ARG TARGETPLATFORM
 ARG COMMITHASH
@@ -32,7 +32,7 @@ COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
 
-ENV PYTHONPATH "${PYTHONPATH}:/app"
+ENV PYTHONPATH="${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
 RUN echo $COMMITHASH > build_info.txt
 CMD ["./run_marqo.sh"]
