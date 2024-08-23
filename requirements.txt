@@ -22,7 +22,7 @@ pycurl==7.45.3
 certifi==2019.11.28
 transformers==4.31.0 # Consider 4.31.0 for _expand_mask
 optimum==1.20.0
-protobuf==5.27.2
+protobuf==3.20.0
 
 
 # LanguageBind
