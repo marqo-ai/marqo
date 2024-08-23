@@ -184,11 +184,22 @@ class StreamingMediaProcessor:
         self.preprocessor = self.preprocessors[modality]
         
         if modality == Modality.VIDEO:
-            self.split_length = marqo_index.video_preprocessing.split_length
-            self.split_overlap = marqo_index.video_preprocessing.split_overlap
+            video_preprocessing = marqo_index.video_preprocessing
+            if video_preprocessing is not None:
+                self.split_length = marqo_index.video_preprocessing.split_length
+                self.split_overlap = marqo_index.video_preprocessing.split_overlap
+            else:
+                self.split_length = 20
+                self.split_overlap = 3
+
         elif modality == Modality.AUDIO:
-            self.split_length = marqo_index.audio_preprocessing.split_length
-            self.split_overlap = marqo_index.audio_preprocessing.split_overlap
+            audio_preprocessing = marqo_index.audio_preprocessing
+            if audio_preprocessing is not None:
+                self.split_length = marqo_index.audio_preprocessing.split_length
+                self.split_overlap = marqo_index.audio_preprocessing.split_overlap
+            else:
+                self.split_length = 20
+                self.split_overlap = 3
         else:
             raise ValueError(f"Unsupported modality: {modality}")
         

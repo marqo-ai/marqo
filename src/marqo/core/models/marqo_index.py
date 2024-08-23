@@ -259,14 +259,8 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     normalize_embeddings: bool
     text_preprocessing: TextPreProcessing
     image_preprocessing: ImagePreProcessing
-    video_preprocessing: Optional[VideoPreProcessing] = VideoPreProcessing(
-        splitLength=20,
-        splitOverlap=5
-    )
-    audio_preprocessing: Optional[AudioPreProcessing] = AudioPreProcessing(
-        splitLength=20,
-        splitOverlap=5
-    )
+    video_preprocessing: Optional[VideoPreProcessing] = None
+    audio_preprocessing: Optional[AudioPreProcessing] = None
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
