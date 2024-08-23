@@ -259,8 +259,8 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     normalize_embeddings: bool
     text_preprocessing: TextPreProcessing
     image_preprocessing: ImagePreProcessing
-    video_preprocessing: VideoPreProcessing
-    audio_preprocessing: AudioPreProcessing
+    video_preprocessing: Optional[VideoPreProcessing] = None
+    audio_preprocessing: Optional[AudioPreProcessing] = None
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
@@ -335,7 +335,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
-    treat_urls_and_pointers_as_media: bool
+    treat_urls_and_pointers_as_media: Optional[bool] = None
     filter_string_max_length: int
 
     def __init__(self, **data):
