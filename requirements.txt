@@ -20,7 +20,7 @@ readerwriterlock==1.0.9
 kazoo==2.10.0
 pycurl==7.45.3
 certifi==2019.11.28
-transformers==4.41.2
+transformers==4.31.0 # Consider 4.31.0 for _expand_mask
 optimum==1.20.0
 protobuf==5.27.2
 
