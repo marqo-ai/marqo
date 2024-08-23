@@ -82,6 +82,7 @@ class MultimodalModel:
         self.device = device
         self.model = None 
         self.encoder = None 
+        print(f"self.device: {self.device}")
 
     def _load_multimodal_model(self):
         if self.properties.loader == "languagebind":
@@ -219,7 +220,6 @@ class LanguageBindEncoder(ModelEncoder):
 
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
-        print(f"infer_modality, content is string")
         extension = content.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif']:
             print(f"infer_modality, content is image")
