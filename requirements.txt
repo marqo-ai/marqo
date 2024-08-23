@@ -22,10 +22,12 @@ pycurl==7.45.3
 certifi==2019.11.28
 transformers==4.41.2
 optimum==1.20.0
-protobuf==5.27.2
+protobuf==3.20.1
 
 
 # LanguageBind
+torch==1.13.1
+
 accelerate==0.20.3
 datasets==2.13.0
 decord==0.6.0 # ERROR: Could not find a version that satisfies the requirement decord==0.6.0 (from versions: none)
