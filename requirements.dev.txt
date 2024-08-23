@@ -86,5 +86,4 @@ webdataset==0.2.48
 SoundFile
 
 
-ffmpeg
 librosa

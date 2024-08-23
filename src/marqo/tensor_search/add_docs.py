@@ -13,7 +13,6 @@ import torch
 import tempfile
 import io
 import scipy.io.wavfile
-import ffmpeg
 import os
 import subprocess
 from urllib.parse import urlparse
