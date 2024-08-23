@@ -152,3 +152,4 @@ dump.rdb
 scripts/vespa_local/vespa_tester_app.zip
 
 src/marqo/tensor_search/cache_dir/*
+tests/tensor_search/integ_tests/cache_dir/*

@@ -68,6 +68,12 @@ class TestEmbed(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
+        unstructured_languagebind_index = cls.unstructured_marqo_index_request(
+            model=Model(name='LanguageBind'),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True
+        )
+
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
             model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
@@ -120,15 +126,27 @@ class TestEmbed(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
         )
 
+        structured_languagebind_index = cls.structured_marqo_index_request(
+            model=Model(name='LanguageBind'),
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text),
+                FieldRequest(name="text_field_2", type=FieldType.Text),
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer)
+            ],
+            tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
             unstructured_image_index_with_random_model,
             unstructured_image_index_with_test_prefix,
+            unstructured_languagebind_index,
             structured_default_text_index,
             structured_default_image_index,
             structured_image_index_with_random_model,
-            structured_image_index_with_test_prefix
+            structured_image_index_with_test_prefix,
+            structured_languagebind_index
         ])
 
         # Assign to objects so they can be used in tests
@@ -136,10 +154,12 @@ class TestEmbed(MarqoTestCase):
         cls.unstructured_default_image_index = cls.indexes[1]
         cls.unstructured_image_index_with_random_model = cls.indexes[2]
         cls.unstructured_image_index_with_test_prefix = cls.indexes[3]
-        cls.structured_default_text_index = cls.indexes[4]
-        cls.structured_default_image_index = cls.indexes[5]
-        cls.structured_image_index_with_random_model = cls.indexes[6]
-        cls.structured_image_index_with_test_prefix = cls.indexes[7]
+        cls.unstructured_languagebind_index = cls.indexes[4]
+        cls.structured_default_text_index = cls.indexes[5]
+        cls.structured_default_image_index = cls.indexes[6]
+        cls.structured_image_index_with_random_model = cls.indexes[7]
+        cls.structured_image_index_with_test_prefix = cls.indexes[8]
+        cls.structured_languagebind_index = cls.indexes[9]
 
     def setUp(self) -> None:
         super().setUp()
@@ -189,6 +209,36 @@ class TestEmbed(MarqoTestCase):
                         self.assertEqual(embed_res["content"], ["This is a test document"])
                         self.assertIsInstance(embed_res["embeddings"][0], list)
                         self.assertEqual(embed_res["embeddings"][0], [0.1, 0.2, 0.3])
+
+    def test_embed_languagebind(self):
+        content = [
+            #"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", # image
+            "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4" # video
+        ]
+        for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
+            with self.subTest(index=index.type):
+                embed_res = embed(
+                                marqo_config=self.config,
+                                index_name=index.name,
+                                embedding_request=EmbedRequest(
+                                    content=content
+                                ),
+                                device=None
+                            )
+                print(embed_res)
+                print(embed_res['embeddings'][0][:7])
+                expected = [
+                    2.0929973125457764, 3.6705381870269775, -0.26776817440986633,
+                    4.294264793395996, -0.9778770804405212, 4.2242279052734375, 0.00010000000000000001
+                ]
+                actual = embed_res['embeddings'][0][:7]
+                
+                for a, e in zip(actual, expected):
+                    self.assertAlmostEqual(a, e, delta=1.5)
+                
+                print(f"Actual: {actual}")
+                print(f"Expected: {expected}")
+
 
     def test_embed_equivalent_to_add_docs(self):
         """

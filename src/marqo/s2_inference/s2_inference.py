@@ -187,11 +187,12 @@ class LanguageBindEncoder(ModelEncoder):
                     return self.encode([content], modality=Modality.TEXT)
                 
                 preprocessed_image = self.preprocessor(Modality.IMAGE)([temp_filename], return_tensors='pt')
+                print(f"preprocessed_image: {preprocessed_image}")
+                print(f"preprocessed_image['pixel_values'].shape: {preprocessed_image['pixel_values'].shape}")
                 inputs['image'] = to_device(preprocessed_image, self.model.device)['pixel_values']
 
         elif modality in [Modality.AUDIO, Modality.VIDEO]:
             if isinstance(content, str) and "http" in content:
-                # If we are only given a url
                 suffix = ".mp4" if modality == Modality.VIDEO else ".wav"
                 with self._temp_file(suffix) as temp_filename:
                     self._download_content(content, temp_filename)
@@ -200,7 +201,9 @@ class LanguageBindEncoder(ModelEncoder):
 
             elif isinstance(content, list) and 'pixel_values' in content[0]:
                 # If media has already been preprocessed
-                inputs[modality.value] = to_device(content[0], self.model.device)['pixel_values']     
+                inputs[modality.value] = to_device(content[0], self.model.device)['pixel_values']
+            elif isinstance(content[0], str) and 'http' in content[0]:
+                return self.encode(content[0], modality=modality)
             else:
                 raise ValueError(f"Unsupported {modality.value} content type: {type(content)}, content: {content}")
         

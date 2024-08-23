@@ -307,7 +307,8 @@ class StreamingMediaProcessor:
                         processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
                     else:  # AUDIO
                         processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
-
+                    print(f"processed_chunk_tensor: {processed_chunk_tensor}")
+                    print(f"len(processed_chunk_tensor['pixel_values'].shape): {processed_chunk_tensor['pixel_values'].shape}")
                     processed_chunk = {
                         'tensor': processed_chunk_tensor,
                         'start_time': chunk_start,
