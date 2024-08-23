@@ -2213,9 +2213,11 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         text_content_to_vectorise = list(field_content.values())
     else:
         for sub_field_name, sub_content in field_content.items():
+            print(f"sub_field_name: {sub_field_name}, sub_content: {sub_content}")
             modality = infer_modality(sub_content)
 
             if isinstance(sub_content, str) and modality == Modality.TEXT:
+                print(f"sub_content is a string and modality is TEXT")
                 text_field_names.append(sub_field_name)
                 text_content_to_vectorise.append(sub_content)
             else:
@@ -2259,6 +2261,11 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         start_time = timer()
         vectors_list = []
         sub_field_name_list = []
+
+        print(f"text_content_to_vectorise: {text_content_to_vectorise}")
+        print(f"image_content_to_vectorise: {image_content_to_vectorise}")
+        print(f"video_content_to_vectorise: {video_content_to_vectorise}")
+        print(f"audio_content_to_vectorise: {audio_content_to_vectorise}")
 
         if len(text_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors.text"):
