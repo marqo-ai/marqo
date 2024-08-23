@@ -185,6 +185,7 @@ class StreamingMediaProcessor:
         
         if modality == Modality.VIDEO:
             video_preprocessing = marqo_index.video_preprocessing
+            print(f"video_preprocessing: {video_preprocessing}")
             if video_preprocessing is not None:
                 self.split_length = marqo_index.video_preprocessing.split_length
                 self.split_overlap = marqo_index.video_preprocessing.split_overlap
@@ -194,6 +195,7 @@ class StreamingMediaProcessor:
 
         elif modality == Modality.AUDIO:
             audio_preprocessing = marqo_index.audio_preprocessing
+            print(f"audio_preprocessing: {audio_preprocessing}")
             if audio_preprocessing is not None:
                 self.split_length = marqo_index.audio_preprocessing.split_length
                 self.split_overlap = marqo_index.audio_preprocessing.split_overlap
