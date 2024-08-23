@@ -211,7 +211,10 @@ def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
     Returns:
         The VespaIndex implementation for the given MarqoIndex
     """
-    if isinstance(marqo_index, StructuredMarqoIndex):
+    if isinstance(marqo_index, SemiStructuredMarqoIndex):
+        from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+        return SemiStructuredVespaIndex(marqo_index)
+    elif isinstance(marqo_index, StructuredMarqoIndex):
         from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
         return StructuredVespaIndex(marqo_index)
     elif isinstance(marqo_index, UnstructuredMarqoIndex):

@@ -105,3 +105,6 @@ class StructuredMarqoIndexRequest(MarqoIndexRequest):
         return values
 
 
+class SemiStructuredMarqoIndexRequest(StructuredMarqoIndexRequest):
+    treat_urls_and_pointers_as_images: bool
+    filter_string_max_length: int

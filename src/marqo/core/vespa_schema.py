@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from marqo.core import constants
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest, StructuredMarqoIndexRequest, \
-    UnstructuredMarqoIndexRequest
+    UnstructuredMarqoIndexRequest, SemiStructuredMarqoIndexRequest
 
 from marqo.core.models.marqo_index import *
 
@@ -87,7 +87,10 @@ def for_marqo_index_request(marqo_index_request: MarqoIndexRequest):
     Returns:
         The VespaSchema implementation for the given MarqoIndexRequest
     """
-    if isinstance(marqo_index_request, StructuredMarqoIndexRequest):
+    if isinstance(marqo_index_request, SemiStructuredMarqoIndexRequest):
+        from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+        return SemiStructuredVespaSchema(marqo_index_request)
+    elif isinstance(marqo_index_request, StructuredMarqoIndexRequest):
         from marqo.core.structured_vespa_index.structured_vespa_schema import StructuredVespaSchema
         return StructuredVespaSchema(marqo_index_request)
     elif isinstance(marqo_index_request, UnstructuredMarqoIndexRequest):

@@ -8,7 +8,7 @@ import marqo.core.models.marqo_index as core
 from marqo import version, marqo_docs
 from marqo.base_model import StrictBaseModel
 from marqo.core.models.marqo_index_request import FieldRequest, MarqoIndexRequest, StructuredMarqoIndexRequest, \
-    UnstructuredMarqoIndexRequest
+    UnstructuredMarqoIndexRequest, SemiStructuredMarqoIndexRequest
 
 
 class AnnParameters(StrictBaseModel):
@@ -17,7 +17,7 @@ class AnnParameters(StrictBaseModel):
 
 
 class IndexSettings(StrictBaseModel):
-    type: core.IndexType = core.IndexType.Unstructured
+    type: core.IndexType = core.IndexType.SemiStructured
     allFields: Optional[List[FieldRequest]]
     tensorFields: Optional[List[str]]
     treatUrlsAndPointersAsImages: Optional[bool]
@@ -197,6 +197,51 @@ class IndexSettings(StrictBaseModel):
                 created_at=time.time(),
                 updated_at=time.time()
             )
+        elif self.type == core.IndexType.SemiStructured:
+            marqo_fields = []
+            if self.allFields:
+                marqo_fields = [
+                    FieldRequest(
+                        name=field.name,
+                        type=field.type,
+                        features=field.features,
+                        dependent_fields=field.dependent_fields
+                    ) for field in self.allFields
+                ]
+
+            if self.treatUrlsAndPointersAsImages is None:
+                # Default value for treat_urls_and_pointers_as_images is False, but we can't set it in the model
+                # as it is not a valid parameter for structured indexes
+                self.treatUrlsAndPointersAsImages = False
+
+            if self.filterStringMaxLength is None:
+                # Default value for filter_string_max_length is 20, but we can't set it in the model
+                # as it is not a valid parameter for structured indexes
+                self.filterStringMaxLength = 50
+
+            return SemiStructuredMarqoIndexRequest(
+                name=index_name,
+                model=core.Model(
+                    name=self.model,
+                    properties=self.modelProperties,
+                    custom=self.modelProperties is not None,
+                    text_query_prefix=self.textQueryPrefix,
+                    text_chunk_prefix=self.textChunkPrefix
+                ),
+                normalize_embeddings=self.normalizeEmbeddings,
+                text_preprocessing=self.textPreprocessing,
+                image_preprocessing=self.imagePreprocessing,
+                distance_metric=self.annParameters.spaceType,
+                vector_numeric_type=self.vectorNumericType,
+                hnsw_config=self.annParameters.parameters,
+                treat_urls_and_pointers_as_images=self.treatUrlsAndPointersAsImages,
+                filter_string_max_length=self.filterStringMaxLength,
+                marqo_version=version.get_version(),
+                created_at=time.time(),
+                updated_at=time.time(),
+                tensor_fields=self.tensorFields or [],
+                fields=marqo_fields,
+            )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {self.type}")
 
@@ -240,6 +285,31 @@ class IndexSettings(StrictBaseModel):
                 imagePreprocessing=marqo_index.image_preprocessing,
                 videoPreprocessing=marqo_index.video_preprocessing,
                 audioPreprocessing=marqo_index.audio_preprocessing,
+                vectorNumericType=marqo_index.vector_numeric_type,
+                annParameters=AnnParameters(
+                    spaceType=marqo_index.distance_metric,
+                    parameters=marqo_index.hnsw_config
+                )
+            )
+        elif isinstance(marqo_index, core.SemiStructuredMarqoIndex):
+            return cls(
+                type=marqo_index.type,
+                allFields=[
+                    FieldRequest(
+                        name=field.name,
+                        type=field.type,
+                        features=field.features,
+                        dependent_fields=field.dependent_fields
+                    ) for field in marqo_index.fields
+                ],
+                tensorFields=[field.name for field in marqo_index.tensor_fields],
+                treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
+                filterStringMaxLength=marqo_index.filter_string_max_length,
+                model=marqo_index.model.name,
+                modelProperties=marqo_index.model.properties,
+                normalizeEmbeddings=marqo_index.normalize_embeddings,
+                textPreprocessing=marqo_index.text_preprocessing,
+                imagePreprocessing=marqo_index.image_preprocessing,
                 vectorNumericType=marqo_index.vector_numeric_type,
                 annParameters=AnnParameters(
                     spaceType=marqo_index.distance_metric,

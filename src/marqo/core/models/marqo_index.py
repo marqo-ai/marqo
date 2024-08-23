@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 class IndexType(Enum):
     Structured = 'structured'
     Unstructured = 'unstructured'
+    SemiStructured = 'semistructured'
 
 
 class FieldType(str, Enum):
@@ -305,7 +306,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
         return name
 
     @classmethod
-    def parse_obj(cls, obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
+    def parse_obj(cls, obj: Any) -> 'MarqoIndex':
         obj = cls._enforce_dict_if_root(obj)
         if not isinstance(obj, dict):
             try:
@@ -319,6 +320,8 @@ class MarqoIndex(ImmutableBaseModel, ABC):
                 return StructuredMarqoIndex(**obj)
             elif obj['type'] == IndexType.Unstructured.value:
                 return UnstructuredMarqoIndex(**obj)
+            elif obj['type'] == IndexType.SemiStructured.value:
+                return SemiStructuredMarqoIndex(**obj)
             else:
                 raise ValidationError(f"Invalid index type {obj['type']}")
 
@@ -492,6 +495,19 @@ class StructuredMarqoIndex(MarqoIndex):
                                   lambda: {dependent_field for field in self.fields if field.dependent_fields
                                            for dependent_field in field.dependent_fields.keys()}
                                   )
+
+
+class SemiStructuredMarqoIndex(StructuredMarqoIndex):
+    type: IndexType = IndexType.SemiStructured
+    treat_urls_and_pointers_as_images: bool
+    filter_string_max_length: int
+
+    def __init__(self, **data):
+        super().__init__(**data)
+
+    @classmethod
+    def _valid_type(cls) -> IndexType:
+        return IndexType.SemiStructured
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']
