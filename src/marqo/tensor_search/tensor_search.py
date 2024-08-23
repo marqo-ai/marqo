@@ -2234,12 +2234,15 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                         media_data = sub_content
 
                     if modality == Modality.IMAGE:
+                        print(f"adding image data to image_content_to_vectorise")
                         image_content_to_vectorise.append(media_data)
                         image_field_names.append(sub_field_name)
                     elif modality == Modality.VIDEO:
+                        print(f"adding video data to video_content_to_vectorise")
                         video_content_to_vectorise.append(media_data[0]['tensor'])
                         video_field_names.append(sub_field_name)
                     elif modality == Modality.AUDIO:
+                        print(f"adding audio data to audio_content_to_vectorise")
                         audio_content_to_vectorise.append(media_data[0]['tensor'])
                         audio_field_names.append(sub_field_name)
 
