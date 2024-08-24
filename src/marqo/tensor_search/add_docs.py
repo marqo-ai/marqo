@@ -23,6 +23,8 @@ import librosa
 import shlex
 import certifi
 import time
+import ffmpeg
+import requests
 
 import numpy as np
 import av # add PyAV to requirements
@@ -46,7 +48,6 @@ from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 from marqo.s2_inference.models.model_type import ModelType
 
 logger = logging.getLogger(__name__)
-
 
 class MemoryPool:
     def __init__(self, total_size: int, chunk_size: int):
@@ -211,7 +212,7 @@ class StreamingMediaProcessor:
         print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
         print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
 
-        self.chunk_size = self.estimate_chunk_size()
+        self.chunk_size = None #self.estimate_chunk_size()
 
         print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
         print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
@@ -220,66 +221,69 @@ class StreamingMediaProcessor:
     def fetch_file_metadata(self):
         start_time = time.time()
         print(f"Starting fetch_file_metadata for URL: {self.url}")
-
-        headers = {}
-        def header_function(header_line):
-            header_line = header_line.decode('iso-8859-1')
-            if ':' not in header_line:
-                return
-            name, value = header_line.split(':', 1)
-            headers[name.strip().lower()] = value.strip()
-
-        c = pycurl.Curl()
-        c.setopt(c.URL, self.url)
-        c.setopt(c.NOBODY, True)
-        c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
-        c.setopt(c.HEADERFUNCTION, header_function)
-        c.setopt(c.CAINFO, certifi.where())
         
-        try:
-            c.perform()
-            size = int(c.getinfo(c.CONTENT_LENGTH_DOWNLOAD))
-            
-            # Try to get duration from headers
-            duration = None
-            if 'x-duration' in headers:
-                duration = float(headers['x-duration'])
-                print(f"from StreamingMediaProcessor, got duration from header: {duration}")
+        parsed_url = urlparse(self.url)
+        is_local_file = parsed_url.scheme == '' or parsed_url.scheme == 'file'
 
-            # If duration is not in headers, use ffprobe with a timeout
-            if duration is None:
-                ffprobe_cmd = f'ffprobe -v quiet -print_format json -show_format -show_streams "{self.url}"'
-                try:
-                    result = subprocess.run(shlex.split(ffprobe_cmd), capture_output=True, text=True, timeout=5)
-                    metadata = json.loads(result.stdout)
+        if not is_local_file:
+            try:
+                # First, try a HEAD request to get content length
+                head_response = requests.head(self.url, headers=self.headers, timeout=5)
+                size = int(head_response.headers.get('Content-Length', 0))
+                print(f"from StreamingMediaProcessor, size: {size}")
+                
+                # If we got the size, try to get duration from partial content
+                if size > 0:
+                    range_header = {'Range': 'bytes=0-262143'}  # Request first 256KB
+                    headers = {**self.headers, **range_header}
+                    partial_response = requests.get(self.url, headers=headers, stream=True, timeout=5)
+                    print(f"from StreamingMediaProcessor, partial_response: {partial_response}")
                     
-                    if 'format' in metadata and 'duration' in metadata['format']:
-                        duration = float(metadata['format']['duration'])
-                        print(f"from StreamingMediaProcessor, got duration from ffprobe: {duration}")
-                except subprocess.TimeoutExpired:
-                    logger.warning("ffprobe timed out, falling back to estimation")
-                except (subprocess.SubprocessError, json.JSONDecodeError) as e:
-                    logger.warning(f"Error running ffprobe: {e}, falling back to estimation")
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as temp_file:
+                        for chunk in partial_response.iter_content(chunk_size=8192):
+                            if chunk:
+                                temp_file.write(chunk)
+                        temp_file_path = temp_file.name
 
+                    # Use ffprobe on the partial content
+                    probe = ffmpeg.probe(temp_file_path, v='error', show_entries='format=duration', of='json')
+                    duration = float(probe['format']['duration'])
+                    print(f"from StreamingMediaProcessor, duration: {duration}")
+                    
+                    os.unlink(temp_file_path)
+                    
+                    end_time = time.time()
+                    print(f"fetch_file_metadata using http completed in {(end_time - start_time) * 1000:.2f} ms")
+                    return size, duration
+
+            except Exception as e:
+                print(f"Error fetching metadata via HTTP: {str(e)}. Falling back to ffprobe.")
+
+        # If the above methods fail or it's a local file, fall back to ffprobe
+        try:
+            probe_options = {
+                'v': 'error',
+                'show_entries': 'format=size,duration',
+                'of': 'json',
+            }
+
+            if not is_local_file:
+                probe_options['probesize'] = '16K'  # Probe only first 16K for remote files
+
+            probe = ffmpeg.probe(self.url, **probe_options)
             
-            # If duration is not in headers, estimate it based on file size
-            if duration is None:
-                if self.modality == Modality.AUDIO:
-                    # Assume 128 kbps bitrate for audio
-                    duration = size / (128 * 1024 / 8)
-                else:  # VIDEO
-                    duration = size / (1024 * 1024)  # Assume 8 Mbps for video
-                    print(f"from StreamingMediaProcessor, got duration from estimate: {duration}")
+            size = int(probe['format'].get('size', 0))
+            duration = float(probe['format'].get('duration', 0))
+
+            print(f"from StreamingMediaProcessor, got duration: {duration}, size: {size} bytes")
 
             end_time = time.time()
-            print(f"fetch_file_metadata completed in {(end_time - start_time) * 1000:.2f} ms")
+            print(f"fetch_file_metadata using ffprobe completed in {(end_time - start_time) * 1000:.2f} ms")
             return size, duration
         
-        except pycurl.error as e:
-            logger.error(f"Error fetching metadata: {e}")
+        except ffmpeg.Error as e:
+            logger.error(f"Error fetching metadata: {e.stderr.decode()}")
             raise
-        finally:
-            c.close()        
 
     def estimate_chunk_size(self):
         if self.duration:
@@ -310,7 +314,16 @@ class StreamingMediaProcessor:
                 ]
                 
                 try:
-                    subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+                    # Use ffmpeg-python to process the chunk
+                    stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
+                    
+                    if self.modality == Modality.VIDEO:
+                        stream = ffmpeg.output(stream, output_file, vcodec='libx264', acodec='aac', **{'f': 'mp4'})
+                    else:  # AUDIO
+                        stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
+                    
+                    ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+                    
                     
                     if self.modality == Modality.VIDEO:
                         processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')

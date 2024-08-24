@@ -62,6 +62,12 @@ jobs:
           repository: marqo-ai/marqo-base
           path: marqo-base
 
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version  # Verify installation
+
       - name: Install dependencies
         run: |
           pip install -r marqo-base/requirements.txt
