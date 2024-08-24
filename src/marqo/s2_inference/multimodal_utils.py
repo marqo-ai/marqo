@@ -154,7 +154,7 @@ class LanguageBindEncoder(ModelEncoder):
 
     def _get_tokenizer(self): # this is used for text only
         pretrained_ckpt = f'lb203/LanguageBind_Image'
-        return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{self.model.properties.cache_dir}/tokenizer_cache_dir')
+        return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
     
     def preprocessor(self, modality):
         preprocessors = {
