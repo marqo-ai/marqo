@@ -324,6 +324,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     if video_audio_check:
                         print(f"from add_docs_unstructured, modality is: {modality}, field_content is: {field_content}")
                         try:
+                            # Check for UnsupportedModalityError in content_repo
+                            if isinstance(content_repo[field_content], s2_inference_errors.S2InferenceError):
+                                print(f"from add_docs_unstructured, content_repo[field_content] is Invalid: {content_repo[field_content]}")
+                                raise content_repo[field_content]
+                                
                             media_chunks = content_repo[field_content]
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 chunk_start = media_chunk['start_time']
@@ -835,8 +840,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         print(f"from tensor_search add_documents_structured, marqo_field.type is {marqo_field.type}")
                         try:
                             media_chunks = content_repo[field_content]
-                            print(f"from add_docs_structured, media_chunks count is {len(media_chunks)}")
+                            
                             #print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
+                            if isinstance(content_repo[field_content], s2_inference_errors.S2InferenceError):
+                                print(f"from add_docs_unstructured, content_repo[field_content] is Invalid: {content_repo[field_content]}")
+                                raise content_repo[field_content]
+                            print(f"from add_docs_structured, media_chunks count is {len(media_chunks)}")
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 print(f"from add_docs_structured, vectorising chunk {chunk_index}")
                                 chunk_start = media_chunk['start_time']

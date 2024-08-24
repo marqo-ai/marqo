@@ -22,6 +22,7 @@ import json
 import librosa
 import shlex
 import certifi
+import time
 
 import numpy as np
 import av # add PyAV to requirements
@@ -37,15 +38,12 @@ from marqo.core.models.marqo_index import *
 from marqo.s2_inference import clip_utils
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
+from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
-from marqo.s2_inference.languagebind import (
-    LanguageBind, LanguageBindVideo, LanguageBindAudio, LanguageBindImage,
-    LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
-    to_device
-)
+from marqo.s2_inference.models.model_type import ModelType
 
 logger = logging.getLogger(__name__)
 
@@ -148,13 +146,17 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                     raise e
 
                     if modality in [Modality.VIDEO, Modality.AUDIO]:
+                        if marqo_index.model.properties.get('type') not in [ModelType.LanguageBind]:
+                            print(f"from threaded_download_and_preprocess_content, model is not a Multimodal model")
+                            content_repo[doc[field]] = UnsupportedModalityError(f"Model {marqo_index.model.name} is not a Multimodal model and does not support {modality}")
+                            continue
                         print(f"from threaded_download_and_preprocess_content, modality is VIDEO or AUDIO")
                         try:
                             processed_chunks = download_and_chunk_media(doc[field], download_headers, modality, marqo_index, preprocessors)
                             content_repo[doc[field]] = processed_chunks
                         except Exception as e:
                             logger.error(f"Error processing {modality} file: {str(e)}")
-                            content_repo[doc[field]] = e
+                            content_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
 
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
@@ -268,7 +270,7 @@ class StreamingMediaProcessor:
                 else:  # VIDEO
                     duration = size / (1024 * 1024)  # Assume 8 Mbps for video
                     print(f"from StreamingMediaProcessor, got duration from estimate: {duration}")
-                    
+
             end_time = time.time()
             print(f"fetch_file_metadata completed in {(end_time - start_time) * 1000:.2f} ms")
             return size, duration
