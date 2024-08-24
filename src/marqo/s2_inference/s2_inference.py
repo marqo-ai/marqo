@@ -15,6 +15,8 @@ from pydantic import BaseModel
 from enum import Enum
 from abc import ABC, abstractmethod
 import pycurl
+import requests
+import subprocess
 from contextlib import contextmanager
 
 
@@ -37,6 +39,7 @@ from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBin
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
+from marqo.s2_inference.clip_utils import download_image_from_url
 from marqo.s2_inference.types import *
 from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
@@ -175,6 +178,9 @@ class LanguageBindEncoder(ModelEncoder):
 
         elif modality == Modality.IMAGE:
             with self._temp_file('.png') as temp_filename:
+                #if isinstance(content, list):
+                #    for item in content:
+                #        return self.encode(item, modality=modality)
                 content = content[0] if isinstance(content, list) else content
                 if isinstance(content, Image):
                     content.save(temp_filename, format='PNG')
@@ -212,7 +218,7 @@ class LanguageBindEncoder(ModelEncoder):
 
         return embeddings[modality.value].cpu().numpy()
 
-    def _download_content(self, url, filename):
+    def _download_content_old(self, url, filename):
         c = pycurl.Curl()
         c.setopt(c.URL, url)
         with open(filename, 'wb') as f:
@@ -220,6 +226,17 @@ class LanguageBindEncoder(ModelEncoder):
             c.perform()
         c.close()
         print(f"successfully downloaded {filename}")
+
+    def _download_content(self, url, filename):
+        # 3 seconds for images, 20 seconds for audio and video
+        timeout_ms = 3000 if filename.endswith(('.png', '.jpg', '.jpeg')) else 20000  
+
+        buffer = download_image_from_url(url, {}, timeout_ms)
+        
+        with open(filename, 'wb') as f:
+            f.write(buffer.getvalue())
+        
+        print(f"Successfully downloaded {filename}")
 
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
