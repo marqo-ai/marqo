@@ -21,6 +21,7 @@ from typing import List, Dict
 import json
 import librosa
 import shlex
+import certifi
 
 import numpy as np
 import av # add PyAV to requirements
@@ -215,6 +216,9 @@ class StreamingMediaProcessor:
         print(f"from StreamingMediaProcessor, self.chunk_size: {self.chunk_size}")
 
     def fetch_file_metadata(self):
+        start_time = time.time()
+        print(f"Starting fetch_file_metadata for URL: {self.url}")
+
         headers = {}
         def header_function(header_line):
             header_line = header_line.decode('iso-8859-1')
@@ -228,6 +232,7 @@ class StreamingMediaProcessor:
         c.setopt(c.NOBODY, True)
         c.setopt(c.HTTPHEADER, [f"{k}: {v}" for k, v in self.headers.items()])
         c.setopt(c.HEADERFUNCTION, header_function)
+        c.setopt(c.CAINFO, certifi.where())
         
         try:
             c.perform()
@@ -263,7 +268,9 @@ class StreamingMediaProcessor:
                 else:  # VIDEO
                     duration = size / (1024 * 1024)  # Assume 8 Mbps for video
                     print(f"from StreamingMediaProcessor, got duration from estimate: {duration}")
-            
+                    
+            end_time = time.time()
+            print(f"fetch_file_metadata completed in {(end_time - start_time) * 1000:.2f} ms")
             return size, duration
         
         except pycurl.error as e:
