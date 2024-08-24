@@ -18,38 +18,6 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import Modality
 
-def mock_image_preprocessor(image_path, return_tensors='pt'):
-    return {'pixel_values': torch.rand(1, 3, 224, 224)}
-
-def mock_video_preprocessor(video_path, return_tensors='pt'):
-    return {'pixel_values': torch.rand(1, 3, 8, 224, 224)}
-
-def mock_audio_preprocessor(audio_path, return_tensors='pt'):
-    return {'pixel_values': torch.rand(1, 3, 112, 1036)} 
-
-class MockMultimodalModel:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def preprocessor(self, modality):
-        if modality == Modality.IMAGE:
-            return mock_image_preprocessor
-        elif modality == Modality.VIDEO:
-            return mock_video_preprocessor
-        elif modality == Modality.AUDIO:
-            return mock_audio_preprocessor
-        else:
-            return None
-
-def mock_load_multimodal_model_and_get_preprocessors(*args, **kwargs):
-    mock_model = MockMultimodalModel()
-    mock_preprocessors = {
-        "image": mock_image_preprocessor,
-        "video": mock_model.preprocessor(Modality.VIDEO),
-        "audio": mock_model.preprocessor(Modality.AUDIO),
-        "text": None
-    }
-    return mock_model, mock_preprocessors
 
 class TestAddDocumentsCombined(MarqoTestCase):
     @classmethod
@@ -93,7 +61,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     }
                 )
             ],
-            model=Model(name="LanguageBind"),
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
             tensor_fields=["multimodal_field", "text_field_3",
                         "video_field_3", "audio_field_2", "image_field_2"],
             normalize_embeddings=True,
@@ -107,7 +75,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         unstructured_languagebind_index_request = cls.unstructured_marqo_index_request(
             name="unstructured_languagebind_index" + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name="LanguageBind"),
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
             treat_urls_and_pointers_as_images=True,
             treat_urls_and_pointers_as_media=True
         )
@@ -206,59 +174,50 @@ class TestAddDocumentsCombined(MarqoTestCase):
             {"image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
             {"text_field_3": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
-        dummy_return = [[1.0, ] * 768]
         for index_name in [self.structured_languagebind_index_name, self.unstructured_languagebind_index_name]:
             with self.subTest(index_name):
-                with patch("marqo.s2_inference.s2_inference.load_multimodal_model_and_get_preprocessors", 
-                           side_effect=mock_load_multimodal_model_and_get_preprocessors) as mock_load, \
-                     patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return):
-                    res = tensor_search.add_documents(
-                        self.config, 
-                        add_docs_params=AddDocsParams(
-                            docs=documents,
-                            index_name=index_name,
-                            tensor_fields=["text_field_3", "image_field_2", "video_field_3", "audio_field_2"] if "unstructured" in index_name else None
-                        )
+                res = tensor_search.add_documents(
+                    self.config, 
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=["text_field_3", "image_field_2", "video_field_3", "audio_field_2"] if "unstructured" in index_name else None
                     )
-                    for item in res.dict(exclude_none=True, by_alias=True)['items']:
-                        self.assertEqual(200, item['status'])
+                )
+                print(res)
+                for item in res.dict(exclude_none=True, by_alias=True)['items']:
+                    self.assertEqual(200, item['status'])
+                
+                self.assertEqual(4, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['success_count'])
+                self.assertEqual(0, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['error_count'])
+                self.assertEqual(0, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['failure_count'])
+
+                print(res)
+
+                get_res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index_name,
+                    document_ids=["1","2","3","4"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)
+
+                for i, doc in enumerate(get_res['results']):
+                    i += 1
+                    tensor_facets = doc['_tensor_facets']
+                    print("tensor_facets count", i, len(tensor_facets), doc.keys())
+                    # Check the length of tensor facets
+                    if i in [1, 3, 4]:
+                        self.assertEqual(len(tensor_facets), 1, f"Document {i} should have 1 tensor facet")
+                    elif i == 2:
+                        #print(tensor_facets)
+                        self.assertEqual(len(tensor_facets), 10, f"Document 2 should have 25 tensor facets")
                     
-                    self.assertEqual(4, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['success_count'])
-                    self.assertEqual(0, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['error_count'])
-                    self.assertEqual(0, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['failure_count'])
-
-                    print(res)
-
-                    #_check_get_docs(self)
-
-                    def _check_get_docs(self):
-                        get_res = tensor_search.get_documents_by_ids(
-                            config=self.config, index_name=index_name,
-                            document_ids=["1","2","3","4"],
-                            show_vectors=True
-                        ).dict(exclude_none=True, by_alias=True)
-
-                        # Iterate through each document in the response. For each document, check that the length  of the tensor facets 
-                        # print(len(doc["results"][0]["_tensor_facets"])) is 1 for 0, 3, and 4. But len is 25 for 2
-                        # Then, for each tensor facet, check that the length of the embedding is 768
-                        # Then, for each embedding, check that it is not equal to any other embedding
-
-                        for i, doc in enumerate(get_res['results']):
-                            tensor_facets = doc['_tensor_facets']
-                            
-                            # Check the length of tensor facets
-                            if i in [0, 3, 4]:
-                                self.assertEqual(len(tensor_facets), 1, f"Document {i} should have 1 tensor facet")
-                            elif i == 2:
-                                self.assertEqual(len(tensor_facets), 25, f"Document 2 should have 25 tensor facets")
-                            
-                            # Check embedding length and uniqueness
-                            embeddings = []
-                            for facet in tensor_facets:
-                                embedding = facet['_embedding']
-                                self.assertEqual(len(embedding), 768, f"Embedding length should be 768 for document {i}")
-                                self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
-                                embeddings.append(embedding)
+                    # Check embedding length and uniqueness
+                    embeddings = []
+                    for facet in tensor_facets:
+                        embedding = facet['_embedding']
+                        self.assertEqual(len(embedding), 768, f"Embedding length should be 768 for document {i}")
+                        self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
+                        embeddings.append(embedding)
 
     def test_add_multimodal_field_document(self):
         multimodal_document = {

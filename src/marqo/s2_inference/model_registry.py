@@ -1934,8 +1934,8 @@ def _get_onnx_clip_properties() -> Dict:
 
 def _get_languagebind_properties() -> Dict:
     LANGUAGEBIND_MODEL_PROPERTIES = {
-        'LanguageBind': {
-            "name": "LanguageBind",
+        'LanguageBind/Video_V1.5_FT_Audio_FT_Image': {
+            "name": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
             "dimensions": 768,
             "type": "languagebind",
             "loader": "languagebind",

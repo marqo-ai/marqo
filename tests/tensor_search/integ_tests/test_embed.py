@@ -69,7 +69,7 @@ class TestEmbed(MarqoTestCase):
         )
 
         unstructured_languagebind_index = cls.unstructured_marqo_index_request(
-            model=Model(name='LanguageBind'),
+            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
             treat_urls_and_pointers_as_images=True,
             treat_urls_and_pointers_as_media=True
         )
@@ -127,7 +127,7 @@ class TestEmbed(MarqoTestCase):
         )
 
         structured_languagebind_index = cls.structured_marqo_index_request(
-            model=Model(name='LanguageBind'),
+            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text),
                 FieldRequest(name="text_field_2", type=FieldType.Text),
