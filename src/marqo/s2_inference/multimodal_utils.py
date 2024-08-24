@@ -40,7 +40,7 @@ class MultimodalModelProperties(BaseModel):
     type: str = "multimodal"
     video_chunk_length: int # in seconds
     audio_chunk_length: int # in seconds
-    cache_dir: str = ModelCache.languagebind_cache_path
+    #cache_dir: str = None
 
 class MultimodalModel:
     def __init__(self, model_name: str, model_properties: Dict[str, Any], device: str):
@@ -59,7 +59,7 @@ class MultimodalModel:
                 'audio': 'LanguageBind_Audio_FT',
                 'image': 'LanguageBind_Image',
             }
-            model = LanguageBind(clip_type=self.clip_type, cache_dir=self.properties.cache_dir)
+            model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path)
             model = model.to(self.device)
             model.eval()
             print(f"successfully loaded LanguageBind model: {self.model_name}")
