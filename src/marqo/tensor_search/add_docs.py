@@ -218,46 +218,44 @@ class StreamingMediaProcessor:
         print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
         print(f"from StreamingMediaProcessor, self.chunk_size: {self.chunk_size}")
 
+    @contextmanager
+    def _temp_file(self, suffix):
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+                yield temp_file.name
+        finally:
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+
     def fetch_file_metadata(self):
-        start_time = time.time()
-        print(f"Starting fetch_file_metadata for URL: {self.url}")
-        
         parsed_url = urlparse(self.url)
         is_local_file = parsed_url.scheme == '' or parsed_url.scheme == 'file'
 
         if not is_local_file:
+            http_start_time = time.time()
             try:
-                # First, try a HEAD request to get content length
-                head_response = requests.head(self.url, headers=self.headers, timeout=5)
-                size = int(head_response.headers.get('Content-Length', 0))
-                print(f"from StreamingMediaProcessor, size: {size}")
-                
-                # If we got the size, try to get duration from partial content
-                if size > 0:
-                    range_header = {'Range': 'bytes=0-262143'}  # Request first 256KB
-                    headers = {**self.headers, **range_header}
-                    partial_response = requests.get(self.url, headers=headers, stream=True, timeout=5)
-                    print(f"from StreamingMediaProcessor, partial_response: {partial_response}")
-                    
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as temp_file:
-                        for chunk in partial_response.iter_content(chunk_size=8192):
-                            if chunk:
-                                temp_file.write(chunk)
-                        temp_file_path = temp_file.name
-
-                    # Use ffprobe on the partial content
-                    probe = ffmpeg.probe(temp_file_path, v='error', show_entries='format=duration', of='json')
-                    duration = float(probe['format']['duration'])
-                    print(f"from StreamingMediaProcessor, duration: {duration}")
-                    
-                    os.unlink(temp_file_path)
-                    
-                    end_time = time.time()
-                    print(f"fetch_file_metadata using http completed in {(end_time - start_time) * 1000:.2f} ms")
-                    return size, duration
-
+                size, duration = self._fetch_metadata_http()
+                http_end_time = time.time()
+                http_duration = http_end_time - http_start_time
+                print(f"HTTP -> ffprobe method took {http_duration:.2f} seconds")
+                return size, duration
             except Exception as e:
                 print(f"Error fetching metadata via HTTP: {str(e)}. Falling back to ffprobe.")
+
+        ffprobe_start_time = time.time()
+        try:
+            size, duration = self._fetch_metadata_ffprobe()
+            ffprobe_end_time = time.time()
+            ffprobe_duration = ffprobe_end_time - ffprobe_start_time
+            print(f"Pure ffprobe method took {ffprobe_duration:.2f} seconds")
+            return size, duration
+        except ffmpeg.Error as e:
+            logger.error(f"Error fetching metadata: {e.stderr.decode()}")
+            raise
+
+    def fetch_file_metadata(self):
+        start_time = time.time()
+        print(f"Starting fetch_file_metadata for URL: {self.url}")
 
         # If the above methods fail or it's a local file, fall back to ffprobe
         try:
@@ -265,10 +263,8 @@ class StreamingMediaProcessor:
                 'v': 'error',
                 'show_entries': 'format=size,duration',
                 'of': 'json',
+                'probesize': '256K' # Probe only the first 256KB
             }
-
-            if not is_local_file:
-                probe_options['probesize'] = '16K'  # Probe only first 16K for remote files
 
             probe = ffmpeg.probe(self.url, **probe_options)
             
@@ -278,7 +274,7 @@ class StreamingMediaProcessor:
             print(f"from StreamingMediaProcessor, got duration: {duration}, size: {size} bytes")
 
             end_time = time.time()
-            print(f"fetch_file_metadata using ffprobe completed in {(end_time - start_time) * 1000:.2f} ms")
+            print(f"fetch_file_metadata using full ffprobe completed in {(end_time - start_time) * 1000:.2f} ms")
             return size, duration
         
         except ffmpeg.Error as e:
@@ -303,16 +299,6 @@ class StreamingMediaProcessor:
                 
                 output_file = os.path.join(temp_dir, f"chunk_{chunk_start}.{'mp4' if self.modality == Modality.VIDEO else 'wav'}")
                 
-                ffmpeg_cmd = [
-                    'ffmpeg',
-                    '-ss', str(chunk_start),
-                    '-i', self.url,
-                    '-t', str(chunk_end - chunk_start),
-                    '-c', 'copy',  # This copies the codec without re-encoding, which is faster
-                    '-y',  # Overwrite output file if it exists
-                    output_file
-                ]
-                
                 try:
                     # Use ffmpeg-python to process the chunk
                     stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
@@ -329,7 +315,7 @@ class StreamingMediaProcessor:
                         processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
                     else:  # AUDIO
                         processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
-                    print(f"processed_chunk_tensor: {processed_chunk_tensor}")
+                    #print(f"processed_chunk_tensor: {processed_chunk_tensor}")
                     print(f"len(processed_chunk_tensor['pixel_values'].shape): {processed_chunk_tensor['pixel_values'].shape}")
                     processed_chunk = {
                         'tensor': processed_chunk_tensor,
