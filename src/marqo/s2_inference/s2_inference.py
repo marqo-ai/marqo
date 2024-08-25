@@ -67,7 +67,7 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[
     #print(f"vectorise, normalize_embeddings: {normalize_embeddings}")
     #print(f"vectorise, modality: {modality}")
     #print(f"vectorise, kwargs: {kwargs}")
-    if modality == None:
+    #if modality == None:
         #print(f"vectorise, modality is unexpectedly None. Content is {content}")
     if _marqo_inference_cache.is_enabled() and enable_cache:
         #print(f"vectorise, _marqo_inference_cache is enabled")
