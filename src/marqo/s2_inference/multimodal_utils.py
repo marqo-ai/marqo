@@ -49,7 +49,7 @@ class MultimodalModel:
         self.device = device
         self.model = None 
         self.encoder = None 
-        print(f"self.device: {self.device}")
+        #print(f"self.device: {self.device}")
 
     def _load_multimodal_model(self):
         if self.properties.loader == "languagebind":
@@ -62,7 +62,7 @@ class MultimodalModel:
             model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path)
             model = model.to(self.device)
             model.eval()
-            print(f"successfully loaded LanguageBind model: {self.model_name}")
+            ##print(f"successfully loaded LanguageBind model: {self.model_name}")
             return model
         elif self.properties.loader == "imagebind":
             # Load ImageBind model
@@ -110,19 +110,19 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
         extension = content.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif']:
-            print(f"infer_modality, content is image")
+            #print(f"infer_modality, content is image")
             return Modality.IMAGE
         elif extension in ['mp4', 'avi', 'mov']:
-            print(f"infer_modality, content is video")
+            #print(f"infer_modality, content is video")
             return Modality.VIDEO
         elif extension in ['mp3', 'wav', 'ogg']:
-            print(f"infer_modality, content is audio")
+            #print(f"infer_modality, content is audio")
             return Modality.AUDIO
         else:
-            print(f"infer_modality, content is text")
+            #print(f"infer_modality, content is text")
             return Modality.TEXT
     elif isinstance(content, bytes):
-        print(f"infer_modality, content is bytes")
+        #print(f"infer_modality, content is bytes")
         # Use python-magic to infer content type
         import magic
         mime = magic.from_buffer(content, mime=True)
@@ -190,8 +190,8 @@ class LanguageBindEncoder(ModelEncoder):
                     return self.encode([content], modality=Modality.TEXT)
                 
                 preprocessed_image = self.preprocessor(Modality.IMAGE)([temp_filename], return_tensors='pt')
-                print(f"preprocessed_image: {preprocessed_image}")
-                print(f"preprocessed_image['pixel_values'].shape: {preprocessed_image['pixel_values'].shape}")
+                #print(f"preprocessed_image: {preprocessed_image}")
+                #print(f"preprocessed_image['pixel_values'].shape: {preprocessed_image['pixel_values'].shape}")
                 inputs['image'] = to_device(preprocessed_image, self.model.device)['pixel_values']
 
         elif modality in [Modality.AUDIO, Modality.VIDEO]:
@@ -224,4 +224,4 @@ class LanguageBindEncoder(ModelEncoder):
         with open(filename, 'wb') as f:
             f.write(buffer.getvalue())
         
-        print(f"Successfully downloaded {filename}")
+        #print(f"Successfully downloaded {filename}")

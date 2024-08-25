@@ -104,7 +104,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
         marqo_index = index_meta_cache.get_index(
             config=config, index_name=add_docs_params.index_name, force_refresh=True
         )
-        print(f"from add_documents, marqo_index: {marqo_index}")
+        #print(f"from add_documents, marqo_index: {marqo_index}")
 
     # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
     except api_exceptions.IndexNotFoundError:
@@ -153,7 +153,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
     with ExitStack() as exit_stack:
-        print(f"from add_docs_unstructured, treat_urls_and_pointers_as_images: {marqo_index.treat_urls_and_pointers_as_images}")
+        #print(f"from add_docs_unstructured, treat_urls_and_pointers_as_images: {marqo_index.treat_urls_and_pointers_as_images}")
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media: # review this logic
             with RequestMetricsStore.for_request().time(
                     "media_download.full_time",
@@ -168,7 +168,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 tensor_fields_and_multimodal_subfields = copy.deepcopy(add_docs_params.tensor_fields) \
                     if add_docs_params.tensor_fields else []
                 tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
-                print(f"from add_docs_unstructured, tensor_fields_and_multimodal_subfields: {tensor_fields_and_multimodal_subfields}")
+                #print(f"from add_docs_unstructured, tensor_fields_and_multimodal_subfields: {tensor_fields_and_multimodal_subfields}")
                 content_repo = exit_stack.enter_context(
                     add_docs.download_and_preprocess_content(
                         docs=docs,
@@ -318,15 +318,15 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 # C) field type is standard
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
                     modality = infer_modality(field_content)
-                    print(f"Processing field: {field}, content type: {type(field_content)}, inferred modality: {modality}")
+                    #print(f"Processing field: {field}, content type: {type(field_content)}, inferred modality: {modality}")
                     video_audio_check = modality in [Modality.VIDEO, Modality.AUDIO] and marqo_index.treat_urls_and_pointers_as_media
 
                     if video_audio_check:
-                        print(f"from add_docs_unstructured, modality is: {modality}, field_content is: {field_content}")
+                        #print(f"from add_docs_unstructured, modality is: {modality}, field_content is: {field_content}")
                         try:
                             # Check for UnsupportedModalityError in content_repo
                             if isinstance(content_repo[field_content], s2_inference_errors.S2InferenceError):
-                                print(f"from add_docs_unstructured, content_repo[field_content] is Invalid: {content_repo[field_content]}")
+                                #print(f"from add_docs_unstructured, content_repo[field_content] is Invalid: {content_repo[field_content]}")
                                 raise content_repo[field_content]
                                 
                             media_chunks = content_repo[field_content]
@@ -362,7 +362,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             break
 
                     elif isinstance(field_content, (str, Image.Image)) and not video_audio_check:
-                        print(f"from add_docs_unstructured, modality is: {modality}, field_content is: {field_content}, but I'm in the wrong code block")
+                        #print(f"from add_docs_unstructured, modality is: {modality}, field_content is: {field_content}, but I'm in the wrong code block")
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
                         # 2. check if it is a url or pointer
                         # 3. If yes in 1 and 2, download blindly (without type)
@@ -371,7 +371,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         # 6. if chunking -> then add the extra chunker
 
                         if isinstance(field_content, str) and not _is_image(field_content):
-                            print(f"from add_docs_unstructured, text processing pipeline")
+                            #print(f"from add_docs_unstructured, text processing pipeline")
                             # text processing pipeline:
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
@@ -382,7 +382,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             text_chunks = content_chunks
                             content_chunks = text_processor.prefix_text_chunks(content_chunks, text_chunk_prefix)
                         else:
-                            print(f"from add_docs_unstructured, image processing pipeline")
+                            #print(f"from add_docs_unstructured, image processing pipeline")
                             # TODO put the logic for getting field parameters into a function and add per field options
                             image_method = marqo_index.image_preprocessing.patch_method
 
@@ -393,7 +393,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 if isinstance(field_content, str) and marqo_index.treat_urls_and_pointers_as_images:
                                     if not isinstance(content_repo[field_content], Exception):
                                         image_data = content_repo[field_content]
-                                        print(f"from add_docs_unstructured, image_data is {image_data}")
+                                        #print(f"from add_docs_unstructured, image_data is {image_data}")
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
                                             f"Could not find image found at `{field_content}`. \n"
@@ -401,19 +401,19 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                         )
                                 else:
                                     image_data = field_content
-                                    print(f"from add_docs_unstructured, image_data is {image_data}")
+                                    #print(f"from add_docs_unstructured, image_data is {image_data}")
                                 if image_method is not None:
                                     content_chunks, text_chunks = image_processor.chunk_image(
                                         image_data, device=add_docs_params.device, method=image_method.value)
-                                    print(f"from add_docs_unstructured, content_chunks is {content_chunks}")
-                                    print(f"from add_docs_unstructured, text_chunks is {text_chunks}")
+                                    #print(f"from add_docs_unstructured, content_chunks is {content_chunks}")
+                                    #print(f"from add_docs_unstructured, text_chunks is {text_chunks}")
                                 else:
                                     # if we are not chunking, then we set the chunks as 1-len lists
                                     # content_chunk is the PIL image
                                     # text_chunk refers to URL
                                     content_chunks, text_chunks = [image_data], [field_content]
-                                    print(f"from add_docs_unstructured, content_chunks is {content_chunks}")
-                                    print(f"from add_docs_unstructured, text_chunks is {text_chunks}")
+                                    #print(f"from add_docs_unstructured, content_chunks is {content_chunks}")
+                                    #print(f"from add_docs_unstructured, text_chunks is {text_chunks}")
                             except s2_inference_errors.S2InferenceError as e:
                                 document_is_valid = False
                                 unsuccessful_docs.append(
@@ -536,8 +536,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         
                         if field_content:  # Check if the subfields are present
                             modality = infer_modality(field_content)
-                            print(f"from vectorise_multimodal_combination_field_unstructured, modality is {modality}")
-                            print(f"from vectorise_multimodal_combination_field_unstructured, field_content is {field_content}")
+                            #print(f"from vectorise_multimodal_combination_field_unstructured, modality is {modality}")
+                            #print(f"from vectorise_multimodal_combination_field_unstructured, field_content is {field_content}")
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                             unsuccessful_doc_to_append,
                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
@@ -618,7 +618,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     vespa_client = config.vespa_client
     vespa_index = StructuredVespaIndex(marqo_index)
     index_model_dimensions = marqo_index.model.get_dimension()
-    print(f"from _add_documents_structured, marqo_index: {marqo_index}")
+    #print(f"from _add_documents_structured, marqo_index: {marqo_index}")
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     if add_docs_params.tensor_fields is not None:
@@ -837,17 +837,17 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
                     if marqo_field.type in [FieldType.VideoPointer, FieldType.AudioPointer]:
-                        print(f"from tensor_search add_documents_structured, marqo_field.type is {marqo_field.type}")
+                        #print(f"from tensor_search add_documents_structured, marqo_field.type is {marqo_field.type}")
                         try:
                             media_chunks = content_repo[field_content]
                             
-                            #print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
+                            ##print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
                             if isinstance(content_repo[field_content], s2_inference_errors.S2InferenceError):
-                                print(f"from add_docs_unstructured, content_repo[field_content] is Invalid: {content_repo[field_content]}")
+                                #print(f"from add_docs_unstructured, content_repo[field_content] is Invalid: {content_repo[field_content]}")
                                 raise content_repo[field_content]
-                            print(f"from add_docs_structured, media_chunks count is {len(media_chunks)}")
+                            #print(f"from add_docs_structured, media_chunks count is {len(media_chunks)}")
                             for chunk_index, media_chunk in enumerate(media_chunks):
-                                print(f"from add_docs_structured, vectorising chunk {chunk_index}")
+                                #print(f"from add_docs_structured, vectorising chunk {chunk_index}")
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
                                 chunk_id = f"{field}::start_{chunk_start:.2f}::end_{chunk_end:.2f}"
@@ -877,7 +877,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     code=api_exceptions.InvalidArgError.code
                                 ))
                             )
-                            print(f"from tensor_search add_documents_structured, unsuccessful_docs is {unsuccessful_docs}")
+                            #print(f"from tensor_search add_documents_structured, unsuccessful_docs is {unsuccessful_docs}")
                             continue
                     elif isinstance(field_content, (str, Image.Image)):
                         # C) Handle standard fields (text and images)
@@ -1318,7 +1318,7 @@ def _get_tensor_facets(marqo_doc_tensors: Dict[str, Any]) -> List[Dict[str, Any]
     """
     tensor_facets = []
     for tensor_field in marqo_doc_tensors:
-        print(f"from _get_tensor_facets: tensor_field = {tensor_field}")
+        #print(f"from _get_tensor_facets: tensor_field = {tensor_field}")
         chunks = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_CHUNKS]
         embeddings = marqo_doc_tensors[tensor_field][constants.MARQO_DOC_EMBEDDINGS]
         if len(chunks) != len(embeddings):
@@ -1778,9 +1778,9 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         # TODO: Handle exception for single job, and allow others to run.
         try:
             if v.content:
-                print(f"from vectorise jobs, v.content is {v.content}")
+                #print(f"from vectorise jobs, v.content is {v.content}")
                 modality = infer_modality(v.content[0] if isinstance(v.content, list) else v.content)
-                print(f"from vectorise jobs, modality is {modality}")
+                #print(f"from vectorise jobs, modality is {modality}")
                 vectors = s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
@@ -1902,10 +1902,10 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
     """
     content_type = 'text' if infer_modality(content) == Modality.TEXT else 'media'
     #content_type = 'media' if treat_urls_as_media and
-    print(f"from get_content_vector, content_type: {content_type}")
+    #print(f"from get_content_vector, content_type: {content_type}")
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
-        print(f"from get_content_vector, vec_job_pointer: {vec_job_pointer}")
+        #print(f"from get_content_vector, vec_job_pointer: {vec_job_pointer}")
         if jobs[vec_job_pointer.job_hash].content_type == content_type:
             try:
                 return job_to_vectors[vec_job_pointer.job_hash][content]
@@ -1970,7 +1970,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     vector_jobs_tuple: Tuple[Dict[Qidx, List[VectorisedJobPointer]], Dict[JHash, VectorisedJobs]] = create_vector_jobs(
         prefixed_queries, config, device)
     
-    print(f"from run_vectorise_pipeline, vector_jobs_tuple is {vector_jobs_tuple}")
+    #print(f"from run_vectorise_pipeline, vector_jobs_tuple is {vector_jobs_tuple}")
 
     qidx_to_jobs, jobs = vector_jobs_tuple
 
@@ -2045,7 +2045,7 @@ def _vector_text_search(
     # Determine the text query prefix
     text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
 
-    print(f"from _vector_text_search, query is {query}, image_download_headers is {image_download_headers}")
+    #print(f"from _vector_text_search, query is {query}, image_download_headers is {image_download_headers}")
 
     if isinstance(query, CustomVectorQuery):
         if context is None:
@@ -2565,8 +2565,8 @@ def vectorise_multimodal_combination_field_structured(
         )
         return combo_chunk, combo_document_is_valid, unsuccessful_doc_to_append, combo_vectorise_time_to_add
 
-    print(f"len(sub_field_name_list) {len(sub_field_name_list)}")
-    print(f"len(vectors_list) {len(vectors_list)}")
+    #print(f"len(sub_field_name_list) {len(sub_field_name_list)}")
+    #print(f"len(vectors_list) {len(vectors_list)}")
     if not len(sub_field_name_list) == len(vectors_list):
         raise api_exceptions.BatchInferenceSizeError(
             message=f"Batch inference size does not match content for multimodal field {field}"

@@ -141,7 +141,7 @@ class IndexSettings(StrictBaseModel):
             if self.treatUrlsAndPointersAsMedia is None:
                 # Default value for treat_urls_and_pointers_as_media is False, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
-                print(f"from to_marqo_index_request, treatUrlsAndPointersAsMedia is None, setting to False")
+                #print(f"from to_marqo_index_request, treatUrlsAndPointersAsMedia is None, setting to False")
                 self.treatUrlsAndPointersAsMedia = False
 
             if self.filterStringMaxLength is None:

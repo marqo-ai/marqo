@@ -96,9 +96,9 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     continue
                 if isinstance(doc[field], str):
                     modality = infer_modality(doc[field])
-                    print(f"from threaded_download_and_preprocess_content, modality: {modality}")
+                    #print(f"from threaded_download_and_preprocess_content, modality: {modality}")
                     if modality == Modality.IMAGE: # or clip_utils._is_image(doc[field]):
-                        print(f"from threaded_download_and_preprocess_content, modality is IMAGE")
+                        #print(f"from threaded_download_and_preprocess_content, modality is IMAGE")
                         # Existing logic
                         if doc[field] in content_repo:
                             continue
@@ -113,14 +113,14 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             continue
                         # preprocess image to tensor
                         if preprocessors is not None and preprocessors['image'] is not None:
-                            print(f"preprocessors['image']: {preprocessors['image']}")
-                            print(f"device: {device}")
+                            ##print(f"preprocessors['image']: {preprocessors['image']}")
+                            ##print(f"device: {device}")
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                print(f"from threaded_download_and_preprocess_content, trying to preprocess image")
+                                #print(f"from threaded_download_and_preprocess_content, trying to preprocess image")
                                 content_repo[doc[field]] = preprocessors['image'](content_repo[doc[field]]).to(device)
-                                print(f"content_repo[doc[field]]: {content_repo[doc[field]]}")
+                                #print(f"content_repo[doc[field]]: {content_repo[doc[field]]}")
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     content_repo[doc[field]] = e
@@ -131,10 +131,10 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
 
                     if modality in [Modality.VIDEO, Modality.AUDIO]:
                         if marqo_index.model.properties.get('type') not in [ModelType.LanguageBind]:
-                            print(f"from threaded_download_and_preprocess_content, model is not a Multimodal model")
+                            ##print(f"from threaded_download_and_preprocess_content, model is not a Multimodal model")
                             content_repo[doc[field]] = UnsupportedModalityError(f"Model {marqo_index.model.name} is not a Multimodal model and does not support {modality}")
                             continue
-                        print(f"from threaded_download_and_preprocess_content, modality is VIDEO or AUDIO")
+                        #print(f"from threaded_download_and_preprocess_content, modality is VIDEO or AUDIO")
                         try:
                             processed_chunks = download_and_chunk_media(doc[field], download_headers, modality, marqo_index, preprocessors)
                             content_repo[doc[field]] = processed_chunks
@@ -185,7 +185,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     marqo_index: Optional[MarqoIndex] = None,
                                     ) -> ContextManager[dict]:
     
-    print(f"from download_and_preprocess_content, marqo_index: {marqo_index}")
+    #print(f"from download_and_preprocess_content, marqo_index: {marqo_index}")
     content_repo = {}  # for image/video/audio
     memory_pool = MemoryPool(total_size=500 * 1024 * 1024, chunk_size=20 * 1024 * 1024)  # 500 MB total, 20 MB chunks
 
@@ -199,18 +199,18 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
         model_auth=model_auth,
         normalize_embeddings=normalize_embeddings
     )
-    print(f"from download_and_preprocess_content, preprocessors: {preprocessors}")
+    #print(f"from download_and_preprocess_content, preprocessors: {preprocessors}")
 
     if not is_preprocess_image_model(model_properties) or patch_method_exists:
-        print(f"from download_and_preprocess_content, is_preprocess_image_model(model_properties): {is_preprocess_image_model(model_properties)}")
-        print(f"from download_and_preprocess_content, patch_method_exists: {patch_method_exists}")
+        #print(f"from download_and_preprocess_content, is_preprocess_image_model(model_properties): {is_preprocess_image_model(model_properties)}")
+        #print(f"from download_and_preprocess_content, patch_method_exists: {patch_method_exists}")
         preprocessors['image'] = None
 
     try:
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
         download_headers={}
-        print(f"from download_and_preprocess_content, thread_allocated_docs: {thread_allocated_docs}")
+        #print(f"from download_and_preprocess_content, thread_allocated_docs: {thread_allocated_docs}")
         with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
             futures = [executor.submit(threaded_download_and_preprocess_content,
                            allocation, 
