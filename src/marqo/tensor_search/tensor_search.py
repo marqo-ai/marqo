@@ -49,6 +49,7 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 from marqo.core.semi_structured_vespa_index.field_request_collector import FieldRequestCollector
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -143,7 +144,7 @@ def _add_documents_semi_structured(config: Config, add_docs_params: AddDocsParam
 
     # ADD DOCS TIMER-LOGGER (3)
     vespa_client = config.vespa_client
-    vespa_index = StructuredVespaIndex(marqo_index)
+    vespa_index = SemiStructuredVespaIndex(marqo_index)
     index_model_dimensions = marqo_index.model.get_dimension()
 
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
@@ -242,8 +243,11 @@ def _add_documents_semi_structured(config: Config, add_docs_params: AddDocsParam
                 tensor_field = marqo_index.tensor_field_map.get(field)
                 is_tensor_field = tensor_field is not None
 
+                if not marqo_field:
+                    continue
+
                 inferred_type = infer_type(copied[field])
-                if marqo_field and inferred_type != marqo_field.type:
+                if inferred_type != marqo_field.type:
                     message = (f"Field {field} is defined as a {marqo_field.type} field for semi-structured index {marqo_index.name}. "
                                f"But the type in the provided doc {doc_id} is {inferred_type}")
                     document_is_valid = False

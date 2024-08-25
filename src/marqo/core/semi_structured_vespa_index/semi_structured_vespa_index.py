@@ -6,13 +6,15 @@ from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, 
                                    InvalidDataRangeError, MarqoDocumentParsingError)
 from marqo.core.models import MarqoQuery
 from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod
-from marqo.core.models.marqo_index import FieldType, FieldFeature, Field, logger
+from marqo.core.models.marqo_index import FieldType, FieldFeature, Field, logger, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
+from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index import VespaIndex
-from marqo.exceptions import InternalError
+from marqo.exceptions import InternalError, InvalidArgumentError
 import semver
 
+from marqo.core.unstructured_vespa_index import common as unstructured_common
 
 class SemiStructuredVespaIndex(VespaIndex):
     """
@@ -58,6 +60,9 @@ class SemiStructuredVespaIndex(VespaIndex):
 
     _MAX_LONG = 9223372036854775807
     _MIN_LONG = -9223372036854775808
+
+    _FILTER_STRING_BOOL_VALUES = ["true", "false"]
+    _RESERVED_FIELD_SUBSTRING = "::"
 
     _HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse(constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION)
 
@@ -169,187 +174,15 @@ class SemiStructuredVespaIndex(VespaIndex):
 
         return {"id": vespa_id, "fields": vespa_fields}
 
+
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
-        vespa_id: Optional[int] = None
-        vespa_fields: Dict[str, Any] = dict()
-        score_modifiers_2_8: Dict[str, int] = {}
-        score_modifiers_float: Dict[str, float] = {}
-        score_modifiers_double_long: Dict[str, float] = {}
+        unstructured_document: SemiStructuredVespaDocument = \
+            (SemiStructuredVespaDocument.from_marqo_document(marqo_document, marqo_index=self._marqo_index))
+        return unstructured_document.to_vespa_document()
 
-        # ID
-        if constants.MARQO_DOC_ID in marqo_document:
-            vespa_id = marqo_document[constants.MARQO_DOC_ID]
-            vespa_fields[common.FIELD_ID] = vespa_id
-
-        # Fields
-        for marqo_field in marqo_document:
-            if marqo_field == constants.MARQO_DOC_TENSORS or marqo_field == constants.MARQO_DOC_ID:
-                continue  # process tensor fields later
-
-            marqo_value = marqo_document[marqo_field]
-            self._verify_marqo_field_name(marqo_field)
-            self._verify_marqo_field_type(marqo_field, marqo_value)
-
-            index_field = self._marqo_index.field_map[marqo_field]
-
-            if (not isinstance(marqo_value, bool)) and isinstance(marqo_value, (int, float)):
-                self._verify_numerical_field_value(marqo_value, index_field)
-
-            if isinstance(marqo_value, list) and len(marqo_value) > 0 and type(marqo_value[0]) in (float, int):
-                for v in marqo_value:
-                    self._verify_numerical_field_value(v, index_field)
-
-            if isinstance(marqo_value, dict) and index_field.type in (FieldType.MapFloat, FieldType.MapInt,
-                                                                      FieldType.MapLong, FieldType.MapDouble):
-                for k, v in marqo_value.items():
-                    if type(v) in (float, int):
-                        self._verify_numerical_field_value(v, index_field)
-
-            if index_field.type == FieldType.Bool:
-                # Booleans are stored as bytes in Vespa
-                marqo_value = int(marqo_value)
-
-            if index_field.lexical_field_name:
-                vespa_fields[index_field.lexical_field_name] = marqo_value
-            if index_field.filter_field_name:
-                vespa_fields[index_field.filter_field_name] = marqo_value
-            if not index_field.lexical_field_name and not index_field.filter_field_name:
-                vespa_fields[index_field.name] = marqo_value
-
-            if FieldFeature.ScoreModifier in index_field.features:
-                if self._marqo_index_version < self._VERSION_2_9_0:
-                    target_dict = score_modifiers_2_8
-                else:
-                    if index_field.type in [FieldType.MapFloat, FieldType.Float]:
-                        target_dict = score_modifiers_float
-                    else:
-                        target_dict = score_modifiers_double_long
-
-                if isinstance(marqo_value, dict):
-                    for key, value in marqo_value.items():
-                        target_dict[f'{index_field.name}.{key}'] = value
-                else:
-                    target_dict[index_field.name] = marqo_value
-
-        # Tensors
-        vector_count = 0
-        if constants.MARQO_DOC_TENSORS in marqo_document:
-            for marqo_tensor_field in marqo_document[constants.MARQO_DOC_TENSORS]:
-                marqo_tensor_value = marqo_document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
-
-                self._verify_marqo_tensor_field_name(marqo_tensor_field)
-                self._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
-
-                # If chunking an image, chunks will be a list of tuples, hence the str(c)
-                chunks = [str(c) for c in marqo_tensor_value[constants.MARQO_DOC_CHUNKS]]
-                embeddings = marqo_tensor_value[constants.MARQO_DOC_EMBEDDINGS]
-                vector_count += len(embeddings)
-
-                index_tensor_field = self._marqo_index.tensor_field_map[marqo_tensor_field]
-
-                vespa_fields[index_tensor_field.chunk_field_name] = chunks
-                vespa_fields[index_tensor_field.embeddings_field_name] = \
-                    {f'{i}': embeddings[i] for i in range(len(embeddings))}
-
-        vespa_fields[common.FIELD_VECTOR_COUNT] = vector_count
-
-        if len(score_modifiers_double_long) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = score_modifiers_double_long
-        if len(score_modifiers_float) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS_FLOAT] = score_modifiers_float
-        if len(score_modifiers_2_8) > 0:
-            vespa_fields[common.FIELD_SCORE_MODIFIERS_2_8] = score_modifiers_2_8
-
-        vespa_doc = {
-            self._VESPA_DOC_FIELDS: vespa_fields
-        }
-
-        if vespa_id is not None:
-            vespa_doc[self._VESPA_DOC_ID] = vespa_id
-
-        return vespa_doc
-
-    def to_marqo_document(
-            self, vespa_document: Dict[str, Any], return_highlights: bool = False
-    ) -> Dict[str, Any]:
-
-        if self._VESPA_DOC_FIELDS not in vespa_document:
-            raise VespaDocumentParsingError(f'Vespa document is missing {self._VESPA_DOC_FIELDS} field')
-
-        fields = vespa_document[self._VESPA_DOC_FIELDS]
-        marqo_document = dict()
-        for field, value in fields.items():
-            if field in self._marqo_index.all_field_map:
-                marqo_field = self._marqo_index.all_field_map[field]
-
-                if marqo_field.type == FieldType.Bool:
-                    # Booleans are stored as bytes in Vespa
-                    if value not in {0, 1}:
-                        raise VespaDocumentParsingError(
-                            f"Vespa document has invalid value '{value}' for boolean field '{marqo_field.name}'. "
-                            f'Expected 0 or 1'
-                        )
-                    value = bool(value)
-
-                marqo_name = marqo_field.name
-                if marqo_name in marqo_document:
-                    # If getting all fields from Vespa, there may be a lexical and a filter field for one Marqo field
-                    # They must have the same value
-                    if marqo_document[marqo_name] != value:
-                        raise VespaDocumentParsingError(
-                            f'Vespa document has different values for Marqo field {marqo_name}: '
-                            f'{marqo_document[marqo_name]} and {value}'
-                        )
-                else:
-
-                    marqo_document[marqo_name] = value
-            elif field in self._marqo_index.tensor_subfield_map:
-                tensor_field = self._marqo_index.tensor_subfield_map[field]
-
-                if constants.MARQO_DOC_TENSORS not in marqo_document:
-                    marqo_document[constants.MARQO_DOC_TENSORS] = dict()
-                if tensor_field.name not in marqo_document[constants.MARQO_DOC_TENSORS]:
-                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name] = dict()
-
-                if field == tensor_field.chunk_field_name:
-                    marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][constants.MARQO_DOC_CHUNKS] = value
-                elif field == tensor_field.embeddings_field_name:
-                    try:
-                        marqo_document[constants.MARQO_DOC_TENSORS][tensor_field.name][
-                            constants.MARQO_DOC_EMBEDDINGS] = list(value['blocks'].values())
-                    except (KeyError, AttributeError, TypeError) as e:
-                        raise VespaDocumentParsingError(
-                            f'Cannot parse embeddings field {field} with value {value}'
-                        ) from e
-
-                else:
-                    raise VespaDocumentParsingError(f'Unexpected tensor subfield {field}')
-            elif field == common.FIELD_ID:
-                marqo_document[constants.MARQO_DOC_ID] = value
-            elif field == common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE:  # Return raw lexical/tensor scores if available. Usually for hybrid search (disjunction).
-                marqo_document[constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = value
-            elif field == common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE:
-                marqo_document[constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = value
-            elif field == self._VESPA_DOC_MATCH_FEATURES:
-                continue
-            elif field in self._VESPA_DOC_FIELDS_TO_IGNORE | {common.FIELD_SCORE_MODIFIERS_2_8,
-                                                              common.FIELD_SCORE_MODIFIERS_FLOAT,
-                                                              common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG,
-                                                              common.FIELD_VECTOR_COUNT,
-                                                              self._VESPA_DOC_MATCH_FEATURES}:
-                continue
-            else:
-                raise VespaDocumentParsingError(
-                    f'Unknown field {field} for index {self._marqo_index.name} in Vespa document'
-                )
-
-        # Highlights
-        if return_highlights and self._VESPA_DOC_MATCH_FEATURES in fields:
-            marqo_document[constants.MARQO_DOC_HIGHLIGHTS] = self._extract_highlights(
-                fields
-            )
-
-        return marqo_document
+    def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
+        unstructured_document: SemiStructuredVespaDocument = SemiStructuredVespaDocument.from_vespa_document(vespa_document)
+        return unstructured_document.to_marqo_document(marqo_index=self._marqo_index, return_highlights=return_highlights)
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         # TODO - There is some inefficiency here, as we are retrieving chunks even if highlights are false,
@@ -691,51 +524,70 @@ class SemiStructuredVespaIndex(VespaIndex):
             return ''
 
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
+        # FIXME logic copied from unstructured
         def escape(s: str) -> str:
             return s.replace('\\', '\\\\').replace('"', '\\"')
 
-        def _convert_to_in_list_str(value_list: list, marqo_field_name: str, marqo_field_type: FieldType) -> str:
-            """
-            Change list into its string representation, replacing [] with ().
-            This is different from `tuple()` because it does not add a comma for single element lists.
+        def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
+            filter_parts = []
 
-            IN only works for 2 field types: string and int.
-            For string: Each element is enclosed in DOUBLE quotes.
-            For int: Add int with no quotes. If wrong type, error out.
-            Otherwise: error out.
-            """
+            # Filter on `_id`
+            if node.field == constants.MARQO_DOC_ID:
+                return f'({unstructured_common.VESPA_FIELD_ID} contains "{escape(node.value)}")'
 
-            in_list = '('
+            # Bool Filter
+            if node.value.lower() in self._FILTER_STRING_BOOL_VALUES:
+                filter_value = int(True if node.value.lower() == "true" else False)
+                bool_filter_string = (f'({unstructured_common.BOOL_FIELDS} contains '
+                                      f'sameElement(key contains "{node.field}", value = {filter_value}))')
+                filter_parts.append(bool_filter_string)
 
-            STR_FIELD_TYPES = [FieldType.Text, FieldType.ArrayText, FieldType.CustomVector]
-            INT_FIELD_TYPES = [FieldType.Int, FieldType.Long, FieldType.ArrayInt, FieldType.ArrayLong]
-            for i in range(len(value_list)):
-                # str type fields
-                if marqo_field_type in STR_FIELD_TYPES:
-                    in_list += f'"{value_list[i]}"'
-                # int type fields
-                elif marqo_field_type in INT_FIELD_TYPES:
-                    try:
-                        test_int_val = int(value_list[i])
-                        in_list += str(value_list[i])
-                    except ValueError:
-                        raise InvalidDataTypeError(
-                            f"Attempting to use the IN filter operator on field: '{marqo_field_name}' of type: '{marqo_field_type}',"
-                            f" but found list element '{value_list[i]}', which is not of type 'int'."
-                        )
-                else:
-                    raise InvalidDataTypeError(
-                        f"The IN filter operator is only supported for the following field types: "
-                        f"{[t.value for t in STR_FIELD_TYPES + INT_FIELD_TYPES]}. However, '{marqo_field_name}' "
-                        f"is of unsupported type: '{marqo_field_type}'."
-                    )
+            # Short String Filter
+            short_string_filter_string = (f'({unstructured_common.SHORT_STRINGS_FIELDS} '
+                                          f'contains sameElement(key contains "{node.field}", '
+                                          f'value contains "{escape(node.value)}"))')
+            filter_parts.append(short_string_filter_string)
 
-                # Add comma if not the last element
-                if i < len(value_list) - 1:
-                    in_list += ', '
+            # String Array Filter
+            string_array_filter_string = (f'({unstructured_common.STRING_ARRAY} contains '
+                                          f'"{node.field}::{escape(node.value)}")')
+            filter_parts.append(string_array_filter_string)
 
-            in_list += ')'
-            return in_list
+            # Numeric Filter
+            numeric_filter_string = ""
+            try:
+                numeric_value = int(node.value)
+                numeric_filter_string = (
+                    f'({unstructured_common.INT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value})) '
+                    f'OR ({unstructured_common.FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))')
+            except ValueError:
+                try:
+                    numeric_value = float(node.value)
+                    numeric_filter_string = f'({unstructured_common.FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))'
+                except ValueError:
+                    pass
+
+            if numeric_filter_string:
+                filter_parts.append(numeric_filter_string)
+
+            # Final Filter String
+            final_filter_string = f"({' OR '.join(filter_parts)})"
+            return final_filter_string
+
+        def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
+            lower = f'value >= {node.lower}' if node.lower is not None else ""
+            higher = f'value <= {node.upper}' if node.upper is not None else ""
+            bound = f'{lower}, {higher}' if lower and higher else f'{lower}{higher}'
+            if not bound:
+                raise InternalError('RangeTerm has no lower or upper bound')
+
+            float_field_string = (f'({unstructured_common.FLOAT_FIELDS} contains '
+                                  f'sameElement(key contains "{node.field}", {bound}))')
+
+            int_field_string = (f'({unstructured_common.INT_FIELDS} contains '
+                                f'sameElement(key contains "{node.field}", {bound}))')
+
+            return f'({float_field_string} OR {int_field_string})'
 
         def tree_to_filter_string(node: search_filter.Node) -> str:
             if isinstance(node, search_filter.Operator):
@@ -745,7 +597,6 @@ class SemiStructuredVespaIndex(VespaIndex):
                     operator = 'OR'
                 else:
                     raise InternalError(f'Unknown operator type {type(node)}')
-
                 return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
             elif isinstance(node, search_filter.Modifier):
                 if isinstance(node, search_filter.Not):
@@ -753,44 +604,12 @@ class SemiStructuredVespaIndex(VespaIndex):
                 else:
                     raise InternalError(f'Unknown modifier type {type(node)}')
             elif isinstance(node, search_filter.Term):
-                if node.field not in self._marqo_index.filterable_fields_names:
-                    raise InvalidFieldNameError(
-                        f"Index '{self._marqo_index.name}' has no filterable field '{node.field}'. "
-                        f'Available filterable fields are: \'{", ".join(self._marqo_index.filterable_fields_names)}\''
-                    )
-
-                if node.field == constants.MARQO_DOC_ID:
-                    marqo_field_name = common.FIELD_ID
-                    marqo_field_type = FieldType.Text
-                else:
-                    marqo_field = self._marqo_index.all_field_map[node.field]
-                    marqo_field_name = marqo_field.filter_field_name
-                    marqo_field_type = marqo_field.type
-
                 if isinstance(node, search_filter.EqualityTerm):
-                    node_value = node.value
-                    if marqo_field_type == FieldType.Bool:
-                        if node_value.lower() == 'true':
-                            node_value = '1'
-                        elif node_value.lower() == 'false':
-                            node_value = '0'
-
-                    return f'{marqo_field_name} contains "{escape(node_value)}"'
+                    return generate_equality_filter_string(node)
                 elif isinstance(node, search_filter.RangeTerm):
-                    lower = f'{marqo_field_name} >= {node.lower}' if node.lower is not None else None
-                    upper = f'{marqo_field_name} <= {node.upper}' if node.upper is not None else None
-                    if lower and upper:
-                        return f'({lower} AND {upper})'
-                    elif lower:
-                        return lower
-                    elif upper:
-                        return upper
-                    else:
-                        raise InternalError('RangeTerm has no lower or upper bound')
+                    return generate_range_filter_string(node)
                 elif isinstance(node, search_filter.InTerm):
-                    return (f'{marqo_field_name} in '
-                            f'{_convert_to_in_list_str(value_list=node.value_list, marqo_field_name=node.field, marqo_field_type=marqo_field_type)}')
-
+                    raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
             raise InternalError(f'Unknown node type {type(node)}')
 
         if marqo_query.filter is not None:
@@ -940,67 +759,6 @@ class SemiStructuredVespaIndex(VespaIndex):
                 f"Received _id {value} of type `{type(value).__name__}`")
         if not value:
             raise MarqoDocumentParsingError("Document ID can't be empty")
-
-    def _extract_highlights(self, vespa_document_fields: Dict[str, Any]) -> List[Dict[Any, str]]:
-        # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features
-        # If a tensor field hasn't been searched, closest(tensor_field)[cells] will be empty and distance(tensor_field)
-        # will be max double
-        match_features = vespa_document_fields[self._VESPA_DOC_MATCH_FEATURES]
-
-        min_distance = None
-        closest_tensor_field = None
-        for tensor_field in self._marqo_index.tensor_fields:
-            closest_feature = f'closest({tensor_field.embeddings_field_name})'
-            if closest_feature in match_features and len(match_features[closest_feature]['cells']) > 0:
-                distance_feature = f'distance(field,{tensor_field.embeddings_field_name})'
-                if distance_feature not in match_features:
-                    raise VespaDocumentParsingError(
-                        f'Expected {distance_feature} in match features but it was not found'
-                    )
-                distance = match_features[distance_feature]
-                if min_distance is None or distance < min_distance:
-                    min_distance = distance
-                    closest_tensor_field = tensor_field
-
-        if closest_tensor_field is None:
-            raise VespaDocumentParsingError('Failed to extract highlights from Vespa document. Could not find '
-                                            'closest tensor field in response')
-
-        # Get chunk index
-        chunk_index_str = next(iter(
-            match_features[f'closest({closest_tensor_field.embeddings_field_name})']['cells']
-        ))
-        try:
-            chunk_index = int(chunk_index_str)
-        except ValueError as e:
-            raise VespaDocumentParsingError(
-                f'Expected integer as chunk index, but found {chunk_index_str}', cause=e
-            ) from e
-
-        # Get chunk value
-        try:
-            chunk_field_name = closest_tensor_field.chunk_field_name
-
-            if chunk_field_name in vespa_document_fields:
-                chunk = vespa_document_fields[chunk_field_name][chunk_index]
-            else:
-                # Note: WARN level will create verbose logs in production as this is per result
-                logger.debug(f'Failed to extract highlights as Vespa document is missing chunk field '
-                             f'{chunk_field_name}. This can happen if attributes_to_retrieve does not include '
-                             f'all searchable tensor fields (searchable_attributes)')
-
-                chunk = None
-
-        except (KeyError, TypeError, IndexError) as e:
-            raise VespaDocumentParsingError(
-                f'Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}',
-                cause=e
-            ) from e
-
-        if chunk is not None:
-            return [{closest_tensor_field.name: chunk}]
-        else:
-            return []
 
     def _get_python_type(self, marqo_type: FieldType) -> type:
         try:
