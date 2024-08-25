@@ -40,7 +40,7 @@ schema {{ index.schema_name }} {
         }
 
         field marqo__short_string_fields type map<string, string> {
-            indexing: summary
+            {# indexing: summary   This is not needed since summary is in each individual text field -#}
             struct-field key { indexing : attribute
                                attribute: fast-search
                                rank: filter }
@@ -218,7 +218,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
-        summary marqo__short_string_fields type map<string, string> {}
+{#        summary marqo__short_string_fields type map<string, string> {}#}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
@@ -236,7 +236,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
-        summary marqo__short_string_fields type map<string, string> {}
+{#        summary marqo__short_string_fields type map<string, string> {}#}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
