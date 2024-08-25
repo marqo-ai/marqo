@@ -40,15 +40,20 @@ class SemiStructuredVespaSchema(VespaSchema):
 
     def __init__(self, index_request: SemiStructuredMarqoIndexRequest):
         self._index_request = index_request
-        template_path = str(os.path.dirname(os.path.abspath(__file__)))
-        self._vespa_schema_template = (Environment(loader=FileSystemLoader(template_path))
-                                       .get_template("semi_structured_vespa_schema_template.sd.jinja2"))
 
     def generate_schema(self) -> (str, MarqoIndex):
         schema_name = self._get_vespa_schema_name(self._index_request.name)
         marqo_index = self._generate_marqo_index(schema_name)
-        schema = self._vespa_schema_template.render(index=marqo_index, dimension=str(marqo_index.model.get_dimension()))
+        schema = self.generate_vespa_schema(marqo_index)
         return schema, marqo_index
+
+    @classmethod
+    def generate_vespa_schema(cls, marqo_index: SemiStructuredMarqoIndex) -> str:
+        template_path = str(os.path.dirname(os.path.abspath(__file__)))
+        environment = Environment(loader=FileSystemLoader(template_path))
+        environment.filters['values_to_list'] = lambda d: list(d.values())
+        vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
+        return vespa_schema_template.render(index=marqo_index, dimension=str(marqo_index.model.get_dimension()))
 
     def _generate_marqo_index(self, schema_name: str) -> SemiStructuredMarqoIndex:
         marqo_index = SemiStructuredMarqoIndex(

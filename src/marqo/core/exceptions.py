@@ -62,3 +62,8 @@ class InvalidTensorFieldError(MarqoDocumentParsingError):
 
 class UnsupportedFeatureError(InvalidArgumentError):
     pass
+
+
+class FieldTypeMismatchError(InvalidArgumentError):
+    pass
+

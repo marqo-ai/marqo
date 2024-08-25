@@ -19,7 +19,9 @@ from marqo.core.exceptions import IndexExistsError, IndexNotFoundError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.models import MarqoIndex
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.exceptions import VespaStatusError
@@ -153,6 +155,20 @@ class IndexManagement:
                 self._save_marqo_version(version.get_version())
 
             return marqo_index
+
+    def update_index(self, marqo_index: SemiStructuredMarqoIndex):
+        with self._deployment_lock_context_manager():
+            app = self.vespa_client.download_application(check_for_application_convergence=True)
+
+            schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+
+            self._update_schema(app, marqo_index.schema_name, schema)
+            self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
+            self._save_index_settings(marqo_index)
+            return marqo_index
+
+
 
     @staticmethod
     def validate_index_settings(index_name: str, settings_dict: dict) -> None:
@@ -476,6 +492,15 @@ class IndexManagement:
         schema_path = os.path.join(app, 'schemas', f'{name}.sd')
         if os.path.exists(schema_path):
             logger.warn(f"Schema {name} already exists in application package, overwriting")
+
+        with open(schema_path, 'w') as f:
+            f.write(schema)
+
+    def _update_schema(self, app: str, name: str, schema: str) -> None:
+        schema_path = os.path.join(app, 'schemas', f'{name}.sd')
+        if not os.path.exists(schema_path):
+            logger.warn(f"Schema {name} does not exists in application package")
+            raise IndexNotFoundError()
 
         with open(schema_path, 'w') as f:
             f.write(schema)
