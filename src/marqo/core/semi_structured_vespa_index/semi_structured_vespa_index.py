@@ -181,7 +181,7 @@ class SemiStructuredVespaIndex(VespaIndex):
         return unstructured_document.to_vespa_document()
 
     def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
-        unstructured_document: SemiStructuredVespaDocument = SemiStructuredVespaDocument.from_vespa_document(vespa_document)
+        unstructured_document: SemiStructuredVespaDocument = SemiStructuredVespaDocument.from_vespa_document(vespa_document, marqo_index=self._marqo_index)
         return unstructured_document.to_marqo_document(marqo_index=self._marqo_index, return_highlights=return_highlights)
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:

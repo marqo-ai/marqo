@@ -44,70 +44,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     _VESPA_DOC_FIELDS = "fields"
     _VESPA_DOC_ID = "id"
 
-    def extract_highlights(self, marqo_index: SemiStructuredMarqoIndex) -> List[Dict[str, str]]:
-        # FIXME logic copied from structured
-        # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features
-        # If a tensor field hasn't been searched, closest(tensor_field)[cells] will be empty and distance(tensor_field)
-        # will be max double
-        match_features = self.match_features
-
-        min_distance = None
-        closest_tensor_field = None
-        for tensor_field in marqo_index.tensor_fields:
-            closest_feature = f'closest({tensor_field.embeddings_field_name})'
-            if closest_feature in match_features and len(match_features[closest_feature]['cells']) > 0:
-                distance_feature = f'distance(field,{tensor_field.embeddings_field_name})'
-                if distance_feature not in match_features:
-                    raise VespaDocumentParsingError(
-                        f'Expected {distance_feature} in match features but it was not found'
-                    )
-                distance = match_features[distance_feature]
-                if min_distance is None or distance < min_distance:
-                    min_distance = distance
-                    closest_tensor_field = tensor_field
-
-        if closest_tensor_field is None:
-            raise VespaDocumentParsingError('Failed to extract highlights from Vespa document. Could not find '
-                                            'closest tensor field in response')
-
-        # Get chunk index
-        chunk_index_str = next(iter(
-            match_features[f'closest({closest_tensor_field.embeddings_field_name})']['cells']
-        ))
-        try:
-            chunk_index = int(chunk_index_str)
-        except ValueError as e:
-            raise VespaDocumentParsingError(
-                f'Expected integer as chunk index, but found {chunk_index_str}', cause=e
-            ) from e
-
-        # Get chunk value
-        try:
-            chunk_field_name = closest_tensor_field.chunk_field_name
-
-            if chunk_field_name in self.tensor_fields:
-                chunk = self.tensor_fields[chunk_field_name][chunk_index]
-            else:
-                # Note: WARN level will create verbose logs in production as this is per result
-                logger.debug(f'Failed to extract highlights as Vespa document is missing chunk field '
-                             f'{chunk_field_name}. This can happen if attributes_to_retrieve does not include '
-                             f'all searchable tensor fields (searchable_attributes)')
-
-                chunk = None
-
-        except (KeyError, TypeError, IndexError) as e:
-            raise VespaDocumentParsingError(
-                f'Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}',
-                cause=e
-            ) from e
-
-        if chunk is not None:
-            return [{closest_tensor_field.name: chunk}]
-        else:
-            return []
-
     @classmethod
-    def from_vespa_document(cls, document: Dict) -> "SemiStructuredVespaDocument":
+    def from_vespa_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
         """
         Instantiate an UnstructuredVespaDocument from a Vespa document.
         Used in get_document_by_id or get_documents_by_ids
@@ -119,10 +57,20 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         raw_tensor_score = fields.pop(unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE) \
             if unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE in fields else None
 
+        tensor_fields = {}
+        text_fields = {}
+        for field_name in fields:
+            if field_name in marqo_index.tensor_subfield_map:
+                tensor_fields[field_name] = fields[field_name]
+            elif field_name in marqo_index.lexically_searchable_fields_names:
+                text_fields[field_name] = fields[field_name]
+
         return cls(id=document[cls._VESPA_DOC_ID],
                    raw_tensor_score=raw_tensor_score,
                    raw_lexical_score=raw_lexical_score,
-                   fixed_fields=SemiStructuredVespaDocumentFields(**fields))
+                   fixed_fields=SemiStructuredVespaDocumentFields(**fields),
+                   tensor_fields=tensor_fields,
+                   text_fields=text_fields)
 
     @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
@@ -222,11 +170,11 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
 
         # text fields
+        for field_name, field_content in self.text_fields.items():
+            marqo_document[field_name] = field_content
 
         # tensor fields
         for field_name, field_content in self.tensor_fields.items():
-            if field_name not in marqo_index.tensor_subfield_map:
-                raise ValueError(f"Unknown tensor field name {field_name}")
             tensor_field = marqo_index.tensor_subfield_map[field_name]
 
             if constants.MARQO_DOC_TENSORS not in marqo_document:
@@ -262,3 +210,65 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             marqo_document[index_constants.MARQO_DOC_HYBRID_LEXICAL_SCORE] = self.raw_lexical_score
 
         return marqo_document
+
+    def extract_highlights(self, marqo_index: SemiStructuredMarqoIndex) -> List[Dict[str, str]]:
+        # FIXME logic copied from structured
+        # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features
+        # If a tensor field hasn't been searched, closest(tensor_field)[cells] will be empty and distance(tensor_field)
+        # will be max double
+        match_features = self.match_features
+
+        min_distance = None
+        closest_tensor_field = None
+        for tensor_field in marqo_index.tensor_fields:
+            closest_feature = f'closest({tensor_field.embeddings_field_name})'
+            if closest_feature in match_features and len(match_features[closest_feature]['cells']) > 0:
+                distance_feature = f'distance(field,{tensor_field.embeddings_field_name})'
+                if distance_feature not in match_features:
+                    raise VespaDocumentParsingError(
+                        f'Expected {distance_feature} in match features but it was not found'
+                    )
+                distance = match_features[distance_feature]
+                if min_distance is None or distance < min_distance:
+                    min_distance = distance
+                    closest_tensor_field = tensor_field
+
+        if closest_tensor_field is None:
+            raise VespaDocumentParsingError('Failed to extract highlights from Vespa document. Could not find '
+                                            'closest tensor field in response')
+
+        # Get chunk index
+        chunk_index_str = next(iter(
+            match_features[f'closest({closest_tensor_field.embeddings_field_name})']['cells']
+        ))
+        try:
+            chunk_index = int(chunk_index_str)
+        except ValueError as e:
+            raise VespaDocumentParsingError(
+                f'Expected integer as chunk index, but found {chunk_index_str}', cause=e
+            ) from e
+
+        # Get chunk value
+        try:
+            chunk_field_name = closest_tensor_field.chunk_field_name
+
+            if chunk_field_name in self.tensor_fields:
+                chunk = self.tensor_fields[chunk_field_name][chunk_index]
+            else:
+                # Note: WARN level will create verbose logs in production as this is per result
+                logger.debug(f'Failed to extract highlights as Vespa document is missing chunk field '
+                             f'{chunk_field_name}. This can happen if attributes_to_retrieve does not include '
+                             f'all searchable tensor fields (searchable_attributes)')
+
+                chunk = None
+
+        except (KeyError, TypeError, IndexError) as e:
+            raise VespaDocumentParsingError(
+                f'Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}',
+                cause=e
+            ) from e
+
+        if chunk is not None:
+            return [{closest_tensor_field.name: chunk}]
+        else:
+            return []
