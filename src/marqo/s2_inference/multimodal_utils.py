@@ -215,15 +215,6 @@ class LanguageBindEncoder(ModelEncoder):
 
         return embeddings[modality.value].cpu().numpy()
 
-    def _download_content_old(self, url, filename):
-        c = pycurl.Curl()
-        c.setopt(c.URL, url)
-        with open(filename, 'wb') as f:
-            c.setopt(c.WRITEDATA, f)
-            c.perform()
-        c.close()
-        print(f"successfully downloaded {filename}")
-
     def _download_content(self, url, filename):
         # 3 seconds for images, 20 seconds for audio and video
         timeout_ms = 3000 if filename.endswith(('.png', '.jpg', '.jpeg')) else 20000  
