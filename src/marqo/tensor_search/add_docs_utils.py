@@ -29,7 +29,7 @@ class StreamingMediaProcessor:
         self.total_size, self.duration = self._fetch_file_metadata()
         
         self._set_split_parameters(modality)
-        self._log_initialization_details()
+        #self._log_initialization_details()
 
     def _set_split_parameters(self, modality):
         preprocessing = self.marqo_index.video_preprocessing if modality == Modality.VIDEO else self.marqo_index.audio_preprocessing
@@ -50,6 +50,7 @@ class StreamingMediaProcessor:
         #print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
         #print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
         #print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
+        pass
 
     def _fetch_file_metadata(self):
         start_time = time.time()
