@@ -51,12 +51,6 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         Used in get_document_by_id or get_documents_by_ids
         """
         fields = document.get(cls._VESPA_DOC_FIELDS, {})
-
-        raw_lexical_score = fields.pop(unstructured_common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE) \
-            if unstructured_common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE in fields else None
-        raw_tensor_score = fields.pop(unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE) \
-            if unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE in fields else None
-
         tensor_fields = {}
         text_fields = {}
         for field_name in fields:
@@ -66,11 +60,16 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 text_fields[field_name] = fields[field_name]
 
         return cls(id=document[cls._VESPA_DOC_ID],
-                   raw_tensor_score=raw_tensor_score,
-                   raw_lexical_score=raw_lexical_score,
                    fixed_fields=SemiStructuredVespaDocumentFields(**fields),
                    tensor_fields=tensor_fields,
-                   text_fields=text_fields)
+                   text_fields=text_fields,
+                   raw_tensor_score=cls.extract_field(fields, unstructured_common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
+                   raw_lexical_score=cls.extract_field(fields, unstructured_common.VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE, None),
+                   match_features=cls.extract_field(fields, unstructured_common.VESPA_DOC_MATCH_FEATURES, dict()))
+
+    @classmethod
+    def extract_field(cls, fields, name: str, default: Any):
+        return fields.pop(name) if name in fields else default
 
     @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
@@ -201,7 +200,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         #             json.loads(serialized_multimodal_params)
 
         if return_highlights and self.match_features:
-            marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.extract_highlights()
+            marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.extract_highlights(marqo_index)
 
         # Hybrid search raw scores
         if self.raw_tensor_score is not None:
