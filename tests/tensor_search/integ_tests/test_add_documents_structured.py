@@ -118,9 +118,13 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 FieldRequest(
                     name='image_field',
                     type=FieldType.ImagePointer,
+                ),
+                FieldRequest(
+                    name='image_field_2',
+                    type=FieldType.ImagePointer,
                 )
             ],
-            tensor_fields=['image_field'],
+            tensor_fields=['image_field', 'image_field_2'],
             model=Model(name='ViT-B/16')
         )
         index_request_img_chunking = cls.structured_marqo_index_request(
@@ -924,7 +928,20 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 "_id": "1",
                 "image_field": "this is not an image/url/path",
                 "title": "A image field with non-image content"
-            }
+            },
+            {
+                "_id": "2",
+                "image_field": "this is not an image/url/path/again",
+                "image_field_2": "this is not an image/url/path/again",
+                "title": "A document with 2 invalid image fields"
+            },
+            {
+                "_id": "3",
+                "image_field": "this is not an image/url/path/again-3",
+                "image_field_2": "this is not an image/url/path/again-3",
+                "title": "Another document with 2 invalid image fields"
+            },
+
         ]
 
         r = tensor_search.add_documents(
@@ -934,7 +951,8 @@ class TestAddDocumentsStructured(MarqoTestCase):
         )
 
         self.assertEqual(True, r.errors)
-        self.assertEqual(1, r._batch_response_stats.failure_count)
-        item = r.items[0]
-        self.assertEqual(400, item.status)
-        self.assertIn("Could not find image at", item.message)
+        self.assertEqual(3, r._batch_response_stats.failure_count)
+        self.assertEqual(3, len(r.items))
+        for item in r.items:
+            self.assertEqual(400, item.status)
+            self.assertIn("Could not find image at", item.message)

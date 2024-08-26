@@ -69,7 +69,7 @@ class TestIsImage(unittest.TestCase):
             ("Invalid PDF", 'document.pdf', False),
             ("Invalid TXT", 'text.txt', False),
             ("No extension", 'imagewithoutextension', False),
-            ("Valid URL with unencoded characters",
+            ("Valid URL with unencoded characters(space) ",
              "http://dummy.dummy.com/is/image/dummy/dummy (1)?wid=123&hei=321&qlt=123&fmt=png-alpha", True)
         ]
 
