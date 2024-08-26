@@ -7,6 +7,9 @@ from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.api import embed
 import numpy as np
+import torch
+import pytest
+
 import requests
 import json
 from unittest import mock
@@ -210,6 +213,7 @@ class TestEmbed(MarqoTestCase):
                         self.assertIsInstance(embed_res["embeddings"][0], list)
                         self.assertEqual(embed_res["embeddings"][0], [0.1, 0.2, 0.3])
 
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is 5gb and is very slow on g4dn.xlarge and may crash it")
     def test_embed_languagebind(self):
         content = [
             #"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", # image

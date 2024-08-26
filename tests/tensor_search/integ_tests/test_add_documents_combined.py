@@ -2,6 +2,9 @@ import os
 import uuid
 from unittest import mock
 from unittest.mock import patch
+import pytest
+import torch
+
 
 import PIL
 import requests
@@ -165,6 +168,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                                                                "vectorise for add_documents")
                 mock_vectorise.reset_mock()
 
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is ~5gb and is very slow on g4dn.xlarge and may crash it")
     def test_add_multimodal_single_documents(self):
         """ """
         documents = [
@@ -218,7 +222,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertEqual(len(embedding), 768, f"Embedding length should be 768 for document {i}")
                         self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
                         embeddings.append(embedding)
-
+    
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is ~5gb and is very slow on g4dn.xlarge and may crash it")
     def test_add_multimodal_field_document(self):
         multimodal_document = {
             "_id": "1_multimodal",
