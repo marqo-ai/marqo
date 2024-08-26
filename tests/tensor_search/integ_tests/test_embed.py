@@ -223,7 +223,7 @@ class TestEmbed(MarqoTestCase):
                                 embedding_request=EmbedRequest(
                                     content=content
                                 ),
-                                device=None
+                                device=utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
                             )
                 print(embed_res)
                 print(embed_res['embeddings'][0][:7])
@@ -236,8 +236,8 @@ class TestEmbed(MarqoTestCase):
                 for a, e in zip(actual, expected):
                     self.assertAlmostEqual(a, e, delta=1.5)
                 
-                print(f"Actual: {actual}")
-                print(f"Expected: {expected}")
+                #print(f"Actual: {actual}")
+                #print(f"Expected: {expected}")
 
 
     def test_embed_equivalent_to_add_docs(self):

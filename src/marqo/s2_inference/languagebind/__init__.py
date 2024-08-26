@@ -68,7 +68,7 @@ class LanguageBind(nn.Module):
         return outputs
 
 def to_device(x, device):
-    print(f"from to_device, device is {device}")
+    #print(f"from to_device, device is {device}")
     out_dict = {k: v.to(device) for k, v in x.items()}
     return out_dict
 

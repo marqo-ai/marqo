@@ -53,7 +53,7 @@ class MultimodalModel:
 
     def _load_multimodal_model(self):
         if self.properties.loader == "languagebind":
-            print(f"Loading LanguageBind model: {self.model_name}")
+            #print(f"Loading LanguageBind model: {self.model_name}")
             self.clip_type = { 
                 'video': 'LanguageBind_Video_V1.5_FT',
                 'audio': 'LanguageBind_Audio_FT',

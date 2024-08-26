@@ -131,7 +131,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         docs=documents,
                         tensor_fields=tensor_fields,)
                 ).dict(exclude_none=True, by_alias=True)
-                print(f"response: {r}")
+                #print(f"response: {r}")
                 self.assertEqual(True, r["errors"])
                 self.assertEqual(2, len(r["items"]))
                 self.assertEqual(200, r["items"][0]["status"])
@@ -537,8 +537,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 ) as content_repo:
                     self.assertEqual(len(expected_repo_structure), len(content_repo))
                     for k in expected_repo_structure:
-                        print(f"expected_repo_structure[k] = {expected_repo_structure[k]}")
-                        print(f"content_repo[k] = {content_repo[k]}")
+                        #print(f"expected_repo_structure[k] = {expected_repo_structure[k]}")
+                        #print(f"content_repo[k] = {content_repo[k]}")
                         self.assertIsInstance(content_repo[k], expected_repo_structure[k])
 
             # Images should not be closed as they are Tensor instead of ImageType
