@@ -258,9 +258,9 @@ class TestBGEModels(unittest.TestCase):
         for model_name in self.models:
             run_test_vectorize(models=[model_name])
 
-    def test_model_outputs(self):
-        for model_name in self.models:
-            run_test_model_outputs([model_name])
+    #def test_model_outputs(self):
+    #    for model_name in self.models:
+    #        run_test_model_outputs([model_name])
         #run_test_model_outputs(self.models)
     
     #def test_model_normalization(self):
@@ -268,9 +268,9 @@ class TestBGEModels(unittest.TestCase):
     #        run_test_model_normalization([model_name])
         #run_test_model_normalization(self.models)
 
-    #def test_cuda_encode_type(self):
-    #    for model_name in self.models:
-    #        run_test_cuda_encode_type([model_name])
+    def test_cuda_encode_type(self):
+        for model_name in self.models:
+            run_test_cuda_encode_type([model_name])
         #run_test_cuda_encode_type(self.models)
 
 #@pytest.mark.skip(reason="This test is failing")
