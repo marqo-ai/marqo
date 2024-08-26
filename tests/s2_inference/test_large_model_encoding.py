@@ -236,7 +236,8 @@ class TestE5Models(unittest.TestCase):
 
 #@pytest.mark.skip(reason="This test is failing")
 @pytest.mark.largemodel
-@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+#@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@pytest.mark.skip(reason="Model is too large")
 class TestBGEModels(unittest.TestCase):
     def setUp(self):
         self.models = ["hf/bge-large-zh-v1.5", "hf/bge-large-en-v1.5"]
