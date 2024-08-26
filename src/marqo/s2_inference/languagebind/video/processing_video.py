@@ -7,10 +7,9 @@ from decord import VideoReader, cpu
 from torchvision import transforms
 from transformers import ProcessorMixin, BatchEncoding
 from transformers.image_processing_utils import BatchFeature
-from pytorchvideo.data.encoded_video import EncodedVideo
 from torchvision.transforms import Compose, Lambda, ToTensor
 from torchvision.transforms._transforms_video import NormalizeVideo, RandomCropVideo, RandomHorizontalFlipVideo, CenterCropVideo
-from pytorchvideo.transforms import ApplyTransformToKey, ShortSideScale, UniformTemporalSubsample
+from pytorchvideo.transforms import ShortSideScale
 
 decord.bridge.set_bridge('torch')
 
@@ -24,35 +23,7 @@ def make_list_of_images(x):
 
 def get_video_transform(config):
     config = config.vision_config
-    if config.video_decode_backend == 'pytorchvideo':
-        transform = ApplyTransformToKey(
-            key="video",
-            transform=Compose(
-                [
-                    UniformTemporalSubsample(config.num_frames),
-                    Lambda(lambda x: x / 255.0),
-                    NormalizeVideo(mean=OPENAI_DATASET_MEAN, std=OPENAI_DATASET_STD),
-                    ShortSideScale(size=224),
-                    CenterCropVideo(224),
-                    RandomHorizontalFlipVideo(p=0.5),
-                ]
-            ),
-        )
-
-    elif config.video_decode_backend == 'decord':
-
-        transform = Compose(
-            [
-                # UniformTemporalSubsample(num_frames),
-                Lambda(lambda x: x / 255.0),
-                NormalizeVideo(mean=OPENAI_DATASET_MEAN, std=OPENAI_DATASET_STD),
-                ShortSideScale(size=224),
-                CenterCropVideo(224),
-                RandomHorizontalFlipVideo(p=0.5),
-            ]
-        )
-
-    elif config.video_decode_backend == 'opencv':
+    if config.video_decode_backend == 'opencv':
         transform = Compose(
             [
                 # UniformTemporalSubsample(num_frames),
@@ -64,7 +35,7 @@ def get_video_transform(config):
             ]
         )
     else:
-        raise NameError('video_decode_backend should specify in (pytorchvideo, decord, opencv)')
+        raise NameError('video_decode_backend should specify in (opencv)')
     return transform
 
 
@@ -76,25 +47,8 @@ def load_and_transform_video(
         clip_end_sec=None,
         num_frames=8,
 ):
-    if video_decode_backend == 'pytorchvideo':
-        #  decord pyav
-        video = EncodedVideo.from_path(video_path, decoder="decord", decode_audio=False)
-        duration = video.duration
-        start_sec = clip_start_sec  # secs
-        end_sec = clip_end_sec if clip_end_sec is not None else duration  # secs
-        video_data = video.get_clip(start_sec=start_sec, end_sec=end_sec)
-        video_outputs = transform(video_data)
-
-    elif video_decode_backend == 'decord':
-        decord.bridge.set_bridge('torch')
-        decord_vr = VideoReader(video_path, ctx=cpu(0))
-        duration = len(decord_vr)
-        frame_id_list = np.linspace(0, duration-1, num_frames, dtype=int)
-        video_data = decord_vr.get_batch(frame_id_list)
-        video_data = video_data.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-        video_outputs = transform(video_data)
-
-    elif video_decode_backend == 'opencv':
+   
+    if video_decode_backend == 'opencv':
         cv2_vr = cv2.VideoCapture(video_path)
         duration = int(cv2_vr.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_id_list = np.linspace(0, duration-1, num_frames, dtype=int)
@@ -109,7 +63,7 @@ def load_and_transform_video(
         video_data = torch.stack(video_data, dim=1)
         video_outputs = transform(video_data)
     else:
-        raise NameError('video_decode_backend should specify in (pytorchvideo, decord, opencv)')
+        raise NameError('video_decode_backend should specify in (opencv)')
     return video_outputs
 
 class LanguageBindVideoProcessor(ProcessorMixin):

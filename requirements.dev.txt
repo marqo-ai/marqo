@@ -16,15 +16,16 @@ pynvml==11.5.0
 kazoo==2.10.0
 pycurl==7.45.3
 certifi==2019.11.28
-transformers==4.31.0 # Consider 4.31.0 for _expand_mask
+#transformers==4.31.0 # Consider 4.31.0 for _expand_mask
+transformers==4.41.2
 
 # s2_inference:
 more_itertools
 boto3==1.25.4
 botocore==1.28.4
 nltk==3.7
-torch==1.13.1
-torchvision==0.14.1
+torch==1.12.1
+torchvision==0.13.1
 Pillow==9.3.0
 numpy==1.23.4
 validators==0.20.0
@@ -73,8 +74,8 @@ einops==0.6.1
 #evaluate==0.4.0
 #ftfy==6.1.1
 #iopath==0.1.10
-peft @ git+https://github.com/huggingface/peft@08cb3dde577747f6ca6638c884fd66fd16cf2e9d
-pytorchvideo @ git+https://github.com/facebookresearch/pytorchvideo.git@28fe037d212663c6a24f373b94cc5d478c8c1a1d
+peft==0.4.0
+pytorchvideo==0.1.5
 torchaudio
 #scipy==1.10.1
 #tensorboardX==2.6.1
@@ -88,18 +89,3 @@ SoundFile==0.12.1
 python-magic==0.4.27
 ffmpeg-python==0.2.0
 #librosa==0.10.2.post1
-
-
-# LanguageBind
-decord==0.6.0 # ERROR: Could not find a version that satisfies the requirement decord==0.6.0 (from versions: none)
-# This is due to decord not having a wheel for ARM64. we can use pip install eva-decord
-eva-decord
-einops==0.6.1
-#peft @ git+https://github.com/huggingface/peft@08cb3dde577747f6ca6638c884fd66fd16cf2e9d
-peft==0.4.0
-pytorchvideo @ git+https://github.com/facebookresearch/pytorchvideo.git@28fe037d212663c6a24f373b94cc5d478c8c1a1d
-torchaudio
-SoundFile==0.12.1
-
-python-magic==0.4.27
-ffmpeg-python==0.2.0
