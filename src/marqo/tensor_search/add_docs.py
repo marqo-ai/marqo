@@ -98,6 +98,9 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     modality = infer_modality(doc[field])
                     print(f"from threaded_download_and_preprocess_content, modality: {modality}")
                     if modality == Modality.IMAGE: # or clip_utils._is_image(doc[field]):
+                        if marqo_index.model.properties.get('type') in [ModelType.LanguageBind]:
+                            if modality not in marqo_index.model.properties.get('supported_modalities'):
+                                raise ValueError(f"Model {marqo_index.model.name} does not support modality: {modality}")
                         print(f"from threaded_download_and_preprocess_content, modality is IMAGE")
                         # Existing logic
                         if doc[field] in content_repo:
@@ -130,7 +133,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                     raise e
 
                     if modality in [Modality.VIDEO, Modality.AUDIO]:
-                        if marqo_index.model.properties.get('type') not in [ModelType.LanguageBind]:
+                        if marqo_index.model.properties.get('type') not in [ModelType.LanguageBind] and modality not in marqo_index.model.properties.get('supported_modalities'):
                             print(f"from threaded_download_and_preprocess_content, model is not a Multimodal model")
                             content_repo[doc[field]] = UnsupportedModalityError(f"Model {marqo_index.model.name} is not a Multimodal model and does not support {modality}")
                             continue

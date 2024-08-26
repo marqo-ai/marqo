@@ -53,22 +53,49 @@ class MultimodalModel:
 
     def _load_multimodal_model(self):
         if self.properties.loader == "languagebind":
-            print(f"Loading LanguageBind model: {self.model_name}")
-            self.clip_type = { 
-                'video': 'LanguageBind_Video_V1.5_FT',
-                'audio': 'LanguageBind_Audio_FT',
-                'image': 'LanguageBind_Image',
-            }
-            model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path)
-            model = model.to(self.device)
-            model.eval()
-            print(f"successfully loaded LanguageBind model: {self.model_name}")
+            model = self._load_languagebind_model()
             return model
+            
         elif self.properties.loader == "imagebind":
             # Load ImageBind model
             pass
         else:
             raise ValueError(f"Unsupported loader: {self.properties.loader}")
+        
+    def _load_languagebind_model(self):
+        print(f"Loading LanguageBind model: {self.model_name}")
+        if self.model_name == "LanguageBind/Video_V1.5_FT_Audio_FT_Image":
+            self.clip_type = { 
+                'video': 'LanguageBind_Video_V1.5_FT',
+                'audio': 'LanguageBind_Audio_FT',
+                'image': 'LanguageBind_Image',
+            }
+        elif self.model_name == "LanguageBind/Video_V1.5_FT_Image":
+            self.clip_type = {
+                'video': 'LanguageBind_Video_V1.5_FT',
+                'image': 'LanguageBind_Image',
+            }
+        elif self.model_name == "LanguageBind/Audio_FT_Image":
+            self.clip_type = {
+                'audio': 'LanguageBind_Audio_FT',
+                'image': 'LanguageBind_Image',
+            }
+        elif self.model_name == "LanguageBind/Audio_FT":
+            self.clip_type = {
+                'audio': 'LanguageBind_Audio_FT',
+            }
+        elif self.model_name == "LanguageBind/Video_1.5_FT":
+            self.clip_type = {
+                'video': 'LanguageBind_Video_1.5_FT',
+            }
+        else:
+            raise ValueError(f"Unsupported LanguageBind model: {self.model_name}")
+        print(f"self.clip_type: {self.clip_type}")
+        model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path)
+        model = model.to(self.device)
+        model.eval()
+        print(f"Successfully loaded LanguageBind model: {self.model_name}")
+        return model
         
     def preprocessor(self, modality):
         if self.encoder is None:
@@ -153,7 +180,12 @@ class LanguageBindEncoder(ModelEncoder):
                 os.unlink(temp_file.name)
 
     def _get_tokenizer(self): # this is used for text only
-        pretrained_ckpt = f'lb203/LanguageBind_Image'
+        if 'image' in self.model.clip_type:
+            pretrained_ckpt = 'lb203/LanguageBind_Image'
+        else:
+            first_model = next(iter(self.model.clip_type.values()))
+            pretrained_ckpt = f'lb203/{first_model}'
+        
         return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
     
     def preprocessor(self, modality):
@@ -162,6 +194,8 @@ class LanguageBindEncoder(ModelEncoder):
             Modality.AUDIO: LanguageBindAudioProcessor,
             Modality.IMAGE: LanguageBindImageProcessor
         }
+        if modality not in self.model.clip_type:
+            return None
         return preprocessors[modality](self.model.model.modality_config[modality])
     
     def encode(self, content, modality, **kwargs):

@@ -1943,6 +1943,43 @@ def _get_languagebind_properties() -> Dict:
             "video_chunk_length": 20,
             "audio_chunk_length": 20,
         },
+        'LanguageBind/Video_V1.5_FT_Image': {
+            "name": "LanguageBind/Video_V1.5_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["video", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Audio_FT_Image': {
+            "name": "LanguageBind/Audio_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["audio", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Audio_FT': {
+            "name": "LanguageBind/Audio_FT",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["video", "language"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Video_1.5_FT': {
+            "name": "LanguageBind/Video_1.5_FT",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["video", "language"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+
     }
     return LANGUAGEBIND_MODEL_PROPERTIES
 
