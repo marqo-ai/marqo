@@ -277,6 +277,7 @@ class TestBGEModels(unittest.TestCase):
 #@pytest.mark.skip(reason="This test is failing")
 @pytest.mark.largemodel
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@pytest.mark.skip(reason="Model is too large")
 class TestSnowflakeModels(unittest.TestCase):
     def setUp(self):
         self.models = ["hf/snowflake-arctic-embed-l"]
