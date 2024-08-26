@@ -86,7 +86,7 @@ class MultimodalModel:
             }
         elif self.model_name == "LanguageBind/Video_1.5_FT":
             self.clip_type = {
-                'video': 'LanguageBind_Video_1.5_FT',
+                'video': 'LanguageBind_Video_V1.5_FT',
             }
         else:
             raise ValueError(f"Unsupported LanguageBind model: {self.model_name}")
@@ -181,10 +181,10 @@ class LanguageBindEncoder(ModelEncoder):
 
     def _get_tokenizer(self): # this is used for text only
         if 'image' in self.model.clip_type:
-            pretrained_ckpt = 'lb203/LanguageBind_Image'
+            pretrained_ckpt = 'LanguageBind/LanguageBind_Image'
         else:
             first_model = next(iter(self.model.clip_type.values()))
-            pretrained_ckpt = f'lb203/{first_model}'
+            pretrained_ckpt = f'LanguageBind/{first_model}'
         
         return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
     
