@@ -16,6 +16,16 @@ class ModelCache:
 
     languagebind_cache_path = os.getenv('LANGUAGEBIND_CACHE_PATH', f'{utils.get_marqo_root_from_env()}/cache/languagebind/')
 
+    @classmethod
+    def get_all_cache_paths(cls):
+        return [
+            cls.onnx_cache_path,
+            cls.torch_cache_path,
+            cls.clip_cache_path,
+            cls.hf_cache_path,
+            cls.languagebind_cache_path
+        ]
+
 class BaseTransformerModels:
 
     names = ('albert-base-v1', 'albert-base-v2', 'albert-large-v1', 'albert-large-v2', 'albert-xlarge-v1', 'albert-xlarge-v2', 'albert-xxlarge-v1', 'albert-xxlarge-v2', 'bert-base-cased-finetuned-mrpc', 'bert-base-cased', 'bert-base-chinese', 'bert-base-german-cased', 'bert-base-german-dbmdz-cased', 'bert-base-german-dbmdz-uncased', 'bert-base-multilingual-cased', 'bert-base-multilingual-uncased', 'bert-base-uncased', 'bert-large-cased-whole-word-masking-finetuned-squad', 'bert-large-cased-whole-word-masking', 'bert-large-cased', 'bert-large-uncased-whole-word-masking-finetuned-squad', 'bert-large-uncased-whole-word-masking', 'bert-large-uncased', 'camembert-base', 'ctrl', 'distilbert-base-cased-distilled-squad', 'distilbert-base-cased', 'distilbert-base-german-cased', 'distilbert-base-multilingual-cased', 'distilbert-base-uncased-distilled-squad',
