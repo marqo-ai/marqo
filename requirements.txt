@@ -76,7 +76,7 @@ einops==0.6.1
 #iopath==0.1.10
 peft==0.4.0
 pytorchvideo==0.1.5
-torchaudio
+torchaudio==0.12.1
 #scipy==1.10.1
 #tensorboardX==2.6.1
 #tokenizers

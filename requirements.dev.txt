@@ -67,16 +67,16 @@ pytest==7.4.3
 # LanguageBind
 #accelerate==0.20.3
 #datasets==2.13.0
-decord==0.6.0 # ERROR: Could not find a version that satisfies the requirement decord==0.6.0 (from versions: none)
+#decord==0.6.0 # ERROR: Could not find a version that satisfies the requirement decord==0.6.0 (from versions: none)
 # This is due to decord not having a wheel for ARM64. we can use pip install eva-decord
 eva-decord
 einops==0.6.1
 #evaluate==0.4.0
 #ftfy==6.1.1
 #iopath==0.1.10
-peft==0.4.0
+#peft==0.4.0
 pytorchvideo==0.1.5
-torchaudio
+torchaudio==0.12.1
 #scipy==1.10.1
 #tensorboardX==2.6.1
 #tokenizers

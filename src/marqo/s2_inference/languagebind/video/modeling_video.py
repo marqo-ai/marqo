@@ -3,14 +3,14 @@ from typing import Optional, Tuple, Union
 
 import torch
 from einops import rearrange
-from peft import LoraConfig, get_peft_model
 from torch import nn
 from torch.nn import functional as F
 from transformers import PreTrainedModel, add_start_docstrings
 from transformers.modeling_outputs import BaseModelOutput, BaseModelOutputWithPooling
 from transformers.models.clip.modeling_clip import CLIPMLP, CLIPAttention, CLIPTextEmbeddings, CLIPVisionEmbeddings, \
-    CLIPVisionModelWithProjection, CLIPTextModelWithProjection, _expand_mask, CLIPOutput, clip_loss
+    CLIPVisionModelWithProjection, CLIPTextModelWithProjection, CLIPOutput, clip_loss
 from transformers.utils import add_start_docstrings_to_model_forward, replace_return_docstrings
+from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 
 from .configuration_video import LanguageBindVideoConfig, CLIPVisionConfig, CLIPTextConfig
 
@@ -569,6 +569,7 @@ class CLIPTextTransformer(nn.Module):
         self.embeddings = CLIPTextEmbeddings(config)
         self.encoder = CLIPEncoder(config)
         self.final_layer_norm = nn.LayerNorm(embed_dim, eps=config.layer_norm_eps)
+        self.attention_mask_converter = AttentionMaskConverter(is_causal=False)
 
     @add_start_docstrings_to_model_forward(CLIP_TEXT_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=BaseModelOutputWithPooling, config_class=CLIPTextConfig)
@@ -605,7 +606,11 @@ class CLIPTextTransformer(nn.Module):
         # expand attention_mask
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            attention_mask = _expand_mask(attention_mask, hidden_states.dtype)
+            attention_mask = self.attn_mask_converter.to_4d(
+                attention_mask,
+                input_shape[-1],  # This is equivalent to the mask's sequence length
+                dtype=hidden_states.dtype
+            )
 
         encoder_outputs = self.encoder(
             inputs_embeds=hidden_states,
@@ -864,9 +869,6 @@ class LanguageBindVideo(CLIPPreTrainedModel):
         text_config = config.text_config
         vision_config = config.vision_config
         self.add_time_attn = vision_config.add_time_attn
-        self.lora_r = vision_config.lora_r
-        self.lora_alpha = vision_config.lora_alpha
-        self.lora_dropout = vision_config.lora_dropout
 
         self.projection_dim = config.projection_dim
         self.text_embed_dim = text_config.hidden_size
@@ -881,28 +883,7 @@ class LanguageBindVideo(CLIPPreTrainedModel):
 
         # Initialize weights and apply final processing
         self.post_init()
-        self.convert_to_lora()
         # self.resize_pos(self.vision_model.embeddings, vision_config)
-
-    def convert_to_lora(self):
-        if self.lora_r == 0:
-            return
-        if self.add_time_attn:
-            target_modules = ["temporal_attn.k_proj", "temporal_attn.v_proj",
-                              "temporal_attn.q_proj", "temporal_attn.out_proj",
-                              "temporal_mlp.fc1", "temporal_mlp.fc2"]
-        else:
-            target_modules = ["k_proj", "v_proj", "q_proj", "out_proj"]
-        config = LoraConfig(
-            r=self.lora_r,  # 16
-            lora_alpha=self.lora_alpha,  # 16
-            target_modules=target_modules,  # self_attn.out_proj
-            lora_dropout=self.lora_dropout,  # 0.1
-            bias="none",
-            modules_to_save=[],
-        )
-        self.vision_model.encoder.is_gradient_checkpointing = False
-        self.vision_model.encoder = get_peft_model(self.vision_model.encoder, config)
 
     def resize_pos(self, m, vision_config):
         # convert embedding

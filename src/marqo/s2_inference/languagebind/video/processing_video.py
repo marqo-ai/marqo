@@ -23,7 +23,18 @@ def make_list_of_images(x):
 
 def get_video_transform(config):
     config = config.vision_config
-    if config.video_decode_backend == 'opencv':
+    if config.video_decode_backend == 'decord':
+        transform = Compose(
+            [
+                # UniformTemporalSubsample(num_frames),
+                Lambda(lambda x: x / 255.0),
+                NormalizeVideo(mean=OPENAI_DATASET_MEAN, std=OPENAI_DATASET_STD),
+                ShortSideScale(size=224),
+                CenterCropVideo(224),
+                RandomHorizontalFlipVideo(p=0.5),
+            ]
+        )
+    elif config.video_decode_backend == 'opencv':
         transform = Compose(
             [
                 # UniformTemporalSubsample(num_frames),
@@ -35,7 +46,7 @@ def get_video_transform(config):
             ]
         )
     else:
-        raise NameError('video_decode_backend should specify in (opencv)')
+        raise NameError('video_decode_backend should specify in (decord, opencv)')
     return transform
 
 
@@ -47,8 +58,16 @@ def load_and_transform_video(
         clip_end_sec=None,
         num_frames=8,
 ):
-   
-    if video_decode_backend == 'opencv':
+    if video_decode_backend == 'decord':
+        decord.bridge.set_bridge('torch')
+        decord_vr = VideoReader(video_path, ctx=cpu(0))
+        duration = len(decord_vr)
+        frame_id_list = np.linspace(0, duration-1, num_frames, dtype=int)
+        video_data = decord_vr.get_batch(frame_id_list)
+        video_data = video_data.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+        video_outputs = transform(video_data)
+
+    elif video_decode_backend == 'opencv':
         cv2_vr = cv2.VideoCapture(video_path)
         duration = int(cv2_vr.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_id_list = np.linspace(0, duration-1, num_frames, dtype=int)
