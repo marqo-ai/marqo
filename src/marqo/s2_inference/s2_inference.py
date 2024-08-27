@@ -61,19 +61,10 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
-    print(f"vectorise, model: {model}")
-    print(f"vectorise, model_cache_key: {model_cache_key}")
-    #print(f"vectorise, content: {content}")
-    print(f"vectorise, normalize_embeddings: {normalize_embeddings}")
-    print(f"vectorise, modality: {modality}")
-    print(f"vectorise, kwargs: {kwargs}")
-    if modality == None:
-        print(f"vectorise, modality is unexpectedly None. Content is {content}")
+
     if _marqo_inference_cache.is_enabled() and enable_cache:
-        print(f"vectorise, _marqo_inference_cache is enabled")
         return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs)
     else:
-        print(f"vectorise, _marqo_inference_cache is not enabled")
         return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
 
 def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs):
@@ -130,7 +121,6 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
         encoder = get_encoder(model)
 
         if isinstance(content, str):
-            print(f"from _encode_without_cache, content is string, {content}")
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
@@ -140,9 +130,8 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
             
             for batch in generate_batches(content, batch_size=batch_size):
                 if modality is None:
-                    print(f"from _encode_without_cache, modality is None")
                     modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
-                print(f"from _encode_without_cache, before encoding modality: {modality}, type(modality): {type(modality)}")
+
                 encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings, **kwargs)
                 
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
@@ -217,7 +206,6 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
     
     if model_properties.get("type") in ['languagebind', 'imagebind']:
-        print(f"from load_multimodal_model_and_get_preprocessors, loading model: {model_name}, model_properties: {model_properties}")
         model = load_multimodal_model(model_name, model_properties, device)
 
     #if not is_preprocess_image_model(model_properties):
@@ -231,8 +219,6 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     )
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
-    print(f"from load_multimodal_model_and_get_preprocessors, model: {model}")
-    print(f"is_preprocess_image_model(model_properties): {is_preprocess_image_model(model_properties)}")
 
     preprocessors = {
         "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None, # improve this logic for multimodal models
@@ -240,7 +226,6 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
         "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
         "text": None # Future preprocessor
     }
-    print(f"preprocessors: {preprocessors}")
 
     return model, preprocessors
     #return getattr(_available_models[model_cache_key][AvailableModelsKey.model], "preprocess", None)
@@ -355,7 +340,6 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         InvalidModelPropertiesError: if the model_properties are invalid
         UnknownModelError: if the model_name is not in the model registry
     """
-    print(f"validate_model_properties")
     if model_properties is not None:
         """checks model dict to see if all required keys are present
         """
@@ -376,7 +360,6 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                 if key not in model_properties:
                     model_properties[key] = value
         elif model_type in (ModelType.OpenCLIP, ModelType.CLIP):
-            print(f"model_type is {model_type}")
             required_keys = ["name", "dimensions"]
         elif model_type in (ModelType.HF_MODEL, ):
             required_keys = ["dimensions"]
@@ -407,7 +390,6 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                                                   f"{marqo_docs.bring_your_own_model()} for more info")
 
     else:
-        print(f"model_properties is None, getting from registry")
         model_properties = get_model_properties_from_registry(model_name)
 
     _validate_model_properties_dimension(model_properties.get("dimensions", None))
@@ -542,22 +524,18 @@ def _load_model(
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
     if model_properties.get('type') in [ModelType.LanguageBind]:
-        print(f"loading for: model_name={model_name} and properties={model_properties}")
         model = MultimodalModel(model_name, model_properties, device)
         model.model = model._load_multimodal_model()
         model.encoder = get_encoder(model)
         return model
 
-    print(f"loading for: model_name={model_name} and properties={model_properties}")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
-    print(f"loader is {loader}")
 
     max_sequence_length = model_properties.get('tokens', get_default_seq_length())
     model = loader(
         model_properties.get('name', None), device=device, embedding_dim=model_properties['dimensions'],
         max_seq_length=max_sequence_length, model_properties=model_properties, model_auth=model_auth
     )
-    print(f"model is {model}")
     model.load()
     return model
 
@@ -599,14 +577,12 @@ def get_model_properties_from_registry(model_name: str) -> dict:
     Returns:
         dict: a dictionary describing properties of the model.
     """
-    print(f"Getting model properties for model={model_name}")
     if model_name not in MODEL_PROPERTIES['models']:
         raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
                                 f"Model is not supported by default.")
 
     model_properties = MODEL_PROPERTIES['models'][model_name]
 
-    print(f"validating model_properties is {model_properties}")
     validate_model_properties(model_name, model_properties)
 
     return model_properties

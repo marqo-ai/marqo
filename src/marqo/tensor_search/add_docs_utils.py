@@ -33,7 +33,6 @@ class StreamingMediaProcessor:
 
     def _set_split_parameters(self, modality):
         preprocessing = self.marqo_index.video_preprocessing if modality == Modality.VIDEO else self.marqo_index.audio_preprocessing
-        print(f"{modality.lower()}_preprocessing: {preprocessing}")
         
         if preprocessing is not None:
             self.split_length = preprocessing.split_length
@@ -46,14 +45,14 @@ class StreamingMediaProcessor:
             raise ValueError(f"Unsupported modality: {modality}")
 
     def _log_initialization_details(self):
-        print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
-        print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
-        print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
-        print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
+        #print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
+        #print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
+        #print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
+        #print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
+        pass
 
     def _fetch_file_metadata(self):
         start_time = time.time()
-        print(f"Starting fetch_file_metadata for URL: {self.url}")
 
         try:
             probe_options = {
@@ -68,10 +67,7 @@ class StreamingMediaProcessor:
             size = int(probe['format'].get('size', 0))
             duration = float(probe['format'].get('duration', 0))
 
-            print(f"from StreamingMediaProcessor, got duration: {duration}, size: {size} bytes")
-
             end_time = time.time()
-            print(f"fetch_file_metadata using full ffprobe completed in {(end_time - start_time) * 1000:.2f} ms")
             return size, duration
         
         except ffmpeg.Error as e:
@@ -107,7 +103,6 @@ class StreamingMediaProcessor:
                     
                     processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
 
-                    print(f"len(processed_chunk_tensor['pixel_values'].shape): {processed_chunk_tensor['pixel_values'].shape}")
                     processed_chunk = {
                         'tensor': processed_chunk_tensor,
                         'start_time': chunk_start,
@@ -134,4 +129,3 @@ class StreamingMediaProcessor:
     def _progress(self, download_total, downloaded, upload_total, uploaded):
         if download_total > 0:
             progress = downloaded / download_total * 100
-            print(f"Download progress: {progress:.2f}%")

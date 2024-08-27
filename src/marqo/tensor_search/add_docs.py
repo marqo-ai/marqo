@@ -96,15 +96,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     continue
                 if isinstance(doc[field], str):
                     modality = infer_modality(doc[field])
-                    print(f"from threaded_download_and_preprocess_content, modality: {modality}")
                     if modality == Modality.IMAGE: # or clip_utils._is_image(doc[field]):
-                        #if marqo_index == None:
-                        #    continue
-                        #elif marqo_index.model.properties.get('type') in [ModelType.LanguageBind]:
-                        #    if modality not in marqo_index.model.properties.get('supported_modalities'):
-                        #        raise ValueError(f"Model {marqo_index.model.name} does not support modality: {modality}")
-
-                        print(f"from threaded_download_and_preprocess_content, modality is IMAGE")
                         # Existing logic
                         if doc[field] in content_repo:
                             continue
@@ -119,14 +111,10 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             continue
                         # preprocess image to tensor
                         if preprocessors is not None and preprocessors['image'] is not None:
-                            print(f"preprocessors['image']: {preprocessors['image']}")
-                            print(f"device: {device}")
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                print(f"from threaded_download_and_preprocess_content, trying to preprocess image")
                                 content_repo[doc[field]] = preprocessors['image'](content_repo[doc[field]]).to(device)
-                                print(f"content_repo[doc[field]]: {content_repo[doc[field]]}")
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     content_repo[doc[field]] = e
