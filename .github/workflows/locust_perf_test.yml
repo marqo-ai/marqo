@@ -1,0 +1,130 @@
+name: locust_perf_test
+# runs Locust performance test
+on:
+  workflow_dispatch:
+    inputs:
+      marqo_base_ref:
+        description: 'marqo branch-name, commit SHA or tag'
+        required: true
+        default: 'mainline'
+
+      test_suite:
+        type: choice
+        required: true
+        options:
+          - locustfile.py
+        description: >
+          Location of the locustfile that contains the test suite. This works as the entrypoint
+
+      number_of_users:
+        type: string
+        required: false
+        default: "10"
+        description: >
+          Total number of simulated users
+          
+      user_spawn_rate:
+        type: string
+        required: false
+        default: "5"
+        description: >
+          Users spawned per second
+
+      duration:
+        type: string
+        required: false
+        default: "60"
+        description: >
+          How long stress testing will go on
+
+      image_to_test:
+        type: string
+        required: false
+        # This is the name of the docker image that is built by the build script:
+        default: marqo_docker_0
+        description: >
+          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
+          Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
+
+jobs:
+  Start-Runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          ec2-image-id:  ${{ secrets.AMD_EC2_IMAGE_ID }}
+          ec2-instance-type: t3.xlarge
+          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
+          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
+
+  Test-Marqo:
+    name: Run CPU Docker Marqo API Tests
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+
+    environment: marqo-test-suite
+
+    steps:
+
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo
+          ref: ${{ github.event.inputs.marqo_ref }}
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.8"
+          cache: "pip"
+
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@v2
+
+      - name: Run Perf Tests
+        run: |
+          docker run -d --name marqo -it -p 8882:8882 marqo-ai/marqo:latest
+          # wait for marqo to start
+          until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
+              sleep 0.1;
+          done;
+          
+          cd marqo/perf_tests
+          pip install -r requirements.txt
+          locust
+
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Test-Marqo # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
