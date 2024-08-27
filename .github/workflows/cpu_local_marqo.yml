@@ -98,15 +98,18 @@ jobs:
 
       - name: Run Perf Tests
         run: |
+          cd perf_tests
+          pip install -r requirements.txt
+          
+          docker logs -f marqo &
+          LOGS_PID=$!
           docker run -d --name marqo -it -p 8882:8882 marqoai/marqo:latest
-          # wait for marqo to start
           until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
               sleep 0.1;
           done;
+          kill $LOGS_PID
           
-          cd marqo/perf_tests
-          pip install -r requirements.txt
-          locust
+          locust 
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
