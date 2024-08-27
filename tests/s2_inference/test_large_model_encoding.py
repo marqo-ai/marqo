@@ -229,7 +229,7 @@ class TestE5Models(unittest.TestCase):
             run_test_cuda_encode_type([model_name])
 
 @pytest.mark.largemodel
-@pytest.mark.skip(reason="Model is too large")
+@pytest.mark.skip(reason="Needs further investigation")
 class TestBGEModels(unittest.TestCase):
     def setUp(self):
         self.models = ["hf/bge-large-zh-v1.5", "hf/bge-large-en-v1.5"]
@@ -264,7 +264,7 @@ class TestBGEModels(unittest.TestCase):
             run_test_cuda_encode_type([model_name])
 
 @pytest.mark.largemodel
-@pytest.mark.skip(reason="Model is too large")
+@pytest.mark.skip(reason="Needs further investigation")
 class TestSnowflakeModels(unittest.TestCase):
     def setUp(self):
         self.models = ["hf/snowflake-arctic-embed-l"]
