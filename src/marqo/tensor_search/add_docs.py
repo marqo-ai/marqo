@@ -153,6 +153,9 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 content_repo[sub_field] = e
                                 metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                                 continue
+
+            # Clear content_repo after processing each document
+            content_repo.clear()
     
 
 def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_index: MarqoIndex, preprocessors = dict) -> List[Dict[str, torch.Tensor]]:

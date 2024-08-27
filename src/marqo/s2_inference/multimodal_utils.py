@@ -144,13 +144,14 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
         return None
 
 
-class LanguageBindEncoder(ModelEncoder):
+class LanguageBindEncoder(ModelEncoder):    
     def __init__(self, model: MultimodalModel):
         self.model = model
         self.tokenizer = self._get_tokenizer()
 
     @contextmanager
     def _temp_file(self, suffix):
+        temp_file = None
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
                 yield temp_file.name
@@ -175,14 +176,19 @@ class LanguageBindEncoder(ModelEncoder):
         
     
     def preprocessor(self, modality):
-        preprocessors = {
-            Modality.VIDEO: LanguageBindVideoProcessor,
-            Modality.AUDIO: LanguageBindAudioProcessor,
-            Modality.IMAGE: LanguageBindImageProcessor
-        }
-        if modality not in self.model.clip_type:
-            return None
-        return preprocessors[modality](self.model.model.modality_config[modality])
+        if not hasattr(self, '_preprocessors'):
+            self._preprocessors = {}
+        
+        if modality not in self._preprocessors:
+            preprocessors = {
+                Modality.VIDEO: LanguageBindVideoProcessor,
+                Modality.AUDIO: LanguageBindAudioProcessor,
+                Modality.IMAGE: LanguageBindImageProcessor
+            }
+            if modality in self.model.clip_type:
+                self._preprocessors[modality] = preprocessors[modality](self.model.model.modality_config[modality])
+        
+        return self._preprocessors.get(modality)
     
     def encode(self, content, modality, **kwargs):
         inputs = {}
@@ -195,9 +201,6 @@ class LanguageBindEncoder(ModelEncoder):
 
         elif modality == Modality.IMAGE:
             with self._temp_file('.png') as temp_filename:
-                #if isinstance(content, list):
-                #    for item in content:
-                #        return self.encode(item, modality=modality)
                 content = content[0] if isinstance(content, list) else content
                 if isinstance(content, Image):
                     content.save(temp_filename, format='PNG')
