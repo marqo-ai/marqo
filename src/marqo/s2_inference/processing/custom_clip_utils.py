@@ -120,7 +120,9 @@ def download_pretrained_from_s3(
             raise ModelDownloadError(
                 "Received 403 error when trying to retrieve model from s3 storage. "
                 "Please check the request's s3 credentials and try again. "
-            )
+            ) from e
+        else:
+            raise e
 
 def download_pretrained_from_url(
         url: str,
