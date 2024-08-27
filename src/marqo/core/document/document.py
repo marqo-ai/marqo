@@ -209,7 +209,7 @@ class Document:
             errors = True
 
         return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
-                                         processingTimeMs=add_docs_processing_time)
+                                         processingTimeMs=add_docs_processing_time * 1000)
 
     def translate_vespa_document_response(self, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
         """A helper function to translate Vespa document response into the expected status, message that
