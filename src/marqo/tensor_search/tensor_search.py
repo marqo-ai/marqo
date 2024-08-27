@@ -104,6 +104,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
         marqo_index = index_meta_cache.get_index(
             config=config, index_name=add_docs_params.index_name, force_refresh=True
         )
+        print(f"from add_documents, add_docs_params: {add_docs_params}")
         print(f"from add_documents, marqo_index: {marqo_index}")
 
     # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)

@@ -179,6 +179,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     marqo_index: Optional[MarqoIndex] = None,
                                     ) -> ContextManager[dict]:
     
+    print(f"from download_and_preprocess_content, thread_count: {thread_count}")
     print(f"from download_and_preprocess_content, marqo_index: {marqo_index}")
     content_repo = {}  # for image/video/audio
     memory_pool = MemoryPool(total_size=500 * 1024 * 1024, chunk_size=20 * 1024 * 1024)  # 500 MB total, 20 MB chunks
