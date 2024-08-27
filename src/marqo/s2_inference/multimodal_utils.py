@@ -40,7 +40,6 @@ class MultimodalModelProperties(BaseModel):
     type: str = "multimodal"
     video_chunk_length: int # in seconds
     audio_chunk_length: int # in seconds
-    #cache_dir: str = None
 
 class MultimodalModel:
     def __init__(self, model_name: str, model_properties: Dict[str, Any], device: str):
@@ -120,19 +119,6 @@ class DefaultEncoder(ModelEncoder):
     def encode(self, content, modality, **kwargs):
         return self.model.encode(content)
 
-class ClipEncoder(ModelEncoder):
-    def __init__(self, model):
-        self.model = model
-
-    def encode(self, content, modality, **kwargs):
-        if modality == Modality.TEXT:
-            return self.model.encode_text(content)
-        elif modality == Modality.IMAGE:
-            return self.model.encode_image(content)
-        else:
-            raise NotImplementedError(f"CLIP does not support encoding for modality: {modality}")
-
-
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
         extension = content.split('.')[-1].lower()
@@ -162,7 +148,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
         else:
             return Modality.TEXT
     else:
-        return Modality.IMAGE # REVIEW THIS CODE
+        return None
 
 
 class LanguageBindEncoder(ModelEncoder):

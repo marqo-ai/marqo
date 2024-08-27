@@ -168,39 +168,48 @@ class TestAddDocumentsCombined(MarqoTestCase):
                                                                "vectorise for add_documents")
                 mock_vectorise.reset_mock()
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is ~5gb and is very slow on g4dn.xlarge and may crash it")
+    @pytest.mark.skipif(torch.cuda.is_available() is True,
+                        reason="We skip this test if we have cuda support. This model is ~5gb and may crash g5dn.xlarge")
     def test_add_multimodal_single_documents(self):
         """ """
         documents = [
-            {"video_field_3": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
+            {
+                "video_field_3": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
+                "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_2": "https://audio-previews.elements.envatousercontent.com/files/187680354/preview.mp3", "_id": "2"}, 
-            {"image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
+            {"audio_field_2": "https://audio-previews.elements.envatousercontent.com/files/187680354/preview.mp3",
+             "_id": "2"},
+            {
+                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "_id": "3"},
             {"text_field_3": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
         for index_name in [self.structured_languagebind_index_name, self.unstructured_languagebind_index_name]:
             with self.subTest(index_name):
                 res = tensor_search.add_documents(
-                    self.config, 
+                    self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
                         index_name=index_name,
-                        tensor_fields=["text_field_3", "image_field_2", "video_field_3", "audio_field_2"] if "unstructured" in index_name else None
+                        tensor_fields=["text_field_3", "image_field_2", "video_field_3",
+                                       "audio_field_2"] if "unstructured" in index_name else None
                     )
                 )
                 print(res)
                 for item in res.dict(exclude_none=True, by_alias=True)['items']:
                     self.assertEqual(200, item['status'])
-                
-                self.assertEqual(4, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['success_count'])
+
+                self.assertEqual(4,
+                                 res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['success_count'])
                 self.assertEqual(0, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['error_count'])
-                self.assertEqual(0, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['failure_count'])
+                self.assertEqual(0,
+                                 res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['failure_count'])
 
                 print(res)
 
                 get_res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index_name,
-                    document_ids=["1","2","3","4"],
+                    document_ids=["1", "2", "3", "4"],
                     show_vectors=True
                 ).dict(exclude_none=True, by_alias=True)
 
@@ -212,9 +221,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     if i in [1, 3, 4]:
                         self.assertEqual(len(tensor_facets), 1, f"Document {i} should have 1 tensor facet")
                     elif i == 2:
-                        #print(tensor_facets)
+                        # print(tensor_facets)
                         self.assertEqual(len(tensor_facets), 10, f"Document 2 should have 25 tensor facets")
-                    
+
                     # Check embedding length and uniqueness
                     embeddings = []
                     for facet in tensor_facets:
@@ -222,8 +231,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertEqual(len(embedding), 768, f"Embedding length should be 768 for document {i}")
                         self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
                         embeddings.append(embedding)
-    
-    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is ~5gb and is very slow on g4dn.xlarge and may crash it")
+
+    @pytest.mark.skipif(torch.cuda.is_available() is True,
+                        reason="We skip this test if we have cuda support. This model is ~5gb and may crash g5dn.xlarge")
     def test_add_multimodal_field_document(self):
         multimodal_document = {
             "_id": "1_multimodal",
@@ -239,17 +249,17 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 "multimodal_field": {
                     "type": "multimodal_combination",
                     "weights": {
-                        "text_field_1": 0.1, 
-                        "text_field_2": 0.1, 
-                        "image_field": 0.5, 
-                        "video_field_1": 0.1, 
-                        "video_field_2": 0.1, 
+                        "text_field_1": 0.1,
+                        "text_field_2": 0.1,
+                        "image_field": 0.5,
+                        "video_field_1": 0.1,
+                        "video_field_2": 0.1,
                         "audio_field_1": 0.1
                     },
                 }
             } if "unstructured" in index_name else None
             res = tensor_search.add_documents(
-                self.config, 
+                self.config,
                 add_docs_params=AddDocsParams(
                     docs=multimodal_document,
                     index_name=index_name,

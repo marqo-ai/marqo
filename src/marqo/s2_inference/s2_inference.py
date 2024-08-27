@@ -126,14 +126,9 @@ def _vectorise_without_cache(model_cache_key: str, content: Union[str, List[str]
 def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
                           normalize_embeddings: bool, modality: Modality, **kwargs) -> List[List[float]]:
     try:
-        print(f"model_cache_key: {model_cache_key}")
-        print(f"available_models: {_available_models}")
         model = _available_models[model_cache_key][AvailableModelsKey.model]
         encoder = get_encoder(model)
-        print(f"from _encode_without_cache, model: {model}")
-        print(f"from _encode_without_cache, encoder: {encoder}")
-        #print(f"from _encode_without_cache, content is {content}")
-        print(f"from _encode_without_cache, modality: {modality}, type(modality): {type(modality)}")
+
         if isinstance(content, str):
             print(f"from _encode_without_cache, content is string, {content}")
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
@@ -177,9 +172,7 @@ def get_marqo_inference_cache() -> MarqoInferenceCache:
     return _marqo_inference_cache
 
 def get_encoder(model):
-    if isinstance(model, OPEN_CLIP) or isinstance(model, CLIP):
-        return ClipEncoder(model)
-    elif isinstance(model, MultimodalModel):
+    if isinstance(model, MultimodalModel):
         if model.properties.loader == "languagebind":
             return LanguageBindEncoder(model)
         elif model.properties.loader == "imagebind":
