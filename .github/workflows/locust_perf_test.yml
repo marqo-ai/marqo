@@ -19,44 +19,64 @@ on:
 
       number_of_users:
         type: string
-        required: false
+        required: true
         default: "10"
         description: >
           Total number of simulated users
 
       user_spawn_rate:
         type: string
-        required: false
+        required: true
         default: "1"
         description: >
           Users spawned per second
 
       duration:
         type: string
-        required: false
+        required: true
         default: "5m"
         description: >
           How long stress testing will go on, default is 5 minutes
 
       marqo_host:
         type: string
-        required: false
+        required: true
         default: "http://localhost:8882"
         # TODO Find a way to provide API key when specifying a Marqo Cloud URL
         description: >
           Marqo host to run performance test on. If it's set to be localhost, we will spin up a local Marqo container. 
           Otherwise, the test will try to connect to the remote Marqo host.  
 
+      index_name:
+        type: string
+        required: true
+        default: "locust-test"
+        description: >
+          Index name to test. This index will be created before the local test run. You can also create it in Marqo Cloud
+          and specify the name here
+
+      # For test in cloud
+      marqo_cloud_api_key:
+        type: string
+        required: false
+        description: >
+          API key used to test Marqo Cloud instance
+
+      # For Local tests
       image_to_test:
         type: string
         required: false
-        # This is the name of the docker image that is built by the build script:
         default: marqo_docker_0
         description: >
           This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
-          Otherwise, the specified docker image is tested. For example "marqoai/marqo:latest"
+          Otherwise, the specified docker image is tested. For example "marqoai/marqo:latest", ignored when testing Marqo Cloud
 
-      # TODO Allow passing in parameter for index name and model to use
+      index_model_name:
+        type: string
+        required: false
+        default: "hf/e5-base-v2"
+        description: >
+          Embedding model to use to create the index. This is ignored when testing Marqo Cloud
 
 jobs:
   Start-Runner:
@@ -103,17 +123,17 @@ jobs:
           python-version: "3.8"
 
       - name: Set up Docker Buildx
-        if: github.event.inputs.image_to_test == 'marqo_docker_0'
+        if: github.event.inputs.marqo_host == 'http://localhost:8882' && github.event.inputs.image_to_test == 'marqo_docker_0'
         uses: docker/setup-buildx-action@v2
 
       - name: Build Docker Image
-        if: github.event.inputs.image_to_test == 'marqo_docker_0'
+        if: github.event.inputs.marqo_host == 'http://localhost:8882' && github.event.inputs.image_to_test == 'marqo_docker_0'
         run: |
           DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0
 
       - name: Start local Marqo container
         if: github.event.inputs.marqo_host == 'http://localhost:8882'
-        run: ./.github/scripts/start_docker_marqo.sh ${{ github.event.inputs.image_to_test }} -e MARQO_MODELS_TO_PRELOAD='["hf/e5-base-v2"]'
+        run: ./.github/scripts/start_docker_marqo.sh ${{ github.event.inputs.image_to_test }} -e MARQO_MODELS_TO_PRELOAD='["${{ github.event.inputs.index_model_name }}"]'
 
       - name: Install Perf Tests Dependencies
         run: |
@@ -127,6 +147,10 @@ jobs:
           locust -f ${{ github.event.inputs.test_suite }} -u ${{ github.event.inputs.number_of_users }} \
           -r ${{ github.event.inputs.user_spawn_rate }} -t ${{ github.event.inputs.duration }} \
           -H ${{ github.event.inputs.marqo_host }}
+        env:
+          MARQO_INDEX_NAME: ${{ github.event.inputs.index_name }}
+          MARQO_INDEX_MODEL_NAME: ${{ github.event.inputs.index_model_name }}
+          MARQO_CLOUD_API_KEY: ${{ github.event.inputs.marqo_cloud_api_key }}
 
       - name: Upload Locust Test Report
         uses: actions/upload-artifact@v4

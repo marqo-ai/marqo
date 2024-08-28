@@ -6,7 +6,7 @@ import marqo
 from marqo._httprequests import HttpRequests, HTTP_OPERATIONS, ALLOWED_OPERATIONS
 from marqo.config import Config
 from marqo.index import Index
-
+import os
 
 class MarqoLocustHttpUser(HttpUser):
     abstract = True
@@ -14,7 +14,7 @@ class MarqoLocustHttpUser(HttpUser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         session: HttpSession = self.client
-        marqo_client = marqo.Client(url=self.host)
+        marqo_client = marqo.Client(url=self.host, api_key=os.getenv('MARQO_CLOUD_API_KEY'))
         marqo_client.http = MarqoLocustHttpRequests(session, marqo_client.config)
 
         def _get_locust_enhanced_index(index_name: str):

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import random
+import os
 
 from locust import events, task, between, run_single_user
+from locust.env import Environment
 from wonderwords import RandomSentence, RandomWord
 import marqo
 
 from common.marqo_locust_http_user import MarqoLocustHttpUser
 
-# TODO make this configurable
-INDEX_NAME = "locust-test"
+INDEX_NAME = os.getenv('MARQO_INDEX_NAME', 'locust-test')
 
 
 class IndexingUser(MarqoLocustHttpUser):
@@ -44,18 +45,23 @@ class SearchUser(MarqoLocustHttpUser):
         )
 
 
-@events.test_start.add_listener
-def on_test_start(environment, **kwargs):
-    # TODO make the marqo client configurable, only create index for local tests
-    marqo_client = marqo.Client(url="http://localhost:8882")
-    # TODO make the model configurable as well
-    marqo_client.create_index(INDEX_NAME, model='hf/e5-base-v2')
+@events.init.add_listener
+def on_test_start(environment: Environment, **kwargs):
+    host = environment.host
+    local_run = host == 'http://localhost:8882'
+    if local_run:
+        # Create index if run local
+        marqo_client = marqo.Client(url=host)
+        marqo_client.create_index(INDEX_NAME, model=os.getenv('MARQO_INDEX_MODEL_NAME', 'hf/e5-base-v2'))
 
 
-@events.test_stop.add_listener
+@events.quitting.add_listener
 def on_test_stop(environment, **kwargs):
-    marqo_client = marqo.Client(url="http://localhost:8882")
-    marqo_client.delete_index(INDEX_NAME)
+    host = environment.host
+    local_run = host == 'http://localhost:8882'
+    if local_run:
+        marqo_client = marqo.Client(url=host)
+        marqo_client.delete_index(INDEX_NAME)
 
 
 # @events.request.add_listener
@@ -68,4 +74,4 @@ def on_test_stop(environment, **kwargs):
 
 
 if __name__ == "__main__":
-    run_single_user(SearchUser)
+    run_single_user(IndexingUser)
