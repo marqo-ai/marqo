@@ -1,2 +1,3 @@
-locust
-marqo
+locust==2.25.0
+marqo==3.7.0
+wonderwords==2.2.0

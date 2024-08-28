@@ -90,6 +90,8 @@ werkzeug==3.0.4
     #   flask
     #   flask-login
     #   locust
+wonderwords==2.2.0
+    # via -r requirements.in
 zipp==3.20.1
     # via importlib-metadata
 zope-event==5.0
