@@ -1,5 +1,6 @@
-name: locust_perf_test
-# runs Locust performance test
+name: cpu_local_marqo_API_tests
+# runs API Tests on CPU-only instance with Vespa and Marqo running in two separate docker containers
+
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +13,7 @@ on:
         type: choice
         required: true
         options:
-          - locustfile.py
+          - random_index_and_tensor_search.py
         description: >
           Location of the locustfile that contains the test suite. This works as the entrypoint
 
@@ -22,20 +23,29 @@ on:
         default: "10"
         description: >
           Total number of simulated users
-          
+
       user_spawn_rate:
         type: string
         required: false
-        default: "5"
+        default: "1"
         description: >
           Users spawned per second
 
       duration:
         type: string
         required: false
-        default: "60"
+        default: "5m"
         description: >
-          How long stress testing will go on
+          How long stress testing will go on, default is 5 minutes
+
+      marqo_host:
+        type: string
+        required: false
+        default: "http://localhost:8882"
+        # TODO Find a way to provide API key when specifying a Marqo Cloud URL
+        description: >
+          Marqo host to run performance test on. If it's set to be localhost, we will spin up a local Marqo container. 
+          Otherwise, the test will try to connect to the remote Marqo host.  
 
       image_to_test:
         type: string
@@ -44,7 +54,9 @@ on:
         default: marqo_docker_0
         description: >
           This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
-          Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
+          Otherwise, the specified docker image is tested. For example "marqoai/marqo:latest"
+
+      # TODO Allow passing in parameter for index name and model to use
 
 jobs:
   Start-Runner:
@@ -83,29 +95,44 @@ jobs:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
-          repository: marqo-ai/marqo
           ref: ${{ github.event.inputs.marqo_ref }}
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
         with:
           python-version: "3.8"
-          cache: "pip"
 
-#      - name: Set up Docker Buildx
-#        uses: docker/setup-buildx-action@v2
+      - name: Set up Docker Buildx
+        if: github.event.inputs.image_to_test == 'marqo_docker_0'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image
+        if: github.event.inputs.image_to_test == 'marqo_docker_0'
+        run: |
+          DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0
+
+      - name: Start local Marqo container
+        if: github.event.inputs.marqo_host == 'http://localhost:8882'
+        run: ./.github/scripts/start_docker_marqo.sh ${{ github.event.inputs.image_to_test }} -e MARQO_MODELS_TO_PRELOAD='["hf/e5-base-v2"]'
+
+      - name: Install Perf Tests Dependencies
+        run: |
+          cd perf_tests
+          pip install -r requirements.txt
 
       - name: Run Perf Tests
         run: |
-          docker run -d --name marqo -it -p 8882:8882 marqo-ai/marqo:latest
-          # wait for marqo to start
-          until [[ $(curl -v --silent --insecure http://localhost:8882 2>&1 | grep Marqo) ]]; do
-              sleep 0.1;
-          done;
-          
-          cd marqo/perf_tests
-          pip install -r requirements.txt
-          locust
+          cd perf_tests
+          mkdir -p report
+          locust -f ${{ github.event.inputs.test_suite }} -u ${{ github.event.inputs.number_of_users }} \
+          -r ${{ github.event.inputs.user_spawn_rate }} -t ${{ github.event.inputs.duration }} \
+          -H ${{ github.event.inputs.marqo_host }}
+
+      - name: Upload Locust Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-locust-test-report
+          path: perf_tests/report/
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
