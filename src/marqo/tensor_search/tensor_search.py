@@ -55,6 +55,7 @@ from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_index import IndexType
+from marqo.s2_inference.models.model_type import ModelType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
@@ -153,13 +154,19 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
+    # Check if model is Video/Audio. If so, manually set thread_count to 5
+    media_download_thread_count = add_docs_params.image_download_thread_count
+    if marqo_index.model.get_properties().get('type') in [ModelType.LanguageBind]:
+        if media_download_thread_count > 5:
+            media_download_thread_count = 5
+
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media: # review this logic
             with RequestMetricsStore.for_request().time(
                     "media_download.full_time",
                     lambda t: logger.debug(
                         f"add_documents image download: took {t:.3f}ms to concurrently download "
-                        f"media for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+                        f"media for {batch_size} docs using {media_download_thread_count} threads"
                     )
             ):
                 # TODO - Refactor this part to make it more readable
@@ -171,7 +178,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 content_repo = exit_stack.enter_context(
                     add_docs.download_and_preprocess_content(
                         docs=docs,
-                        thread_count=add_docs_params.image_download_thread_count,
+                        thread_count=media_download_thread_count,
                         tensor_fields=tensor_fields_and_multimodal_subfields,
                         image_download_headers=add_docs_params.image_download_headers,
                         model_name=marqo_index.model.name,
@@ -635,6 +642,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     # Deduplicate docs, keep the latest
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
+    # Check if model is Video/Audio. If so, manually set thread_count to 5
+    media_download_thread_count = add_docs_params.image_download_thread_count
+    if marqo_index.model.get_properties().get('type') in [ModelType.LanguageBind]:
+        if media_download_thread_count > 5:
+            media_download_thread_count = 5
+
     with ExitStack() as exit_stack:
         #image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
         media_fields = [
@@ -649,7 +662,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 "media_download.full_time",
                 lambda t: logger.debug(
                     f"add_documents media download: took {t:.3f}ms to concurrently download "
-                    f"media for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+                    f"media for {batch_size} docs using {media_download_thread_count} threads"
                 )
             ):
 
@@ -659,7 +672,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 content_repo = exit_stack.enter_context(
                     add_docs.download_and_preprocess_content(
                         docs=docs, 
-                        thread_count=add_docs_params.image_download_thread_count,
+                        thread_count=media_download_thread_count,
                         tensor_fields=media_fields,
                         image_download_headers=add_docs_params.image_download_headers, # add non image download headers in the future
                         model_name=marqo_index.model.name,

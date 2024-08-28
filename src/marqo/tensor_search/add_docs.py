@@ -162,9 +162,8 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     ) -> ContextManager[dict]:
     
     # Check if model is Video/Audio. If so, manually set thread_count to 5
-    if model_properties.get('type') in [ModelType.LanguageBind]:
-        thread_count = 5
-
+    #if model_properties.get('type') in [ModelType.LanguageBind]:
+    #    thread_count = 5
     content_repo = {}  # for image/video/audio
 
     docs_per_thread = math.ceil(len(docs) / thread_count)

@@ -190,7 +190,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
                                                      device: Optional[str] = None,
                                                      model_auth: Optional[ModelAuth] = None,
                                                      normalize_embeddings: bool = get_default_normalization()) \
-        -> Optional[Compose]:
+        -> Tuple[Any, Dict[str, Optional[Compose]]]:
     """Load the model and return preprocessors for different modalities.
 
     Args:
@@ -209,11 +209,8 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
     
-    if model_properties.get("type") in ['languagebind', 'imagebind']:
-        model = load_multimodal_model(model_name, model_properties, device)
-
-    #if not is_preprocess_image_model(model_properties):
-    #    raise InternalError(message=f"Model {model_name} is not a model that requires preload image preprocessor.")
+    #if model_properties.get("type") in ['languagebind', 'imagebind']:
+    #    model = load_multimodal_model(model_name, model_properties, device)
 
     model_cache_key = _create_model_cache_key(model_name, device, model_properties)
 
@@ -225,7 +222,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     model = _available_models[model_cache_key][AvailableModelsKey.model]
 
     preprocessors = {
-        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None, # improve this logic for multimodal models
+        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
         "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
         "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
         "text": None # Future preprocessor
@@ -298,6 +295,7 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
             _validate_model_into_device(model_name, validated_model_properties, device,
                                        calling_func=_update_available_models.__name__)
             try:
+                print(f"loading {model_name} on device {device}")
                 most_recently_used_time = datetime.datetime.now()
                 _available_models[model_cache_key] = {
                     AvailableModelsKey.model: _load_model(
