@@ -42,7 +42,6 @@ on:
         type: string
         required: true
         default: "http://localhost:8882"
-        # TODO Find a way to provide API key when specifying a Marqo Cloud URL
         description: >
           Marqo host to run performance test on. If it's set to be localhost, we will spin up a local Marqo container. 
           Otherwise, the test will try to connect to the remote Marqo host.  
