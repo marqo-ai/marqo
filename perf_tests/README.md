@@ -26,14 +26,18 @@ locust
 # Alternatively you can specify CLI params to override the default settings
 locust -u <user_count> -r <spawn-rate> -t <duragion> -H <host> -f <test_file> 
 
+# When run locally, by default it creates an index `locust-test` with `hf/e5-base-v2` model,
+# You can specify the name of the index or model by using env vars
+MARQO_INDEX_NAME=<index_name> MARQO_INDEX_MODEL_NAME=<model_name> locust 
+
+# You can also run against a Marqo Cloud instance by providing the host and API key
+MARQO_INDEX_NAME=<index_name> ARQO_CLOUD_API_KEY=<your api key> locust -H <host>
+
 # After the run, a test report will be generated to report/report.html file
 ```
 
-### Run against Marqo Cloud
-TODO will be supported soon
-
 ## Trigger run in Github
-TODO will be added when the GH action is merged to master
+TODO add after the GH action is merged to master
 
 ## Develop new test cases
 
