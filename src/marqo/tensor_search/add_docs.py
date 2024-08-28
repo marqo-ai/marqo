@@ -32,28 +32,12 @@ from marqo.s2_inference.models.model_type import ModelType
 
 logger = logging.getLogger(__name__)
 
-class MemoryPool:
-    def __init__(self, total_size: int, chunk_size: int):
-        self.total_size = total_size
-        self.chunk_size = chunk_size
-        self.pool = Queue(maxsize=total_size // chunk_size)
-
-        for _ in range(self.pool.maxsize):
-            self.pool.put(bytearray(chunk_size))
-
-    def get_chunk(self):
-        return self.pool.get()
-
-    def return_chunk(self, chunk):
-        self.pool.put(chunk)
-
 
 def threaded_download_and_preprocess_content(allocated_docs: List[dict], 
                                                 content_repo: dict, 
                                                 tensor_fields: List[str],
                                                 image_download_headers: dict,
                                                 device: str = None,
-                                                memory_pool: Optional[MemoryPool] = None, # Optional for now
                                                 download_headers: Optional[Dict] = None,  # Optional for now
                                                 metric_obj: Optional[RequestMetrics] = None,
                                                 preprocessors: Optional[Dict[str, Compose]] = None,
@@ -123,12 +107,10 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 else:
                                     raise e
 
-                    if modality in [Modality.VIDEO, Modality.AUDIO]:
+                    elif modality in [Modality.VIDEO, Modality.AUDIO]:
                         if marqo_index.model.properties.get('type') not in [ModelType.LanguageBind] and modality not in marqo_index.model.properties.get('supported_modalities'):
-                            #print(f"from threaded_download_and_preprocess_content, model is not a Multimodal model")
-                            content_repo[doc[field]] = UnsupportedModalityError(f"Model {marqo_index.model.name} is not a Multimodal model and does not support {modality}")
+                            content_repo[doc[field]] = UnsupportedModalityError(f"Model {marqo_index.model.name} does not support {modality}")
                             continue
-                        #print(f"from threaded_download_and_preprocess_content, modality is VIDEO or AUDIO")
                         try:
                             processed_chunks = download_and_chunk_media(doc[field], download_headers, modality, marqo_index, preprocessors)
                             content_repo[doc[field]] = processed_chunks
@@ -179,10 +161,11 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     marqo_index: Optional[MarqoIndex] = None,
                                     ) -> ContextManager[dict]:
     
-    #print(f"from download_and_preprocess_content, thread_count: {thread_count}")
-    #print(f"from download_and_preprocess_content, marqo_index: {marqo_index}")
+    # Check if model is Video/Audio. If so, manually set thread_count to 5
+    if model_properties.get('type') in [ModelType.LanguageBind]:
+        thread_count = 5
+
     content_repo = {}  # for image/video/audio
-    memory_pool = MemoryPool(total_size=500 * 1024 * 1024, chunk_size=20 * 1024 * 1024)  # 500 MB total, 20 MB chunks
 
     docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
@@ -194,18 +177,14 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
         model_auth=model_auth,
         normalize_embeddings=normalize_embeddings
     )
-    #print(f"from download_and_preprocess_content, preprocessors: {preprocessors}")
 
     if not is_preprocess_image_model(model_properties) or patch_method_exists:
-        #print(f"from download_and_preprocess_content, is_preprocess_image_model(model_properties): {is_preprocess_image_model(model_properties)}")
-        #print(f"from download_and_preprocess_content, patch_method_exists: {patch_method_exists}")
         preprocessors['image'] = None
 
     try:
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
         download_headers={}
-        #print(f"from download_and_preprocess_content, thread_allocated_docs: {thread_allocated_docs}")
         with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
             futures = [executor.submit(threaded_download_and_preprocess_content,
                            allocation, 
@@ -213,13 +192,11 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                            tensor_fields,
                            image_download_headers, 
                            device,
-                           memory_pool, 
                            download_headers, 
                            m[i], 
                            preprocessors,
                            marqo_index)
            for i, allocation in enumerate(thread_allocated_docs)]
-
 
             # Unhandled exceptions will be raised here.
             # We only raise the first exception if there are multiple exceptions
@@ -230,7 +207,6 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
         metric_obj = RequestMetricsStore.for_request()
         metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
         metric_obj.times = reduce_thread_metrics(metric_obj.times)
-        #print(f"from download_and_preprocess_content, content_repo: {content_repo}")
         yield content_repo
     finally:
         for p in content_repo.values():
