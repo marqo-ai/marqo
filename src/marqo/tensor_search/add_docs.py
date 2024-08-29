@@ -168,7 +168,8 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     print(f"from download_and_preprocess_content, len(docs): {len(docs)}")
     # Check if model is LanguageBind and docs length > 16
     is_languagebind = model_properties.get('type') == ModelType.LanguageBind
-    if is_languagebind and len(docs) > 16:
+    enable = False
+    if enable: #is_languagebind and len(docs) > 16:
         print(f"Processing {len(docs)} docs in batches of 16")
         # Process in batches of 16
         for i in range(0, len(docs), 16):
