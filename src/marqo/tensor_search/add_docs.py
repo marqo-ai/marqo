@@ -173,6 +173,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
         # Process in batches of 16
         for i in range(0, len(docs), 16):
             batch = docs[i:i+16]
+            print(f"Processing batch {i//16 + 1} of {math.ceil(len(docs)/16)}")
             batch_content_repo = process_batch(batch, thread_count, tensor_fields, image_download_headers,
                                                model_name, normalize_embeddings, download_headers,
                                                model_properties, model_auth, device, patch_method_exists,
