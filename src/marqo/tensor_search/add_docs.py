@@ -165,7 +165,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     #if model_properties.get('type') in [ModelType.LanguageBind]:
     #    thread_count = 5
     content_repo = {}  # for image/video/audio
-
+    print(f"from download_and_preprocess_content, len(docs): {len(docs)}")
     # Check if model is LanguageBind and docs length > 16
     is_languagebind = model_properties.get('type') == ModelType.LanguageBind
     if is_languagebind and len(docs) > 16:
