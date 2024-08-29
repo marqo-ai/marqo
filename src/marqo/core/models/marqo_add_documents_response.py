@@ -17,6 +17,9 @@ class BatchResponseStats(MarqoBaseModel):
             "x-count-error": str(self.error_count),
         }
 
+    def has_error_or_failure(self):
+        return self.error_count + self.failure_count > 0
+
 
 class MarqoBaseDocumentsResponse(MarqoBaseModel):
     """A base documents API response model."""
@@ -52,6 +55,16 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
     error: Optional[str] = None
     code: Optional[str] = None
 
+    @classmethod
+    def from_error(cls, doc_id: Optional[str], error: Any) -> 'MarqoAddDocumentsItem':
+        return MarqoAddDocumentsItem(
+            id=doc_id if doc_id is not None else '',
+            error=error.message,
+            message=error.message,
+            status=int(error.status_code or 400),
+            code=error.code
+        )
+
 
 class MarqoAddDocumentsResponse(MarqoBaseDocumentsResponse):
     errors: bool
@@ -76,4 +89,5 @@ class MarqoAddDocumentsResponse(MarqoBaseDocumentsResponse):
                     raise ValueError(f"Unexpected status code: {item.status}")
 
         values['_batch_response_stats'] = batch_response_count
+        values['errors'] = batch_response_count.has_error_or_failure()
         return values
