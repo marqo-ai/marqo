@@ -392,7 +392,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                         image_data = content_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not find image found at `{field_content}`. \n"
+                                            f"Could not process the media file found at `{field_content}`. \n"
                                             f"Reason: {str(content_repo[field_content])}"
                                         )
                                 else:
@@ -904,7 +904,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                         image_data = content_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not find image found at `{field_content}`. \n"
+                                            f"Could not process the media file found at `{field_content}`. \n"
                                             f"Reason: {str(content_repo[field_content])}"
                                         )
                                 else:
@@ -2398,7 +2398,7 @@ def vectorise_multimodal_combination_field_structured(
                             image_data = content_repo[sub_content]
                         else:
                             raise s2_inference_errors.S2InferenceError(
-                                f"Could not find image at `{sub_content}`. \n"
+                                f"Could not process image at `{sub_content}`. \n"
                                 f"Reason: {str(content_repo[sub_content])}"
                             )
                         image_content_to_vectorise.append(image_data)
@@ -2408,7 +2408,7 @@ def vectorise_multimodal_combination_field_structured(
                             video_data = content_repo[sub_content][0]['tensor']
                         else:
                             raise s2_inference_errors.S2InferenceError(
-                                f"Could not find video at `{sub_content}`. \n"
+                                f"Could not process video at `{sub_content}`. \n"
                                 f"Reason: {str(content_repo[sub_content])}"
                             )
                         video_content_to_vectorise.append(video_data)
@@ -2418,7 +2418,7 @@ def vectorise_multimodal_combination_field_structured(
                             audio_data = content_repo[sub_content][0]['tensor']
                         else:
                             raise s2_inference_errors.S2InferenceError(
-                                f"Could not find audio at `{sub_content}`. \n"
+                                f"Could not process audio at `{sub_content}`. \n"
                                 f"Reason: {str(content_repo[sub_content])}"
                             )
                         audio_content_to_vectorise.append(audio_data)

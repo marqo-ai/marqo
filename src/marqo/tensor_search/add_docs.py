@@ -122,7 +122,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 f"Model {marqo_index.model.name} does not support {modality}")
                             continue
                         try:
-                            processed_chunks = download_and_chunk_media(doc[field], download_headers, modality,
+                            processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
                                                                         marqo_index, preprocessors)
                             content_repo[doc[field]] = processed_chunks
                         except Exception as e:
@@ -148,10 +148,10 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
     
 
-def download_and_chunk_media(url: str, headers: dict, modality: Modality, marqo_index: MarqoIndex, preprocessors = dict) -> List[Dict[str, torch.Tensor]]:
+def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index: MarqoIndex, preprocessors = dict) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
-    processor = StreamingMediaProcessor(url, headers, modality, marqo_index, preprocessors)
+    processor = StreamingMediaProcessor(url, device, headers, modality, marqo_index, preprocessors)
     
     if processor.total_size > MAX_FILE_SIZE:
         raise ValueError(f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")

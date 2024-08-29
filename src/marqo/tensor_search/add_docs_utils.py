@@ -19,8 +19,9 @@ from marqo.s2_inference.s2_inference import  Modality
 
 
 class StreamingMediaProcessor:
-    def __init__(self, url: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex, preprocessors: Dict[str, Compose]):
+    def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex, preprocessors: Dict[str, Compose]):
         self.url = url
+        self.device = device
         self.headers = headers
         self.modality = modality
         self.marqo_index = marqo_index
@@ -102,6 +103,8 @@ class StreamingMediaProcessor:
                     ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
                     
                     processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
+                    processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
+                    
 
                     processed_chunk = {
                         'tensor': processed_chunk_tensor,
