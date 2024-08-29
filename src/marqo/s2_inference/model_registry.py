@@ -487,6 +487,20 @@ def _get_open_clip_properties() -> Dict:
             "dimensions": 512,
             "note": "Marqo's fashionSigLIP model",
             "type": "open_clip"
+        },
+        "open_clip/MobileCLIP-B/datacompdr_lt":{
+            "name": "open_clip/MobileCLIP-B/datacompdr_lt",
+            "dimensions": 512,
+            "note": "MobileCLIP model",
+            "type": "open_clip",
+            "pretrained": "datacompdr_lt"
+        },
+        "open_clip/MobileCLIP-S1/datacompdr": {
+            "name": "open_clip/MobileCLIP-S1/datacompdr",
+            "dimensions": 512,
+            "note": "MobileCLIP model",
+            "type": "open_clip",
+            "pretrained": "datacompdr"
         }
     }
     return OPEN_CLIP_MODEL_PROPERTIES

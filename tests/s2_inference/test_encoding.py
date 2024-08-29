@@ -280,12 +280,15 @@ class TestOpenClipModelEncoding(unittest.TestCase):
     '''
 
     def setUp(self) -> None:
-        self.open_clip_test_model = ['open_clip/RN50/yfcc15m', 'open_clip/ViT-B-32/laion2b_s34b_b79k',
-                                     'open_clip/ViT-B-16/laion2b_s34b_b88k', 'open_clip/convnext_base/laion400m_s13b_b51k',
-                                     'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
-                                     'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
-                                     'open_clip/EVA02-B-16/merged2b_s8b_b131k']
-        pass
+        self.open_clip_test_model = [
+            'open_clip/RN50/yfcc15m', 'open_clip/ViT-B-32/laion2b_s34b_b79k',
+            'open_clip/ViT-B-16/laion2b_s34b_b88k', 'open_clip/convnext_base/laion400m_s13b_b51k',
+            'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
+            'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
+            'open_clip/EVA02-B-16/merged2b_s8b_b131k',
+            "open_clip/MobileCLIP-B/datacompdr_lt",
+            "open_clip/MobileCLIP-S1/datacompdr"
+        ]
 
     def tearDown(self) -> None:
         clear_loaded_models()
