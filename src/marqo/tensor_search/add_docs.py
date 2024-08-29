@@ -166,6 +166,43 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     #    thread_count = 5
     content_repo = {}  # for image/video/audio
 
+    # Check if model is LanguageBind and docs length > 16
+    is_languagebind = model_properties.get('type') == ModelType.LanguageBind
+    if is_languagebind and len(docs) > 16:
+        print(f"Processing {len(docs)} docs in batches of 16")
+        # Process in batches of 16
+        for i in range(0, len(docs), 16):
+            batch = docs[i:i+16]
+            batch_content_repo = process_batch(batch, thread_count, tensor_fields, image_download_headers,
+                                               model_name, normalize_embeddings, download_headers,
+                                               model_properties, model_auth, device, patch_method_exists,
+                                               marqo_index)
+            content_repo.update(batch_content_repo)
+    else:
+        print(f"Processing {len(docs)} docs in single batch")
+        # Original processing logic
+        content_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
+                                     model_name, normalize_embeddings, download_headers,
+                                     model_properties, model_auth, device, patch_method_exists,
+                                     marqo_index)
+
+    try:
+        yield content_repo
+    finally:
+        for p in content_repo.values():
+            if isinstance(p, ImageFile):
+                p.close()
+            elif isinstance(p, (list, np.ndarray)):
+                # Clean up video/audio chunks if necessary
+                pass
+
+
+def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
+                  image_download_headers: dict, model_name: str, normalize_embeddings: bool,
+                  download_headers: Optional[Dict], model_properties: Optional[Dict],
+                  model_auth: Optional[ModelAuth], device: Optional[str],
+                  patch_method_exists: bool, marqo_index: Optional[MarqoIndex]) -> dict:
+
     docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
 
@@ -180,40 +217,37 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     if not is_preprocess_image_model(model_properties) or patch_method_exists:
         preprocessors['image'] = None
 
-    try:
-        m = [RequestMetrics() for i in range(thread_count)]
-        thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
-        download_headers={}
-        with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
-            futures = [executor.submit(threaded_download_and_preprocess_content,
-                           allocation, 
-                           content_repo, 
-                           tensor_fields,
-                           image_download_headers, 
-                           device,
-                           download_headers, 
-                           m[i], 
-                           preprocessors,
-                           marqo_index)
-           for i, allocation in enumerate(thread_allocated_docs)]
+    content_repo = {}
+    m = [RequestMetrics() for i in range(thread_count)]
+    # Consider replacing below with:
+    # thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(0, len(copied), docs_per_thread)]
+    thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
+    download_headers = download_headers if download_headers else {}
 
-            # Unhandled exceptions will be raised here.
-            # We only raise the first exception if there are multiple exceptions
-            for future in concurrent.futures.as_completed(futures):
-                _ = future.result()
+    with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
+        futures = [executor.submit(threaded_download_and_preprocess_content,
+                        allocation, 
+                        content_repo, 
+                        tensor_fields,
+                        image_download_headers, 
+                        device,
+                        download_headers, 
+                        m[i], 
+                        preprocessors,
+                        marqo_index)
+        for i, allocation in enumerate(thread_allocated_docs)]
 
-        # Fix up metric_obj to make it not mention thread-ids
-        metric_obj = RequestMetricsStore.for_request()
-        metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
-        metric_obj.times = reduce_thread_metrics(metric_obj.times)
-        yield content_repo
-    finally:
-        for p in content_repo.values():
-            if isinstance(p, ImageFile):
-                p.close()
-            elif isinstance(p, (list, np.ndarray)):
-                # Clean up video/audio chunks if necessary
-                pass
+        # Unhandled exceptions will be raised here.
+        # We only raise the first exception if there are multiple exceptions
+        for future in concurrent.futures.as_completed(futures):
+            _ = future.result()
+
+    # Fix up metric_obj to make it not mention thread-ids
+    metric_obj = RequestMetricsStore.for_request()
+    metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
+    metric_obj.times = reduce_thread_metrics(metric_obj.times)
+    return content_repo
+    
 
 def reduce_thread_metrics(data):
     """Reduce the metrics from each thread, as if they were run in a single thread.

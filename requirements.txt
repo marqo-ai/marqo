@@ -22,12 +22,4 @@ certifi==2019.11.28
 transformers==4.41.2
 optimum==1.20.0
 
-# LanguageBind
-
-eva-decord==0.6.1
-einops==0.6.1
-pytorchvideo==0.1.5
-torchaudio==0.12.1
-SoundFile==0.12.1
-python-magic==0.4.27
-ffmpeg-python==0.2.0
+#eva-decord==0.6.1

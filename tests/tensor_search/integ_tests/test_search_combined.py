@@ -203,7 +203,7 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://audio-previews.elements.envatousercontent.com/files/187680354/preview.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
             {"image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
@@ -236,7 +236,7 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://audio-previews.elements.envatousercontent.com/files/187680354/preview.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
             {"image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
@@ -256,7 +256,7 @@ class TestSearch(MarqoTestCase):
                 results = tensor_search.search(
                     config=self.config,
                     index_name=index.name,
-                    text="https://audio-previews.elements.envatousercontent.com/files/187680354/preview.mp3"
+                    text="https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3"
                 )
                 
                 # Assertions

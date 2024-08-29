@@ -177,7 +177,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 "video_field_3": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
                 "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_2": "https://audio-previews.elements.envatousercontent.com/files/187680354/preview.mp3",
+            {"audio_field_2": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
              "_id": "2"},
             {
                 "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
@@ -242,7 +242,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
             "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
             "video_field_2": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
-            "audio_field_1": "https://audio-previews.elements.envatousercontent.com/files/187680354/preview.mp3",
+            "audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
         },
         for index_name in [self.structured_languagebind_index_name, self.unstructured_languagebind_index_name]:
             mappings = {
