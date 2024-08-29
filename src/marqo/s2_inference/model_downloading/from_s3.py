@@ -19,13 +19,7 @@ def get_presigned_s3_url(location: S3Location, auth: Optional[S3Auth] = None):
 
     TODO: add link to proper usage in error messages
     """
-    if auth is None:
-        raise ModelDownloadError(
-            "Error retrieving private model. s3 authorisation information is required to "
-            "download a model from an s3 bucket. "
-            "If the model is publicly accessible, please use the model's publicly accessible URL."
-        )
-    s3_client = boto3.client('s3', **auth.dict())
+    s3_client = boto3.client('s3', **(auth.dict() if auth is not None else {}))
     try:
         return s3_client.generate_presigned_url('get_object', Params=location.dict(exclude_unset=True))
     except NoCredentialsError:
