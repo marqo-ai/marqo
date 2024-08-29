@@ -1664,15 +1664,15 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         except (s2_inference_errors.UnknownModelError,
                 s2_inference_errors.InvalidModelPropertiesError,
                 s2_inference_errors.ModelLoadError,
-                s2_inference.ModelDownloadError) as model_error:
+                s2_inference.ModelDownloadError) as e:
             raise api_exceptions.BadRequestError(
-                message=f'Problem vectorising query. Reason: {str(model_error)}',
+                message=f'Problem vectorising query. Reason: {str(e)}',
                 link=marqo_docs.list_of_models()
-            )
+            ) from e
 
         except s2_inference_errors.S2InferenceError as e:
             # TODO: differentiate image processing errors from other types of vectorise errors
-            raise api_exceptions.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}')
+            raise api_exceptions.InvalidArgError(message=f'Error vectorising content: {v.content}. Message: {e}') from e
     return result
 
 
