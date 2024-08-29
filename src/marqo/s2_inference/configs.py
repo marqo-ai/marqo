@@ -15,6 +15,16 @@ class ModelCache:
     hf_cache_path = os.getenv('HF_SAVE_PATH', f'{utils.get_marqo_root_from_env()}/cache/hf/')
 
     languagebind_cache_path = os.getenv('LANGUAGEBIND_CACHE_PATH', f'{utils.get_marqo_root_from_env()}/cache/languagebind/')
+    
+    @classmethod
+    def get_all_cache_paths(cls):
+        return [
+            cls.onnx_cache_path,
+            cls.torch_cache_path,
+            cls.clip_cache_path,
+            cls.hf_cache_path,
+            cls.languagebind_cache_path
+        ]
 
 class BaseTransformerModels:
 

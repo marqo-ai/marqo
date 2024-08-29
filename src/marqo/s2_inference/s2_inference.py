@@ -245,7 +245,7 @@ def _get_max_vectorise_batch_size() -> int:
     except (ValueError, TypeError) as e:
         value_error_msg = f"`{validation_error_msg} Current value: `{max_batch_size_value}`. Reason: {e}"
         logger.error(value_error_msg)
-        raise ConfigurationError(value_error_msg)
+        raise ConfigurationError(value_error_msg) from e
     if batch_size < 1:
         batch_size_too_small_msg = f"`{validation_error_msg} Current value: `{max_batch_size_value}`."
         logger.error(batch_size_too_small_msg)
@@ -319,17 +319,17 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
                     f"Unable to load model={model_name} on device={device} with normalization={normalize_embeddings}. "
                     f"If you are trying to load a custom model, "
                     f"please check that model_properties={validated_model_properties} is correct "
-                    f"and Marqo has access to the weights file.")
+                    f"and Marqo has access to the weights file.") from e
 
     else:
         most_recently_used_time = datetime.datetime.now()
         logger.debug(f'renewed {model_name} on device {device} with new most recently time={most_recently_used_time}.')
         try:
             _available_models[model_cache_key][AvailableModelsKey.most_recently_used_time] = most_recently_used_time
-        except KeyError:
+        except KeyError as e:
             raise ModelNotInCacheError(f"Marqo cannot renew model {model_name} on device {device} with normalization={normalize_embeddings}. "
                                        f"Maybe another thread is updating the model cache at the same time."
-                                       f"Please wait for 10 seconds and send the request again.\n")
+                                       f"Please wait for 10 seconds and send the request again.\n") from e
 
 
 def validate_model_properties(model_name: str, model_properties: dict) -> dict:
