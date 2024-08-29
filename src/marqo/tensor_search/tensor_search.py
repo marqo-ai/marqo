@@ -155,8 +155,9 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     # Check if model is Video/Audio. If so, manually set thread_count to 5
     media_download_thread_count = add_docs_params.image_download_thread_count
     if marqo_index.model.get_properties().get('type') in [ModelType.LanguageBind]:
-        if media_download_thread_count > 5:
-            media_download_thread_count = 5
+        #if media_download_thread_count > 5:
+        #    media_download_thread_count = 5
+        pass
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media: # review this logic
@@ -640,8 +641,9 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     # Check if model is Video/Audio. If so, manually set thread_count to 5
     media_download_thread_count = add_docs_params.image_download_thread_count
     if marqo_index.model.get_properties().get('type') in [ModelType.LanguageBind]:
-        if media_download_thread_count > 5:
-            media_download_thread_count = 5
+        #if media_download_thread_count > 5:
+        #    media_download_thread_count = 5
+        pass
 
     with ExitStack() as exit_stack:
         #image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]

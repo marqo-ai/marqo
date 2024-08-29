@@ -104,7 +104,6 @@ class StreamingMediaProcessor:
                     
                     processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
                     processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
-                    
 
                     processed_chunk = {
                         'tensor': processed_chunk_tensor,
