@@ -81,6 +81,12 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                 if isinstance(doc[field], str):
                     modality = infer_modality(doc[field])
                     if modality == Modality.IMAGE: # or clip_utils._is_image(doc[field]):
+                        if marqo_index.model is not None and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]:
+                            if marqo_index.model.properties.get('supported_modalities') is not None:
+                                if Modality.IMAGE not in marqo_index.model.properties.get('supported_modalities'):
+                                    content_repo[doc[field]] = UnsupportedModalityError(
+                                        f"Model {marqo_index.model.name} does not support {modality}")
+                                    continue
                         # Existing logic
                         if doc[field] in content_repo:
                             continue
@@ -108,11 +114,15 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                     raise e
 
                     elif modality in [Modality.VIDEO, Modality.AUDIO]:
-                        if marqo_index.model.properties.get('type') not in [ModelType.LanguageBind] and modality not in marqo_index.model.properties.get('supported_modalities'):
-                            content_repo[doc[field]] = UnsupportedModalityError(f"Model {marqo_index.model.name} does not support {modality}")
+                        if marqo_index.model.properties.get('type') not in [
+                            ModelType.LanguageBind] and modality not in marqo_index.model.properties.get(
+                                'supported_modalities'):
+                            content_repo[doc[field]] = UnsupportedModalityError(
+                                f"Model {marqo_index.model.name} does not support {modality}")
                             continue
                         try:
-                            processed_chunks = download_and_chunk_media(doc[field], download_headers, modality, marqo_index, preprocessors)
+                            processed_chunks = download_and_chunk_media(doc[field], download_headers, modality,
+                                                                        marqo_index, preprocessors)
                             content_repo[doc[field]] = processed_chunks
                         except Exception as e:
                             logger.error(f"Error processing {modality} file: {str(e)}")
@@ -165,23 +175,19 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     #if model_properties.get('type') in [ModelType.LanguageBind]:
     #    thread_count = 5
     content_repo = {}  # for image/video/audio
-    print(f"from download_and_preprocess_content, len(docs): {len(docs)}")
     # Check if model is LanguageBind and docs length > 16
     is_languagebind = model_properties.get('type') == ModelType.LanguageBind
-    enable = False
-    if enable: #is_languagebind and len(docs) > 16:
-        print(f"Processing {len(docs)} docs in batches of 16")
+    enable = False 
+    if enable and is_languagebind and len(docs) > 16:
         # Process in batches of 16
         for i in range(0, len(docs), 16):
             batch = docs[i:i+16]
-            print(f"Processing batch {i//16 + 1} of {math.ceil(len(docs)/16)}")
             batch_content_repo = process_batch(batch, thread_count, tensor_fields, image_download_headers,
                                                model_name, normalize_embeddings, download_headers,
                                                model_properties, model_auth, device, patch_method_exists,
                                                marqo_index)
             content_repo.update(batch_content_repo)
     else:
-        print(f"Processing {len(docs)} docs in single batch")
         # Original processing logic
         content_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
                                      model_name, normalize_embeddings, download_headers,

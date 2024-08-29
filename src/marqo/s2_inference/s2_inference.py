@@ -295,7 +295,6 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
             _validate_model_into_device(model_name, validated_model_properties, device,
                                        calling_func=_update_available_models.__name__)
             try:
-                print(f"loading {model_name} on device {device}")
                 most_recently_used_time = datetime.datetime.now()
                 _available_models[model_cache_key] = {
                     AvailableModelsKey.model: _load_model(

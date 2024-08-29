@@ -1970,8 +1970,8 @@ def _get_languagebind_properties() -> Dict:
             "video_chunk_length": 20,
             "audio_chunk_length": 20,
         },
-        'LanguageBind/Video_1.5_FT': {
-            "name": "LanguageBind/Video_1.5_FT",
+        'LanguageBind/Video_V1.5_FT': {
+            "name": "LanguageBind/Video_V1.5_FT",
             "dimensions": 768,
             "type": "languagebind",
             "loader": "languagebind",

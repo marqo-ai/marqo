@@ -105,8 +105,6 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
         marqo_index = index_meta_cache.get_index(
             config=config, index_name=add_docs_params.index_name, force_refresh=True
         )
-        #print(f"from add_documents, add_docs_params: {add_docs_params}")
-        #print(f"from add_documents, marqo_index: {marqo_index}")
 
     # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
     except api_exceptions.IndexNotFoundError:
@@ -338,7 +336,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 chunk_end = media_chunk['end_time']
                                 chunk_id = f"{field}::start_{chunk_start:.2f}::end_{chunk_end:.2f}"
                                 chunks.append(chunk_id)
-                                #print(f"from add_docs_unstructured, chunk_id is: {chunk_id}, modality is: {modality}, media_chunk is: {media_chunk}")
 
                                 vector = s2_inference.vectorise(
                                     model_name=marqo_index.model.name,
@@ -531,8 +528,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         
                         if field_content:  # Check if the subfields are present
                             modality = infer_modality(field_content)
-                            #print(f"from vectorise_multimodal_combination_field_unstructured, modality is {modality}")
-                            #print(f"from vectorise_multimodal_combination_field_unstructured, field_content is {field_content}")
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                             unsuccessful_doc_to_append,
                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
@@ -613,7 +608,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     vespa_client = config.vespa_client
     vespa_index = StructuredVespaIndex(marqo_index)
     index_model_dimensions = marqo_index.model.get_dimension()
-    #print(f"from _add_documents_structured, marqo_index: {marqo_index}")
+
     RequestMetricsStore.for_request().start("add_documents.processing_before_vespa")
 
     if add_docs_params.tensor_fields is not None:
@@ -684,7 +679,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         marqo_index=marqo_index
                     )
                 )
-                #print(f"from tensor_search add_documents_structured, content_repo is {content_repo}")
 
         if add_docs_params.use_existing_tensors:
             existing_docs_dict: Dict[str, dict] = {}
@@ -838,17 +832,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
                     if marqo_field.type in [FieldType.VideoPointer, FieldType.AudioPointer]:
-                        #print(f"from tensor_search add_documents_structured, marqo_field.type is {marqo_field.type}")
                         try:
                             media_chunks = content_repo[field_content]
                             
-                            #print(f"from tensor_search add_documents_structured, media_chunks is {media_chunks}")
                             if isinstance(content_repo[field_content], s2_inference_errors.S2InferenceError):
-                                #print(f"from add_docs_unstructured, content_repo[field_content] is Invalid: {content_repo[field_content]}")
                                 raise content_repo[field_content]
-                            #print(f"from add_docs_structured, media_chunks count is {len(media_chunks)}")
                             for chunk_index, media_chunk in enumerate(media_chunks):
-                                #print(f"from add_docs_structured, vectorising chunk {chunk_index}")
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
                                 chunk_id = f"{field}::start_{chunk_start:.2f}::end_{chunk_end:.2f}"
@@ -865,7 +854,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                     modality=Modality.VIDEO if marqo_field.type == FieldType.VideoPointer else Modality.AUDIO
                                 )
                                 embeddings.extend(vector)  # vectorise returns a list of vectors
-                                #print(f"from tensor_search add_documents_structured, embeddings is {embeddings}")
                                 
                         except Exception as e:
                             document_is_valid = False

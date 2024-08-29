@@ -83,7 +83,7 @@ class MultimodalModel:
             self.clip_type = {
                 'audio': 'LanguageBind_Audio_FT',
             }
-        elif self.model_name == "LanguageBind/Video_1.5_FT":
+        elif self.model_name == "LanguageBind/Video_V1.5_FT":
             self.clip_type = {
                 'video': 'LanguageBind_Video_V1.5_FT',
             }
@@ -162,16 +162,13 @@ class LanguageBindEncoder(ModelEncoder):
     def _get_tokenizer(self): # this is used for text only
         if 'image' in self.model.clip_type:
             pretrained_ckpt = 'LanguageBind/LanguageBind_Image'
-            #print(f"Image Tokenize")
             return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
         else:
             first_model = next(iter(self.model.clip_type.values()))
             pretrained_ckpt = f'LanguageBind/{first_model}'
             if "video" in first_model.lower():
-                #print(f"Video Tokenizer")
                 return LanguageBindVideoTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
             else:
-                #print(f"Audio Tokenizer")
                 return LanguageBindAudioTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
         
     
