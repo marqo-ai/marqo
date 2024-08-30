@@ -309,7 +309,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                 # C) field type is standard
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
-                    if isinstance(field_content, (str, Image.Image)):
+                    if isinstance(field_content, str):
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
                         # 2. check if it is a url or pointer
                         # 3. If yes in 1 and 2, download blindly (without type)
@@ -317,7 +317,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
                         # 6. if chunking -> then add the extra chunker
 
-                        if isinstance(field_content, str) and not _is_image(field_content):
+                        if not _is_image(field_content):
                             # text processing pipeline:
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
