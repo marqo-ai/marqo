@@ -541,7 +541,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
         marqo_add_documents_response = config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
-            add_docs_processing_time_ms=100 * (t1 - t0)
+            add_docs_processing_time_ms=1000 * (t1 - t0)
         )
         return marqo_add_documents_response
 
