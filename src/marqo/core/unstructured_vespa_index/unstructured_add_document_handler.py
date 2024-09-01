@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from typing import Dict, Any, List
 
 import semver
@@ -31,7 +32,8 @@ from marqo.vespa.models.get_document_response import Document
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
     def __init__(self, marqo_index: UnstructuredMarqoIndex, config: Config, add_docs_params: AddDocsParams):
         validate_tensor_fields(add_docs_params.tensor_fields)
-        validate_mappings_object_format(add_docs_params.mappings)
+        if add_docs_params.mappings:
+            validate_mappings_object_format(add_docs_params.mappings)
 
         super().__init__(marqo_index, config, add_docs_params)
 
@@ -98,7 +100,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
             self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc)
 
-    def _download_and_chunk_image_contents(self, invalid_docs: List[MarqoAddDocumentsItem]) -> None:
+    def _download_and_chunk_image_contents(self, invalid_docs: List[MarqoAddDocumentsItem], exit_stack) -> None:
         # download images
         url_field_map = dict()
         doc_url_map = dict()
@@ -122,42 +124,46 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
         # TODO refactor download_and_preprocess_images to accept dict(doc_id, list(urls))
         # FIXME maybe pass in add_docs_params and marqo index directly?
-        with add_docs.download_and_preprocess_images(
-            docs=doc_url_map.values(),
-            thread_count=self.add_docs_params.image_download_thread_count,
-            tensor_fields=tensor_fields,
-            image_download_headers=self.add_docs_params.image_download_headers,
-            model_name=self.marqo_index.model.name,
-            normalize_embeddings=self.marqo_index.normalize_embeddings,
-            model_properties=self.marqo_index.model.get_properties(),
-            device=self.add_docs_params.device,
-            model_auth=self.add_docs_params.model_auth,
-            patch_method_exists=self.marqo_index.image_preprocessing.patch_method is not None
-        ) as image_repo:
-            image_method = self.marqo_index.image_preprocessing.patch_method
-            for url, data in image_repo.items():
-                if isinstance(data, Exception):
-                    for doc_id in set([doc_id for (doc_id, _) in url_field_map[url]]):
-                        invalid_docs.append(MarqoAddDocumentsItem.from_error(doc_id, data))
-                        self.tensor_fields_container.remove_doc(doc_id)
-                else:
-                    if image_method is not None:
-                        # TODO handle error
-                        content_chunks, text_chunks = image_processor.chunk_image(
-                            data, device=self.add_docs_params.device, method=image_method.value)
-                    else:
-                        content_chunks, text_chunks = [data], [url]
+        image_repo = exit_stack.enter_context(
+            add_docs.download_and_preprocess_images(
+                docs=list(doc_url_map.values()),
+                thread_count=self.add_docs_params.image_download_thread_count,
+                tensor_fields=tensor_fields,
+                image_download_headers=self.add_docs_params.image_download_headers,
+                model_name=self.marqo_index.model.name,
+                normalize_embeddings=self.marqo_index.normalize_embeddings,
+                model_properties=self.marqo_index.model.get_properties(),
+                device=self.add_docs_params.device,
+                model_auth=self.add_docs_params.model_auth,
+                patch_method_exists=self.marqo_index.image_preprocessing.patch_method is not None
+            )
+        )
 
-                    for (_, tensor_field_content) in url_field_map[url]:
-                        tensor_field_content.chunks = text_chunks
-                        tensor_field_content.content_chunks = content_chunks
+        image_method = self.marqo_index.image_preprocessing.patch_method
+        for url, data in image_repo.items():
+            if isinstance(data, Exception):
+                for doc_id in set([doc_id for (doc_id, _) in url_field_map[url]]):
+                    invalid_docs.append(MarqoAddDocumentsItem.from_error(doc_id, data))
+                    self.tensor_fields_container.remove_doc(doc_id)
+            else:
+                if image_method is not None:
+                    # TODO handle error
+                    content_chunks, text_chunks = image_processor.chunk_image(
+                        data, device=self.add_docs_params.device, method=image_method.value)
+                else:
+                    content_chunks, text_chunks = [data], [url]
+
+                for (_, tensor_field_content) in url_field_map[url]:
+                    tensor_field_content.chunks = text_chunks
+                    tensor_field_content.content_chunks = content_chunks
 
     def vectorise_tensor_fields(self) -> List[MarqoAddDocumentsItem]:
         invalid_docs: List[MarqoAddDocumentsItem] = []
-        self._chunk_text_content(invalid_docs)
-        self._download_and_chunk_image_contents(invalid_docs)
-        self._batch_vectorise(invalid_docs)
-        # TODO handle multimodal fields
+        with ExitStack() as exit_stack:
+            self._chunk_text_content(invalid_docs)
+            self._download_and_chunk_image_contents(invalid_docs, exit_stack)
+            self._batch_vectorise(invalid_docs)
+            # TODO handle multimodal fields
 
         return invalid_docs
 
