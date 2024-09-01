@@ -45,6 +45,8 @@ class AddDocumentsHandler(ABC):
                     # This collects the doc
                     self.handle_field(marqo_doc, field_name, field_content)
 
+                self.handle_multi_modal_fields(marqo_doc['_id'], marqo_doc)
+
                 # we only add doc to marqo_docs if it is valid
                 marqo_docs[loc] = marqo_doc
 
@@ -78,6 +80,10 @@ class AddDocumentsHandler(ABC):
 
     @abstractmethod
     def handle_field(self, marqo_doc, field_name, field_content):
+        pass
+
+    @abstractmethod
+    def handle_multi_modal_fields(self, doc_id: str, marqo_doc: Dict[str, Any]):
         pass
 
     @abstractmethod

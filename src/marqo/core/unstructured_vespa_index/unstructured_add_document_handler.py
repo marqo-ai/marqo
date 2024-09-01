@@ -1,6 +1,8 @@
+import json
 from contextlib import ExitStack
 from typing import Dict, Any, List
 
+import numpy as np
 import semver
 
 from marqo import marqo_docs
@@ -13,6 +15,7 @@ from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
+from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_tensor_fields, validate_field_name, \
     validate_mappings_object_format, validate_coupling_of_mappings_and_doc
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
@@ -80,11 +83,12 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                 # TODO is_non_tensor_field check can be move out to AddDocsParams level
                 validate_custom_vector(field_content, False, self.marqo_index.model.get_dimension())
             elif self.tensor_fields_container.is_multimodal_field(field_name):
-                # TODO is_non_tensor_field check can be move out to AddDocsParams level
+                # FIXME, multimodal field should not be present in the doc
+                # TODO This validation should be done at AddDocsParams level
                 validate_multimodal_combination(field_content, False,
                                                 self.tensor_fields_container.get_multimodal_field_mapping(field_name))
             elif self.marqo_index.parsed_marqo_version() < semver.VersionInfo.parse("2.9.0"):
-                # TODO better to have version check extract to a common place
+                # TODO This check should not happen at root level
                 raise InvalidArgError(
                     f"The field {field_name} is a map field and only supported for indexes created with Marqo 2.9.0 "
                     f"or later. See {marqo_docs.map_fields()} and {marqo_docs.mappings()}."
@@ -92,13 +96,22 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             else:
                 validate_map_numeric_field(field_content)
 
+    def handle_multi_modal_fields(self, doc_id: str, marqo_doc: Dict[str, Any]) -> None:
+
+        for field_name, mapping in self.tensor_fields_container.collect_multi_modal_fields(doc_id):
+            if MARQO_DOC_MULTIMODAL_PARAMS not in marqo_doc:
+                marqo_doc[MARQO_DOC_MULTIMODAL_PARAMS] = dict()
+            # FIXME check if this is correct, we compare dict with json when checking existing field
+            marqo_doc[MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(mapping)
+
     def handle_existing_tensors(self, existing_vespa_docs: Dict[str, Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
             return
 
         for doc_id, vespa_doc in existing_vespa_docs.items():
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
-            self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc)
+            existing_multimodal_mappings = existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, None)
+            self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc, existing_multimodal_mappings)
 
     def _download_and_chunk_image_contents(self, invalid_docs: List[MarqoAddDocumentsItem], exit_stack) -> None:
         # download images
@@ -163,7 +176,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             self._chunk_text_content(invalid_docs)
             self._download_and_chunk_image_contents(invalid_docs, exit_stack)
             self._batch_vectorise(invalid_docs)
-            # TODO handle multimodal fields
+            self._handle_multimodal_fields(invalid_docs)
 
         return invalid_docs
 
@@ -184,7 +197,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
         result = []
         for resp in index_responses.responses:
-            # FIXME if response is error, id is not returned
+            # FIXME if response is error, id is not returned, we can return id, but there's a url encoding bug of Id
             doc_id = resp.id.split('::')[-1] if resp.id else None
             status, message = self.config.document.translate_vespa_document_response(resp.status, message=resp.message)
             result.append(MarqoAddDocumentsItem(id=doc_id, status=status, message=message))
@@ -223,4 +236,27 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             )
 
             tensor_field_content.embeddings = embeddings
+
+    def _handle_multimodal_fields(self, invalid_docs: List[MarqoAddDocumentsItem]):
+        for doc_id, field_name, tensor_field_content in (
+                self.tensor_fields_container.tensor_fields_to_vectorise(FieldType.MultimodalCombination)):
+
+            subfield_contents = self.tensor_fields_container.get_tensor_field_content(
+                doc_id, include_multimodal_subfields=True)
+
+            weights = tensor_field_content.field_content
+            field_contents = dict()
+            combo_embeddings = []
+            for sub_field_name, weight in weights.items():
+                # TODO handle key error
+                field_contents[sub_field_name] = subfield_contents[sub_field_name].field_content
+                # FIXME chunking is not supported for multi-modal?
+                combo_embeddings.append(np.array(subfield_contents[sub_field_name].embeddings[0]) * weight)
+
+            vector_chunk = np.squeeze(np.mean(combo_embeddings, axis=0))
+            if self.marqo_index.normalize_embeddings:
+                vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
+
+            tensor_field_content.chunks = [json.dumps(field_contents)]
+            tensor_field_content.embeddings = [vector_chunk.tolist()]
 
