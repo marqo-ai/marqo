@@ -1,4 +1,5 @@
-from typing import List, Dict, Tuple, Set, Optional, Any, Generator
+import json
+from typing import List, Dict, Tuple, Set, Optional, Any, Generator, Union
 
 from pydantic.main import BaseModel
 
@@ -10,7 +11,7 @@ from marqo.tensor_search import enums
 
 
 class TensorFieldContent(BaseModel):
-    field_content: str
+    field_content: Union[str, dict]  # field content of multimodal field is a dict derived from its subfields
     field_type: FieldType
     chunks: Optional[List[str]] = None
     content_chunks: Optional[List[str]] = None
@@ -56,7 +57,7 @@ class TensorFieldsContainer:
         if doc_id in self._tensor_field_map:
             del self._tensor_field_map[doc_id]
 
-    def add_tensor_field_content(self, doc_id: str, field_name: str, field_content: str, field_type: FieldType,
+    def add_tensor_field_content(self, doc_id: str, field_name: str, field_content: Union[str, dict], field_type: FieldType,
                                  chunks: Optional[List[str]] = None,
                                  embeddings: Optional[List[List[float]]] = None) -> None:
         if doc_id not in self._tensor_field_map:
@@ -89,11 +90,11 @@ class TensorFieldsContainer:
 
                 yield doc_id, field_name, tensor_field_content
 
-    def get_tensor_field_content(self, doc_id: str) -> Dict[str, TensorFieldContent]:
+    def get_tensor_field_content(self, doc_id: str, include_multimodal_subfields: bool = False) -> Dict[str, TensorFieldContent]:
         return {field_name: content for field_name, content in self._tensor_field_map.get(doc_id, dict()).items()
-                if field_name in self._tensor_fields}
+                if include_multimodal_subfields or field_name in self._tensor_fields}
 
-    def populate_tensor_from_existing_doc(self, doc_id, existing_marqo_doc):
+    def populate_tensor_from_existing_doc(self, doc_id: str, existing_marqo_doc: Dict[str, Any], existing_multimodal_mappings: dict) -> None:
         if doc_id not in self._tensor_field_map:
             return
 
@@ -115,7 +116,7 @@ class TensorFieldsContainer:
                 # This field is not a tensor field in existing doc, we need to vectorise
                 continue
 
-            # TODO see if this handle multimodal fields
+            # TODO handle multimodal fields
 
             existing_tensor = existing_marqo_doc[constants.MARQO_DOC_TENSORS][field_name]
             tensor_content.chunks = existing_tensor[constants.MARQO_DOC_CHUNKS]
@@ -135,8 +136,9 @@ class TensorFieldsContainer:
             return content
 
         if self.is_multimodal_field(field_name):
-            # TODO handle multimodal
-            pass
+            raise InvalidArgError(
+                f"Multimodal_field {field_name} cannot have value assigned"
+            )
 
         if not isinstance(field_content, str):
             # TODO better error message
@@ -149,8 +151,14 @@ class TensorFieldsContainer:
         )
         return field_content
 
+    # TODO this logic is unstructured only. We need to extract out
     def _infer_field_type(self, field_content: str):
         if self._treat_url_as_media and _is_image(field_content):
             return FieldType.ImagePointer
 
         return FieldType.Text
+
+    def collect_multi_modal_fields(self, doc_id: str):
+        for field_name, mapping in self._multimodal_combo_fields.items():
+            self.add_tensor_field_content(doc_id, field_name, mapping['weights'], field_type=FieldType.MultimodalCombination)
+            yield field_name, mapping
