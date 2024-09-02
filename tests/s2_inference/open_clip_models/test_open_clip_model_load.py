@@ -28,9 +28,9 @@ class TestOpenCLIPModelLoad(TestCase):
         }
 
         with patch("marqo.s2_inference.clip_utils.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
-                   return_value=(MagicMock(), None)) as mock_load_method:
+                   return_value=(MagicMock(), MagicMock())) as mock_load_method:
             with patch("marqo.s2_inference.clip_utils.OPEN_CLIP._load_tokenizer_from_checkpoint",
-                       return_value=None) as mock_load_tokenizer:
+                       return_value=MagicMock()) as mock_load_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                     model = OPEN_CLIP(model_name, model_properties=model_properties, device="cpu")
                     model.load()
@@ -147,3 +147,33 @@ class TestOpenCLIPModelLoad(TestCase):
                         cache_dir=ModelCache.clip_cache_path
                     )
                     mock_tokenizer.assert_called_once_with("ViT-B-32")
+
+    def test_load_OpenCLIPModel_missing_model_properties(self):
+        """Test loading an OpenCLIP model with missing model properties should raise an error."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "type": "open_clip"
+            # Missing 'name' and 'url'
+        }
+
+        with self.assertRaises(ValueError) as context:
+            model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+            model.load()
+
+        self.assertIn("validation error", str(context.exception))
+        self.assertIn("name", str(context.exception))
+
+    def test_load_OpenCLIPModel_unsupported_image_preprocessor(self):
+        """Test loading an OpenCLIP model with an unsupported image preprocessor should raise an error."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "name": "ViT-B-32",
+            "type": "open_clip",
+            "image_preprocessor": "UnsupportedPreprocessor"
+        }
+
+        with self.assertRaises(ValueError) as context:
+            model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+            model.load()
+
+        self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'MobileCLIP', 'CLIPA'", str(context.exception))
