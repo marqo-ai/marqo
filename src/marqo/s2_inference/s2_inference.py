@@ -172,7 +172,6 @@ def get_encoder(model):
             # Return ImageBind encoder when implemented
             pass
     return DefaultEncoder(model)
-        #raise ValueError(f"Unsupported model type: {type(model)}")
 
 
 def is_preprocess_image_model(model_properties: dict = None) -> bool:

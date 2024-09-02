@@ -37,11 +37,11 @@ class IndexSettings(StrictBaseModel):
         patchMethod=None
     )
     videoPreprocessing: core.VideoPreProcessing = core.VideoPreProcessing(
-        splitLength=10,
+        splitLength=20,
         splitOverlap=3,
     )
     audioPreprocessing: core.AudioPreProcessing = core.AudioPreProcessing(
-        splitLength=10,
+        splitLength=20,
         splitOverlap=3,
     )
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float

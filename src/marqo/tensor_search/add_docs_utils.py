@@ -84,24 +84,34 @@ class StreamingMediaProcessor:
         processed_chunks = []
         chunk_duration = self.split_length
         overlap_duration = self.split_overlap
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
-            for chunk_start in range(0, math.ceil(self.duration), chunk_duration - overlap_duration):
-                chunk_end = min(chunk_start + chunk_duration, self.duration)
-                
+            # Calculate total number of chunks
+            total_chunks = math.ceil((self.duration - overlap_duration) / (chunk_duration - overlap_duration))
+
+            for i in range(total_chunks):
+                # For the last chunk, ensure it captures the end of the media
+                if i == total_chunks - 1:
+                    chunk_start = max(self.duration - chunk_duration, 0)
+                    chunk_end = self.duration
+                else:
+                    chunk_start = i * (chunk_duration - overlap_duration)
+                    chunk_end = min(chunk_start + chunk_duration, self.duration)
+                print(f"chunk_start: {chunk_start}, chunk_end: {chunk_end}")
+
                 output_file = self._get_output_file_path(temp_dir, chunk_start)
-                
+
                 try:
                     # Use ffmpeg-python to process the chunk
                     stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
-                    
+
                     if self.modality == Modality.VIDEO:
                         stream = ffmpeg.output(stream, output_file, vcodec='libx264', acodec='aac', **{'f': 'mp4'})
                     else:  # AUDIO
                         stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
-                    
+
                     ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
-                    
+
                     processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
                     processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
 
@@ -110,9 +120,9 @@ class StreamingMediaProcessor:
                         'start_time': chunk_start,
                         'end_time': chunk_end
                     }
-                    
+
                     processed_chunks.append(processed_chunk)
-                    
+
                 except subprocess.CalledProcessError as e:
                     logger.error(f"Error processing chunk starting at {chunk_start}: {e.stderr}")
                     continue  # Skip this chunk and continue with the next one
@@ -121,12 +131,8 @@ class StreamingMediaProcessor:
                     if os.path.exists(output_file):
                         os.remove(output_file)
 
-                # Move to the next chunk start, but don't not beyond the file duration
-                if chunk_end == self.duration:
-                    break
-                chunk_start = min(chunk_start + (chunk_duration - overlap_duration), self.duration - overlap_duration)
-                
         return processed_chunks
+
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):
         if download_total > 0:
