@@ -528,9 +528,9 @@ class OPEN_CLIP(AbstractCLIPModel):
         self.pretrained = model_type.split("/", 3)[2] if model_type.startswith("open_clip/") else model_type
         self.model_properties = OpenCLIPModelProperties(**self.model_properties)
 
-    def load(self) -> None:
+    def _load_necessary_components(self) -> None:
         """Load the open_clip model and tokenizer."""
-        if self.model_properties.url or self.model_properties.model_location:
+        if self.model_properties.url is not None or self.model_properties.model_location is not None:
             self.model, self.preprocess = self._load_model_and_image_preprocessor_from_checkpoint()
             self.tokenizer = self._load_tokenizer_from_checkpoint()
         elif self.model_properties.name.startswith(HF_HUB_PREFIX):
@@ -547,8 +547,19 @@ class OPEN_CLIP(AbstractCLIPModel):
             )
         self.model.eval()
 
-    def load_tokenizer(self):
-        pass
+    def _check_loaded_components(self):
+        """Check if the open_clip model, tokenizer, and image preprocessor are loaded.
+
+        Raises:
+            RuntimeError: If the open_clip model, tokenizer, or image preprocessor is not loaded.
+        """
+        if self.model is None:
+            raise RuntimeError("The open_clip model is not loaded. Please load the model before inference.")
+        if self.tokenizer is None:
+            raise RuntimeError("The open_clip tokenizer is not loaded. Please load the tokenizer before inference.")
+        if self.preprocess is None:
+            raise RuntimeError("The open_clip image preprocessor is not loaded. "
+                               "Please load the image preprocessor before inference.")
 
     def _load_image_preprocessor(self) -> Callable:
         return image_transform_v2(self.preprocess_config)

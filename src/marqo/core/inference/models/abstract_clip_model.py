@@ -2,16 +2,17 @@ from abc import abstractmethod
 
 from PIL import UnidentifiedImageError
 
-from marqo.core.inference.models.abstract_model import AbstractModel
+from marqo.core.inference.models.abstract_model import AbstractEmbeddingModel
 from marqo.s2_inference.types import *
-from marqo.core.inference.models.utils import _is_image, format_and_load_CLIP_images, format_and_load_CLIP_image
+from marqo.core.inference.models.image_download import (_is_image, format_and_load_CLIP_images,
+                                                        format_and_load_CLIP_image)
 from marqo.s2_inference.logger import get_logger
 import torch
 
 logger = get_logger(__name__)
 
 
-class AbstractCLIPModel(AbstractModel):
+class AbstractCLIPModel(AbstractEmbeddingModel):
     """Abstract base class for CLIP models.
 
     Attributes:
@@ -60,11 +61,6 @@ class AbstractCLIPModel(AbstractModel):
         self.model = None
         self.tokenizer = None
         self.preprocess = None
-
-    @abstractmethod
-    def load_tokenizer(self):
-        """Load tokenizer."""
-        pass
 
     @abstractmethod
     def encode_text(self, inputs: Union[str, List[str]], normalize: bool = True) -> FloatTensor:
