@@ -20,11 +20,13 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 
-def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
-                             image_download_headers: dict,
-                             device: str = None,
-                             metric_obj: Optional[RequestMetrics] = None,
-                             preprocessor: Optional[Compose] = None) -> None:
+def threaded_download_and_preprocess_images(
+        allocated_docs: List[dict], image_repo: dict, tensor_fields: List[str],
+        image_download_headers: dict,
+        device: str = None,
+        metric_obj: Optional[RequestMetrics] = None,
+        preprocessor: Optional[Compose] = None,
+        force_download: bool = False) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -36,6 +38,7 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
         tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         image_download_headers: A dict of headers for image download. Can be used
             to authenticate image downloads
+        force_download: If True, skip the _is_image check and download the fields as images.
     Side Effects:
         Adds members to the image_repo dict. Each key is a string which is identified as a URL.
         Each value is either a PIL image, or UnidentifiedImageError, if there were any errors encountered retrieving
@@ -61,7 +64,7 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
             for field in list(doc):
                 if field not in tensor_fields:
                     continue
-                if isinstance(doc[field], str) and clip_utils._is_image(doc[field]):
+                if force_download or (isinstance(doc[field], str) and clip_utils._is_image(doc[field])):
                     if doc[field] in image_repo:
                         continue
                     try:
@@ -105,15 +108,19 @@ def threaded_download_and_preprocess_images(allocated_docs: List[dict], image_re
 
 
 @contextmanager
-def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                    image_download_headers: dict,
-                    model_name: str,
-                    normalize_embeddings: bool,
-                    model_properties: Optional[Dict] = None,
-                    model_auth: Optional[ModelAuth] = None,
-                    device: Optional[str] = None,
-                    patch_method_exists: bool = False
-                    ) -> ContextManager[dict]:
+def download_and_preprocess_images(
+        docs: List[dict],
+        thread_count: int,
+        tensor_fields: List[str],
+        image_download_headers: dict,
+        model_name: str,
+        normalize_embeddings: bool,
+        model_properties: Optional[Dict] = None,
+        model_auth: Optional[ModelAuth] = None,
+        device: Optional[str] = None,
+        patch_method_exists: bool = False,
+        force_download: bool = False
+) -> ContextManager[dict]:
     """Concurrently downloads images from each doc, storing them into the image_repo dict
     Args:
         docs: docs with images to be downloaded. These will be allocated to each thread
@@ -123,7 +130,7 @@ def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_f
     This should be called only if treat URLs as images is True
         patch_method_exists: If True, the patch method exists in the model. If False, the patch method does not exist.
             We only preprocess images if the patch method DOES NOT exist.
-
+        force_download: If True, skip the _is_image check and download the fields as images.
 
     Returns:
          An image repo: a dict <image pointer>:<image data>
@@ -144,10 +151,17 @@ def download_and_preprocess_images(docs: List[dict], thread_count: int, tensor_f
         m = [RequestMetrics() for i in range(thread_count)]
         thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(len(copied))[::docs_per_thread]]
         with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
-            futures = [executor.submit(threaded_download_and_preprocess_images,
-                                       allocation, image_repo, tensor_fields,
-                                       image_download_headers, device, m[i], preprocessor)
-                       for i, allocation in enumerate(thread_allocated_docs)]
+            futures = [executor.submit(
+                threaded_download_and_preprocess_images,
+                allocated_docs=allocation,  # Explicitly passing 'allocation' as 'allocated_docs'
+                image_repo=image_repo,
+                tensor_fields=tensor_fields,
+                image_download_headers=image_download_headers,
+                device=device,
+                metric_obj=m[i],  # Assuming 'm[i]' is intended for 'metric_obj'
+                preprocessor=preprocessor,
+                force_download=force_download
+            ) for i, allocation in enumerate(thread_allocated_docs)]
 
             # Unhandled exceptions will be raised here.
             # We only raise the first exception if there are multiple exceptions

@@ -1,9 +1,10 @@
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 from pydantic import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core.models.marqo_add_documents_response import BatchResponseStats
+from marqo.core.models.marqo_add_documents_response import MarqoBaseDocumentsResponse
 
 
 class MarqoUpdateDocumentsItem(MarqoBaseModel):
@@ -13,13 +14,11 @@ class MarqoUpdateDocumentsItem(MarqoBaseModel):
     error: Optional[str] = None
 
 
-class MarqoUpdateDocumentsResponse(MarqoBaseModel):
+class MarqoUpdateDocumentsResponse(MarqoBaseDocumentsResponse):
     errors: bool
     index_name: str
     items: List[MarqoUpdateDocumentsItem]
     processingTimeMs: float
-
-    _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats)
 
     @root_validator(pre=False, skip_on_failure=True)
     def count_items(cls, values):
@@ -39,6 +38,3 @@ class MarqoUpdateDocumentsResponse(MarqoBaseModel):
 
         values['_batch_response_stats'] = batch_response_count
         return values
-
-    def get_header_dict(self) -> Dict[str, str]:
-        return self._batch_response_stats.get_header_dict()
