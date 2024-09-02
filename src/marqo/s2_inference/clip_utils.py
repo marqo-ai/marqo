@@ -112,7 +112,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
     """
     if os.path.isfile(image_path):
         img = Image.open(image_path)
-    elif validators.url(image_path):
+    elif validate_url(image_path):
         if metrics_obj is not None:
             metrics_obj.start(f"image_download.{image_path}")
         try:
@@ -133,6 +133,20 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
                                      f"{marqo_docs.indexing_images()}")
 
     return img
+
+
+def validate_url(url: str) -> bool:
+    """Validate a URL to ensure it is a valid URL. Returns True if the URL is valid or the encoded URL is valid.
+    Args:
+        url (str): URL to validate.
+    Returns:
+        bool: True if the URL is valid, False otherwise.
+    """
+    if isinstance(url, str):
+        return validators.url(url) or validators.url(encode_url(url))
+    else:
+        return False
+
 
 
 def download_image_from_url(image_path: str, image_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
@@ -270,7 +284,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         else:
             # if it is not a local file and does not have an extension
             # check if url
-            if validators.url(thing):
+            if validate_url(thing):
                 return True
             else:
                 return False

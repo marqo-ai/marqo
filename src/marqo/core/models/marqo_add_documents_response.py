@@ -1,21 +1,8 @@
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Set
 
 from pydantic import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
-
-
-class MarqoAddDocumentsItem(MarqoBaseModel):
-    """A response from adding a document to Marqo.
-
-    This model takes the response from Marqo vector store and translate it to a user-friendly response.
-    """
-    status: int
-    # This id can be any type as it might be used to hold an invalid id response
-    id: Any = Field(alias="_id", default=None)
-    message: Optional[str] = None
-    error: Optional[str] = None
-    code: Optional[str] = None
 
 
 class BatchResponseStats(MarqoBaseModel):
@@ -31,13 +18,46 @@ class BatchResponseStats(MarqoBaseModel):
         }
 
 
-class MarqoAddDocumentsResponse(MarqoBaseModel):
+class MarqoBaseDocumentsResponse(MarqoBaseModel):
+    """A base documents API response model."""
+    _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats)
+
+    def dict(self, *args, **kwargs) -> Dict[str, Any]:
+        """Setting default exclude to exclude _batch_response_stats from the response.
+
+        Setting Field(exclude=True) does not work for
+        _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats). So we need
+        to exclude it manually.
+        """
+        exclude: Set[str] = kwargs.get('exclude', set())
+        if not isinstance(exclude, set):
+            raise TypeError("exclude must be a set")
+        exclude = exclude.union({'_batch_response_stats'})
+        kwargs['exclude'] = exclude
+        return super().dict(*args, **kwargs)
+
+    def get_header_dict(self) -> Dict[str, str]:
+        return self._batch_response_stats.get_header_dict()
+
+
+class MarqoAddDocumentsItem(MarqoBaseModel):
+    """A response from adding a document to Marqo.
+
+    This model takes the response from Marqo vector store and translate it to a user-friendly response.
+    """
+    status: int
+    # This id can be any type as it might be used to hold an invalid id response
+    id: Any = Field(alias="_id", default=None)
+    message: Optional[str] = None
+    error: Optional[str] = None
+    code: Optional[str] = None
+
+
+class MarqoAddDocumentsResponse(MarqoBaseDocumentsResponse):
     errors: bool
     processingTimeMs: float
     index_name: str  # TODO Change this to camelCase in the future (Breaking change!)
     items: List[MarqoAddDocumentsItem]
-
-    _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats)
 
     @root_validator(pre=False, skip_on_failure=True)
     def count_items(cls, values):
@@ -57,6 +77,3 @@ class MarqoAddDocumentsResponse(MarqoBaseModel):
 
         values['_batch_response_stats'] = batch_response_count
         return values
-
-    def get_header_dict(self) -> Dict[str, str]:
-        return self._batch_response_stats.get_header_dict()

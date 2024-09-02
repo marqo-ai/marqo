@@ -65,7 +65,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         documents = [
             {
-                "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_statue.png",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
+                                 "/examples/ImageSearchGuide/data/image2.jpg",
                 "text_field_1": "This is a valid image",
                 "_id": "1"
             },

@@ -179,7 +179,7 @@ class Document:
     def translate_add_documents_response(self, responses: Optional[FeedBatchResponse],
                                          index_name: str,
                                          unsuccessful_docs: List,
-                                         add_docs_processing_time: float) \
+                                         add_docs_processing_time_ms: float) \
             -> MarqoAddDocumentsResponse:
         """Translate Vespa FeedBatchResponse into MarqoAddDocumentsResponse.
 
@@ -187,7 +187,7 @@ class Document:
             responses: The response from Vespa
             index_name: The name of the index
             unsuccessful_docs: The list of unsuccessful documents
-            add_docs_processing_time: The processing time of the add documents operation, in seconds
+            add_docs_processing_time_ms: The processing time of the add documents operation, in milliseconds
 
         Return:
             MarqoAddDocumentsResponse: The response of the add documents operation
@@ -209,7 +209,7 @@ class Document:
             errors = True
 
         return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
-                                         processingTimeMs=add_docs_processing_time)
+                                         processingTimeMs=add_docs_processing_time_ms)
 
     def translate_vespa_document_response(self, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
         """A helper function to translate Vespa document response into the expected status, message that

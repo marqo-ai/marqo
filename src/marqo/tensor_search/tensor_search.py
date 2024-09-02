@@ -309,7 +309,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                 # C) field type is standard
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
-                    if isinstance(field_content, (str, Image.Image)):
+                    if isinstance(field_content, str):
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
                         # 2. check if it is a url or pointer
                         # 3. If yes in 1 and 2, download blindly (without type)
@@ -317,7 +317,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
                         # 6. if chunking -> then add the extra chunker
 
-                        if isinstance(field_content, str) and not _is_image(field_content):
+                        if not _is_image(field_content):
                             # text processing pipeline:
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
@@ -340,7 +340,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                         image_data = image_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not find image found at `{field_content}`. \n"
+                                            f"Could not find image at `{field_content}`. \n"
                                             f"Reason: {str(image_repo[field_content])}"
                                         )
                                 else:
@@ -541,7 +541,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
         marqo_add_documents_response = config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
-            add_docs_processing_time=t1 - t0
+            add_docs_processing_time_ms=1000 * (t1 - t0)
         )
         return marqo_add_documents_response
 
@@ -606,7 +606,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
-                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None
+                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None,
+                        force_download=True
                     )
                 )
 
@@ -758,7 +759,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                      f"Is this a new tensor field?")
 
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
-                    if isinstance(field_content, (str, Image.Image)):
+                    is_image_pointer_field = marqo_field.type == FieldType.ImagePointer
+                    if isinstance(field_content, str):
 
                         # TODO: better/consistent handling of a no-op for processing (but still vectorize)
 
@@ -769,7 +771,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
                         # 6. if chunking -> then add the extra chunker
 
-                        if isinstance(field_content, str) and not _is_image(field_content):
+                        if not is_image_pointer_field:
                             # text processing pipeline:
                             split_by = marqo_index.text_preprocessing.split_method.value
                             split_length = marqo_index.text_preprocessing.split_length
@@ -792,7 +794,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                         image_data = image_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not find image found at `{field_content}`. \n"
+                                            f"Could not find image at `{field_content}`. \n"
                                             f"Reason: {str(image_repo[field_content])}"
                                         )
                                 else:
@@ -1020,7 +1022,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
         marqo_add_documents_response = config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
-            add_docs_processing_time=t1 - t0
+            add_docs_processing_time_ms=1000 * (t1 - t0)
         )
         return marqo_add_documents_response
 
@@ -2088,7 +2090,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                             image_data = image_repo[sub_content]
                         else:
                             raise s2_inference_errors.S2InferenceError(
-                                f"Could not find image found at `{sub_content}`. \n"
+                                f"Could not find image at `{sub_content}`. \n"
                                 f"Reason: {str(image_repo[sub_content])}"
                             )
                     else:
@@ -2241,7 +2243,7 @@ def vectorise_multimodal_combination_field_structured(
                         image_data = image_repo[sub_content]
                     else:
                         raise s2_inference_errors.S2InferenceError(
-                            f"Could not find image found at `{sub_content}`. \n"
+                            f"Could not find image at `{sub_content}`. \n"
                             f"Reason: {str(image_repo[sub_content])}"
                         )
                 else:
