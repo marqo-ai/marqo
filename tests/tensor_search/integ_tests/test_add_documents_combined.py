@@ -11,6 +11,8 @@ import requests
 import torch
 from torch import Tensor
 from urllib3.exceptions import ProtocolError
+import unittest.mock
+
 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -20,6 +22,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import Modality
+from marqo.tensor_search import add_docs_utils
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -222,7 +225,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertEqual(len(tensor_facets), 1, f"Document {i} should have 1 tensor facet")
                     elif i == 2:
                         # print(tensor_facets)
-                        self.assertEqual(len(tensor_facets), 10, f"Document 2 should have 25 tensor facets")
+                        self.assertEqual(len(tensor_facets), 10, f"Document 2 should have 10 tensor facets")
 
                     # Check embedding length and uniqueness
                     embeddings = []
@@ -610,3 +613,64 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 for i in range(1, 4):
                     self.assertEqual(400, r["items"][i]["status"])
                     self.assertIn("Document _id must be a string", r["items"][i]["error"])
+
+
+    @unittest.mock.patch('marqo.tensor_search.add_docs_utils.ffmpeg')
+    @unittest.mock.patch('marqo.tensor_search.add_docs_utils.tempfile.TemporaryDirectory')
+    def test_process_media_chunk_calculation(self, mock_temp_dir, mock_ffmpeg):
+        # Mock the TemporaryDirectory context manager
+        mock_temp_dir.return_value.__enter__.return_value = '/tmp/mock_dir'
+
+        # Create a mock MarqoIndex
+        mock_index = unittest.mock.Mock()
+        mock_index.video_preprocessing = unittest.mock.Mock(split_length=10, split_overlap=2)
+
+        # Create a StreamingMediaProcessor instance with mocked values
+        processor = add_docs_utils.StreamingMediaProcessor(
+            url='http://example.com/video.mp4',
+            device='cpu',
+            headers={},
+            modality=add_docs_utils.Modality.VIDEO,
+            marqo_index=mock_index,
+            preprocessors={'video': unittest.mock.Mock()}
+        )
+
+        # Set arbitrary values
+        processor.duration = 25  # 25 seconds video
+        processor.split_length = 10  # 10 seconds per chunk
+        processor.split_overlap = 2  # 2 seconds overlap
+
+        # Mock the preprocessor to return a dummy tensor
+        processor.preprocessor = unittest.mock.Mock(return_value={'pixel_values': unittest.mock.Mock()})
+
+        # Call the process_media method
+        result = processor.process_media()
+
+        # Expected chunk calculations
+        expected_chunks = [
+            {'start_time': 0, 'end_time': 10},
+            {'start_time': 8, 'end_time': 18},
+            {'start_time': 15, 'end_time': 25}  # Last chunk adjusted to video end
+        ]
+
+        # Assert the number of chunks
+        self.assertEqual(len(result), len(expected_chunks))
+
+        # Assert the start and end times of each chunk
+        for i, chunk in enumerate(result):
+            self.assertEqual(chunk['start_time'], expected_chunks[i]['start_time'])
+            self.assertEqual(chunk['end_time'], expected_chunks[i]['end_time'])
+
+        # Verify that ffmpeg.input was called for each chunk
+        self.assertEqual(mock_ffmpeg.input.call_count, len(expected_chunks))
+
+        # Verify the ffmpeg.input calls
+        for i, expected_chunk in enumerate(expected_chunks):
+            mock_ffmpeg.input.assert_any_call(
+                'http://example.com/video.mp4',
+                ss=expected_chunk['start_time'],
+                t=expected_chunk['end_time'] - expected_chunk['start_time']
+            )
+
+        # Verify that ffmpeg.run was called for each chunk
+        self.assertEqual(mock_ffmpeg.run.call_count, len(expected_chunks))

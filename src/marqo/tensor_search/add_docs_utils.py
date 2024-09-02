@@ -97,7 +97,6 @@ class StreamingMediaProcessor:
                 else:
                     chunk_start = i * (chunk_duration - overlap_duration)
                     chunk_end = min(chunk_start + chunk_duration, self.duration)
-                print(f"chunk_start: {chunk_start}, chunk_end: {chunk_end}")
 
                 output_file = self._get_output_file_path(temp_dir, chunk_start)
 
