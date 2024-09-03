@@ -40,7 +40,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                                 download_headers: Optional[Dict] = None,  # Optional for now
                                                 metric_obj: Optional[RequestMetrics] = None,
                                                 preprocessors: Optional[Dict[str, Compose]] = None,
-                                                marqo_index: Optional[MarqoIndex] = None) -> None:
+                                                marqo_index: Optional[MarqoIndex] = None,
+                                                force_download: bool = False) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -52,6 +53,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
         tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         image_download_headers: A dict of headers for image download. Can be used
             to authenticate image downloads
+        force_download: If True, skip the _is_image check and download the fields as images.
     Side Effects:
         Adds members to the image_repo dict. Each key is a string which is identified as a URL.
         Each value is either a PIL image, or UnidentifiedImageError, if there were any errors encountered retrieving
@@ -77,7 +79,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
             for field in list(doc):
                 if field not in tensor_fields:
                     continue
-                if isinstance(doc[field], str):
+                if isinstance(doc[field], str) or force_download:
                     modality = infer_modality(doc[field])
                     if modality == Modality.IMAGE: # or clip_utils._is_image(doc[field]):
                         if (marqo_index is not None
@@ -90,6 +92,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         # Existing logic
                         if doc[field] in content_repo:
                             continue
+
+                   
                         try:
                             content_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
                                                                                      timeout_ms=int(
@@ -169,6 +173,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     device: Optional[str] = None,
                                     patch_method_exists: bool = False,
                                     marqo_index: Optional[MarqoIndex] = None,
+                                    force_download: bool = False
                                     ) -> ContextManager[dict]:
     
     # Check if model is Video/Audio. If so, manually set thread_count to 5
@@ -179,18 +184,18 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     is_languagebind = model_properties.get('type') == ModelType.LanguageBind
     enable = False 
     if enable and is_languagebind and len(docs) > 16:
-        # Process in batches of 16
+        # Process in batches of 16. This is currently disabled
         for i in range(0, len(docs), 16):
             batch = docs[i:i+16]
             batch_content_repo = process_batch(batch, thread_count, tensor_fields, image_download_headers,
-                                               model_name, normalize_embeddings, download_headers,
+                                               model_name, normalize_embeddings, force_download, download_headers,
                                                model_properties, model_auth, device, patch_method_exists,
                                                marqo_index)
             content_repo.update(batch_content_repo)
     else:
         # Original processing logic
         content_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
-                                     model_name, normalize_embeddings, download_headers,
+                                     model_name, normalize_embeddings, force_download, download_headers,
                                      model_properties, model_auth, device, patch_method_exists,
                                      marqo_index)
 
@@ -207,7 +212,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
 
 def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                   image_download_headers: dict, model_name: str, normalize_embeddings: bool,
-                  download_headers: Optional[Dict], model_properties: Optional[Dict],
+                  force_download: bool, download_headers: Optional[Dict], model_properties: Optional[Dict],
                   model_auth: Optional[ModelAuth], device: Optional[str],
                   patch_method_exists: bool, marqo_index: Optional[MarqoIndex]) -> dict:
 
@@ -242,7 +247,8 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                         download_headers, 
                         m[i], 
                         preprocessors,
-                        marqo_index)
+                        marqo_index,
+                        force_download)
         for i, allocation in enumerate(thread_allocated_docs)]
 
         # Unhandled exceptions will be raised here.

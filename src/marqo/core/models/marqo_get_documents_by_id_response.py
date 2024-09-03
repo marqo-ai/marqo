@@ -3,8 +3,9 @@ from typing import Optional, Union, List, Dict, Any
 from pydantic import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
-from marqo.tensor_search.enums import TensorField
 from marqo.core.models.marqo_add_documents_response import BatchResponseStats
+from marqo.core.models.marqo_add_documents_response import MarqoBaseDocumentsResponse
+from marqo.tensor_search.enums import TensorField
 
 
 class MarqoGetDocumentsByIdsItem(MarqoBaseModel):
@@ -20,14 +21,12 @@ class MarqoGetDocumentsByIdsItem(MarqoBaseModel):
     found: Optional[bool] = Field(alias=str(TensorField.found), default=None)
 
 
-class MarqoGetDocumentsByIdsResponse(MarqoBaseModel):
+class MarqoGetDocumentsByIdsResponse(MarqoBaseDocumentsResponse):
     """
     A response from getting documents by their ids from Marqo.
     """
     errors: bool
     results: List[Union[MarqoGetDocumentsByIdsItem, Dict]] = []
-
-    _batch_response_stats: BatchResponseStats = Field(exclude=True, default_factory=BatchResponseStats)
 
     @root_validator(pre=False, skip_on_failure=True)
     def count_items(cls, values):
@@ -53,6 +52,3 @@ class MarqoGetDocumentsByIdsResponse(MarqoBaseModel):
 
         values['_batch_response_stats'] = batch_response_count
         return values
-
-    def get_header_dict(self) -> Dict[str, str]:
-        return self._batch_response_stats.get_header_dict()

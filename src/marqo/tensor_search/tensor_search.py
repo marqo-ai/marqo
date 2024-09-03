@@ -598,7 +598,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
         marqo_add_documents_response = config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
-            add_docs_processing_time=t1 - t0
+            add_docs_processing_time_ms=1000 * (t1 - t0)
         )
         return marqo_add_documents_response
 
@@ -678,7 +678,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
                         patch_method_exists=marqo_index.image_preprocessing.patch_method is not None,
-                        marqo_index=marqo_index
+                        marqo_index=marqo_index,
+                        force_download=True
                     )
                 )
 
@@ -2422,7 +2423,7 @@ def vectorise_multimodal_combination_field_structured(
                         image_field_names.append(sub_field_name)
                     elif sub_field_name in video_fields:
                         if not isinstance(content_repo[sub_content], Exception):
-                            video_data = content_repo[sub_content][0]['tensor']
+                            video_data = [content_repo[sub_content][i]['tensor'] for i in range(len(content_repo[sub_content]))]
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not process video at `{sub_content}`. \n"
@@ -2432,7 +2433,7 @@ def vectorise_multimodal_combination_field_structured(
                         video_field_names.append(sub_field_name)
                     elif sub_field_name in audio_fields:
                         if not isinstance(content_repo[sub_content], Exception):
-                            audio_data = content_repo[sub_content][0]['tensor']
+                            audio_data = [content_repo[sub_content][i]['tensor'] for i in range(len(content_repo[sub_content]))]
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not process audio at `{sub_content}`. \n"
