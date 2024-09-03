@@ -476,13 +476,13 @@ def _get_open_clip_properties() -> Dict:
             "type": "open_clip",
             "pretrained": "datacomp_s34b_b86k"
         },
-        "open_clip/ViT-B-16/marqo-fashionCLIP": {
+        "Marqo/marqo-fashionCLIP": {
             "name": "hf-hub:Marqo/marqo-fashionCLIP",
             "dimensions": 512,
             "note": "Marqo's fashionCLIP model",
             "type": "open_clip"
         },
-        "open_clip/ViT-B-16-SigLIP/marqo-fashionSigLIP": {
+        "Marqo/marqo-fashionSigLIP": {
             "name": "hf-hub:Marqo/marqo-fashionSigLIP",
             "dimensions": 768,
             "note": "Marqo's fashionSigLIP model",
