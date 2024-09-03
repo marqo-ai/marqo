@@ -21,9 +21,9 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference import s2_inference
-from marqo.tensor_search import add_docs
 
 # TODO deps to tensor_search needs to be removed
+from marqo.tensor_search import add_docs
 from marqo.tensor_search.constants import ALLOWED_UNSTRUCTURED_FIELD_TYPES
 from marqo.tensor_search.validation import list_types_valid, validate_custom_vector, \
     validate_multimodal_combination, validate_map_numeric_field
@@ -146,7 +146,6 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         if not doc_image_fields:
             return dict()
 
-        # TODO refactor download_and_preprocess_images to accept dict(doc_id, list(urls))
         image_repo = exit_stack.enter_context(
             add_docs.download_and_preprocess_images(
                 docs=list(doc_image_fields.values()),
@@ -186,7 +185,6 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                     tensor_field_content.chunk(chunkers)
                     tensor_field_content.vectorise(vectoriser)
                 except AddDocumentsError as err:
-                    #  TODO make sure the chunkers and vectoriser all throws AddDocumentError
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
 

@@ -68,7 +68,7 @@ class AddDocumentsResponseCollector:
         if doc_id in self.marqo_docs:
             doc_id = self.marqo_docs.pop(doc_id)[ORIGINAL_ID]
 
-        print(f"Error detected for doc {doc_id} at location [{loc}]: {error.error_message}")
+        # TODO log errors in one place
 
         # Even if the last document is invalid, we should not use previous ones?
         if doc_id:

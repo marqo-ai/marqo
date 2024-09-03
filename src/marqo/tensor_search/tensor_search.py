@@ -98,6 +98,8 @@ from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResp
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
 
+from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
+
 logger = get_logger(__name__)
 
 
@@ -118,7 +120,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
             f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
     if isinstance(marqo_index, UnstructuredMarqoIndex):
-        return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        # return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        return UnstructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
     elif isinstance(marqo_index, SemiStructuredMarqoIndex):
         return _add_documents_semi_structured(config, add_docs_params, marqo_index)
     elif isinstance(marqo_index, StructuredMarqoIndex):
