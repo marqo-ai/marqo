@@ -68,6 +68,8 @@ class AddDocumentsResponseCollector:
         if doc_id in self.marqo_docs:
             doc_id = self.marqo_docs.pop(doc_id)[ORIGINAL_ID]
 
+        print(f"Error detected for doc {doc_id} at location [{loc}]: {error.error_message}")
+
         # Even if the last document is invalid, we should not use previous ones?
         if doc_id:
             self.visited_doc_ids.add(doc_id)
@@ -131,7 +133,7 @@ class AddDocumentsHandler(ABC):
 
         # retrieve existing docs for existing tensor
         if self.add_docs_params.use_existing_tensors:
-            result = self.config.vespa_client.get_batch(self.add_docs_response_collector.visited_doc_ids,
+            result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.visited_doc_ids),
                                                         self.marqo_index.schema_name)
             existing_vespa_docs = {r.id: r.document for r in result.responses if r.status == 200}
             self.handle_existing_tensors(existing_vespa_docs)

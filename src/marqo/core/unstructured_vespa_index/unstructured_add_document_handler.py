@@ -29,7 +29,8 @@ from marqo.tensor_search.validation import list_types_valid, validate_custom_vec
     validate_multimodal_combination, validate_map_numeric_field
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.get_document_response import Document
-from marqo.api import exceptions as errors
+from marqo.api import exceptions as api_errors
+from marqo.s2_inference import errors as s2_inference_errors
 
 
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
@@ -56,7 +57,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                 validate_coupling_of_mappings_and_doc(
                     doc, self.add_docs_params.mappings, multimodal_sub_fields
                 )
-            except errors.InvalidArgError as err:
+            except api_errors.InvalidArgError as err:
                 raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def handle_field(self, marqo_doc, field_name, field_content):
@@ -100,7 +101,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                     )
                 else:
                     validate_map_numeric_field(field_content)
-        except (errors.InvalidFieldNameError, errors.InvalidArgError) as err:
+        except (api_errors.InvalidFieldNameError, api_errors.InvalidArgError) as err:
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
@@ -163,10 +164,9 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
         for url, data in image_repo.items():
             if isinstance(data, Exception):
-                del image_repo[url]
                 for doc_id in url_doc_id_map[url]:
                     self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(
-                        data.message  # TODO catch specific errors
+                        error_message=f"Could not find image found at `{url}`. Reason: {str(data)}"
                     ))
                     self.tensor_fields_container.remove_doc(doc_id)
 
@@ -214,26 +214,40 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             if single_chunk or image_method is None:
                 return [url], [image_data]
 
-            # TODO handle error
-            content_chunks, text_chunks = image_processor.chunk_image(
-                image_data, device=self.add_docs_params.device, method=image_method.value)
-            return text_chunks, content_chunks
+            try:
+                content_chunks, text_chunks = image_processor.chunk_image(
+                    image_data, device=self.add_docs_params.device, method=image_method.value)
+                return text_chunks, content_chunks
+            except s2_inference_errors.S2InferenceError as e:
+                raise AddDocumentsError(e.message)
 
         return chunk
 
     def vectoriser(self) -> Vectoriser:
         def vectorise(content_chunks: List[str], field_type: FieldType):
             # TODO batch request to get more GPU utilisation, also consider how to fail fast
-            # TODO handle error
-            return s2_inference.vectorise(
-                model_name=self.marqo_index.model.name,
-                model_properties=self.marqo_index.model.get_properties(),
-                content=content_chunks,
-                device=self.add_docs_params.device,
-                normalize_embeddings=self.marqo_index.normalize_embeddings,
-                infer=field_type == FieldType.ImagePointer,
-                model_auth=self.add_docs_params.model_auth
-            )
+            try:
+                return s2_inference.vectorise(
+                    model_name=self.marqo_index.model.name,
+                    model_properties=self.marqo_index.model.get_properties(),
+                    content=content_chunks,
+                    device=self.add_docs_params.device,
+                    normalize_embeddings=self.marqo_index.normalize_embeddings,
+                    infer=field_type == FieldType.ImagePointer,
+                    model_auth=self.add_docs_params.model_auth
+                )
+            except (s2_inference_errors.UnknownModelError,
+                    s2_inference_errors.InvalidModelPropertiesError,
+                    s2_inference_errors.ModelLoadError,
+                    s2_inference.ModelDownloadError) as model_error:
+                # Fail the whole batch due to a malfunctioning embedding model
+                # TODO Add a core exception
+                raise api_errors.BadRequestError(
+                    message=f'Problem vectorising query. Reason: {str(model_error)}',
+                    link=marqo_docs.list_of_models()
+                )
+            except s2_inference_errors.S2InferenceError as e:
+                raise AddDocumentsError(e.message)
 
         return vectorise
 

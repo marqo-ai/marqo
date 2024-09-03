@@ -96,19 +96,25 @@ class MultiModalTensorFieldContent(TensorFieldContent):
 
     @property
     def tensor_field_chunks(self):
-        subfield_chunks = {subfield: self.subfields[subfield].sub_field_chunk for subfield in self.weights.keys()}
+        subfield_chunks = {subfield: self.subfields[subfield].sub_field_chunk for subfield in self.weights.keys()
+                           if subfield in self.subfields}
         return [json.dumps(subfield_chunks)]
 
     @property
     def tensor_field_embeddings(self):
         combo_embeddings = [
             np.array(self.subfields[subfield].sub_field_embedding) * weight for subfield, weight in self.weights.items()
+            if subfield in self.subfields
         ]
+
+        if not combo_embeddings:
+            return []
+
         vector_chunk = np.squeeze(np.mean(combo_embeddings, axis=0))
         if self.normalize_embeddings:
             vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
 
-        return [vector_chunk]
+        return [vector_chunk.tolist()]
 
 
 class TensorFieldsContainer:
@@ -274,7 +280,8 @@ class TensorFieldsContainer:
         for field_name, mapping in self._multimodal_combo_fields.items():
             self.add_tensor_field_content(doc_id, field_name, MultiModalTensorFieldContent(
                 weights=mapping['weights'], field_content='', field_type=FieldType.MultimodalCombination,
-                subfields={subfield: self._tensor_field_map[doc_id][subfield] for subfield in mapping['weights'].keys()},
+                subfields={subfield: self._tensor_field_map[doc_id][subfield] for subfield in mapping['weights'].keys()
+                           if doc_id in self._tensor_field_map and subfield in self._tensor_field_map[doc_id]},
                 is_tensor_field=True, is_multimodal_subfield=False, normalize_embeddings=normalize_embeddings
             ))
             yield field_name, mapping
