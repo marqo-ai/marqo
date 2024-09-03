@@ -48,14 +48,13 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
         self.vespa_index = UnstructuredVespaIndex(marqo_index)
 
-    def validate_doc(self, doc) -> Optional[str]:
-        doc_id = super().validate_doc(doc)
+    def validate_doc(self, doc):
+        super().validate_doc(doc)
         multimodal_sub_fields = list(self.tensor_fields_container.get_multimodal_sub_fields())
         if self.add_docs_params.mappings and multimodal_sub_fields:
             validate_coupling_of_mappings_and_doc(
                 doc, self.add_docs_params.mappings, multimodal_sub_fields
             )
-        return doc_id
 
     def handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
@@ -115,8 +114,9 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
         for doc_id, vespa_doc in existing_vespa_docs.items():
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
-            existing_multimodal_mappings = existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, None)
-            self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc, existing_multimodal_mappings)
+            existing_multimodal_mappings = existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, dict())
+            self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc,
+                                                                           existing_multimodal_mappings)
 
     def _download_image_contents(self, exit_stack):
         # collect image urls
@@ -218,8 +218,9 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         return chunk
 
     def vectoriser(self) -> Vectoriser:
-        # TODO batch request to get more GPU utilisation, also consider how to fail fast
         def vectorise(content_chunks: List[str], field_type: FieldType):
+            # TODO batch request to get more GPU utilisation, also consider how to fail fast
+            # TODO handle error
             return s2_inference.vectorise(
                 model_name=self.marqo_index.model.name,
                 model_properties=self.marqo_index.model.get_properties(),
@@ -248,6 +249,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         index_responses = self.config.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
         for resp in index_responses.responses:
+            # FIXME doc_id is not url encoded
             doc_id = resp.id.split('::')[-1] if resp.id else None
             status, message = self.config.document.translate_vespa_document_response(resp.status, message=resp.message)
             if status != 200:

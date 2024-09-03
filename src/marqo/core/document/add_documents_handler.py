@@ -5,9 +5,6 @@ from http import HTTPStatus
 from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any
 
-# TODO replace these exception with core exception
-from marqo.api.exceptions import InvalidDocumentIdError, InvalidArgError, DocTooLargeError, MarqoWebError
-
 from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
@@ -19,6 +16,7 @@ from marqo.api import exceptions as errors
 
 
 ORIGINAL_ID='_original_id'
+
 
 class AddDocumentsError(Exception):
     status_code: int = HTTPStatus.BAD_REQUEST
@@ -97,7 +95,9 @@ class AddDocumentsHandler(ABC):
         for doc in reversed(self.add_docs_params.docs):
             original_id = None
             try:
-                original_id = self.validate_doc(doc)
+                self.validate_doc(doc)
+
+                original_id = self.validate_doc_id(doc.pop(MARQO_DOC_ID))
                 doc_id = original_id or str(uuid.uuid4())
                 marqo_doc = {ORIGINAL_ID: original_id, MARQO_DOC_ID: doc_id}  # keep this info for error report
 
@@ -145,14 +145,21 @@ class AddDocumentsHandler(ABC):
     def persist_to_vespa(self) -> None:
         pass
 
-    def validate_doc(self, doc):
+    def validate_doc(self, doc) -> None:
         try:
             validation.validate_doc(doc)
-            doc_id = doc.pop(MARQO_DOC_ID)
-            if doc_id and  doc_id in self.add_docs_response_collector.visited_doc_ids:
-                raise DuplicateDocumentError(f"Document will be ignored since doc with the same id"
-                                             f" `{doc_id}` supersedes this one")
-            return doc_id
         except errors.__InvalidRequestError as err:
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
+
+    def validate_doc_id(self, doc_id) -> Optional[str]:
+        if doc_id:
+            try:
+                validation.validate_id(doc_id)
+            except errors.__InvalidRequestError as err:
+                raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
+
+            if doc_id in self.add_docs_response_collector.visited_doc_ids:
+                raise DuplicateDocumentError(f"Document will be ignored since doc with the same id"
+                                             f" `{doc_id}` supersedes this one")
+        return doc_id
 
