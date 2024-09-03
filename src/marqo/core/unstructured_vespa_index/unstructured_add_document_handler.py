@@ -96,7 +96,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                     )
                 else:
                     validate_map_numeric_field(field_content)
-        except errors.__InvalidRequestError as err:
+        except (errors.InvalidFieldNameError, errors.InvalidArgError) as err:
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
