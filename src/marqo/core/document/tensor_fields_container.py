@@ -1,21 +1,105 @@
 import json
-from typing import List, Dict, Tuple, Set, Optional, Any, Generator, Union
+from functools import cached_property
+from typing import List, Dict, Set, Optional, Any, Generator, Union, Tuple, Protocol, cast
 
+import numpy as np
 from pydantic.main import BaseModel
 
-from marqo.api.exceptions import InvalidArgError
 from marqo.core import constants
+from marqo.core.document.add_documents_handler import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.tensor_search import enums
 
 
+class Chunker(Protocol):
+    def __call__(self, field_content: str, single_chunk: bool = False) -> Tuple[List[str], List[str]]:
+        ...
+
+
+class Vectoriser(Protocol):
+    def __call__(self, content_chunks: List[str], field_type: FieldType) -> List[List[float]]:
+        ...
+
+
 class TensorFieldContent(BaseModel):
-    field_content: Union[str, dict]  # field content of multimodal field is a dict derived from its subfields
+    field_content: str
     field_type: FieldType
     chunks: Optional[List[str]] = None
     content_chunks: Optional[List[str]] = None
     embeddings: Optional[List[List[float]]] = None
+
+    # metadata fields
+    is_tensor_field: bool
+    is_multimodal_subfield: bool
+    is_resolved: bool = False
+    tensor_field_chunk_count: int = 0
+
+    def populate_from_existing_tensor(self, chunks: List[str], embeddings: List[List[float]]) -> None:
+        self.chunks = chunks
+        self.embeddings = embeddings
+        if not self.is_multimodal_subfield or len(chunks) == 1:
+            self.is_resolved = True
+
+    def chunk(self, chunkers: Dict[FieldType, Chunker]) -> None:
+        if self.field_type not in chunkers or self.is_resolved:
+            return
+
+        if self.is_tensor_field and not self.chunks:
+            self.chunks, self.content_chunks = chunkers[self.field_type](self.field_content, single_chunk=False)
+            self.tensor_field_chunk_count = len(self.chunks)
+
+        if self.is_multimodal_subfield:
+
+            chunks, content_chunks = chunkers[self.field_type](self.field_content, single_chunk=True)
+            if not self.chunks:
+                self.chunks, self.content_chunks = chunks, content_chunks
+            else:
+                # attach the single chunk to chunks only if chunks do not match
+                if chunks[0] != self.chunks[-1]:
+                    self.chunks.extend(chunks)
+                    self.content_chunks.extend(content_chunks)
+
+    def vectorise(self, vectoriser: Vectoriser) -> None:
+        pass
+
+    @property
+    def tensor_field_chunks(self):
+        return self.chunks[:self.tensor_field_chunk_count] if self.chunks else []
+
+    @property
+    def tensor_field_embeddings(self):
+        return self.embeddings[:self.tensor_field_chunk_count] if self.chunks else []
+
+    @property
+    def sub_field_chunk(self):
+        return self.chunks[-1] if self.chunks else None
+
+    @property
+    def sub_field_embedding(self):
+        return self.embeddings[-1] if self.embeddings else None
+
+
+class MultiModalTensorFieldContent(TensorFieldContent):
+    weights: Dict[str, float]
+    subfields: Dict[str, TensorFieldContent] = dict()
+    normalize_embeddings: bool
+
+    @property
+    def tensor_field_chunks(self):
+        subfield_chunks = {subfield: self.subfields[subfield].sub_field_chunk for subfield in self.weights.keys()}
+        return [json.dumps(subfield_chunks)]
+
+    @property
+    def tensor_field_embeddings(self):
+        combo_embeddings = [
+            np.array(self.subfields[subfield].sub_field_embedding) * weight for subfield, weight in self.weights.items()
+        ]
+        vector_chunk = np.squeeze(np.mean(combo_embeddings, axis=0))
+        if self.normalize_embeddings:
+            vector_chunk = vector_chunk / np.linalg.norm(vector_chunk)
+
+        return [vector_chunk]
 
 
 class TensorFieldsContainer:
@@ -57,22 +141,18 @@ class TensorFieldsContainer:
         if doc_id in self._tensor_field_map:
             del self._tensor_field_map[doc_id]
 
-    def add_tensor_field_content(self, doc_id: str, field_name: str, field_content: Union[str, dict], field_type: FieldType,
-                                 chunks: Optional[List[str]] = None,
-                                 embeddings: Optional[List[List[float]]] = None) -> None:
+    def add_tensor_field_content(self, doc_id: str, field_name: str, content: TensorFieldContent) -> None:
         if doc_id not in self._tensor_field_map:
             self._tensor_field_map[doc_id] = dict()
-
-        self._tensor_field_map[doc_id][field_name] = TensorFieldContent(
-            field_content=field_content,
-            field_type=field_type,
-            chunks=chunks,
-            embeddings=embeddings
-        )
+        self._tensor_field_map[doc_id][field_name] = content
 
     def tensor_fields_to_vectorise(self, *types: FieldType) -> Generator[str, str, TensorFieldContent]:
         for doc_id, fields in self._tensor_field_map.items():
             for field_name, tensor_field_content in fields.items():
+                if doc_id not in self._tensor_field_map:
+                    # removed during interation due to error handling
+                    break
+
                 if tensor_field_content.field_type not in types:
                     # type does not match
                     continue
@@ -90,15 +170,17 @@ class TensorFieldsContainer:
 
                 yield doc_id, field_name, tensor_field_content
 
-    def get_tensor_field_content(self, doc_id: str, include_multimodal_subfields: bool = False) -> Dict[str, TensorFieldContent]:
+    def get_tensor_field_content(self, doc_id: str) -> Dict[str, TensorFieldContent]:
         return {field_name: content for field_name, content in self._tensor_field_map.get(doc_id, dict()).items()
-                if include_multimodal_subfields or field_name in self._tensor_fields}
+                if content.is_tensor_field}
 
-    def populate_tensor_from_existing_doc(self, doc_id: str, existing_marqo_doc: Dict[str, Any], existing_multimodal_mappings: dict) -> None:
+    def populate_tensor_from_existing_doc(self, doc_id: str, existing_marqo_doc: Dict[str, Any],
+                                          existing_multimodal_mappings: dict) -> None:
         if doc_id not in self._tensor_field_map:
             return
+        doc = self._tensor_field_map[doc_id]
 
-        for field_name, tensor_content in self._tensor_field_map[doc_id].items():
+        for field_name, tensor_content in doc.items():
             if tensor_content.embeddings:
                 # Already populated, might be a custom vector
                 continue
@@ -107,7 +189,21 @@ class TensorFieldsContainer:
                 # This is a new field added to the doc, we need to vectorise it
                 continue
 
-            if existing_marqo_doc[field_name] != tensor_content.field_content:
+            if field_name in existing_multimodal_mappings:
+                if tensor_content.field_type != FieldType.MultimodalCombination:
+                    # Field with the same name is not a multimodal field in this batch
+                    continue
+
+                weights = cast(MultiModalTensorFieldContent, tensor_content).weights
+                if existing_multimodal_mappings[field_name]['weight'] != weights:
+                    # mapping config is different, need to re-vectorise
+                    continue
+
+                if any([existing_marqo_doc[sub_field] != doc[sub_field].field_content for sub_field in weights.keys()]):
+                    # If content of any subfields does not match
+                    continue
+
+            elif existing_marqo_doc[field_name] != tensor_content.field_content:
                 # Field content has changed, we need to re-vectorise
                 continue
 
@@ -115,8 +211,6 @@ class TensorFieldsContainer:
                     field_name in existing_marqo_doc[constants.MARQO_DOC_TENSORS]):
                 # This field is not a tensor field in existing doc, we need to vectorise
                 continue
-
-            # TODO handle multimodal fields
 
             existing_tensor = existing_marqo_doc[constants.MARQO_DOC_TENSORS][field_name]
             tensor_content.chunks = existing_tensor[constants.MARQO_DOC_CHUNKS]
@@ -131,23 +225,34 @@ class TensorFieldsContainer:
             content = field_content['content']
             vector = field_content['vector']
             self.add_tensor_field_content(
-                doc_id, field_name, content, field_type=FieldType.CustomVector, chunks=[content], embeddings=[vector]
+                doc_id, field_name, TensorFieldContent(
+                    field_content=content,
+                    field_type=FieldType.CustomVector,
+                    chunks=[content],
+                    embeddings=[vector],
+                    is_tensor_field=True,
+                    is_multimodal_subfield=False
+                )
             )
             return content
 
         if self.is_multimodal_field(field_name):
-            raise InvalidArgError(
+            raise AddDocumentsError(
                 f"Multimodal_field {field_name} cannot have value assigned"
             )
 
         if not isinstance(field_content, str):
-            # TODO better error message
-            raise InvalidArgError(
+            raise AddDocumentsError(
                 f"Field of type {type(field_content).__name__} cannot be tensor field"
             )
 
         self.add_tensor_field_content(
-            doc_id, field_name, field_content, field_type=self._infer_field_type(field_content)
+            doc_id, field_name, TensorFieldContent(
+                field_content=field_content,
+                field_type=self._infer_field_type(field_content),
+                is_tensor_field=field_name in self._tensor_fields,
+                is_multimodal_subfield=field_name in self._multimodal_sub_fields
+            )
         )
         return field_content
 
@@ -158,7 +263,12 @@ class TensorFieldsContainer:
 
         return FieldType.Text
 
-    def collect_multi_modal_fields(self, doc_id: str):
+    def collect_multi_modal_fields(self, doc_id: str, normalize_embeddings: bool):
         for field_name, mapping in self._multimodal_combo_fields.items():
-            self.add_tensor_field_content(doc_id, field_name, mapping['weights'], field_type=FieldType.MultimodalCombination)
+            self.add_tensor_field_content(doc_id, field_name, MultiModalTensorFieldContent(
+                weights=mapping['weights'], field_content='', field_type=FieldType.MultimodalCombination,
+                subfields={subfield: self._tensor_field_map[doc_id][subfield] for subfield in mapping['weights'].keys()},
+                is_tensor_field=True, is_multimodal_subfield=False, normalize_embeddings=normalize_embeddings
+            ))
             yield field_name, mapping
+

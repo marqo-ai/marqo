@@ -89,5 +89,4 @@ class MarqoAddDocumentsResponse(MarqoBaseDocumentsResponse):
                     raise ValueError(f"Unexpected status code: {item.status}")
 
         values['_batch_response_stats'] = batch_response_count
-        values['errors'] = batch_response_count.has_error_or_failure()
         return values

@@ -1,6 +1,7 @@
 import json
 import uuid
 from abc import ABC, abstractmethod
+from http import HTTPStatus
 from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any
 
@@ -8,11 +9,77 @@ from typing import List, Dict, Optional, Any
 from marqo.api.exceptions import InvalidDocumentIdError, InvalidArgError, DocTooLargeError, MarqoWebError
 
 from marqo.config import Config
+from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
-from marqo.tensor_search import utils, enums
+from marqo.tensor_search import utils, enums, validation
 from marqo.vespa.models.get_document_response import Document
+from marqo.api import exceptions as errors
+
+
+ORIGINAL_ID='_original_id'
+
+class AddDocumentsError(Exception):
+    status_code: int = HTTPStatus.BAD_REQUEST
+    error_code: str = 'invalid_argument'
+    error_message: str
+
+    def __init__(self, error_message: str,
+                 error_code: str = 'invalid_argument',
+                 status_code: int = HTTPStatus.BAD_REQUEST) -> None:
+        self.error_code = error_code
+        self.error_message = error_message
+        self.status_code = status_code
+
+
+class DuplicateDocumentError(AddDocumentsError):
+    pass
+
+
+class AddDocumentsResponseCollector:
+    def __init__(self):
+        self.start_time = timer()
+        # TODO we ignore the location for now, and will add it if needed in the future
+        self.responses: List[MarqoAddDocumentsItem] = []
+        self.errors = False
+        self.marqo_docs: Dict[str, Dict[str, Any]] = dict()
+        self.visited_doc_ids: List[str] = []
+
+    def collect_marqo_doc(self, marqo_doc: Dict[str, Any]):
+        self.marqo_docs[marqo_doc[MARQO_DOC_ID]] = marqo_doc
+        if marqo_doc[ORIGINAL_ID] is not None:
+            self.visited_doc_ids.append(marqo_doc[ORIGINAL_ID])
+
+    def collect_error_response(self, doc_id: Optional[str], error: AddDocumentsError):
+        if isinstance(error, DuplicateDocumentError):
+            # This is the current logic, we ignore duplicate documents
+            # TODO remove this branch when we need to report duplicates as error in the response
+            return
+
+        if doc_id in self.marqo_docs:
+            doc_id = self.marqo_docs.pop(doc_id)[ORIGINAL_ID]
+
+        self.responses.append(MarqoAddDocumentsItem(
+            id=doc_id if doc_id is not None else '',
+            error=error.error_message,
+            message=error.error_message,
+            status=error.status_code,
+            code=error.error_code
+        ))
+
+        self.errors = True
+
+    def collect_successful_response(self, doc_id: Optional[str]):
+        self.responses.append(MarqoAddDocumentsItem(
+            id=doc_id if doc_id is not None else '',
+            status=200,
+        ))
+
+    def to_add_doc_responses(self, index_name: str) -> MarqoAddDocumentsResponse:
+        processing_time = (timer() - self.start_time) * 1000
+        return MarqoAddDocumentsResponse(errors=self.errors, index_name=index_name, items=self.responses,
+                                         processingTimeMs=processing_time)
 
 
 class AddDocumentsHandler(ABC):
@@ -21,69 +88,49 @@ class AddDocumentsHandler(ABC):
         self.marqo_index = marqo_index
         self.add_docs_params = add_docs_params
         self.config = config
+        self.add_docs_response_collector = AddDocumentsResponseCollector()
 
     def add_documents(self):
         """
         Template method for adding documents to Marqo index
         """
-        responses: List[Optional[MarqoAddDocumentsItem]] = [None] * len(self.add_docs_params.docs)
-        marqo_docs: Dict[int, Dict[str, Any]] = dict()
-        visited_doc_ids: Dict[str, int] = dict()
-
-        t0 = timer()
-        # Reverse the order to handle duplicate doc override correctly
-        for i, doc in enumerate(reversed(self.add_docs_params.docs)):
-            loc = len(self.add_docs_params.docs) - 1 - i
-            doc_id = None
-            marqo_doc = dict()
+        for doc in reversed(self.add_docs_params.docs):
+            original_id = None
             try:
-                self.validate_doc(doc, loc)
-                doc_id = self._validate_doc_id(doc, loc, visited_doc_ids)
-                marqo_doc['_id'] = doc_id or str(uuid.uuid4())
+                original_id = self.validate_doc(doc)
+                doc_id = original_id or str(uuid.uuid4())
+                marqo_doc = {ORIGINAL_ID: original_id, MARQO_DOC_ID: doc_id}  # keep this info for error report
 
                 for field_name, field_content in doc.items():
-                    # This collects the doc
                     self.handle_field(marqo_doc, field_name, field_content)
 
-                self.handle_multi_modal_fields(marqo_doc['_id'], marqo_doc)
+                self.handle_multi_modal_fields(marqo_doc)
 
-                # we only add doc to marqo_docs if it is valid
-                marqo_docs[loc] = marqo_doc
-
-            except MarqoWebError as err:
-                # TODO check different exceptions
-                responses[loc] = MarqoAddDocumentsItem.from_error(doc_id, err)
+                self.add_docs_response_collector.collect_marqo_doc(marqo_doc)
+            except AddDocumentsError as err:
+                self.add_docs_response_collector.collect_error_response(original_id, err)
 
         # retrieve existing docs for existing tensor
         if self.add_docs_params.use_existing_tensors:
-            result = self.config.vespa_client.get_batch(list(visited_doc_ids.keys()), self.marqo_index.schema_name)
+            result = self.config.vespa_client.get_batch(self.add_docs_response_collector.visited_doc_ids,
+                                                        self.marqo_index.schema_name)
             existing_vespa_docs = {r.id: r.document for r in result.responses if r.status == 200}
             self.handle_existing_tensors(existing_vespa_docs)
 
         # vectorise tensor fields
-        doc_id_location_map = {doc['_id']: loc for loc, doc in marqo_docs.items()}
-        for invalid_doc_item in self.vectorise_tensor_fields():
-            loc = doc_id_location_map[invalid_doc_item.id]
-            # TODO remove generated doc_id
-            responses[loc] = invalid_doc_item
-            del marqo_docs[loc]
+        self.vectorise_tensor_fields()
 
         # persist to vespa if there are still valid docs
-        if marqo_docs:
-            for add_doc_item in self.persist_to_vespa(marqo_docs):
-                loc = doc_id_location_map[add_doc_item.id]
-                # TODO remove generated doc_id
-                responses[loc] = add_doc_item
+        self.persist_to_vespa()
 
-        return MarqoAddDocumentsResponse(errors=False, index_name=self.marqo_index.name, items=responses,
-                                         processingTimeMs=((timer() - t0) * 1000))
+        return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
 
     @abstractmethod
     def handle_field(self, marqo_doc, field_name, field_content):
         pass
 
     @abstractmethod
-    def handle_multi_modal_fields(self, doc_id: str, marqo_doc: Dict[str, Any]):
+    def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]):
         pass
 
     @abstractmethod
@@ -91,51 +138,21 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def vectorise_tensor_fields(self) -> List[MarqoAddDocumentsItem]:
+    def vectorise_tensor_fields(self) -> None:
         pass
 
     @abstractmethod
-    def persist_to_vespa(self, marqo_docs) -> List[MarqoAddDocumentsItem]:
+    def persist_to_vespa(self) -> None:
         pass
 
-    def validate_doc(self, doc, loc: int):
-        if not isinstance(doc, dict):
-            raise InvalidArgError("Docs must be dicts")
+    def validate_doc(self, doc):
+        try:
+            validation.validate_doc(doc)
+            doc_id = doc.pop(MARQO_DOC_ID)
+            if doc_id and  doc_id in self.add_docs_response_collector.visited_doc_ids:
+                raise DuplicateDocumentError(f"Document will be ignored since doc with the same id"
+                                             f" `{doc_id}` supersedes this one")
+            return doc_id
+        except errors.__InvalidRequestError as err:
+            raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
-        if len(doc) <= 0:
-            raise InvalidArgError("Can't index an empty dict.")
-
-        max_doc_size = utils.read_env_vars_and_defaults(var=enums.EnvVars.MARQO_MAX_DOC_BYTES)
-        if max_doc_size is not None:
-            try:
-                serialized = json.dumps(doc)
-            except TypeError as e:
-                raise InvalidArgError(f"Unable to index document: it is not serializable! "
-                                      f"Document: `{doc}` ")
-            if len(serialized) > int(max_doc_size):
-                maybe_id = f" _id:`{doc['_id']}`" if '_id' in doc else ''
-                raise DocTooLargeError(
-                    f"Document{maybe_id} with length `{len(serialized)}` exceeds "
-                    f"the allowed document size limit of [{max_doc_size}]."
-                )
-
-    def _validate_doc_id(self, doc, loc: int, visited_doc_ids: Dict[str, int]) -> Optional[str]:
-        if '_id' not in doc:
-            return None
-
-        doc_id = doc['_id']
-        if not isinstance(doc_id, str):
-            raise InvalidDocumentIdError(
-                f"Document _id must be a string type! "
-                f"Received _id {doc_id} of type `{type(doc_id).__name__}`")
-
-        if doc_id in visited_doc_ids:
-            # TODO find a better error type
-            raise InvalidDocumentIdError(f"Document will be ignored since doc with the same id"
-                                         f" `{doc_id}` at location [{visited_doc_ids[doc_id]}] supersedes this one")
-        else:
-            # TODO this matches the current behaviour, check if it's better to do all validation first
-            visited_doc_ids[doc_id] = loc
-
-        del doc['_id']
-        return doc_id
