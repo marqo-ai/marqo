@@ -2225,10 +2225,10 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                         image_content_to_vectorise.append(media_data)
                         image_field_names.append(sub_field_name)
                     elif modality == Modality.VIDEO:
-                        video_content_to_vectorise.append(media_data[0]['tensor'])
+                        video_content_to_vectorise.append([media_data[i]['tensor'] for i in range(len(media_data))])
                         video_field_names.append(sub_field_name)
                     elif modality == Modality.AUDIO:
-                        audio_content_to_vectorise.append(media_data[0]['tensor'])
+                        audio_content_to_vectorise.append([media_data[i]['tensor'] for i in range(len(media_data))])
                         audio_field_names.append(sub_field_name)
 
                 except s2_inference_errors.S2InferenceError as e:
@@ -2260,6 +2260,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                     device=device, normalize_embeddings=normalize_embeddings,
                     infer=False, model_auth=model_auth, modality=Modality.TEXT
                 )
+
                 vectors_list.extend(text_vectors)
                 sub_field_name_list.extend(text_field_names)
 
@@ -2276,27 +2277,37 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 
         if len(video_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors.video"):
-                for video_field, video_content in zip(video_field_names, video_content_to_vectorise):
-                    video_vectors = s2_inference.vectorise(
-                        model_name=marqo_index.model.name,
-                        model_properties=marqo_index.model.properties, content=[video_content],
-                        device=device, normalize_embeddings=normalize_embeddings,
-                        infer=True, model_auth=model_auth, modality=Modality.VIDEO
-                    )
-                    vectors_list.extend(video_vectors)
-                    sub_field_name_list.extend([video_field] * len(video_vectors))
+                for video_chunks_list in video_content_to_vectorise:
+                    video_vectors = []
+                    for video_chunk in video_chunks_list:
+                        video_vector = s2_inference.vectorise(
+                            model_name=marqo_index.model.name,
+                            model_properties=marqo_index.model.properties, content=[video_chunk],
+                            device=device, normalize_embeddings=normalize_embeddings,
+                            infer=True, model_auth=model_auth, modality=Modality.VIDEO
+                        )
+                        video_vectors.append(video_vector)
+                     # Average the vectors for this video field
+                    avg_video_vector = np.mean(video_vectors, axis=0).tolist()
+                    vectors_list.append(avg_video_vector)
+                sub_field_name_list.extend(video_field_names)
 
         if len(audio_content_to_vectorise) > 0:
             with RequestMetricsStore.for_request().time(f"create_vectors.audio"):
-                for audio_field, audio_content in zip(audio_field_names, audio_content_to_vectorise):
-                    audio_vectors = s2_inference.vectorise(
-                        model_name=marqo_index.model.name,
-                        model_properties=marqo_index.model.properties, content=[audio_content],
-                        device=device, normalize_embeddings=normalize_embeddings,
-                        infer=True, model_auth=model_auth, modality=Modality.AUDIO
-                    )
-                    vectors_list.extend(audio_vectors)
-                    sub_field_name_list.extend([audio_field] * len(audio_vectors))
+                for audio_chunks_list in audio_content_to_vectorise:
+                    audio_vectors = []
+                    for audio_chunk in audio_chunks_list:
+                        audio_vector = s2_inference.vectorise(
+                            model_name=marqo_index.model.name,
+                            model_properties=marqo_index.model.properties, content=[audio_chunk],
+                            device=device, normalize_embeddings=normalize_embeddings,
+                            infer=True, model_auth=model_auth, modality=Modality.AUDIO
+                        )
+                        audio_vectors.extend(audio_vector)
+                    # Average the vectors for this audio field
+                    avg_audio_vector = np.mean(audio_vectors, axis=0).tolist()
+                    vectors_list.append(avg_audio_vector)
+                sub_field_name_list.extend(audio_field_names)
 
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
@@ -2435,10 +2446,10 @@ def vectorise_multimodal_combination_field_structured(
                         image_content_to_vectorise.append(sub_content)
                         image_field_names.append(sub_field_name)
                     elif sub_field_name in video_fields:
-                        video_content_to_vectorise.append(sub_content[0]['tensor'])
+                        video_content_to_vectorise.append([sub_content[i]['tensor'] for i in range(len(sub_content))])
                         video_field_names.append(sub_field_name)
                     elif sub_field_name in audio_fields:
-                        audio_content_to_vectorise.append(sub_content[0]['tensor'])
+                        audio_content_to_vectorise.append([sub_content[i]['tensor'] for i in range(len(sub_content))])
                         audio_field_names.append(sub_field_name)
                     else:
                         raise s2_inference_errors.S2InferenceError(
@@ -2499,28 +2510,40 @@ def vectorise_multimodal_combination_field_structured(
         # Process video content
         if video_content_to_vectorise:
             with RequestMetricsStore.for_request().time("create_vectors.video"):
-                for video_field, video_content in zip(video_field_names, video_content_to_vectorise):
-                    video_vectors = s2_inference.vectorise(
-                        model_name=marqo_index.model.name,
-                        model_properties=marqo_index.model.properties, content=[video_content],
-                        device=device, normalize_embeddings=normalize_embeddings,
-                        infer=True, model_auth=model_auth, modality=Modality.VIDEO
-                    )
-                    vectors_list.extend(video_vectors)
-                    sub_field_name_list.extend([video_field] * len(video_vectors))
+
+                for video_chunks_list in video_content_to_vectorise:
+                    video_vectors = []
+                    for video_chunk in video_chunks_list:
+                        print(f"video_chunk: {video_chunk}")
+                        video_vector = s2_inference.vectorise(
+                            model_name=marqo_index.model.name,
+                            model_properties=marqo_index.model.properties, content=[video_chunk],
+                            device=device, normalize_embeddings=normalize_embeddings,
+                            infer=True, model_auth=model_auth, modality=Modality.VIDEO
+                        )
+                        video_vectors.append(video_vector)
+                    # Average the vectors for this video field
+                    avg_video_vector = np.mean(video_vectors, axis=0).tolist()
+                    vectors_list.append(avg_video_vector)
+                sub_field_name_list.extend(video_field_names)
 
         # Process audio content
         if audio_content_to_vectorise:
             with RequestMetricsStore.for_request().time(f"create_vectors.audio"):
-                for audio_field, audio_content in zip(audio_field_names, audio_content_to_vectorise):
-                    audio_vectors = s2_inference.vectorise(
-                        model_name=marqo_index.model.name,
-                        model_properties=marqo_index.model.properties, content=[audio_content],
-                        device=device, normalize_embeddings=normalize_embeddings,
-                        infer=True, model_auth=model_auth, modality=Modality.AUDIO
-                    )
-                    vectors_list.extend(audio_vectors)
-                    sub_field_name_list.extend([audio_field] * len(audio_vectors))
+                for audio_chunks_list in audio_content_to_vectorise:
+                    audio_vectors = []
+                    for audio_chunk in audio_chunks_list:
+                        audio_vector = s2_inference.vectorise(
+                            model_name=marqo_index.model.name,
+                            model_properties=marqo_index.model.properties, content=[audio_chunk],
+                            device=device, normalize_embeddings=normalize_embeddings,
+                            infer=True, model_auth=model_auth, modality=Modality.AUDIO
+                        )
+                        audio_vectors.extend(audio_vector)
+                    # Average the vectors for this audio field
+                    avg_audio_vector = np.mean(audio_vectors, axis=0).tolist()
+                    vectors_list.append(avg_audio_vector)
+                sub_field_name_list.extend(audio_field_names)
 
         end_time = timer()
         combo_vectorise_time_to_add += (end_time - start_time)
