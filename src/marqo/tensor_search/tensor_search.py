@@ -2047,6 +2047,7 @@ def _vector_text_search(
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
+    print(f"vectorised text (length {len(vectorised_text)}): {vectorised_text}")
 
     marqo_query = MarqoTensorQuery(
         index_name=index_name,
@@ -2063,6 +2064,7 @@ def _vector_text_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
+    print(f"vespa_query: {vespa_query}")
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_vespa")
     logger.debug(
@@ -2074,6 +2076,7 @@ def _vector_text_search(
                                                 ):
         try:
             responses = config.vespa_client.query(**vespa_query)
+            print(f"responses: {responses}")
         except VespaStatusError as e:
             # The index will not have the embedding_similarity rank profile if there are no tensor fields
             if f"No profile named '{RANK_PROFILE_EMBEDDING_SIMILARITY}'" in e.message:
@@ -2093,6 +2096,7 @@ def _vector_text_search(
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
     gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
+    print(f"gathered_docs: {gathered_docs}")
 
     if boost is not None:
         raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')

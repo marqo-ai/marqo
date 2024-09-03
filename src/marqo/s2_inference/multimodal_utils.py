@@ -171,7 +171,9 @@ class LanguageBindEncoder(ModelEncoder):
             else:
                 return LanguageBindAudioTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
         
-    
+    def _normalize(self, outputs):
+        return outputs / outputs.norm(dim=-1, keepdim=True)
+
     def preprocessor(self, modality):
         if not hasattr(self, '_preprocessors'):
             self._preprocessors = {}
@@ -187,7 +189,7 @@ class LanguageBindEncoder(ModelEncoder):
         
         return self._preprocessors.get(modality)
     
-    def encode(self, content, modality, **kwargs):
+    def encode(self, content, modality, normalize=True, **kwargs):
         inputs = {}
         
         if modality == Modality.TEXT:
@@ -231,7 +233,12 @@ class LanguageBindEncoder(ModelEncoder):
         with torch.no_grad():
             embeddings = self.model.model(inputs)
 
-        return embeddings[modality.value].cpu().numpy()
+        embeddings = embeddings[modality.value]
+
+        if normalize:
+            embeddings = self._normalize(embeddings)
+
+        return embeddings.cpu().numpy()
 
     def _download_content(self, url, filename):
         # 3 seconds for images, 20 seconds for audio and video
