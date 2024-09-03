@@ -565,7 +565,7 @@ class TestMarqoFashionCLIP(TestCase):
     def test_MarqoFashionSigLIPModel_load(self):
         """Test the load method of MarqoFashionCLIPModel."""
 
-        model_tag = "open_clip/ViT-B-16-SigLIP/marqo-fashionSigLIP"
+        model_tag = "Marqo/marqo-fashionSigLIP"
         model_properties = OPEN_CLIP_MODEL_PROPERTIES[model_tag]
         model = OPEN_CLIP(model_tag, device="cpu", model_properties=model_properties)
 
@@ -591,7 +591,7 @@ class TestMarqoFashionCLIP(TestCase):
     def test_MarqoFashionCLIPModel_load(self):
         """Test the load method of MarqoFashionCLIPModel."""
 
-        model_tag = "open_clip/ViT-B-16/marqo-fashionCLIP"
+        model_tag = "Marqo/marqo-fashionCLIP"
         model_properties = OPEN_CLIP_MODEL_PROPERTIES[model_tag]
         model = OPEN_CLIP(model_tag, device="cpu", model_properties=model_properties)
 
