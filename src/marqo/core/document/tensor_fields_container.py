@@ -35,10 +35,12 @@ class TensorFieldContent(BaseModel):
     is_resolved: bool = False
     tensor_field_chunk_count: int = 0
 
-    def populate_from_existing_tensor(self, chunks: List[str], embeddings: List[List[float]]) -> None:
+    def populate_chunks_and_embeddings(self, chunks: List[str], embeddings: List[List[float]]) -> None:
+        # TODO check chunks and embeddings have same length
         self.chunks = chunks
         self.embeddings = embeddings
-        if not self.is_multimodal_subfield or len(chunks) == 1:
+        self.tensor_field_chunk_count = len(chunks)
+        if not self.is_multimodal_subfield:
             self.is_resolved = True
 
     def chunk(self, chunkers: Dict[FieldType, Chunker]) -> None:
@@ -230,17 +232,15 @@ class TensorFieldsContainer:
 
         if self.is_custom_tensor_field(field_name):
             content = field_content['content']
-            vector = field_content['vector']
-            self.add_tensor_field_content(
-                doc_id, field_name, TensorFieldContent(
-                    field_content=content,
-                    field_type=FieldType.CustomVector,
-                    chunks=[content],
-                    embeddings=[vector],
-                    is_tensor_field=True,
-                    is_multimodal_subfield=False
-                )
+            embedding = field_content['vector']
+            tensor_field_content = TensorFieldContent(
+                field_content=content,
+                field_type=FieldType.CustomVector,
+                is_tensor_field=True,
+                is_multimodal_subfield=False,  # for now custom vectors can only be top level
             )
+            tensor_field_content.populate_chunks_and_embeddings([content], [embedding])
+            self.add_tensor_field_content( doc_id, field_name, tensor_field_content)
             return content
 
         if self.is_multimodal_field(field_name):

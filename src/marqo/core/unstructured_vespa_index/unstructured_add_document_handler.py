@@ -52,9 +52,12 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         super().validate_doc(doc)
         multimodal_sub_fields = list(self.tensor_fields_container.get_multimodal_sub_fields())
         if self.add_docs_params.mappings and multimodal_sub_fields:
-            validate_coupling_of_mappings_and_doc(
-                doc, self.add_docs_params.mappings, multimodal_sub_fields
-            )
+            try:
+                validate_coupling_of_mappings_and_doc(
+                    doc, self.add_docs_params.mappings, multimodal_sub_fields
+                )
+            except errors.InvalidArgError as err:
+                raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     def handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
@@ -63,6 +66,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:
+            # TODO extract the validation logic somewhere else
             validate_field_name(field_name)
 
             if type(field_content) not in ALLOWED_UNSTRUCTURED_FIELD_TYPES:
