@@ -238,8 +238,8 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             all_chunks = []
             all_embeddings = []
             for field_name, tensor_field_content in self.tensor_fields_container.get_tensor_field_content(doc_id).items():
-                all_chunks.extend([f'{field_name}::{chunk}' for chunk in tensor_field_content.chunks])
-                all_embeddings.extend(tensor_field_content.embeddings)
+                all_chunks.extend([f'{field_name}::{chunk}' for chunk in tensor_field_content.tensor_field_chunks])
+                all_embeddings.extend(tensor_field_content.tensor_field_embeddings)
             doc[constants.MARQO_DOC_CHUNKS] = all_chunks
             doc[constants.MARQO_DOC_EMBEDDINGS] = {index: embedding for index, embedding in enumerate(all_embeddings)}
 

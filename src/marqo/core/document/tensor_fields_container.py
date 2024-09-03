@@ -61,7 +61,14 @@ class TensorFieldContent(BaseModel):
                     self.content_chunks.extend(content_chunks)
 
     def vectorise(self, vectoriser: Vectoriser) -> None:
-        pass
+        if self.is_resolved:
+            return
+
+        if not self.embeddings:
+            self.embeddings = vectoriser(self.content_chunks, self.field_type)
+        elif len(self.embeddings) < len(self.content_chunks):
+            content_chunks_not_vectorised = self.content_chunks[len(self.embeddings) - 1:]
+            self.embeddings.extend(vectoriser(content_chunks_not_vectorised, self.field_type))
 
     @property
     def tensor_field_chunks(self):
