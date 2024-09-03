@@ -882,7 +882,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         # 5. load correct media type into memory -> PIL (images), videos (), audio (torchaudio)
                         # 6. if chunking -> then add the extra chunker
 
-                        if isinstance(field_content, str) and not _is_image(field_content):
+                        if isinstance(field_content, str) and not _is_image(field_content) and not marqo_field.type == FieldType.ImagePointer:
                             # text processing pipeline:
                             modality = Modality.TEXT
                             split_by = marqo_index.text_preprocessing.split_method.value
@@ -1137,7 +1137,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
         marqo_add_documents_response = config.document.translate_add_documents_response(
             index_responses, index_name=add_docs_params.index_name, unsuccessful_docs=unsuccessful_docs,
-            add_docs_processing_time=t1 - t0
+            add_docs_processing_time_ms=(t1 - t0) * 1000
         )
         return marqo_add_documents_response
 

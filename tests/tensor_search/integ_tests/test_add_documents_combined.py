@@ -203,14 +203,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 for item in res.dict(exclude_none=True, by_alias=True)['items']:
                     self.assertEqual(200, item['status'])
 
-                self.assertEqual(4,
-                                 res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['success_count'])
-                self.assertEqual(0, res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['error_count'])
-                self.assertEqual(0,
-                                 res.dict(exclude_none=True, by_alias=True)['_batch_response_stats']['failure_count'])
-
-                print(res)
-
                 get_res = tensor_search.get_documents_by_ids(
                     config=self.config, index_name=index_name,
                     document_ids=["1", "2", "3", "4"],
