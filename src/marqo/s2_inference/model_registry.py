@@ -484,7 +484,7 @@ def _get_open_clip_properties() -> Dict:
         },
         "open_clip/ViT-B-16-SigLIP/marqo-fashionSigLIP": {
             "name": "hf-hub:Marqo/marqo-fashionSigLIP",
-            "dimensions": 512,
+            "dimensions": 768,
             "note": "Marqo's fashionSigLIP model",
             "type": "open_clip"
         },
