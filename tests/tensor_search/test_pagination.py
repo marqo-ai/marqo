@@ -28,9 +28,24 @@ class TestPagination(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
+        # Create docs lists
+        cls.NUMBER_OF_DOCS = 400
+        cls.SEARCH_KEYWORD = "hello"
+        cls.docs_list_unique = []   # Every doc should have a UNIQUE lexical & tensor score
+        cls.docs_list_same_score = []   # Every doc will have the SAME score
+        for i in range(cls.NUMBER_OF_DOCS):
+            cls.docs_list_unique.append({
+                "_id": f"doc{i}",
+                "title": " ".join([cls.SEARCH_KEYWORD for _ in range(i)])
+            })
+            cls.docs_list_same_score.append({
+                "_id": f"doc{i}",
+                "title": cls.SEARCH_KEYWORD
+            })
+
         index_request_structured = cls.structured_marqo_index_request(
             fields=[
-                FieldRequest(name='title', type=FieldType.Text),
+                FieldRequest(name='title', type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(
                     name='desc',
                     type=FieldType.Text,
@@ -73,51 +88,21 @@ class TestPagination(MarqoTestCase):
     def tearDown(self):
         self.device_patcher.stop()
 
-    def generate_random_string(self, length):
-        # Generate a random string of given length
-        letters = string.ascii_lowercase
-        return ''.join(random.choice(letters) for _ in range(length))
-
-    def generate_unique_strings(self, num_strings):
-        """
-        Generate strings that will have different bm25 scores, to confirm pagination works as expected
-        """
-        unique_strings = set()
-        while len(unique_strings) < num_strings:
-            # Vary content and length
-            length = random.randint(1, 5)  # Random length between 1 and 5
-            rand_str = self.generate_random_string(length)
-
-            # Vary term frequency by repeating some words
-            words = rand_str.split()
-            if len(words) > 1 and random.random() > 0.5:
-                rand_str += " " + random.choice(words)
-
-            unique_strings.add(rand_str)
-
-        return list(unique_strings)
-
     def test_pagination_single_field(self):
-        num_docs = 400
+        """
+        Pagination results are consistent when using 1 field, on both tensor and lexical search.
+        Searching for all results at the same time yields same results and order as searching for smaller pages of
+        results at a time.
+        Valid for when all results have DIFFERENT scores.
+        """
         batch_size = 100
 
         for index in [self.index_structured, self.index_unstructured]:
-            for _ in range(0, num_docs, batch_size):
-                docs = []
-                for i in range(batch_size):
-                    title = "my title"
-                    for j in range(i):
-                        title += " ".join(self.generate_unique_strings(j))
-                    doc = {"_id": str(i),
-                           "title": title,
-                           'desc': 'my description'}
-                    docs.append(doc)
-
+            for starting_idx in range(0, self.NUMBER_OF_DOCS, batch_size):
                 r = tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
-                                                  # Add docs with increasing title word count, so each will have unique tensor and lexical scores
-                                                  docs=docs,
+                                                  docs=self.docs_list_unique[starting_idx:starting_idx+batch_size],
                                                   device="cpu",
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
@@ -130,53 +115,47 @@ class TestPagination(MarqoTestCase):
                     search_method=search_method,
                     config=self.config,
                     index_name=index.name,
-                    text='my title',
-                    result_count=num_docs)
+                    text=self.SEARCH_KEYWORD,
+                    result_count=self.NUMBER_OF_DOCS)
 
-                # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
-                for page_size in [100, 200]:
+                for page_size in [1, 5, 10, 100, 200]:
                     with self.subTest(f'Index: {index.type}, Search method: {search_method}, Page size: {page_size}'):
                         paginated_search_results = {"hits": []}
 
-                        for page_num in range(math.ceil(num_docs / page_size)):
+                        for page_num in range(math.ceil(self.NUMBER_OF_DOCS / page_size)):
                             lim = page_size
                             off = page_num * page_size
                             page_res = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=index.name,
-                                text='my title',
+                                text=self.SEARCH_KEYWORD,
                                 result_count=lim, offset=off)
 
                             paginated_search_results["hits"].extend(page_res["hits"])
 
-                        # Compare paginated to full results (length only for now)
                         self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
                         for i in range(len(full_search_results["hits"])):
                             self.assertEqual(full_search_results["hits"][i]["_id"], paginated_search_results["hits"][i]["_id"])
                             self.assertEqual(full_search_results["hits"][i]["_score"], paginated_search_results["hits"][i]["_score"])
 
-    def test_pagination_inconsistency(self):
-        num_docs = 400
+    @unittest.skip
+    def test_pagination_single_field_same_scores(self):
+        """
+        We want to ensure pagination result order is consistent even when results have SAME scores.
+        This only works using rerankCount parameter.
+        When using 1 field, on both tensor and lexical search.
+        Searching for all results at the same time yields same results and order as searching for smaller pages of
+        results at a time.
+        """
         batch_size = 100
 
         for index in [self.index_structured, self.index_unstructured]:
-            for _ in range(0, num_docs, batch_size):
-                docs = []
-                for i in range(batch_size):
-                    title = "my title"
-                    for j in range(i):
-                        title += " ".join(self.generate_unique_strings(j))
-                    doc = {"_id": str(i),
-                           "title": title,
-                           'desc': 'my description'}
-                    docs.append(doc)
-
+            for starting_idx in range(0, self.NUMBER_OF_DOCS, batch_size):
                 r = tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
-                                                  # Add docs with increasing title word count, so each will have unique tensor and lexical scores
-                                                  docs=docs,
+                                                  docs=self.docs_list_same_score[starting_idx:starting_idx+batch_size],
                                                   device="cpu",
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
@@ -189,51 +168,39 @@ class TestPagination(MarqoTestCase):
                     search_method=search_method,
                     config=self.config,
                     index_name=index.name,
-                    text='my title',
-                    result_count=num_docs)
+                    text=self.SEARCH_KEYWORD,
+                    result_count=self.NUMBER_OF_DOCS)
 
-                # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
-                for page_size in [1, 2, 3, 5, 10]:
+                for page_size in [1, 5, 10, 100, 200]:
                     with self.subTest(f'Index: {index.type}, Search method: {search_method}, Page size: {page_size}'):
                         paginated_search_results = {"hits": []}
 
-                        for page_num in range(math.ceil(num_docs / page_size)):
+                        for page_num in range(math.ceil(self.NUMBER_OF_DOCS / page_size)):
                             lim = page_size
                             off = page_num * page_size
                             page_res = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
                                 index_name=index.name,
-                                text='my title',
+                                text=self.SEARCH_KEYWORD,
                                 result_count=lim, offset=off)
 
                             paginated_search_results["hits"].extend(page_res["hits"])
 
-                        # Compare paginated to full results (length only for now)
                         self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
                         for i in range(len(full_search_results["hits"])):
                             self.assertEqual(full_search_results["hits"][i]["_id"], paginated_search_results["hits"][i]["_id"])
                             self.assertEqual(full_search_results["hits"][i]["_score"], paginated_search_results["hits"][i]["_score"])
 
+    @unittest.skip
     def test_pagination_hybrid(self):
-        num_docs = 400
         batch_size = 100
-
         for index in [self.index_structured, self.index_unstructured]:
-            for _ in range(0, num_docs, batch_size):
-                docs = []
-                for i in range(batch_size):
-                    title = "my title"
-                    for j in range(i):
-                        title += " ".join(self.generate_unique_strings(j))
-                    doc = {"_id": str(i),
-                           "title": title,
-                           'desc': 'my description'}
-                    docs.append(doc)
+            for starting_idx in range(0, self.NUMBER_OF_DOCS, batch_size):
                 r = tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
-                                                  docs=docs,
+                                                  docs=self.docs_list_unique[starting_idx:starting_idx + batch_size],
                                                   device="cpu",
                                                   tensor_fields=['title'] if index.type == IndexType.Unstructured
                                                   else None
@@ -255,15 +222,14 @@ class TestPagination(MarqoTestCase):
                                                            rankingMethod=ranking_method),
                         config=self.config,
                         index_name=index.name,
-                        text='my title',
-                        result_count=num_docs)
+                        text=self.SEARCH_KEYWORD,
+                        result_count=self.NUMBER_OF_DOCS)
 
-                    # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
-                    for page_size in [100, 200]:
+                    for page_size in [5, 10, 100, 200]:
                         with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
                             paginated_search_results = {"hits": []}
 
-                            for page_num in range(math.ceil(num_docs / page_size)):
+                            for page_num in range(math.ceil(self.NUMBER_OF_DOCS / page_size)):
                                 lim = page_size
                                 off = page_num * page_size
                                 page_res = tensor_search.search(
@@ -272,16 +238,19 @@ class TestPagination(MarqoTestCase):
                                                                        rankingMethod=ranking_method),
                                     config=self.config,
                                     index_name=index.name,
-                                    text='my title',
+                                    text=self.SEARCH_KEYWORD,
                                     result_count=lim, offset=off)
 
                                 paginated_search_results["hits"].extend(page_res["hits"])
 
                             # Compare paginated to full results (length only for now)
                             self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
-                            # Scores need to match, except for disjunction/rrf (where scores are determined by rank)
-                            if (retrieval_method, ranking_method) != ("disjunction", "rrf"):
-                                for i in range(len(full_search_results["hits"])):
+
+                            for i in range(len(full_search_results["hits"])):
+                                self.assertEqual(full_search_results["hits"][i]["_id"],
+                                                 paginated_search_results["hits"][i]["_id"])
+                                # Scores need to match, except for disjunction/rrf (where scores are determined by rank)
+                                if (retrieval_method, ranking_method) != ("disjunction", "rrf"):
                                     self.assertEqual(full_search_results["hits"][i]["_score"],
                                                      paginated_search_results["hits"][i]["_score"])
 

@@ -1227,7 +1227,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 
 
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
-           result_count: int = 3, offset: int = 0,
+           result_count: int = 3, offset: int = 0, rerank_count: int = None,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
@@ -1350,7 +1350,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         if search_method.upper() == SearchMethod.TENSOR:
             search_result = _vector_text_search(
                 config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
-                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                rerank_count=rerank_count, ef_search=ef_search, approximate=approximate,
+                searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
@@ -1361,7 +1362,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             from marqo.core.search.hybrid_search import HybridSearch
             search_result = HybridSearch().search(
                 config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
-                ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
+                rerank_count=rerank_count, ef_search=ef_search, approximate=approximate,
+                searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
@@ -1850,7 +1852,8 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Optional[Union[str, dict, CustomVectorQuery]], result_count: int = 5, offset: int = 0,
+        config: Config, index_name: str, query: Optional[Union[str, dict, CustomVectorQuery]], result_count: int = 5,
+        offset: int = 0, rerank_count: int = None,
         ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
@@ -1866,6 +1869,7 @@ def _vector_text_search(
             <query string>:<weight float> pairs, or None with a context
         result_count:
         offset:
+        rerank_count: Number of hits to retrieve and rank (should be equal to or larger than result count).
         searchable_attributes: Iterable of field names to search. If left as None, then all will
             be searched
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
@@ -1933,6 +1937,7 @@ def _vector_text_search(
         vector_query=vectorised_text,
         filter=filter_string,
         limit=result_count,
+        rerank_count=rerank_count,
         ef_search=ef_search,
         approximate=approximate,
         offset=offset,

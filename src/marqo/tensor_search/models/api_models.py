@@ -40,6 +40,7 @@ class SearchQuery(BaseMarqoModel):
     searchMethod: SearchMethod = SearchMethod.TENSOR
     limit: int = 10
     offset: int = 0
+    rerankCount: int = None
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
     showHighlights: bool = True

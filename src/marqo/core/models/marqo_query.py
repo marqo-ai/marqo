@@ -41,10 +41,34 @@ class MarqoQuery(StrictBaseModel, ABC):
 
 class MarqoTensorQuery(MarqoQuery):
     vector_query: List[float]
+    rerank_count: Optional[int] = None
     ef_search: Optional[int] = None
     approximate: bool = True
 
-    # TODO - validate that ef_search >= offset+limit if provided
+    @root_validator(pre=True)
+    def validate_ef_search_and_rerank_count(cls, values):
+        # ef_search must be greater than or equal to limit + offset if provided
+        ef_search = values.get("ef_search")
+        limit = values.get("limit")
+        offset = values.get("offset", 0)
+        if ef_search is not None:
+            if ef_search < limit + offset:
+                raise ValueError(f"Your 'ef_search' is too low. For a tensor search, 'efSearch' must be greater than "
+                                 f"or equal to 'limit' + 'offset'. Your current efSearch is {ef_search}, limit is "
+                                 f"{limit}, offset is {offset}.")
+
+        # rerank_count must be between limit + offset and ef_search (inclusive) if provided
+        rerank_count = values.get("rerank_count")
+        if rerank_count is not None:
+            if rerank_count < limit + offset:
+                raise ValueError(f"Your 'rerank_count' is too low. For a tensor search, 'rerankCount' must be greater "
+                                 f"than or equal to 'limit' + 'offset'. Your current rerankCount is {rerank_count}, "
+                                 f"limit is {limit}, offset is {offset}.")
+            if rerank_count > ef_search:
+                raise ValueError(f"Your 'rerank_count' is too high. For a tensor search, 'rerankCount' must be less "
+                                 f"than or equal to 'efSearch'. Your current rerankCount is {rerank_count}, efSearch "
+                                 f"is {ef_search}.")
+        return values
 
 
 class MarqoLexicalQuery(MarqoQuery):

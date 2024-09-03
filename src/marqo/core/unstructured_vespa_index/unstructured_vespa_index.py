@@ -110,12 +110,20 @@ class UnstructuredVespaIndex(VespaIndex):
     def _get_tensor_search_term(self, marqo_query: MarqoTensorQuery) -> str:
         field_to_search = unstructured_common.VESPA_DOC_EMBEDDINGS
 
-        if marqo_query.ef_search is not None:
-            target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
-            additional_hits = marqo_query.ef_search - target_hits
+        # Calculate target hits
+        if marqo_query.rerank_count is None:
+            if marqo_query.ef_search is None:
+                target_hits = marqo_query.limit + marqo_query.offset
+            else:
+                target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
         else:
-            target_hits = marqo_query.limit + marqo_query.offset
+            target_hits = marqo_query.rerank_count
+
+        # Calculate additional hits (always use ef_search - target_hits if possible)
+        if marqo_query.ef_search is None:
             additional_hits = 0
+        else:
+            additional_hits = marqo_query.ef_search - target_hits
 
         if self._marqo_index_version >= self._HYBRID_SEARCH_MINIMUM_VERSION:
             query_input_embedding_parameter = unstructured_common.QUERY_INPUT_EMBEDDING
@@ -356,7 +364,8 @@ class UnstructuredVespaIndex(VespaIndex):
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,  # limits the number of results going to phase 2
+            'ranking.rerankCount': marqo_query.rerank_count if marqo_query.rerank_count is not None else \
+                                    marqo_query.limit + marqo_query.offset,       # limits the number of results going to phase 2
 
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,

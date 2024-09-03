@@ -554,8 +554,9 @@ class StructuredVespaIndex(VespaIndex):
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,       # limits the number of results going to phase 2
-            
+            'ranking.rerankCount': marqo_query.rerank_count if marqo_query.rerank_count is not None else \
+                                    marqo_query.limit + marqo_query.offset,       # limits the number of results going to phase 2
+
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,
             'offset': marqo_query.offset,
@@ -657,12 +658,20 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-        if marqo_query.ef_search is not None:
-            target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
-            additional_hits = marqo_query.ef_search - target_hits
+        # Calculate target hits
+        if marqo_query.rerank_count is None:
+            if marqo_query.ef_search is None:
+                target_hits = marqo_query.limit + marqo_query.offset
+            else:
+                target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
         else:
-            target_hits = marqo_query.limit + marqo_query.offset
+            target_hits = marqo_query.rerank_count
+
+        # Calculate additional hits (always use ef_search - target_hits if possible)
+        if marqo_query.ef_search is None:
             additional_hits = 0
+        else:
+            additional_hits = marqo_query.ef_search - target_hits
 
         terms = []
         for field in fields_to_search:
