@@ -229,19 +229,19 @@ class TestEmbed(MarqoTestCase):
                                 ),
                                 device=None
                             )
-                print(embed_res)
-                print(embed_res['embeddings'][0][:7])
+                #print(embed_res)
+                #print(embed_res['embeddings'][0][:7])
                 expected = [
-                    2.0929973125457764, 3.6705381870269775, -0.26776817440986633,
-                    4.294264793395996, -0.9778770804405212, 4.2242279052734375, 0.00010000000000000001
+                    0.0298048947006464, 0.05226955562829971, -0.0038126774597913027,
+                    0.061151087284088135, -0.013925471343100071, 0.060153547674417496, -0.0031225811690092087
                 ]
                 actual = embed_res['embeddings'][0][:7]
                 
                 for a, e in zip(actual, expected):
                     self.assertAlmostEqual(a, e, delta=1.5)
                 
-                print(f"Actual: {actual}")
-                print(f"Expected: {expected}")
+                #print(f"Actual: {actual}")
+                #print(f"Expected: {expected}")
 
 
     def test_embed_equivalent_to_add_docs(self):

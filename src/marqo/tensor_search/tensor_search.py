@@ -182,6 +182,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         image_download_headers=add_docs_params.image_download_headers,
                         model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
+                        media_field_types_mapping=None,
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
@@ -654,6 +655,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             marqo_index.field_map_by_type[FieldType.AudioPointer]
         ]
 
+        media_field_types_mapping = {field.name: field.type for field in 
+            marqo_index.field_map_by_type[FieldType.ImagePointer] +
+            marqo_index.field_map_by_type[FieldType.VideoPointer] +
+            marqo_index.field_map_by_type[FieldType.AudioPointer]
+        }
+        
+
         if media_fields:
             with RequestMetricsStore.for_request().time(
                 "media_download.full_time",
@@ -674,6 +682,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         image_download_headers=add_docs_params.image_download_headers, # add non image download headers in the future
                         model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
+                        media_field_types_mapping=media_field_types_mapping,
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,

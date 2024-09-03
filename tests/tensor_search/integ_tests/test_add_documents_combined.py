@@ -404,7 +404,28 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     {"Title": "frog", "Desc": "blah"}, {"Title": "Dog", "Loc": "https://google.com/my_dog.png"}],
                 content_repo=content_repo,
                 tensor_fields=['Title', 'Desc', 'Loc'],
-                image_download_headers={}
+                image_download_headers={},
+                marqo_index = UnstructuredMarqoIndex(
+                    name="test", 
+                    schema_name="test", 
+                    type=IndexType.Unstructured, 
+                    model=Model(name="test", properties={}), 
+                    normalize_embeddings=True, 
+                    text_preprocessing=TextPreProcessing(splitLength=1, splitMethod=TextSplitMethod.Sentence, splitOverlap=0), 
+                    image_preprocessing=ImagePreProcessing(patchMethod=None), 
+                    distance_metric=DistanceMetric.PrenormalizedAngular, 
+                    vector_numeric_type=VectorNumericType.Float, 
+                    treat_urls_and_pointers_as_images=True,
+                    filter_string_max_length=100,
+                    hnsw_config=HnswConfig(
+                        m=16, 
+                        efConstruction=512, 
+                    ), 
+                    marqo_version="0.1.0", 
+                    created_at=1, 
+                    updated_at=1, 
+                    _cache={}
+                )
             )
             assert list(content_repo.keys()) == ['https://google.com/my_dog.png']
             assert isinstance(content_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)

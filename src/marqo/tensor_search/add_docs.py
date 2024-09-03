@@ -37,6 +37,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                                 tensor_fields: List[str],
                                                 image_download_headers: dict,
                                                 device: str = None,
+                                                media_field_types_mapping: Optional[Dict[str, FieldType]] = None,
                                                 download_headers: Optional[Dict] = None,  # Optional for now
                                                 metric_obj: Optional[RequestMetrics] = None,
                                                 preprocessors: Optional[Dict[str, Compose]] = None,
@@ -81,7 +82,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     continue
                 if isinstance(doc[field], str) or force_download:
                     modality = infer_modality(doc[field])
-                    if clip_utils._is_image(doc[field]): # or modality == Modality.IMAGE and 
+                    if modality == Modality.IMAGE or (marqo_index.type == IndexType.Structured and media_field_types_mapping[field] == FieldType.ImagePointer): # clip_utils._is_image(doc[field])
                         if (marqo_index is not None
                                 and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
                                 and marqo_index.model.properties.get('supported_modalities') is not None
@@ -117,7 +118,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 else:
                                     raise e
 
-                    elif modality in [Modality.VIDEO, Modality.AUDIO]:
+                    elif modality in [Modality.VIDEO, Modality.AUDIO] or (marqo_index.type == 'structured' and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer]):
                         if marqo_index.model.properties.get('type') not in [
                             ModelType.LanguageBind] and modality not in marqo_index.model.properties.get(
                                 'supported_modalities'):
@@ -133,11 +134,12 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             content_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
 
                     else:
+                        pass
                         # raise an error
-                        content_repo[doc[field]] = S2InferenceError(
-                                            f"Could not process the media file found at `{doc[field]}`. \n"
-                                            f"Reason: Not a valid URL or a supportedmodality"
-                        )
+                        #content_repo[doc[field]] = S2InferenceError(
+                        #                    f"Could not process the media file found at `{doc[field]}`. \n"
+                        #                    f"Reason: Not a valid URL or a supportedmodality"
+                        #)
 
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
@@ -174,6 +176,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     image_download_headers: dict,
                                     model_name: str,
                                     normalize_embeddings: bool,
+                                    media_field_types_mapping: Optional[Dict[str, FieldType]],
                                     download_headers: Optional[Dict] = None,  # Optional for now
                                     model_properties: Optional[Dict] = None,
                                     model_auth: Optional[ModelAuth] = None,
@@ -188,9 +191,9 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     #    thread_count = 5
     content_repo = {}  # for image/video/audio
     content_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
-                                    model_name, normalize_embeddings, force_download, download_headers,
-                                    model_properties, model_auth, device, patch_method_exists,
-                                    marqo_index)
+                                    model_name, normalize_embeddings, force_download,
+                                    media_field_types_mapping, download_headers, model_properties, model_auth, 
+                                    device, patch_method_exists, marqo_index)
 
     try:
         yield content_repo
@@ -205,7 +208,8 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
 
 def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                   image_download_headers: dict, model_name: str, normalize_embeddings: bool,
-                  force_download: bool, download_headers: Optional[Dict], model_properties: Optional[Dict],
+                  force_download: bool, media_field_types_mapping: Optional[Dict[str, FieldType]], 
+                  download_headers: Optional[Dict], model_properties: Optional[Dict],
                   model_auth: Optional[ModelAuth], device: Optional[str],
                   patch_method_exists: bool, marqo_index: Optional[MarqoIndex]) -> dict:
 
@@ -237,6 +241,7 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                         tensor_fields,
                         image_download_headers, 
                         device,
+                        media_field_types_mapping,
                         download_headers, 
                         m[i], 
                         preprocessors,

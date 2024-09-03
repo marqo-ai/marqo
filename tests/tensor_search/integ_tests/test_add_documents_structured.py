@@ -950,7 +950,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 index_name=self.index_name_img_no_chunking, docs=documents
             )
         )
-        print(r)
+
         self.assertEqual(True, r.errors)
         self.assertEqual(3, r._batch_response_stats.failure_count)
         self.assertEqual(3, len(r.items))
