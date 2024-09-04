@@ -336,8 +336,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": str(i),
-             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/"
-                            "assets/ai_hippo_realistic.png"
+             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
              } for i in range(10)
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
@@ -358,6 +357,41 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         ).dict(exclude_none=True, by_alias=True)
 
                         self.assertEqual(thread_count, mock_download_images.call_count)
+
+    def test_image_url_is_embedded_as_image_not_text(self):
+        """
+        Ensure that the image URL is embedded as an image and not as text
+        """
+        docs = [
+            {"_id": "1",
+             "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+             }
+        ]
+        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+                else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=docs,
+                        tensor_fields=tensor_fields
+                    )
+                )
+
+                doc = tensor_search.get_documents_by_ids(
+                    config=self.config,
+                    index_name=index_name,
+                    document_ids=["1"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)
+
+                # Assert that the vector is similar to expected_vector
+                expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
+                                   -0.032505638897418976, -0.06116769462823868, -0.03929287940263748]
+                self.assertAlmostEqual(doc['results'][0]['_tensor_facets'][0]['_embedding'][:6], expected_vector[:6])
+                        
 
     def test_imageDownloadWithoutPreprocessor(self):
         content_repo = dict()
