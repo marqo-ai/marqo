@@ -1,5 +1,6 @@
 import os
 from io import BytesIO
+from platform import architecture
 
 import certifi
 import clip
@@ -409,7 +410,7 @@ class CLIP:
         if self.model is None:
             self.load()
 
-        text = self.tokenizer(sentence, truncate=self.truncate).to(self.device)
+        text = self.tokenizer(sentence, truncate=True).to(self.device)
 
         with torch.no_grad():
             outputs = self.model.encode_text(text)
@@ -525,23 +526,18 @@ class FP16_CLIP(CLIP):
 class OPEN_CLIP(AbstractCLIPModel):
     def __init__(
             self,
-            model_type: str = "open_clip/ViT-B-32-quickgelu/laion400m_e32",
             device: Optional[str] = None,
-            embedding_dim: Optional[int] = None,
-            truncate: bool = True,
             model_properties: Optional[Dict] = None,
             model_auth: Optional[Dict] = None,
-            **kwargs
     ) -> None:
 
-        super().__init__(model_type, device, embedding_dim, truncate, model_properties)
+        super().__init__(device, model_properties, model_auth)
 
         # model_auth gets passed through add_docs and search requests:
-        self.model_auth = model_auth
         self.preprocess_config = None
-        self.model_name = model_type.split("/", 3)[1] if model_type.startswith("open_clip/") else model_type
-        self.pretrained = model_type.split("/", 3)[2] if model_type.startswith("open_clip/") else model_type
-        self.model_properties = OpenCLIPModelProperties(**self.model_properties)
+
+    def _build_model_properties(self, model_properties: dict):
+        return OpenCLIPModelProperties(**model_properties)
 
     def _load_necessary_components(self) -> None:
         """Load the open_clip model and tokenizer."""
@@ -551,7 +547,7 @@ class OPEN_CLIP(AbstractCLIPModel):
         elif self.model_properties.name.startswith(HF_HUB_PREFIX):
             self.model, self.preprocess = self._load_model_and_image_preprocessor_from_hf_repo()
             self.tokenizer = self._load_tokenizer_from_hf_repo()
-        elif self.model_tag.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
+        elif self.model_properties.name.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
             self.model, self.preprocess = self._load_model_and_image_preprocessor_from_open_clip_repo()
             self.tokenizer = self._load_tokenizer_from_open_clip_repo()
         else:
@@ -619,7 +615,7 @@ class OPEN_CLIP(AbstractCLIPModel):
             raise ValueError("The 'url' or 'model_location' is required in 'model_properties' "
                              "when loading a custom open_clip model through a URL or a model_location object")
 
-        logger.info(f"The name of the custom clip model is {self.model_name}. We use open_clip loader")
+        logger.info(f"The name of the custom clip model is {self.model_properties.name}. We use open_clip loader")
 
         try:
             self.preprocess_config = self._aggregate_image_preprocessor_config()
@@ -657,7 +653,7 @@ class OPEN_CLIP(AbstractCLIPModel):
             elif isinstance(e, (AttributeError, RuntimeError)) or (
                     "This could be because the operator doesn't exist for this backend" in str(e)):
                 raise InvalidModelPropertiesError(
-                    f"Marqo encountered an error when loading custom open_clip model '{self.model_name}' with "
+                    f"Marqo encountered an error when loading custom open_clip model '{self.model_properties.name}' with "
                     f"model properties = '{self.model_properties.dict()}'. "
                     f"The error message is {str(e)}. "
                     f"You may have tried to load a clip model even though model_properties['type'] is set to 'open_clip' "
@@ -666,7 +662,7 @@ class OPEN_CLIP(AbstractCLIPModel):
                 )
             else:
                 raise RuntimeError(
-                    f"Marqo encountered an error when loading custom open_clip model {self.model_name} with "
+                    f"Marqo encountered an error when loading custom open_clip model {self.model_properties.name} with "
                     f"model properties = {self.model_properties.dict()}. "
                     f"The error message is {str(e)}. "
                     f"Please check and update your model properties and retry. "
@@ -690,12 +686,12 @@ class OPEN_CLIP(AbstractCLIPModel):
 
         The model name should be provided in the model properties, and it is a string starting with `open_clip/`.
         """
-        self.model_name = self.model_tag.split("/", 3)[1]
-        self.pretrained = self.model_tag.split("/", 3)[2]
+        architecture = self.model_properties.name.split("/", 3)[1]
+        pretrained = self.model_properties.name.split("/", 3)[2]
 
         model, _, preprocess = open_clip.create_model_and_transforms(
-            model_name=self.model_name,
-            pretrained=self.pretrained,
+            model_name=architecture,
+            pretrained=pretrained,
             device=self.device,
             cache_dir=ModelCache.clip_cache_path
         )
@@ -712,7 +708,7 @@ class OPEN_CLIP(AbstractCLIPModel):
         return open_clip.get_tokenizer(self.model_properties.name)
 
     def _load_tokenizer_from_open_clip_repo(self) -> Callable:
-        return open_clip.get_tokenizer(self.model_name)
+        return open_clip.get_tokenizer(self.model_properties.name.split("/", 3)[1])
 
     def _download_from_repo(self):
         """Downloads model from an external repo like s3 and returns the filepath
