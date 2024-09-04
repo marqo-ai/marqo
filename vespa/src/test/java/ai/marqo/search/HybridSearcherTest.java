@@ -1,6 +1,7 @@
 package ai.marqo.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -23,7 +24,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class HybridSearcherTest {
 
@@ -268,28 +268,37 @@ class HybridSearcherTest {
         // Negative test cases
         @ParameterizedTest
         @CsvSource({
-                "invalidformat/0/e0a1c64b0c20b56741834b5", // Missing 'index:'
-                "index:/0/e0a1c64b0c20b56741834b5", // Missing content after 'index:'
-                "index:vespa-content-dummy_index//e0a1c64b0c20b56741834b5", // Missing digit part
-                "index:vespa-content-dummy_index/123/", // Missing doc ID part after last slash
-                "someotherformat:vespa-content-dummy_index/0/e0a1c64b0c20b56741834b5", // Incorrect prefix
-                "index:vespa content dummy_index/0/e0a1c64b0c20b56741834b5", // Whitespace in index name
-                "index:vespa-content/dummy_index/0/e0a1c64b0c20b56741834b5", // Slash in index name
-                "index:vespa-content-dummy_index/abc/e0a1c64b0c20b56741834b5", // Non-numeric value in the 2nd group
-                "index:vespa-content-dummy_index/1abc/e0a1c64b0c20b56741834b5", // Partially numeric value in 2nd group
-                "index:vespa-content-dummy_index/-123/e0a1c64b0c20b56741834b5", // Negative number in the 2nd group
-                "index:vespa-content-dummy_index/0 ", // Whitespace after last slash, missing document ID
-
+            "invalidformat/0/e0a1c64b0c20b56741834b5", // Missing 'index:'
+            "index:/0/e0a1c64b0c20b56741834b5", // Missing content after 'index:'
+            "index:vespa-content-dummy_index//e0a1c64b0c20b56741834b5", // Missing digit part
+            "index:vespa-content-dummy_index/123/", // Missing doc ID part after last slash
+            "someotherformat:vespa-content-dummy_index/0/e0a1c64b0c20b56741834b5", // Incorrect
+            // prefix
+            "index:vespa content dummy_index/0/e0a1c64b0c20b56741834b5", // Whitespace in index name
+            "index:vespa-content/dummy_index/0/e0a1c64b0c20b56741834b5", // Slash in index name
+            "index:vespa-content-dummy_index/abc/e0a1c64b0c20b56741834b5", // Non-numeric value in
+            // the 2nd group
+            "index:vespa-content-dummy_index/1abc/e0a1c64b0c20b56741834b5", // Partially numeric
+            // value in 2nd group
+            "index:vespa-content-dummy_index/-123/e0a1c64b0c20b56741834b5", // Negative number in
+            // the 2nd group
+            "index:vespa-content-dummy_index/0 ", // Whitespace after last slash, missing document
+            // ID
         })
         void shouldThrowExceptionForInvalidFormat(String invalidVespaId) {
             // Ensure IllegalStateException is thrown when the regex does not match
-            InternalException exception = assertThrows(InternalException.class, () -> {
-                HybridSearcher.extractDocIdFromHitId(invalidVespaId);
-            });
+            InternalException exception =
+                    assertThrows(
+                            InternalException.class,
+                            () -> {
+                                HybridSearcher.extractDocIdFromHitId(invalidVespaId);
+                            });
 
             // Assert the exception message contains the invalid hit ID
-            assertThat(exception.getMessage()).contains("Vespa doc ID could not be extracted from the full hit ID: "
-                    + invalidVespaId);
+            assertThat(exception.getMessage())
+                    .contains(
+                            "Vespa doc ID could not be extracted from the full hit ID: "
+                                    + invalidVespaId);
         }
     }
 

@@ -455,8 +455,8 @@ public class HybridSearcher extends Searcher {
         if (matcher.find()) {
             return matcher.group(1); // Return the captured group (document ID)
         } else {
-            throw new InternalException("Vespa doc ID could not be extracted from the full hit ID: "
-                    + fullPath + ".");
+            throw new InternalException(
+                    "Vespa doc ID could not be extracted from the full hit ID: " + fullPath + ".");
         }
     }
 }
