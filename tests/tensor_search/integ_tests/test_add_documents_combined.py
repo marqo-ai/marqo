@@ -565,6 +565,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     model_name="ViT-B/32",
                     normalize_embeddings=True,
                     model_properties=model_properties,
+                    media_field_types_mapping=None,
                     device="cpu"
                 ) as content_repo:
                     self.assertEqual(len(expected_repo_structure), len(content_repo))

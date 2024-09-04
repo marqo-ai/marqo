@@ -6,6 +6,9 @@ import subprocess
 from contextlib import contextmanager
 import tempfile
 import os
+import validators
+import magic
+import io
 
 from pydantic import BaseModel
 from enum import Enum
@@ -20,7 +23,7 @@ from marqo.s2_inference.languagebind import (
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
     to_device
 )
-from marqo.s2_inference.clip_utils import download_image_from_url
+from marqo.s2_inference.clip_utils import download_image_from_url, validate_url, _is_image
 from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBindImageTokenizer
 from marqo.s2_inference.languagebind.video.tokenization_video import LanguageBindVideoTokenizer
 from marqo.s2_inference.languagebind.audio.tokenization_audio import LanguageBindAudioTokenizer
@@ -117,8 +120,26 @@ class DefaultEncoder(ModelEncoder):
     def encode(self, content, modality, **kwargs):
         return self.model.encode(content)
 
+@contextmanager
+def fetch_content_sample(url, sample_size=10240):  # 10 KB
+    response = requests.get(url, stream=True)
+    buffer = io.BytesIO()
+    try:
+        for chunk in response.iter_content(chunk_size=sample_size):
+            buffer.write(chunk)
+            if buffer.tell() >= sample_size:
+                break
+        buffer.seek(0)
+        yield buffer
+    finally:
+        buffer.close()
+        response.close()
+
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
+        if not validators.url(content):
+            return Modality.TEXT
+        
         extension = content.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif']:
             return Modality.IMAGE
@@ -126,11 +147,30 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.VIDEO
         elif extension in ['mp3', 'wav', 'ogg']:
             return Modality.AUDIO
-        else:
-            return Modality.TEXT
+        
+        if validate_url(content):
+            # Use context manager to handle content sample
+            try:
+                if _is_image(content):
+                    return Modality.IMAGE
+                # For future use, when libmagic is installed in the container
+                """with fetch_content_sample(content) as sample:
+                    print(f"did not find extension, but found url: {content}")
+                    mime = magic.from_buffer(sample.read(), mime=True)
+                    print(f"mime: {mime}")
+                    if mime.startswith('image/'):
+                        return Modality.IMAGE
+                    elif mime.startswith('video/'):
+                        return Modality.VIDEO
+                    elif mime.startswith('audio/'):
+                        return Modality.AUDIO"""
+            except Exception as e:
+                pass
+        
+        return Modality.TEXT
+    
     elif isinstance(content, bytes):
-        # Use python-magic to infer content type
-        import magic
+        # Use python-magic for byte content
         mime = magic.from_buffer(content, mime=True)
         if mime.startswith('image/'):
             return Modality.IMAGE
@@ -140,9 +180,8 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.AUDIO
         else:
             return Modality.TEXT
-    else:
-        return None
-
+    
+    return None
 
 class LanguageBindEncoder(ModelEncoder):    
     def __init__(self, model: MultimodalModel):
