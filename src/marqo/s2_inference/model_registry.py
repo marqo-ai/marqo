@@ -501,6 +501,30 @@ def _get_open_clip_properties() -> Dict:
             "note": "MobileCLIP model",
             "type": "open_clip",
             "pretrained": "datacompdr"
+        },
+        "visheratin/nllb-clip-base-siglip": {
+            "name": "hf-hub:visheratin/nllb-clip-base-siglip",
+            "dimensions": 768,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
+        },
+        "visheratin/nllb-siglip-mrl-base": {
+            "name": "hf-hub:visheratin/nllb-siglip-mrl-base",
+            "dimensions": 768,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
+        },
+        "visheratin/nllb-clip-large-siglip": {
+            "name": "hf-hub:visheratin/nllb-clip-large-siglip",
+            "dimensions": 1152,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
+        },
+        "visheratin/nllb-siglip-mrl-large": {
+            "name": "hf-hub:visheratin/nllb-siglip-mrl-large",
+            "dimensions": 1152,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
         }
     }
     return OPEN_CLIP_MODEL_PROPERTIES
