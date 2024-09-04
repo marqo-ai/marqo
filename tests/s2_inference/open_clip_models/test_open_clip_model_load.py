@@ -32,7 +32,7 @@ class TestOpenCLIPModelLoad(TestCase):
             with patch("marqo.s2_inference.clip_utils.OPEN_CLIP._load_tokenizer_from_checkpoint",
                        return_value=MagicMock()) as mock_load_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    model = OPEN_CLIP(model_name, model_properties=model_properties, device="cpu")
+                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                     model.load()
                     mock_load_method.assert_called_once()
                     mock_load_tokenizer.assert_called_once()
@@ -51,7 +51,7 @@ class TestOpenCLIPModelLoad(TestCase):
                     as mock_tokenizer:
                 with patch("marqo.s2_inference.clip_utils.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                        model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
                         mock_create_model.assert_called_once_with(
                             model_name="ViT-B-108",
@@ -86,7 +86,7 @@ class TestOpenCLIPModelLoad(TestCase):
                     as mock_tokenizer:
                 with patch("marqo.s2_inference.clip_utils.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                        model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
                         mock_create_model.assert_called_once_with(
                             model_name="test-siglip",
@@ -117,7 +117,7 @@ class TestOpenCLIPModelLoad(TestCase):
             with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                     model.load()
                     mock_create_model.assert_called_once_with(
                         model_name="hf-hub:my_test_hub",
@@ -138,7 +138,7 @@ class TestOpenCLIPModelLoad(TestCase):
             with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                     model.load()
                     mock_create_model.assert_called_once_with(
                         model_name="ViT-B-32",
@@ -157,7 +157,7 @@ class TestOpenCLIPModelLoad(TestCase):
         }
 
         with self.assertRaises(ValueError) as context:
-            model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
             model.load()
 
         self.assertIn("validation error", str(context.exception))
@@ -173,7 +173,7 @@ class TestOpenCLIPModelLoad(TestCase):
         }
 
         with self.assertRaises(ValueError) as context:
-            model = OPEN_CLIP(model_tag, model_properties=model_properties, device="cpu")
+            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
             model.load()
 
         self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'MobileCLIP', 'CLIPA'", str(context.exception))

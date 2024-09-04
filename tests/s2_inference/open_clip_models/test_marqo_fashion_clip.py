@@ -567,7 +567,7 @@ class TestMarqoFashionCLIP(TestCase):
 
         model_tag = "Marqo/marqo-fashionSigLIP"
         model_properties = OPEN_CLIP_MODEL_PROPERTIES[model_tag]
-        model = OPEN_CLIP(model_tag, device="cpu", model_properties=model_properties)
+        model = OPEN_CLIP(device="cpu", model_properties=model_properties)
 
         model.load()
 
@@ -593,7 +593,7 @@ class TestMarqoFashionCLIP(TestCase):
 
         model_tag = "Marqo/marqo-fashionCLIP"
         model_properties = OPEN_CLIP_MODEL_PROPERTIES[model_tag]
-        model = OPEN_CLIP(model_tag, device="cpu", model_properties=model_properties)
+        model = OPEN_CLIP(device="cpu", model_properties=model_properties)
 
         model.load()
 
