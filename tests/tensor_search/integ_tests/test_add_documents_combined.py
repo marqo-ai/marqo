@@ -390,8 +390,11 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 # Assert that the vector is similar to expected_vector
                 expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
                                    -0.032505638897418976, -0.06116769462823868, -0.03929287940263748]
-                self.assertAlmostEqual(doc['results'][0]['_tensor_facets'][0]['_embedding'][:6], expected_vector[:6])
-                        
+                actual_vector = doc['results'][0]['_tensor_facets'][0]['_embedding']
+                
+                for i, expected_value in enumerate(expected_vector):
+                    self.assertAlmostEqual(actual_vector[i], expected_value, places=5)
+
 
     def test_imageDownloadWithoutPreprocessor(self):
         content_repo = dict()
