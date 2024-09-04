@@ -151,19 +151,16 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
         if validate_url(content):
             # Use context manager to handle content sample
             try:
-                if _is_image(content):
-                    return Modality.IMAGE
-                # For future use, when libmagic is installed in the container
-                """with fetch_content_sample(content) as sample:
-                    print(f"did not find extension, but found url: {content}")
+                with fetch_content_sample(content) as sample:
+                    #print(f"did not find extension, but found url: {content}")
                     mime = magic.from_buffer(sample.read(), mime=True)
-                    print(f"mime: {mime}")
+                    #print(f"mime: {mime}")
                     if mime.startswith('image/'):
                         return Modality.IMAGE
                     elif mime.startswith('video/'):
                         return Modality.VIDEO
                     elif mime.startswith('audio/'):
-                        return Modality.AUDIO"""
+                        return Modality.AUDIO
             except Exception as e:
                 pass
         
