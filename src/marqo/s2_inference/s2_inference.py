@@ -507,7 +507,8 @@ def _load_model(
     model_type = model_properties.get("type")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
-    # TODO For each refactored model class, add a new elif block here
+    # TODO For each refactored model class, add a new elif block here and remove the if block
+    #  once we have all models refactored
     if model_type == ModelType.OpenCLIP:
         model = loader(
             device = device,

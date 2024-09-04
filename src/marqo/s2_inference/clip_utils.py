@@ -535,7 +535,6 @@ class OPEN_CLIP(AbstractCLIPModel):
 
         # model_auth gets passed through add_docs and search requests:
         self.preprocess_config = None
-        self.model_properties = OpenCLIPModelProperties(**self.model_properties)
 
     def _build_model_properties(self, model_properties: dict):
         return OpenCLIPModelProperties(**model_properties)
