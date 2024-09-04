@@ -176,7 +176,7 @@ public class HybridSearcher extends Searcher {
 
                 reciprocalRank = alpha * (1.0 / (rank + k));
                 rrfScores.put(
-                        hit.getId().toString(), reciprocalRank); // Store hit's score via its URI
+                        extractDocIdFromHit(hit), reciprocalRank); // Store hit's score via its URI
                 hit.setField(
                         "marqo__raw_tensor_score",
                         hit.getRelevance()
@@ -208,7 +208,7 @@ public class HybridSearcher extends Searcher {
                         verbose);
 
                 // Check if score already exists. If so, add to it.
-                existingScore = rrfScores.get(hit.getId().toString());
+                existingScore = rrfScores.get(extractDocIdFromHit(hit));
                 if (existingScore == null) {
                     // If the score doesn't exist, add new hit to result list (with rrf score).
                     logIfVerbose("No existing score found! Starting at 0.0.", verbose);
@@ -217,17 +217,17 @@ public class HybridSearcher extends Searcher {
                             hit.getRelevance()
                                     .getScore()); // Encode raw score for Marqo debugging purposes
                     hit.setRelevance(reciprocalRank); // Update score to be weighted RR (lexical)
-                    rrfScores.put(hit.getId().toString(), reciprocalRank); // Log score in hashmap
+                    rrfScores.put(extractDocIdFromHit(hit), reciprocalRank); // Log score in hashmap
                     result.add(hit);
 
                 } else {
                     // If it does, find that hit in the result list and update it, adding new rrf to
                     // its score.
                     newScore = existingScore + reciprocalRank;
-                    rrfScores.put(hit.getId().toString(), newScore);
+                    rrfScores.put(extractDocIdFromHit(hit), newScore);
 
                     // Update existing hit in result list
-                    Hit existingHit = result.get(hit.getId().toString());
+                    Hit existingHit = result.get(extractDocIdFromHit(hit));
                     existingHit.setField(
                             "marqo__raw_lexical_score",
                             hit.getRelevance()
@@ -237,7 +237,7 @@ public class HybridSearcher extends Searcher {
 
                     logIfVerbose(
                             String.format(
-                                    "Existing score found for hit: %s.", hit.getId().toString()),
+                                    "Existing score found for hit: %s.", extractDocIdFromHit(hit)),
                             verbose);
                     logIfVerbose(String.format("Existing score is: %.7f", existingScore), verbose);
                     logIfVerbose(String.format("New score is: %.7f", newScore), verbose);
@@ -381,7 +381,7 @@ public class HybridSearcher extends Searcher {
                 logger.info(
                         String.format(
                                 "{IDX: %s, HIT ID: %s, RELEVANCE: %.7f}",
-                                idx, hit.getId().toString(), hit.getRelevance().getScore()));
+                                idx, extractDocIdFromHit(hit), hit.getRelevance().getScore()));
                 idx++;
             }
             logger.info("=======================");
@@ -423,5 +423,14 @@ public class HybridSearcher extends Searcher {
      */
     String addQueryWrapper(String str) {
         return "query(" + str + ")";
+    }
+
+    /*
+     * Extracts the document ID from a hit (string after last slash)
+     */
+    String extractDocIdFromHit(Hit hit) {
+        String fullPath = hit.getId().toString();
+        String[] parts = fullPath.split("/");
+        return parts[parts.length - 1];
     }
 }
