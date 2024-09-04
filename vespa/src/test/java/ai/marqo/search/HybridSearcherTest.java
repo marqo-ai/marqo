@@ -47,11 +47,11 @@ class HybridSearcherTest {
         Query query = getHybridQuery(k, alpha, "test", "disjunction", "rrf");
 
         HitGroup hitsTensor = new HitGroup();
-        hitsTensor.add(new Hit("tensor1", 1.0));
-        hitsTensor.add(new Hit("both", 0.4));
+        hitsTensor.add(new Hit("index:test/0/tensor1", 1.0));
+        hitsTensor.add(new Hit("index:test/0/both", 0.4));
 
         HitGroup hitsLexical = new HitGroup();
-        hitsLexical.add(new Hit("both", 0.45));
+        hitsLexical.add(new Hit("index:test/0/both", 0.45));
 
         ArgumentCaptor<Query> queryArgumentCaptor = ArgumentCaptor.forClass(Query.class);
 
@@ -63,7 +63,10 @@ class HybridSearcherTest {
         // verify the result is the fused hit group
         assertThat(result).isNotNull();
         assertThat(result.hits().get(0))
-                .isEqualTo(new Hit("both", alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k))));
+                .isEqualTo(
+                        new Hit(
+                                "index:test/0/both",
+                                alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k))));
         assertThat(result.hits().get(0).fields())
                 .containsAllEntriesOf(
                         Map.of("marqo__raw_tensor_score", 0.4, "marqo__raw_lexical_score", 0.45));
@@ -75,83 +78,190 @@ class HybridSearcherTest {
         assertThat(allQueries.get(1).properties().get("yql")).isEqualTo("tensor yql");
     }
 
-    @Test
-    void testRRF() {
-        // Create Hybrid Searcher
-        HybridSearcher testSearcher = new HybridSearcher();
+    @Nested
+    class RRFTest {
+        @Test
+        void shouldFuseWithDefaultParameters() {
+            // Cases
+            // With tied scores
+            // No overlap
+            // With overlap
+            // More tensor hits
+            // More lexical hits
+            // 0 Tensor hits
+            // 0 Lexical hits
+            // 0 hits both
+            // Higher alpha (break ties)
+            // Lower alpha (stack results)
+            // invalid alpha (should throw exception) < 0 or > 1
+            // alpha is 0, alpha is 1
 
-        // Cases
-        // With tied scores
-        // No overlap
-        // With overlap
-        // More tensor hits
-        // More lexical hits
-        // 0 Tensor hits
-        // 0 Lexical hits
-        // 0 hits both
-        // Higher alpha (break ties)
-        // Lower alpha (stack results)
-        // invalid alpha (should throw exception) < 0 or > 1
-        // alpha is 0, alpha is 1
+            // Use nested classes to group tests (eg testAlpha)
+            // Each case is 1 method
 
-        // Use nested classes to group tests (eg testAlpha)
-        // Each case is 1 method
+            // Create tensor hits
+            HitGroup hitsTensor = new HitGroup();
+            hitsTensor.add(new Hit("index:test/0/tensor1", 1.0));
+            hitsTensor.add(new Hit("index:test/0/tensor2", 0.8));
+            hitsTensor.add(new Hit("index:test/0/tensor3", 0.6));
+            hitsTensor.add(new Hit("index:test/0/tensor4", 0.5));
+            hitsTensor.add(new Hit("index:test/0/both1", 0.4));
+            hitsTensor.add(new Hit("index:test/0/both2", 0.3));
 
-        // Create tensor hits
-        HitGroup hitsTensor = new HitGroup();
-        hitsTensor.add(new Hit("tensor1", 1.0));
-        hitsTensor.add(new Hit("tensor2", 0.8));
-        hitsTensor.add(new Hit("tensor3", 0.6));
-        hitsTensor.add(new Hit("tensor4", 0.5));
-        hitsTensor.add(new Hit("both1", 0.4));
-        hitsTensor.add(new Hit("both2", 0.3));
+            // Create lexical hits
+            HitGroup hitsLexical = new HitGroup();
+            hitsLexical.add(new Hit("index:test/0/lexical1", 1.0));
+            hitsLexical.add(new Hit("index:test/0/lexical2", 0.7));
+            hitsLexical.add(new Hit("index:test/0/lexical3", 0.5));
+            hitsLexical.add(new Hit("index:test/0/both1", 0.45));
+            hitsLexical.add(new Hit("index:test/0/both2", 0.44));
 
-        // Create lexical hits
-        HitGroup hitsLexical = new HitGroup();
-        hitsLexical.add(new Hit("lexical1", 1.0));
-        hitsLexical.add(new Hit("lexical2", 0.7));
-        hitsLexical.add(new Hit("lexical3", 0.5));
-        hitsLexical.add(new Hit("both1", 0.45));
-        hitsLexical.add(new Hit("both2", 0.44));
+            // Set parameters
+            int k = 60;
+            double alpha = 0.5;
+            boolean verbose = false;
 
-        // Set parameters
-        int k = 60;
-        double alpha = 0.5;
-        boolean verbose = false;
+            // Call the rrf function
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
 
-        // Call the rrf function
-        HitGroup result = testSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            // Check that the result size is correct
+            assertThat(result.asList()).hasSize(6);
 
-        // Check that the result size is correct
-        assertThat(result.asList()).hasSize(6);
+            // Check that result order and scores are correct
+            assertThat(result.asList())
+                    .containsExactly(
+                            // Score should be a sum (tensor rank and lexical rank)
+                            new Hit(
+                                    "index:test/0/both1",
+                                    alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k))),
+                            // Score should be a sum (tensor rank and lexical rank)
+                            new Hit(
+                                    "index:test/0/both2",
+                                    alpha * (1.0 / (6 + k)) + alpha * (1.0 / (5 + k))),
+                            // Since tie, lexical was put first. Likely due to alphabetical ID.
+                            new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
+                            new Hit("index:test/0/tensor1", alpha * (1.0 / (1 + k))),
+                            new Hit("index:test/0/lexical2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/0/tensor2", alpha * (1.0 / (2 + k))));
 
-        // Check that result order and scores are correct
-        assertThat(result.asList())
-                .containsExactly(
-                        // Score should be a sum (tensor rank and lexical rank)
-                        new Hit("both1", alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k))),
-                        // Score should be a sum (tensor rank and lexical rank)
-                        new Hit("both2", alpha * (1.0 / (6 + k)) + alpha * (1.0 / (5 + k))),
-                        // Since tie, lexical was put first. Likely due to alphabetical ID.
-                        new Hit("lexical1", alpha * (1.0 / (1 + k))),
-                        new Hit("tensor1", alpha * (1.0 / (1 + k))),
-                        new Hit("lexical2", alpha * (1.0 / (2 + k))),
-                        new Hit("tensor2", alpha * (1.0 / (2 + k))));
+            assertThat(result.get(0).fields())
+                    .containsAllEntriesOf(
+                            Map.of(
+                                    "marqo__raw_tensor_score",
+                                    0.4,
+                                    "marqo__raw_lexical_score",
+                                    0.45));
+            assertThat(result.get(1).fields())
+                    .containsAllEntriesOf(
+                            Map.of(
+                                    "marqo__raw_tensor_score",
+                                    0.3,
+                                    "marqo__raw_lexical_score",
+                                    0.44));
+            assertThat(result.get(2).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
+            assertThat(result.get(3).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
+            assertThat(result.get(4).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
+            assertThat(result.get(5).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+        }
 
-        assertThat(result.get(0).fields())
-                .containsAllEntriesOf(
-                        Map.of("marqo__raw_tensor_score", 0.4, "marqo__raw_lexical_score", 0.45));
-        assertThat(result.get(1).fields())
-                .containsAllEntriesOf(
-                        Map.of("marqo__raw_tensor_score", 0.3, "marqo__raw_lexical_score", 0.44));
-        assertThat(result.get(2).fields())
-                .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
-        assertThat(result.get(3).fields())
-                .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
-        assertThat(result.get(4).fields())
-                .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
-        assertThat(result.get(5).fields())
-                .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+        @Test
+        void shouldFuseWithMismatchedGroups() {
+            // Create tensor hits
+            HitGroup hitsTensor = new HitGroup();
+            hitsTensor.add(new Hit("index:test/5/tensor1", 1.0));
+            hitsTensor.add(new Hit("index:test/6/tensor2", 0.8));
+            hitsTensor.add(new Hit("index:test/7/tensor3", 0.6));
+            hitsTensor.add(new Hit("index:test/8/tensor4", 0.5));
+            hitsTensor.add(new Hit("index:test/9/both1", 0.4));
+            hitsTensor.add(new Hit("index:test/10/both2", 0.3));
+
+            // Create lexical hits
+            HitGroup hitsLexical = new HitGroup();
+            hitsLexical.add(new Hit("index:test/0/lexical1", 1.0));
+            hitsLexical.add(new Hit("index:test/1/lexical2", 0.7));
+            hitsLexical.add(new Hit("index:test/2/lexical3", 0.5));
+            hitsLexical.add(new Hit("index:test/3/both1", 0.45));
+            hitsLexical.add(new Hit("index:test/4/both2", 0.44));
+
+            // Set parameters
+            int k = 60;
+            double alpha = 0.5;
+            boolean verbose = false;
+
+            // Call the rrf function
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+
+            // Check that the result size is correct
+            assertThat(result.asList()).hasSize(6);
+
+            // Check that result order and scores are correct
+            // If results have the same score, they will be sorted by alphabetical hit ID.
+            // Results in TENSOR list will be prioritized, because they are evaluated first in RRF.
+            assertThat(result.asList())
+                    .containsExactly(
+                            // Score should be a sum (tensor rank and lexical rank)
+                            new Hit(
+                                    "index:test/9/both1",
+                                    alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k))),
+                            // Score should be a sum (tensor rank and lexical rank)
+                            new Hit(
+                                    "index:test/10/both2",
+                                    alpha * (1.0 / (6 + k)) + alpha * (1.0 / (5 + k))),
+                            // Since tie, lexical was put first. Likely due to alphabetical ID.
+                            new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
+                            new Hit("index:test/5/tensor1", alpha * (1.0 / (1 + k))),
+                            new Hit("index:test/1/lexical2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/6/tensor2", alpha * (1.0 / (2 + k))));
+
+            assertThat(result.get(0).fields())
+                    .containsAllEntriesOf(
+                            Map.of(
+                                    "marqo__raw_tensor_score",
+                                    0.4,
+                                    "marqo__raw_lexical_score",
+                                    0.45));
+            assertThat(result.get(1).fields())
+                    .containsAllEntriesOf(
+                            Map.of(
+                                    "marqo__raw_tensor_score",
+                                    0.3,
+                                    "marqo__raw_lexical_score",
+                                    0.44));
+            assertThat(result.get(2).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
+            assertThat(result.get(3).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
+            assertThat(result.get(4).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
+            assertThat(result.get(5).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+        }
+    }
+
+    @Nested
+    class IdExtractorTest {
+        @ParameterizedTest
+        @CsvSource(
+                value = {
+                    "index:vespa-content-dummy_index/0/e0a1c64b0c20b56741834b5,"
+                            + " e0a1c64b0c20b56741834b5", // Base case
+                    "index:vespa-content-dummy_index/0/e0a1c64b0/c20b56741834b5,"
+                            + " e0a1c64b0/c20b56741834b5", // Slash in doc ID
+                    "index:vespa-content-dummy_index/0/e0a1c64b0//c20b56741834b5,"
+                            + " e0a1c64b0//c20b56741834b5", // Double slash in doc ID
+                    "index:vespa-content-dummy_index/0//e0a1c64b0c20b56741834b5,"
+                            + " /e0a1c64b0c20b56741834b5", // Slash at start of doc ID
+                    "index:vespa-content-dummy_index/0/e0a1c64b0c/2/0b56741834b5,"
+                            + " e0a1c64b0c/2/0b56741834b5", // Multiple slashes in doc ID
+                })
+        void shouldExtractIdFromHit(String vespaId, String expectedId) {
+            String id = HybridSearcher.extractDocIdFromHitId(vespaId);
+            assertThat(id).isEqualTo(expectedId);
+        }
     }
 
     @Nested
