@@ -2059,7 +2059,6 @@ def _get_model_load_mappings() -> Dict:
             'random':Random,
             'hf':HF_MODEL,
             "no_model": NO_MODEL,
-            #"languagebind": LANGUAGEBIND,
             }
 
 def load_model_properties() -> Dict:

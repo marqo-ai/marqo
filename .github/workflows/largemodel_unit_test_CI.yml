@@ -62,11 +62,12 @@ jobs:
           repository: marqo-ai/marqo-base
           path: marqo-base
 
-      - name: Install FFmpeg
+      - name: Install FFmpeg and libmagic
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg libmagic1
           ffmpeg -version  # Verify installation
+          magic -v  # Verify installation
 
       - name: Install dependencies
         run: |
