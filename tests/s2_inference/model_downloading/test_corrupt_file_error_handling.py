@@ -121,7 +121,6 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                     str(context.exception))
                 mock_os_remove.assert_not_called()
 
-    @unittest.skip("This test is skipped. Broken due to pytorch version change. Fix.")
     def test_load_clip_model_into_open_clip_no_mock(self):
         model_properties = {
             "name": "ViT-B-32",
