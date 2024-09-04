@@ -1,5 +1,6 @@
 package ai.marqo.search;
 
+import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.search.Query;
@@ -454,7 +455,8 @@ public class HybridSearcher extends Searcher {
         if (matcher.find()) {
             return matcher.group(1); // Return the captured group (document ID)
         } else {
-            throw new IllegalArgumentException("Invalid vespa doc ID format: " + fullPath + ".");
+            throw new InternalException("Vespa doc ID could not be extracted from the full hit ID: "
+                    + fullPath + ".");
         }
     }
 }
