@@ -22,6 +22,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo.s2_inference.s2_inference import Modality
+from marqo.s2_inference.multimodal_utils import infer_modality
 from marqo.tensor_search import add_docs_utils
 
 
@@ -172,21 +173,26 @@ class TestAddDocumentsCombined(MarqoTestCase):
                                                                "vectorise for add_documents")
                 mock_vectorise.reset_mock()
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True,
-                        reason="We skip this test if we have cuda support. This model is ~5gb and may crash g5dn.xlarge")
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="GPU testing device needs to be investigated")
     def test_add_multimodal_single_documents(self):
         """ """
         documents = [
             {
                 "video_field_3": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
-                "_id": "1"},
-            # Replace the audio link with something marqo-hosted
-            {"audio_field_2": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
-             "_id": "2"},
+                "_id": "1"
+            },
+            {
+                "audio_field_2": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
+                "_id": "2"
+            },
             {
                 "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
-                "_id": "3"},
-            {"text_field_3": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
+                "_id": "3"
+            },
+            {
+                "text_field_3": "hello there padawan. Today you will begin your training to be a Jedi",
+                "_id": "4"
+            },
         ]
         for index_name in [self.structured_languagebind_index_name, self.unstructured_languagebind_index_name]:
             with self.subTest(index_name):
@@ -228,8 +234,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
                         embeddings.append(embedding)
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True,
-                        reason="We skip this test if we have cuda support. This model is ~5gb and may crash g5dn.xlarge")
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="GPU testing device needs to be investigated")
     def test_add_multimodal_field_document(self):
         multimodal_document = {
             "_id": "1_multimodal",
@@ -689,3 +694,16 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         # Verify that ffmpeg.run was called for each chunk
         self.assertEqual(mock_ffmpeg.run.call_count, len(expected_chunks))
+
+    def test_webp_image_download_infer_modality(self):
+        """the webp extension is not predefined among the extensions in infer_modality.
+        this test ensures that the webp extension is correctly inferred as an image"""
+        webp_image_url = "https://i.ebayimg.com/images/g/UawAAOSwpd5iR9Bs/s-l1600.webp"
+        modality = infer_modality(webp_image_url)
+        self.assertEqual(modality, add_docs_utils.Modality.IMAGE)
+
+    def test_no_extension_image_url_infer_modality(self):
+        """this test ensures that the image url with no extension is correctly inferred as an image"""
+        image_url_no_extension = "https://il.redbubble.net/catalogue/image/by-rb-work/157037551/simple-preview"
+        modality = infer_modality(image_url_no_extension)
+        self.assertEqual(modality, add_docs_utils.Modality.IMAGE)
