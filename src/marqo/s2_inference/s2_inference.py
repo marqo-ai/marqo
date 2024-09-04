@@ -503,16 +503,26 @@ def _load_model(
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
+
+    model_type = model_properties.get("type")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
-    model = loader(
-        model_properties.get('name', None),
-        device=device,
-        embedding_dim=model_properties['dimensions'],
-        model_properties=model_properties,
-        model_auth=model_auth,
-        max_seq_length=model_properties.get('tokens', get_default_seq_length())
-    )
+    # TODO For each refactored model class, add a new elif block here
+    if model_type == ModelType.OpenCLIP:
+        model = loader(
+            device = device,
+            model_properties = model_properties,
+            model_auth = model_auth,
+        )
+    else:
+        model = loader(
+            model_properties.get('name', None),
+            device=device,
+            embedding_dim=model_properties['dimensions'],
+            model_properties=model_properties,
+            model_auth=model_auth,
+            max_seq_length=model_properties.get('tokens', get_default_seq_length())
+        )
     model.load()
     return model
 
