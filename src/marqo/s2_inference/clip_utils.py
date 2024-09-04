@@ -530,7 +530,8 @@ class OPEN_CLIP(AbstractCLIPModel):
             embedding_dim: Optional[int] = None,
             truncate: bool = True,
             model_properties: Optional[Dict] = None,
-            model_auth: Optional[Dict] = None
+            model_auth: Optional[Dict] = None,
+            **kwargs
     ) -> None:
 
         super().__init__(model_type, device, embedding_dim, truncate, model_properties)

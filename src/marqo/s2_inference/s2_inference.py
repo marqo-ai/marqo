@@ -510,7 +510,8 @@ def _load_model(
         device=device,
         embedding_dim=model_properties['dimensions'],
         model_properties=model_properties,
-        model_auth=model_auth
+        model_auth=model_auth,
+        max_seq_length=model_properties.get('tokens', get_default_seq_length())
     )
     model.load()
     return model
