@@ -1,11 +1,7 @@
-import cv2
 import numpy as np
 import torch
 import torchaudio
-from torchvision import transforms
-from transformers import ProcessorMixin, BatchEncoding
-from transformers.image_processing_utils import BatchFeature
-from torch.nn import functional as F
+from transformers import ProcessorMixin
 
 
 def make_list_of_images(x):
@@ -16,17 +12,22 @@ def make_list_of_images(x):
 
 torchaudio.set_audio_backend("soundfile")
 
+
 def torchaudio_loader(path):
     return torchaudio.load(path)
 
+
 def int16_to_float32_torch(x):
     return (x / 32767.0).type(torch.float32)
+
 
 def float32_to_int16_torch(x):
     x = torch.clamp(x, min=-1., max=1.)
     return (x * 32767.).type(torch.int16)
 
+
 DEFAULT_AUDIO_FRAME_SHIFT_MS = 10
+
 
 class AudioTransform:
     def __init__(self, args):
@@ -41,7 +42,6 @@ class AudioTransform:
         # std=4.5689974
         # self.norm = transforms.Normalize(mean=self.audio_mean, std=self.audio_std)
 
-
     def __call__(self, audio_data_and_origin_sr):
         audio_data, origin_sr = audio_data_and_origin_sr
         if self.sample_rate != origin_sr:
@@ -49,7 +49,6 @@ class AudioTransform:
             audio_data = torchaudio.functional.resample(audio_data, orig_freq=origin_sr, new_freq=self.sample_rate)
         waveform_melspec = self.waveform2melspec(audio_data)
         return waveform_melspec
-
 
     def waveform2melspec(self, audio_data):
         mel = self.get_mel(audio_data)
@@ -110,19 +109,21 @@ class AudioTransform:
         )
         return mel  # (T, n_mels)
 
+
 def get_audio_transform(config):
     config = config.vision_config
     return AudioTransform(config)
 
 
 def load_and_transform_audio(
-    audio_path,
-    transform,
+        audio_path,
+        transform,
 ):
     waveform_and_sr = torchaudio_loader(audio_path)
     audio_outputs = transform(waveform_and_sr)
 
     return audio_outputs
+
 
 class LanguageBindAudioProcessor(ProcessorMixin):
     attributes = []

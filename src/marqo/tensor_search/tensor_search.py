@@ -152,12 +152,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
-    # Check if model is Video/Audio. If so, manually set thread_count to 5
     media_download_thread_count = add_docs_params.image_download_thread_count
-    if marqo_index.model.get_properties().get('type') in [ModelType.LanguageBind]:
-        #if media_download_thread_count > 5:
-        #    media_download_thread_count = 5
-        pass
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media: # review this logic
@@ -529,7 +524,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     if combo_chunk is None:
                         
                         if field_content:  # Check if the subfields are present
-                            modality = infer_modality(field_content)
                             (combo_chunk, combo_embeddings, combo_document_is_valid,
                             unsuccessful_doc_to_append,
                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
@@ -641,13 +635,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
     # Check if model is Video/Audio. If so, manually set thread_count to 5
     media_download_thread_count = add_docs_params.image_download_thread_count
-    if marqo_index.model.get_properties().get('type') in [ModelType.LanguageBind]:
-        #if media_download_thread_count > 5:
-        #    media_download_thread_count = 5
-        pass
 
     with ExitStack() as exit_stack:
-        #image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
         media_fields = [
             field.name for field in 
             marqo_index.field_map_by_type[FieldType.ImagePointer] +
@@ -2183,8 +2172,6 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         combo_document_is_valid:  if the document is a valid
         unsuccessful_docs: appended unsucessful_docs
         combo_total_vectorise_time: the vectorise time spent in combo field
-        new_fields_from_multimodal_combination: the new fields from multimodal combination field that will be added to
-            index properties
 
     '''
 
@@ -2193,10 +2180,6 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
     combo_chunk = {}
     combo_embeddings = []
     unsuccessful_doc_to_append = tuple()
-    new_fields_from_multimodal_combination = set()
-
-    # Copy the important mutable objects from main body for safety purpose
-    field_content_copy = copy.deepcopy(field_content)
 
     # Lists to store the field name and field content to vectorise.
     text_field_names = []
@@ -2399,10 +2382,6 @@ def vectorise_multimodal_combination_field_structured(
     combo_vectorise_time_to_add = 0
     combo_chunk = {}
     unsuccessful_doc_to_append = tuple()
-    new_fields_from_multimodal_combination = set()
-
-    # Copy the important mutable objects from main body for safety purpose
-    multimodal_object_copy = copy.deepcopy(multimodal_object)
 
     # 4 lists to store the field name and field content to vectorise.
     text_field_names, image_field_names, video_field_names, audio_field_names = [], [], [], []

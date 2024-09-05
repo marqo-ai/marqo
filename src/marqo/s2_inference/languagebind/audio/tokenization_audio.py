@@ -21,10 +21,10 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "lb203/LanguageBind-Audio": 77,
 }
 
-
 PRETRAINED_INIT_CONFIGURATION = {
     "lb203/LanguageBind-Audio": {},
 }
+
 
 class LanguageBindAudioTokenizer(CLIPTokenizer):
     """
@@ -74,4 +74,4 @@ class LanguageBindAudioTokenizer(CLIPTokenizer):
             bos_token,
             eos_token,
             pad_token,  # hack to enable padding
-            **kwargs,)
+            **kwargs, )

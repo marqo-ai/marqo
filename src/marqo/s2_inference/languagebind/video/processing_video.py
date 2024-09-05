@@ -2,24 +2,24 @@ import cv2
 import decord
 import numpy as np
 import torch
-from PIL import Image
 from decord import VideoReader, cpu
-from torchvision import transforms
-from transformers import ProcessorMixin, BatchEncoding
-from transformers.image_processing_utils import BatchFeature
-from torchvision.transforms import Compose, Lambda, ToTensor
-from torchvision.transforms._transforms_video import NormalizeVideo, RandomCropVideo, RandomHorizontalFlipVideo, CenterCropVideo
 from pytorchvideo.transforms import ShortSideScale
+from torchvision.transforms import Compose, Lambda
+from torchvision.transforms._transforms_video import NormalizeVideo, RandomHorizontalFlipVideo, \
+    CenterCropVideo
+from transformers import ProcessorMixin
 
 decord.bridge.set_bridge('torch')
 
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 
+
 def make_list_of_images(x):
     if not isinstance(x, list):
         return [x]
     return x
+
 
 def get_video_transform(config):
     config = config.vision_config
@@ -62,7 +62,7 @@ def load_and_transform_video(
         decord.bridge.set_bridge('torch')
         decord_vr = VideoReader(video_path, ctx=cpu(0))
         duration = len(decord_vr)
-        frame_id_list = np.linspace(0, duration-1, num_frames, dtype=int)
+        frame_id_list = np.linspace(0, duration - 1, num_frames, dtype=int)
         video_data = decord_vr.get_batch(frame_id_list)
         video_data = video_data.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
         video_outputs = transform(video_data)
@@ -70,7 +70,7 @@ def load_and_transform_video(
     elif video_decode_backend == 'opencv':
         cv2_vr = cv2.VideoCapture(video_path)
         duration = int(cv2_vr.get(cv2.CAP_PROP_FRAME_COUNT))
-        frame_id_list = np.linspace(0, duration-1, num_frames, dtype=int)
+        frame_id_list = np.linspace(0, duration - 1, num_frames, dtype=int)
 
         video_data = []
         for frame_idx in frame_id_list:
@@ -84,6 +84,7 @@ def load_and_transform_video(
     else:
         raise NameError('video_decode_backend should specify in (opencv)')
     return video_outputs
+
 
 class LanguageBindVideoProcessor(ProcessorMixin):
     attributes = []

@@ -8,11 +8,6 @@ from transformers.utils import logging
 logger = logging.get_logger(__name__)
 
 
-
-
-
-
-
 class CLIPTextConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`CLIPTextModel`]. It is used to instantiate a CLIP
@@ -68,25 +63,25 @@ class CLIPTextConfig(PretrainedConfig):
     model_type = "clip_text_model"
 
     def __init__(
-        self,
-        vocab_size=49408,
-        hidden_size=512,
-        intermediate_size=2048,
-        projection_dim=512,
-        num_hidden_layers=12,
-        num_attention_heads=8,
-        max_position_embeddings=77,
-        hidden_act="quick_gelu",
-        layer_norm_eps=1e-5,
-        attention_dropout=0.0,
-        initializer_range=0.02,
-        initializer_factor=1.0,
-        # This differs from `CLIPTokenizer`'s default and from openai/clip
-        # See https://github.com/huggingface/transformers/pull/24773#issuecomment-1632287538
-        pad_token_id=1,
-        bos_token_id=49406,
-        eos_token_id=49407,
-        **kwargs,
+            self,
+            vocab_size=49408,
+            hidden_size=512,
+            intermediate_size=2048,
+            projection_dim=512,
+            num_hidden_layers=12,
+            num_attention_heads=8,
+            max_position_embeddings=77,
+            hidden_act="quick_gelu",
+            layer_norm_eps=1e-5,
+            attention_dropout=0.0,
+            initializer_range=0.02,
+            initializer_factor=1.0,
+            # This differs from `CLIPTokenizer`'s default and from openai/clip
+            # See https://github.com/huggingface/transformers/pull/24773#issuecomment-1632287538
+            pad_token_id=1,
+            bos_token_id=49406,
+            eos_token_id=49407,
+            **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
 
@@ -121,8 +116,6 @@ class CLIPTextConfig(PretrainedConfig):
             )
 
         return cls.from_dict(config_dict, **kwargs)
-
-
 
 
 class CLIPVisionConfig(PretrainedConfig):
@@ -179,31 +172,31 @@ class CLIPVisionConfig(PretrainedConfig):
     model_type = "clip_vision_model"
 
     def __init__(
-        self,
-        hidden_size=768,
-        intermediate_size=3072,
-        projection_dim=512,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        num_channels=3,
-        image_size=224,
-        patch_size=32,
-        hidden_act="quick_gelu",
-        layer_norm_eps=1e-5,
-        attention_dropout=0.0,
-        initializer_range=0.02,
-        initializer_factor=1.0,
+            self,
+            hidden_size=768,
+            intermediate_size=3072,
+            projection_dim=512,
+            num_hidden_layers=12,
+            num_attention_heads=12,
+            num_channels=3,
+            image_size=224,
+            patch_size=32,
+            hidden_act="quick_gelu",
+            layer_norm_eps=1e-5,
+            attention_dropout=0.0,
+            initializer_range=0.02,
+            initializer_factor=1.0,
 
-        add_time_attn=False, ################################
-        num_frames=1, ################################
-        force_patch_dropout=0.0, ################################
-        lora_r=2, ################################
-        lora_alpha=16, ################################
-        lora_dropout=0.0, ################################
-        num_mel_bins=0.0, ################################
-        target_length=0.0, ################################
-        video_decode_backend='decord', #########################
-        **kwargs,
+            add_time_attn=False,  ################################
+            num_frames=1,  ################################
+            force_patch_dropout=0.0,  ################################
+            lora_r=2,  ################################
+            lora_alpha=16,  ################################
+            lora_dropout=0.0,  ################################
+            num_mel_bins=0.0,  ################################
+            target_length=0.0,  ################################
+            video_decode_backend='decord',  #########################
+            **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -300,7 +293,7 @@ class LanguageBindImageConfig(PretrainedConfig):
     is_composition = True
 
     def __init__(
-        self, text_config=None, vision_config=None, projection_dim=512, logit_scale_init_value=2.6592, **kwargs
+            self, text_config=None, vision_config=None, projection_dim=512, logit_scale_init_value=2.6592, **kwargs
     ):
         # If `_config_dict` exist, we use them for the backward compatibility.
         # We pop out these 2 attributes before calling `super().__init__` to avoid them being saved (which causes a lot
@@ -411,13 +404,3 @@ class LanguageBindImageConfig(PretrainedConfig):
         output["vision_config"] = self.vision_config.to_dict()
         output["model_type"] = self.__class__.model_type
         return output
-
-
-
-
-
-
-
-
-
-

@@ -21,10 +21,10 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "lb203/LanguageBind-Image": 77,
 }
 
-
 PRETRAINED_INIT_CONFIGURATION = {
     "lb203/LanguageBind-Image": {},
 }
+
 
 class LanguageBindImageTokenizer(CLIPTokenizer):
     """
@@ -74,4 +74,4 @@ class LanguageBindImageTokenizer(CLIPTokenizer):
             bos_token,
             eos_token,
             pad_token,  # hack to enable padding
-            **kwargs,)
+            **kwargs, )

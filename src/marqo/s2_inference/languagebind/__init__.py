@@ -1,22 +1,17 @@
-import torch
 from torch import nn
-from transformers import AutoConfig
-
-from .image.configuration_image import LanguageBindImageConfig
-from .image.modeling_image import LanguageBindImage
-from .image.tokenization_image import LanguageBindImageTokenizer
-from .image.processing_image import LanguageBindImageProcessor
-
-from .video.configuration_video import LanguageBindVideoConfig
-from .video.modeling_video import LanguageBindVideo
-from .video.tokenization_video import LanguageBindVideoTokenizer
-from .video.processing_video import LanguageBindVideoProcessor
 
 from .audio.configuration_audio import LanguageBindAudioConfig
 from .audio.modeling_audio import LanguageBindAudio
-from .audio.tokenization_audio import LanguageBindAudioTokenizer
 from .audio.processing_audio import LanguageBindAudioProcessor
-
+from .audio.tokenization_audio import LanguageBindAudioTokenizer
+from .image.configuration_image import LanguageBindImageConfig
+from .image.modeling_image import LanguageBindImage
+from .image.processing_image import LanguageBindImageProcessor
+from .image.tokenization_image import LanguageBindImageTokenizer
+from .video.configuration_video import LanguageBindVideoConfig
+from .video.modeling_video import LanguageBindVideo
+from .video.processing_video import LanguageBindVideoProcessor
+from .video.tokenization_video import LanguageBindVideoTokenizer
 
 config_dict = {
     'image': LanguageBindImageConfig,
@@ -33,6 +28,7 @@ transform_dict = {
     'audio': LanguageBindAudioProcessor,
     'image': LanguageBindImageProcessor,
 }
+
 
 class LanguageBind(nn.Module):
     def __init__(self, clip_type, use_temp=True, cache_dir='./cache_dir'):
@@ -67,7 +63,7 @@ class LanguageBind(nn.Module):
             outputs[key] = value
         return outputs
 
+
 def to_device(x, device):
     out_dict = {k: v.to(device) for k, v in x.items()}
     return out_dict
-
