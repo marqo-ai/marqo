@@ -509,7 +509,7 @@ def _load_model(
 
     # TODO For each refactored model class, add a new elif block here and remove the if block
     #  once we have all models refactored
-    if model_type == ModelType.OpenCLIP:
+    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL):
         model = loader(
             device = device,
             model_properties = model_properties,
