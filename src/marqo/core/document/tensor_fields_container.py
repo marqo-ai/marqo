@@ -6,7 +6,7 @@ import numpy as np
 from pydantic.main import BaseModel
 
 from marqo.core import constants
-from marqo.core.document.add_documents_handler import AddDocumentsError
+from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
 from marqo.s2_inference.clip_utils import _is_image
 from marqo.tensor_search import enums

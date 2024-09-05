@@ -740,17 +740,15 @@ class VespaClient:
 
         # Handle other exceptions
         try:
+            self._raise_for_status(resp)
             return FeedBatchDocumentResponse(**resp.json(), status=resp.status_code)
         except JSONDecodeError as e:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here, so we error out the whole batch
                 raise VespaError(cause=e, message=f"Unexpected response from Vespa: {resp.text}") from e
-
-            try:
-                self._raise_for_status(resp)
-            except VespaStatusError as e:
-                logger.error(e, exc_info=True)
-                return FeedBatchDocumentResponse(status=resp.status_code, message=e.message, id=doc_id)
+        except VespaStatusError as e:
+            logger.error(e, exc_info=True)
+            return FeedBatchDocumentResponse(status=resp.status_code, message=e.message, id=doc_id)
 
     def _feed_document_sync(self, sync_client: httpx.Client, document: VespaDocument, schema: str,
                             timeout: int) -> FeedBatchDocumentResponse:
