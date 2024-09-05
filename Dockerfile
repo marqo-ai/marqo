@@ -31,14 +31,14 @@ ARG TARGETPLATFORM
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
     dnf install -y epel-release && \
     dnf config-manager --set-enabled powertools && \
-    dnf install -y gcc-c++ cmake make python38-devel ffmpeg-devel && \
+    dnf install -y gcc-c++ cmake make python38-devel ffmpeg-devel git && \
     git clone --recursive https://github.com/dmlc/decord && \
     cd decord && mkdir build && cd build && \
     cmake .. -DUSE_CUDA=0 -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc) && cd ../python && \
     pip3 install . && \
     cd ../../ && rm -rf decord && \
-    dnf remove -y gcc-c++ cmake make && dnf autoremove -y && dnf clean all; \
+    dnf remove -y gcc-c++ cmake make git && dnf autoremove -y && dnf clean all; \
 fi
 
 COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/vespa/target/
