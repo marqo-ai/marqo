@@ -125,7 +125,7 @@ jobs:
       
       - name: Add decord to PYTHONPATH
         run: |
-          DECORD_PATH=$(python -m pip show decord | grep Location | cut -d ' ' -f 2)
+          DECORD_PATH=$(python3 -m pip show decord | grep Location | cut -d ' ' -f 2)
           echo "PYTHONPATH=$PYTHONPATH:$DECORD_PATH" >> $GITHUB_ENV
       
       # TODO: linting here
