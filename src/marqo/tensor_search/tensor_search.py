@@ -1823,7 +1823,6 @@ def get_query_vectors_from_jobs(
                         possible_jobs=qidx_to_job[qidx],
                         jobs=jobs,
                         job_to_vectors=job_to_vectors,
-                        treat_urls_as_media=True,  # TODO - infer this from model
                         content=content),
                      weight,
                      content
@@ -1857,7 +1856,6 @@ def get_query_vectors_from_jobs(
                 possible_jobs=qidx_to_job.get(qidx, []),
                 jobs=jobs,
                 job_to_vectors=job_to_vectors,
-                treat_urls_as_media=True, # TODO - infer this from model
                 content=q.q
             )
         else:
@@ -1866,7 +1864,7 @@ def get_query_vectors_from_jobs(
 
 
 def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors: Dict[JHash, Dict[str, List[float]]],
-                       jobs: Dict[JHash, VectorisedJobs]) -> List[float]:
+                       jobs: Dict[JHash, VectorisedJobs], content: str) -> List[float]:
     """finds the vector associated with a piece of content
 
     Args:
