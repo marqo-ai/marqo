@@ -94,7 +94,6 @@ class MultimodalModel:
         else:
             raise ValueError(f"Unsupported LanguageBind model: {self.model_name}")
         model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path).to(self.device)
-        model = model.to(self.device)
         model.eval()
         return model
         
@@ -126,7 +125,7 @@ def fetch_content_sample(url, sample_size=10240):  # 10 KB
     response = requests.get(url, stream=True)
     buffer = io.BytesIO()
     try:
-        for chunk in response.iter_content(chunk_size=sample_size):
+        for chunk in response.iter_content(chunk_size=min(sample_size, 8192)):
             buffer.write(chunk)
             if buffer.tell() >= sample_size:
                 break
@@ -183,7 +182,9 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.TEXT
         
     else:
-        raise ValueError(f"Unsupported content type: {type(content)}. It is neither a string, list of strings, nor bytes.")
+        return Modality.TEXT
+        #raise ValueError(f"Unsupported content type: {type(content)}. 
+        # It is neither a string, list of strings, nor bytes.")
 
 class LanguageBindEncoder(ModelEncoder):    
     def __init__(self, model: MultimodalModel):
