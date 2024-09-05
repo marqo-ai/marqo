@@ -115,13 +115,18 @@ jobs:
           pwd
           cd python
           pip install .
-          echo "Decord installed in: $(python -c 'import decord; print(decord.__file__)')"
+          echo "Decord installed in: $(python3 -c 'import decord; print(decord.__file__)')"
 
       - name: Verify decord installation
         run: |
-          python3 -c "import decord; print(decord.__file__)"
+          python3 -m pip show decord
           python3 -c "import sys; print(sys.path)"
-          pip list | grep decord
+          python3 -c "import decord; print(decord.__file__)"
+      
+      - name: Add decord to PYTHONPATH
+        run: |
+          DECORD_PATH=$(python -m pip show decord | grep Location | cut -d ' ' -f 2)
+          echo "PYTHONPATH=$PYTHONPATH:$DECORD_PATH" >> $GITHUB_ENV
       
       # TODO: linting here
   
