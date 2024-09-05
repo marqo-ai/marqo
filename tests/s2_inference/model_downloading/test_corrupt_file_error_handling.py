@@ -57,7 +57,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
 
         self.dummpy_corrupted_file = "/path/to/corrupted/file.pt"
 
-    @patch('open_clip.create_model_and_transforms', autospec=True)
+    @patch('open_clip.create_model', autospec=True)
     @patch('os.remove', autospec=True)
     def test_corrupted_file_handling(self, mock_os_remove, mock_create_model_and_transforms):
         # Setup
@@ -73,7 +73,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                 # Reset necessary mock
                 mock_os_remove.reset_mock()
 
-    @patch('open_clip.create_model_and_transforms', autospec=True)
+    @patch('open_clip.create_model', autospec=True)
     @patch('os.remove', autospec=True)
     def test_file_removal_failure_handling(self, mock_os_remove, mock_create_model_and_transforms):
         # Setup
@@ -92,7 +92,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                 # Reset the mock
                 mock_os_remove.reset_mock()
 
-    @patch('open_clip.create_model_and_transforms', autospec=True)
+    @patch('open_clip.create_model', autospec=True)
     @patch('os.remove', autospec=True)
     def test_other_errors_handling(self, mock_os_remove, mock_create_model_and_transforms):
         # Setup
@@ -105,7 +105,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                 self.assertIn("Marqo encountered an error when loading custom open_clip model", str(context.exception))
                 mock_os_remove.assert_not_called()
 
-    @patch('open_clip.create_model_and_transforms', autospec=True)
+    @patch('open_clip.create_model', autospec=True)
     @patch('os.remove', autospec=True)
     def test_load_clip_into_open_clip_errors_handling(self, mock_os_remove, mock_create_model_and_transforms):
         # Setup
@@ -117,7 +117,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                 with self.assertRaises(InvalidModelPropertiesError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn(
-                    "You may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'",
+                    "You may have tried to load a clip model even though model_properties['type'] is set to 'open_clip'",
                     str(context.exception))
                 mock_os_remove.assert_not_called()
 
@@ -132,7 +132,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
             _ = _load_model(**self.load_parameters, model_properties=model_properties)
 
         self.assertIn(
-            "You may have tried to load a `clip` model even though `model_properties['type']` is set to 'open_clip'",
+            "You may have tried to load a clip model even though model_properties['type'] is set to 'open_clip'",
             str(context.exception))
 
     def test_incomplete_download_open_clip_no_mock(self):
