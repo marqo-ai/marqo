@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import torch
 from PIL import Image
-from decord import VideoReader, cpu
 from torchvision import transforms
 from transformers import ProcessorMixin, BatchEncoding
 from transformers.image_processing_utils import BatchFeature
@@ -10,7 +9,6 @@ from torchvision.transforms import Compose, Lambda, ToTensor
 from torchvision.transforms._transforms_video import NormalizeVideo, RandomCropVideo, RandomHorizontalFlipVideo, CenterCropVideo
 from pytorchvideo.transforms import ShortSideScale
 
-decord.bridge.set_bridge('torch')
 
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
@@ -68,6 +66,9 @@ def load_and_transform_video(
 
     if video_decode_backend == 'decord':
         import decord
+        from decord import VideoReader, cpu
+
+        decord.bridge.set_bridge('torch')
 
         decord.bridge.set_bridge('torch')
         decord_vr = VideoReader(video_path, ctx=cpu(0))
