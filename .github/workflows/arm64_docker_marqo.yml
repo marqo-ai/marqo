@@ -126,9 +126,9 @@ jobs:
         run: |
           cd $DECORD_BUILD_DIR/..
           pwd
-          cd python
+          cd python3
           pip install .
-          echo "Decord installed in: $(python -c 'import decord; print(decord.__file__)')"
+          echo "Decord installed in: $(python3 -c 'import decord; print(decord.__file__)')"
 
       - name: Verify decord installation
         run: |
