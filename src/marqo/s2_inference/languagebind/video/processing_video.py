@@ -1,5 +1,4 @@
 import cv2
-import decord
 import numpy as np
 import torch
 from PIL import Image
@@ -58,7 +57,18 @@ def load_and_transform_video(
         clip_end_sec=None,
         num_frames=8,
 ):
+    try:
+        import decord
+        decord_available = True
+    except ImportError:
+        decord_available = False
+
+    if video_decode_backend == 'decord' and not decord_available:
+        video_decode_backend = 'opencv'
+
     if video_decode_backend == 'decord':
+        import decord
+
         decord.bridge.set_bridge('torch')
         decord_vr = VideoReader(video_path, ctx=cpu(0))
         duration = len(decord_vr)
