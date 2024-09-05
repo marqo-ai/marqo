@@ -81,6 +81,32 @@ jobs:
           apt-get -y update
           apt-get -y install python3.9
           apt-get -y install pip
+
+      - name: Verify Python version
+        run: |
+          python --version
+          which python
+          python3 --version
+          which python3
+          python3.9 --version
+          which python3.9
+
+      - name: Set Python 3.9 as default
+        run: |
+          sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.9 1
+          sudo update-alternatives --set python /usr/bin/python3.9
+          sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
+          sudo update-alternatives --set python3 /usr/bin/python3.9
+          echo "PATH=/usr/bin:$PATH" >> $GITHUB_ENV
+      
+      - name: Verify Python version
+        run: |
+          python --version
+          which python
+          python3 --version
+          which python3
+          python3.9 --version
+          which python3.9
   
       - name: Install Dependencies
         run: |
