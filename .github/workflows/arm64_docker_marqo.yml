@@ -96,24 +96,26 @@ jobs:
       
       - name: Clone and build decord
         run: |
+          pwd
           git clone --recursive https://github.com/dmlc/decord
           cd decord
           mkdir build && cd build
           cmake .. -DUSE_CUDA=0 -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
+          echo "DECORD_BUILD_DIR=$(pwd)" >> $GITHUB_ENV
 
-      - name: Install decord in main Python environment
+      - name: Install decord
         run: |
-          cd /actions-runner/_work/marqo/marqo/decord/python
+          cd $DECORD_BUILD_DIR/..
+          pwd
+          cd python
           pip install .
-
-      - name: Set LD_PRELOAD for decord
-        run: echo "LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libffi.so.7" >> $GITHUB_ENV
+          echo "Decord installed in: $(python -c 'import decord; print(decord.__file__)')"
 
       - name: Verify decord installation
         run: |
-          python -c "import decord; print(decord.__file__)"
-          python -c "import sys; print(sys.path)"
+          python3 -c "import decord; print(decord.__file__)"
+          python3 -c "import sys; print(sys.path)"
           pip list | grep decord
       
       # TODO: linting here
