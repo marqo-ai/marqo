@@ -31,7 +31,9 @@ ARG TARGETPLATFORM
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
     dnf install -y epel-release && \
     dnf config-manager --set-enabled powertools && \
-    dnf install -y gcc-c++ cmake make python38-devel ffmpeg-devel git ffmpeg && \
+    dnf install -y gcc-c++ cmake make python38-devel git && \
+    dnf config-manager --add-repo=https://negativo17.org/repos/epel-multimedia.repo && \
+    dnf install -y ffmpeg && \
     git clone --recursive https://github.com/dmlc/decord && \
     cd decord && mkdir build && cd build && \
     cmake .. -DUSE_CUDA=0 -DCMAKE_BUILD_TYPE=Release && \
