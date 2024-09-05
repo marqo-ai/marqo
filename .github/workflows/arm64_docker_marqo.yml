@@ -102,13 +102,19 @@ jobs:
           cmake .. -DUSE_CUDA=0 -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
 
-      - name: Install decord
+      - name: Install decord in main Python environment
         run: |
-          cd decord/python
+          cd /actions-runner/_work/marqo/marqo/decord/python
           pip install .
 
       - name: Set LD_PRELOAD for decord
         run: echo "LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libffi.so.7" >> $GITHUB_ENV
+
+      - name: Verify decord installation
+        run: |
+          python -c "import decord; print(decord.__file__)"
+          python -c "import sys; print(sys.path)"
+          pip list | grep decord
       
       # TODO: linting here
   
