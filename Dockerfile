@@ -27,6 +27,18 @@ RUN rm requirements.txt
 # Stage 3: Final stage that builds on the base image
 FROM base_image
 
+ARG TARGETPLATFORM
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    apt-get update && apt-get install -y build-essential python3-dev python3-setuptools make cmake ffmpeg libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev && \
+    git clone --recursive https://github.com/dmlc/decord && \
+    cd decord && mkdir build && cd build && \
+    cmake .. -DUSE_CUDA=0 -DCMAKE_BUILD_TYPE=Release && \
+    make -j$(nproc) && cd ../python && \
+    pip3 install . && \
+    cd ../../ && rm -rf decord && \
+    apt-get remove -y build-essential make cmake && apt-get autoremove -y && apt-get clean; \
+fi
+
 COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app/vespa/target/
 COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
