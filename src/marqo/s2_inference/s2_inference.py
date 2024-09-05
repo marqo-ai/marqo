@@ -30,7 +30,7 @@ from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
-
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
     
 logger = get_logger(__name__)
 
@@ -48,7 +48,7 @@ _marqo_inference_cache = MarqoInferenceCache(cache_size=read_env_vars_and_defaul
 def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
               model_properties: dict = None,
               device: str = None, normalize_embeddings: bool = get_default_normalization(),
-              model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = None, **kwargs,) -> List[List[float]]:
+              model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT, **kwargs,) -> List[List[float]]:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
@@ -168,9 +168,8 @@ def get_encoder(model):
     if isinstance(model, MultimodalModel):
         if model.properties.loader == "languagebind":
             return LanguageBindEncoder(model)
-        elif model.properties.loader == "imagebind":
-            # Return ImageBind encoder when implemented
-            pass
+        else:
+            raise NotImplementedError(f"Model {model.name} is not supported")
     return DefaultEncoder(model)
 
 

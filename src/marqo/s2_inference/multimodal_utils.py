@@ -28,6 +28,7 @@ from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBin
 from marqo.s2_inference.languagebind.video.tokenization_video import LanguageBindVideoTokenizer
 from marqo.s2_inference.languagebind.audio.tokenization_audio import LanguageBindAudioTokenizer
 from marqo.s2_inference.configs import ModelCache
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 
@@ -92,7 +93,7 @@ class MultimodalModel:
             }
         else:
             raise ValueError(f"Unsupported LanguageBind model: {self.model_name}")
-        model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path)
+        model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path).to(self.device)
         model = model.to(self.device)
         model.eval()
         return model
@@ -136,6 +137,9 @@ def fetch_content_sample(url, sample_size=10240):  # 10 KB
         response.close()
 
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
+    """
+    Infer the modality of the content. Video, audio, image or text.
+    """
     if isinstance(content, str):
         if not validators.url(content):
             return Modality.TEXT
@@ -177,8 +181,9 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.AUDIO
         else:
             return Modality.TEXT
-    
-    return None
+        
+    else:
+        raise ValueError(f"Unsupported content type: {type(content)}. It is neither a string, list of strings, nor bytes.")
 
 class LanguageBindEncoder(ModelEncoder):    
     def __init__(self, model: MultimodalModel):

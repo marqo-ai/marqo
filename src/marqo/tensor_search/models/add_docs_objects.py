@@ -30,7 +30,7 @@ class AddDocsBodyParams(BaseModel):
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
     documents: Union[Sequence[Union[dict, Any]], np.ndarray]
-    imageDownloadThreadCount: int = read_env_vars_and_defaults_ints(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT)
+    imageDownloadThreadCount: int = read_env_vars_and_defaults_ints(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
     textChunkPrefix: Optional[str] = None
 
 
@@ -61,7 +61,7 @@ class AddDocsParams(BaseModel):
     index_name: str
     device: Optional[str]
     tensor_fields: Optional[List] = Field(default_factory=None)
-    image_download_thread_count: int = read_env_vars_and_defaults_ints(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT)
+    image_download_thread_count: int = read_env_vars_and_defaults_ints(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None

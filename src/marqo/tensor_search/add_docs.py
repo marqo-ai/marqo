@@ -26,6 +26,7 @@ from marqo.tensor_search.add_docs_utils import StreamingMediaProcessor
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 from marqo.s2_inference.models.model_type import ModelType
 
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 def threaded_download_and_preprocess_content(allocated_docs: List[dict], 
-                                                content_repo: dict, 
+                                                media_repo: dict, 
                                                 tensor_fields: List[str],
                                                 image_download_headers: dict,
                                                 device: str = None,
@@ -87,21 +88,21 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
                                 and marqo_index.model.properties.get('supported_modalities') is not None
                                 and Modality.IMAGE not in marqo_index.model.properties.get('supported_modalities')):
-                            content_repo[doc[field]] = UnsupportedModalityError(
+                            media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index.model.name} does not support {modality}")
                             continue
                         # Existing logic
-                        if doc[field] in content_repo:
+                        if doc[field] in media_repo:
                             continue
 
                    
                         try:
-                            content_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
+                            media_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
                                                                                      timeout_ms=int(
                                                                                          TIMEOUT_SECONDS * 1000),
                                                                                      metrics_obj=metric_obj)
                         except PIL.UnidentifiedImageError as e:
-                            content_repo[doc[field]] = e
+                            media_repo[doc[field]] = e
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
@@ -109,34 +110,34 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                content_repo[doc[field]] = preprocessors['image'](content_repo[doc[field]]).to(device)
+                                media_repo[doc[field]] = preprocessors['image'](media_repo[doc[field]]).to(device)
                             except OSError as e:
                                 if "image file is truncated" in str(e):
-                                    content_repo[doc[field]] = e
+                                    media_repo[doc[field]] = e
                                     metric_obj.increment_counter(f"{doc.get(field, '')}.OSError")
                                     continue
                                 else:
                                     raise e
 
-                    elif modality in [Modality.VIDEO, Modality.AUDIO] or (marqo_index.type == 'structured' and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer]):
+                    elif modality in [Modality.VIDEO, Modality.AUDIO] or (marqo_index.type == IndexType.Structured and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer]):
                         if marqo_index.model.properties.get('type') not in [
                             ModelType.LanguageBind] and modality not in marqo_index.model.properties.get(
                                 'supported_modalities'):
-                            content_repo[doc[field]] = UnsupportedModalityError(
+                            media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index.model.name} does not support {modality}")
                             continue
                         try:
                             processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
                                                                         marqo_index, preprocessors)
-                            content_repo[doc[field]] = processed_chunks
+                            media_repo[doc[field]] = processed_chunks
                         except Exception as e:
                             logger.error(f"Error processing {modality} file: {str(e)}")
-                            content_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
+                            media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
 
                     else:
                         pass
                         # raise an error
-                        #content_repo[doc[field]] = S2InferenceError(
+                        #media_repo[doc[field]] = S2InferenceError(
                         #                    f"Could not process the media file found at `{doc[field]}`. \n"
                         #                    f"Reason: Not a valid URL or a supportedmodality"
                         #)
@@ -145,22 +146,22 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                 elif isinstance(doc[field], dict):
                     for sub_field in list(doc[field].values()):
                         if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
-                            if sub_field in content_repo:
+                            if sub_field in media_repo:
                                 continue
                             try:
-                                content_repo[sub_field] = clip_utils.load_image_from_path(
+                                media_repo[sub_field] = clip_utils.load_image_from_path(
                                     sub_field,
                                     image_download_headers,
                                     timeout=TIMEOUT_SECONDS,
                                     metrics_obj=metric_obj
                                 )
                             except PIL.UnidentifiedImageError as e:
-                                content_repo[sub_field] = e
+                                media_repo[sub_field] = e
                                 metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                                 continue
     
 
-def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index: MarqoIndex, preprocessors = dict) -> List[Dict[str, torch.Tensor]]:
+def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index: MarqoIndex, preprocessors: Preprocessors) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
     processor = StreamingMediaProcessor(url, device, headers, modality, marqo_index, preprocessors)
@@ -189,16 +190,16 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
     # Check if model is Video/Audio. If so, manually set thread_count to 5
     #if model_properties.get('type') in [ModelType.LanguageBind]:
     #    thread_count = 5
-    content_repo = {}  # for image/video/audio
-    content_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
+    media_repo = {}  # for image/video/audio
+    media_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
                                     model_name, normalize_embeddings, force_download,
                                     media_field_types_mapping, download_headers, model_properties, model_auth, 
                                     device, patch_method_exists, marqo_index)
 
     try:
-        yield content_repo
+        yield media_repo
     finally:
-        for p in content_repo.values():
+        for p in media_repo.values():
             if isinstance(p, ImageFile):
                 p.close()
             elif isinstance(p, (list, np.ndarray)):
@@ -227,7 +228,7 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
     if not is_preprocess_image_model(model_properties) or patch_method_exists:
         preprocessors['image'] = None
 
-    content_repo = {}
+    media_repo = {}
     m = [RequestMetrics() for i in range(thread_count)]
     # Consider replacing below with:
     # thread_allocated_docs = [copied[i: i + docs_per_thread] for i in range(0, len(copied), docs_per_thread)]
@@ -237,7 +238,7 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
     with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
         futures = [executor.submit(threaded_download_and_preprocess_content,
                         allocation, 
-                        content_repo, 
+                        media_repo, 
                         tensor_fields,
                         image_download_headers, 
                         device,
@@ -258,7 +259,7 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
     metric_obj = RequestMetricsStore.for_request()
     metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
     metric_obj.times = reduce_thread_metrics(metric_obj.times)
-    return content_repo
+    return media_repo
     
 
 def reduce_thread_metrics(data):

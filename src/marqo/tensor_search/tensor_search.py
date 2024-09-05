@@ -146,7 +146,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     unsuccessful_docs: List[Tuple[int, MarqoAddDocumentsItem]] = []
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)
-    content_repo = {}
+    media_repo = {}
 
     text_chunk_prefix = marqo_index.model.get_text_chunk_prefix(add_docs_params.text_chunk_prefix)
 
@@ -159,7 +159,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
             with RequestMetricsStore.for_request().time(
                     "media_download.full_time",
                     lambda t: logger.debug(
-                        f"add_documents image download: took {t:.3f}ms to concurrently download "
+                        f"add_documents media download: took {t:.3f}ms to concurrently download "
                         f"media for {batch_size} docs using {media_download_thread_count} threads"
                     )
             ):
@@ -169,7 +169,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 tensor_fields_and_multimodal_subfields = copy.deepcopy(add_docs_params.tensor_fields) \
                     if add_docs_params.tensor_fields else []
                 tensor_fields_and_multimodal_subfields.extend(multimodal_sub_fields)
-                content_repo = exit_stack.enter_context(
+                media_repo = exit_stack.enter_context(
                     add_docs.download_and_preprocess_content(
                         docs=docs,
                         thread_count=media_download_thread_count,
@@ -277,8 +277,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                 # C) field type is standard -> chunking and vectorisation
                 # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
                 # Do step D regardless. It will generate separate chunks for multimodal.
-                # E) field type is video_pointer -> use video chunking and vectorisation
-                # F) field type is audio_pointer -> use audio chunking and vectorisation
 
                 # A) Calculate custom vector field logic here. It should ignore use_existing_tensors, as this step has no vectorisation.
                 document_dict_field_type = add_docs.determine_document_dict_field_type(field, field_content,
@@ -323,11 +321,11 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
                     if video_audio_check:
                         try:
-                            # Check for UnsupportedModalityError in content_repo
-                            if isinstance(content_repo[field_content], s2_inference_errors.S2InferenceError):
-                                raise content_repo[field_content]
+                            # Check for UnsupportedModalityError in media_repo
+                            if isinstance(media_repo[field_content], s2_inference_errors.S2InferenceError):
+                                raise media_repo[field_content]
                                 
-                            media_chunks = content_repo[field_content]
+                            media_chunks = media_repo[field_content]
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
@@ -345,7 +343,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                     modality=modality
                                 )
                                 embeddings.extend(vector)
-                        except Exception as e:
+                        except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
                                 (i, MarqoAddDocumentsItem(
@@ -358,7 +356,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             )
                             break
 
-                    elif isinstance(field_content, (str, Image.Image)) and not video_audio_check:
+                    elif isinstance(field_content, (str, Image.Image)):
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
                         # 2. check if it is a url or pointer
                         # 3. If yes in 1 and 2, download blindly (without type)
@@ -385,12 +383,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 # in the future, if we have different chunking methods, make sure we catch possible
                                 # errors of different types generated here, too.
                                 if isinstance(field_content, str) and marqo_index.treat_urls_and_pointers_as_images:
-                                    if not isinstance(content_repo[field_content], Exception):
-                                        image_data = content_repo[field_content]
+                                    if not isinstance(media_repo[field_content], Exception):
+                                        image_data = media_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
                                             f"Could not process the media file found at `{field_content}`. \n"
-                                            f"Reason: {str(content_repo[field_content])}"
+                                            f"Reason: {str(media_repo[field_content])}"
                                         )
                                 else:
                                     image_data = field_content
@@ -529,7 +527,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_unstructured(
                                 field_name,
                                 field_content, i, doc_id, add_docs_params.device, marqo_index,
-                                content_repo, multimodal_params, model_auth=add_docs_params.model_auth,
+                                media_repo, multimodal_params, model_auth=add_docs_params.model_auth,
                                 text_chunk_prefix=text_chunk_prefix,
                                 )
 
@@ -626,7 +624,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     unsuccessful_docs: List[Tuple[int, MarqoAddDocumentsItem]] = []
     total_vectorise_time = 0
     batch_size = len(add_docs_params.docs)  # use length before deduplication
-    content_repo = {}
+    media_repo = {}
 
     text_chunk_prefix = marqo_index.model.get_text_chunk_prefix(add_docs_params.text_chunk_prefix)
 
@@ -663,7 +661,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 if '_id' in media_fields:
                     raise api_exceptions.BadRequestError(message="`_id` field cannot be an image pointer field.")
 
-                content_repo = exit_stack.enter_context(
+                media_repo = exit_stack.enter_context(
                     add_docs.download_and_preprocess_content(
                         docs=docs, 
                         thread_count=media_download_thread_count,
@@ -796,9 +794,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 # B) use_existing_tensors=True and field content hasn't changed -> no chunking or vectorisation
                 # C) field type is standard -> chunking and vectorisation
                 # D) field type is multimodal -> use vectorise_multimodal_combination_field (does chunking and vectorisation)
-                # E) field type is video_pointer -> use video chunking and vectorisation
-                # F) field type is audio_pointer -> use audio chunking and vectorisation
-
 
                 # A) Calculate custom vector field logic here. It should ignore use_existing_tensors, as this step has no vectorisation.
                 if marqo_field.type == FieldType.CustomVector:
@@ -834,10 +829,10 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                 if len(chunks) == 0:  # Not using existing tensors or didn't find it
                     if marqo_field.type in [FieldType.VideoPointer, FieldType.AudioPointer]:
                         try:
-                            media_chunks = content_repo[field_content]
+                            media_chunks = media_repo[field_content]
                             
-                            if isinstance(content_repo[field_content], s2_inference_errors.S2InferenceError):
-                                raise content_repo[field_content]
+                            if isinstance(media_repo[field_content], s2_inference_errors.S2InferenceError):
+                                raise media_repo[field_content]
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
@@ -856,7 +851,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 )
                                 embeddings.extend(vector)  # vectorise returns a list of vectors
                                 
-                        except Exception as e:
+                        except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
                             unsuccessful_docs.append(
                                 (i, MarqoAddDocumentsItem(
@@ -901,12 +896,12 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 # in the future, if we have different chunking methods, make sure we catch possible
                                 # errors of different types generated here, too.
                                 if isinstance(field_content, str) and field in media_fields:
-                                    if not isinstance(content_repo[field_content], Exception):
-                                        image_data = content_repo[field_content]
+                                    if not isinstance(media_repo[field_content], Exception):
+                                        image_data = media_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
                                             f"Could not process the media file found at `{field_content}`. \n"
-                                            f"Reason: {str(content_repo[field_content])}"
+                                            f"Reason: {str(media_repo[field_content])}"
                                         )
                                 else:
                                     image_data = field_content
@@ -1068,7 +1063,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 unsuccessful_doc_to_append,
                                 combo_vectorise_time_to_add) = vectorise_multimodal_combination_field_structured(
                                     field_name, field_content, copied, i, doc_id, add_docs_params.device, marqo_index,
-                                    content_repo, mappings, model_auth=add_docs_params.model_auth,
+                                    media_repo, mappings, model_auth=add_docs_params.model_auth,
                                     text_chunk_prefix=text_chunk_prefix,
                                 )
 
@@ -1871,8 +1866,7 @@ def get_query_vectors_from_jobs(
 
 
 def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors: Dict[JHash, Dict[str, List[float]]],
-                       jobs: Dict[JHash, VectorisedJobs],
-                       treat_urls_as_media: bool, content: str) -> List[float]:
+                       jobs: Dict[JHash, VectorisedJobs]) -> List[float]:
     """finds the vector associated with a piece of content
 
     Args:
@@ -2146,7 +2140,7 @@ def get_cpu_info() -> dict:
 def vectorise_multimodal_combination_field_unstructured(field: str,
                                                         field_content: Dict[str, str], doc_index: int,
                                                         doc_id: str, device: str, marqo_index: UnstructuredMarqoIndex,
-                                                        content_repo, field_map: dict,
+                                                        media_repo, field_map: dict,
                                                         model_auth: Optional[ModelAuth] = None,
                                                         text_chunk_prefix: str = None,
                                                         modality=None):
@@ -2195,7 +2189,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
     infer_if_image = marqo_index.treat_urls_and_pointers_as_images
     infer_if_media = marqo_index.treat_urls_and_pointers_as_media
 
-    if infer_if_image is False and infer_if_media is False:
+    if not infer_if_image and not infer_if_media:
         text_field_names = list(field_content.keys())
         text_content_to_vectorise = list(field_content.values())
     else:
@@ -2208,12 +2202,12 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
             else:
                 try:
                     if isinstance(sub_content, str):
-                        if not isinstance(content_repo[sub_content], Exception):
-                            media_data = content_repo[sub_content]
+                        if not isinstance(media_repo[sub_content], Exception):
+                            media_data = media_repo[sub_content]
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not find media content at `{sub_content}`. \n"
-                                f"Reason: {str(content_repo[sub_content])}"
+                                f"Reason: {str(media_repo[sub_content])}"
                             )
                     else:
                         media_data = sub_content
@@ -2347,7 +2341,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
 
 def vectorise_multimodal_combination_field_structured(
         field: str, multimodal_object: Dict[str, dict], doc: dict, doc_index: int,
-        doc_id: str, device: str, marqo_index: StructuredMarqoIndex, content_repo, field_map: dict,
+        doc_id: str, device: str, marqo_index: StructuredMarqoIndex, media_repo, field_map: dict,
         model_auth: Optional[ModelAuth] = None,
         text_chunk_prefix: str = None
 ):
@@ -2400,32 +2394,32 @@ def vectorise_multimodal_combination_field_structured(
             try:
                 if isinstance(sub_content, str):
                     if sub_field_name in image_fields:
-                        if not isinstance(content_repo[sub_content], Exception):
-                            image_data = content_repo[sub_content]
+                        if not isinstance(media_repo[sub_content], Exception):
+                            image_data = media_repo[sub_content]
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not process image at `{sub_content}`. \n"
-                                f"Reason: {str(content_repo[sub_content])}"
+                                f"Reason: {str(media_repo[sub_content])}"
                             )
                         image_content_to_vectorise.append(image_data)
                         image_field_names.append(sub_field_name)
                     elif sub_field_name in video_fields:
-                        if not isinstance(content_repo[sub_content], Exception):
-                            video_data = [content_repo[sub_content][i]['tensor'] for i in range(len(content_repo[sub_content]))]
+                        if not isinstance(media_repo[sub_content], Exception):
+                            video_data = [media_repo[sub_content][i]['tensor'] for i in range(len(media_repo[sub_content]))]
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not process video at `{sub_content}`. \n"
-                                f"Reason: {str(content_repo[sub_content])}"
+                                f"Reason: {str(media_repo[sub_content])}"
                             )
                         video_content_to_vectorise.append(video_data)
                         video_field_names.append(sub_field_name)
                     elif sub_field_name in audio_fields:
-                        if not isinstance(content_repo[sub_content], Exception):
-                            audio_data = [content_repo[sub_content][i]['tensor'] for i in range(len(content_repo[sub_content]))]
+                        if not isinstance(media_repo[sub_content], Exception):
+                            audio_data = [media_repo[sub_content][i]['tensor'] for i in range(len(media_repo[sub_content]))]
                         else:
                             raise s2_inference_errors.S2InferenceError(
                                 f"Could not process audio at `{sub_content}`. \n"
-                                f"Reason: {str(content_repo[sub_content])}"
+                                f"Reason: {str(media_repo[sub_content])}"
                             )
                         audio_content_to_vectorise.append(audio_data)
                         audio_field_names.append(sub_field_name)
