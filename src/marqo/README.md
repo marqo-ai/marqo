@@ -94,7 +94,7 @@ VESPA_CONFIG_URL=http://localhost:19071
 VESPA_DOCUMENT_URL=http://localhost:8080
 VESPA_QUERY_URL=http://localhost:8080
 ```
-9. Now you can Debug this file directly from your IDE (e.g. PyCharm) to start Marqo locally.
+8. Now you can Debug this file directly from your IDE (e.g. PyCharm) to start Marqo locally.
 9. Set breakpoints in the project for better debugging experience.
 
 
