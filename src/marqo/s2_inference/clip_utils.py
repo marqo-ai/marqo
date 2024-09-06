@@ -556,6 +556,7 @@ class OPEN_CLIP(AbstractCLIPModel):
                 f"Check {marqo_docs.bring_your_own_model()} "
                 f"for more details on the supported methods to open_clip model "
             )
+        self.model = self.model.to(self.device)
         self.model.eval()
 
     def _check_loaded_components(self):
