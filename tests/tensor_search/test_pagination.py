@@ -183,6 +183,7 @@ class TestPagination(MarqoTestCase):
                 self.assertFalse(r['errors'], "Errors in add documents call")
 
             test_cases = [
+                ("disjunction", "copeland"),
                 ("disjunction", "rrf"),
                 ("lexical", "tensor"),
                 ("tensor", "lexical"),

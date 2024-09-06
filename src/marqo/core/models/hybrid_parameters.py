@@ -15,6 +15,7 @@ class RetrievalMethod(str, Enum):
 
 
 class RankingMethod(str, Enum):
+    Copeland = 'copeland'
     RRF = 'rrf'
     Tensor = 'tensor'
     Lexical = 'lexical'
@@ -69,7 +70,7 @@ class HybridParameters(StrictBaseModel):
 
         # score_modifiers_lexical can only be defined for Lexical, RRF, NormalizeLinear
         if values.get('scoreModifiersLexical') is not None:
-            if not (values.get('rankingMethod') in [RankingMethod.Lexical, RankingMethod.RRF] or
+            if not (values.get('rankingMethod') in [RankingMethod.Lexical, RankingMethod.RRF, RankingMethod.Copeland] or
                     values.get('retrievalMethod') == RetrievalMethod.Lexical):
                 raise ValueError(
                     "'scoreModifiersLexical' can only be defined for 'lexical', 'rrf' ranking methods or "
@@ -77,15 +78,15 @@ class HybridParameters(StrictBaseModel):
 
         # score_modifiers_tensor can only be defined for Tensor, RRF, NormalizeLinear
         if values.get('scoreModifiersTensor') is not None:
-            if values.get('rankingMethod') not in [RankingMethod.Tensor, RankingMethod.RRF]:
+            if values.get('rankingMethod') not in [RankingMethod.Tensor, RankingMethod.RRF, RankingMethod.Copeland]:
                 raise ValueError(
                     "'scoreModifiersTensor' can only be defined for 'tensor', 'rrf', ranking methods")  # TODO: re-add normalize_linear
 
         # if retrievalMethod == Disjunction, then ranking_method must be RRF, NormalizeLinear
         if values.get('retrievalMethod') == RetrievalMethod.Disjunction:
-            if values.get('rankingMethod') not in [RankingMethod.RRF]:
+            if values.get('rankingMethod') not in [RankingMethod.RRF, RankingMethod.Copeland]:
                 raise ValueError(
-                    "For retrievalMethod: disjunction, rankingMethod must be: rrf")  # TODO: re-add normalize_linear
+                    "For retrievalMethod: disjunction, rankingMethod must be: rrf or copeland")  # TODO: re-add normalize_linear
 
         # if retrievalMethod is Lexical or Tensor, then ranking_method must be Tensor, Lexical
         if values.get('retrievalMethod') in [RetrievalMethod.Lexical, RetrievalMethod.Tensor]:
