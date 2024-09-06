@@ -1,8 +1,6 @@
 """Abstractions for Multimodal Models"""
 
-import pycurl
 import requests
-import subprocess
 from contextlib import contextmanager
 import tempfile
 import os
@@ -17,18 +15,17 @@ from typing import List, Dict, Any, Union
 from PIL.Image import Image
 import torch
 
-from marqo.s2_inference.multimodal_utils import *
+from marqo.s2_inference.multimodal_model_load import *
 from marqo.s2_inference.languagebind import (
     LanguageBind, 
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
     to_device
 )
-from marqo.s2_inference.clip_utils import download_image_from_url, validate_url, _is_image
+from marqo.s2_inference.clip_utils import download_image_from_url, validate_url
 from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBindImageTokenizer
 from marqo.s2_inference.languagebind.video.tokenization_video import LanguageBindVideoTokenizer
 from marqo.s2_inference.languagebind.audio.tokenization_audio import LanguageBindAudioTokenizer
 from marqo.s2_inference.configs import ModelCache
-from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 

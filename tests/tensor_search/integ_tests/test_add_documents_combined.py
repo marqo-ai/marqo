@@ -21,9 +21,8 @@ from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase
-from marqo.s2_inference.s2_inference import Modality
-from marqo.s2_inference.multimodal_utils import infer_modality
-from marqo.tensor_search import add_docs_utils
+from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
+from marqo.tensor_search import streaming_media_processor
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -749,8 +748,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     self.assertIn("Document _id must be a string", r["items"][i]["error"])
 
 
-    @unittest.mock.patch('marqo.tensor_search.add_docs_utils.ffmpeg')
-    @unittest.mock.patch('marqo.tensor_search.add_docs_utils.tempfile.TemporaryDirectory')
+    @unittest.mock.patch('marqo.tensor_search.streaming_media_processor.ffmpeg')
+    @unittest.mock.patch('marqo.tensor_search.streaming_media_processor.tempfile.TemporaryDirectory')
     def test_process_media_chunk_calculation(self, mock_temp_dir, mock_ffmpeg):
         # Mock the TemporaryDirectory context manager
         mock_temp_dir.return_value.__enter__.return_value = '/tmp/mock_dir'
@@ -760,11 +759,11 @@ class TestAddDocumentsCombined(MarqoTestCase):
         mock_index.video_preprocessing = unittest.mock.Mock(split_length=10, split_overlap=2)
 
         # Create a StreamingMediaProcessor instance with mocked values
-        processor = add_docs_utils.StreamingMediaProcessor(
+        processor = streaming_media_processor.StreamingMediaProcessor(
             url='http://example.com/video.mp4',
             device='cpu',
             headers={},
-            modality=add_docs_utils.Modality.VIDEO,
+            modality=streaming_media_processor.Modality.VIDEO,
             marqo_index=mock_index,
             preprocessors={'video': unittest.mock.Mock()}
         )
@@ -814,10 +813,10 @@ class TestAddDocumentsCombined(MarqoTestCase):
         this test ensures that the webp extension is correctly inferred as an image"""
         webp_image_url = "https://i.ebayimg.com/images/g/UawAAOSwpd5iR9Bs/s-l1600.webp"
         modality = infer_modality(webp_image_url)
-        self.assertEqual(modality, add_docs_utils.Modality.IMAGE)
+        self.assertEqual(modality, streaming_media_processor.Modality.IMAGE)
 
     def test_no_extension_image_url_infer_modality(self):
         """this test ensures that the image url with no extension is correctly inferred as an image"""
         image_url_no_extension = "https://il.redbubble.net/catalogue/image/by-rb-work/157037551/simple-preview"
         modality = infer_modality(image_url_no_extension)
-        self.assertEqual(modality, add_docs_utils.Modality.IMAGE)
+        self.assertEqual(modality, streaming_media_processor.Modality.IMAGE)

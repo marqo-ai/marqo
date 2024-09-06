@@ -22,7 +22,7 @@ from marqo.s2_inference import clip_utils
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
 from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError
-from marqo.tensor_search.add_docs_utils import StreamingMediaProcessor
+from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics

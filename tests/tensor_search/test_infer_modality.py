@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 import requests
 import io
-from marqo.s2_inference.multimodal_utils import Modality, infer_modality, fetch_content_sample
+from marqo.s2_inference.multimodal_model_load import Modality, infer_modality, fetch_content_sample
 
 class TestMultimodalUtils(unittest.TestCase):
 
@@ -46,8 +46,8 @@ class TestMultimodalUtils(unittest.TestCase):
         self.assertEqual(infer_modality("https://example.com/video.mp4"), Modality.VIDEO)
         self.assertEqual(infer_modality("https://example.com/audio.mp3"), Modality.AUDIO)
 
-    @patch('marqo.s2_inference.multimodal_utils.validate_url')
-    @patch('marqo.s2_inference.multimodal_utils.fetch_content_sample')
+    @patch('marqo.s2_inference.multimodal_model_load.validate_url')
+    @patch('marqo.s2_inference.multimodal_model_load.fetch_content_sample')
     def test_infer_modality_url_without_extension(self, mock_fetch, mock_validate):
         mock_validate.return_value = True
         mock_sample = MagicMock()

@@ -8,15 +8,13 @@ import math
 import tempfile
 import os
 import subprocess
-from urllib.parse import urlparse
 from typing import List, Dict
 import time
 import ffmpeg
 
-from torchvision.transforms import Compose
 from marqo.core.models.marqo_index import *
-from marqo.s2_inference.s2_inference import  Modality
-from marqo.s2_inference.s2_inference import Preprocessors
+from marqo.s2_inference.multimodal_model_load import Modality
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 class StreamingMediaProcessor:

@@ -25,12 +25,11 @@ from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.types import *
-from marqo.s2_inference.multimodal_utils import *
+from marqo.s2_inference.multimodal_model_load import *
 from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
-from marqo.tensor_search.models.preprocessors_model import Preprocessors
     
 logger = get_logger(__name__)
 
