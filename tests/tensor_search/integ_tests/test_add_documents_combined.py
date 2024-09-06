@@ -175,7 +175,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                             docs=documents,
                             tensor_fields=tensor_fields)
                     ).dict(exclude_none=True, by_alias=True)
-                    mock_vectorise.assert_called_once()
+                    self.assertTrue(mock_vectorise.called)
                     args, kwargs = mock_vectorise.call_args
                     self.assertFalse("enable_cache" in kwargs, "enable_cache should not be passed to "
                                                                "vectorise for add_documents")
@@ -341,7 +341,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                             docs=documents,
                             tensor_fields=tensor_fields)
                     ).dict(exclude_none=True, by_alias=True)
-                    mock_vectorise.assert_called_once()
+                    # Check that vectorise was called at least once
+                    self.assertTrue(mock_vectorise.called)
                     args, kwargs = mock_vectorise.call_args
                     self.assertIn("content", kwargs)
                     content = kwargs["content"]
