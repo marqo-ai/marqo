@@ -53,7 +53,7 @@ class MultimodalModel:
         self.properties = MultimodalModelProperties(**model_properties)
         self.device = device
         self.model = None 
-        self.encoder = None 
+        self.encoder = None
 
     def _load_multimodal_model(self):
         if self.properties.loader == "languagebind":

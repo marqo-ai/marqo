@@ -36,10 +36,18 @@ class TestAddDocumentsCombined(MarqoTestCase):
             fields=[
                 FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
                 FieldRequest(name="text_field_1", type=FieldType.Text,
-                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch])
+                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
+                FieldRequest(
+                    name="multimodal_field", 
+                    type=FieldType.MultimodalCombination,
+                    dependent_fields={
+                        "image_field_1": 1.0,
+                        "text_field_1": 0.0
+                    }
+                )
             ],
             model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
-            tensor_fields=["image_field_1", "text_field_1"]
+            tensor_fields=["image_field_1", "text_field_1", "multimodal_field"]
         )
 
         structured_languagebind_index_request = cls.structured_marqo_index_request(
@@ -270,6 +278,16 @@ class TestAddDocumentsCombined(MarqoTestCase):
             )
 
             print(res)
+
+            doc = tensor_search.get_documents_by_ids(
+                config=self.config,
+                index_name=index_name,
+                document_ids=["1_multimodal"],
+                show_vectors=True
+            ).dict(exclude_none=True, by_alias=True)
+
+            print(doc)
+
             for item in res.dict(exclude_none=True, by_alias=True)['items']:
                 self.assertEqual(200, item['status'])
 
@@ -395,6 +413,64 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 for i, expected_value in enumerate(expected_vector):
                     self.assertAlmostEqual(actual_vector[i], expected_value, places=5)
 
+    def test_multimodal_image_url_is_embedded_as_image_not_text(self):
+        """
+        Ensure that the image URL in a multimodal field is embedded as an image and not as text
+        """
+        docs = [
+            {
+                "_id": "1",
+                "text_field_1": "This text should be ignored",
+                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            }
+        ]
+
+        # Expected vector for the LanguageBind model (adjust these values based on actual output)
+        expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
+                           -0.032505638897418976, -0.06116769462823868, -0.03929287940263748]
+
+        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
+            with self.subTest(index_name):
+                # For unstructured index, we need to define the multimodal field and its weights
+                if "unstructured" in index_name:
+                    tensor_fields = ["multimodal_field"]
+                    mappings = {
+                        "multimodal_field": {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "text_field_1": 0.0,
+                                "image_field_1": 1.0,  # Only consider the image
+                            }
+                        }
+                    }
+                else:
+                    tensor_fields = None
+                    mappings = None
+
+                res = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=docs,
+                        tensor_fields=tensor_fields,
+                        mappings=mappings
+                    )
+                )
+
+                doc = tensor_search.get_documents_by_ids(
+                    config=self.config,
+                    index_name=index_name,
+                    document_ids=["1"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)
+
+                # Get the actual vector
+                actual_vector = doc['results'][0]['_tensor_facets'][0]['_embedding']
+
+                # Assert that the vector is similar to expected_vector
+                for i, expected_value in enumerate(expected_vector):
+                    self.assertAlmostEqual(actual_vector[i], expected_value, places=4,
+                                        msg=f"Mismatch at index {i} for {index_name}")
 
     def test_imageDownloadWithoutPreprocessor(self):
         media_repo = dict()

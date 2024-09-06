@@ -2499,7 +2499,6 @@ def vectorise_multimodal_combination_field_structured(
                 for video_chunks_list in video_content_to_vectorise:
                     video_vectors = []
                     for video_chunk in video_chunks_list:
-                        print(f"video_chunk: {video_chunk}")
                         video_vector = s2_inference.vectorise(
                             model_name=marqo_index.model.name,
                             model_properties=marqo_index.model.properties, content=[video_chunk],
