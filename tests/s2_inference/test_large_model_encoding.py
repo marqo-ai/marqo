@@ -132,7 +132,11 @@ class TestLargeClipModels(unittest.TestCase):
             'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg',
             'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
             'open_clip/ViT-H-14-378-quickgelu/dfn5b',
-            'open_clip/ViT-SO400M-14-SigLIP-384/webli'
+            'open_clip/ViT-SO400M-14-SigLIP-384/webli',
+            "visheratin/nllb-siglip-mrl-large",
+            "visheratin/nllb-clip-large-siglip",
+            "visheratin/nllb-siglip-mrl-base",
+            "visheratin/nllb-clip-base-siglip"
         ]
 
     def tearDown(self):
@@ -158,27 +162,31 @@ class TestLargeClipModels(unittest.TestCase):
         texts = ['hello', 'big', 'asasasasaaaaaaaaaaaa', '', 'a word. another one!?. #$#.']
 
         for name in self.models:
-            model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
+            with self.subTest(f"Testing model: {name}"):
+                model = _load_model(name, model_properties=get_model_properties_from_registry(name), device=device)
 
-            for text in texts:
-                assert abs(model.encode(text) - model.encode([text])).sum() < eps
-                assert abs(model.encode_text(text) - model.encode([text])).sum() < eps
-                assert abs(model.encode(text) - model.encode_text([text])).sum() < eps
+                for text in texts:
+                    assert abs(model.encode(text) - model.encode([text])).sum() < eps
+                    assert abs(model.encode_text(text) - model.encode([text])).sum() < eps
+                    assert abs(model.encode(text) - model.encode_text([text])).sum() < eps
 
-            del model
-            clear_loaded_models()
+                del model
+                clear_loaded_models()
 
     def test_model_outputs(self):
         for model_name in self.models:
-            run_test_model_outputs([model_name])
+            with self.subTest(f"Testing model: {model_name}"):
+                run_test_model_outputs([model_name])
 
     def test_model_normalization(self):
         for model_name in self.models:
-            run_test_model_normalization([model_name])
+            with self.subTest(f"Testing model: {model_name}"):
+                run_test_model_normalization([model_name])
 
     def test_cuda_encode_type(self):
         for model_name in self.models:
-            run_test_cuda_encode_type([model_name])
+            with self.subTest(f"Testing model: {model_name}"):
+                run_test_cuda_encode_type([model_name])
 
     @patch("torch.cuda.amp.autocast")
     def test_autocast_called_in_open_clip(self, mock_autocast):
@@ -186,10 +194,11 @@ class TestLargeClipModels(unittest.TestCase):
         contents = ['this is a test sentence. so is this.',
                     "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
         for model_name in names:
-            for content in contents:
-                vectorise(model_name=model_name, content=content, device="cuda")
-                mock_autocast.assert_called_once()
-                mock_autocast.reset_mock()
+            with self.subTest(f"Testing model: {model_name}"):
+                for content in contents:
+                    vectorise(model_name=model_name, content=content, device="cuda")
+                    mock_autocast.assert_called_once()
+                    mock_autocast.reset_mock()
 
 
 

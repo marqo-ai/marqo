@@ -475,6 +475,56 @@ def _get_open_clip_properties() -> Dict:
             "note": "open_clip model: ViT-B-32-256/datacomp_s34b_b86k",
             "type": "open_clip",
             "pretrained": "datacomp_s34b_b86k"
+        },
+        "Marqo/marqo-fashionCLIP": {
+            "name": "hf-hub:Marqo/marqo-fashionCLIP",
+            "dimensions": 512,
+            "note": "Marqo's fashionCLIP model",
+            "type": "open_clip"
+        },
+        "Marqo/marqo-fashionSigLIP": {
+            "name": "hf-hub:Marqo/marqo-fashionSigLIP",
+            "dimensions": 768,
+            "note": "Marqo's fashionSigLIP model",
+            "type": "open_clip"
+        },
+        "open_clip/MobileCLIP-B/datacompdr_lt":{
+            "name": "open_clip/MobileCLIP-B/datacompdr_lt",
+            "dimensions": 512,
+            "note": "MobileCLIP model",
+            "type": "open_clip",
+            "pretrained": "datacompdr_lt"
+        },
+        "open_clip/MobileCLIP-S1/datacompdr": {
+            "name": "open_clip/MobileCLIP-S1/datacompdr",
+            "dimensions": 512,
+            "note": "MobileCLIP model",
+            "type": "open_clip",
+            "pretrained": "datacompdr"
+        },
+        "visheratin/nllb-clip-base-siglip": {
+            "name": "hf-hub:visheratin/nllb-clip-base-siglip",
+            "dimensions": 768,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
+        },
+        "visheratin/nllb-siglip-mrl-base": {
+            "name": "hf-hub:visheratin/nllb-siglip-mrl-base",
+            "dimensions": 768,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
+        },
+        "visheratin/nllb-clip-large-siglip": {
+            "name": "hf-hub:visheratin/nllb-clip-large-siglip",
+            "dimensions": 1152,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
+        },
+        "visheratin/nllb-siglip-mrl-large": {
+            "name": "hf-hub:visheratin/nllb-siglip-mrl-large",
+            "dimensions": 1152,
+            "note": "A multilingual CLIP model",
+            "type": "open_clip"
         }
     }
     return OPEN_CLIP_MODEL_PROPERTIES
