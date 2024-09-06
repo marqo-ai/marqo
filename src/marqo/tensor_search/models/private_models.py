@@ -7,8 +7,10 @@ from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
 from pydantic import BaseModel, validator
 from marqo.api.exceptions import InvalidArgError
 from typing import Optional
+from pydantic import Field
+from marqo.base_model import ImmutableBaseModel
 
-class ModelAuth(BaseModel):
+class ModelAuth(ImmutableBaseModel):
     """TODO: insert links to docs in error message"""
     class Config:
         allow_mutation = False
@@ -33,14 +35,14 @@ class ModelAuth(BaseModel):
         return v
 
 
-class ModelLocation(BaseModel):
+class ModelLocation(ImmutableBaseModel):
 
     class Config:
         allow_mutation = False
 
     s3: Optional[S3Location] = None
     hf: Optional[HfModelLocation] = None
-    auth_required: bool = False
+    auth_required: bool = Field(default=False, alias="authRequired")
 
     @validator('s3', 'hf', pre=True, always=True)
     def _ensure_exactly_one_location(cls, v, values, field):
