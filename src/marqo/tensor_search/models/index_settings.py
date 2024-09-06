@@ -53,6 +53,31 @@ class IndexSettings(StrictBaseModel):
         )
     )
     
+    @root_validator
+    def validate_url_pointer_treatment(cls, values):
+        treat_as_images = values.get('treatUrlsAndPointersAsImages')
+        treat_as_media = values.get('treatUrlsAndPointersAsMedia')
+
+        if treat_as_images is None:
+            treat_as_images = False
+        if treat_as_media is None:
+            treat_as_media = False
+
+        if treat_as_images and not treat_as_media:
+            # Deprecation warning
+            import warnings
+            warnings.warn("'treatUrlsAndPointersAsImages' is deprecated. Use 'treatUrlsAndPointersAsMedia' instead.", DeprecationWarning)
+
+        if not treat_as_images and treat_as_media:
+            raise api_exceptions.InvalidArgError(
+                "Invalid combination: 'treatUrlsAndPointersAsImages' cannot be False when 'treatUrlsAndPointersAsMedia' is True."
+            )
+
+        # If treatUrlsAndPointersAsMedia is True, ensure treatUrlsAndPointersAsImages is also True
+        if treat_as_media:
+            values['treatUrlsAndPointersAsImages'] = True
+
+        return values
 
     @root_validator(pre=True)
     def validate_field_names(cls, values):

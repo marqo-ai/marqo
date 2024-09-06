@@ -34,6 +34,7 @@ import copy
 import json
 import typing
 import uuid
+import os
 from collections import defaultdict
 from contextlib import ExitStack
 from timeit import default_timer as timer
@@ -78,6 +79,8 @@ from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
     Device, TensorField, SearchMethod, EnvVars
 )
+from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
@@ -152,7 +155,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
-    media_download_thread_count = add_docs_params.image_download_thread_count
+    media_download_thread_count = _determine_thread_count(marqo_index, add_docs_params)
+    print(f"media_download_thread_count unstruct: {media_download_thread_count}")
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media: # review this logic
@@ -632,7 +636,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
     # Check if model is Video/Audio. If so, manually set thread_count to 5
-    media_download_thread_count = add_docs_params.image_download_thread_count
+    media_download_thread_count = _determine_thread_count(marqo_index, add_docs_params)
+    print(f"media_download_thread_count struct: {media_download_thread_count}")
 
     with ExitStack() as exit_stack:
         media_fields = [
@@ -1133,6 +1138,33 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
             add_docs_processing_time_ms=(t1 - t0) * 1000
         )
         return marqo_add_documents_response
+
+
+def _determine_thread_count(marqo_index, add_docs_params):
+    model_properties = marqo_index.model.get_properties()
+    is_languagebind_model = model_properties.get('type') == 'languagebind'
+
+    default_thread_count = read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+
+    # Check if media_download_thread_count is set in params
+    if add_docs_params.media_download_thread_count is not None:
+        return add_docs_params.media_download_thread_count
+
+    # Check if image_download_thread_count is explicitly set in params
+    if add_docs_params.image_download_thread_count != default_thread_count:
+        return add_docs_params.image_download_thread_count
+
+    # Check if environment variable is explicitly set
+    env_thread_count = os.environ.get(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+    if env_thread_count is not None and int(env_thread_count) != default_thread_count:
+        return int(env_thread_count)
+
+    # If it's a LanguageBind model and no explicit setting, use 5
+    if is_languagebind_model:
+        return 5
+
+    # Default case
+    return default_thread_count
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
