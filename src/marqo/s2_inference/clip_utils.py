@@ -767,7 +767,7 @@ class OPEN_CLIP(AbstractCLIPModel):
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
-                with torch.cuda.amp.autocast():
+                with torch.autocast("cuda"):
                     outputs = self.model.encode_text(text).to(torch.float32)
             else:
                 outputs = self.model.encode_text(text).to(torch.float32)
