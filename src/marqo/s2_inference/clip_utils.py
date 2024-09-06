@@ -765,6 +765,7 @@ class OPEN_CLIP(AbstractCLIPModel):
         text = self.tokenizer(sentence).to(self.device)
         print(text)
 
+        print(type(text))
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.autocast("cuda"):
