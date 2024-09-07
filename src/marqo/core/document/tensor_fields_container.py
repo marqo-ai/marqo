@@ -1,6 +1,5 @@
 import json
-from functools import cached_property
-from typing import List, Dict, Set, Optional, Any, Generator, Union, Tuple, Protocol, cast
+from typing import List, Dict, Set, Optional, Any, Generator, Tuple, Protocol, cast
 
 import numpy as np
 from pydantic.main import BaseModel
@@ -8,8 +7,6 @@ from pydantic.main import BaseModel
 from marqo.core import constants
 from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
-from marqo.s2_inference.clip_utils import _is_image
-from marqo.tensor_search import enums
 
 
 class Chunker(Protocol):
@@ -100,6 +97,9 @@ class MultiModalTensorFieldContent(TensorFieldContent):
 
     @property
     def tensor_field_chunks(self):
+        if not self.subfields:
+            return []
+
         subfield_chunks = {subfield: self.subfields[subfield].sub_field_chunk for subfield in self.weights.keys()
                            if subfield in self.subfields}
         return [json.dumps(subfield_chunks)]
@@ -123,26 +123,18 @@ class MultiModalTensorFieldContent(TensorFieldContent):
 
 class TensorFieldsContainer:
 
-    def __init__(self, tensor_fields: List[str], mappings: dict, treat_url_as_media: bool = False):
+    def __init__(self, tensor_fields: List[str], custom_vector_fields: List[str], multimodal_combo_fields: dict):
         self._tensor_field_map: Dict[str, Dict[str, TensorFieldContent]] = dict()
         self._tensor_fields = set(tensor_fields)
-        self._custom_tensor_fields: Set[str] = set()
-        self._multimodal_combo_fields = dict()
-        self._multimodal_sub_fields = set()
+        self._custom_tensor_fields: Set[str] = set(custom_vector_fields)
+        self._multimodal_combo_fields = multimodal_combo_fields
         self._multimodal_sub_field_reverse_map: Dict[str, Set[str]] = dict()
-        self._treat_url_as_media = treat_url_as_media
 
-        for field_name, mapping in mappings.items():
-            field_type = mapping.get("type", None)
-            if field_type == enums.MappingsObjectType.custom_vector:
-                self._custom_tensor_fields.add(field_name)
-            elif field_type == enums.MappingsObjectType.multimodal_combination:
-                self._multimodal_combo_fields[field_name] = mapping
-                for sub_field in mapping["weights"].keys():
-                    self._multimodal_sub_fields.add(sub_field)
-                    if sub_field not in self._multimodal_sub_field_reverse_map:
-                        self._multimodal_sub_field_reverse_map[sub_field] = set()
-                    self._multimodal_sub_field_reverse_map[sub_field].add(field_name)
+        for field_name, weights in self._multimodal_combo_fields.items():
+            for sub_field in weights.keys():
+                if sub_field not in self._multimodal_sub_field_reverse_map:
+                    self._multimodal_sub_field_reverse_map[sub_field] = set()
+                self._multimodal_sub_field_reverse_map[sub_field].add(field_name)
 
     def is_custom_tensor_field(self, field_name: str) -> bool:
         return field_name in self._custom_tensor_fields
@@ -154,7 +146,7 @@ class TensorFieldsContainer:
         return self._multimodal_combo_fields.get(field_name, None)
 
     def get_multimodal_sub_fields(self) -> Set[str]:
-        return self._multimodal_sub_fields
+        return set(self._multimodal_sub_field_reverse_map.keys())
 
     def remove_doc(self, doc_id: str):
         if doc_id in self._tensor_field_map:
@@ -191,7 +183,7 @@ class TensorFieldsContainer:
 
     def get_tensor_field_content(self, doc_id: str) -> Dict[str, TensorFieldContent]:
         return {field_name: content for field_name, content in self._tensor_field_map.get(doc_id, dict()).items()
-                if content.is_tensor_field}
+                if content.is_tensor_field and content.tensor_field_chunks}
 
     def populate_tensor_from_existing_doc(self, doc_id: str, existing_marqo_doc: Dict[str, Any],
                                           existing_multimodal_mappings: dict) -> None:
@@ -235,8 +227,8 @@ class TensorFieldsContainer:
             tensor_content.chunks = existing_tensor[constants.MARQO_DOC_CHUNKS]
             tensor_content.embeddings = existing_tensor[constants.MARQO_DOC_EMBEDDINGS]
 
-    def collect(self, doc_id: str, field_name: str, field_content: Any) -> Any:
-        if field_name not in self._tensor_fields and field_name not in self._multimodal_sub_fields:
+    def collect(self, doc_id: str, field_name: str, field_content: Any, text_field_type: FieldType) -> Any:
+        if field_name not in self._tensor_fields and field_name not in self._multimodal_sub_field_reverse_map:
             # not tensor fields, no need to collect
             return field_content
 
@@ -266,27 +258,20 @@ class TensorFieldsContainer:
         self.add_tensor_field_content(
             doc_id, field_name, TensorFieldContent(
                 field_content=field_content,
-                field_type=self._infer_field_type(field_content),
+                field_type=text_field_type,
                 is_tensor_field=field_name in self._tensor_fields,
-                is_multimodal_subfield=field_name in self._multimodal_sub_fields
+                is_multimodal_subfield=field_name in self._multimodal_sub_field_reverse_map
             )
         )
         return field_content
 
-    # TODO this logic is unstructured only. We need to extract out
-    def _infer_field_type(self, field_content: str):
-        if self._treat_url_as_media and _is_image(field_content):
-            return FieldType.ImagePointer
-
-        return FieldType.Text
-
     def collect_multi_modal_fields(self, doc_id: str, normalize_embeddings: bool):
-        for field_name, mapping in self._multimodal_combo_fields.items():
+        for field_name, weights in self._multimodal_combo_fields.items():
             self.add_tensor_field_content(doc_id, field_name, MultiModalTensorFieldContent(
-                weights=mapping['weights'], field_content='', field_type=FieldType.MultimodalCombination,
-                subfields={subfield: self._tensor_field_map[doc_id][subfield] for subfield in mapping['weights'].keys()
+                weights=weights, field_content='', field_type=FieldType.MultimodalCombination,
+                subfields={subfield: self._tensor_field_map[doc_id][subfield] for subfield in weights.keys()
                            if doc_id in self._tensor_field_map and subfield in self._tensor_field_map[doc_id]},
                 is_tensor_field=True, is_multimodal_subfield=False, normalize_embeddings=normalize_embeddings
             ))
-            yield field_name, mapping
+            yield field_name, weights
 

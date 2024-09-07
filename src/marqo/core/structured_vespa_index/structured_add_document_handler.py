@@ -1,4 +1,3 @@
-import json
 from typing import Dict, Any
 
 from marqo.api import exceptions as api_errors
@@ -10,7 +9,6 @@ from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
-from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search import validation
 from marqo.vespa.models import VespaDocument
@@ -25,10 +23,21 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
         self.vespa_index = StructuredVespaIndex(marqo_index)
 
     def _create_tensor_fields_container(self) -> TensorFieldsContainer:
-        # TODO change this
+        multimodal_combo_fields = {field.name: field.dependent_fields for field in
+                                   self.marqo_index.field_map_by_type[FieldType.MultimodalCombination]}
+
+        if self.add_docs_params.mappings:
+            # weights in mappings can override weights defined in the index
+            # TODO verify if this logic is correct
+            for field_name, mapping in self.add_docs_params.mappings.items():
+                if (mapping.get("type", None) == FieldType.MultimodalCombination
+                        and field_name in multimodal_combo_fields):
+                    multimodal_combo_fields[field_name] = mapping['weights']
+
         return TensorFieldsContainer(
-            list(self.marqo_index.tensor_field_map.keys()),
-            self.add_docs_params.mappings or dict()
+            tensor_fields=list(self.marqo_index.tensor_field_map.keys()),
+            custom_vector_fields=[field.name for field in self.marqo_index.field_map_by_type[FieldType.CustomVector]],
+            multimodal_combo_fields=multimodal_combo_fields,
         )
 
     def _validate_add_docs_params(self, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
@@ -43,7 +52,8 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
-        content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name, field_content)
+        field_type = self.marqo_index.field_map[field_name].type
+        content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name, field_content, field_type)
         marqo_doc[field_name] = content
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
@@ -82,12 +92,12 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
         doc_id = marqo_doc[MARQO_DOC_ID]
-        for field_name, mapping in self.tensor_fields_container.collect_multi_modal_fields(
+        for field_name, weights in self.tensor_fields_container.collect_multi_modal_fields(
                 doc_id, self.marqo_index.normalize_embeddings):
-
-            if MARQO_DOC_MULTIMODAL_PARAMS not in marqo_doc:
-                marqo_doc[MARQO_DOC_MULTIMODAL_PARAMS] = dict()
-            marqo_doc[MARQO_DOC_MULTIMODAL_PARAMS][field_name] = json.dumps(mapping)
+            # Structured index stores the weights in the multimodal fields only if the weights differs from
+            # the weights defined in the index field definition
+            if self.marqo_index.field_map.get(field_name).dependent_fields != weights:
+                marqo_doc[field_name] = weights
 
     def handle_existing_tensors(self, existing_vespa_docs: Dict[str, Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
@@ -95,7 +105,10 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
 
         for doc_id, vespa_doc in existing_vespa_docs.items():
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
-            existing_multimodal_mappings = existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, dict())
+            existing_multimodal_mappings = {
+                field.name: existing_marqo_doc.get(field.name, field.dependent_fields)
+                for field in self.marqo_index.field_map_by_type[FieldType.MultimodalCombination]
+            }
             self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc,
                                                                            existing_multimodal_mappings)
 
@@ -104,8 +117,8 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
         processed_tensor_fields = dict()
         for field_name, tensor_field_content in doc_tensor_fields.items():
             processed_tensor_fields[field_name] = {
-                constants.MARQO_DOC_CHUNKS: tensor_field_content.chunks,
-                constants.MARQO_DOC_EMBEDDINGS: tensor_field_content.embeddings,
+                constants.MARQO_DOC_CHUNKS: tensor_field_content.tensor_field_chunks,
+                constants.MARQO_DOC_EMBEDDINGS: tensor_field_content.tensor_field_embeddings,
             }
         if processed_tensor_fields:
             doc[constants.MARQO_DOC_TENSORS] = processed_tensor_fields

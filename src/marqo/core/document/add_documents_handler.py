@@ -12,7 +12,7 @@ from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import Chunker, Vectoriser, TensorFieldsContainer
-from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError
+from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
@@ -284,7 +284,13 @@ class AddDocumentsHandler(ABC):
         return vectorise
 
     def persist_to_vespa(self) -> None:
-        vespa_docs = [self.to_vespa_doc(doc) for doc in self.add_docs_response_collector.marqo_docs.values()]
+        vespa_docs = []
+        for doc_id, doc in self.add_docs_response_collector.marqo_docs.copy().items():
+            try:
+                vespa_docs.append(self.to_vespa_doc(doc))
+            except MarqoDocumentParsingError as e:
+                self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(e.message))
+
         index_responses = self.config.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
         for resp in index_responses.responses:

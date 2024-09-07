@@ -50,6 +50,7 @@ from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 from marqo.core.semi_structured_vespa_index.field_request_collector import FieldRequestCollector
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
+from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -125,7 +126,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
     elif isinstance(marqo_index, SemiStructuredMarqoIndex):
         return _add_documents_semi_structured(config, add_docs_params, marqo_index)
     elif isinstance(marqo_index, StructuredMarqoIndex):
-        return _add_documents_structured(config, add_docs_params, marqo_index)
+        # return _add_documents_structured(config, add_docs_params, marqo_index)
+        return StructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
     else:
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
