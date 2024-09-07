@@ -9,10 +9,12 @@ from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
-# TODO deps to tensor_search needs to be removed
-from marqo.tensor_search import validation
+
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.get_document_response import Document
+
+# TODO deps to tensor_search needs to be removed
+from marqo.tensor_search import validation
 
 
 class StructuredAddDocumentsHandler(AddDocumentsHandler):
@@ -105,12 +107,12 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
 
         for doc_id, vespa_doc in existing_vespa_docs.items():
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
-            existing_multimodal_mappings = {
+            existing_multimodal_weights = {
                 field.name: existing_marqo_doc.get(field.name, field.dependent_fields)
                 for field in self.marqo_index.field_map_by_type[FieldType.MultimodalCombination]
             }
             self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc,
-                                                                           existing_multimodal_mappings)
+                                                                           existing_multimodal_weights)
 
     def to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])

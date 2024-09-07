@@ -186,7 +186,7 @@ class TensorFieldsContainer:
                 if content.is_tensor_field and content.tensor_field_chunks}
 
     def populate_tensor_from_existing_doc(self, doc_id: str, existing_marqo_doc: Dict[str, Any],
-                                          existing_multimodal_mappings: dict) -> None:
+                                          existing_multimodal_weights: Dict[str, Dict[str, float]]) -> None:
         if doc_id not in self._tensor_field_map:
             return
         doc = self._tensor_field_map[doc_id]
@@ -200,13 +200,13 @@ class TensorFieldsContainer:
                 # This is a new field added to the doc, we need to vectorise it
                 continue
 
-            if field_name in existing_multimodal_mappings:
+            if field_name in existing_multimodal_weights:
                 if tensor_content.field_type != FieldType.MultimodalCombination:
                     # Field with the same name is not a multimodal field in this batch
                     continue
 
                 weights = cast(MultiModalTensorFieldContent, tensor_content).weights
-                if existing_multimodal_mappings[field_name]['weight'] != weights:
+                if existing_multimodal_weights[field_name] != weights:
                     # mapping config is different, need to re-vectorise
                     continue
 
@@ -268,10 +268,14 @@ class TensorFieldsContainer:
     def collect_multi_modal_fields(self, doc_id: str, normalize_embeddings: bool):
         for field_name, weights in self._multimodal_combo_fields.items():
             self.add_tensor_field_content(doc_id, field_name, MultiModalTensorFieldContent(
-                weights=weights, field_content='', field_type=FieldType.MultimodalCombination,
+                weights=weights,
+                field_content='',
+                field_type=FieldType.MultimodalCombination,
                 subfields={subfield: self._tensor_field_map[doc_id][subfield] for subfield in weights.keys()
                            if doc_id in self._tensor_field_map and subfield in self._tensor_field_map[doc_id]},
-                is_tensor_field=True, is_multimodal_subfield=False, normalize_embeddings=normalize_embeddings
+                is_tensor_field=True,
+                is_multimodal_subfield=False,
+                normalize_embeddings=normalize_embeddings
             ))
             yield field_name, weights
 

@@ -18,12 +18,14 @@ from marqo.core.unstructured_vespa_index.unstructured_validation import validate
     validate_mappings_object_format, validate_coupling_of_mappings_and_doc
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.s2_inference.clip_utils import _is_image
+
+from marqo.vespa.models import VespaDocument
+from marqo.vespa.models.get_document_response import Document
+
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search.constants import ALLOWED_UNSTRUCTURED_FIELD_TYPES
 from marqo.tensor_search.validation import list_types_valid, validate_custom_vector, \
     validate_multimodal_combination, validate_map_numeric_field
-from marqo.vespa.models import VespaDocument
-from marqo.vespa.models.get_document_response import Document
 
 
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
@@ -133,9 +135,12 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
         for doc_id, vespa_doc in existing_vespa_docs.items():
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
-            existing_multimodal_mappings = existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, dict())
+            existing_multimodal_weights = {
+                field_name: mapping['weights']
+                for field_name, mapping in existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, dict())
+            }
             self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc,
-                                                                           existing_multimodal_mappings)
+                                                                           existing_multimodal_weights)
 
     def to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         all_chunks = []
