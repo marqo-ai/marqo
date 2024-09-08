@@ -391,7 +391,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                         image_data = media_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not process the image file found at `{field_content}`. \n"
+                                            f"Could not process the media file found at `{field_content}`. \n"
                                             f"Reason: {str(media_repo[field_content])}"
                                         )
                                 else:
@@ -904,7 +904,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                         image_data = media_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not process the image file found at `{field_content}`. \n"
+                                            f"Could not process the media file found at `{field_content}`. \n"
                                             f"Reason: {str(media_repo[field_content])}"
                                         )
                                 else:
