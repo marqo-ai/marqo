@@ -1145,23 +1145,24 @@ def _determine_thread_count(marqo_index, add_docs_params):
 
     default_image_thread_count = 20
     default_media_thread_count = 5
-    # Check if media_download_thread_count is set in params
-    if add_docs_params.media_download_thread_count != default_media_thread_count:
-        return add_docs_params.media_download_thread_count
 
     # Check if image_download_thread_count is explicitly set in params
     if add_docs_params.image_download_thread_count != default_image_thread_count:
         return add_docs_params.image_download_thread_count
+    
+    # Check if media_download_thread_count is set in params
+    if add_docs_params.media_download_thread_count != default_media_thread_count:
+        return add_docs_params.media_download_thread_count
 
+    env_media_thread_count = os.environ.get(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+    if env_media_thread_count is not None and int(env_media_thread_count) != default_media_thread_count:
+        return int(env_media_thread_count)
+    
     # Check if environment variable is explicitly set
     env_image_thread_count = os.environ.get(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
     if env_image_thread_count is not None and int(env_image_thread_count) != default_image_thread_count:
         return int(env_image_thread_count)
     
-    env_media_thread_count = os.environ.get(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
-    if env_media_thread_count is not None and int(env_media_thread_count) != default_media_thread_count:
-        return int(env_media_thread_count)
-
     # If it's a LanguageBind model and no explicit setting, use 5
     if is_languagebind_model:
         return 5
