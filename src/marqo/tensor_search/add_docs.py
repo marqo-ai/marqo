@@ -186,10 +186,7 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     marqo_index: Optional[MarqoIndex] = None,
                                     force_download: bool = False
                                     ) -> ContextManager[dict]:
-    
-    # Check if model is Video/Audio. If so, manually set thread_count to 5
-    #if model_properties.get('type') in [ModelType.LanguageBind]:
-    #    thread_count = 5
+
     media_repo = {}  # for image/video/audio
     media_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
                                     model_name, normalize_embeddings, force_download,
