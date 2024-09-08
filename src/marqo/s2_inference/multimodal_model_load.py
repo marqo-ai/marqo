@@ -17,7 +17,7 @@ import torch
 
 from marqo.s2_inference.multimodal_model_load import *
 from marqo.s2_inference.languagebind import (
-    LanguageBind, 
+    LanguageBind,
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
     to_device
 )
@@ -28,12 +28,12 @@ from marqo.s2_inference.languagebind.audio.tokenization_audio import LanguageBin
 from marqo.s2_inference.configs import ModelCache
 
 
-
 class Modality(str, Enum):
     TEXT = "language"
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+
 
 class MultimodalModelProperties(BaseModel):
     name: str
@@ -41,31 +41,32 @@ class MultimodalModelProperties(BaseModel):
     supported_modalities: List[Modality]
     dimensions: int
     type: str = "multimodal"
-    video_chunk_length: int # in seconds
-    audio_chunk_length: int # in seconds
+    video_chunk_length: int  # in seconds
+    audio_chunk_length: int  # in seconds
+
 
 class MultimodalModel:
     def __init__(self, model_name: str, model_properties: Dict[str, Any], device: str):
         self.model_name = model_name
         self.properties = MultimodalModelProperties(**model_properties)
         self.device = device
-        self.model = None 
+        self.model = None
         self.encoder = None
 
     def _load_multimodal_model(self):
         if self.properties.loader == "languagebind":
             model = self._load_languagebind_model()
             return model
-            
+
         elif self.properties.loader == "imagebind":
             # Load ImageBind model
             pass
         else:
             raise ValueError(f"Unsupported loader: {self.properties.loader}")
-        
+
     def _load_languagebind_model(self):
         if self.model_name == "LanguageBind/Video_V1.5_FT_Audio_FT_Image":
-            self.clip_type = { 
+            self.clip_type = {
                 'video': 'LanguageBind_Video_V1.5_FT',
                 'audio': 'LanguageBind_Audio_FT',
                 'image': 'LanguageBind_Image',
@@ -93,7 +94,7 @@ class MultimodalModel:
         model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path).to(self.device)
         model.eval()
         return model
-        
+
     def preprocessor(self, modality):
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
@@ -103,12 +104,13 @@ class MultimodalModel:
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
         return self.encoder.encode(content, modality, **kwargs)
-    
+
 
 class ModelEncoder(ABC):
     @abstractmethod
     def encode(self, content, modality, **kwargs):
         pass
+
 
 class DefaultEncoder(ModelEncoder):
     def __init__(self, model):
@@ -116,6 +118,7 @@ class DefaultEncoder(ModelEncoder):
 
     def encode(self, content, modality, **kwargs):
         return self.model.encode(content)
+
 
 @contextmanager
 def fetch_content_sample(url, sample_size=10240):  # 10 KB
@@ -132,6 +135,7 @@ def fetch_content_sample(url, sample_size=10240):  # 10 KB
         buffer.close()
         response.close()
 
+
 def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     """
     Infer the modality of the content. Video, audio, image or text.
@@ -139,7 +143,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
         if not validators.url(content):
             return Modality.TEXT
-        
+
         extension = content.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif']:
             return Modality.IMAGE
@@ -147,7 +151,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.VIDEO
         elif extension in ['mp3', 'wav', 'ogg']:
             return Modality.AUDIO
-        
+
         if validate_url(content):
             # Use context manager to handle content sample
             try:
@@ -161,9 +165,9 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
                         return Modality.AUDIO
             except Exception as e:
                 pass
-        
+
         return Modality.TEXT
-    
+
     elif isinstance(content, bytes):
         # Use python-magic for byte content
         mime = magic.from_buffer(content, mime=True)
@@ -175,13 +179,14 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.AUDIO
         else:
             return Modality.TEXT
-        
+
     else:
         return Modality.TEXT
-        #raise ValueError(f"Unsupported content type: {type(content)}. 
+        # raise ValueError(f"Unsupported content type: {type(content)}.
         # It is neither a string, list of strings, nor bytes.")
 
-class LanguageBindEncoder(ModelEncoder):    
+
+class LanguageBindEncoder(ModelEncoder):
     def __init__(self, model: MultimodalModel):
         self.model = model
         self.tokenizer = self._get_tokenizer()
@@ -196,25 +201,28 @@ class LanguageBindEncoder(ModelEncoder):
             if os.path.exists(temp_file.name):
                 os.unlink(temp_file.name)
 
-    def _get_tokenizer(self): # this is used for text only
+    def _get_tokenizer(self):  # this is used for text only
         if 'image' in self.model.clip_type:
             pretrained_ckpt = 'LanguageBind/LanguageBind_Image'
-            return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
+            return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt,
+                                                              cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
         else:
             first_model = next(iter(self.model.clip_type.values()))
             pretrained_ckpt = f'LanguageBind/{first_model}'
             if "video" in first_model.lower():
-                return LanguageBindVideoTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
+                return LanguageBindVideoTokenizer.from_pretrained(pretrained_ckpt,
+                                                                  cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
             else:
-                return LanguageBindAudioTokenizer.from_pretrained(pretrained_ckpt, cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
-        
+                return LanguageBindAudioTokenizer.from_pretrained(pretrained_ckpt,
+                                                                  cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
+
     def _normalize(self, outputs):
         return outputs / outputs.norm(dim=-1, keepdim=True)
 
     def preprocessor(self, modality):
         if not hasattr(self, '_preprocessors'):
             self._preprocessors = {}
-        
+
         if modality not in self._preprocessors:
             preprocessors = {
                 Modality.VIDEO: LanguageBindVideoProcessor,
@@ -223,12 +231,12 @@ class LanguageBindEncoder(ModelEncoder):
             }
             if modality in self.model.clip_type:
                 self._preprocessors[modality] = preprocessors[modality](self.model.model.modality_config[modality])
-        
+
         return self._preprocessors.get(modality)
-    
+
     def encode(self, content, modality, normalize=True, **kwargs):
         inputs = {}
-        
+
         if modality == Modality.TEXT:
             inputs[Modality.TEXT] = to_device(
                 self.tokenizer(content, max_length=77, padding='max_length', truncation=True, return_tensors='pt'),
@@ -247,7 +255,7 @@ class LanguageBindEncoder(ModelEncoder):
                     self._download_content(content, temp_filename)
                 else:
                     return self.encode([content], modality=Modality.TEXT)
-                
+
                 preprocessed_image = self.preprocessor(Modality.IMAGE)([temp_filename], return_tensors='pt')
                 inputs['image'] = to_device(preprocessed_image, self.model.device)['pixel_values']
 
@@ -266,7 +274,7 @@ class LanguageBindEncoder(ModelEncoder):
                 return self.encode(content[0], modality=modality)
             else:
                 raise ValueError(f"Unsupported {modality.value} content type: {type(content)}, content: {content}")
-        
+
         with torch.no_grad():
             embeddings = self.model.model(inputs)
 
@@ -279,9 +287,9 @@ class LanguageBindEncoder(ModelEncoder):
 
     def _download_content(self, url, filename):
         # 3 seconds for images, 20 seconds for audio and video
-        timeout_ms = 3000 if filename.endswith(('.png', '.jpg', '.jpeg')) else 20000  
+        timeout_ms = 3000 if filename.endswith(('.png', '.jpg', '.jpeg')) else 20000
 
         buffer = download_image_from_url(url, {}, timeout_ms)
-        
+
         with open(filename, 'wb') as f:
             f.write(buffer.getvalue())

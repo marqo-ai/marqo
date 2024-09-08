@@ -18,7 +18,8 @@ from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 class StreamingMediaProcessor:
-    def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex, preprocessors: Preprocessors):
+    def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex,
+                 preprocessors: Preprocessors):
         self.url = url
         self.device = device
         self.headers = headers
@@ -27,13 +28,13 @@ class StreamingMediaProcessor:
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
         self.total_size, self.duration = self._fetch_file_metadata()
-        
+
         self._set_split_parameters(modality)
         self._log_initialization_details()
 
     def _set_split_parameters(self, modality):
         preprocessing = self.marqo_index.video_preprocessing if modality == Modality.VIDEO else self.marqo_index.audio_preprocessing
-        
+
         if preprocessing is not None:
             self.split_length = preprocessing.split_length
             self.split_overlap = preprocessing.split_overlap
@@ -45,10 +46,10 @@ class StreamingMediaProcessor:
             raise ValueError(f"Unsupported modality: {modality}")
 
     def _log_initialization_details(self):
-        #print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
-        #print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
-        #print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
-        #print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
+        # print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
+        # print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
+        # print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
+        # print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
         pass
 
     def _fetch_file_metadata(self):
@@ -59,17 +60,17 @@ class StreamingMediaProcessor:
                 'v': 'error',
                 'show_entries': 'format=size,duration',
                 'of': 'json',
-                'probesize': '256K' # Probe only the first 256KB
+                'probesize': '256K'  # Probe only the first 256KB
             }
 
             probe = ffmpeg.probe(self.url, **probe_options)
-            
+
             size = int(probe['format'].get('size', 0))
             duration = float(probe['format'].get('duration', 0))
 
             end_time = time.time()
             return size, duration
-        
+
         except ffmpeg.Error as e:
             logger.error(f"Error fetching metadata: {e.stderr.decode()}")
             raise
@@ -77,7 +78,6 @@ class StreamingMediaProcessor:
     def _get_output_file_path(self, temp_dir, chunk_start):
         extension = 'mp4' if self.modality == Modality.VIDEO else 'wav'
         return os.path.join(temp_dir, f"chunk_{chunk_start}.{extension}")
-
 
     def process_media(self) -> List[Dict[str, torch.Tensor]]:
         processed_chunks = []
@@ -130,7 +130,6 @@ class StreamingMediaProcessor:
                         os.remove(output_file)
 
         return processed_chunks
-
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):
         if download_total > 0:

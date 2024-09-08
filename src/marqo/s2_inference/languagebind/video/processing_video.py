@@ -7,7 +7,6 @@ from torchvision.transforms._transforms_video import NormalizeVideo, RandomHoriz
     CenterCropVideo
 from transformers import ProcessorMixin
 
-
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
 
@@ -70,7 +69,7 @@ def load_and_transform_video(
         decord.bridge.set_bridge('torch')
         decord_vr = VideoReader(video_path, ctx=cpu(0))
         duration = len(decord_vr)
-        frame_id_list = np.linspace(0, duration-1, num_frames, dtype=int)
+        frame_id_list = np.linspace(0, duration - 1, num_frames, dtype=int)
         video_data = decord_vr.get_batch(frame_id_list)
         video_data = video_data.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
         video_outputs = transform(video_data)
