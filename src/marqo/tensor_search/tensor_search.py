@@ -156,7 +156,6 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
     media_download_thread_count = _determine_thread_count(marqo_index, add_docs_params)
-    print(f"media_download_thread_count unstruct: {media_download_thread_count}")
 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media: # review this logic
@@ -360,7 +359,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             )
                             break
 
-                    elif isinstance(field_content, (str, Image.Image)):
+                    elif isinstance(field_content, str):
                         # 1. check if urls should be downloaded -> "treat_pointers_and_urls_as_images":True
                         # 2. check if it is a url or pointer
                         # 3. If yes in 1 and 2, download blindly (without type)
@@ -391,7 +390,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                         image_data = media_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not process the media file found at `{field_content}`. \n"
+                                            f"Could not process the image file found at `{field_content}`. \n"
                                             f"Reason: {str(media_repo[field_content])}"
                                         )
                                 else:
@@ -637,7 +636,6 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
     # Check if model is Video/Audio. If so, manually set thread_count to 5
     media_download_thread_count = _determine_thread_count(marqo_index, add_docs_params)
-    print(f"media_download_thread_count struct: {media_download_thread_count}")
 
     with ExitStack() as exit_stack:
         media_fields = [
@@ -868,7 +866,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 ))
                             )
                             continue
-                    elif isinstance(field_content, (str, Image.Image)):
+                    elif isinstance(field_content, str):
                         # C) Handle standard fields (text and images)
 
                         # TODO: better/consistent handling of a no-op for processing (but still vectorize)
@@ -905,7 +903,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                         image_data = media_repo[field_content]
                                     else:
                                         raise s2_inference_errors.S2InferenceError(
-                                            f"Could not process the media file found at `{field_content}`. \n"
+                                            f"Could not process the image file found at `{field_content}`. \n"
                                             f"Reason: {str(media_repo[field_content])}"
                                         )
                                 else:
@@ -2070,7 +2068,6 @@ def _vector_text_search(
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
         qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
-    print(f"vectorised text (length {len(vectorised_text)}): {vectorised_text}")
 
     marqo_query = MarqoTensorQuery(
         index_name=index_name,
@@ -2087,7 +2084,6 @@ def _vector_text_search(
 
     vespa_index = vespa_index_factory(marqo_index)
     vespa_query = vespa_index.to_vespa_query(marqo_query)
-    print(f"vespa_query: {vespa_query}")
 
     total_preprocess_time = RequestMetricsStore.for_request().stop("search.vector.processing_before_vespa")
     logger.debug(
@@ -2099,7 +2095,6 @@ def _vector_text_search(
                                                 ):
         try:
             responses = config.vespa_client.query(**vespa_query)
-            print(f"responses: {responses}")
         except VespaStatusError as e:
             # The index will not have the embedding_similarity rank profile if there are no tensor fields
             if f"No profile named '{RANK_PROFILE_EMBEDDING_SIMILARITY}'" in e.message:
@@ -2119,7 +2114,6 @@ def _vector_text_search(
     # SEARCH TIMER-LOGGER (post-processing)
     RequestMetricsStore.for_request().start("search.vector.postprocess")
     gathered_docs = gather_documents_from_response(responses, marqo_index, highlights, attributes_to_retrieve)
-    print(f"gathered_docs: {gathered_docs}")
 
     if boost is not None:
         raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')

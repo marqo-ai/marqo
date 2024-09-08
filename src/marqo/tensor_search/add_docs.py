@@ -83,7 +83,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     continue
                 if isinstance(doc[field], str) or force_download:
                     modality = infer_modality(doc[field])
-                    if modality == Modality.IMAGE or (marqo_index.type == IndexType.Structured and media_field_types_mapping[field] == FieldType.ImagePointer): # clip_utils._is_image(doc[field])
+                    if modality == Modality.IMAGE or (marqo_index.type == IndexType.Structured and media_field_types_mapping[field] == FieldType.ImagePointer):
                         if (marqo_index is not None
                                 and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
                                 and marqo_index.model.properties.get('supported_modalities') is not None

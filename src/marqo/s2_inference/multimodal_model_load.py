@@ -152,9 +152,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             # Use context manager to handle content sample
             try:
                 with fetch_content_sample(content) as sample:
-                    #print(f"did not find extension, but found url: {content}")
                     mime = magic.from_buffer(sample.read(), mime=True)
-                    #print(f"mime: {mime}")
                     if mime.startswith('image/'):
                         return Modality.IMAGE
                     elif mime.startswith('video/'):
