@@ -67,7 +67,7 @@ from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.s2_inference import infer_modality, Modality
-from marqo.s2_inference.clip_utils import _is_image
+from marqo.s2_inference.clip_utils import _is_image, validate_url
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
@@ -1674,7 +1674,7 @@ def construct_vector_input_batches(query: Optional[Union[str, Dict]], index_info
     treat_urls_as_media = True
 
     if isinstance(query, str):
-        if treat_urls_as_media and _is_image(query):
+        if treat_urls_as_media and validate_url(query):
             return [], [query, ]
         else:
             return [query, ], []

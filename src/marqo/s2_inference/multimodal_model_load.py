@@ -145,7 +145,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.TEXT
 
         extension = content.split('.')[-1].lower()
-        if extension in ['jpg', 'jpeg', 'png', 'gif']:
+        if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
             return Modality.IMAGE
         elif extension in ['mp4', 'avi', 'mov']:
             return Modality.VIDEO
