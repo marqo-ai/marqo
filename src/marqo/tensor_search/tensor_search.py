@@ -555,7 +555,12 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
 
             if document_is_valid:
                 if processed_tensor_fields:
-                    processed_marqo_embeddings = {k: v for k, v in enumerate(embeddings_list)}
+                    
+                    # Ensure embeddings_list is flat
+                    flat_embeddings_list = [emb for sublist in embeddings_list for emb in (sublist if isinstance(sublist[0], list) else [sublist])]
+                    
+                    processed_marqo_embeddings = {k: v for k, v in enumerate(flat_embeddings_list)}
+        
                     assert len(processed_tensor_fields) == len(
                         processed_marqo_embeddings), "Chunks and embeddings must be the same length"
                     copied[constants.MARQO_DOC_CHUNKS] = processed_tensor_fields
