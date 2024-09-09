@@ -7,9 +7,11 @@ on:
   push:
     branches:
       - mainline
+      - releases/*
   pull_request:
     branches:
       - mainline
+      - releases/*
 
 permissions:
   contents: read
