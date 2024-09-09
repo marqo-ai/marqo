@@ -134,7 +134,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
                                                                         marqo_index, preprocessors)
                             media_repo[doc[field]] = processed_chunks
-                        except ffmpeg.Error as e:
+                        except (ffmpeg.Error, S2InferenceError) as e:
                             logger.error(f"Error processing {modality} file: {str(e)}")
                             media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
 
