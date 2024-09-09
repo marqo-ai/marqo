@@ -557,9 +557,7 @@ class OPEN_CLIP(AbstractCLIPModel):
                 f"for more details on the supported methods to open_clip model "
             )
         self.model = self.model.to(self.device)
-        # TODO Remove this check after we upgrade the torch version
-        if self.model_properties.name not in ("open_clip/ViT-SO400M-14-SigLIP-384/webli"):
-            self.model.eval()
+        self.model.eval()
 
     def _check_loaded_components(self):
         """Check if the open_clip model, tokenizer, and image preprocessor are loaded.
@@ -756,7 +754,6 @@ class OPEN_CLIP(AbstractCLIPModel):
             outputs /= self.normalize(outputs)
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
-
 
     def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
         if self.model is None:
