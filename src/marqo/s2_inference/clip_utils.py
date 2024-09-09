@@ -557,7 +557,9 @@ class OPEN_CLIP(AbstractCLIPModel):
                 f"for more details on the supported methods to open_clip model "
             )
         self.model = self.model.to(self.device)
-        self.model.eval()
+        # TODO Remove this check after we upgrade the torch version
+        if self.model_properties.name not in ("open_clip/ViT-SO400M-14-SigLIP-384/webli"):
+            self.model.eval()
 
     def _check_loaded_components(self):
         """Check if the open_clip model, tokenizer, and image preprocessor are loaded.
@@ -742,12 +744,21 @@ class OPEN_CLIP(AbstractCLIPModel):
 
         self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
 
-        with torch.no_grad():
+        # TODO Remove this check after we upgrade the torch version
+        if self.model_properties.name in ["open_clip/ViT-SO400M-14-SigLIP-384/webli"]:
             if self.device.startswith("cuda"):
-                with torch.cuda.amp.autocast():
+                with torch.inference_mode(), torch.cuda.amp.autocast():
                     outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
             else:
-                outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+                with torch.inference_mode():
+                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+        else:
+            if self.device.startswith("cuda"):
+                with torch.no_grad(), torch.cuda.amp.autocast():
+                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+            else:
+                with torch.no_grad():
+                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
@@ -760,18 +771,23 @@ class OPEN_CLIP(AbstractCLIPModel):
         if self.model is None:
             self.load()
 
-
-        print(self.device)
         text = self.tokenizer(sentence).to(self.device)
-        print(text)
 
-        print(type(text))
-        with torch.no_grad():
+        # TODO Remove this check after we upgrade the torch version
+        if self.model_properties.name in ["open_clip/ViT-SO400M-14-SigLIP-384/webli"]:
             if self.device.startswith("cuda"):
-                with torch.autocast("cuda"):
+                with torch.inference_mode(), torch.cuda.amp.autocast():
                     outputs = self.model.encode_text(text).to(torch.float32)
             else:
-                outputs = self.model.encode_text(text).to(torch.float32)
+                with torch.inference_mode():
+                    outputs = self.model.encode_text(text).to(torch.float32)
+        else:
+            if self.device.startswith("cuda"):
+                with torch.no_grad(), torch.cuda.amp.autocast():
+                    outputs = self.model.encode_text(text).to(torch.float32)
+            else:
+                with torch.no_grad():
+                    outputs = self.model.encode_text(text).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
