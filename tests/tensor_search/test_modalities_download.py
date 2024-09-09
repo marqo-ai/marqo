@@ -229,6 +229,3 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         mock_download_and_chunk.assert_any_call(
             self.mock_audio_url, "cpu", None, Modality.AUDIO, self.mock_marqo_index, None
         )
-
-if __name__ == "__main__":
-    unittest.main()
