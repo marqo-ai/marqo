@@ -139,12 +139,11 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
 
                     else:
-                        pass
                         # raise an error
-                        # media_repo[doc[field]] = S2InferenceError(
-                        #                    f"Could not process the media file found at `{doc[field]}`. \n"
-                        #                    f"Reason: Not a valid URL or a supportedmodality"
-                        # )
+                        media_repo[doc[field]] = S2InferenceError(
+                            f"Could not process the media file found at `{doc[field]}`. \n"
+                            f"Reason: Not a valid URL or a supportedmodality"
+                        )
 
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
