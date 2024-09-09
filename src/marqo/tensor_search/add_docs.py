@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from typing import ContextManager
 import threading
 import torch
+import ffmpeg
 
 import logging
 from typing import List, Dict
@@ -33,17 +34,17 @@ from marqo.s2_inference.models.model_type import ModelType
 logger = logging.getLogger(__name__)
 
 
-def threaded_download_and_preprocess_content(allocated_docs: List[dict], 
-                                                media_repo: dict, 
-                                                tensor_fields: List[str],
-                                                image_download_headers: dict,
-                                                device: str = None,
-                                                media_field_types_mapping: Optional[Dict[str, FieldType]] = None,
-                                                download_headers: Optional[Dict] = None,  # Optional for now
-                                                metric_obj: Optional[RequestMetrics] = None,
-                                                preprocessors: Optional[Dict[str, Compose]] = None,
-                                                marqo_index: Optional[MarqoIndex] = None,
-                                                force_download: bool = False) -> None:
+def threaded_download_and_preprocess_content(allocated_docs: List[dict],
+                                             media_repo: dict,
+                                             tensor_fields: List[str],
+                                             image_download_headers: dict,
+                                             device: str = None,
+                                             media_field_types_mapping: Optional[Dict[str, FieldType]] = None,
+                                             download_headers: Optional[Dict] = None,  # Optional for now
+                                             metric_obj: Optional[RequestMetrics] = None,
+                                             preprocessors: Optional[Dict[str, Compose]] = None,
+                                             marqo_index: Optional[MarqoIndex] = None,
+                                             force_download: bool = False) -> None:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -83,7 +84,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     continue
                 if isinstance(doc[field], str) or force_download:
                     modality = infer_modality(doc[field])
-                    if modality == Modality.IMAGE or (marqo_index.type == IndexType.Structured and media_field_types_mapping[field] == FieldType.ImagePointer):
+                    if (modality == Modality.IMAGE and marqo_index.type == IndexType.Unstructured) or (
+                            marqo_index.type == IndexType.Structured and media_field_types_mapping[field] == FieldType.ImagePointer):
                         if (marqo_index is not None
                                 and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
                                 and marqo_index.model.properties.get('supported_modalities') is not None
@@ -95,7 +97,6 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         if doc[field] in media_repo:
                             continue
 
-                   
                         try:
                             media_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
                                                                                      timeout_ms=int(
@@ -119,10 +120,13 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 else:
                                     raise e
 
-                    elif modality in [Modality.VIDEO, Modality.AUDIO] or (marqo_index.type == IndexType.Structured and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer]):
+                    elif (modality in [Modality.VIDEO,
+                                       Modality.AUDIO] and marqo_index.type == IndexType.Unstructured) or (
+                            marqo_index.type == IndexType.Structured and media_field_types_mapping[field] in 
+                            [FieldType.AudioPointer, FieldType.VideoPointer]):
                         if marqo_index.model.properties.get('type') not in [
                             ModelType.LanguageBind] and modality not in marqo_index.model.properties.get(
-                                'supported_modalities'):
+                            'supported_modalities'):
                             media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index.model.name} does not support {modality}")
                             continue
@@ -130,17 +134,17 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
                                                                         marqo_index, preprocessors)
                             media_repo[doc[field]] = processed_chunks
-                        except Exception as e:
+                        except ffmpeg.Error as e:
                             logger.error(f"Error processing {modality} file: {str(e)}")
                             media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
 
                     else:
                         pass
                         # raise an error
-                        #media_repo[doc[field]] = S2InferenceError(
+                        # media_repo[doc[field]] = S2InferenceError(
                         #                    f"Could not process the media file found at `{doc[field]}`. \n"
                         #                    f"Reason: Not a valid URL or a supportedmodality"
-                        #)
+                        # )
 
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
@@ -159,15 +163,17 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 media_repo[sub_field] = e
                                 metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                                 continue
-    
 
-def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index: MarqoIndex, preprocessors: Preprocessors) -> List[Dict[str, torch.Tensor]]:
+
+def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index: MarqoIndex,
+                             preprocessors: Preprocessors) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
     processor = StreamingMediaProcessor(url, device, headers, modality, marqo_index, preprocessors)
-    
+
     if processor.total_size > MAX_FILE_SIZE:
-        raise ValueError(f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
+        raise ValueError(
+            f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
 
     return processor.process_media()
 
@@ -186,12 +192,11 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     marqo_index: Optional[MarqoIndex] = None,
                                     force_download: bool = False
                                     ) -> ContextManager[dict]:
-
     media_repo = {}  # for image/video/audio
     media_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
-                                    model_name, normalize_embeddings, force_download,
-                                    media_field_types_mapping, download_headers, model_properties, model_auth, 
-                                    device, patch_method_exists, marqo_index)
+                               model_name, normalize_embeddings, force_download,
+                               media_field_types_mapping, download_headers, model_properties, model_auth,
+                               device, patch_method_exists, marqo_index)
 
     try:
         yield media_repo
@@ -206,11 +211,10 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
 
 def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                   image_download_headers: dict, model_name: str, normalize_embeddings: bool,
-                  force_download: bool, media_field_types_mapping: Optional[Dict[str, FieldType]], 
+                  force_download: bool, media_field_types_mapping: Optional[Dict[str, FieldType]],
                   download_headers: Optional[Dict], model_properties: Optional[Dict],
                   model_auth: Optional[ModelAuth], device: Optional[str],
                   patch_method_exists: bool, marqo_index: Optional[MarqoIndex]) -> dict:
-
     docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
 
@@ -234,18 +238,18 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
 
     with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
         futures = [executor.submit(threaded_download_and_preprocess_content,
-                        allocation, 
-                        media_repo, 
-                        tensor_fields,
-                        image_download_headers, 
-                        device,
-                        media_field_types_mapping,
-                        download_headers, 
-                        m[i], 
-                        preprocessors,
-                        marqo_index,
-                        force_download)
-        for i, allocation in enumerate(thread_allocated_docs)]
+                                   allocation,
+                                   media_repo,
+                                   tensor_fields,
+                                   image_download_headers,
+                                   device,
+                                   media_field_types_mapping,
+                                   download_headers,
+                                   m[i],
+                                   preprocessors,
+                                   marqo_index,
+                                   force_download)
+                   for i, allocation in enumerate(thread_allocated_docs)]
 
         # Unhandled exceptions will be raised here.
         # We only raise the first exception if there are multiple exceptions
@@ -257,7 +261,7 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
     metric_obj = RequestMetrics.reduce_from_list([metric_obj] + m)
     metric_obj.times = reduce_thread_metrics(metric_obj.times)
     return media_repo
-    
+
 
 def reduce_thread_metrics(data):
     """Reduce the metrics from each thread, as if they were run in a single thread.
