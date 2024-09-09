@@ -365,7 +365,7 @@ def _get_open_clip_properties() -> Dict:
         # New models as of Marqo 2.7.0
         # Added for: Open CLIP 2.24.0
         "open_clip/ViT-SO400M-14-SigLIP-384/webli": {
-            "name": "hf-hub:timm/ViT-SO400M-14-SigLIP-384",
+            "name": "open_clip/ViT-SO400M-14-SigLIP-384/webli",
             "dimensions": 1152,
             "note": "open_clip model: ViT-SO400M-14-SigLIP-384/webli",
             "type": "open_clip",
