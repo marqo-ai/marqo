@@ -150,5 +150,3 @@ dump.rdb
 
 # Tester app for unit tests
 scripts/vespa_local/vespa_tester_app.zip
-
-src/marqo/tensor_search/cache_dir/*

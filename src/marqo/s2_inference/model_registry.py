@@ -1982,6 +1982,56 @@ def _get_onnx_clip_properties() -> Dict:
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
+def _get_languagebind_properties() -> Dict:
+    LANGUAGEBIND_MODEL_PROPERTIES = {
+        'LanguageBind/Video_V1.5_FT_Audio_FT_Image': {
+            "name": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["video", "audio", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Video_V1.5_FT_Image': {
+            "name": "LanguageBind/Video_V1.5_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["video", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Audio_FT_Image': {
+            "name": "LanguageBind/Audio_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["audio", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Audio_FT': {
+            "name": "LanguageBind/Audio_FT",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["video", "language"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Video_V1.5_FT': {
+            "name": "LanguageBind/Video_V1.5_FT",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "supported_modalities": ["video", "language"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+
+    }
+    return LANGUAGEBIND_MODEL_PROPERTIES
 
 def _get_fp16_clip_properties() -> Dict:
     FP16_CLIP_MODEL_PROPERTIES = {
@@ -2058,7 +2108,8 @@ def _get_model_load_mappings() -> Dict:
             "fp16_clip": FP16_CLIP,
             'random':Random,
             'hf':HF_MODEL,
-            "no_model": NO_MODEL}
+            "no_model": NO_MODEL,
+            }
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already
@@ -2076,6 +2127,7 @@ def load_model_properties() -> Dict:
     multilingual_clip_model_properties = get_multilingual_clip_properties()
     fp16_clip_model_properties = _get_fp16_clip_properties()
     no_model_properties = _get_no_model_properties()
+    languagebind_model_properties = _get_languagebind_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -2089,6 +2141,7 @@ def load_model_properties() -> Dict:
     model_properties.update(multilingual_clip_model_properties)
     model_properties.update(fp16_clip_model_properties)
     model_properties.update(no_model_properties)
+    model_properties.update(languagebind_model_properties)
 
 
     all_properties = dict()

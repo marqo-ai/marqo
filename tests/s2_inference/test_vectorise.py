@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 from marqo.api.exceptions import ConfigurationError, InternalError
 from marqo.tensor_search.enums import AvailableModelsKey
+from marqo.s2_inference.multimodal_model_load import Modality
 import datetime
 
 
@@ -239,7 +240,7 @@ class TestVectoriseBatching(unittest.TestCase):
         result = s2_inference.vectorise(model_name='mock_model', content=single_content,
                                         model_properties=self.mock_model_props, device="cpu")
 
-        self.mock_model.encode.assert_called_once_with(single_content, normalize=True)
+        self.mock_model.encode.assert_called_once_with(single_content, normalize=True, modality=Modality.TEXT)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 

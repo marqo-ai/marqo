@@ -24,6 +24,8 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
     normalize_embeddings: bool
     text_preprocessing: marqo_index.TextPreProcessing
     image_preprocessing: marqo_index.ImagePreProcessing
+    video_preprocessing: marqo_index.VideoPreProcessing
+    audio_preprocessing: marqo_index.AudioPreProcessing
     distance_metric: marqo_index.DistanceMetric
     vector_numeric_type: marqo_index.VectorNumericType
     hnsw_config: marqo_index.HnswConfig
@@ -39,8 +41,8 @@ class MarqoIndexRequest(ImmutableStrictBaseModel, ABC):
 
 class UnstructuredMarqoIndexRequest(MarqoIndexRequest):
     treat_urls_and_pointers_as_images: bool
+    treat_urls_and_pointers_as_media: bool
     filter_string_max_length: int
-
 
 class FieldRequest(StrictBaseModel):
     name: str

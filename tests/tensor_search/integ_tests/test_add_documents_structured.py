@@ -834,6 +834,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     index_name=self.index_name_img_random, device="cpu"
                 )
             ).dict(exclude_none=True, by_alias=True)
+            print(res1)
             self.assertEqual(
                 c,
                 self.config.monitoring.get_index_stats_by_name(
@@ -955,4 +956,4 @@ class TestAddDocumentsStructured(MarqoTestCase):
         self.assertEqual(3, len(r.items))
         for item in r.items:
             self.assertEqual(400, item.status)
-            self.assertIn("Could not find image at", item.message)
+            self.assertIn("Could not process the media file found at", item.message)

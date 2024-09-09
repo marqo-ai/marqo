@@ -413,7 +413,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     ({"bad_test_text_field": "test", "bad_field_int": 1}, "received bad_field_int:1"),
                     ({"bad_test_text_field": "test", "bad_field_bool": True}, "received bad_field_bool:True"),
                     ({"bad_test_text_field": "test", "bad_field_list": ["123", "23"]}, f'received bad_field_list:{["123", "23"]}'),
-                    ({"bad_test_text_field": "test", "bad_field_img": "https://a-void-image.jpg"}, "Could not find image"),
+                    ({"bad_test_text_field": "test", "bad_field_img": "https://a-void-image.jpg"}, "Could not find media"),
                     ({"bad_multimodal_field": "test"}, "Document and mappings object have conflicting fields")
                 ]
 
@@ -560,6 +560,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 expected_tensor = np.mean(
                     [text_tensor_1 * 0.32, text_tensor_2 * 0, image_tensor_1 * -0.48, image_tensor_2 * 1.34], axis=0)
 
+                print(f"combo_tensor_1: {combo_tensor_1}")
+                print(f"expected_tensor: {expected_tensor}")
                 assert np.allclose(combo_tensor_1, expected_tensor, atol=1e-5)
                 assert np.allclose(combo_tensor_2, expected_tensor, atol=1e-5)
                 assert np.allclose(combo_tensor_3, expected_tensor, atol=1e-5)

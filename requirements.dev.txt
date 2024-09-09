@@ -61,3 +61,13 @@ httpx==0.25.0
 # test requirements
 pyvespa==0.37.1
 pytest==7.4.3
+
+
+# LanguageBind
+eva-decord==0.6.1
+einops==0.6.1
+pytorchvideo==0.1.5
+torchaudio==0.12.1
+SoundFile==0.12.1
+python-magic==0.4.27
+ffmpeg-python==0.2.0
