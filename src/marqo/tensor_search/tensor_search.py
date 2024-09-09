@@ -333,7 +333,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
-                                chunk_id = f"{field}::start_{chunk_start:.2f}::end_{chunk_end:.2f}"
+                                chunk_time = [chunk_start, chunk_end]
+                                chunk_id = f"{field}::{chunk_time}"
                                 chunks.append(chunk_id)
 
                                 vector = s2_inference.vectorise(
@@ -840,7 +841,8 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             for chunk_index, media_chunk in enumerate(media_chunks):
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
-                                chunk_id = f"{field}::start_{chunk_start:.2f}::end_{chunk_end:.2f}"
+                                chunk_time = [chunk_start, chunk_end]
+                                chunk_id = f"{field}::{chunk_time}"
                                 chunks.append(chunk_id)
 
                                 vector = s2_inference.vectorise(
