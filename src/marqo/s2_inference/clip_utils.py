@@ -744,21 +744,12 @@ class OPEN_CLIP(AbstractCLIPModel):
 
         self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
 
-        # TODO Remove this check after we upgrade the torch version
-        if self.model_properties.name in ["open_clip/ViT-SO400M-14-SigLIP-384/webli"]:
+        with torch.no_grad():
             if self.device.startswith("cuda"):
-                with torch.inference_mode(), torch.cuda.amp.autocast():
+                with torch.cuda.amp.autocast():
                     outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
             else:
-                with torch.inference_mode():
-                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
-        else:
-            if self.device.startswith("cuda"):
-                with torch.no_grad(), torch.cuda.amp.autocast():
-                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
-            else:
-                with torch.no_grad():
-                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+                outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
@@ -766,28 +757,19 @@ class OPEN_CLIP(AbstractCLIPModel):
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
 
+    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
         if self.model is None:
             self.load()
 
         text = self.tokenizer(sentence).to(self.device)
 
-        # TODO Remove this check after we upgrade the torch version
-        if self.model_properties.name in ["open_clip/ViT-SO400M-14-SigLIP-384/webli"]:
+        with torch.no_grad():
             if self.device.startswith("cuda"):
-                with torch.inference_mode(), torch.cuda.amp.autocast():
+                with torch.cuda.amp.autocast():
                     outputs = self.model.encode_text(text).to(torch.float32)
             else:
-                with torch.inference_mode():
-                    outputs = self.model.encode_text(text).to(torch.float32)
-        else:
-            if self.device.startswith("cuda"):
-                with torch.no_grad(), torch.cuda.amp.autocast():
-                    outputs = self.model.encode_text(text).to(torch.float32)
-            else:
-                with torch.no_grad():
-                    outputs = self.model.encode_text(text).to(torch.float32)
+                outputs = self.model.encode_text(text).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
