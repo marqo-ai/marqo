@@ -141,7 +141,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     Infer the modality of the content. Video, audio, image or text.
     """
     if isinstance(content, str):
-        if not validators.url(content):
+        if not validate_url(content):
             return Modality.TEXT
 
         extension = content.split('.')[-1].lower()
