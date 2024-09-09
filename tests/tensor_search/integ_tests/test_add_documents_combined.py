@@ -369,7 +369,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         tensor_search.add_documents(
                             config=self.config, add_docs_params=AddDocsParams(
                                 index_name=index_name, docs=docs, device="cpu",
-                                media_download_thread_count=thread_count,
+                                image_download_thread_count=thread_count,
                                 tensor_fields=tensor_fields
                             )
                         ).dict(exclude_none=True, by_alias=True)
