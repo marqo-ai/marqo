@@ -19,6 +19,7 @@ from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, Mar
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
+from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search import utils, enums, validation, add_docs
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.get_document_response import Document
@@ -30,7 +31,14 @@ from marqo.s2_inference import s2_inference
 from marqo.s2_inference import errors as s2_inference_errors
 
 
-ORIGINAL_ID='_original_id'
+ORIGINAL_ID = '_original_id'
+
+MODALITY_FIELD_TYPE_MAP = {
+    Modality.TEXT: FieldType.Text,
+    Modality.IMAGE: FieldType.ImagePointer,
+    Modality.VIDEO: FieldType.VideoPointer,
+    Modality.AUDIO: FieldType.AudioPointer,
+}
 
 
 class AddDocumentsResponseCollector:
@@ -161,17 +169,22 @@ class AddDocumentsHandler(ABC):
         pass
 
     def vectorise_tensor_fields(self) -> None:
-        self.vectorise_tensor_fields_in_batch_per_doc()
+        self.vectorise_tensor_fields_per_field()
 
     def vectorise_tensor_fields_per_field(self) -> None:
         with ExitStack() as exit_stack:
+            media_repo = self._download_media_contents(exit_stack)
             chunkers: Dict[FieldType, Chunker] = {
                 FieldType.Text: self.text_chunker(),
-                FieldType.ImagePointer: self.image_chunker(exit_stack)
+                FieldType.ImagePointer: self.image_chunker(media_repo),
+                FieldType.AudioPointer: self.video_audio_chunker(media_repo),
+                FieldType.VideoPointer: self.video_audio_chunker(media_repo),
             }
             vectorisers: Dict[FieldType, Vectoriser] = {
-                FieldType.Text: self.single_vectoriser(infer=False),
-                FieldType.ImagePointer: self.single_vectoriser(infer=True)
+                FieldType.Text: self.single_vectoriser(modality=Modality.TEXT),
+                FieldType.ImagePointer: self.single_vectoriser(modality=Modality.IMAGE),
+                FieldType.AudioPointer: self.single_vectoriser(modality=Modality.AUDIO),
+                FieldType.VideoPointer: self.single_vectoriser(modality=Modality.VIDEO),
             }
 
             for doc_id, field_name, tensor_field_content in (
@@ -185,9 +198,10 @@ class AddDocumentsHandler(ABC):
 
     def vectorise_tensor_fields_in_batch_per_doc(self) -> None:
         with ExitStack() as exit_stack:
+            media_repo = self._download_media_contents(exit_stack)
             chunkers: Dict[FieldType, Chunker] = {
                 FieldType.Text: self.text_chunker(),
-                FieldType.ImagePointer: self.image_chunker(exit_stack)
+                FieldType.ImagePointer: self.image_chunker(media_repo)
             }
 
             doc_chunks_map: Dict[str, Dict[FieldType, List[str]]] = dict()
@@ -217,10 +231,8 @@ class AddDocumentsHandler(ABC):
 
             for doc_id, chunks_to_vectorise in doc_chunks_map.items():
                 try:
-                    vectorisers: Dict[FieldType, Vectoriser] = {
-                        FieldType.Text: self.batch_vectoriser(chunks_to_vectorise[FieldType.Text], infer=False),
-                        FieldType.ImagePointer: self.batch_vectoriser(chunks_to_vectorise[FieldType.ImagePointer], infer=True)
-                    }
+                    vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
+                                   for modality, field_type in MODALITY_FIELD_TYPE_MAP}
 
                     for tensor_field_content in doc_field_map[doc_id]:
                         tensor_field_content.vectorise(vectorisers)
@@ -231,9 +243,11 @@ class AddDocumentsHandler(ABC):
 
     def vectorise_tensor_fields_in_batch_per_add_doc_batch(self) -> None:
         with ExitStack() as exit_stack:
+            media_repo = self._download_media_contents(exit_stack)
+
             chunkers: Dict[FieldType, Chunker] = {
                 FieldType.Text: self.text_chunker(),
-                FieldType.ImagePointer: self.image_chunker(exit_stack)
+                FieldType.ImagePointer: self.image_chunker(media_repo)
             }
 
             chunks_map: Dict[FieldType, List[str]] = {
@@ -252,10 +266,8 @@ class AddDocumentsHandler(ABC):
                     self.tensor_fields_container.remove_doc(doc_id)
 
             try:
-                vectorisers: Dict[FieldType, Vectoriser] = {
-                    FieldType.Text: self.batch_vectoriser(chunks_to_vectorise[FieldType.Text], infer=False),
-                    FieldType.ImagePointer: self.batch_vectoriser(chunks_to_vectorise[FieldType.ImagePointer], infer=True)
-                }
+                vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
+                               for modality, field_type in MODALITY_FIELD_TYPE_MAP}
             except AddDocumentsError as err:
                 # TODO we need to fail the batch
                 return
@@ -270,7 +282,7 @@ class AddDocumentsHandler(ABC):
         url_doc_id_map = dict()
         doc_media_fields = dict()
         media_field_types_mapping = dict()
-        media_field_types = [FieldType.ImagePointer]  #, FieldType.AudioPointer, FieldType.VideoPointer]
+        media_field_types = [FieldType.ImagePointer, FieldType.AudioPointer, FieldType.VideoPointer]
         for doc_id, field_name, tensor_field_content in (
                 self.tensor_fields_container.tensor_fields_to_vectorise(*media_field_types)):
             url = tensor_field_content.field_content
@@ -330,13 +342,12 @@ class AddDocumentsHandler(ABC):
 
         return chunk
 
-    def image_chunker(self, exit_stack) -> Chunker:
-        image_repo = self._download_media_contents(exit_stack)
+    def image_chunker(self, media_repo) -> Chunker:
         image_method = self.marqo_index.image_preprocessing.patch_method
 
         def chunk(field_content: str, single_chunk: bool = False):
             url = field_content
-            image_data = image_repo[url]
+            image_data = media_repo[url]
             if single_chunk or image_method is None:
                 return [url], [image_data]
 
@@ -349,13 +360,35 @@ class AddDocumentsHandler(ABC):
 
         return chunk
 
-    def single_vectoriser(self, infer: bool) -> Vectoriser:
+    def video_audio_chunker(self, media_repo) -> Chunker:
+        def chunk_id(media_chunk: dict) -> str:
+            chunk_start = media_chunk['start_time']
+            chunk_end = media_chunk['end_time']
+            return f"{[chunk_start, chunk_end]}"
+
+        def chunk(field_content: str, single_chunk: bool = False):
+            url = field_content
+            media_chunks = media_repo[url]
+
+            # single_chunk does not apply to video and audio fields. Instead, it needs to calculate the
+            # embedding for each chunk and average them
+            if single_chunk:
+                raise RuntimeError("Video and Audio chunker does not support single_chunk")
+
+            text_chunks = [chunk_id(media_chunk) for media_chunk in media_chunks]
+            content_chunks = [media_chunk['tensor'] for media_chunk in media_chunks]
+
+            return text_chunks, content_chunks
+
+        return chunk
+
+    def single_vectoriser(self, modality: Modality) -> Vectoriser:
         def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
-            return self._s2inference_vectorise(content_chunks, infer)
+            return self._s2inference_vectorise(content_chunks, modality)
 
         return vectorise
 
-    def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], infer: bool) -> Vectoriser:
+    def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], modality: Modality) -> Vectoriser:
         def dict_key(chunk: Union[str, Image, tensor]):
             if isinstance(chunk, Image):
                 return hash((chunk.format, chunk.size))
@@ -364,7 +397,7 @@ class AddDocumentsHandler(ABC):
 
         embedding_cache = dict()
         if chunks_to_vectorise:
-            embeddings = self._s2inference_vectorise(chunks_to_vectorise, infer)
+            embeddings = self._s2inference_vectorise(chunks_to_vectorise, modality)
             embedding_cache = {dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
 
         def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
@@ -372,7 +405,7 @@ class AddDocumentsHandler(ABC):
 
         return vectorise
 
-    def _s2inference_vectorise(self, content_chunks: Union[List[str], List[Image]], infer: bool):
+    def _s2inference_vectorise(self, content_chunks: Union[List[str], List[Image]], modality: Modality):
         try:
             return s2_inference.vectorise(
                 model_name=self.marqo_index.model.name,
@@ -381,8 +414,7 @@ class AddDocumentsHandler(ABC):
                 device=self.add_docs_params.device,
                 normalize_embeddings=self.marqo_index.normalize_embeddings,
                 model_auth=self.add_docs_params.model_auth,
-                # TODO how is this param used? Is it different for different modals?
-                infer=infer
+                modality=modality
             )
         except (s2_inference_errors.UnknownModelError,
                 s2_inference_errors.InvalidModelPropertiesError,
