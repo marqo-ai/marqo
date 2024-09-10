@@ -38,8 +38,6 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           ec2-image-id: ami-03f8729795bfb473a
           ec2-instance-type: g4dn.2xlarge
-          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
-          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Large Model Unit Tests
