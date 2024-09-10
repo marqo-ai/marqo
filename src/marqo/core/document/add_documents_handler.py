@@ -264,38 +264,40 @@ class AddDocumentsHandler(ABC):
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 tensor_field_content.vectorise(vectorisers)
 
-    def _download_image_contents(self, exit_stack):
+    def _download_media_contents(self, exit_stack):
         # collect image urls
         # consider collect these info while building tensor_fields_container
         url_doc_id_map = dict()
-        doc_image_fields = dict()
-        image_tensor_fields = set()
+        doc_media_fields = dict()
+        media_field_types_mapping = dict()
+        media_field_types = [FieldType.ImagePointer]  #, FieldType.AudioPointer, FieldType.VideoPointer]
         for doc_id, field_name, tensor_field_content in (
-                self.tensor_fields_container.tensor_fields_to_vectorise(FieldType.ImagePointer)):
+                self.tensor_fields_container.tensor_fields_to_vectorise(*media_field_types)):
             url = tensor_field_content.field_content
 
             if url not in url_doc_id_map:
                 url_doc_id_map[url] = set()
             url_doc_id_map[url].add(doc_id)
 
-            if doc_id not in doc_image_fields:
-                doc_image_fields[doc_id] = dict()
-            doc_image_fields[doc_id][field_name] = url
+            if doc_id not in doc_media_fields:
+                doc_media_fields[doc_id] = dict()
+            doc_media_fields[doc_id][field_name] = url
 
-            image_tensor_fields.add(field_name)
+            media_field_types_mapping[field_name] = tensor_field_content.field_type
 
-        if not doc_image_fields:
+        if not doc_media_fields:
             return dict()
 
         image_repo = exit_stack.enter_context(
             add_docs.download_and_preprocess_content(
-                docs=list(doc_image_fields.values()),
+                docs=list(doc_media_fields.values()),
+                # TODO derive this
                 thread_count=self.add_docs_params.image_download_thread_count,
-                tensor_fields=image_tensor_fields,
+                tensor_fields=list(media_field_types_mapping.keys()),
                 image_download_headers=self.add_docs_params.image_download_headers,
                 model_name=self.marqo_index.model.name,
                 normalize_embeddings=self.marqo_index.normalize_embeddings,
-                media_field_types_mapping=None,
+                media_field_types_mapping=media_field_types_mapping,
                 model_properties=self.marqo_index.model.get_properties(),
                 device=self.add_docs_params.device,
                 model_auth=self.add_docs_params.model_auth,
@@ -308,7 +310,7 @@ class AddDocumentsHandler(ABC):
             if isinstance(data, Exception):
                 for doc_id in url_doc_id_map[url]:
                     self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(
-                        error_message=f"Could not find image found at `{url}`. Reason: {str(data)}"
+                        error_message=f"Could not process the media file found at `{url}`. Reason: {str(data)}"
                     ))
                     self.tensor_fields_container.remove_doc(doc_id)
 
@@ -329,7 +331,7 @@ class AddDocumentsHandler(ABC):
         return chunk
 
     def image_chunker(self, exit_stack) -> Chunker:
-        image_repo = self._download_image_contents(exit_stack)
+        image_repo = self._download_media_contents(exit_stack)
         image_method = self.marqo_index.image_preprocessing.patch_method
 
         def chunk(field_content: str, single_chunk: bool = False):

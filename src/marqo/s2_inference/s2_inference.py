@@ -131,7 +131,10 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                 if modality is None:
                     modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
 
-                encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings, **kwargs)
+                # TODO maybe the infer parameter can be replaced by modality
+                infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
+                encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings,
+                                               infer=infer, **kwargs)
                 
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
             
