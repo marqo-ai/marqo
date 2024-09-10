@@ -141,7 +141,7 @@ class AddDocumentsHandler(ABC):
         if self.add_docs_params.use_existing_tensors:
             result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.visited_doc_ids),
                                                         self.marqo_index.schema_name)
-            existing_vespa_docs = {r.id: r.document for r in result.responses if r.status == 200}
+            existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
             self.handle_existing_tensors(existing_vespa_docs)
 
         # vectorise tensor fields
@@ -165,27 +165,18 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def handle_existing_tensors(self, existing_vespa_docs: Dict[str, Document]):
+    def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
         pass
 
     def vectorise_tensor_fields(self) -> None:
-        self.vectorise_tensor_fields_per_field()
+        self.vectorise_tensor_fields_in_batch_per_doc()
 
     def vectorise_tensor_fields_per_field(self) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
-            chunkers: Dict[FieldType, Chunker] = {
-                FieldType.Text: self.text_chunker(),
-                FieldType.ImagePointer: self.image_chunker(media_repo),
-                FieldType.AudioPointer: self.video_audio_chunker(media_repo),
-                FieldType.VideoPointer: self.video_audio_chunker(media_repo),
-            }
-            vectorisers: Dict[FieldType, Vectoriser] = {
-                FieldType.Text: self.single_vectoriser(modality=Modality.TEXT),
-                FieldType.ImagePointer: self.single_vectoriser(modality=Modality.IMAGE),
-                FieldType.AudioPointer: self.single_vectoriser(modality=Modality.AUDIO),
-                FieldType.VideoPointer: self.single_vectoriser(modality=Modality.VIDEO),
-            }
+            chunkers = self._field_type_chunker_map(media_repo)
+            vectorisers = {field_type: self.single_vectoriser(modality)
+                           for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
@@ -199,10 +190,7 @@ class AddDocumentsHandler(ABC):
     def vectorise_tensor_fields_in_batch_per_doc(self) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
-            chunkers: Dict[FieldType, Chunker] = {
-                FieldType.Text: self.text_chunker(),
-                FieldType.ImagePointer: self.image_chunker(media_repo)
-            }
+            chunkers = self._field_type_chunker_map(media_repo)
 
             doc_chunks_map: Dict[str, Dict[FieldType, List[str]]] = dict()
             doc_field_map: Dict[str, List[TensorFieldContent]] = dict()
@@ -213,10 +201,7 @@ class AddDocumentsHandler(ABC):
                     chunks_to_vectorise = tensor_field_content.chunk(chunkers)
                     field_type = tensor_field_content.field_type
                     if doc_id not in doc_chunks_map:
-                        doc_chunks_map[doc_id] = {
-                            FieldType.Text: [],
-                            FieldType.ImagePointer: []
-                        }
+                        doc_chunks_map[doc_id] = {field_type: [] for field_type in chunkers.keys()}
                     doc_chunks_map[doc_id][field_type].extend(chunks_to_vectorise)
 
                     if doc_id not in doc_field_map:
@@ -232,7 +217,7 @@ class AddDocumentsHandler(ABC):
             for doc_id, chunks_to_vectorise in doc_chunks_map.items():
                 try:
                     vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
-                                   for modality, field_type in MODALITY_FIELD_TYPE_MAP}
+                                   for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
 
                     for tensor_field_content in doc_field_map[doc_id]:
                         tensor_field_content.vectorise(vectorisers)
@@ -244,16 +229,8 @@ class AddDocumentsHandler(ABC):
     def vectorise_tensor_fields_in_batch_per_add_doc_batch(self) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
-
-            chunkers: Dict[FieldType, Chunker] = {
-                FieldType.Text: self.text_chunker(),
-                FieldType.ImagePointer: self.image_chunker(media_repo)
-            }
-
-            chunks_map: Dict[FieldType, List[str]] = {
-                FieldType.Text: [],
-                FieldType.ImagePointer: []
-            }
+            chunkers = self._field_type_chunker_map(media_repo)
+            chunks_map = {field_type: [] for field_type in chunkers.keys()}
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
@@ -267,7 +244,7 @@ class AddDocumentsHandler(ABC):
 
             try:
                 vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
-                               for modality, field_type in MODALITY_FIELD_TYPE_MAP}
+                               for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
             except AddDocumentsError as err:
                 # TODO we need to fail the batch
                 return
@@ -275,6 +252,15 @@ class AddDocumentsHandler(ABC):
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 tensor_field_content.vectorise(vectorisers)
+
+    def _field_type_chunker_map(self, media_repo):
+        chunkers: Dict[FieldType, Chunker] = {
+            FieldType.Text: self.text_chunker(),
+            FieldType.ImagePointer: self.image_chunker(media_repo),
+            FieldType.AudioPointer: self.video_audio_chunker(media_repo),
+            FieldType.VideoPointer: self.video_audio_chunker(media_repo),
+        }
+        return chunkers
 
     def _download_media_contents(self, exit_stack):
         # collect image urls
