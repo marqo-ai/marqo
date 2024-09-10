@@ -95,7 +95,10 @@ class TestGetSettings(MarqoTestCase):
                     'textPreprocessing': {'splitLength': 2,
                                         'splitMethod': TextSplitMethod.Sentence,
                                         'splitOverlap': 0},
+                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'treatUrlsAndPointersAsImages': False,
+                    'treatUrlsAndPointersAsMedia': False,
                     'type': IndexType.Unstructured,
                     'vectorNumericType': VectorNumericType.Float
                 }
@@ -133,6 +136,8 @@ class TestGetSettings(MarqoTestCase):
                         'splitMethod': TextSplitMethod.Sentence,
                         'splitOverlap': 0
                     },
+                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'type': IndexType.Structured,
                     'vectorNumericType': VectorNumericType.Float
                 }
@@ -160,7 +165,10 @@ class TestGetSettings(MarqoTestCase):
                     'textPreprocessing': {'splitLength': 3,
                                         'splitMethod': TextSplitMethod.Word,
                                         'splitOverlap': 1},
+                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'treatUrlsAndPointersAsImages': False,
+                    'treatUrlsAndPointersAsMedia': False,
                     'type': IndexType.Unstructured,
                     'vectorNumericType': VectorNumericType.Float
                 }
@@ -198,6 +206,8 @@ class TestGetSettings(MarqoTestCase):
                         'splitMethod': TextSplitMethod.Word,
                         'splitOverlap': 1
                     },
+                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'type': IndexType.Structured,
                     'vectorNumericType': VectorNumericType.Float
                 }

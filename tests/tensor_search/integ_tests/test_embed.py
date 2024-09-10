@@ -7,6 +7,9 @@ from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.api import embed
 import numpy as np
+import torch
+import pytest
+
 import requests
 import json
 from unittest import mock
@@ -68,6 +71,18 @@ class TestEmbed(MarqoTestCase):
             treat_urls_and_pointers_as_images=True
         )
 
+        unstructured_image_index_request = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            treat_urls_and_pointers_as_images=True
+        )
+
+        unstructured_languagebind_index = cls.unstructured_marqo_index_request(
+            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True
+        )
+
         # STRUCTURED indexes
         structured_default_text_index = cls.structured_marqo_index_request(
             model=Model(name="hf/all_datasets_v4_MiniLM-L6"),
@@ -96,6 +111,25 @@ class TestEmbed(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "image_field_1", "image_field_2"]
         )
 
+        structured_image_index_request = cls.structured_marqo_index_request(
+            name="structured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            fields=[
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
+                FieldRequest(
+                    name="multimodal_field", 
+                    type=FieldType.MultimodalCombination,
+                    dependent_fields={
+                        "image_field_1": 1.0,
+                        "text_field_1": 0.0
+                    }
+                )
+            ],
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            tensor_fields=["image_field_1", "text_field_1", "multimodal_field"]
+        )
+
         structured_image_index_with_random_model = cls.structured_marqo_index_request(
             model=Model(name='random/small'),
             fields=[
@@ -120,15 +154,29 @@ class TestEmbed(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
         )
 
+        structured_languagebind_index = cls.structured_marqo_index_request(
+            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text),
+                FieldRequest(name="text_field_2", type=FieldType.Text),
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer)
+            ],
+            tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
             unstructured_image_index_with_random_model,
             unstructured_image_index_with_test_prefix,
+            unstructured_image_index_request,
+            unstructured_languagebind_index,
             structured_default_text_index,
             structured_default_image_index,
+            structured_image_index_request,
             structured_image_index_with_random_model,
-            structured_image_index_with_test_prefix
+            structured_image_index_with_test_prefix,
+            structured_languagebind_index
         ])
 
         # Assign to objects so they can be used in tests
@@ -136,10 +184,14 @@ class TestEmbed(MarqoTestCase):
         cls.unstructured_default_image_index = cls.indexes[1]
         cls.unstructured_image_index_with_random_model = cls.indexes[2]
         cls.unstructured_image_index_with_test_prefix = cls.indexes[3]
-        cls.structured_default_text_index = cls.indexes[4]
-        cls.structured_default_image_index = cls.indexes[5]
-        cls.structured_image_index_with_random_model = cls.indexes[6]
-        cls.structured_image_index_with_test_prefix = cls.indexes[7]
+        cls.unstructured_image_index_request = cls.indexes[4]
+        cls.unstructured_languagebind_index = cls.indexes[5]
+        cls.structured_default_text_index = cls.indexes[6]
+        cls.structured_default_image_index = cls.indexes[7]
+        cls.structured_image_index_request = cls.indexes[8]
+        cls.structured_image_index_with_random_model = cls.indexes[9]
+        cls.structured_image_index_with_test_prefix = cls.indexes[10]
+        cls.structured_languagebind_index = cls.indexes[11]
 
     def setUp(self) -> None:
         super().setUp()
@@ -189,6 +241,67 @@ class TestEmbed(MarqoTestCase):
                         self.assertEqual(embed_res["content"], ["This is a test document"])
                         self.assertIsInstance(embed_res["embeddings"][0], list)
                         self.assertEqual(embed_res["embeddings"][0], [0.1, 0.2, 0.3])
+
+    def test_embed_image_url_as_image_not_text(self):
+        """
+        Test that image URLs are embedded as images and not as text using the embed function.
+        """
+        image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+        
+        # Expected vector for the image (same as in test_multimodal_image_url_is_embedded_as_image_not_text)
+        expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
+                        -0.032505638897418976, -0.06116769462823868, -0.03929287940263748]
+
+        for index in [self.unstructured_image_index_request, self.structured_image_index_request]:
+            with self.subTest(index=index.type):
+                embed_res = embed(
+                    marqo_config=self.config,
+                    index_name=index.name,
+                    embedding_request=EmbedRequest(
+                        content=[image_url]
+                    ),
+                    device="cpu"
+                )
+
+                # Get the actual vector
+                actual_vector = embed_res["embeddings"][0]
+
+                # Assert that the vector is similar to expected_vector
+                for i, expected_value in enumerate(expected_vector):
+                    self.assertAlmostEqual(actual_vector[i], expected_value, places=4,
+                                        msg=f"Mismatch at index {i} for {index.type}")
+                    
+
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="Skip this test if we have cuda support.")
+    def test_embed_languagebind(self):
+        content = [
+            #"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", # image
+            "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4" # video
+        ]
+        for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
+            with self.subTest(index=index.type):
+                embed_res = embed(
+                                marqo_config=self.config,
+                                index_name=index.name,
+                                embedding_request=EmbedRequest(
+                                    content=content
+                                ),
+                                device=None
+                            )
+                #print(embed_res)
+                #print(embed_res['embeddings'][0][:7])
+                expected = [
+                    0.0298048947006464, 0.05226955562829971, -0.0038126774597913027,
+                    0.061151087284088135, -0.013925471343100071, 0.060153547674417496, -0.0031225811690092087
+                ]
+                actual = embed_res['embeddings'][0][:7]
+                
+                for a, e in zip(actual, expected):
+                    self.assertAlmostEqual(a, e, delta=1.5)
+                
+                #print(f"Actual: {actual}")
+                #print(f"Expected: {expected}")
+
 
     def test_embed_equivalent_to_add_docs(self):
         """

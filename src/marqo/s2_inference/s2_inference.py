@@ -10,10 +10,12 @@ from PIL import UnidentifiedImageError
 from PIL.Image import Image
 from torch import Tensor
 from torchvision.transforms import Compose
+from typing import List, Dict, Any, Optional
 
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
 from marqo.s2_inference import constants
+from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
@@ -23,11 +25,12 @@ from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.types import *
+from marqo.s2_inference.multimodal_model_load import *
 from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
-
+    
 logger = get_logger(__name__)
 
 # The avaiable has the structure:
@@ -40,33 +43,11 @@ _marqo_inference_cache = MarqoInferenceCache(cache_size=read_env_vars_and_defaul
                                              cache_type=read_env_vars_and_defaults(EnvVars.MARQO_INFERENCE_CACHE_TYPE))
 
 
-def vectorise(model_name: str, content: Union[str, List[str], List[Image]],
+
+def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
               model_properties: dict = None,
               device: str = None, normalize_embeddings: bool = get_default_normalization(),
-              model_auth: ModelAuth = None, enable_cache: bool = False, **kwargs) -> List[List[float]]:
-    """Vectorizes the content by model name.
-
-    Args:
-        model_name (str) : Acts as an identifying alias if model_properties is given.
-                        If model_properties is None then model_name is used to fetch properties from model_registry
-        content (_type_):
-            str: A single string to vectorize, can be text or an image path
-            List[str]: A list of strings to vectorize, can be text or image paths, but not mixed
-            List[Image]: A list of PIL images to vectorize
-        model_properties(dict): {"name": str, "dimensions": int, "tokens": int, "type": str}
-                                if model_properties['name'] is not in model_registry, these properties are used to fetch the model
-                                if model_properties['name'] is in model_registry, default properties are overridden
-                                model_properties can be None only if model_name is a model present in the registry
-        model_auth: Authorisation details for downloading a model (if required)
-        enable_cache: A flag to enable or disable the cache
-
-    Returns:
-        List[List[float]]: _description_
-
-    Raises:
-        VectoriseError: if the content can't be vectorised, for some reason.
-    """
-
+              model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT, **kwargs,) -> List[List[float]]:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
@@ -78,83 +59,99 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image]],
         model_auth=model_auth
     )
 
+    model = _available_models[model_cache_key][AvailableModelsKey.model]
+
     if _marqo_inference_cache.is_enabled() and enable_cache:
-        if isinstance(content, str):
-            vectorised = _marqo_inference_cache.get(model_cache_key, content)
-            if vectorised is None:
-                vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
-                _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
-                return vectorised
-            else:
-                return _convert_cached_embeddings_to_output(vectorised)
-        elif isinstance(content, list):
-            contents_to_vectorise = []
-            cached_output: List[Tuple[int, List[float]]] = []
-
-            # Collect the content that needs to be vectorised
-            for loc, content_item in enumerate(content):
-                if not isinstance(content_item, str):
-                    contents_to_vectorise.append(content_item)
-                else:
-                    vectorised = _marqo_inference_cache.get(model_cache_key, content_item)
-                    if vectorised is None:
-                        contents_to_vectorise.append(content_item)
-                    else:
-                        cached_output.append((loc, vectorised))
-
-            if contents_to_vectorise:
-                vectorised_outputs: List[List[float]] = _encode_without_cache(model_cache_key, contents_to_vectorise,
-                                                                              normalize_embeddings, **kwargs)
-
-                # Cache the vectorised outputs
-                for contents_to_vectorise_loc, vectorised_output in enumerate(vectorised_outputs):
-                    if isinstance(content[contents_to_vectorise_loc], str):
-                        _marqo_inference_cache.set(model_cache_key,
-                                                   contents_to_vectorise[contents_to_vectorise_loc], vectorised_output)
-
-                # Insert the cached outputs back into the vectorised outputs
-                for loc, cached_vector in cached_output:
-                    vectorised_outputs.insert(loc, cached_vector)
-            else:
-                vectorised_outputs = [vector for _, vector in cached_output]
-            return vectorised_outputs
-        else:
-            raise TypeError(f"Unsupported content type: {type(content).__name__}")
+        return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs)
     else:
-        return _encode_without_cache(model_cache_key, content, normalize_embeddings, **kwargs)
+        return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
 
+def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs):
+    if isinstance(content, str):
+        vectorised = _marqo_inference_cache.get(model_cache_key, content)
+        if vectorised is None:
+            vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
+            _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
+        else:
+            vectorised = _convert_cached_embeddings_to_output(vectorised)
+        return vectorised
+    elif isinstance(content, list):
+        return _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs)
+    else:
+        raise TypeError(f"Unsupported content type: {type(content).__name__}")
 
-def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image]],
-                          normalize_embeddings: bool, **kwargs) -> List[List[float]]:
+def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs):
+    contents_to_vectorise = []
+    cached_output = []
+
+    # Collect the content that needs to be vectorised
+    for loc, content_item in enumerate(content):
+        if isinstance(content_item, str):
+            vectorised = _marqo_inference_cache.get(model_cache_key, content_item)
+            if vectorised is None:
+                contents_to_vectorise.append(content_item)
+            else:
+                cached_output.append((loc, vectorised))
+        else:
+            contents_to_vectorise.append(content_item)
+
+    if contents_to_vectorise:
+        vectorised_outputs = _encode_without_cache(model_cache_key, contents_to_vectorise, normalize_embeddings, modality, **kwargs)
+        # Cache the vectorised outputs
+        for content_item, vectorised_output in zip(contents_to_vectorise, vectorised_outputs):
+            if isinstance(content_item, str):
+                _marqo_inference_cache.set(model_cache_key, content_item, vectorised_output)
+        # Insert the cached outputs back into the vectorised outputs
+        for loc, cached_vector in cached_output:
+            vectorised_outputs.insert(loc, cached_vector)
+    else:
+        vectorised_outputs = [vector for _, vector in cached_output]
+
+    return vectorised_outputs
+
+def _vectorise_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+                             normalize_embeddings: bool, modality: Modality, **kwargs) -> List[List[float]]:
+    return _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
+
+def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+                          normalize_embeddings: bool, modality: Modality, **kwargs) -> List[List[float]]:
     try:
-        if isinstance(content, str):
-            vectorised = _available_models[model_cache_key][AvailableModelsKey.model].encode(content,
-                                                                                             normalize=normalize_embeddings,
-                                                                                             **kwargs)
-        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
-            vectorised = _available_models[model_cache_key][AvailableModelsKey.model].encode(content,
-                                                                                             normalize=normalize_embeddings,
-                                                                                             **kwargs)
+        model = _available_models[model_cache_key][AvailableModelsKey.model]
+        encoder = get_encoder(model)
 
+        if isinstance(content, str):
+            vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
+        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
+            vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
+            
             for batch in generate_batches(content, batch_size=batch_size):
-                vector_batches.append(_convert_tensor_to_numpy(
-                    _available_models[model_cache_key][AvailableModelsKey.model].encode(batch,
-                                                                                        normalize=normalize_embeddings,
-                                                                                        **kwargs)))
-            if not vector_batches or all(
-                    len(batch) == 0 for batch in vector_batches):  # Check for empty vector_batches or empty arrays
+                if modality is None:
+                    modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
+
+                encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings, **kwargs)
+                
+                vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
+            
+            if not vector_batches or all(len(batch) == 0 for batch in vector_batches):
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
                 vectorised = np.concatenate(vector_batches, axis=0)
+
+                # Clear CUDA cache
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+        
     except (UnidentifiedImageError, OSError) as e:
         if isinstance(e, UnidentifiedImageError) or "image file is truncated" in str(e):
             raise VectoriseError(f"Could not process given image: {content}. Original Error message: {e}") from e
         else:
             raise e
+    
     return _convert_vectorized_output(vectorised)
+
 
 
 def get_available_models() -> Dict:
@@ -166,6 +163,14 @@ def get_marqo_inference_cache() -> MarqoInferenceCache:
     """Returns the _marqo_inference_cache object"""
     return _marqo_inference_cache
 
+def get_encoder(model):
+    if isinstance(model, MultimodalModel):
+        if model.properties.loader == "languagebind":
+            return LanguageBindEncoder(model)
+        else:
+            raise NotImplementedError(f"Model {model.name} is not supported")
+    return DefaultEncoder(model)
+
 
 def is_preprocess_image_model(model_properties: dict = None) -> bool:
     """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module
@@ -174,33 +179,35 @@ def is_preprocess_image_model(model_properties: dict = None) -> bool:
     model_type = model_properties.get("type", None)
     return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
 
+def load_multimodal_model(model_name: str, model_properties: Dict[str, Any], device: str) -> MultimodalModel:
+    model = MultimodalModel(model_name, model_properties, device)
+    return model
 
-def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_properties: Optional[dict] = None,
+def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
                                                      device: Optional[str] = None,
                                                      model_auth: Optional[ModelAuth] = None,
                                                      normalize_embeddings: bool = get_default_normalization()) \
-        -> Optional[Compose]:
-    """Load the multimodal model and return the image preprocessor.
+        -> Tuple[Any, Dict[str, Optional[Compose]]]:
+    """Load the model and return preprocessors for different modalities.
+
     Args:
-        model_name (str): The name of the multimodal model to load.
-        model_properties (dict): The validated properties of the multimodal model.
-            The model properties should have been validated in marqo_index
+        model_name (str): The name of the model to load.
+        model_properties (dict): The validated properties of the model.
         device (str): The device to load the model on.
         model_auth: Authorisation details for downloading a model (if required)
         normalize_embeddings (bool): Whether to normalize the embeddings.
 
     Returns:
-        Optional[Compose]: The image preprocessor in the loaded model. If not found, returns None.
+        Tuple[Any, Dict[str, Optional[Compose]]]: The loaded model and a dictionary of preprocessors for different modalities.
 
     Raises:
         InternalError: If the device is not set.
-        InternalError: If the model is not a model that requires preload image preprocessor.
     """
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
-
-    if not is_preprocess_image_model(model_properties):
-        raise InternalError(message=f"Model {model_name} is not a model that requires preload image preprocessor.")
+    
+    #if model_properties.get("type") in ['languagebind', 'imagebind']:
+    #    model = load_multimodal_model(model_name, model_properties, device)
 
     model_cache_key = _create_model_cache_key(model_name, device, model_properties)
 
@@ -209,7 +216,17 @@ def load_multimodal_model_and_get_image_preprocessor(model_name: str, model_prop
         model_auth=model_auth
     )
 
-    return getattr(_available_models[model_cache_key][AvailableModelsKey.model], "preprocess", None)
+    model = _available_models[model_cache_key][AvailableModelsKey.model]
+
+    preprocessors = {
+        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
+        "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
+        "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
+        "text": None # Future preprocessor
+    }
+
+    return model, preprocessors
+    #return getattr(_available_models[model_cache_key][AvailableModelsKey.model], "preprocess", None)
 
 
 def _get_max_vectorise_batch_size() -> int:
@@ -353,6 +370,8 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
                             ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
             pass
+        elif model_type in [ModelType.LanguageBind]:
+            MultimodalModelProperties(**model_properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
                                               f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
@@ -502,6 +521,12 @@ def _load_model(
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
+    if model_properties.get('type') in [ModelType.LanguageBind]:
+        model = MultimodalModel(model_name, model_properties, device)
+        model.model = model._load_multimodal_model()
+        model.encoder = get_encoder(model)
+        return model
+
     print(f"loading for: model_name={model_name} and properties={model_properties}")
 
     model_type = model_properties.get("type")
@@ -527,6 +552,13 @@ def _load_model(
     model.load()
     return model
 
+def chunk_video(video_path: str, chunk_length: int, frames_per_chunk: int) -> List[List[Image]]:
+    # Implement video chunking and frame extraction
+    pass
+
+def chunk_audio(audio_path: str, chunk_length: int) -> List[np.ndarray]:
+    # Implement audio chunking
+    pass
 
 def clear_loaded_models() -> None:
     """ clears the loaded model cache
@@ -558,7 +590,6 @@ def get_model_properties_from_registry(model_name: str) -> dict:
     Returns:
         dict: a dictionary describing properties of the model.
     """
-
     if model_name not in MODEL_PROPERTIES['models']:
         raise UnknownModelError(f"Could not find model properties in model registry for model={model_name}. "
                                 f"Model is not supported by default.")
@@ -717,7 +748,7 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
 
     if model_type not in MODEL_PROPERTIES['loaders']:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
-
+    
     return MODEL_PROPERTIES['loaders'][model_type]
 
 

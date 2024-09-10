@@ -63,3 +63,7 @@ class BatchInferenceSizeNotMatchError(S2InferenceError):
 
 class ImageDownloadError(S2InferenceError):
     pass
+
+
+class UnsupportedModalityError(S2InferenceError):
+    pass

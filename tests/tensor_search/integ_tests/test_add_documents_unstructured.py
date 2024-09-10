@@ -674,6 +674,7 @@ class TestAddDocumentsUnstructured(MarqoTestCase):
                     tensor_fields=["title", "location"]
                 )
             ).dict(exclude_none=True, by_alias=True)
+            print(res1)
             self.assertEqual(
                 c,
                 self.config.monitoring.get_index_stats_by_name(

@@ -15,7 +15,8 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.core.models.marqo_index import StructuredMarqoIndex, FieldFeature, FieldType, Model
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
-    ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod, IndexType
+    ImagePreProcessing, VideoPreProcessing, AudioPreProcessing, Model, DistanceMetric, VectorNumericType, \
+    HnswConfig, TextSplitMethod, IndexType
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 
@@ -451,6 +452,7 @@ class TestPrefix(MarqoTestCase):
             ),
             normalize_embeddings=True,
             treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=False,
             filter_string_max_length=1000,
             text_preprocessing=TextPreProcessing(
                 splitLength=6,
@@ -458,6 +460,14 @@ class TestPrefix(MarqoTestCase):
                 splitMethod=TextSplitMethod.Character
             ),
             image_preprocessing=ImagePreProcessing(),
+            video_preprocessing=VideoPreProcessing(
+                splitLength=20,
+                splitOverlap=1,
+            ),
+            audio_preprocessing=AudioPreProcessing(
+                splitLength=20,
+                splitOverlap=1,
+            ),
             distance_metric=DistanceMetric.DotProduct,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(

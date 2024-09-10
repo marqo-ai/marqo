@@ -1,6 +1,8 @@
 import os
 import uuid
 from unittest import mock
+import torch
+import pytest
 
 import marqo.core.exceptions as core_exceptions
 from marqo.core.models.marqo_index import *
@@ -51,6 +53,12 @@ class TestSearch(MarqoTestCase):
         unstructured_image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
             treat_urls_and_pointers_as_images=True
+        )
+
+        unstructured_languagebind_index = cls.unstructured_marqo_index_request(
+            model=Model(name='LanguageBind/Video_V1.5_FT_Audio_FT_Image'),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True
         )
 
         # STRUCTURED indexes
@@ -139,16 +147,32 @@ class TestSearch(MarqoTestCase):
             tensor_fields=["text_field_1", "text_field_2", "image_field_1"]
         )
 
+        structured_languagebind_index = cls.structured_marqo_index_request(
+            name="my-multimodal-index" + str(uuid.uuid4()).replace('-', ''),
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text),
+                FieldRequest(name="video_field_1", type=FieldType.VideoPointer),
+                FieldRequest(name="audio_field_1", type=FieldType.AudioPointer),
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
+            ],
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
+            tensor_fields=["text_field_1",
+                        "video_field_1", "audio_field_1", "image_field_1"],
+            normalize_embeddings=True,
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_text_index_encoded_name,
             unstructured_default_image_index,
             unstructured_image_index_with_chunking,
             unstructured_image_index_with_random_model,
+            unstructured_languagebind_index,
             structured_default_text_index,
             structured_default_text_index_encoded_name,
             structured_default_image_index,
-            structured_image_index_with_random_model
+            structured_image_index_with_random_model,
+            structured_languagebind_index
         ])
 
         # Assign to objects so they can be used in tests
@@ -157,10 +181,12 @@ class TestSearch(MarqoTestCase):
         cls.unstructured_default_image_index = cls.indexes[2]
         cls.unstructured_image_index_with_chunking = cls.indexes[3]
         cls.unstructured_image_index_with_random_model = cls.indexes[4]
-        cls.structured_default_text_index = cls.indexes[5]
-        cls.structured_default_text_index_encoded_name = cls.indexes[6]
-        cls.structured_default_image_index = cls.indexes[7]
-        cls.structured_image_index_with_random_model = cls.indexes[8]
+        cls.unstructured_languagebind_index = cls.indexes[5]
+        cls.structured_default_text_index = cls.indexes[6]
+        cls.structured_default_text_index_encoded_name = cls.indexes[7]
+        cls.structured_default_image_index = cls.indexes[8]
+        cls.structured_image_index_with_random_model = cls.indexes[9]
+        cls.structured_languagebind_index = cls.indexes[10]
 
     def setUp(self) -> None:
         super().setUp()
@@ -171,6 +197,73 @@ class TestSearch(MarqoTestCase):
     def tearDown(self) -> None:
         super().tearDown()
         self.device_patcher.stop()
+
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is 5gb and is very slow on g4dn.xlarge and may crash it")
+    def test_search_video(self):
+        documents = [
+            {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
+            # Replace the audio link with something marqo-hosted
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
+            {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
+        ]
+        for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
+            with self.subTest(index=index.type):
+                response = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=documents,
+                        tensor_fields=["text_field_1",
+                        "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Search using the video
+                results = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4"
+                )
+
+                # Assertions
+                self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
+                self.assertEqual(results['hits'][0]['_id'], "1")  # The video document should be the top result
+                self.assertGreater(results['hits'][0]['_score'], results['hits'][1]['_score'])  # Video should have higher score
+
+    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is 5gb and is very slow on g4dn.xlarge and may crash it")
+    def test_search_audio(self):
+        documents = [
+            {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
+            # Replace the audio link with something marqo-hosted
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
+            {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
+        ]
+        for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
+            with self.subTest(index=index.type):
+                response = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=documents,
+                        tensor_fields=["text_field_1",
+                        "video_field_1", "audio_field_1", "image_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Search using the audio
+                results = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3"
+                )
+                
+                # Assertions
+                self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
+                self.assertEqual(results['hits'][0]['_id'], "2")  # The audio document should be the top result
+                self.assertGreater(results['hits'][0]['_score'], results['hits'][1]['_score'])  # Audio should have higher score
+
 
     def test_filtering_list_case_tensor(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:

@@ -14,3 +14,4 @@ class ModelType(str, Enum):
     Random = 'random'
     HF_MODEL = 'hf'
     NO_MODEL= "no_model"
+    LanguageBind = "languagebind"
