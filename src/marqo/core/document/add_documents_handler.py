@@ -5,13 +5,15 @@ from abc import ABC, abstractmethod
 from contextlib import ExitStack
 from http import HTTPStatus
 from timeit import default_timer as timer
-from typing import List, Dict, Optional, Any, Tuple, Set
+from typing import List, Dict, Optional, Any, Tuple, Set, Union
+
+from PIL.Image import Image
 
 from marqo import marqo_docs
 from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
-from marqo.core.document.tensor_fields_container import Chunker, Vectoriser, TensorFieldsContainer
+from marqo.core.document.tensor_fields_container import Chunker, Vectoriser, TensorFieldsContainer, TensorFieldContent
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
@@ -158,21 +160,108 @@ class AddDocumentsHandler(ABC):
         pass
 
     def vectorise_tensor_fields(self) -> None:
+        self.vectorise_tensor_fields_in_batch_per_doc()
+
+    def vectorise_tensor_fields_per_field(self) -> None:
         with ExitStack() as exit_stack:
             chunkers: Dict[FieldType, Chunker] = {
                 FieldType.Text: self.text_chunker(),
                 FieldType.ImagePointer: self.image_chunker(exit_stack)
             }
-            vectoriser = self.vectoriser()
+            vectorisers: Dict[FieldType, Vectoriser] = {
+                FieldType.Text: self.single_vectoriser(infer=False),
+                FieldType.ImagePointer: self.single_vectoriser(infer=True)
+            }
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
                     tensor_field_content.chunk(chunkers)
-                    tensor_field_content.vectorise(vectoriser)
+                    tensor_field_content.vectorise(vectorisers)
                 except AddDocumentsError as err:
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
+
+    def vectorise_tensor_fields_in_batch_per_doc(self) -> None:
+        with ExitStack() as exit_stack:
+            chunkers: Dict[FieldType, Chunker] = {
+                FieldType.Text: self.text_chunker(),
+                FieldType.ImagePointer: self.image_chunker(exit_stack)
+            }
+
+            doc_chunks_map: Dict[str, Dict[FieldType, List[str]]] = dict()
+            doc_field_map: Dict[str, List[TensorFieldContent]] = dict()
+
+            for doc_id, field_name, tensor_field_content in (
+                    self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
+                try:
+                    chunks_to_vectorise = tensor_field_content.chunk(chunkers)
+                    field_type = tensor_field_content.field_type
+                    if doc_id not in doc_chunks_map:
+                        doc_chunks_map[doc_id] = {
+                            FieldType.Text: [],
+                            FieldType.ImagePointer: []
+                        }
+                    doc_chunks_map[doc_id][field_type].extend(chunks_to_vectorise)
+
+                    if doc_id not in doc_field_map:
+                        doc_field_map[doc_id] = []
+                    doc_field_map[doc_id].append(tensor_field_content)
+
+                except AddDocumentsError as err:
+                    self.add_docs_response_collector.collect_error_response(doc_id, err)
+                    self.tensor_fields_container.remove_doc(doc_id)
+                    if doc_id in doc_chunks_map:
+                        del doc_chunks_map[doc_id]
+
+            for doc_id, chunks_to_vectorise in doc_chunks_map.items():
+                try:
+                    vectorisers: Dict[FieldType, Vectoriser] = {
+                        FieldType.Text: self.batch_vectoriser(chunks_to_vectorise[FieldType.Text], infer=False),
+                        FieldType.ImagePointer: self.batch_vectoriser(chunks_to_vectorise[FieldType.ImagePointer], infer=True)
+                    }
+
+                    for tensor_field_content in doc_field_map[doc_id]:
+                        tensor_field_content.vectorise(vectorisers)
+
+                except AddDocumentsError as err:
+                    self.add_docs_response_collector.collect_error_response(doc_id, err)
+                    self.tensor_fields_container.remove_doc(doc_id)
+
+    def vectorise_tensor_fields_in_batch_per_add_doc_batch(self) -> None:
+        with ExitStack() as exit_stack:
+            chunkers: Dict[FieldType, Chunker] = {
+                FieldType.Text: self.text_chunker(),
+                FieldType.ImagePointer: self.image_chunker(exit_stack)
+            }
+
+            chunks_map: Dict[FieldType, List[str]] = {
+                FieldType.Text: [],
+                FieldType.ImagePointer: []
+            }
+
+            for doc_id, field_name, tensor_field_content in (
+                    self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
+                try:
+                    chunks_to_vectorise = tensor_field_content.chunk(chunkers)
+                    field_type = tensor_field_content.field_type
+                    chunks_map[field_type].extend(chunks_to_vectorise)
+                except AddDocumentsError as err:
+                    self.add_docs_response_collector.collect_error_response(doc_id, err)
+                    self.tensor_fields_container.remove_doc(doc_id)
+
+            try:
+                vectorisers: Dict[FieldType, Vectoriser] = {
+                    FieldType.Text: self.batch_vectoriser(chunks_to_vectorise[FieldType.Text], infer=False),
+                    FieldType.ImagePointer: self.batch_vectoriser(chunks_to_vectorise[FieldType.ImagePointer], infer=True)
+                }
+            except AddDocumentsError as err:
+                # TODO we need to fail the batch
+                return
+
+            for doc_id, field_name, tensor_field_content in (
+                    self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
+                tensor_field_content.vectorise(vectorisers)
 
     def _download_image_contents(self, exit_stack):
         # collect image urls
@@ -255,33 +344,54 @@ class AddDocumentsHandler(ABC):
 
         return chunk
 
-    def vectoriser(self) -> Vectoriser:
-        def vectorise(content_chunks: List[str], field_type: FieldType):
-            # TODO batch request to get more GPU utilisation, also consider how to fail fast
-            try:
-                return s2_inference.vectorise(
-                    model_name=self.marqo_index.model.name,
-                    model_properties=self.marqo_index.model.get_properties(),
-                    content=content_chunks,
-                    device=self.add_docs_params.device,
-                    normalize_embeddings=self.marqo_index.normalize_embeddings,
-                    infer=field_type == FieldType.ImagePointer,
-                    model_auth=self.add_docs_params.model_auth
-                )
-            except (s2_inference_errors.UnknownModelError,
-                    s2_inference_errors.InvalidModelPropertiesError,
-                    s2_inference_errors.ModelLoadError,
-                    s2_inference.ModelDownloadError) as model_error:
-                # Fail the whole batch due to a malfunctioning embedding model
-                # TODO Add a core exception
-                raise api_errors.BadRequestError(
-                    message=f'Problem vectorising query. Reason: {str(model_error)}',
-                    link=marqo_docs.list_of_models()
-                )
-            except s2_inference_errors.S2InferenceError as e:
-                raise AddDocumentsError(e.message)
+    def single_vectoriser(self, infer: bool) -> Vectoriser:
+        def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+            return self._s2inference_vectorise(content_chunks, infer)
 
         return vectorise
+
+    def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], infer: bool) -> Vectoriser:
+        def dict_key(chunk: Union[str, Image]):
+            if isinstance(chunk, str):
+                return chunk
+            if isinstance(chunk, Image):
+                return hash((chunk.format, chunk.size))
+            raise AddDocumentsError("Content chunk is not str or Image")
+
+        embedding_cache = dict()
+        if chunks_to_vectorise:
+            embeddings = self._s2inference_vectorise(chunks_to_vectorise, infer)
+            embedding_cache = {dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
+
+        def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+            return [embedding_cache[dict_key(chunk)] for chunk in content_chunks]
+
+        return vectorise
+
+    def _s2inference_vectorise(self, content_chunks: Union[List[str], List[Image]], infer: bool):
+        try:
+            return s2_inference.vectorise(
+                model_name=self.marqo_index.model.name,
+                model_properties=self.marqo_index.model.get_properties(),
+                content=content_chunks,
+                device=self.add_docs_params.device,
+                normalize_embeddings=self.marqo_index.normalize_embeddings,
+                model_auth=self.add_docs_params.model_auth,
+                # TODO how is this param used? Is it different for different modals?
+                infer=infer
+            )
+        except (s2_inference_errors.UnknownModelError,
+                s2_inference_errors.InvalidModelPropertiesError,
+                s2_inference_errors.ModelLoadError,
+                s2_inference.ModelDownloadError) as model_error:
+            # Fail the whole batch due to a malfunctioning embedding model
+            # TODO Add a core exception
+            raise api_errors.BadRequestError(
+                message=f'Problem vectorising query. Reason: {str(model_error)}',
+                link=marqo_docs.list_of_models()
+            )
+        except s2_inference_errors.S2InferenceError as e:
+            raise AddDocumentsError(e.message)
 
     def persist_to_vespa(self) -> None:
         vespa_docs = []
