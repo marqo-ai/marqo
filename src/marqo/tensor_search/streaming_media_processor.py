@@ -18,13 +18,17 @@ from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 class StreamingMediaProcessor:
-    def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index: MarqoIndex,
-                 preprocessors: Preprocessors):
+    def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index_type: IndexType,
+                 marqo_index_model: Model, preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
+                 video_preprocessing: VideoPreProcessing = None):
         self.url = url
         self.device = device
         self.headers = headers
         self.modality = modality
-        self.marqo_index = marqo_index
+        self.marqo_index_type = marqo_index_type
+        self.marqo_index_model = marqo_index_model
+        self.audio_preprocessing = audio_preprocessing
+        self.video_preprocessing = video_preprocessing
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
         self.total_size, self.duration = self._fetch_file_metadata()
@@ -33,7 +37,7 @@ class StreamingMediaProcessor:
         self._log_initialization_details()
 
     def _set_split_parameters(self, modality):
-        preprocessing = self.marqo_index.video_preprocessing if modality == Modality.VIDEO else self.marqo_index.audio_preprocessing
+        preprocessing = self.video_preprocessing if modality == Modality.VIDEO else self.audio_preprocessing
 
         if preprocessing is not None:
             self.split_length = preprocessing.split_length

@@ -23,6 +23,7 @@ from marqo.s2_inference.languagebind import (
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
     to_device
 )
+from marqo.s2_inference.errors import MediaDownloadError
 from marqo.core.inference.image_download import encode_url
 from marqo.s2_inference.clip_utils import download_image_from_url, validate_url
 from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBindImageTokenizer
@@ -170,7 +171,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
                     elif mime.startswith('audio/'):
                         return Modality.AUDIO
             except requests.exceptions.RequestException as e:
-                pass
+                raise MediaDownloadError(f"Error downloading media file {content}: {e}")
 
         return Modality.TEXT
 
@@ -188,8 +189,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
 
     else:
         return Modality.TEXT
-        # raise ValueError(f"Unsupported content type: {type(content)}.
-        # It is neither a string, list of strings, nor bytes.")
+
 
 
 class LanguageBindEncoder(ModelEncoder):
