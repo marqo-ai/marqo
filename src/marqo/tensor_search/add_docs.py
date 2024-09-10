@@ -93,8 +93,12 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     try:    
                         inferred_modality = infer_modality(doc[field])
                     except MediaDownloadError as e:
-                        media_repo[doc[field]] = MediaDownloadError(f"Error inferring modality of media file {doc[field]}: {e}")
-                        continue
+                        if is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer:
+                            # Continue processing for structured indexes with image fields
+                            inferred_modality = Modality.IMAGE
+                        else:
+                            media_repo[doc[field]] = MediaDownloadError(f"Error inferring modality of media file {doc[field]}: {e}")
+                            continue
 
                     if (inferred_modality == Modality.IMAGE and is_unstructured_index) or (
                         is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer): # Don't use infer modality in structured image pointers
