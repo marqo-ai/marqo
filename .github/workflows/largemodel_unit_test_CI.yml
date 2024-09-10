@@ -47,6 +47,20 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
     steps:
+      - name: Expand root volume
+        run: |
+          TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -v http://169.254.169.254/latest/meta-data/instance-id)
+          VOLUME_ID=$(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=$INSTANCE_ID | jq -r .Volumes[0].Attachments[0].VolumeId)
+          echo $INSTANCE_ID
+          echo $VOLUME_ID
+          aws ec2 modify-volume --volume-id $VOLUME_ID --size 400
+          sleep 15
+          growpart /dev/nvme0n1 1
+          lsblk
+          xfs_growfs -d /
+          df -hT
+
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
