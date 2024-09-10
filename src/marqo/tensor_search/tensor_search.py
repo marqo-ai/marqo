@@ -170,32 +170,50 @@ def _add_documents_semi_structured(config: Config, add_docs_params: AddDocsParam
     # Deduplicate docs, keep the latest
     docs, doc_ids = config.document.remove_duplicated_documents(add_docs_params.docs)
 
-    with ExitStack() as exit_stack:
-        image_fields = [field.name for field in marqo_index.field_map_by_type[FieldType.ImagePointer]]
+    media_download_thread_count = _determine_thread_count(marqo_index, add_docs_params)
 
-        if image_fields:
+    with ExitStack() as exit_stack:
+        media_fields = [
+            field.name for field in
+            marqo_index.field_map_by_type[FieldType.ImagePointer] +
+            marqo_index.field_map_by_type[FieldType.VideoPointer] +
+            marqo_index.field_map_by_type[FieldType.AudioPointer]
+        ]
+
+        media_field_types_mapping = {field.name: field.type for field in
+                                     marqo_index.field_map_by_type[FieldType.ImagePointer] +
+                                     marqo_index.field_map_by_type[FieldType.VideoPointer] +
+                                     marqo_index.field_map_by_type[FieldType.AudioPointer]
+                                     }
+
+        if media_fields:
             with RequestMetricsStore.for_request().time(
-                    "image_download.full_time",
+                    "media_download.full_time",
                     lambda t: logger.debug(
-                        f"add_documents image download: took {t:.3f}ms to concurrently download "
-                        f"images for {batch_size} docs using {add_docs_params.image_download_thread_count} threads"
+                        f"add_documents media download: took {t:.3f}ms to concurrently download "
+                        f"media for {batch_size} docs using {media_download_thread_count} threads"
                     )
             ):
 
-                if '_id' in image_fields:
+                if '_id' in media_fields:
                     raise api_exceptions.BadRequestError(message="`_id` field cannot be an image pointer field.")
 
-                image_repo = exit_stack.enter_context(
-                    add_docs.download_and_preprocess_images(
-                        docs=docs, thread_count=add_docs_params.image_download_thread_count,
-                        tensor_fields=image_fields,
+                media_repo = exit_stack.enter_context(
+                    add_docs.download_and_preprocess_content(
+                        docs=docs,
+                        thread_count=media_download_thread_count,
+                        tensor_fields=media_fields,
                         image_download_headers=add_docs_params.image_download_headers,
+                        # add non image download headers in the future
                         model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
+                        media_field_types_mapping=media_field_types_mapping,
                         model_properties=marqo_index.model.get_properties(),
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
-                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None
+                        patch_method_exists=marqo_index.image_preprocessing.patch_method is not None,
+                        marqo_index=marqo_index,
+                        force_download=True
                     )
                 )
 

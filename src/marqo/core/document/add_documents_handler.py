@@ -288,17 +288,19 @@ class AddDocumentsHandler(ABC):
             return dict()
 
         image_repo = exit_stack.enter_context(
-            add_docs.download_and_preprocess_images(
+            add_docs.download_and_preprocess_content(
                 docs=list(doc_image_fields.values()),
                 thread_count=self.add_docs_params.image_download_thread_count,
                 tensor_fields=image_tensor_fields,
                 image_download_headers=self.add_docs_params.image_download_headers,
                 model_name=self.marqo_index.model.name,
                 normalize_embeddings=self.marqo_index.normalize_embeddings,
+                media_field_types_mapping=None,
                 model_properties=self.marqo_index.model.get_properties(),
                 device=self.add_docs_params.device,
                 model_auth=self.add_docs_params.model_auth,
-                patch_method_exists=self.marqo_index.image_preprocessing.patch_method is not None
+                patch_method_exists=self.marqo_index.image_preprocessing.patch_method is not None,
+                marqo_index=self.marqo_index
             )
         )
 
