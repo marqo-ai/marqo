@@ -22,8 +22,6 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-RUN pip uninstall -y open_clip_torch
-RUN pip install open-clip-torch==2.24.0
 RUN rm requirements.txt
 
 # Stage 3: Final stage that builds on the base image
@@ -33,6 +31,9 @@ COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app
 COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
+
+RUN pip uninstall -y open_clip_torch
+RUN pip install open-clip-torch==2.24.0
 
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
