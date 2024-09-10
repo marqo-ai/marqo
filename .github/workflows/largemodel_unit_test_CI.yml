@@ -57,7 +57,9 @@ jobs:
           export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           export AWS_DEFAULT_REGION=${{ secrets.AWS_REGION }}
           
-          VOLUME_ID=$(aws ec2 describe-volumes --region=${{ secrets.AWS_REGION }}--filters Name=attachment.instance-id,Values=${{ needs.start-runner.outputs.ec2-instance-id }} --query "Volumes[0].{ID:VolumeId}" --output text)
+          aws configure 
+          
+          VOLUME_ID=$(aws ec2 describe-volumes --region=${{ secrets.AWS_REGION }} --filters Name=attachment.instance-id, Values=${{ needs.start-runner.outputs.ec2-instance-id }} --query "Volumes[0].{ID:VolumeId}" --output text)
           echo "Instance ID: ${{ needs.start-runner.outputs.ec2-instance-id }}"
           echo "Volume ID: ${VOLUME_ID}"
           aws ec2 modify-volume --region=eu-west-1 --volume-id "${VOLUME_ID}" --size 256
