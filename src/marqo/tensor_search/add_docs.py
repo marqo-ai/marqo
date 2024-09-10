@@ -135,8 +135,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 else:
                                     raise e
 
-                    elif (
-                            inferred_modality in [Modality.VIDEO, Modality.AUDIO] and is_unstructured_index) or (
+                    elif (inferred_modality in [Modality.VIDEO, Modality.AUDIO] and is_unstructured_index) or (
                             is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer] and inferred_modality in [Modality.AUDIO, Modality.VIDEO]):
 
                         if marqo_index_model.properties.get('type') not in [
