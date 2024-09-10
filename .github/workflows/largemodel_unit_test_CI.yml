@@ -29,17 +29,17 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ami-03f8729795bfb473a
+          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
           ec2-instance-type: g4dn.2xlarge
-          subnet-id: subnet-0718f8f98cdef0074
-          security-group-id: sg-03bd8d27a1e616cfe
+          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
+          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
 
   Test-Marqo:
     name: Run Large Model Unit Tests
