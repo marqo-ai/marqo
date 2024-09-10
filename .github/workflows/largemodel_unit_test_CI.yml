@@ -52,17 +52,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y awscli
           sudo apt-get install -y jq
-          # Fetch the EC2 metadata and modify the volume size
-          TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-          INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -v http://169.254.169.254/latest/meta-data/instance-id)
-          VOLUME_ID=$(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=$INSTANCE_ID | jq -r .Volumes[0].Attachments[0].VolumeId)
           
-          echo $INSTANCE_ID
-          echo $VOLUME_ID
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          export AWS_DEFAULT_REGION=${{ secrets.AWS_REGION }}
           
-          aws ec2 modify-volume --volume-id $VOLUME_ID --size 400
-          sleep 15
-          
+          VOLUME_ID=$(aws ec2 describe-volumes --region=${{ secrets.AWS_REGION }}--filters Name=attachment.instance-id,Values=${{ needs.start-runner.outputs.ec2-instance-id }} --query "Volumes[0].{ID:VolumeId}" --output text)
+          echo "Instance ID: ${{ needs.start-runner.outputs.ec2-instance-id }}"
+          echo "Volume ID: ${VOLUME_ID}"
+          aws ec2 modify-volume --region=eu-west-1 --volume-id "${VOLUME_ID}" --size 256
+          sleep 15  # let it update
           growpart /dev/nvme0n1 1
           lsblk
           xfs_growfs -d /
