@@ -36,7 +36,7 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
+          ec2-image-id: ami-03f8729795bfb473a
           ec2-instance-type: g4dn.2xlarge
           subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
           security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
@@ -47,28 +47,6 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
     steps:
-      - name: Expand root volume
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
-          sudo apt-get install -y jq
-          
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          export AWS_DEFAULT_REGION=${{ secrets.AWS_REGION }}
-          
-          aws configure 
-          
-          VOLUME_ID=$(aws ec2 describe-volumes --region=${{ secrets.AWS_REGION }} --filters Name=attachment.instance-id, Values=${{ needs.start-runner.outputs.ec2-instance-id }} --query "Volumes[0].{ID:VolumeId}" --output text)
-          echo "Instance ID: ${{ needs.start-runner.outputs.ec2-instance-id }}"
-          echo "Volume ID: ${VOLUME_ID}"
-          aws ec2 modify-volume --region=eu-west-1 --volume-id "${VOLUME_ID}" --size 256
-          sleep 15  # let it update
-          growpart /dev/nvme0n1 1
-          lsblk
-          xfs_growfs -d /
-          df -hT
-
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
