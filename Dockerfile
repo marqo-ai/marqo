@@ -32,7 +32,6 @@ COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
 
-RUN pip show open_clip_torch
 
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
