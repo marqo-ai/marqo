@@ -159,8 +159,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             logger.error(f"Error processing {modality} file: {str(e)}")
                             media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
                     
-                    elif modality is Modality.TEXT and is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer]:
-                        media_repo[doc[field]] = S2InferenceError(f"Error processing media file {doc}, detected as text")
+                    elif modality is Modality.TEXT and is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer, FieldType.ImagePointer]:
+                        media_repo[doc[field]] = S2InferenceError(f"Error processing media file {doc}, detected as text or failed to determine modality")
                     else:
                         pass
 

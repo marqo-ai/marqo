@@ -14,6 +14,8 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
 from PIL.Image import Image
 import torch
+from urllib.parse import quote
+
 
 from marqo.s2_inference.multimodal_model_load import *
 from marqo.s2_inference.languagebind import (
@@ -143,13 +145,19 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
         if not validate_url(content):
             return Modality.TEXT
+        
+        # Encode the URL
+        encoded_url = quote(content, safe=':/')
 
-        extension = content.split('.')[-1].lower()
+        extension = encoded_url.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+            print(f"inferred image")
             return Modality.IMAGE
         elif extension in ['mp4', 'avi', 'mov']:
+            print(f"inferred video")
             return Modality.VIDEO
         elif extension in ['mp3', 'wav', 'ogg']:
+            print(f"inferred audio")
             return Modality.AUDIO
 
         if validate_url(content):
@@ -158,13 +166,17 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
                 with fetch_content_sample(content) as sample:
                     mime = magic.from_buffer(sample.read(), mime=True)
                     if mime.startswith('image/'):
+                        print(f"inferred image from url")
                         return Modality.IMAGE
                     elif mime.startswith('video/'):
+                        print(f"inferred video from url")
                         return Modality.VIDEO
                     elif mime.startswith('audio/'):
+                        print(f"inferred audio from url")
                         return Modality.AUDIO
-            except Exception as e:
-                pass
+            except requests.exceptions.RequestException as e:
+                print(f"Request failed: {e}")
+                raise ValueError("Failed to fetch content from URL.")
 
         return Modality.TEXT
 
