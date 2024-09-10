@@ -33,7 +33,7 @@ COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
 
 RUN pip uninstall open_clip_torch -y
-RUN pip install open_clip_torch==2.24.0 --no-cache-dir --force-reinstall
+RUN pip install open_clip_torch==2.24.0
 
 RUN pip show open_clip_torch
 
