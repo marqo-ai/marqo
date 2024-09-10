@@ -92,7 +92,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     if (modality == Modality.IMAGE and is_no_index) or (
                         modality == Modality.IMAGE and is_unstructured_index) or (
                         is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer and modality not in [Modality.TEXT, Modality.AUDIO, Modality.VIDEO]):
-
+                        
                         if (marqo_index is not None
                                 and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
                                 and marqo_index.model.properties.get('supported_modalities') is not None
@@ -138,11 +138,11 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 f"Model {marqo_index.model.name} does not support {modality}")
                             continue
 
-                        if modality is Modality.VIDEO and media_field_types_mapping[
+                        if is_structured_index and modality is Modality.VIDEO and media_field_types_mapping[
                             field] is not FieldType.VideoPointer:
                             media_repo[doc[field]] = S2InferenceError(
                                 f"Invalid audio file. Error processing media file {doc}, detected as video, but field type is not VideoPointer")
-                        elif modality is Modality.AUDIO and media_field_types_mapping[
+                        elif is_structured_index and modality is Modality.AUDIO and media_field_types_mapping[
                             field] is not FieldType.AudioPointer:
                             media_repo[doc[field]] = S2InferenceError(
                                 f"Invalid video file. Error processing media file {doc}, detected as audio, but field type is not AudioPointer")

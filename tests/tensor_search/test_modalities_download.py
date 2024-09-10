@@ -8,6 +8,7 @@ from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
 from marqo.s2_inference.s2_inference import Modality
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+import ffmpeg
 
 
 class TestThreadedDownloadAndPreprocess(unittest.TestCase):
@@ -184,7 +185,6 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
             docs, media_repo, tensor_fields, {}, device="cpu",
             marqo_index=self.mock_marqo_index
         )
-
         self.assertIn(self.mock_video_url, media_repo)
         self.assertIsInstance(media_repo[self.mock_video_url], S2InferenceError)
 
@@ -229,3 +229,116 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         mock_download_and_chunk.assert_any_call(
             self.mock_audio_url, "cpu", None, Modality.AUDIO, self.mock_marqo_index, None
         )
+
+    @patch("marqo.tensor_search.add_docs.download_and_chunk_media")
+    @patch("marqo.tensor_search.add_docs.infer_modality")
+    def test_mismatched_media_fields(self, mock_infer_modality, mock_download_and_chunk):
+        self.mock_model.properties["type"] = ModelType.LanguageBind
+        self.mock_model.properties["supported_modalities"] = [Modality.VIDEO, Modality.AUDIO, Modality.TEXT, Modality.IMAGE]
+        self.mock_marqo_index.type = IndexType.Structured
+
+        docs = [
+            {"video_field": self.mock_audio_url},
+            {"audio_field": self.mock_video_url}
+        ]
+        media_repo = {}
+        tensor_fields = ["video_field", "audio_field"]
+        media_field_types_mapping = {"video_field": FieldType.VideoPointer, "audio_field": FieldType.AudioPointer}
+
+        mock_infer_modality.side_effect = [Modality.AUDIO, Modality.VIDEO]
+        mock_download_and_chunk.side_effect = [
+            S2InferenceError("Invalid video file"),
+            S2InferenceError("Invalid audio file")
+        ]
+
+        threaded_download_and_preprocess_content(
+            docs, media_repo, tensor_fields, {}, device="cpu",
+            marqo_index=self.mock_marqo_index,
+            media_field_types_mapping=media_field_types_mapping
+        )
+
+        self.assertIn(self.mock_audio_url, media_repo)
+        self.assertIn(self.mock_video_url, media_repo)
+        self.assertIsInstance(media_repo[self.mock_audio_url], S2InferenceError)
+        self.assertIsInstance(media_repo[self.mock_video_url], S2InferenceError)
+        self.assertIn("Invalid video file", str(media_repo[self.mock_audio_url]))
+        self.assertIn("Invalid audio file", str(media_repo[self.mock_video_url]))
+
+    @patch("marqo.tensor_search.add_docs.infer_modality")
+    def test_invalid_media_fields(self, mock_infer_modality):
+        self.mock_model.properties["type"] = ModelType.LanguageBind
+        self.mock_model.properties["supported_modalities"] = [Modality.VIDEO, Modality.AUDIO, Modality.TEXT, Modality.IMAGE]
+        self.mock_marqo_index.type = IndexType.Structured
+
+        docs = [
+            {"video_field": "This is text, not a video URL"},
+            {"audio_field": "This is text, not an audio URL"}
+        ]
+        media_repo = {}
+        tensor_fields = ["video_field", "audio_field"]
+        media_field_types_mapping = {"video_field": FieldType.VideoPointer, "audio_field": FieldType.AudioPointer}
+
+        mock_infer_modality.side_effect = [Modality.TEXT, Modality.TEXT]
+
+        threaded_download_and_preprocess_content(
+            docs, media_repo, tensor_fields, {}, device="cpu",
+            marqo_index=self.mock_marqo_index,
+            media_field_types_mapping=media_field_types_mapping
+        )
+
+        self.assertIn("This is text, not a video URL", media_repo)
+        self.assertIn("This is text, not an audio URL", media_repo)
+        self.assertIsInstance(media_repo["This is text, not a video URL"], S2InferenceError)
+        self.assertIsInstance(media_repo["This is text, not an audio URL"], S2InferenceError)
+        self.assertIn("Error processing media file", str(media_repo["This is text, not a video URL"]))
+        self.assertIn("Error processing media file", str(media_repo["This is text, not an audio URL"]))
+
+
+    @patch("marqo.tensor_search.add_docs.download_and_chunk_media")
+    @patch("marqo.tensor_search.add_docs.infer_modality")
+    def test_ffmpeg_error_handling(self, mock_infer_modality, mock_download_and_chunk):
+        self.mock_model.properties["type"] = ModelType.LanguageBind
+        self.mock_model.properties["supported_modalities"] = [Modality.VIDEO, Modality.AUDIO]
+        self.mock_marqo_index.type = IndexType.Structured
+
+        docs = [{"video_field": self.mock_video_url}]
+        media_repo = {}
+        tensor_fields = ["video_field"]
+        media_field_types_mapping = {"video_field": FieldType.VideoPointer}
+
+        mock_infer_modality.return_value = Modality.VIDEO
+        mock_download_and_chunk.side_effect = ffmpeg.Error("FFmpeg processing error", stdout=b"", stderr=b"")
+
+        threaded_download_and_preprocess_content(
+            docs, media_repo, tensor_fields, {}, device="cpu",
+            marqo_index=self.mock_marqo_index,
+            media_field_types_mapping=media_field_types_mapping
+        )
+
+        self.assertIn(self.mock_video_url, media_repo)
+        self.assertIsInstance(media_repo[self.mock_video_url], S2InferenceError)
+        self.assertIn("Error processing video file", str(media_repo[self.mock_video_url]))
+
+    @patch("marqo.tensor_search.add_docs.clip_utils.load_image_from_path")
+    @patch("marqo.tensor_search.add_docs.infer_modality")
+    def test_valid_image_processing(self, mock_infer_modality, mock_load_image):
+        mock_infer_modality.return_value = Modality.IMAGE
+        mock_load_image.return_value = self.mock_image
+
+        self.mock_model.properties["type"] = ModelType.LanguageBind
+        self.mock_model.properties["supported_modalities"] = [Modality.IMAGE, Modality.TEXT]
+        self.mock_marqo_index.type = IndexType.Structured
+
+        docs = [{"image_field": "https://example.com/valid_image.jpg"}]
+        media_repo = {}
+        tensor_fields = ["image_field"]
+        media_field_types_mapping = {"image_field": FieldType.ImagePointer}
+
+        threaded_download_and_preprocess_content(
+            docs, media_repo, tensor_fields, {}, device="cpu",
+            marqo_index=self.mock_marqo_index,
+            media_field_types_mapping=media_field_types_mapping
+        )
+
+        self.assertIn("https://example.com/valid_image.jpg", media_repo)
+        self.assertEqual(media_repo["https://example.com/valid_image.jpg"], self.mock_image)
