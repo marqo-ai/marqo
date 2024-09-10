@@ -35,6 +35,8 @@ COPY src /app/src
 RUN pip uninstall open_clip_torch -y
 RUN pip install open_clip_torch==2.24.0 --no-cache-dir --force-reinstall
 
+RUN pip show open_clip_torch
+
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
 RUN echo $COMMITHASH > build_info.txt
