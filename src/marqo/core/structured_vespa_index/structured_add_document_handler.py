@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from marqo.api import exceptions as api_errors
 from marqo.config import Config
@@ -101,17 +101,17 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
             if self.marqo_index.field_map.get(field_name).dependent_fields != weights:
                 marqo_doc[field_name] = weights
 
-    def handle_existing_tensors(self, existing_vespa_docs: Dict[str, Document]):
+    def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
             return
 
-        for doc_id, vespa_doc in existing_vespa_docs.items():
+        for vespa_doc in existing_vespa_docs:
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
             existing_multimodal_weights = {
                 field.name: existing_marqo_doc.get(field.name, field.dependent_fields)
                 for field in self.marqo_index.field_map_by_type[FieldType.MultimodalCombination]
             }
-            self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc,
+            self.tensor_fields_container.populate_tensor_from_existing_doc(existing_marqo_doc,
                                                                            existing_multimodal_weights)
 
     def to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:

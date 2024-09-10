@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import semver
 
@@ -126,17 +126,17 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                 'type': FieldType.MultimodalCombination
             })
 
-    def handle_existing_tensors(self, existing_vespa_docs: Dict[str, Document]):
+    def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
             return
 
-        for doc_id, vespa_doc in existing_vespa_docs.items():
+        for vespa_doc in existing_vespa_docs:
             existing_marqo_doc = self.vespa_index.to_marqo_document(vespa_doc.dict())
             existing_multimodal_weights = {
                 field_name: mapping['weights']
-                for field_name, mapping in existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, dict())
+                for field_name, mapping in existing_marqo_doc.get(MARQO_DOC_MULTIMODAL_PARAMS, dict()).items()
             }
-            self.tensor_fields_container.populate_tensor_from_existing_doc(doc_id, existing_marqo_doc,
+            self.tensor_fields_container.populate_tensor_from_existing_doc(existing_marqo_doc,
                                                                            existing_multimodal_weights)
 
     def to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:

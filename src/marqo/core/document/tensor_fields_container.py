@@ -6,6 +6,7 @@ from PIL.Image import Image
 from pydantic.main import BaseModel
 
 from marqo.core import constants
+from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
 
@@ -93,7 +94,7 @@ class TensorFieldContent(BaseModel):
 
     @property
     def tensor_field_embeddings(self):
-        return self.embeddings[:self.tensor_field_chunk_count] if self.chunks else []
+        return self.embeddings[:self.tensor_field_chunk_count] if self.embeddings else []
 
     @property
     def sub_field_chunk(self):
@@ -124,6 +125,10 @@ class MultiModalTensorFieldContent(TensorFieldContent):
 
     @property
     def tensor_field_chunks(self):
+        if self.is_resolved:
+            # populated from existing tensor
+            return super().tensor_field_chunks
+
         if not self.subfields:
             return []
 
@@ -133,6 +138,10 @@ class MultiModalTensorFieldContent(TensorFieldContent):
 
     @property
     def tensor_field_embeddings(self):
+        if self.is_resolved:
+            # populated from existing tensor
+            return super().tensor_field_embeddings
+
         if not self.subfields:
             return []
 
@@ -212,10 +221,13 @@ class TensorFieldsContainer:
         return {field_name: content for field_name, content in self._tensor_field_map.get(doc_id, dict()).items()
                 if content.is_tensor_field and content.tensor_field_chunks}
 
-    def populate_tensor_from_existing_doc(self, doc_id: str, existing_marqo_doc: Dict[str, Any],
+    def populate_tensor_from_existing_doc(self, existing_marqo_doc: Dict[str, Any],
                                           existing_multimodal_weights: Dict[str, Dict[str, float]]) -> None:
+        doc_id = existing_marqo_doc[MARQO_DOC_ID]
+
         if doc_id not in self._tensor_field_map:
             return
+
         doc = self._tensor_field_map[doc_id]
 
         for field_name, tensor_content in doc.items():
@@ -223,11 +235,9 @@ class TensorFieldsContainer:
                 # Already populated, might be a custom vector
                 continue
 
-            if field_name not in existing_marqo_doc:
-                # This is a new field added to the doc, we need to vectorise it
-                continue
-
             if field_name in existing_multimodal_weights:
+                # for multimodal_combo fields
+
                 if tensor_content.field_type != FieldType.MultimodalCombination:
                     # Field with the same name is not a multimodal field in this batch
                     continue
@@ -237,22 +247,30 @@ class TensorFieldsContainer:
                     # mapping config is different, need to re-vectorise
                     continue
 
-                if any([existing_marqo_doc[sub_field] != doc[sub_field].field_content for sub_field in weights.keys()]):
+                if any([sub_field not in existing_marqo_doc or sub_field not in doc or
+                        existing_marqo_doc[sub_field] != doc[sub_field].field_content for sub_field in weights.keys()]):
                     # If content of any subfields does not match
                     continue
 
-            elif existing_marqo_doc[field_name] != tensor_content.field_content:
-                # Field content has changed, we need to re-vectorise
-                continue
+            else:
+                # for other tensor fields
+
+                if field_name not in existing_marqo_doc:
+                    # This is a new field added to the doc, we need to vectorise it
+                    continue
+
+                if existing_marqo_doc[field_name] != tensor_content.field_content:
+                    # Field content has changed, we need to re-vectorise
+                    continue
 
             if (constants.MARQO_DOC_TENSORS not in existing_marqo_doc or
-                    field_name in existing_marqo_doc[constants.MARQO_DOC_TENSORS]):
+                    field_name not in existing_marqo_doc[constants.MARQO_DOC_TENSORS]):
                 # This field is not a tensor field in existing doc, we need to vectorise
                 continue
 
             existing_tensor = existing_marqo_doc[constants.MARQO_DOC_TENSORS][field_name]
-            tensor_content.chunks = existing_tensor[constants.MARQO_DOC_CHUNKS]
-            tensor_content.embeddings = existing_tensor[constants.MARQO_DOC_EMBEDDINGS]
+            tensor_content.populate_chunks_and_embeddings(existing_tensor[constants.MARQO_DOC_CHUNKS],
+                                                          existing_tensor[constants.MARQO_DOC_EMBEDDINGS])
 
     def collect(self, doc_id: str, field_name: str, field_content: Any, text_field_type: FieldType) -> Any:
         if field_name not in self._tensor_fields and field_name not in self._multimodal_sub_field_reverse_map:
