@@ -490,20 +490,21 @@ def _get_open_clip_properties() -> Dict:
             "note": "Marqo's fashionSigLIP model",
             "type": "open_clip"
         },
-        "open_clip/MobileCLIP-B/datacompdr_lt":{
-            "name": "open_clip/MobileCLIP-B/datacompdr_lt",
-            "dimensions": 512,
-            "note": "MobileCLIP model",
-            "type": "open_clip",
-            "pretrained": "datacompdr_lt"
-        },
-        "open_clip/MobileCLIP-S1/datacompdr": {
-            "name": "open_clip/MobileCLIP-S1/datacompdr",
-            "dimensions": 512,
-            "note": "MobileCLIP model",
-            "type": "open_clip",
-            "pretrained": "datacompdr"
-        },
+        # TODO Add these model back when we upgrade the open_clip version
+        # "open_clip/MobileCLIP-B/datacompdr_lt":{
+        #     "name": "open_clip/MobileCLIP-B/datacompdr_lt",
+        #     "dimensions": 512,
+        #     "note": "MobileCLIP model",
+        #     "type": "open_clip",
+        #     "pretrained": "datacompdr_lt"
+        # },
+        # "open_clip/MobileCLIP-S1/datacompdr": {
+        #     "name": "open_clip/MobileCLIP-S1/datacompdr",
+        #     "dimensions": 512,
+        #     "note": "MobileCLIP model",
+        #     "type": "open_clip",
+        #     "pretrained": "datacompdr"
+        # },
         "visheratin/nllb-clip-base-siglip": {
             "name": "hf-hub:visheratin/nllb-clip-base-siglip",
             "dimensions": 768,

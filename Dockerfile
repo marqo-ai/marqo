@@ -6,7 +6,7 @@ COPY vespa .
 RUN mvn clean package
 
 # Stage 2: Base image for Python setup
-FROM marqoai/marqo-base:29 as base_image
+FROM marqoai/marqo-base:30 as base_image
 
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var
@@ -22,7 +22,6 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-RUN pip install --upgrade open-clip-torch==2.24.0
 RUN rm requirements.txt
 
 # Stage 3: Final stage that builds on the base image

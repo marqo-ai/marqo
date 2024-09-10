@@ -12,7 +12,7 @@ class ImagePreprocessor(str, Enum):
     SigLIP = "SigLIP"
     OpenAI = "OpenAI"
     OpenCLIP = "OpenCLIP"
-    MobileCLIP = "MobileCLIP"
+    # MobileCLIP = "MobileCLIP" # TODO Add this back when we upgrade the open clip and torch versions
     CLIPA = "CLIPA"
 
 
