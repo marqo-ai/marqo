@@ -847,7 +847,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
                                 chunk_time = [chunk_start, chunk_end]
-                                chunk_id = f"{field}::{chunk_time}"
+                                chunk_id = f"{chunk_time}"
                                 chunks.append(chunk_id)
 
                                 vector = s2_inference.vectorise(
