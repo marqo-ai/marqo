@@ -152,13 +152,10 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
 
         extension = encoded_url.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-            print(f"inferred image")
             return Modality.IMAGE
         elif extension in ['mp4', 'avi', 'mov']:
-            print(f"inferred video")
             return Modality.VIDEO
         elif extension in ['mp3', 'wav', 'ogg']:
-            print(f"inferred audio")
             return Modality.AUDIO
 
         if validate_url(encoded_url):
@@ -167,13 +164,10 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
                 with fetch_content_sample(encoded_url) as sample:
                     mime = magic.from_buffer(sample.read(), mime=True)
                     if mime.startswith('image/'):
-                        print(f"inferred image from url")
                         return Modality.IMAGE
                     elif mime.startswith('video/'):
-                        print(f"inferred video from url")
                         return Modality.VIDEO
                     elif mime.startswith('audio/'):
-                        print(f"inferred audio from url")
                         return Modality.AUDIO
             except requests.exceptions.RequestException as e:
                 pass
