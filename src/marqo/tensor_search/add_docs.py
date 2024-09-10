@@ -74,7 +74,6 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
 
     """
     # Determine index type
-    #is_no_index = marqo_index is None
     is_structured_index = marqo_index_type == IndexType.Structured
     is_unstructured_index = marqo_index_type == IndexType.Unstructured
 
