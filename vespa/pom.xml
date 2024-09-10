@@ -128,7 +128,13 @@
     <parent>
         <groupId>com.yahoo.vespa</groupId>
         <artifactId>cloud-tenant-base</artifactId>
-        <version>[8,9)</version>  <!-- Use the latest Vespa release on each build -->
+        <!--
+        Vespa 8.332.5 is baked in the Marqo docker image for Marqo 2.5.0 to 2.11.4. This customer searcher feature
+        is first introduced in Marqo 2.10.0. Vespa minor versions are backward compatible, but not forward compatible.
+        Pin to this version to make sure we don't accidentally bring in dependencies that are missing in this version
+        of Vespa.
+        -->
+        <version>8.332.5</version>
         <relativePath/>
     </parent>
     
