@@ -8,6 +8,7 @@ from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any, Tuple, Set, Union
 
 from PIL.Image import Image
+from torch import tensor
 
 from marqo import marqo_docs
 from marqo.config import Config
@@ -351,12 +352,11 @@ class AddDocumentsHandler(ABC):
         return vectorise
 
     def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], infer: bool) -> Vectoriser:
-        def dict_key(chunk: Union[str, Image]):
-            if isinstance(chunk, str):
-                return chunk
+        def dict_key(chunk: Union[str, Image, tensor]):
             if isinstance(chunk, Image):
                 return hash((chunk.format, chunk.size))
-            raise AddDocumentsError("Content chunk is not str or Image")
+            else:
+                return chunk
 
         embedding_cache = dict()
         if chunks_to_vectorise:
