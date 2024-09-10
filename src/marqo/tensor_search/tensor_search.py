@@ -50,6 +50,8 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 from marqo.core.constants import MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
+from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
+from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -118,9 +120,11 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
             f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
     if isinstance(marqo_index, UnstructuredMarqoIndex):
-        return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        # return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        return UnstructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
     elif isinstance(marqo_index, StructuredMarqoIndex):
-        return _add_documents_structured(config, add_docs_params, marqo_index)
+        # return _add_documents_structured(config, add_docs_params, marqo_index)
+        return StructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
     else:
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
