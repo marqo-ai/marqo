@@ -23,6 +23,7 @@ from marqo.s2_inference.languagebind import (
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
     to_device
 )
+from marqo.core.inference.image_download import encode_url
 from marqo.s2_inference.clip_utils import download_image_from_url, validate_url
 from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBindImageTokenizer
 from marqo.s2_inference.languagebind.video.tokenization_video import LanguageBindVideoTokenizer
@@ -147,7 +148,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             return Modality.TEXT
         
         # Encode the URL
-        encoded_url = quote(content, safe=':/')
+        encoded_url = encode_url(content)
 
         extension = encoded_url.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
@@ -160,10 +161,10 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
             print(f"inferred audio")
             return Modality.AUDIO
 
-        if validate_url(content):
+        if validate_url(encoded_url):
             # Use context manager to handle content sample
             try:
-                with fetch_content_sample(content) as sample:
+                with fetch_content_sample(encoded_url) as sample:
                     mime = magic.from_buffer(sample.read(), mime=True)
                     if mime.startswith('image/'):
                         print(f"inferred image from url")
@@ -175,8 +176,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
                         print(f"inferred audio from url")
                         return Modality.AUDIO
             except requests.exceptions.RequestException as e:
-                print(f"Request failed: {e}")
-                raise ValueError("Failed to fetch content from URL.")
+                pass
 
         return Modality.TEXT
 
