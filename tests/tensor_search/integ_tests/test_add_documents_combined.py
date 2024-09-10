@@ -527,6 +527,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 media_repo=media_repo,
                 tensor_fields=['Title', 'Desc', 'Loc'],
                 image_download_headers={},
+                marqo_index_type=IndexType.Unstructured,
+                marqo_index_model=Model(name="test", properties={}),
             )
             assert list(media_repo.keys()) == ['https://google.com/my_dog.png']
             assert isinstance(media_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
