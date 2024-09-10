@@ -176,9 +176,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
                 raise MediaDownloadError(f"Error determining MIME type for {encoded_url}: {e}") from e
             except IOError as e:
                 raise MediaDownloadError(f"IO error while processing {encoded_url}: {e}") from e
-            except Exception as e:
-                raise MediaDownloadError(f"Unexpected error while processing {encoded_url}: {e}") from e
-
+            
         return Modality.TEXT
 
     elif isinstance(content, bytes):
