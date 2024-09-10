@@ -176,4 +176,4 @@ class TestOpenCLIPModelLoad(TestCase):
             model = OPEN_CLIP(model_properties=model_properties, device="cpu")
             model.load()
 
-        self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'MobileCLIP', 'CLIPA'", str(context.exception))
+        self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'CLIPA'", str(context.exception))

@@ -286,8 +286,8 @@ class TestOpenClipModelEncoding(unittest.TestCase):
             'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
             'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
             'open_clip/EVA02-B-16/merged2b_s8b_b131k',
-            "open_clip/MobileCLIP-B/datacompdr_lt",
-            "open_clip/MobileCLIP-S1/datacompdr"
+            # "open_clip/MobileCLIP-B/datacompdr_lt",
+            # "open_clip/MobileCLIP-S1/datacompdr"
         ]
 
     def tearDown(self) -> None:
