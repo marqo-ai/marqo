@@ -138,14 +138,15 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 f"Model {marqo_index.model.name} does not support {modality}")
                             continue
 
-                        if is_structured_index and modality is Modality.VIDEO and media_field_types_mapping[
+                        if is_structured_index:
+                            if modality is Modality.VIDEO and media_field_types_mapping[
                             field] is not FieldType.VideoPointer:
-                            media_repo[doc[field]] = S2InferenceError(
-                                f"Invalid audio file. Error processing media file {doc}, detected as video, but field type is not VideoPointer")
-                        elif is_structured_index and modality is Modality.AUDIO and media_field_types_mapping[
+                                media_repo[doc[field]] = S2InferenceError(
+                                    f"Invalid audio file. Error processing media file {doc}, detected as video, but field type is not VideoPointer")
+                            if modality is Modality.AUDIO and media_field_types_mapping[
                             field] is not FieldType.AudioPointer:
-                            media_repo[doc[field]] = S2InferenceError(
-                                f"Invalid video file. Error processing media file {doc}, detected as audio, but field type is not AudioPointer")
+                                media_repo[doc[field]] = S2InferenceError(
+                                    f"Invalid video file. Error processing media file {doc}, detected as audio, but field type is not AudioPointer")
                         else:
                             try:
                                 processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
