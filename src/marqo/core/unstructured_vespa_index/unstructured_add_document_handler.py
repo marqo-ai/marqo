@@ -8,7 +8,7 @@ from marqo.api import exceptions as api_errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.add_documents_handler import AddDocumentsHandler, AddDocumentsError
+from marqo.core.document.add_documents_handler import AddDocumentsHandler, AddDocumentsError, MODALITY_FIELD_TYPE_MAP
 from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models import UnstructuredMarqoIndex
@@ -17,7 +17,7 @@ from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARA
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_tensor_fields, validate_field_name, \
     validate_mappings_object_format, validate_coupling_of_mappings_and_doc
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.s2_inference.clip_utils import _is_image
+from marqo.s2_inference.multimodal_model_load import infer_modality
 
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.get_document_response import Document
@@ -72,10 +72,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         if not isinstance(field_content, str):
             return None
 
-        if self.marqo_index.treat_urls_and_pointers_as_images and _is_image(field_content):
-            return FieldType.ImagePointer
-
-        return FieldType.Text
+        return MODALITY_FIELD_TYPE_MAP[infer_modality(field_content)]
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:
