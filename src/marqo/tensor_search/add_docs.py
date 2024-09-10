@@ -91,7 +91,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     modality = infer_modality(doc[field])
                     if (modality == Modality.IMAGE and is_no_index) or (
                         modality == Modality.IMAGE and is_unstructured_index) or (
-                        is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer):
+                        is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer and modality not in [Modality.TEXT, Modality.AUDIO, Modality.VIDEO]):
 
                         if (marqo_index is not None
                                 and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
@@ -129,25 +129,35 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
 
                     elif (modality in [Modality.VIDEO, Modality.AUDIO] and is_no_index) or (
                             modality in [Modality.VIDEO, Modality.AUDIO] and is_unstructured_index) or (
-                            is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer]):
-                            
+                            is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer] and modality not in [Modality.TEXT, Modality.IMAGE]):
+                        
                         if marqo_index.model.properties.get('type') not in [
                             ModelType.LanguageBind] and modality not in marqo_index.model.properties.get(
                             'supported_modalities'):
                             media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index.model.name} does not support {modality}")
                             continue
-                        try:
-                            processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
-                                                                        marqo_index, preprocessors)
-                            media_repo[doc[field]] = processed_chunks
-                        except (ffmpeg.Error, S2InferenceError) as e:
-                            logger.error(f"Error processing {modality} file: {str(e)}")
-                            media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
 
+                        if modality is Modality.VIDEO and media_field_types_mapping[
+                            field] is not FieldType.VideoPointer:
+                            media_repo[doc[field]] = S2InferenceError(
+                                f"Invalid audio file. Error processing media file {doc}, detected as video, but field type is not VideoPointer")
+                        elif modality is Modality.AUDIO and media_field_types_mapping[
+                            field] is not FieldType.AudioPointer:
+                            media_repo[doc[field]] = S2InferenceError(
+                                f"Invalid video file. Error processing media file {doc}, detected as audio, but field type is not AudioPointer")
+                        else:
+                            try:
+                                processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
+                                                                        marqo_index, preprocessors)
+                                media_repo[doc[field]] = processed_chunks
+                            except (ffmpeg.Error, S2InferenceError) as e:
+                                logger.error(f"Error processing {modality} file: {str(e)}")
+                                media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
+                    elif modality is Modality.TEXT:
+                        media_repo[doc[field]] = S2InferenceError(f"Error processing media file {doc}, detected as text")
                     else:
                         pass
-                        # raise an error
 
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
