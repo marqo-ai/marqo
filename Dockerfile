@@ -22,7 +22,7 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-RUN pip uninstall open-clip-torch -y
+RUN pip uninstall -y open_clip_torch
 RUN pip install open-clip-torch==2.24.0
 RUN rm requirements.txt
 
