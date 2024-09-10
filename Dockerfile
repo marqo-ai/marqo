@@ -22,7 +22,7 @@ WORKDIR /app
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
-RUN pip install open-clip-torch==2.24.1 --force-reinstall
+RUN pip install open-clip-torch==2.24.0 --force-reinstall
 RUN rm requirements.txt
 
 # Stage 3: Final stage that builds on the base image
