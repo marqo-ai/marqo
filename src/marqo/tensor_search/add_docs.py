@@ -91,14 +91,14 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                     inferred_modality = infer_modality(doc[field])
                     if (inferred_modality == Modality.IMAGE and is_no_index) or (
                         inferred_modality == Modality.IMAGE and is_unstructured_index) or (
-                        is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer and modality not in [Modality.TEXT, Modality.AUDIO, Modality.VIDEO]):
+                        is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer and inferred_modality not in [Modality.TEXT, Modality.AUDIO, Modality.VIDEO]):
 
                         if (marqo_index is not None
                                 and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
                                 and marqo_index.model.properties.get('supported_modalities') is not None
                                 and Modality.IMAGE not in marqo_index.model.properties.get('supported_modalities')):
                             media_repo[doc[field]] = UnsupportedModalityError(
-                                f"Model {marqo_index.model.name} does not support {modality}")
+                                f"Model {marqo_index.model.name} does not support {inferred_modality}")
                             continue
                         # Existing logic
                         if doc[field] in media_repo:
