@@ -72,6 +72,9 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         if not isinstance(field_content, str):
             return None
 
+        if not self.marqo_index.treat_urls_and_pointers_as_media:
+            return FieldType.Text
+
         return MODALITY_FIELD_TYPE_MAP[infer_modality(field_content)]
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
