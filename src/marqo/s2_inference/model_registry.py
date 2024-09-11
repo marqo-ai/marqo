@@ -364,8 +364,8 @@ def _get_open_clip_properties() -> Dict:
 
         # New models as of Marqo 2.7.0
         # Added for: Open CLIP 2.24.0
-        # TODO the open_clip/ViT-SO400M-14-SigLIP-384/webli is not available on torch 1.12
-        # Add this model back when we upgrade the torch version
+        # This model is not available on the environment with torch 12 and open_clip 2.26.0
+        # If we want to upgrade the open_clip version, we need to upgrade torch version as well to support this model
         "open_clip/ViT-SO400M-14-SigLIP-384/webli": {
             "name": "open_clip/ViT-SO400M-14-SigLIP-384/webli",
             "dimensions": 1152,
