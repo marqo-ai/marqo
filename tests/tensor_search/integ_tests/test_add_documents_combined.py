@@ -354,7 +354,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": str(i),
-             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+             "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
              } for i in range(10)
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
