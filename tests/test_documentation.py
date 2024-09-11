@@ -1,9 +1,11 @@
 import unittest
+import pytest
 
 import httpx
 
 from marqo import marqo_docs
 
+@pytest.mark.skip(reason="skipping since we have a CI pipeline for this")
 class TestDocumentation(unittest.TestCase):
     def test_urls(self):
         # Retrieve all public functions in the module
