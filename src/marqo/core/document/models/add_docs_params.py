@@ -2,7 +2,7 @@ from typing import List
 from typing import Optional, Union, Any, Sequence
 
 import numpy as np
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, root_validator
 from pydantic import Field
 
 from marqo import marqo_docs
@@ -16,6 +16,7 @@ from marqo.tensor_search.enums import EnvVars
 
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
+
     Params:
         index_name: name of the index
         docs: List of documents
@@ -40,7 +41,8 @@ class AddDocsParams(BaseModel):
     index_name: str
     device: Optional[str]
     tensor_fields: Optional[List] = Field(default_factory=None)
-    image_download_thread_count: int = 20
+    image_download_thread_count: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
+    media_download_thread_count: Optional[int]
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
@@ -52,6 +54,14 @@ class AddDocsParams(BaseModel):
         if "device" not in data or data["device"] is None:
             data["device"] = get_best_available_device()
         super().__init__(**data)
+
+    @root_validator
+    def validate_thread_counts(cls, values):
+        image_count = values.get('image_download_thread_count')
+        media_count = values.get('media_download_thread_count')
+        if media_count is not None and image_count != read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST):
+            raise ValueError("Cannot set both image_download_thread_count and media_download_thread_count")
+        return values
 
     @validator('docs')
     def validate_docs(cls, docs):

@@ -1,9 +1,8 @@
 import copy
-import json
+import os
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import ExitStack
-from http import HTTPStatus
 from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any, Tuple, Set, Union
 
@@ -11,6 +10,7 @@ from PIL.Image import Image
 from torch import tensor
 
 from marqo import marqo_docs
+from marqo.api import exceptions as api_errors
 from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
@@ -19,17 +19,15 @@ from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, Mar
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
+from marqo.s2_inference import errors as s2_inference_errors
+from marqo.s2_inference import s2_inference
 from marqo.s2_inference.multimodal_model_load import Modality
-from marqo.tensor_search import utils, enums, validation, add_docs
-from marqo.vespa.models import VespaDocument
-from marqo.vespa.models.get_document_response import Document
-from marqo.api import exceptions as api_errors
-
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
-from marqo.s2_inference import s2_inference
-from marqo.s2_inference import errors as s2_inference_errors
-
+from marqo.tensor_search import validation, add_docs
+from marqo.tensor_search.enums import EnvVars
+from marqo.vespa.models import VespaDocument
+from marqo.vespa.models.get_document_response import Document
 
 ORIGINAL_ID = '_original_id'
 
@@ -287,10 +285,10 @@ class AddDocumentsHandler(ABC):
             return dict()
 
         image_repo = exit_stack.enter_context(
+            # TODO refactor this to only pass in necessary parameters
             add_docs.download_and_preprocess_content(
                 docs=list(doc_media_fields.values()),
-                # TODO derive this
-                thread_count=self.add_docs_params.image_download_thread_count,
+                thread_count=self._determine_thread_count(self.marqo_index, self.add_docs_params),
                 tensor_fields=list(media_field_types_mapping.keys()),
                 image_download_headers=self.add_docs_params.image_download_headers,
                 model_name=self.marqo_index.model.name,
@@ -300,7 +298,10 @@ class AddDocumentsHandler(ABC):
                 device=self.add_docs_params.device,
                 model_auth=self.add_docs_params.model_auth,
                 patch_method_exists=self.marqo_index.image_preprocessing.patch_method is not None,
-                marqo_index=self.marqo_index
+                marqo_index_type=self.marqo_index.type,
+                marqo_index_model=self.marqo_index.model,
+                audio_preprocessing=self.marqo_index.audio_preprocessing,
+                video_preprocessing=self.marqo_index.video_preprocessing,
             )
         )
 
@@ -313,6 +314,39 @@ class AddDocumentsHandler(ABC):
                     self.tensor_fields_container.remove_doc(doc_id)
 
         return image_repo
+
+    def _determine_thread_count(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams):
+        model_properties = marqo_index.model.get_properties()
+        is_languagebind_model = model_properties.get('type') == 'languagebind'
+
+        default_image_thread_count = 20
+        default_media_thread_count = 5
+
+        # Check if media_download_thread_count is set in params
+        if (add_docs_params.media_download_thread_count is not None and
+                add_docs_params.media_download_thread_count != default_media_thread_count):
+            return add_docs_params.media_download_thread_count
+
+        env_media_thread_count = os.environ.get(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+        if env_media_thread_count is not None and int(env_media_thread_count) != default_media_thread_count:
+            return int(env_media_thread_count)
+
+        # If it's a LanguageBind model and no explicit setting, use 5
+        if is_languagebind_model:
+            return 5
+
+        # Check if image_download_thread_count is explicitly set in params
+        if (add_docs_params.image_download_thread_count is not None and
+                add_docs_params.image_download_thread_count != default_image_thread_count):
+            return add_docs_params.image_download_thread_count
+
+        # Check if environment variable is explicitly set
+        env_image_thread_count = os.environ.get(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+        if env_image_thread_count is not None and int(env_image_thread_count) != default_image_thread_count:
+            return int(env_image_thread_count)
+
+        # Default case
+        return default_image_thread_count
 
     def text_chunker(self) -> Chunker:
         text_chunk_prefix = self.marqo_index.model.get_text_chunk_prefix(self.add_docs_params.text_chunk_prefix)
