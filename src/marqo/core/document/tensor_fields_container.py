@@ -211,7 +211,8 @@ class TensorFieldsContainer:
                 if (field_name not in self._tensor_fields and
                         field_name in self._multimodal_sub_field_reverse_map and
                         all([fields[field].embeddings is not None
-                             for field in self._multimodal_sub_field_reverse_map[field_name]])):
+                             for field in self._multimodal_sub_field_reverse_map[field_name]
+                             if field in fields])):
                     # if field is only used by multimodal fields and all multimodal fields using it are vectorised
                     continue
 

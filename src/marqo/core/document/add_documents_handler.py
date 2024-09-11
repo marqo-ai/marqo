@@ -370,6 +370,10 @@ class AddDocumentsHandler(ABC):
 
     def single_vectoriser(self, modality: Modality) -> Vectoriser:
         def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+            if modality in [Modality.AUDIO, Modality.VIDEO]:
+                # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind model
+                return [vector for content_chunk in content_chunks for vector in
+                        self._s2inference_vectorise([content_chunk], modality)]
             return self._s2inference_vectorise(content_chunks, modality)
 
         return vectorise
@@ -383,7 +387,12 @@ class AddDocumentsHandler(ABC):
 
         embedding_cache = dict()
         if chunks_to_vectorise:
-            embeddings = self._s2inference_vectorise(chunks_to_vectorise, modality)
+            if modality in [Modality.AUDIO, Modality.VIDEO]:
+                # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind model
+                embeddings = [vector for content_chunk in chunks_to_vectorise for vector in
+                              self._s2inference_vectorise([content_chunk], modality)]
+            else:
+                embeddings = self._s2inference_vectorise(chunks_to_vectorise, modality)
             embedding_cache = {dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
 
         def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
