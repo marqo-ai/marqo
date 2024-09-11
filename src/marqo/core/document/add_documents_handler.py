@@ -379,11 +379,14 @@ class AddDocumentsHandler(ABC):
         return vectorise
 
     def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], modality: Modality) -> Vectoriser:
-        def dict_key(chunk: Union[str, Image, tensor]):
+        def dict_key(chunk: Union[str, Image, tensor, Dict[str, tensor]]):
             if isinstance(chunk, Image):
                 return hash((chunk.format, chunk.size))
+            elif isinstance(chunk, dict):
+                # Generate a hash based on sorted key-value pairs to ensure consistency.
+                return hash(frozenset((k, dict_key(v)) for k, v in chunk.items()))
             else:
-                return chunk
+                return hash(chunk)
 
         embedding_cache = dict()
         if chunks_to_vectorise:
