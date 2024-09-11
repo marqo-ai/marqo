@@ -186,7 +186,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
                         patch_method_exists=marqo_index.image_preprocessing.patch_method is not None,
-                        marqo_index=marqo_index
+                        marqo_index_type=marqo_index.type,
+                        marqo_index_model=marqo_index.model,
+                        audio_preprocessing=marqo_index.audio_preprocessing,
+                        video_preprocessing=marqo_index.video_preprocessing,
                     )
                 )
 
@@ -684,7 +687,10 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         device=add_docs_params.device,
                         model_auth=add_docs_params.model_auth,
                         patch_method_exists=marqo_index.image_preprocessing.patch_method is not None,
-                        marqo_index=marqo_index,
+                        marqo_index_type=marqo_index.type,
+                        marqo_index_model=marqo_index.model,
+                        audio_preprocessing=marqo_index.audio_preprocessing,
+                        video_preprocessing=marqo_index.video_preprocessing,
                         force_download=True
                     )
                 )
@@ -847,7 +853,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 chunk_start = media_chunk['start_time']
                                 chunk_end = media_chunk['end_time']
                                 chunk_time = [chunk_start, chunk_end]
-                                chunk_id = f"{field}::{chunk_time}"
+                                chunk_id = f"{chunk_time}"
                                 chunks.append(chunk_id)
 
                                 vector = s2_inference.vectorise(

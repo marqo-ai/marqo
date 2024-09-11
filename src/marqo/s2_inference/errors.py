@@ -7,6 +7,8 @@ class S2InferenceError(Exception):
             self.message = message
             super().__init__(self.message)
 
+class MediaMismatchError(S2InferenceError):
+    pass
 
 class ChunkerError(S2InferenceError):
     pass
@@ -64,6 +66,8 @@ class BatchInferenceSizeNotMatchError(S2InferenceError):
 class ImageDownloadError(S2InferenceError):
     pass
 
+class MediaDownloadError(S2InferenceError):
+    pass
 
 class UnsupportedModalityError(S2InferenceError):
     pass

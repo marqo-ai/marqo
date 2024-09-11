@@ -485,6 +485,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
             media_repo=media_repo,
             tensor_fields=['field_1', 'field_2'],
             image_download_headers={},
+            marqo_index_type=IndexType.Unstructured,
+            marqo_index_model=Model(name="test", properties={}),
         )
         assert len(media_repo) == 2
         assert isinstance(media_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
@@ -504,7 +506,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields=['field_1', 'field_2'],
             image_download_headers={},
             preprocessors={'image': lambda x: torch.randn(3, 224, 224)},
-            device='cpu'
+            device='cpu',
+            marqo_index_type=IndexType.Unstructured,
+            marqo_index_model=Model(name="test", properties={}),
         )
         assert len(media_repo) == 2
         assert isinstance(media_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
@@ -523,27 +527,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 media_repo=media_repo,
                 tensor_fields=['Title', 'Desc', 'Loc'],
                 image_download_headers={},
-                marqo_index = UnstructuredMarqoIndex(
-                    name="test", 
-                    schema_name="test", 
-                    type=IndexType.Unstructured, 
-                    model=Model(name="test", properties={}), 
-                    normalize_embeddings=True, 
-                    text_preprocessing=TextPreProcessing(splitLength=1, splitMethod=TextSplitMethod.Sentence, splitOverlap=0), 
-                    image_preprocessing=ImagePreProcessing(patchMethod=None), 
-                    distance_metric=DistanceMetric.PrenormalizedAngular, 
-                    vector_numeric_type=VectorNumericType.Float, 
-                    treat_urls_and_pointers_as_images=True,
-                    filter_string_max_length=100,
-                    hnsw_config=HnswConfig(
-                        m=16, 
-                        efConstruction=512, 
-                    ), 
-                    marqo_version="0.1.0", 
-                    created_at=1, 
-                    updated_at=1, 
-                    _cache={}
-                )
+                marqo_index_type=IndexType.Unstructured,
+                marqo_index_model=Model(name="test", properties={}),
             )
             assert list(media_repo.keys()) == ['https://google.com/my_dog.png']
             assert isinstance(media_repo['https://google.com/my_dog.png'], PIL.UnidentifiedImageError)
@@ -629,7 +614,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 allocated_docs=docs,
                 media_repo=media_repo,
                 tensor_fields=['field_1', 'field_2'],
-                image_download_headers={}
+                image_download_headers={},
+                marqo_index_type=IndexType.Unstructured,
+                marqo_index_model=Model(name="test", properties={}),
             )
             assert len(expected_repo_structure) == len(media_repo)
             for k in expected_repo_structure:
@@ -684,7 +671,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     normalize_embeddings=True,
                     model_properties=model_properties,
                     media_field_types_mapping=None,
-                    device="cpu"
+                    device="cpu",
+                    marqo_index_type=IndexType.Unstructured,
+                    marqo_index_model=Model(name="test", properties={}),
                 ) as media_repo:
                     self.assertEqual(len(expected_repo_structure), len(media_repo))
                     for k in expected_repo_structure:
@@ -764,7 +753,10 @@ class TestAddDocumentsCombined(MarqoTestCase):
             device='cpu',
             headers={},
             modality=streaming_media_processor.Modality.VIDEO,
-            marqo_index=mock_index,
+            marqo_index_type=IndexType.Unstructured,
+            marqo_index_model=Model(name="test", properties={}),
+            audio_preprocessing=unittest.mock.Mock(),
+            video_preprocessing=unittest.mock.Mock(),
             preprocessors={'video': unittest.mock.Mock()}
         )
 
