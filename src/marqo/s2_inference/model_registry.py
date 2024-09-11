@@ -364,6 +364,8 @@ def _get_open_clip_properties() -> Dict:
 
         # New models as of Marqo 2.7.0
         # Added for: Open CLIP 2.24.0
+        # This model is not available on the environment with torch 12 and open_clip 2.26.0
+        # If we want to upgrade the open_clip version, we need to upgrade torch version as well to support this model
         "open_clip/ViT-SO400M-14-SigLIP-384/webli": {
             "name": "open_clip/ViT-SO400M-14-SigLIP-384/webli",
             "dimensions": 1152,
@@ -488,20 +490,21 @@ def _get_open_clip_properties() -> Dict:
             "note": "Marqo's fashionSigLIP model",
             "type": "open_clip"
         },
-        "open_clip/MobileCLIP-B/datacompdr_lt":{
-            "name": "open_clip/MobileCLIP-B/datacompdr_lt",
-            "dimensions": 512,
-            "note": "MobileCLIP model",
-            "type": "open_clip",
-            "pretrained": "datacompdr_lt"
-        },
-        "open_clip/MobileCLIP-S1/datacompdr": {
-            "name": "open_clip/MobileCLIP-S1/datacompdr",
-            "dimensions": 512,
-            "note": "MobileCLIP model",
-            "type": "open_clip",
-            "pretrained": "datacompdr"
-        },
+        # TODO Add these model back when we upgrade the open_clip version
+        # "open_clip/MobileCLIP-B/datacompdr_lt":{
+        #     "name": "open_clip/MobileCLIP-B/datacompdr_lt",
+        #     "dimensions": 512,
+        #     "note": "MobileCLIP model",
+        #     "type": "open_clip",
+        #     "pretrained": "datacompdr_lt"
+        # },
+        # "open_clip/MobileCLIP-S1/datacompdr": {
+        #     "name": "open_clip/MobileCLIP-S1/datacompdr",
+        #     "dimensions": 512,
+        #     "note": "MobileCLIP model",
+        #     "type": "open_clip",
+        #     "pretrained": "datacompdr"
+        # },
         "visheratin/nllb-clip-base-siglip": {
             "name": "hf-hub:visheratin/nllb-clip-base-siglip",
             "dimensions": 768,

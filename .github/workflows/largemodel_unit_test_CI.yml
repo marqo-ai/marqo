@@ -9,6 +9,9 @@ on:
       - mainline
     paths-ignore:
       - '**.md'
+  pull_request:
+    branches:
+      - mainline
 
 permissions:
   contents: read
@@ -24,19 +27,19 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.LARGEMODELTEST_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.LARGEMODELTEST_SECRETACCESSKEY }}
+          aws-region: ${{ secrets.LARGEMODELTEST_AWS_REGION }}
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
+          ec2-image-id: ${{ secrets.LARGEMODELTEST_AMI }}
           ec2-instance-type: g4dn.2xlarge
-          subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
-          security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
+          subnet-id: ${{ secrets.LARGEMODELTEST_SUBNET_ID }}
+          security-group-id: ${{ secrets.LARGEMODELTEST_SECURITY_GROUP }}
 
   Test-Marqo:
     name: Run Large Model Unit Tests
@@ -87,6 +90,8 @@ jobs:
           # Build Vespa components
           echo "Installing jdk 17"
           sudo apt-get install openjdk-17-jdk -y
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
           echo "Installing maven"
           sudo apt-get install maven -y
           echo "Building Vespa components"
@@ -150,9 +155,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.LARGEMODELTEST_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.LARGEMODELTEST_SECRETACCESSKEY }}
+          aws-region: ${{ secrets.LARGEMODELTEST_AWS_REGION }}
       - name: Stop EC2 runner
         uses: machulav/ec2-github-runner@v2
         with:

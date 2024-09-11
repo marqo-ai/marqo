@@ -6,7 +6,7 @@ COPY vespa .
 RUN mvn clean package
 
 # Stage 2: Base image for Python setup
-FROM marqoai/marqo-base:29 as base_image
+FROM marqoai/marqo-base:30 as base_image
 
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var
@@ -31,6 +31,7 @@ COPY --from=maven_build /app/vespa/target/marqo-custom-searchers-deploy.jar /app
 COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
+
 
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh

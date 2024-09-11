@@ -13,7 +13,7 @@ import transformers
 import validators
 from PIL import Image, UnidentifiedImageError
 from multilingual_clip import pt_multilingual_clip
-from open_clip.pretrained import _pcfg, _slpcfg, _apcfg, _mccfg
+from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
 from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
 from requests.utils import requote_uri
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
@@ -585,8 +585,6 @@ class OPEN_CLIP(AbstractCLIPModel):
             base_image_preprocess_config = _slpcfg()
         elif self.model_properties.image_preprocessor in [ImagePreprocessor.CLIPA]:
             base_image_preprocess_config = _apcfg()
-        elif self.model_properties.image_preprocessor in [ImagePreprocessor.MobileCLIP]:
-            base_image_preprocess_config = _mccfg()
         else:
             raise ValueError(f"Invalid image preprocessor {self.model_properties.image_preprocessor}")
 
@@ -756,7 +754,6 @@ class OPEN_CLIP(AbstractCLIPModel):
         return self._convert_output(outputs)
 
     def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
-
         if self.model is None:
             self.load()
 
