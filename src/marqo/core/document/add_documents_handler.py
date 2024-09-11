@@ -435,7 +435,7 @@ class AddDocumentsHandler(ABC):
             except MarqoDocumentParsingError as e:
                 self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(e.message))
 
-        index_responses = self.config.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
+        index_responses = self.config.vespa_client.feed_batch(list(reversed(vespa_docs)), self.marqo_index.schema_name)
 
         for resp in index_responses.responses:
             # FIXME doc_id is not url encoded
