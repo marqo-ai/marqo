@@ -103,7 +103,7 @@ class MarqoTestCase(unittest.TestCase):
                 split_overlap=1,
             ),
             audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
-                split_length=20,
+                split_length=10,
                 split_overlap=1,
             ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
@@ -160,7 +160,7 @@ class MarqoTestCase(unittest.TestCase):
                 split_overlap=1,
             ),
             audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
-                split_length=20,
+                split_length=10,
                 split_overlap=1,
             ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
@@ -226,7 +226,7 @@ class MarqoTestCase(unittest.TestCase):
                 split_overlap=1,
             ),
             audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
-                split_length=20,
+                split_length=10,
                 split_overlap=1,
             ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
@@ -286,7 +286,7 @@ class MarqoTestCase(unittest.TestCase):
                 split_overlap=1,
             ),
             audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
-                split_length=20,
+                split_length=10,
                 split_overlap=1,
             ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,

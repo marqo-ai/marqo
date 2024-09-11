@@ -41,7 +41,7 @@ class IndexSettings(StrictBaseModel):
         splitOverlap=3,
     )
     audioPreprocessing: core.AudioPreProcessing = core.AudioPreProcessing(
-        splitLength=20,
+        splitLength=10,
         splitOverlap=3,
     )
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float

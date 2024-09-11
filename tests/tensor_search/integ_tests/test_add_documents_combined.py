@@ -231,7 +231,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertEqual(len(tensor_facets), 1, f"Document {i} should have 1 tensor facet")
                     elif i == 2:
                         # print(tensor_facets)
-                        self.assertEqual(len(tensor_facets), 10, f"Document 2 should have 10 tensor facets")
+                        self.assertEqual(len(tensor_facets), 20, f"Document 2 should have 20 tensor facets")
 
                     # Check embedding length and uniqueness
                     embeddings = []

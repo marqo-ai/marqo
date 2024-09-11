@@ -465,7 +465,7 @@ class TestPrefix(MarqoTestCase):
                 splitOverlap=1,
             ),
             audio_preprocessing=AudioPreProcessing(
-                splitLength=20,
+                splitLength=10,
                 splitOverlap=1,
             ),
             distance_metric=DistanceMetric.DotProduct,
