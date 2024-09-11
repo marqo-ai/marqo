@@ -22,7 +22,7 @@ from marqo.core.models.marqo_index import *
 from marqo.s2_inference import clip_utils
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
-from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError
+from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -43,7 +43,10 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                              download_headers: Optional[Dict] = None,  # Optional for now
                                              metric_obj: Optional[RequestMetrics] = None,
                                              preprocessors: Optional[Dict[str, Compose]] = None,
-                                             marqo_index: Optional[MarqoIndex] = None,
+                                             marqo_index_type: Optional[IndexType] = None,
+                                             marqo_index_model: Optional[Model] = None,
+                                             audio_preprocessing: Optional[AudioPreProcessing] = None,
+                                             video_preprocessing: Optional[VideoPreProcessing] = None,
                                              force_download: bool = False) -> None:
     """A thread calls this function to download images for its allocated documents
 
@@ -71,9 +74,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
 
     """
     # Determine index type
-    is_no_index = marqo_index is None
-    is_structured_index = marqo_index.type == IndexType.Structured if not is_no_index else False
-    is_unstructured_index = marqo_index.type == IndexType.Unstructured if not is_no_index else False
+    is_structured_index = marqo_index_type == IndexType.Structured
+    is_unstructured_index = marqo_index_type == IndexType.Unstructured
 
     # Generate pseudo-unique ID for thread metrics.
     _id = f'image_download.{threading.get_ident()}'
@@ -88,18 +90,27 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                 if field not in tensor_fields:
                     continue
                 if isinstance(doc[field], str) or force_download:
-                    modality = infer_modality(doc[field])
-                    if (modality == Modality.IMAGE and is_no_index) or (
-                        modality == Modality.IMAGE and is_unstructured_index) or (
-                        is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer):
-
-                        if (marqo_index is not None
-                                and marqo_index.model.properties.get('type') in [ModelType.LanguageBind]
-                                and marqo_index.model.properties.get('supported_modalities') is not None
-                                and Modality.IMAGE not in marqo_index.model.properties.get('supported_modalities')):
-                            media_repo[doc[field]] = UnsupportedModalityError(
-                                f"Model {marqo_index.model.name} does not support {modality}")
+                    try:    
+                        inferred_modality = infer_modality(doc[field])
+                    except MediaDownloadError as e:
+                        if is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer:
+                            # Continue processing for structured indexes with image fields
+                            inferred_modality = Modality.IMAGE
+                        else:
+                            media_repo[doc[field]] = MediaDownloadError(f"Error inferring modality of media file {doc[field]}: {e}")
                             continue
+
+                    if (inferred_modality == Modality.IMAGE and is_unstructured_index) or (
+                        is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer): # Don't use infer modality in structured image pointers
+
+                        if marqo_index_model.properties.get('type') in [ModelType.LanguageBind] \
+                            and marqo_index_model.properties.get('supported_modalities') is not None \
+                            and Modality.IMAGE not in marqo_index_model.properties.get('supported_modalities'):
+
+                            media_repo[doc[field]] = UnsupportedModalityError(
+                                f"Model {marqo_index_model.name} does not support {inferred_modality}")
+                            continue
+
                         # Existing logic
                         if doc[field] in media_repo:
                             continue
@@ -127,27 +138,42 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 else:
                                     raise e
 
-                    elif (modality in [Modality.VIDEO, Modality.AUDIO] and is_no_index) or (
-                            modality in [Modality.VIDEO, Modality.AUDIO] and is_unstructured_index) or (
-                            is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer]):
-                            
-                        if marqo_index.model.properties.get('type') not in [
-                            ModelType.LanguageBind] and modality not in marqo_index.model.properties.get(
+                    elif (inferred_modality in [Modality.VIDEO, Modality.AUDIO] and is_unstructured_index) or (
+                            is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer] and inferred_modality in [Modality.AUDIO, Modality.VIDEO]):
+
+                        if marqo_index_model.properties.get('type') not in [
+                            ModelType.LanguageBind] and inferred_modality not in marqo_index_model.properties.get(
                             'supported_modalities'):
                             media_repo[doc[field]] = UnsupportedModalityError(
-                                f"Model {marqo_index.model.name} does not support {modality}")
+                                f"Model {marqo_index_model.name} does not support {inferred_modality}")
                             continue
+
+                        if is_structured_index:
+                            if inferred_modality is Modality.VIDEO and media_field_types_mapping[
+                            field] is FieldType.AudioPointer:
+                                media_repo[doc[field]] = MediaMismatchError(
+                                    f"Invalid audio file. Error processing media file {doc}, detected as video, but field type is not VideoPointer")
+                                continue
+
+                            if inferred_modality is Modality.AUDIO and media_field_types_mapping[
+                            field] is FieldType.VideoPointer:
+                                media_repo[doc[field]] = MediaMismatchError(
+                                    f"Invalid video file. Error processing media file {doc}, detected as audio, but field type is not AudioPointer")
+                                continue
+
                         try:
-                            processed_chunks = download_and_chunk_media(doc[field], device, download_headers, modality,
-                                                                        marqo_index, preprocessors)
+                            processed_chunks = download_and_chunk_media(doc[field], device, download_headers, inferred_modality,
+                                                                    marqo_index_type, marqo_index_model, preprocessors,
+                                                                    audio_preprocessing, video_preprocessing)
                             media_repo[doc[field]] = processed_chunks
                         except (ffmpeg.Error, S2InferenceError) as e:
-                            logger.error(f"Error processing {modality} file: {str(e)}")
-                            media_repo[doc[field]] = S2InferenceError(f"Error processing {modality} file: {str(e)}")
-
+                            logger.error(f"Error processing {inferred_modality} file: {str(e)}")
+                            media_repo[doc[field]] = S2InferenceError(f"Error processing {inferred_modality} file: {str(e)}")
+                    
+                    elif inferred_modality is Modality.TEXT and is_structured_index and media_field_types_mapping[field] in [FieldType.AudioPointer, FieldType.VideoPointer, FieldType.ImagePointer]:
+                        media_repo[doc[field]] = S2InferenceError(f"Error processing media file {doc}, detected as text, expected a {media_field_types_mapping[field]} pointer")
                     else:
                         pass
-                        # raise an error
 
                 # For multimodal tensor combination
                 elif isinstance(doc[field], dict):
@@ -168,11 +194,13 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
 
 
-def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index: MarqoIndex,
-                             preprocessors: Preprocessors) -> List[Dict[str, torch.Tensor]]:
+def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index_type: IndexType, marqo_index_model: Model,
+                             preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
+                             video_preprocessing: VideoPreProcessing = None) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
-    processor = StreamingMediaProcessor(url, device, headers, modality, marqo_index, preprocessors)
+    processor = StreamingMediaProcessor(url, device, headers, modality, marqo_index_type, marqo_index_model, preprocessors,
+                                        audio_preprocessing, video_preprocessing)
 
     if processor.total_size > MAX_FILE_SIZE:
         raise ValueError(
@@ -192,14 +220,18 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                                     model_auth: Optional[ModelAuth] = None,
                                     device: Optional[str] = None,
                                     patch_method_exists: bool = False,
-                                    marqo_index: Optional[MarqoIndex] = None,
+                                    marqo_index_type: Optional[IndexType] = None,
+                                    marqo_index_model: Optional[Model] = None,
+                                    audio_preprocessing: Optional[AudioPreProcessing] = None,
+                                    video_preprocessing: Optional[VideoPreProcessing] = None,
                                     force_download: bool = False
                                     ) -> ContextManager[dict]:
     media_repo = {}  # for image/video/audio
     media_repo = process_batch(docs, thread_count, tensor_fields, image_download_headers,
                                model_name, normalize_embeddings, force_download,
                                media_field_types_mapping, download_headers, model_properties, model_auth,
-                               device, patch_method_exists, marqo_index)
+                               device, patch_method_exists, marqo_index_type, marqo_index_model,
+                               audio_preprocessing, video_preprocessing)
 
     try:
         yield media_repo
@@ -217,7 +249,9 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                   force_download: bool, media_field_types_mapping: Optional[Dict[str, FieldType]],
                   download_headers: Optional[Dict], model_properties: Optional[Dict],
                   model_auth: Optional[ModelAuth], device: Optional[str],
-                  patch_method_exists: bool, marqo_index: Optional[MarqoIndex]) -> dict:
+                  patch_method_exists: bool, marqo_index_type: Optional[IndexType], marqo_index_model: Optional[Model],
+                  audio_preprocessing: Optional[AudioPreProcessing] = None,
+                  video_preprocessing: Optional[VideoPreProcessing] = None) -> dict:
     docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
 
@@ -250,7 +284,10 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                                    download_headers,
                                    m[i],
                                    preprocessors,
-                                   marqo_index,
+                                   marqo_index_type,
+                                   marqo_index_model,
+                                   audio_preprocessing,
+                                   video_preprocessing,
                                    force_download)
                    for i, allocation in enumerate(thread_allocated_docs)]
 

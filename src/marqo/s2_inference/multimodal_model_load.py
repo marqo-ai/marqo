@@ -14,6 +14,8 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
 from PIL.Image import Image
 import torch
+from urllib.parse import quote
+
 
 from marqo.s2_inference.multimodal_model_load import *
 from marqo.s2_inference.languagebind import (
@@ -21,6 +23,8 @@ from marqo.s2_inference.languagebind import (
     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
     to_device
 )
+from marqo.s2_inference.errors import MediaDownloadError
+from marqo.core.inference.image_download import encode_url
 from marqo.s2_inference.clip_utils import download_image_from_url, validate_url
 from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBindImageTokenizer
 from marqo.s2_inference.languagebind.video.tokenization_video import LanguageBindVideoTokenizer
@@ -143,8 +147,11 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     if isinstance(content, str):
         if not validate_url(content):
             return Modality.TEXT
+        
+        # Encode the URL
+        encoded_url = encode_url(content)
 
-        extension = content.split('.')[-1].lower()
+        extension = encoded_url.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
             return Modality.IMAGE
         elif extension in ['mp4', 'avi', 'mov']:
@@ -152,10 +159,10 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
         elif extension in ['mp3', 'wav', 'ogg']:
             return Modality.AUDIO
 
-        if validate_url(content):
+        if validate_url(encoded_url):
             # Use context manager to handle content sample
             try:
-                with fetch_content_sample(content) as sample:
+                with fetch_content_sample(encoded_url) as sample:
                     mime = magic.from_buffer(sample.read(), mime=True)
                     if mime.startswith('image/'):
                         return Modality.IMAGE
@@ -163,9 +170,13 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
                         return Modality.VIDEO
                     elif mime.startswith('audio/'):
                         return Modality.AUDIO
-            except Exception as e:
-                pass
-
+            except requests.exceptions.RequestException as e:
+                raise MediaDownloadError(f"Error downloading media file {content}: {e}") from e
+            except magic.MagicException as e:
+                raise MediaDownloadError(f"Error determining MIME type for {encoded_url}: {e}") from e
+            except IOError as e:
+                raise MediaDownloadError(f"IO error while processing {encoded_url}: {e}") from e
+            
         return Modality.TEXT
 
     elif isinstance(content, bytes):
@@ -182,8 +193,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
 
     else:
         return Modality.TEXT
-        # raise ValueError(f"Unsupported content type: {type(content)}.
-        # It is neither a string, list of strings, nor bytes.")
+
 
 
 class LanguageBindEncoder(ModelEncoder):
