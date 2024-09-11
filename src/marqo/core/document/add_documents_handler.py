@@ -26,7 +26,8 @@ from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.tensor_search import validation, add_docs
 from marqo.tensor_search.enums import EnvVars
-from marqo.vespa.models import VespaDocument
+from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.models.get_document_response import Document
 
 ORIGINAL_ID = '_original_id'
@@ -116,39 +117,43 @@ class AddDocumentsHandler(ABC):
         """
         Template method for adding documents to Marqo index
         """
-        for loc, original_doc in enumerate(reversed(self.add_docs_params.docs)):
-            doc = copy.deepcopy(original_doc)
-            original_id = None
-            try:
-                self.validate_doc(doc)
+        with RequestMetricsStore.for_request().time("add_documents.processing_before_vespa"):
+            for loc, original_doc in enumerate(reversed(self.add_docs_params.docs)):
+                doc = copy.deepcopy(original_doc)
+                original_id = None
+                try:
+                    self.validate_doc(doc)
 
-                original_id = self.validate_and_pop_doc_id(doc)
-                doc_id = original_id or str(uuid.uuid4())
-                marqo_doc = {ORIGINAL_ID: original_id, MARQO_DOC_ID: doc_id}  # keep this info for error report
+                    original_id = self.validate_and_pop_doc_id(doc)
+                    doc_id = original_id or str(uuid.uuid4())
+                    marqo_doc = {ORIGINAL_ID: original_id, MARQO_DOC_ID: doc_id}  # keep this info for error report
 
-                for field_name, field_content in doc.items():
-                    self.handle_field(marqo_doc, field_name, field_content)
+                    for field_name, field_content in doc.items():
+                        self.handle_field(marqo_doc, field_name, field_content)
 
-                self.handle_multi_modal_fields(marqo_doc)
+                    self.handle_multi_modal_fields(marqo_doc)
 
-                self.add_docs_response_collector.collect_marqo_doc(loc, marqo_doc)
-            except AddDocumentsError as err:
-                self.add_docs_response_collector.collect_error_response(original_id, err, loc)
+                    self.add_docs_response_collector.collect_marqo_doc(loc, marqo_doc)
+                except AddDocumentsError as err:
+                    self.add_docs_response_collector.collect_error_response(original_id, err, loc)
 
-        # retrieve existing docs for existing tensor
-        if self.add_docs_params.use_existing_tensors:
-            result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.visited_doc_ids),
-                                                        self.marqo_index.schema_name)
-            existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
-            self.handle_existing_tensors(existing_vespa_docs)
+            # retrieve existing docs for existing tensor
+            if self.add_docs_params.use_existing_tensors:
+                result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.visited_doc_ids),
+                                                            self.marqo_index.schema_name)
+                existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
+                self.handle_existing_tensors(existing_vespa_docs)
 
-        # vectorise tensor fields
-        self.vectorise_tensor_fields()
+            # vectorise tensor fields
+            self.vectorise_tensor_fields()
 
         # persist to vespa if there are still valid docs
-        self.persist_to_vespa()
+        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
+            response = self.persist_to_vespa()
 
-        return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
+        with RequestMetricsStore.for_request().time("add_documents.postprocess"):
+            self.handle_vespa_response(response)
+            return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
 
     @abstractmethod
     def _create_tensor_fields_container(self) -> TensorFieldsContainer:
@@ -284,26 +289,27 @@ class AddDocumentsHandler(ABC):
         if not doc_media_fields:
             return dict()
 
-        image_repo = exit_stack.enter_context(
-            # TODO refactor this to only pass in necessary parameters
-            add_docs.download_and_preprocess_content(
-                docs=list(doc_media_fields.values()),
-                thread_count=self._determine_thread_count(self.marqo_index, self.add_docs_params),
-                tensor_fields=list(media_field_types_mapping.keys()),
-                image_download_headers=self.add_docs_params.image_download_headers,
-                model_name=self.marqo_index.model.name,
-                normalize_embeddings=self.marqo_index.normalize_embeddings,
-                media_field_types_mapping=media_field_types_mapping,
-                model_properties=self.marqo_index.model.get_properties(),
-                device=self.add_docs_params.device,
-                model_auth=self.add_docs_params.model_auth,
-                patch_method_exists=self.marqo_index.image_preprocessing.patch_method is not None,
-                marqo_index_type=self.marqo_index.type,
-                marqo_index_model=self.marqo_index.model,
-                audio_preprocessing=self.marqo_index.audio_preprocessing,
-                video_preprocessing=self.marqo_index.video_preprocessing,
+        with RequestMetricsStore.for_request().time("image_download.full_time"):
+            image_repo = exit_stack.enter_context(
+                # TODO refactor this to only pass in necessary parameters
+                add_docs.download_and_preprocess_content(
+                    docs=list(doc_media_fields.values()),
+                    thread_count=self._determine_thread_count(self.marqo_index, self.add_docs_params),
+                    tensor_fields=list(media_field_types_mapping.keys()),
+                    image_download_headers=self.add_docs_params.image_download_headers,
+                    model_name=self.marqo_index.model.name,
+                    normalize_embeddings=self.marqo_index.normalize_embeddings,
+                    media_field_types_mapping=media_field_types_mapping,
+                    model_properties=self.marqo_index.model.get_properties(),
+                    device=self.add_docs_params.device,
+                    model_auth=self.add_docs_params.model_auth,
+                    patch_method_exists=self.marqo_index.image_preprocessing.patch_method is not None,
+                    marqo_index_type=self.marqo_index.type,
+                    marqo_index_model=self.marqo_index.model,
+                    audio_preprocessing=self.marqo_index.audio_preprocessing,
+                    video_preprocessing=self.marqo_index.video_preprocessing,
+                )
             )
-        )
 
         for url, data in image_repo.items():
             if isinstance(data, Exception):
@@ -404,11 +410,12 @@ class AddDocumentsHandler(ABC):
 
     def single_vectoriser(self, modality: Modality) -> Vectoriser:
         def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
-            if modality in [Modality.AUDIO, Modality.VIDEO]:
-                # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind model
-                return [vector for content_chunk in content_chunks for vector in
-                        self._s2inference_vectorise([content_chunk], modality)]
-            return self._s2inference_vectorise(content_chunks, modality)
+            with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                if modality in [Modality.AUDIO, Modality.VIDEO]:
+                    # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
+                    return [vector for content_chunk in content_chunks for vector in
+                            self._s2inference_vectorise([content_chunk], modality)]
+                return self._s2inference_vectorise(content_chunks, modality)
 
         return vectorise
 
@@ -424,13 +431,14 @@ class AddDocumentsHandler(ABC):
 
         embedding_cache = dict()
         if chunks_to_vectorise:
-            if modality in [Modality.AUDIO, Modality.VIDEO]:
-                # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind model
-                embeddings = [vector for content_chunk in chunks_to_vectorise for vector in
-                              self._s2inference_vectorise([content_chunk], modality)]
-            else:
-                embeddings = self._s2inference_vectorise(chunks_to_vectorise, modality)
-            embedding_cache = {dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
+            with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                if modality in [Modality.AUDIO, Modality.VIDEO]:
+                    # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
+                    embeddings = [vector for content_chunk in chunks_to_vectorise for vector in
+                                  self._s2inference_vectorise([content_chunk], modality)]
+                else:
+                    embeddings = self._s2inference_vectorise(chunks_to_vectorise, modality)
+                embedding_cache = {dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
 
         def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
             return [embedding_cache[dict_key(chunk)] for chunk in content_chunks]
@@ -461,7 +469,7 @@ class AddDocumentsHandler(ABC):
         except s2_inference_errors.S2InferenceError as e:
             raise AddDocumentsError(e.message)
 
-    def persist_to_vespa(self) -> None:
+    def persist_to_vespa(self) -> FeedBatchResponse:
         vespa_docs = []
         for doc_id, doc in self.add_docs_response_collector.marqo_docs.copy().items():
             try:
@@ -469,9 +477,10 @@ class AddDocumentsHandler(ABC):
             except MarqoDocumentParsingError as e:
                 self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(e.message))
 
-        index_responses = self.config.vespa_client.feed_batch(list(reversed(vespa_docs)), self.marqo_index.schema_name)
+        return self.config.vespa_client.feed_batch(list(reversed(vespa_docs)), self.marqo_index.schema_name)
 
-        for resp in index_responses.responses:
+    def handle_vespa_response(self, response: FeedBatchResponse):
+        for resp in response.responses:
             # FIXME doc_id is not url encoded
             doc_id = resp.id.split('::')[-1] if resp.id else None
             status, message = self.config.document.translate_vespa_document_response(resp.status, message=resp.message)
