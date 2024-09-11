@@ -354,7 +354,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": str(i),
-             "image_field": TestImageUrls.IMAGE2.value
+             "image_field_1": TestImageUrls.IMAGE2.value
              } for i in range(10)
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
