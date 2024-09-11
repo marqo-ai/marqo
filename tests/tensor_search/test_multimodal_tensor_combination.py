@@ -405,15 +405,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
     def test_multimodal_field_bad_field_content(self):
         # TODO: Add structured index: `structured_random_multimodal_index` to this list once validation is added
-        for index in [self.unstructured_random_multimodal_index]:
+        for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
                 test_cases = [
-                    ({"bad_test_text_field": "test", "bad_field_float": 2.4}, "received bad_field_float:2.4"),
-                    ({"bad_test_text_field": "test", "bad_field_int": 1}, "received bad_field_int:1"),
-                    ({"bad_test_text_field": "test", "bad_field_bool": True}, "received bad_field_bool:True"),
-                    ({"bad_test_text_field": "test", "bad_field_list": ["123", "23"]}, f'received bad_field_list:{["123", "23"]}'),
-                    ({"bad_test_text_field": "test", "bad_field_img": "https://a-void-image.jpg"}, "Could not find media"),
-                    ({"bad_multimodal_field": "test"}, "Document and mappings object have conflicting fields")
+                    ({"bad_test_text_field": "test", "bad_field_float": 2.4}, "received bad_field_float:2.4", "Invalid type <class 'float'> for tensor field bad_field_float"),
+                    ({"bad_test_text_field": "test", "bad_field_int": 1}, "received bad_field_int:1", "Invalid type <class 'int'> for tensor field bad_field_int"),
+                    ({"bad_test_text_field": "test", "bad_field_bool": True}, "received bad_field_bool:True", "Invalid type <class 'bool'> for tensor field bad_field_bool"),
+                    ({"bad_test_text_field": "test", "bad_field_list": ["123", "23"]}, f'received bad_field_list:{["123", "23"]}', "Invalid type <class 'list'> for tensor field bad_field_list"),
+                    ({"bad_test_text_field": "test", "bad_field_img": "https://a-void-image.jpg"}, "Could not process the media file found", "Could not process the media file found"),
+                    ({"bad_multimodal_field": "test"}, "Document and mappings object have conflicting fields", "Field bad_multimodal_field is a multimodal combination field and cannot be assigned a value.")
                 ]
 
                 mappings = {
@@ -427,7 +427,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         }
                 }
 
-                for document, error_msg in test_cases:
+                for document, error_msg_unstructured, error_msg_structured in test_cases:
+                    error_msg = error_msg_unstructured if index.type == IndexType.Unstructured else error_msg_structured
                     with self.subTest(error_msg):
                         with mock.patch("marqo.s2_inference.s2_inference.vectorise") as mock_vectorise:
                             res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -596,6 +597,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 self.assertEqual(score_1, score_2)
 
+    @unittest.skip(reason="we don't call vectorise_multimodal_combination_field_unstructured any more")
     def test_multimodal_tensor_combination_vectorise_call_unstructured(self):
         """check if the chunks are properly created in the add_documents"""
 
@@ -814,7 +816,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     # Ensure the doc is added
                     assert tensor_search.get_document_by_id(config=self.config, index_name=index.name,
                                                             document_id="111")
-                    # Ensure that vectorise is only called twice
+                    # Ensure that vectorise is only called once
                     self.assertEqual(1, len(mock_vectorise.call_args_list))
 
                     text_content = [f"A rider is riding a horse jumping over the barrier_{i}." for i in range(1, 5)]
