@@ -59,7 +59,7 @@ jobs:
 
           # CUDA AMD64 instance
           ec2-image-id: ${{ secrets.CUDA_EC2_IMAGE_ID }}
-          ec2-instance-type: g4dn.xlarge
+          ec2-instance-type: g4dn.2xlarge
           subnet-id: ${{ secrets.CUDA_SUBNET_ID }}
           security-group-id: ${{ secrets.CUDA_SECURITY_GROUP_ID }}
 
