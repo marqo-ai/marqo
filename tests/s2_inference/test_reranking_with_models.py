@@ -5,6 +5,7 @@ import numpy as np
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference.errors import RerankerError,RerankerNameError
 from marqo.s2_inference.s2_inference import clear_loaded_models
+from tests.marqo_test import TEST_IMAGE_URLS
 
 
 class TestRerankingWithModels(unittest.TestCase):
@@ -172,7 +173,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': TEST_IMAGE_URLS['hippo_realistic'],
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -228,7 +229,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': TEST_IMAGE_URLS['hippo_realistic'],
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -266,7 +267,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': TEST_IMAGE_URLS['hippo_realistic'],
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': {"location":[0,0,20,30]},
@@ -324,7 +325,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': TEST_IMAGE_URLS['hippo_realistic'],
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -381,7 +382,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+                        'location': TEST_IMAGE_URLS['hippo_realistic'],
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],

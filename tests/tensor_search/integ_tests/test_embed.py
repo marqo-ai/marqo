@@ -275,7 +275,7 @@ class TestEmbed(MarqoTestCase):
     @pytest.mark.skipif(torch.cuda.is_available() is True, reason="Skip this test if we have cuda support.")
     def test_embed_languagebind(self):
         content = [
-            #"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", # image
+            #TEST_IMAGE_URLS['hippo_realistic'], # image
             "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4" # video
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:

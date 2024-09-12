@@ -14,12 +14,13 @@ from marqo.s2_inference.errors import ImageDownloadError
 from marqo.tensor_search.enums import ModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.models.private_models import S3Auth, S3Location, HfModelLocation
+from tests.marqo_test import TEST_IMAGE_URLS
 
 
 class TestImageDownloading(unittest.TestCase):
 
     def test_loadImageFromPathTimeout(self):
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url = TEST_IMAGE_URLS['hippo_realistic']
         # should be fine on regular timeout:
         img = clip_utils.load_image_from_path(good_url, {})
         assert isinstance(img, types.ImageType)
@@ -32,7 +33,7 @@ class TestImageDownloading(unittest.TestCase):
         """Do we catch other download errors?
         The errors tested inherit from requests.exceptions.RequestException
         """
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url = TEST_IMAGE_URLS['hippo_realistic']
         clip_utils.load_image_from_path(good_url, {})
         for err in [pycurl.error]:
             with mock.patch('pycurl.Curl') as MockCurl:
@@ -43,7 +44,7 @@ class TestImageDownloading(unittest.TestCase):
 
     @patch('pycurl.Curl')
     def test_downloadImageFromRrlCloseCalled(self, MockCurl):
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url = TEST_IMAGE_URLS['hippo_realistic']
 
         mock_curl_instance = MockCurl.return_value
         mock_curl_instance.getinfo.return_value = 200

@@ -18,7 +18,7 @@ from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
 from tests.utils.transition import add_docs_caller
 from marqo.core.utils.prefix import determine_text_prefix
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
@@ -442,7 +442,7 @@ class TestVectorSearch(MarqoTestCase):
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
         tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
-        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        hippo_img = TEST_IMAGE_URLS['hippo_realistic']
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
@@ -964,7 +964,7 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, index_settings=settings, config=self.config
         )
-        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+        url_1 = TEST_IMAGE_URLS['hippo_realistic']
         url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
         docs = [
             {"_id": "123",
@@ -1020,7 +1020,7 @@ class TestVectorSearch(MarqoTestCase):
     def test_multi_search_images(self):
         docs = [
             {
-                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "loc a": TEST_IMAGE_URLS['hippo_realistic'],
                 "_id": 'realistic_hippo'},
             {"loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
@@ -1045,10 +1045,10 @@ class TestVectorSearch(MarqoTestCase):
             ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
             ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
+              TEST_IMAGE_URLS['hippo_realistic']: -1.0},
              ['artefact_hippo', 'realistic_hippo']),
             ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+              TEST_IMAGE_URLS['hippo_realistic']: -1.0,
               "artefact": 1.0, "photo realistic": -1,
               },
              ['artefact_hippo', 'realistic_hippo']),
@@ -1071,7 +1071,7 @@ class TestVectorSearch(MarqoTestCase):
         """
         docs = [
             {
-                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "loc a": TEST_IMAGE_URLS['hippo_realistic'],
                 "_id": 'realistic_hippo'},
             {"loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
              "_id": 'artefact_hippo'}
@@ -1092,18 +1092,18 @@ class TestVectorSearch(MarqoTestCase):
         multi_queries = [
             {
                 "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+                TEST_IMAGE_URLS['hippo_realistic']: -1.0,
                 "artefact": 5.0, "photo realistic": -1,
             },
             {
                 "artefact": 5.0,
                 "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
                 "photo realistic": -1,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0
+                TEST_IMAGE_URLS['hippo_realistic']: -1.0
             },
             {
                 "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 3,
-                "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+                TEST_IMAGE_URLS['hippo_realistic']: -1.0,
             },
             {
                 "hello": 3, "some thing": -1.0,
@@ -1151,7 +1151,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search_images_edge_cases(self):
         docs = [
-            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            {"loc": TEST_IMAGE_URLS['hippo_realistic'],
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1185,7 +1185,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search_images_ok_edge_cases(self):
         docs = [
-            {"loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            {"loc": TEST_IMAGE_URLS['hippo_realistic'],
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1240,7 +1240,7 @@ class TestVectorSearch(MarqoTestCase):
         The code paths for image and search have diverged quite a bit
         """
         hippo_image = (
-            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+            TEST_IMAGE_URLS['hippo_realistic']
         )
         doc_dict = {
             'realistic_hippo': {"loc": hippo_image,

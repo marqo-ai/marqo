@@ -15,7 +15,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 
 
@@ -423,7 +423,7 @@ class TestUpdate(MarqoTestCase):
         """
         Test that updating an image field in a multimodal context properly embeds the image as an image and not as text.
         """
-        original_image_url = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+        original_image_url = TEST_IMAGE_URLS['hippo_realistic']
         updated_image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
         
         original_doc = {
