@@ -76,7 +76,6 @@ jobs:
           pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.dev.txt
-          pip install pytest==7.4.0
 
       - name: Build Vespa
         run: |
@@ -138,10 +137,16 @@ jobs:
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
           export MARQO_MAX_CPU_MODEL_MEMORY=15
-          # TODO: move this to largemodel_unit_test_CI.yml
+          
+          cd marqo
+          export PYTHONPATH="./tests:./src:."
+          pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
-          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests --ignore=marqo/tests/test_documentation.py
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-test-report
+          path: marqo/cov_html/
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
