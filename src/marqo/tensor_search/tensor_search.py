@@ -161,10 +161,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media:  # review this logic
             with RequestMetricsStore.for_request().time(
-                    "media_download.full_time",
+                    "image_download.full_time",
                     lambda t: logger.debug(
-                        f"add_documents media download: took {t:.3f}ms to concurrently download "
-                        f"media for {batch_size} docs using {media_download_thread_count} threads"
+                        f"add_documents image download: took {t:.3f}ms to concurrently download "
+                        f"images for {batch_size} docs using {media_download_thread_count} threads"
                     )
             ):
                 # TODO - Refactor this part to make it more readable
@@ -340,16 +340,20 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 chunk_id = f"{field}::{chunk_time}"
                                 chunks.append(chunk_id)
 
-                                vector = s2_inference.vectorise(
-                                    model_name=marqo_index.model.name,
-                                    content=[media_chunk['tensor']],
-                                    model_properties=marqo_index.model.get_properties(),
-                                    device=add_docs_params.device,
-                                    normalize_embeddings=marqo_index.normalize_embeddings,
-                                    infer=True,
-                                    model_auth=add_docs_params.model_auth,
-                                    modality=modality
-                                )
+                                start_time = timer()
+                                with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                                    vector = s2_inference.vectorise(
+                                        model_name=marqo_index.model.name,
+                                        content=[media_chunk['tensor']],
+                                        model_properties=marqo_index.model.get_properties(),
+                                        device=add_docs_params.device,
+                                        normalize_embeddings=marqo_index.normalize_embeddings,
+                                        infer=True,
+                                        model_auth=add_docs_params.model_auth,
+                                        modality=modality
+                                    )
+                                end_time = timer()
+                                total_vectorise_time += (end_time - start_time)
                                 embeddings.extend(vector)
                         except s2_inference_errors.S2InferenceError as e:
                             document_is_valid = False
@@ -663,10 +667,10 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
         if media_fields:
             with RequestMetricsStore.for_request().time(
-                    "media_download.full_time",
+                    "image_download.full_time",
                     lambda t: logger.debug(
-                        f"add_documents media download: took {t:.3f}ms to concurrently download "
-                        f"media for {batch_size} docs using {media_download_thread_count} threads"
+                        f"add_documents image download: took {t:.3f}ms to concurrently download "
+                        f"images for {batch_size} docs using {media_download_thread_count} threads"
                     )
             ):
 
@@ -856,16 +860,21 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                                 chunk_id = f"{chunk_time}"
                                 chunks.append(chunk_id)
 
-                                vector = s2_inference.vectorise(
-                                    model_name=marqo_index.model.name,
-                                    content=[media_chunk['tensor']],  # Wrap in list as vectorise expects an iterable
-                                    model_properties=marqo_index.model.get_properties(),
-                                    device=add_docs_params.device,
-                                    normalize_embeddings=marqo_index.normalize_embeddings,
-                                    infer=True,
-                                    model_auth=add_docs_params.model_auth,
-                                    modality=Modality.VIDEO if marqo_field.type == FieldType.VideoPointer else Modality.AUDIO
-                                )
+                                start_time = timer()
+                                with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+                                    vector = s2_inference.vectorise(
+                                        model_name=marqo_index.model.name,
+                                        content=[media_chunk['tensor']],  # Wrap in list as vectorise expects an iterable
+                                        model_properties=marqo_index.model.get_properties(),
+                                        device=add_docs_params.device,
+                                        normalize_embeddings=marqo_index.normalize_embeddings,
+                                        infer=True,
+                                        model_auth=add_docs_params.model_auth,
+                                        modality=Modality.VIDEO if marqo_field.type == FieldType.VideoPointer else Modality.AUDIO
+                                    )
+
+                                end_time = timer()
+                                total_vectorise_time += (end_time - start_time)
                                 embeddings.extend(vector)  # vectorise returns a list of vectors
 
                         except s2_inference_errors.S2InferenceError as e:
@@ -2288,7 +2297,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
         sub_field_name_list = []
 
         if len(text_content_to_vectorise) > 0:
-            with RequestMetricsStore.for_request().time(f"create_vectors.text"):
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
                 prefixed_text_content_to_vectorise = text_processor.prefix_text_chunks(text_content_to_vectorise,
                                                                                        text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
@@ -2302,7 +2311,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                 sub_field_name_list.extend(text_field_names)
 
         if len(image_content_to_vectorise) > 0:
-            with RequestMetricsStore.for_request().time(f"create_vectors.image"):
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=image_content_to_vectorise,
@@ -2313,7 +2322,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                 sub_field_name_list.extend(image_field_names)
 
         if len(video_content_to_vectorise) > 0:
-            with RequestMetricsStore.for_request().time(f"create_vectors.video"):
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
                 for video_chunks_list in video_content_to_vectorise:
                     video_vectors = []
                     for video_chunk in video_chunks_list:
@@ -2330,7 +2339,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                 sub_field_name_list.extend(video_field_names)
 
         if len(audio_content_to_vectorise) > 0:
-            with RequestMetricsStore.for_request().time(f"create_vectors.audio"):
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
                 for audio_chunks_list in audio_content_to_vectorise:
                     audio_vectors = []
                     for audio_chunk in audio_chunks_list:
@@ -2511,7 +2520,7 @@ def vectorise_multimodal_combination_field_structured(
 
         # Process text content
         if text_content_to_vectorise:
-            with RequestMetricsStore.for_request().time("create_vectors.text"):
+            with RequestMetricsStore.for_request().time("create_vectors"):
                 prefixed_text_content = text_processor.prefix_text_chunks(text_content_to_vectorise, text_chunk_prefix)
                 text_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
@@ -2528,7 +2537,7 @@ def vectorise_multimodal_combination_field_structured(
 
         # Process image content
         if image_content_to_vectorise:
-            with RequestMetricsStore.for_request().time("create_vectors.image"):
+            with RequestMetricsStore.for_request().time("create_vectors"):
                 image_vectors = s2_inference.vectorise(
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.get_properties(),
@@ -2544,7 +2553,7 @@ def vectorise_multimodal_combination_field_structured(
 
         # Process video content
         if video_content_to_vectorise:
-            with RequestMetricsStore.for_request().time("create_vectors.video"):
+            with RequestMetricsStore.for_request().time("create_vectors"):
 
                 for video_chunks_list in video_content_to_vectorise:
                     video_vectors = []
@@ -2563,7 +2572,7 @@ def vectorise_multimodal_combination_field_structured(
 
         # Process audio content
         if audio_content_to_vectorise:
-            with RequestMetricsStore.for_request().time(f"create_vectors.audio"):
+            with RequestMetricsStore.for_request().time(f"create_vectors"):
                 for audio_chunks_list in audio_content_to_vectorise:
                     audio_vectors = []
                     for audio_chunk in audio_chunks_list:
