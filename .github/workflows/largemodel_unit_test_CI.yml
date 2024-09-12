@@ -105,6 +105,7 @@ jobs:
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
           
+          
           cd marqo/scripts/vespa_local
           set -x
           python vespa_local.py start
@@ -140,6 +141,8 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
+          export MARQO_MAX_CPU_MODEL_MEMORY=15
+          export MARQO_MAX_CUDA_MODEL_MEMORY=15
           
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
           pytest marqo/tests --largemodel --ignore=marqo/tests/test_documentation.py

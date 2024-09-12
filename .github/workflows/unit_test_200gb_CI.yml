@@ -137,6 +137,8 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
+          export MARQO_MAX_CPU_MODEL_MEMORY=15
+          # TODO: move this to largemodel_unit_test_CI.yml
 
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
           pytest marqo/tests --ignore=marqo/tests/test_documentation.py
