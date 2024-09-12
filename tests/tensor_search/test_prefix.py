@@ -259,7 +259,7 @@ class TestPrefix(MarqoTestCase):
                         docs=[{
                             "Title": "Horse rider",
                             "text_field": "hello",
-                            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field": TEST_IMAGE_URLS['image1'],
                             "_id": "1"
                         }],
                         device="cpu",
@@ -281,13 +281,13 @@ class TestPrefix(MarqoTestCase):
                         docs=[{
                             "Title": "Horse rider",
                             "text_field": "passage: hello",
-                            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field": TEST_IMAGE_URLS['image1'],
                             "_id": "2"
                         },
                         {
                             "Title": "Horse rider",
                             "text_field": "passage: passage: hello",
-                            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field": TEST_IMAGE_URLS['image1'],
                             "_id": "3"
                         }],
                         device="cpu",

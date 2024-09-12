@@ -123,8 +123,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         documents = [
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": TEST_IMAGE_URLS['image2'],
                 "text_field_1": "This is a valid image",
                 "_id": "1"
             },
@@ -352,7 +351,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": str(i),
-             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+             "image_field": TEST_IMAGE_URLS['image2']
              } for i in range(10)
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
@@ -380,7 +379,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": "1",
-             "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+             "image_field_1": TEST_IMAGE_URLS['image2']
              }
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
@@ -419,7 +418,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             {
                 "_id": "1",
                 "text_field_1": "This text should be ignored",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": TEST_IMAGE_URLS['image2'],
             }
         ]
 
@@ -691,26 +690,22 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         test_docs = [
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_1": TEST_IMAGE_URLS['image1'],
                  "text_field_1": "this is a valid image",
                  "_id": "1"
             },
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": TEST_IMAGE_URLS['image2'],
                 "text_field_1": "this is a invalid image due to int id",
                 "_id": 2
             },
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image3.jpg",
+                "image_field_1": TEST_IMAGE_URLS['image3'],
                 "text_field_1": "this is a invalid image due to None",
                 "_id": None
             },
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image4.jpg",
+                "image_field_1": TEST_IMAGE_URLS['image4'],
                 "text_field_1": "this is a invalid image due to ",
                 "_id": []
             }

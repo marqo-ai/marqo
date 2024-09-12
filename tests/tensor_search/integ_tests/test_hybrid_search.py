@@ -1015,7 +1015,7 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         docs=[
                             {"_id": "hippo image", "image_field_1": TEST_IMAGE_URLS['hippo_realistic']},
-                            {"_id": "random image", "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"},
+                            {"_id": "random image", "image_field_1": TEST_IMAGE_URLS['image2']},
                             {"_id": "hippo text", "text_field_1": "hippo"},
                             {"_id": "hippo text low relevance", "text_field_1": "hippo text text random"},
                             {"_id": "random text", "text_field_1": "random text"}

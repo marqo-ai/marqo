@@ -398,7 +398,7 @@ class TestUpdate(MarqoTestCase):
 
         Note: We can only update an image pointer field when it is not a tensor field."""
         original_doc = {
-            "image_pointer_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+            "image_pointer_field": TEST_IMAGE_URLS['image1'],
             "text_field_tensor": "search me",
             "_id": "1"
         }
@@ -409,14 +409,14 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
         updated_doc = {
-            "image_pointer_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+            "image_pointer_field": TEST_IMAGE_URLS['image2'],
             "_id": "1"
         }
         r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
-        self.assertEqual("https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+        self.assertEqual(TEST_IMAGE_URLS['image2'],
                          updated_doc["image_pointer_field"])
         
     def test_update_multimodal_image_field(self):
@@ -424,7 +424,7 @@ class TestUpdate(MarqoTestCase):
         Test that updating an image field in a multimodal context properly embeds the image as an image and not as text.
         """
         original_image_url = TEST_IMAGE_URLS['hippo_realistic']
-        updated_image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+        updated_image_url = TEST_IMAGE_URLS['image2']
         
         original_doc = {
             "_id": "1",
