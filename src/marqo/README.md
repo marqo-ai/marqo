@@ -37,45 +37,24 @@ docker run --detach --name vespa --hostname vespa-tutorial \
 ```
 You can verify that Vespa has been set up correctly by visiting `http://localhost:8080` in your browser.
 
-5. We've written custom logic to handle to reranking of all the results that Vespa outputs. We call this Hybrid search. Hybrid Search combines both lexical and tensor search to provide the best relevance possible. Hybrid search provides flexibility to get the best results of both types of search and fine tune which type to lean into. It's a great place to start when you want the precision of lexical search but the semantic understanding of tensor search.
-The logic is written in Java so you need to create a jar file 
+5. We need to install Java Development Kit and Maven to build the jar file for the custom searchers.
 
 5a. Install Java Development Kit: 
-You can install the Java Development Kit (JDK) by following the instructions [here](https://openjdk.org/install/). 
-You will need to set Java to Path, you can do this by 
-```zsh
-vi ~/.zshrc
+You can install the Java Development Kit (JDK) by following the instructions [here](https://docs.oracle.com/en/java/javase/22/install/overview-jdk-installation.html). 
+Post installation, remember to set JAVA_HOME Environment Variable and to add Java to the PATH Environment Variable.
+You can verify the installation by running the following command:
+```bash
+java -version
 ```
-or 
-```zsh
-vi ~/.zprofile
-```
-In the .zshrc/.zprofile file, paste the following contents: 
-```
-JAVA_HOME="/Library/Java/JavaVirtualMachines/jdk-22.0.2.jdk/Contents/Home"
-PATH="${JAVA_HOME}/bin:${PATH}"
-```
-Remember to replace the "/Library/Java/JavaVirtualMachines/jdk-22.0.2.jdk/Contents/Home" with the path to your JDK.
-After doing this, you should be able to run the following command to check if Java is installed correctly:
-```zsh
-java -version 
-```
-you should be able to see the version of java you installed. 
-
-5b. Install Maven (https://maven.apache.org/install.html)
+5b. Install Maven 
 You can install Maven by following the instructions [here](https://maven.apache.org/install.html).
-Similar to setting java to path, you will need to set Maven to Path, open your .zshrc / .zprofile file similar to above. 
-```
-export M2_HOME="/Users/your-username/Downloads/apache-maven-3.9.9"
-PATH="${M2_HOME}/bin:${PATH}"
-```
-Remember to replace the "/Users/your-username/Downloads/apache-maven-3.9.9" with the path to your Maven.
-You can verify that maven has been configured correctly by running 
-```zsh
-mvn -v 
+Similar to setting Java, you need to add Maven to the PATH Environment Variable.
+Verify Maven installation by running the following command: 
+```bash
+mvn -version
 ```
 Post this you need to create a jar file, cd into the vespa directory in your local marqo repository, and run 
-```zsh
+```bash
 mvn clean package
 ```
 Post running this command, you will see that a target folder gets created in the vespa directory, which contains a jar file called marqo-custom-searchers-deploy.jar. This jar file is used to deploy the custom searchers to Vespa.
