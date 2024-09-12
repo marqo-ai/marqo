@@ -137,16 +137,16 @@ jobs:
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
           export MARQO_MAX_CPU_MODEL_MEMORY=15
-          # TODO: move this to largemodel_unit_test_CI.yml
-
-          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest --ignore=marqo/tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html marqo/tests
+          
+          cd marqo
+          export PYTHONPATH="./tests:./src:."
+          pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report
-          path: marqo/htmlcov/
+          path: marqo/cov_html/
   
   Stop-Runner:
     name: Stop self-hosted EC2 runner
