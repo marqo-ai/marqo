@@ -161,7 +161,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
     with ExitStack() as exit_stack:
         if marqo_index.treat_urls_and_pointers_as_images or marqo_index.treat_urls_and_pointers_as_media:  # review this logic
             with RequestMetricsStore.for_request().time(
-                    "media_download.full_time",
+                    "image_download.full_time",
                     lambda t: logger.debug(
                         f"add_documents media download: took {t:.3f}ms to concurrently download "
                         f"media for {batch_size} docs using {media_download_thread_count} threads"
@@ -663,7 +663,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
         if media_fields:
             with RequestMetricsStore.for_request().time(
-                    "media_download.full_time",
+                    "image_download.full_time",
                     lambda t: logger.debug(
                         f"add_documents media download: took {t:.3f}ms to concurrently download "
                         f"media for {batch_size} docs using {media_download_thread_count} threads"
