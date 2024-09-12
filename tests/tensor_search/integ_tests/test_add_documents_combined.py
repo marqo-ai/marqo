@@ -542,14 +542,14 @@ class TestAddDocumentsCombined(MarqoTestCase):
             ([{"_id": "123",
                "image_field_1": TEST_IMAGE_URLS['hippo_realistic']},
               {"_id": "789",
-               "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+               "image_field_1": TEST_IMAGE_URLS['hippo_statue']},
               {"_id": "456", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
              [("123", 200), ("789", 200), ("456", 400)]
              ),
             ([{"_id": "123",
                "image_field_1": TEST_IMAGE_URLS['hippo_realistic']},
               {"_id": "789",
-               "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+               "image_field_1": TEST_IMAGE_URLS['hippo_statue']},
               {"_id": "456", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist.png"},
               {"_id": "111", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
              [("123", 200), ("789", 200), ("456", 400), ("111", 400)]
