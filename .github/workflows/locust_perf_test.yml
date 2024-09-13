@@ -1,14 +1,10 @@
-name: cpu_local_marqo_API_tests
-# runs API Tests on CPU-only instance with Vespa and Marqo running in two separate docker containers
+name: locust_performance_tests
+run-name: Locust test suite ${{ inputs.test_suite }} run on ${{ inputs.marqo_host }} with ${{ inputs.number_of_users }} users
+# runs Locust performance tests on local Marqo container or Marqo Cloud
 
 on:
   workflow_dispatch:
     inputs:
-      marqo_base_ref:
-        description: 'marqo branch-name, commit SHA or tag'
-        required: true
-        default: 'mainline'
-
       test_suite:
         type: choice
         required: true
@@ -103,7 +99,7 @@ jobs:
           security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run CPU Docker Marqo API Tests
+    name: Run Locust Performance Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
 

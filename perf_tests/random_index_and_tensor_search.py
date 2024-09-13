@@ -13,7 +13,7 @@ from common.marqo_locust_http_user import MarqoLocustHttpUser
 INDEX_NAME = os.getenv('MARQO_INDEX_NAME', 'locust-test')
 
 
-class IndexingUser(MarqoLocustHttpUser):
+class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
     fixed_count = 1
     wait_time = between(1, 2)
     s = RandomSentence()
@@ -74,4 +74,4 @@ def on_test_stop(environment, **kwargs):
 
 
 if __name__ == "__main__":
-    run_single_user(IndexingUser)
+    run_single_user(AddDocToUnstructuredIndexUser)
