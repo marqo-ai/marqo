@@ -662,6 +662,15 @@ class VespaClient:
 
         return response.json()
 
+    def get_vespa_version(self) -> str:
+        endpoint = f'{self.config_url}/state/v1/version'
+
+        response = self.http_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.json()['version']
+
     def _download_application(self, session_id: int, httpx_client: httpx.Client) -> str:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
 

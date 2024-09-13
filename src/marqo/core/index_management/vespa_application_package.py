@@ -419,16 +419,8 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
         return self._vespa_client.get_binary_content(self._content_base_url, *paths)
 
     def save_file(self, content: Union[str, bytes], *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
-        """
-        Saves the given content to the given path in the application package. Please note that the binary content
-        is not supported due to this Vespa bug: https://github.com/vespa-engine/vespa/issues/32016
-        """
-        # TODO remove this code branch after upgrading Vespa to 8.382.22+
-        if isinstance(content, bytes):
-            raise VespaError("Uploading binary content to Vespa deployment session is currently not supported")
-
         if backup is not None:
-            if not self.file_exists(*paths):
+            if self.file_exists(*paths):
                 backup.backup_file(self.read_binary_file(*paths), *paths)
             else:
                 backup.mark_for_removal(*paths)
