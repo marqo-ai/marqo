@@ -15,7 +15,7 @@ from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
 
 
 class TestAddDocumentsStructured(MarqoTestCase):

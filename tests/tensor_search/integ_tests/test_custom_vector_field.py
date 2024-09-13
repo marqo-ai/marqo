@@ -298,14 +298,14 @@ class TestCustomVectorField(MarqoTestCase):
                 self.assertEqual(vespa_fields["marqo__short_string_fields"],
                                  {'multimodal_text': 'blah', 'my_custom_vector': 'custom content is here!!'})
                 self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!',
-                                                                 f'my_multimodal::{{"multimodal_text": "blah", "multimodal_image": "{TEST_IMAGE_URLS["hippo_realistic"]}"}}'])
+                                                                 f'my_multimodal::{{"multimodal_text": "blah", "multimodal_image": "{TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]}"}}'])
                 self.assertEqual(vespa_fields["marqo__embeddings"]["0"], self.random_vector_1), # First vector is custom vector
                 self.assertIn("1", vespa_fields["marqo__embeddings"])   # Just checking that multimodal vector is in embeddings, but not actually checking its value
 
             elif isinstance(index, StructuredMarqoIndex):
                 self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ['custom content is here!!'])
                 self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
-                self.assertEqual(vespa_fields["marqo__chunks_my_multimodal"], [f'{{"multimodal_text": "blah", "multimodal_image": "{TEST_IMAGE_URLS["hippo_realistic"]}"}}'])
+                self.assertEqual(vespa_fields["marqo__chunks_my_multimodal"], [f'{{"multimodal_text": "blah", "multimodal_image": "{TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]}"}}'])
                 self.assertIn("0", vespa_fields["marqo__embeddings_my_multimodal"])  # Just checking that multimodal vector is in embeddings, but not actually checking its value
             self.assertEqual(vespa_fields["marqo__vector_count"], 2)
 

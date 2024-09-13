@@ -819,7 +819,12 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     self.assertEqual(1, len(mock_vectorise.call_args_list))
 
                     text_content = [f"A rider is riding a horse jumping over the barrier_{i}." for i in range(1, 5)]
-                    text_content = text_content + [TEST_IMAGE_URLS[f'image{i}'] for i in range(1, 5)]
+                    text_content = text_content + [
+                        TEST_IMAGE_URLS[ImageKey.IMAGE1],
+                        TEST_IMAGE_URLS[ImageKey.IMAGE2],
+                        TEST_IMAGE_URLS[ImageKey.IMAGE3],
+                        TEST_IMAGE_URLS[ImageKey.IMAGE4],
+                    ]
 
                     real_text_content = [call_kwargs['content'] for call_args, call_kwargs
                                          in mock_vectorise.call_args_list][0]
