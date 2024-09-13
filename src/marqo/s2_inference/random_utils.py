@@ -12,8 +12,12 @@ def sentence_to_hash(sentence):
     # for speed reasons we hash
     if isinstance(sentence, ImageType):
         pixel_data = list(sentence.getdata())
-        pixel_averages = [sum(channels)/len(channels) for channels in pixel_data]
-        image_average = functools.reduce(lambda x, y: x + y, pixel_averages)/len(pixel_data)
+        if isinstance(pixel_data[0], tuple):
+            pixel_averages = [sum(channels)/len(channels) for channels in pixel_data]
+            image_average = functools.reduce(lambda x, y: x + y, pixel_averages) / len(pixel_data)
+        else:
+            # uses palette
+            image_average = functools.reduce(lambda x, y: x + y, pixel_data)/len(pixel_data)
         return int(hashlib.sha256(str(image_average).encode('utf-8')).hexdigest(), 16) % 10 ** 8
     else:
         return int(hashlib.sha256(sentence.encode('utf-8')).hexdigest(), 16) % 10**8
