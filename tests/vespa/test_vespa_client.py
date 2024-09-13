@@ -423,3 +423,8 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         for r in batch_response.responses:
             self.assertEqual(r.status, 500)
             self.assertIn("Network Error", r.message)
+
+    def test_get_vespa_version(self):
+        expected_vespa_version = '8.396.18'
+        version = self.client.get_vespa_version()
+        self.assertEqual(expected_vespa_version, version)

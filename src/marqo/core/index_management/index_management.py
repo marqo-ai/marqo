@@ -2,6 +2,8 @@ from contextlib import contextmanager
 from typing import List, Tuple
 from typing import Optional
 
+import semver
+
 import marqo.logging
 import marqo.vespa.vespa_client
 from marqo import version
@@ -24,11 +26,18 @@ logger = marqo.logging.get_logger(__name__)
 
 
 class IndexManagement:
+    MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES = semver.VersionInfo.parse('8.382.22')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
 
-    def __init__(self, vespa_client: VespaClient, zookeeper_client: Optional[ZookeeperClient] = None,
-                 enable_index_operations: bool = False):
+    def __init__(self,
+                 vespa_client: VespaClient,
+                 zookeeper_client: Optional[ZookeeperClient] = None,
+                 enable_index_operations: bool = False,
+                 deployment_timeout_seconds = 60,
+                 convergence_timeout_seconds = 120,
+                 deployment_lock_timeout = 0,
+                 ):
         """Instantiate an IndexManagement object.
 
         Args:
@@ -38,9 +47,11 @@ class IndexManagement:
                 the object can create/delete indexes, otherwise, it raises an InternalError during index operations.
         """
         self.vespa_client = vespa_client
-        # FIXME should we set acquire_timeout?
-        self._zookeeper_deployment_lock = get_deployment_lock(zookeeper_client) if zookeeper_client else None
+        self._zookeeper_deployment_lock = get_deployment_lock(zookeeper_client, deployment_lock_timeout) \
+            if zookeeper_client else None
         self._enable_index_operations = enable_index_operations
+        self._deployment_timeout_seconds = deployment_timeout_seconds
+        self._convergence_timeout_seconds = convergence_timeout_seconds
 
     @staticmethod
     def validate_index_settings(index_name: str, settings_dict: dict) -> None:
@@ -71,8 +82,7 @@ class IndexManagement:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
         with self._vespa_deployment_lock():
-            # TODO Change to self._vespa_application_with_deployment_session after upgrading Vespa to 8.382.22+
-            application = self._vespa_application(check_configured=False)
+            application = self._get_application_context_manager_for_bootstrapping_and_rollback(check_configured=False)
             with application as app:
 
                 marqo_version = version.get_version()
@@ -89,8 +99,7 @@ class IndexManagement:
 
     def rollback_vespa(self) -> None:
         with self._vespa_deployment_lock():
-            # TODO Change to self._vespa_application_with_deployment_session after upgrading Vespa to 8.382.22+
-            application = self._vespa_application()
+            application = self._get_application_context_manager_for_bootstrapping_and_rollback()
             with application as app:
                 try:
                     app.rollback(version.get_version())
@@ -271,8 +280,8 @@ class IndexManagement:
         should_deploy = yield app
 
         if should_deploy is None or should_deploy is True:
-            self.vespa_client.deploy_application(app_root_path)
-            self.vespa_client.wait_for_application_convergence()
+            self.vespa_client.deploy_application(app_root_path, timeout=self._deployment_timeout_seconds)
+            self.vespa_client.wait_for_application_convergence(timeout=self._convergence_timeout_seconds)
 
         if should_deploy is not None:
             yield
@@ -298,11 +307,19 @@ class IndexManagement:
             prepare_response = self.vespa_client.prepare(prepare_url)
             # TODO handle prepare configChangeActions
             # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
-            self.vespa_client.prepare(prepare_response['activate'])
-            self.vespa_client.wait_for_application_convergence()
+            self.vespa_client.activate(prepare_response['activate'])
+            self.vespa_client.wait_for_application_convergence(timeout=self._convergence_timeout_seconds)
 
         if should_deploy is not None:
             yield
+
+    def _get_application_context_manager_for_bootstrapping_and_rollback(self, check_configured: bool = True):
+        vespa_version = semver.VersionInfo.parse(self.vespa_client.get_vespa_version())
+
+        if vespa_version < self.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
+            return self._vespa_application(check_configured=check_configured)
+        else:
+            return self._vespa_application_with_deployment_session(check_configured=check_configured)
 
     @contextmanager
     def _vespa_deployment_lock(self):

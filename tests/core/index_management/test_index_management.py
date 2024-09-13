@@ -6,6 +6,7 @@ import tempfile
 import textwrap
 import threading
 import time
+import unittest
 from pathlib import Path
 from unittest import mock
 from datetime import datetime
@@ -29,17 +30,34 @@ from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_fact
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
+from marqo.vespa.vespa_client import VespaClient
 from tests.marqo_test import MarqoTestCase
+
+
+def _will_use_overriding_bootstrapping_mechanism():
+    vespa_client = VespaClient(
+        "http://localhost:19071",
+        "http://localhost:8080",
+        "http://localhost:8080",
+        content_cluster_name="content_default",
+    )
+
+    vespa_version = vespa_client.get_vespa_version()
+
+    return semver.Version.parse(vespa_version) >= IndexManagement.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES
 
 
 @pytest.mark.slowtest
 class TestIndexManagement(MarqoTestCase):
+    use_overriding_bootstrapping_mechanism = _will_use_overriding_bootstrapping_mechanism()
 
     def setUp(self):
         super().setUp()
         self.index_management = IndexManagement(self.vespa_client,
                                                 zookeeper_client=self.zookeeper_client,
-                                                enable_index_operations=True)
+                                                enable_index_operations=True,
+                                                deployment_timeout_seconds=10,
+                                                convergence_timeout_seconds=20)
         # this resets the application package to a clean state
         self._test_dir = str(os.path.dirname(os.path.abspath(__file__)))
         self._deploy_initial_app_package()
@@ -69,7 +87,9 @@ class TestIndexManagement(MarqoTestCase):
 
         self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
 
-    def test_skip_boostrap_if_already_bootstrapped(self):
+    @unittest.skipIf(use_overriding_bootstrapping_mechanism,
+                     reason="In newer version of vespa, we use deployment session for bootstrapping")
+    def test_skip_boostrap_if_already_bootstrapped_for_older_vespa_version(self):
         def modified_post(*args, **kwargs):
             return httpx.post(*args, **kwargs)
 
@@ -85,7 +105,24 @@ class TestIndexManagement(MarqoTestCase):
             self.assertEqual(mock_post.call_count, 1)
             self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
 
-    def test_boostrap_from_existing_app_prior_to_2_12_should_populate_index_settings(self):
+    @unittest.skipUnless(use_overriding_bootstrapping_mechanism,
+                         reason="In older version of vespa, we use prepareandactivate for bootstrapping")
+    def test_skip_boostrap_if_already_bootstrapped_for_newer_vespa_version(self):
+        def modified_put(*args, **kwargs):
+            return httpx.put(*args, **kwargs)
+
+        # verify the first boostrap call deploys the app to vespa
+        with mock.patch.object(httpx.Client, 'put', side_effect=modified_put) as mock_post:
+            self.assertTrue(self.index_management.bootstrap_vespa())
+            self.assertTrue('prepare' in mock_post.call_args_list[-2].args[0])
+            self.assertTrue('active' in mock_post.call_args_list[-1].args[0])
+
+        # verify the second boostrap call skips the deployment
+        with mock.patch.object(httpx.Client, 'put', side_effect=modified_put) as mock_post:
+            self.assertFalse(self.index_management.bootstrap_vespa())
+            self.assertEqual(mock_post.call_count, 0)
+
+    def test_boostrap_from_existing_app_should_populate_index_settings(self):
         existing_index = self._deploy_existing_app_package()
         existing_index_with_version = existing_index.copy(update={'version': 1})
 
