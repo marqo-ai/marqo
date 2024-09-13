@@ -12,7 +12,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from marqo.vespa.models import VespaDocument, FeedBatchDocumentResponse, FeedBatchResponse
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
 
 
 class TestCustomVectorField(MarqoTestCase):
@@ -266,7 +266,7 @@ class TestCustomVectorField(MarqoTestCase):
                         docs=[{
                             "_id": "0",
                             "multimodal_text": "blah",
-                            "multimodal_image": TEST_IMAGE_URLS['hippo_realistic'],
+                            "multimodal_image": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                             "my_custom_vector": {
                                 "content": "custom content is here!!",
                                 "vector": self.random_vector_1
@@ -291,10 +291,10 @@ class TestCustomVectorField(MarqoTestCase):
             if isinstance(index, UnstructuredMarqoIndex):
                 self.assertEqual(vespa_fields["marqo__strings"],
                                  ['blah',
-                                  TEST_IMAGE_URLS['hippo_realistic'],
+                                  TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                                   'custom content is here!!'])
                 self.assertEqual(vespa_fields["marqo__long_string_fields"],
-                                 {'multimodal_image': TEST_IMAGE_URLS['hippo_realistic']})
+                                 {'multimodal_image': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]})
                 self.assertEqual(vespa_fields["marqo__short_string_fields"],
                                  {'multimodal_text': 'blah', 'my_custom_vector': 'custom content is here!!'})
                 self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!',

@@ -542,7 +542,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         Image URL as ID is not downloaded
         """
         docs = [{
-            "_id": TEST_IMAGE_URLS['hippo_realistic'],
+            "_id": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
             "title": "wow"}
         ]
 
@@ -796,7 +796,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         assert 'desc' in doc_w_facets
 
     def test_various_image_count(self):
-        hippo_url = TEST_IMAGE_URLS['hippo_realistic']
+        hippo_url = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
 
         def _check_get_docs(doc_count, title_value):
             approx_half = math.floor(doc_count / 2)

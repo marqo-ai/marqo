@@ -18,7 +18,7 @@ from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
 from tests.utils.transition import add_docs_caller
 from marqo.core.utils.prefix import determine_text_prefix
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
@@ -442,7 +442,7 @@ class TestVectorSearch(MarqoTestCase):
         settings = {"index_defaults": {"treat_urls_and_pointers_as_images": True, "model": "ViT-B/32"}}
         tensor_search.delete_index(self.config, self.index_name_1)
         tensor_search.create_vector_index(index_name=self.index_name_1, index_settings=settings, config=self.config)
-        hippo_img = TEST_IMAGE_URLS['hippo_realistic']
+        hippo_img = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
         add_docs_caller(
             config=self.config, index_name=self.index_name_1, docs=[
                 {"img": hippo_img, "abc": "some text", "other field": "baaadd", "_id": "5678", "my_string": "b"},
@@ -964,8 +964,8 @@ class TestVectorSearch(MarqoTestCase):
         tensor_search.create_vector_index(
             index_name=self.index_name_1, index_settings=settings, config=self.config
         )
-        url_1 = TEST_IMAGE_URLS['hippo_realistic']
-        url_2 = TEST_IMAGE_URLS['hippo_statue']
+        url_1 = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
+        url_2 = TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]
         docs = [
             {"_id": "123",
              "image_field": url_1,
@@ -1020,9 +1020,9 @@ class TestVectorSearch(MarqoTestCase):
     def test_multi_search_images(self):
         docs = [
             {
-                "loc a": TEST_IMAGE_URLS['hippo_realistic'],
+                "loc a": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                 "_id": 'realistic_hippo'},
-            {"loc b": TEST_IMAGE_URLS['hippo_statue'],
+            {"loc b": TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
@@ -1042,13 +1042,13 @@ class TestVectorSearch(MarqoTestCase):
             ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
             ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
             ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-            ({TEST_IMAGE_URLS['hippo_statue']: -1.0,
+            ({TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
-            ({TEST_IMAGE_URLS['hippo_statue']: 2.0,
-              TEST_IMAGE_URLS['hippo_realistic']: -1.0},
+            ({TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: 2.0,
+              TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: -1.0},
              ['artefact_hippo', 'realistic_hippo']),
-            ({TEST_IMAGE_URLS['hippo_statue']: 2.0,
-              TEST_IMAGE_URLS['hippo_realistic']: -1.0,
+            ({TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: 2.0,
+              TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: -1.0,
               "artefact": 1.0, "photo realistic": -1,
               },
              ['artefact_hippo', 'realistic_hippo']),
@@ -1071,9 +1071,9 @@ class TestVectorSearch(MarqoTestCase):
         """
         docs = [
             {
-                "loc a": TEST_IMAGE_URLS['hippo_realistic'],
+                "loc a": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                 "_id": 'realistic_hippo'},
-            {"loc a": TEST_IMAGE_URLS['hippo_statue'],
+            {"loc a": TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
              "_id": 'artefact_hippo'}
         ]
         image_index_config = {
@@ -1091,19 +1091,19 @@ class TestVectorSearch(MarqoTestCase):
         )
         multi_queries = [
             {
-                TEST_IMAGE_URLS['hippo_statue']: 2.0,
-                TEST_IMAGE_URLS['hippo_realistic']: -1.0,
+                TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: 2.0,
+                TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: -1.0,
                 "artefact": 5.0, "photo realistic": -1,
             },
             {
                 "artefact": 5.0,
-                TEST_IMAGE_URLS['hippo_statue']: 2.0,
+                TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: 2.0,
                 "photo realistic": -1,
-                TEST_IMAGE_URLS['hippo_realistic']: -1.0
+                TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: -1.0
             },
             {
-                TEST_IMAGE_URLS['hippo_statue']: 3,
-                TEST_IMAGE_URLS['hippo_realistic']: -1.0,
+                TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: 3,
+                TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: -1.0,
             },
             {
                 "hello": 3, "some thing": -1.0,
@@ -1151,7 +1151,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search_images_edge_cases(self):
         docs = [
-            {"loc": TEST_IMAGE_URLS['hippo_realistic'],
+            {"loc": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1185,7 +1185,7 @@ class TestVectorSearch(MarqoTestCase):
 
     def test_multi_search_images_ok_edge_cases(self):
         docs = [
-            {"loc": TEST_IMAGE_URLS['hippo_realistic'],
+            {"loc": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
              "_id": 'realistic_hippo'},
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
@@ -1240,7 +1240,7 @@ class TestVectorSearch(MarqoTestCase):
         The code paths for image and search have diverged quite a bit
         """
         hippo_image = (
-            TEST_IMAGE_URLS['hippo_realistic']
+            TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
         )
         doc_dict = {
             'realistic_hippo': {"loc": hippo_image,

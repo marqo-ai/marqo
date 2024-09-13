@@ -18,7 +18,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
 
 
 class TestSearchStructured(MarqoTestCase):
@@ -789,8 +789,8 @@ class TestSearchStructured(MarqoTestCase):
 
     def test_image_search_highlights(self):
         """Does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
-        url_1 = TEST_IMAGE_URLS['hippo_realistic']
-        url_2 = TEST_IMAGE_URLS['hippo_statue']
+        url_1 = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
+        url_2 = TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]
         docs = [
             {"_id": "123", "image_field_1": url_1, "text_field_1": "irrelevant text"},
             {"_id": "789", "image_field_1": url_2},
@@ -849,11 +849,11 @@ class TestSearchStructured(MarqoTestCase):
         docs = [
             {
                 "_id": 'realistic_hippo',
-                "image_field_1": TEST_IMAGE_URLS['hippo_realistic']
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
             },
             {
                 "_id": 'artefact_hippo',
-                "image_field_2": TEST_IMAGE_URLS['hippo_statue']
+                "image_field_2": TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]
             }
         ]
         tensor_search.add_documents(
@@ -867,13 +867,13 @@ class TestSearchStructured(MarqoTestCase):
             ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
             ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
             ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-            ({TEST_IMAGE_URLS['hippo_statue']: -1.0,
+            ({TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
-            ({TEST_IMAGE_URLS['hippo_statue']: 2.0,
-              TEST_IMAGE_URLS['hippo_realistic']: -1.0},
+            ({TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: 2.0,
+              TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: -1.0},
              ['artefact_hippo', 'realistic_hippo']),
-            ({TEST_IMAGE_URLS['hippo_statue']: 2.0,
-              TEST_IMAGE_URLS['hippo_realistic']: -1.0,
+            ({TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]: 2.0,
+              TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: -1.0,
               "artefact": 1.0, "photo realistic": -1},
              ['artefact_hippo', 'realistic_hippo']),
         ]
@@ -892,7 +892,7 @@ class TestSearchStructured(MarqoTestCase):
         docs = [
             {
                 "_id": 'realistic_hippo',
-                "image_field_1": TEST_IMAGE_URLS['hippo_realistic']
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
             },
             {
                 "_id": 'artefact_hippo',
@@ -924,7 +924,7 @@ class TestSearchStructured(MarqoTestCase):
         docs = [
             {
                 "_id": 'realistic_hippo',
-                "image_field_1": TEST_IMAGE_URLS['hippo_realistic']
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
             },
             {
                 "_id": 'artefact_hippo',
@@ -975,7 +975,7 @@ class TestSearchStructured(MarqoTestCase):
 
     def test_image_search(self):
         """This test is to ensure image search works as expected"""
-        hippo_image = TEST_IMAGE_URLS['hippo_realistic']
+        hippo_image = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
         doc_dict = {
             'realistic_hippo': {"image_field_1": hippo_image, "_id": 'realistic_hippo'},
             'artefact_hippo': {"text_field_1": "Some text about a weird forest", "_id": 'artefact_hippo'}

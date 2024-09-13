@@ -8,7 +8,7 @@ from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
 
 
 class TestAddDocumentsUseExistingTensors(MarqoTestCase):
@@ -779,8 +779,8 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         }
         tensor_search.create_vector_index(
             index_name=self.index_name_2, index_settings=index_settings, config=self.config)
-        hippo_img = TEST_IMAGE_URLS['hippo_realistic']
-        artefact_hippo_img = TEST_IMAGE_URLS['hippo_statue']
+        hippo_img = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
+        artefact_hippo_img = TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]
         tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_2, docs=[
                 {

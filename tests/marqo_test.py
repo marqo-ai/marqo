@@ -21,15 +21,29 @@ from marqo.core.monitoring.monitoring import Monitoring
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
+
+class ImageKey(Enum):
+    IMAGE0 = 'image0'
+    IMAGE1 = 'image1'
+    IMAGE2 = 'image2'
+    IMAGE3 = 'image3'
+    IMAGE4 = 'image4'
+    COCO = 'coco'
+    HIPPO_REALISTIC = 'hippo_realistic'
+    HIPPO_REALISTIC_LARGE = 'hippo_realistic_large'
+    HIPPO_STATUE = 'hippo_statue'
+
+
 TEST_IMAGE_URLS = {
-    'image0': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg',
-    'image1': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
-    'image2': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg',
-    'image3': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg',
-    'image4': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg',
-    'coco': 'https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg',
-    'hippo_realistic': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png',
-    'hippo_statue': 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png',
+    ImageKey.IMAGE0: 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg',
+    ImageKey.IMAGE1: 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
+    ImageKey.IMAGE2: 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg',
+    ImageKey.IMAGE3: 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg',
+    ImageKey.IMAGE4: 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg',
+    ImageKey.COCO: 'https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg',
+    ImageKey.HIPPO_REALISTIC: 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png',
+    ImageKey.HIPPO_REALISTIC_LARGE: 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png',
+    ImageKey.HIPPO_STATUE: 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png',
 }
 
 

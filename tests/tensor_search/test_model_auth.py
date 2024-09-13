@@ -8,7 +8,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
 from marqo.api.exceptions import InvalidArgError, IndexNotFoundError, BadRequestError
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
 from marqo.s2_inference.model_downloading.from_s3 import get_s3_model_absolute_cache_path
 from marqo.tensor_search.models.external_apis.s3 import S3Location
 from unittest import mock
@@ -554,7 +554,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
                 config=self.config,
                 model_auth=model_auth,
                 text={
-                    TEST_IMAGE_URLS['hippo_realistic']: 0.3,
+                    TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: 0.3,
                     'my text': -1.3
                 },
             )
@@ -622,7 +622,7 @@ class TestModelAuthOpenCLIP(MarqoTestCase):
                     auto_refresh=True, device="cpu",
                     docs=[{
                         'my_combination_field': {
-                            'my_image': TEST_IMAGE_URLS['hippo_realistic'],
+                            'my_image': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                             'some_text': f"my text {i}"}} for i in range(20)],
                     mappings={
                         "my_combination_field": {
@@ -2140,7 +2140,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 config=self.config,
                 model_auth=model_auth,
                 text={
-                    TEST_IMAGE_URLS['hippo_realistic']: 0.3,
+                    TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]: 0.3,
                     'my text': -1.3
                 },
             )
@@ -2203,7 +2203,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                     auto_refresh=True, device="cpu",
                     docs=[{
                         'my_combination_field': {
-                            'my_image': TEST_IMAGE_URLS['hippo_realistic'],
+                            'my_image': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                             'some_text': f"my text {i}"}} for i in range(20)],
                     mappings={
                         "my_combination_field": {

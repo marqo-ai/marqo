@@ -20,7 +20,7 @@ from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS
+from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
 from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
 from marqo.tensor_search import streaming_media_processor
 
@@ -123,7 +123,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         documents = [
             {
-                "image_field_1": TEST_IMAGE_URLS['image2'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.IMAGE2],
                 "text_field_1": "This is a valid image",
                 "_id": "1"
             },
@@ -192,7 +192,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 "_id": "2"
             },
             {
-                "image_field_2": TEST_IMAGE_URLS['hippo_realistic'],
+                "image_field_2": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC_LARGE],
                 "_id": "3"
             },
             {
@@ -246,7 +246,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
             "_id": "1_multimodal",
             "text_field_1": "New York",
             "text_field_2": "Los Angeles",
-            "image_field_1": TEST_IMAGE_URLS['hippo_realistic'],
+            "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC_LARGE],
+            # "image_field_2": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC], # png image with palette is not supported
             "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
             "video_field_2": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
             "audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
@@ -294,7 +295,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """Ensure media_repo can catch an unexpected error right in thread."""
         documents = [
             {
-                "image_field_1": TEST_IMAGE_URLS['hippo_realistic'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                 "_id": "1"
             }
         ]
@@ -320,7 +321,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """Ensure vectorise receives tensor from add_documents when the model is OpenCLIP or CLIP."""
         documents = [
             {
-                "image_field_1": TEST_IMAGE_URLS['hippo_realistic'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
                 "_id": "1"
             }
         ]
@@ -351,7 +352,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": str(i),
-             "image_field": TEST_IMAGE_URLS['image2']
+             "image_field": TEST_IMAGE_URLS[ImageKey.IMAGE2]
              } for i in range(10)
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
@@ -379,7 +380,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": "1",
-             "image_field_1": TEST_IMAGE_URLS['image2']
+             "image_field_1": TEST_IMAGE_URLS[ImageKey.IMAGE2]
              }
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
@@ -418,7 +419,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             {
                 "_id": "1",
                 "text_field_1": "This text should be ignored",
-                "image_field_1": TEST_IMAGE_URLS['image2'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.IMAGE2],
             }
         ]
 
@@ -471,7 +472,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_imageDownloadWithoutPreprocessor(self):
         media_repo = dict()
-        good_url = TEST_IMAGE_URLS['hippo_realistic']
+        good_url = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
         test_doc = {
             'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
             'field_2': good_url
@@ -491,7 +492,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_imageDownloadWithPreprocessor(self):
         media_repo = dict()
-        good_url = TEST_IMAGE_URLS['hippo_realistic']
+        good_url = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
         test_doc = {
             'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
             'field_2': good_url
@@ -539,16 +540,16 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs_results = [
             ([{"_id": "123",
-               "image_field_1": TEST_IMAGE_URLS['hippo_realistic']},
+               "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]},
               {"_id": "789",
-               "image_field_1": TEST_IMAGE_URLS['hippo_statue']},
+               "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]},
               {"_id": "456", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
              [("123", 200), ("789", 200), ("456", 400)]
              ),
             ([{"_id": "123",
-               "image_field_1": TEST_IMAGE_URLS['hippo_realistic']},
+               "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]},
               {"_id": "789",
-               "image_field_1": TEST_IMAGE_URLS['hippo_statue']},
+               "image_field_1": TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE]},
               {"_id": "456", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist.png"},
               {"_id": "111", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
              [("123", 200), ("789", 200), ("456", 400), ("111", 400)]
@@ -578,7 +579,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_threaded_download_images_non_tensor_field(self):
         """Tests add_docs.threaded_download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = TEST_IMAGE_URLS['hippo_realistic']
+        good_url = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
         bad_url = 'https://google.com/my_dog.png'
         examples = [
             ([{
@@ -621,7 +622,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_download_images_non_tensor_field(self):
         """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = TEST_IMAGE_URLS['hippo_realistic']
+        good_url = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
         bad_url = 'https://google.com/my_dog.png'
         examples = [
             ([{
@@ -690,22 +691,22 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         test_docs = [
             {
-                "image_field_1": TEST_IMAGE_URLS['image1'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.IMAGE1],
                  "text_field_1": "this is a valid image",
                  "_id": "1"
             },
             {
-                "image_field_1": TEST_IMAGE_URLS['image2'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.IMAGE2],
                 "text_field_1": "this is a invalid image due to int id",
                 "_id": 2
             },
             {
-                "image_field_1": TEST_IMAGE_URLS['image3'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.IMAGE3],
                 "text_field_1": "this is a invalid image due to None",
                 "_id": None
             },
             {
-                "image_field_1": TEST_IMAGE_URLS['image4'],
+                "image_field_1": TEST_IMAGE_URLS[ImageKey.IMAGE4],
                 "text_field_1": "this is a invalid image due to ",
                 "_id": []
             }
