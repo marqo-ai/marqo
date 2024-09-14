@@ -81,7 +81,7 @@ class Document:
         Return:
             MarqoUpdateDocumentsResponse containing the response of the partial update operation
         """
-        if marqo_index.type == IndexType.Unstructured:
+        if marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured]:
             raise UnsupportedFeatureError("Partial document update is not supported for unstructured indexes. "
                                           "Please use add_documents with use_existing_tensor=True instead")
         elif marqo_index.type == IndexType.Structured:

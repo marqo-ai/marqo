@@ -15,7 +15,9 @@ from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig, \
     VespaApplicationFileStore, ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.exceptions import VespaStatusError
@@ -352,3 +354,17 @@ class IndexManagement:
             except ZookeeperLockNotAcquiredError:
                 raise OperationConflictError("Another index creation/deletion operation is in progress. "
                                              "Your request is rejected. Please try again later")
+
+    # TODO This will be replaced when the index setting is moved to application package
+    def update_index(self, marqo_index: SemiStructuredMarqoIndex):
+        with self._deployment_lock_context_manager():
+            app = self.vespa_client.download_application(check_for_application_convergence=True)
+
+            schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+            with open(os.path.join(app, 'schemas', f'{marqo_index.schema_name}.sd'), 'w') as f:
+                f.write(schema)
+
+            self.vespa_client.deploy_application(app)
+            self.vespa_client.wait_for_application_convergence()
+            self._save_index_settings(marqo_index)
+            return marqo_index

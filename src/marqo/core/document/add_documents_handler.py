@@ -147,9 +147,14 @@ class AddDocumentsHandler(ABC):
             # vectorise tensor fields
             self.vectorise_tensor_fields()
 
+        # FIXME this step is not timed in the original implementation
+        vespa_docs = self.convert_to_vespa_docs()
+
+        self.pre_persist_to_vespa()
+
         # persist to vespa if there are still valid docs
         with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            response = self.persist_to_vespa()
+            response = self.config.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
         with RequestMetricsStore.for_request().time("add_documents.postprocess"):
             self.handle_vespa_response(response)
@@ -171,6 +176,59 @@ class AddDocumentsHandler(ABC):
     def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
         pass
 
+    @abstractmethod
+    def to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
+        pass
+
+    def pre_persist_to_vespa(self) -> None:
+        pass
+
+    def convert_to_vespa_docs(self) -> List[VespaDocument]:
+        vespa_docs = []
+        for doc_id, doc in self.add_docs_response_collector.marqo_docs.copy().items():
+            try:
+                vespa_docs.append(self.to_vespa_doc(doc))
+            except MarqoDocumentParsingError as e:
+                self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(e.message))
+
+        return list(reversed(vespa_docs))
+
+    def handle_vespa_response(self, response: FeedBatchResponse):
+        for resp in response.responses:
+            # FIXME doc_id is not url encoded
+            doc_id = resp.id.split('::')[-1] if resp.id else None
+            status, message = self.config.document.translate_vespa_document_response(resp.status, message=resp.message)
+            if status != 200:
+                self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(
+                    error_message=resp.message, status_code=resp.status, error_code='vespa_error'  # breaking?
+                ))
+            else:
+                self.add_docs_response_collector.collect_successful_response(doc_id)
+
+    def validate_doc(self, doc) -> None:
+        try:
+            validation.validate_doc(doc)
+        except (api_errors.InvalidArgError, api_errors.DocTooLargeError) as err:
+            raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
+
+    def validate_and_pop_doc_id(self, doc) -> Optional[str]:
+        if MARQO_DOC_ID not in doc:
+            return None
+
+        doc_id = doc.pop(MARQO_DOC_ID)
+        try:
+            validation.validate_id(doc_id)
+        except api_errors.InvalidDocumentIdError as err:
+            raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
+
+        if self.add_docs_response_collector.visited(doc_id):
+            raise DuplicateDocumentError(f"Document will be ignored since doc with the same id"
+                                         f" `{doc_id}` supersedes this one")
+
+        return doc_id
+
+    # Follow logic are to handle preprocessing, chunking and vectorisation of all tensor fields
+    # TODO see if these should be moved to some other classes.
     def vectorise_tensor_fields(self) -> None:
         self.vectorise_tensor_fields_in_batch_per_doc()
 
@@ -469,50 +527,3 @@ class AddDocumentsHandler(ABC):
         except s2_inference_errors.S2InferenceError as e:
             raise AddDocumentsError(e.message)
 
-    def persist_to_vespa(self) -> FeedBatchResponse:
-        vespa_docs = []
-        for doc_id, doc in self.add_docs_response_collector.marqo_docs.copy().items():
-            try:
-                vespa_docs.append(self.to_vespa_doc(doc))
-            except MarqoDocumentParsingError as e:
-                self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(e.message))
-
-        return self.config.vespa_client.feed_batch(list(reversed(vespa_docs)), self.marqo_index.schema_name)
-
-    def handle_vespa_response(self, response: FeedBatchResponse):
-        for resp in response.responses:
-            # FIXME doc_id is not url encoded
-            doc_id = resp.id.split('::')[-1] if resp.id else None
-            status, message = self.config.document.translate_vespa_document_response(resp.status, message=resp.message)
-            if status != 200:
-                self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(
-                    error_message=resp.message, status_code=resp.status, error_code='vespa_error'  # breaking?
-                ))
-            else:
-                self.add_docs_response_collector.collect_successful_response(doc_id)
-
-    @abstractmethod
-    def to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
-        pass
-
-    def validate_doc(self, doc) -> None:
-        try:
-            validation.validate_doc(doc)
-        except (api_errors.InvalidArgError, api_errors.DocTooLargeError) as err:
-            raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
-
-    def validate_and_pop_doc_id(self, doc) -> Optional[str]:
-        if MARQO_DOC_ID not in doc:
-            return None
-
-        doc_id = doc.pop(MARQO_DOC_ID)
-        try:
-            validation.validate_id(doc_id)
-        except api_errors.InvalidDocumentIdError as err:
-            raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
-
-        if self.add_docs_response_collector.visited(doc_id):
-            raise DuplicateDocumentError(f"Document will be ignored since doc with the same id"
-                                         f" `{doc_id}` supersedes this one")
-
-        return doc_id
