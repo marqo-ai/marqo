@@ -232,6 +232,11 @@ class TensorFieldsContainer:
         doc = self._tensor_field_map[doc_id]
 
         for field_name, tensor_content in doc.items():
+            if not tensor_content.is_tensor_field:
+                # If this is not top level tensor field, we do not populate from existing tensor
+                # TODO confirm if this is expected for unstructured as well
+                continue
+
             if tensor_content.embeddings:
                 # Already populated, might be a custom vector
                 continue

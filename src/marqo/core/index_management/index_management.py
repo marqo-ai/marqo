@@ -15,7 +15,9 @@ from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig, \
     VespaApplicationFileStore, ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.tensor_search.models.index_settings import IndexSettings
 from marqo.vespa.exceptions import VespaStatusError
@@ -183,6 +185,21 @@ class IndexManagement:
         """
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
+
+    def update_index(self, marqo_index: SemiStructuredMarqoIndex) -> None:
+        """
+        Update index settings and schema
+        Aars:
+            marqo_index: Index to update, only SemiStructuredMarqoIndex is supported
+        Raises:
+            IndexNotFoundError: If an index does not exist
+            RuntimeError: If deployment lock is not instantiated
+            OperationConflictError: If another index creation/deletion operation is
+                in progress and the lock cannot be acquired
+        """
+        with self._vespa_deployment_lock():
+            schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+            self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """

@@ -8,7 +8,7 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
@@ -106,9 +106,10 @@ class HybridSearch:
             hybrid_parameters = HybridParameters()
 
         # TODO: Remove when unstructured searchable attributes are supported
-        if isinstance(marqo_index, UnstructuredMarqoIndex) and \
-                (hybrid_parameters.searchableAttributesTensor is not None or \
-                hybrid_parameters.searchableAttributesLexical is not None):
+        if (isinstance(marqo_index, UnstructuredMarqoIndex) and
+                not isinstance(marqo_index, SemiStructuredMarqoIndex) and
+                (hybrid_parameters.searchableAttributesTensor is not None or
+                 hybrid_parameters.searchableAttributesLexical is not None)):
             raise core_exceptions.UnsupportedFeatureError(
                 f"Hybrid search for unstructured indexes currently does not support `searchableAttributesTensor` or "
                 f"`searchableAttributesLexical`. Please set these attributes to None."

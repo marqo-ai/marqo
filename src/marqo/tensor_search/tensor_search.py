@@ -50,6 +50,8 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 from marqo.core.constants import MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
+from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
+    SemiStructuredAddDocumentsHandler
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.tensor_search.models.api_models import CustomVectorQuery
@@ -59,7 +61,7 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
-from marqo.core.models.marqo_index import IndexType
+from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
@@ -119,6 +121,8 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
         raise api_exceptions.IndexNotFoundError(
             f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
+    if isinstance(marqo_index, SemiStructuredMarqoIndex):
+        return SemiStructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
     if isinstance(marqo_index, UnstructuredMarqoIndex):
         # return _add_documents_unstructured(config, add_docs_params, marqo_index)
         return UnstructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()

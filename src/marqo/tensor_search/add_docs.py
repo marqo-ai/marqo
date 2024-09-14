@@ -75,7 +75,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
     """
     # Determine index type
     is_structured_index = marqo_index_type == IndexType.Structured
-    is_unstructured_index = marqo_index_type == IndexType.Unstructured
+    is_unstructured_index = marqo_index_type in [IndexType.Unstructured, IndexType.SemiStructured]
 
     # Generate pseudo-unique ID for thread metrics.
     _id = f'image_download.{threading.get_ident()}'

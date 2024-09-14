@@ -91,7 +91,10 @@ def for_marqo_index_request(marqo_index_request: MarqoIndexRequest):
         from marqo.core.structured_vespa_index.structured_vespa_schema import StructuredVespaSchema
         return StructuredVespaSchema(marqo_index_request)
     elif isinstance(marqo_index_request, UnstructuredMarqoIndexRequest):
-        from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
-        return UnstructuredVespaSchema(marqo_index_request)
+        # TODO find a way to test UnstructuredIndex
+        # from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
+        # return UnstructuredVespaSchema(marqo_index_request)
+        from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+        return SemiStructuredVespaSchema(marqo_index_request)
     else:
         raise ValueError(f"No known implementation for index type {type(marqo_index_request)}")
