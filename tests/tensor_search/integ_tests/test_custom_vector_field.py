@@ -157,15 +157,15 @@ class TestCustomVectorField(MarqoTestCase):
             self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
             vespa_fields = feed_batch_args[0][0].fields
 
-            if isinstance(index, UnstructuredMarqoIndex):
+            if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
+                self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ["custom content is here!!"])
+                self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
+
+            elif isinstance(index, UnstructuredMarqoIndex):
                 self.assertEqual(vespa_fields["marqo__strings"], ["custom content is here!!"])
                 self.assertEqual(vespa_fields["marqo__short_string_fields"], {"my_custom_vector": "custom content is here!!"})
                 self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!'])
                 self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
-
-            elif isinstance(index, StructuredMarqoIndex):
-                self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ["custom content is here!!"])
-                self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
 
             self.assertEqual(vespa_fields["marqo__vector_count"], 1)
 
@@ -213,17 +213,15 @@ class TestCustomVectorField(MarqoTestCase):
             feed_batch_args = call_args[0].args
             self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
             vespa_fields = feed_batch_args[0][0].fields
-
-            if isinstance(index, UnstructuredMarqoIndex):
-                self.assertEqual(vespa_fields["marqo__strings"], [""])
-                self.assertEqual(vespa_fields["marqo__short_string_fields"],
-                                 {"my_custom_vector": ""})
-                self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::'])
-                self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
-
-            elif isinstance(index, StructuredMarqoIndex):
+            if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
                 self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], [""])
                 self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
+
+            elif isinstance(index, UnstructuredMarqoIndex):
+                self.assertEqual(vespa_fields["marqo__strings"], [""])
+                self.assertEqual(vespa_fields["marqo__short_string_fields"], {"my_custom_vector": ""})
+                self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::'])
+                self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
 
             self.assertEqual(vespa_fields["marqo__vector_count"], 1)
 
@@ -287,7 +285,14 @@ class TestCustomVectorField(MarqoTestCase):
             self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
             vespa_fields = feed_batch_args[0][0].fields
 
-            if isinstance(index, UnstructuredMarqoIndex):
+            if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
+                self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ['custom content is here!!'])
+                self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
+                self.assertEqual(vespa_fields["marqo__chunks_my_multimodal"], [
+                    f'{{"multimodal_text": "blah", "multimodal_image": "{TestImageUrls.HIPPO_REALISTIC.value}"}}'])
+                self.assertIn("0", vespa_fields["marqo__embeddings_my_multimodal"]) # Just checking that multimodal vector is in embeddings, but not actually checking its value
+
+            elif isinstance(index, UnstructuredMarqoIndex):
                 self.assertEqual(vespa_fields["marqo__strings"],
                                  ['blah',
                                   TestImageUrls.HIPPO_REALISTIC.value,
@@ -301,11 +306,6 @@ class TestCustomVectorField(MarqoTestCase):
                 self.assertEqual(vespa_fields["marqo__embeddings"]["0"], self.random_vector_1), # First vector is custom vector
                 self.assertIn("1", vespa_fields["marqo__embeddings"])   # Just checking that multimodal vector is in embeddings, but not actually checking its value
 
-            elif isinstance(index, StructuredMarqoIndex):
-                self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ['custom content is here!!'])
-                self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
-                self.assertEqual(vespa_fields["marqo__chunks_my_multimodal"], [f'{{"multimodal_text": "blah", "multimodal_image": "{TestImageUrls.HIPPO_REALISTIC.value}"}}'])
-                self.assertIn("0", vespa_fields["marqo__embeddings_my_multimodal"])  # Just checking that multimodal vector is in embeddings, but not actually checking its value
             self.assertEqual(vespa_fields["marqo__vector_count"], 2)
 
     def test_add_documents_use_existing_tensors_with_custom_vector_field(self):

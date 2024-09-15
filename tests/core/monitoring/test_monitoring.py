@@ -5,7 +5,8 @@ import pytest
 
 from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.exceptions import IndexNotFoundError
-from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, IndexType
+from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, \
+    UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.tensor_search import tensor_search
@@ -159,7 +160,7 @@ class TestMonitoring(MarqoTestCase):
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -209,7 +210,7 @@ class TestMonitoring(MarqoTestCase):
                         docs=[{"desc": "2"}, {"desc": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -232,7 +233,7 @@ class TestMonitoring(MarqoTestCase):
                         docs=[{"title": "2"}, {"title": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -285,7 +286,7 @@ class TestMonitoring(MarqoTestCase):
                                 docs=docs,
                                 index_name=marqo_index.name,
                                 device="cpu",
-                                tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                                tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                             )
                         )
                     elif operation == 'delete':
@@ -313,7 +314,7 @@ class TestMonitoring(MarqoTestCase):
                         docs=[{"title": "test " * number_of_words}, {"title": "2"}],  # 3 + 1 vectors expected
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -336,7 +337,7 @@ class TestMonitoring(MarqoTestCase):
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(

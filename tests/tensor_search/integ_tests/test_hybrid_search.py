@@ -179,6 +179,17 @@ class TestHybridSearch(MarqoTestCase):
                 mock_vespa_client_query = unittest.mock.MagicMock()
                 mock_vespa_client_query.side_effect = pass_through_query
 
+                if index == self.unstructured_default_text_index:
+                    # this is required to create the tensor fields in the semi-structured index
+                    tensor_search.add_documents(
+                        config=self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index.name,
+                            docs=[{"_id": "1", "text_field_1": "dogs", "text_field_2": "cats", "text_field_3": "cows"},],
+                            tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+                        ),
+                    )
+
                 @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
                 def run():
                     res = tensor_search.search(
@@ -192,9 +203,9 @@ class TestHybridSearch(MarqoTestCase):
                             alpha=0.6,
                             rrfK=61,
                             searchableAttributesLexical=["text_field_1", "text_field_2"] \
-                                if isinstance(index, StructuredMarqoIndex) else None,
+                                if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)) else None,
                             searchableAttributesTensor=["text_field_2", "text_field_3"] \
-                                if isinstance(index, StructuredMarqoIndex) else None,
+                                if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)) else None,
                             scoreModifiersLexical={
                                 "multiply_score_by": [
                                     {"field_name": "mult_field_1", "weight": 1.0},
@@ -240,7 +251,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["query_features"]["marqo__add_weights_tensor"],
                                  {'add_field_1': 1.0})
 
-                if isinstance(index, StructuredMarqoIndex):
+                if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
                     self.assertIn("(({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
                                   "nearestNeighbor(marqo__embeddings_text_field_2, marqo__query_embedding)) OR "
                                   "({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
@@ -403,6 +414,20 @@ class TestHybridSearch(MarqoTestCase):
         mock_vespa_client_query = unittest.mock.MagicMock()
         mock_vespa_client_query.side_effect = pass_through_query
 
+        tensor_search.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=self.unstructured_index_with_no_model.name,
+                docs=[{"_id": "doc1", "custom_field_1":
+                    {
+                        "content": "test custom field content_1",
+                        "vector": np.random.rand(16).tolist()
+                    }}],
+                tensor_fields=["custom_field_1"],
+                mappings={"custom_field_1": {"type": "custom_vector"}}
+            ),
+        )
+
         with self.subTest("Custom vector query, with content, no context"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -430,7 +455,7 @@ class TestHybridSearch(MarqoTestCase):
 
             vespa_query_kwargs = call_args[-1][1]
             self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings, marqo__query_embedding)",
+                          "nearestNeighbor(marqo__embeddings_custom_field_1, marqo__query_embedding)",
                           vespa_query_kwargs["marqo__yql.tensor"])
             # Lexical yql has content text, but Tensor uses the sample vector
             self.assertIn("default contains \"sample\"", vespa_query_kwargs["marqo__yql.lexical"])
@@ -466,7 +491,7 @@ class TestHybridSearch(MarqoTestCase):
 
             vespa_query_kwargs = call_args[-1][1]
             self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings, marqo__query_embedding)",
+                          "nearestNeighbor(marqo__embeddings_custom_field_1, marqo__query_embedding)",
                           vespa_query_kwargs["marqo__yql.tensor"])
             # Lexical yql has content text, but Tensor uses the sample vector with context
             self.assertIn("default contains \"sample\"",
@@ -502,7 +527,7 @@ class TestHybridSearch(MarqoTestCase):
 
             vespa_query_kwargs = call_args[-1][1]
             self.assertIn("{targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
-                          "nearestNeighbor(marqo__embeddings, marqo__query_embedding)",
+                          "nearestNeighbor(marqo__embeddings_custom_field_1, marqo__query_embedding)",
                           vespa_query_kwargs["marqo__yql.tensor"])
             self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
                              sample_vector)
@@ -1204,6 +1229,7 @@ class TestHybridSearch(MarqoTestCase):
             text="dogs",
             search_method="TENSOR",
             result_count=20,
+            searchable_attributes=["text_field_1"]
         )
         lexical_res = tensor_search.search(
             config=self.config,
@@ -1211,6 +1237,7 @@ class TestHybridSearch(MarqoTestCase):
             text="dogs",
             search_method="LEXICAL",
             result_count=10,
+            searchable_attributes=["text_field_1"]
         )
         tensor_res = tensor_search.search(
             config=self.config,
@@ -1218,6 +1245,7 @@ class TestHybridSearch(MarqoTestCase):
             text="dogs",
             search_method="TENSOR",
             result_count=10,
+            searchable_attributes=["text_field_1"]
         )
 
         # Lexical retrieval with Tensor ranking
@@ -1230,6 +1258,8 @@ class TestHybridSearch(MarqoTestCase):
                 hybrid_parameters=HybridParameters(
                     retrievalMethod=RetrievalMethod.Lexical,
                     rankingMethod=RankingMethod.Tensor,
+                    searchableAttributesLexical=["text_field_1"],
+                    searchableAttributesTensor=["text_field_1"],
                     verbose=True
                 ),
                 result_count=10
@@ -1257,6 +1287,8 @@ class TestHybridSearch(MarqoTestCase):
                 hybrid_parameters=HybridParameters(
                     retrievalMethod=RetrievalMethod.Tensor,
                     rankingMethod=RankingMethod.Lexical,
+                    searchableAttributesLexical=["text_field_1"],
+                    searchableAttributesTensor=["text_field_1"],
                     verbose=True
                 ),
                 result_count=10
@@ -1417,7 +1449,7 @@ class TestHybridSearch(MarqoTestCase):
 
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
-                if isinstance(index, StructuredMarqoIndex):
+                if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
                     final_test_cases = test_cases + [
                         # Searchable attributes need to match retrieval method
                         ({
@@ -1693,6 +1725,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
 
+    @unittest.skip(reason="semi-structured-index-now-supports it")
     def test_hybrid_search_unstructured_with_searchable_attributes_fails(self):
         """
         Test that hybrid search with unstructured index and searchable attributes fails.

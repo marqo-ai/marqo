@@ -119,7 +119,7 @@ class TestPagination(MarqoTestCase):
                                                   # Add docs with increasing title word count, so each will have unique tensor and lexical scores
                                                   docs=docs,
                                                   device="cpu",
-                                                  tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                  tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
                                                   else None
                                                   )
                 ).dict(exclude_none=True, by_alias=True)
@@ -176,7 +176,7 @@ class TestPagination(MarqoTestCase):
                     add_docs_params=AddDocsParams(index_name=index.name,
                                                   docs=docs,
                                                   device="cpu",
-                                                  tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                  tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
                                                   else None
                                                   )
                 ).dict(exclude_none=True, by_alias=True)
@@ -346,7 +346,7 @@ class TestPagination(MarqoTestCase):
                                                       docs=[{"title": 'my title', 'desc': 'my title'} for i in
                                                             range(batch_size)],
                                                       device="cpu",
-                                                      tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                      tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
                                                       else None,
                                                       )
                     ).dict(exclude_none=True, by_alias=True)
