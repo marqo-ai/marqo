@@ -108,11 +108,11 @@ class TestSearchRegression(MarqoTestCase):
                 docs_with_same_bm25_score = [("doc8", "doc9")]
 
                 # Select results
-                if isinstance(index, UnstructuredMarqoIndex):
+                if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
+                    expected_results = results_2_9.search_results_structured
+                elif isinstance(index, UnstructuredMarqoIndex):
                     expected_results = results_2_9.search_results_unstructured
                     docs_with_same_bm25_score.append(("doc7", "doc11"))
-                elif isinstance(index, StructuredMarqoIndex):
-                    expected_results = results_2_9.search_results_structured
 
                 # Add documents
                 tensor_search.add_documents(
@@ -149,7 +149,10 @@ class TestSearchRegression(MarqoTestCase):
                                 self.assertIn(expected_results[search_method][i]["_id"], same_score_group)
                             else:
                                 self.assertEqual(search_res["hits"][i]["_id"], expected_results[search_method][i]["_id"])
-                            self.assertTrue(np.allclose(search_res["hits"][i]["_score"], expected_results[search_method][i]["_score"], atol=1e-6))
+                            self.assertTrue(np.allclose(search_res["hits"][i]["_score"], expected_results[search_method][i]["_score"], atol=1e-6),
+                                            msg=f'Score of Hit {i} do not match in {search_method} search on {index.type} index, '
+                                                f'expected: {expected_results[search_method][i]["_score"]}, '
+                                                f'actual: {search_res["hits"][i]["_score"]}')
 
     def test_document_vectors_match_2_9(self):
         """

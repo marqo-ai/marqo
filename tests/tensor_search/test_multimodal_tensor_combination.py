@@ -429,7 +429,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 }
 
                 for document, error_msg_unstructured, error_msg_structured in test_cases:
-                    error_msg = error_msg_unstructured if index.type == IndexType.Unstructured else error_msg_structured
+                    error_msg = error_msg_unstructured if isinstance(index, UnstructuredMarqoIndex) else error_msg_structured
                     with self.subTest(error_msg):
                         with mock.patch("marqo.s2_inference.s2_inference.vectorise") as mock_vectorise:
                             res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
