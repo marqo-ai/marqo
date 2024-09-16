@@ -1,3 +1,29 @@
+# Release 2.12.0
+
+## New features
+- Add support for video and audio modalities using LanguageBind models ([#931](https://github.com/marqo-ai/marqo/pull/931)). You can now index, embed, and search with video and audio files using Marqo, extending your search capabilities beyond text and images. 
+- Load OpenCLIP models from HuggingFace Hub ([#939](https://github.com/marqo-ai/marqo/pull/939)). Support loading OpenCLIP models directly from HuggingFace by providing a model name with the hf-hub: prefix. This simplifies model integration and expands your options.
+- Load custom OpenCLIP checkpoints with different image preprocessors ([#939](https://github.com/marqo-ai/marqo/pull/939)). Allow loading a custom OpenCLIP checkpoint with a different image preprocessor by providing imagePreprocessor in the model properties. This offers greater flexibility in model selection and customization.
+
+
+## Bug fixes and minor changes
+- Fix tokenizer loading for custom OpenCLIP checkpoints ([#939](https://github.com/marqo-ai/marqo/pull/939)). The correct tokenizer is now applied when custom OpenCLIP model checkpoints are loaded.
+- Improve error handling for image_pointer fields in structured indexes ([#944](https://github.com/marqo-ai/marqo/pull/944)). Structured indexes now have targeted error reporting for non-image content in image_pointer fields. This improvement prevents batch failures and provides clearer feedback to users.
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.5k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
+# Release 2.11.4
+
+## Bug fixes and minor changes
+- Fix duplication of results in RRF hybrid search ([#957](https://github.com/marqo-ai/marqo/pull/957)). Resolved an issue where some results in Reciprocal Rank Fusion (RRF) hybrid search were duplicated, ensuring more accurate and unique search results.
+
+# Release 2.11.3
+
+## Bug fixes and minor changes
+- Support S3 custom model without explicit credentials ([#948](https://github.com/marqo-ai/marqo/pull/948)).
+
 # Release 2.11.2
 
 ## Bug fixes and minor changes
