@@ -5,7 +5,7 @@ import numpy as np
 from marqo.s2_inference.reranking import rerank
 from marqo.s2_inference.errors import RerankerError,RerankerNameError
 from marqo.s2_inference.s2_inference import clear_loaded_models
-from tests.marqo_test import TEST_IMAGE_URLS, ImageKey
+from tests.marqo_test import TestImageUrls
 
 
 class TestRerankingWithModels(unittest.TestCase):
@@ -158,7 +158,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # not all results have the searchable filed to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
+                        'location': TestImageUrls.HIPPO_STATUE.value,
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -173,7 +173,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
+                        'location': TestImageUrls.HIPPO_REALISTIC.value,
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -214,7 +214,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # not all results have the searchable filed to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
+                        'location': TestImageUrls.HIPPO_STATUE.value,
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -229,7 +229,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
+                        'location': TestImageUrls.HIPPO_REALISTIC.value,
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -252,7 +252,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # not all results have the searchable filed to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
+                        'location': TestImageUrls.HIPPO_STATUE.value,
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -267,7 +267,7 @@ class TestRerankingWithModels(unittest.TestCase):
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
+                        'location': TestImageUrls.HIPPO_REALISTIC.value,
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': {"location":[0,0,20,30]},
@@ -309,7 +309,7 @@ class TestRerankingWithModels(unittest.TestCase):
         # all results have the searchable field to rerank over
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
+                        'location': TestImageUrls.HIPPO_STATUE.value,
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -318,14 +318,14 @@ class TestRerankingWithModels(unittest.TestCase):
                         {'attributes': 'face is viking. body is white turtleneck. background is pearl',
                         # missing locations
                         'other': 'some more text',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
+                        'location': TestImageUrls.HIPPO_STATUE.value,
                         '_id': 'QmRR6PBkgCdhiSYBM3AY3EWhn4ZbeR2X8Ygpy2veLkcPC5',
                         '_score': 0.2876821,
                         '_highlights': [],
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
+                        'location': TestImageUrls.HIPPO_REALISTIC.value,
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],
@@ -366,7 +366,7 @@ class TestRerankingWithModels(unittest.TestCase):
 
         results_lexical = {'hits': 
                     [{'attributes': 'yello head. pruple shirt. black sweater.',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
+                        'location': TestImageUrls.HIPPO_STATUE.value,
                         'other': 'some other text',
                         # this one has no id
                         '_score': 1.4017934,
@@ -375,14 +375,14 @@ class TestRerankingWithModels(unittest.TestCase):
                         {'attributes': 'face is viking. body is white turtleneck. background is pearl',
                         # missing locations
                         'other': 'some more text',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_STATUE],
+                        'location': TestImageUrls.HIPPO_STATUE.value,
                         '_id': 'QmRR6PBkgCdhiSYBM3AY3EWhn4ZbeR2X8Ygpy2veLkcPC5',
                         '_score': 0.2876821,
                         '_highlights': [],
                         },
                         # this one has less fields
                         {'attributes': 'face is bowlcut. body is blue . background is grey. head is tan',
-                        'location': TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
+                        'location': TestImageUrls.HIPPO_REALISTIC.value,
                         '_id': 'QmTVYuULK1Qbzh21Y3hzeTFny5AGUSUGAXoGjLqNB2b1at',
                         '_score': 0.2876821,
                         '_highlights': [],

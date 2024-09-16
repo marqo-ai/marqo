@@ -13,7 +13,7 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output,
 )
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
-from tests.marqo_test import TEST_IMAGE_URLS, ImageKey
+from tests.marqo_test import TestImageUrls
 
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
@@ -340,9 +340,9 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
         device = 'cpu'
         eps = 1e-9
-        images = [TEST_IMAGE_URLS[ImageKey.IMAGE0],
-                  TEST_IMAGE_URLS[ImageKey.IMAGE1],
-                  TEST_IMAGE_URLS[ImageKey.IMAGE2]]
+        images = [TestImageUrls.IMAGE0.value,
+                  TestImageUrls.IMAGE1.value,
+                  TestImageUrls.IMAGE2.value]
 
         for name in names:
 
@@ -456,7 +456,7 @@ class TestOpenClipModelEncoding(unittest.TestCase):
     @patch("torch.cuda.amp.autocast")
     def test_autocast_called_when_cuda(self, mock_autocast):
         names = self.open_clip_test_model
-        contents = ['this is a test sentence. so is this.', TEST_IMAGE_URLS[ImageKey.IMAGE0]]
+        contents = ['this is a test sentence. so is this.', TestImageUrls.IMAGE0.value]
         for model_name in names:
             for content in contents:
                 vectorise(model_name=model_name, content=content, device="cpu")

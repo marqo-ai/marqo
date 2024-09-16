@@ -14,7 +14,7 @@ from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQuery
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 @unittest.skip
@@ -25,7 +25,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
         super(TestImageDownloadHeaders, cls).setUpClass()
         cls.generic_header = {"Content-type": "application/json"}
         cls.index_name_1 = "my-test-index-1"
-        cls.real_img_url = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
+        cls.real_img_url = TestImageUrls.HIPPO_REALISTIC.value
 
     def setUp(self) -> None:
         self.endpoint = self.authorized_url

@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from marqo.s2_inference.s2_inference import get_marqo_inference_cache, clear_marqo_inference_cache, clear_loaded_models
-from tests.marqo_test import TEST_IMAGE_URLS, ImageKey
+from tests.marqo_test import TestImageUrls
 
 
 class TestVectoriseInferenceCache(unittest.TestCase):
@@ -133,7 +133,7 @@ class TestVectoriseInferenceCache(unittest.TestCase):
     def test_vectorise_cacheWorkForImagePath(self):
         """Test if the cache works for image paths."""
         vectorise = self._import_vectorise_with_inference_cache()
-        content = [TEST_IMAGE_URLS[ImageKey.IMAGE1]]
+        content = [TestImageUrls.IMAGE1.value]
         # First call
         original_vector = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
                                     device="cpu", enable_cache=True, infer=True)

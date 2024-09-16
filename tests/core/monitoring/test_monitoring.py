@@ -10,7 +10,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestMonitoring(MarqoTestCase):
@@ -180,7 +180,7 @@ class TestMonitoring(MarqoTestCase):
             config=self.config, add_docs_params=AddDocsParams(
                 docs=[
                     {"title": "2",
-                     "img": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
+                     "img": TestImageUrls.HIPPO_REALISTIC.value
                      },
                     {"title": "2"},
                     {"desc": "2"}

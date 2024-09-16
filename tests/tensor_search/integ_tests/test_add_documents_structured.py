@@ -15,7 +15,7 @@ from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TEST_IMAGE_URLS, ImageKey
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestAddDocumentsStructured(MarqoTestCase):
@@ -542,7 +542,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         Image URL as ID is not downloaded
         """
         docs = [{
-            "_id": TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC],
+            "_id": TestImageUrls.HIPPO_REALISTIC.value,
             "title": "wow"}
         ]
 
@@ -796,7 +796,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         assert 'desc' in doc_w_facets
 
     def test_various_image_count(self):
-        hippo_url = TEST_IMAGE_URLS[ImageKey.HIPPO_REALISTIC]
+        hippo_url = TestImageUrls.HIPPO_REALISTIC.value
 
         def _check_get_docs(doc_count, title_value):
             approx_half = math.floor(doc_count / 2)
