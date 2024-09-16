@@ -42,6 +42,7 @@ from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 
 import numpy as np
 import psutil
+import semver
 from PIL import Image
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
@@ -293,6 +294,10 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     # Generate exactly 1 chunk with the custom vector.
                     chunks = [f"{field}::{copied[field]['content']}"]
                     embeddings = [copied[field]["vector"]]
+                    # If normalize_embeddings is true and the index version is > 2.12.0, normalize the embeddings.
+                    # We have added version specific check here to prevent backwards compatibility issues.
+                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > semver.VersionInfo.parse("2.12.0"):
+                        embeddings = normalize_custom_vector(embeddings)
 
                     # Update parent document (copied) to fit new format. Use content (text) to replace input dict
                     copied[field] = field_content["content"]
@@ -2648,3 +2653,14 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
             document_ids=doc_ids,
         )
     )
+
+def normalize_custom_vector(embeddings):
+    embeddings_array = np.array(embeddings)
+    magnitude = np.linalg.norm(embeddings_array)
+    if magnitude != 0:
+        embeddings_array = embeddings_array / magnitude
+    else:
+        embeddings_array = embeddings_array
+
+    return embeddings_array.tolist()
+
