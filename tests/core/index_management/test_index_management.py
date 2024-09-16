@@ -30,26 +30,11 @@ from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_fact
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
-from marqo.vespa.vespa_client import VespaClient
 from tests.marqo_test import MarqoTestCase
-
-
-def _will_use_overriding_bootstrapping_mechanism():
-    vespa_client = VespaClient(
-        "http://localhost:19071",
-        "http://localhost:8080",
-        "http://localhost:8080",
-        content_cluster_name="content_default",
-    )
-
-    vespa_version = vespa_client.get_vespa_version()
-
-    return semver.Version.parse(vespa_version) >= IndexManagement.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES
 
 
 @pytest.mark.slowtest
 class TestIndexManagement(MarqoTestCase):
-    use_overriding_bootstrapping_mechanism = _will_use_overriding_bootstrapping_mechanism()
 
     def setUp(self):
         super().setUp()
@@ -87,9 +72,11 @@ class TestIndexManagement(MarqoTestCase):
 
         self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
 
-    @unittest.skipIf(use_overriding_bootstrapping_mechanism,
-                     reason="In newer version of vespa, we use deployment session for bootstrapping")
     def test_skip_boostrap_if_already_bootstrapped_for_older_vespa_version(self):
+        if (semver.Version.parse(self.vespa_client.get_vespa_version()) >=
+                IndexManagement.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
+            self.skipTest(reason="In newer version of vespa, we use deployment session for bootstrapping")
+
         def modified_post(*args, **kwargs):
             return httpx.post(*args, **kwargs)
 
@@ -105,9 +92,11 @@ class TestIndexManagement(MarqoTestCase):
             self.assertEqual(mock_post.call_count, 1)
             self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
 
-    @unittest.skipUnless(use_overriding_bootstrapping_mechanism,
-                         reason="In older version of vespa, we use prepareandactivate for bootstrapping")
     def test_skip_boostrap_if_already_bootstrapped_for_newer_vespa_version(self):
+        if (semver.Version.parse(self.vespa_client.get_vespa_version()) <
+                IndexManagement.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
+            self.skipTest(reason="In older version of vespa, we use prepareandactivate for bootstrapping")
+
         def modified_put(*args, **kwargs):
             return httpx.put(*args, **kwargs)
 
