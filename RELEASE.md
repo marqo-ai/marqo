@@ -7,9 +7,8 @@
 
 
 ## Bug fixes and minor changes
-- Correct tokenizer loading for custom OpenCLIP checkpoints ([#939](https://github.com/marqo-ai/marqo/pull/939)). Fixed a bug where an incorrect tokenizer was loaded when using a custom OpenCLIP checkpoint, ensuring the correct tokenizer is now applied with your custom models.
-- Handle non-image content in image_pointer fields for structured indexes ([#944](https://github.com/marqo-ai/marqo/pull/944)). Fixed an issue where providing non-image content in an image_pointer field resulted in an internal error and batch failure. Now, a proper 400 error is returned for the specific document, preventing the entire batch from failing.
-
+- Fix tokenizer loading for custom OpenCLIP checkpoints ([#939](https://github.com/marqo-ai/marqo/pull/939)). The correct tokenizer is now applied when custom OpenCLIP model checkpoints are loaded.
+- Improve error handling for image_pointer fields in structured indexes ([#944](https://github.com/marqo-ai/marqo/pull/944)). Structured indexes now have targeted error reporting for non-image content in image_pointer fields. This improvement prevents batch failures and provides clearer feedback to users.
 
 ## Contributor shout-outs
 - Shoutouts to our valuable 4.5k stargazers!
