@@ -293,6 +293,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     # Generate exactly 1 chunk with the custom vector.
                     chunks = [f"{field}::{copied[field]['content']}"]
                     embeddings = [copied[field]["vector"]]
+                    if marqo_index.normalize_embeddings:
+                        embeddings = normalize_custom_vector(embeddings)
 
                     # Update parent document (copied) to fit new format. Use content (text) to replace input dict
                     copied[field] = field_content["content"]
@@ -2648,3 +2650,14 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
             document_ids=doc_ids,
         )
     )
+
+def normalize_custom_vector(embeddings):
+    embeddings_array = np.array(embeddings)
+    magnitude = np.linalg.norm(embeddings_array)
+    if magnitude != 0:
+        embeddings_array = embeddings_array / magnitude
+    else:
+        embeddings_array = embeddings_array
+
+    return embeddings_array.tolist()
+
