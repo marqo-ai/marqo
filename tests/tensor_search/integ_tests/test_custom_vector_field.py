@@ -235,6 +235,8 @@ class TestCustomVectorField(MarqoTestCase):
                 self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.random_vector_1})
 
             elif isinstance(index, StructuredMarqoIndex):
+                print("Printing embeddings" + vespa_fields["marqo__embeddings_my_custom_vector"]["0"].__str__())
+                print("Printing embeddings2" + self.random_vector_1.__str__())
                 self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ["custom content is here!!"])
                 self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.random_vector_1})
 
