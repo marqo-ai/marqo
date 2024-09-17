@@ -75,6 +75,11 @@ class MultimodalModel:
                 'audio': 'LanguageBind_Audio_FT',
                 'image': 'LanguageBind_Image',
             }
+        elif self.model_name == "LanguageBind/Video_V1.5_FT_Audio_FT":
+            self.clip_type = {
+                'video': 'LanguageBind_Video_V1.5_FT',
+                'audio': 'LanguageBind_Audio_FT',
+            }
         elif self.model_name == "LanguageBind/Video_V1.5_FT_Image":
             self.clip_type = {
                 'video': 'LanguageBind_Video_V1.5_FT',
