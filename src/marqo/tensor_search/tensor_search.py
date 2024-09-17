@@ -44,6 +44,7 @@ import numpy as np
 import psutil
 import semver
 from PIL import Image
+from numpy import ndarray
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import marqo_docs
@@ -296,8 +297,8 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     embeddings = [copied[field]["vector"]]
                     # If normalize_embeddings is true and the index version is > 2.12.0, normalize the embeddings.
                     # We have added version specific check here to prevent backwards compatibility issues.
-                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > semver.VersionInfo.parse("2.12.0"):
-                        embeddings = normalize_custom_vector(embeddings)
+                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > semver.VersionInfo.parse(constants.MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION):
+                        embeddings = normalize_vector(embeddings)
 
                     # Update parent document (copied) to fit new format. Use content (text) to replace input dict
                     copied[field] = field_content["content"]
@@ -825,6 +826,11 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     # Generate exactly 1 chunk with the custom vector.
                     chunks = [copied[field]['content']]
                     embeddings = [copied[field]["vector"]]
+
+                    # If normalize_embeddings is true and the index version is > 2.12.0, normalize the embeddings.
+                    # We have added version specific check here to prevent backwards compatibility issues.
+                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > semver.VersionInfo.parse(constants.MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION):
+                        embeddings = normalize_vector(embeddings)
 
                     # Update parent document (copied) to fit new format. Use content (text) to replace input dict
                     copied[field] = field_content["content"]
@@ -1911,9 +1917,7 @@ def get_query_vectors_from_jobs(
             merged_vector = np.mean(weighted_vectors, axis=0)
 
             if q.index.normalize_embeddings:
-                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
-                if norm > 0:
-                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+                merged_vector = normalize_vector(merged_vector)
             result[qidx] = list(merged_vector)
         elif isinstance(q.q, str):
             # result[qidx] = vectors[0]
@@ -2654,13 +2658,32 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
         )
     )
 
-def normalize_custom_vector(embeddings):
-    embeddings_array = np.array(embeddings)
-    magnitude = np.linalg.norm(embeddings_array)
+def normalize_vector(embeddings: Union[List[List[float]], ndarray]) -> List[List[float]]:
+    """
+    Normalizes a list of vectors (embeddings) to have unit length.
+
+    Args:
+        embeddings (Union[List[List[float]], ndarray]): A list of vectors or a numpy ndarray of vectors to be normalized.
+
+    Returns:
+        List[List[float]]: A list of normalized vectors.
+    """
+
+    # Convert the input embeddings to a numpy array
+    if embeddings.__class__ == ndarray:
+        embeddings_array = embeddings
+    else:
+        embeddings_array = np.array(embeddings)
+
+    # Calculate the magnitude (Euclidean norm) of each vector along the last axis
+    magnitude = np.linalg.norm(embeddings_array, axis = -1, keepdims=True)
+
+    # Normalize each vector by dividing by its magnitude, handle zero magnitude case
     if magnitude != 0:
         embeddings_array = embeddings_array / magnitude
     else:
-        embeddings_array = embeddings_array
+        embeddings_array = embeddings_array # Handle the zero vector case
 
+    # Convert the normalized numpy array back to a list and return
     return embeddings_array.tolist()
 
