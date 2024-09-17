@@ -198,7 +198,8 @@ class TestSearch(MarqoTestCase):
         super().tearDown()
         self.device_patcher.stop()
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is 5gb and is very slow on g4dn.xlarge and may crash it")
+    @pytest.mark.largemodel
+    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_search_video(self):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
@@ -232,7 +233,8 @@ class TestSearch(MarqoTestCase):
                 self.assertEqual(results['hits'][0]['_id'], "1")  # The video document should be the top result
                 self.assertGreater(results['hits'][0]['_score'], results['hits'][1]['_score'])  # Video should have higher score
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="We skip this test if we have cuda support. This model is 5gb and is very slow on g4dn.xlarge and may crash it")
+    @pytest.mark.largemodel
+    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_search_audio(self):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
