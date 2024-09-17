@@ -41,7 +41,7 @@ class IndexSettings(StrictBaseModel):
         splitOverlap=3,
     )
     audioPreprocessing: core.AudioPreProcessing = core.AudioPreProcessing(
-        splitLength=20,
+        splitLength=10,
         splitOverlap=3,
     )
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float
@@ -57,8 +57,6 @@ class IndexSettings(StrictBaseModel):
     def validate_url_pointer_treatment(cls, values):
         treat_as_images = values.get('treatUrlsAndPointersAsImages')
         treat_as_media = values.get('treatUrlsAndPointersAsMedia')
-        print("treat_as_images", treat_as_images)
-        print("treat_as_media", treat_as_media)
         if treat_as_images is None:
             if treat_as_media is True:
                 treat_as_images = None #False
@@ -153,7 +151,6 @@ class IndexSettings(StrictBaseModel):
                 updated_at=time.time(),
             )
         elif self.type == core.IndexType.Unstructured:
-            print("treatUrlsAndPointersAsImages", self.treatUrlsAndPointersAsImages)
             if self.allFields is not None:
                 raise api_exceptions.InvalidArgError(
                     "allFields is not a valid parameter for unstructured indexes"
