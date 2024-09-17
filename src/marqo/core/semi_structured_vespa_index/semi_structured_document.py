@@ -97,7 +97,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 field = marqo_index.field_map[field_name]
                 if field.type == FieldType.Text:
                     instance.text_fields[field.lexical_field_name] = field_content
-                    if len(field_content) <= marqo_index.filter_string_max_length:
+                    if len(field_content) <= marqo_index.filter_string_max_length:  # TODO the combined field content of a multimodal field appear here. find out why
                         instance.fixed_fields.short_string_fields[field_name] = field_content
                 else:
                     instance.text_fields[field.name] = field_content
@@ -130,6 +130,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 for marqo_tensor_field in document[constants.MARQO_DOC_TENSORS]:
                     marqo_tensor_value = document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
 
+                    # TODO check if these validation is required
                     # self._verify_marqo_tensor_field_name(marqo_tensor_field)
                     # self._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
 
