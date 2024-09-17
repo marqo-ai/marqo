@@ -6,7 +6,7 @@ from marqo.api.exceptions import IndexNotFoundError, InvalidArgError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.enums import TensorField
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 import pprint
 
@@ -91,7 +91,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
 
         self.test_score_documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 4 fields
              "multiply_1": 1,
              "multiply_2": 20.0,
@@ -100,7 +100,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "1"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # let's multiply by 0
              "multiply_1": 0,
              "multiply_2": 20.0,
@@ -109,14 +109,14 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "2"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 2 fields
              "multiply_2": 20.3,
              "add_1": 1.2,
              "_id": "3"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # change order
              "add_1": 1.0,
              "add_2": 3.0,
@@ -125,7 +125,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "4"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # float
              "multiply_1": 1,
              "multiply_2": 2.531,
@@ -134,7 +134,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "5"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              "_id": "0",
              "filter": "original"
              },
@@ -154,7 +154,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
     def test_search_result_not_affected_if_fields_not_exist(self):
         documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              "_id": "0",
              "filter": "original"
             },
@@ -325,7 +325,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
         # multiply_1 is string here, which should be skipped in modification
         documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 4 fields
              "multiply_1": "1",
              "multiply_2": 20.0,
@@ -334,7 +334,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "1"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # let's multiply by 0
              "multiply_1": "0",
              "multiply_2": 20.0,
@@ -343,14 +343,14 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "2"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 2 fields
              "multiply_2": 20.3,
              "add_1": 1.2,
              "_id": "3"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # change order
              "add_1": 1.0,
              "add_2": 3.0,
@@ -359,7 +359,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "4"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # float
              "multiply_1": "1",
              "multiply_2": 2.531,
@@ -368,7 +368,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
              "_id": "5"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              "_id": "0",
              "filter": "original"
              },
@@ -398,7 +398,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
     def test_expected_error_raised(self):
         documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 4 fields
              "multiply_1": 1,
              "multiply_2": 20.0,
@@ -529,7 +529,7 @@ class TestScoreModifiersSearch(MarqoTestCase):
     def test_normal_query_body_is_called(self):
         documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              "_id": "0",
              "filter": "original"
              },
@@ -629,7 +629,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
 
         self.test_score_documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 4 fields
              "multiply_1": 1,
              "multiply_2": 20.0,
@@ -638,7 +638,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "1"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # let's multiply by 0
              "multiply_1": 0,
              "multiply_2": 20.0,
@@ -647,14 +647,14 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "2"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 2 fields
              "multiply_2": 20.3,
              "add_1": 1.2,
              "_id": "3"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # change order
              "add_1": 1.0,
              "add_2": 3.0,
@@ -663,7 +663,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "4"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # float
              "multiply_1": 1,
              "multiply_2": 2.531,
@@ -672,7 +672,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "5"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              "_id": "0",
              "filter": "original"
              },
@@ -692,7 +692,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
     def test_bulk_search_result_not_affected_if_fields_not_exist(self):
         documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-            "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+            "my_image_field": TestImageUrls.IMAGE2.value,
             "_id": "0",
             "filter": "original"
             },
@@ -927,7 +927,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
         # multiply_1 is string here, which should be skipped in modification
         documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 4 fields
              "multiply_1": "1",
              "multiply_2": 20.0,
@@ -936,7 +936,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "1"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # let's multiply by 0
              "multiply_1": "0",
              "multiply_2": 20.0,
@@ -945,14 +945,14 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "2"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # 2 fields
              "multiply_2": 20.3,
              "add_1": 1.2,
              "_id": "3"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # change order
              "add_1": 1.0,
              "add_2": 3.0,
@@ -961,7 +961,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "4"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              # float
              "multiply_1": "1",
              "multiply_2": 2.531,
@@ -970,7 +970,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
              "_id": "5"
              },
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              "_id": "0",
              "filter": "original"
              },
@@ -1015,7 +1015,7 @@ class TestScoreModifiersBulkSearch(MarqoTestCase):
     def test_bulk_search_normal_query_body_is_called(self):
         documents = [
             {"my_text_field": "A rider is riding a horse jumping over the barrier.",
-             "my_image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+             "my_image_field": TestImageUrls.IMAGE2.value,
              "_id": "0",
              "filter": "original"
              },

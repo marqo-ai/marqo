@@ -10,7 +10,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
@@ -204,7 +204,8 @@ class TestSearch(MarqoTestCase):
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
             {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
-            {"image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
+            {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
+            # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"}, # png image with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
@@ -237,7 +238,8 @@ class TestSearch(MarqoTestCase):
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
             {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
-            {"image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", "_id": "3"},
+            {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
+            # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"},  # png file with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
@@ -363,7 +365,7 @@ class TestSearch(MarqoTestCase):
     def test_filtering_list_case_image(self):
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index):
-                hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+                hippo_img = TestImageUrls.HIPPO_REALISTIC.value
                 tensor_search.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(

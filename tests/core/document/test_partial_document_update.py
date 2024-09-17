@@ -15,7 +15,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 
 
@@ -398,7 +398,7 @@ class TestUpdate(MarqoTestCase):
 
         Note: We can only update an image pointer field when it is not a tensor field."""
         original_doc = {
-            "image_pointer_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+            "image_pointer_field": TestImageUrls.IMAGE1.value,
             "text_field_tensor": "search me",
             "_id": "1"
         }
@@ -409,22 +409,22 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
         updated_doc = {
-            "image_pointer_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+            "image_pointer_field": TestImageUrls.IMAGE2.value,
             "_id": "1"
         }
         r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
-        self.assertEqual("https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+        self.assertEqual(TestImageUrls.IMAGE2.value,
                          updated_doc["image_pointer_field"])
         
     def test_update_multimodal_image_field(self):
         """
         Test that updating an image field in a multimodal context properly embeds the image as an image and not as text.
         """
-        original_image_url = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
-        updated_image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+        original_image_url = TestImageUrls.HIPPO_REALISTIC.value
+        updated_image_url = TestImageUrls.IMAGE2.value
         
         original_doc = {
             "_id": "1",

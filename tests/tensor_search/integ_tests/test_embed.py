@@ -2,7 +2,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifierLists
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search.api import embed
@@ -246,7 +246,7 @@ class TestEmbed(MarqoTestCase):
         """
         Test that image URLs are embedded as images and not as text using the embed function.
         """
-        image_url = "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+        image_url = TestImageUrls.IMAGE2.value
         
         # Expected vector for the image (same as in test_multimodal_image_url_is_embedded_as_image_not_text)
         expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
@@ -275,7 +275,7 @@ class TestEmbed(MarqoTestCase):
     @pytest.mark.skipif(torch.cuda.is_available() is True, reason="Skip this test if we have cuda support.")
     def test_embed_languagebind(self):
         content = [
-            #"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png", # image
+            #TestImageUrls.HIPPO_REALISTIC.value, # image
             "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4" # video
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
@@ -484,7 +484,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index.type):
-                image_url = "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg"
+                image_url = TestImageUrls.IMAGE1.value
                 original_query = self.config.vespa_client.query
 
                 def pass_through_query(*arg, **kwargs):
@@ -529,7 +529,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index.type):
-                image_url = "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg"
+                image_url = TestImageUrls.IMAGE1.value
                 vectorise = s2_inference.vectorise
                 def pass_through_vectorise(*arg, **kwargs):
                     """Vectorise will behave as usual, but we will be able to see the call list
@@ -575,7 +575,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index.type):
-                image_url = "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg"
+                image_url = TestImageUrls.IMAGE1.value
                 original_query = self.config.vespa_client.query
                 def pass_through_query(*arg, **kwargs):
                     return original_query(*arg, **kwargs)
@@ -622,7 +622,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index.type):
-                image_url = "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg"
+                image_url = TestImageUrls.IMAGE2.value
                 original_query = self.config.vespa_client.query
                 def pass_through_query(*arg, **kwargs):
                     return original_query(*arg, **kwargs)

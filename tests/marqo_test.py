@@ -22,6 +22,18 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
 
+class TestImageUrls(Enum):
+    IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
+    IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'
+    IMAGE2 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
+    IMAGE3 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg'
+    IMAGE4 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg'
+    COCO = 'https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg'
+    HIPPO_REALISTIC = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png'
+    HIPPO_REALISTIC_LARGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+    HIPPO_STATUE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png'
+
+
 class MarqoTestCase(unittest.TestCase):
     indexes = []
 

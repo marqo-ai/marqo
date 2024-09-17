@@ -12,6 +12,8 @@ from marqo.s2_inference.s2_inference import (
 )
 import functools
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
+from tests.marqo_test import TestImageUrls
+
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 from marqo.s2_inference.configs import ModelCache
 import shutil
@@ -192,7 +194,7 @@ class TestLargeClipModels(unittest.TestCase):
     def test_autocast_called_in_open_clip(self, mock_autocast):
         names = ["open_clip/ViT-B-32/laion400m_e31"]
         contents = ['this is a test sentence. so is this.',
-                    "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
+                    TestImageUrls.IMAGE0.value]
         for model_name in names:
             with self.subTest(f"Testing model: {model_name}"):
                 for content in contents:

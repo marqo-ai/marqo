@@ -20,7 +20,7 @@ from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
 from marqo.tensor_search import streaming_media_processor
 
@@ -123,8 +123,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         documents = [
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": TestImageUrls.IMAGE2.value,
                 "text_field_1": "This is a valid image",
                 "_id": "1"
             },
@@ -193,7 +192,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 "_id": "2"
             },
             {
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "image_field_2": TestImageUrls.HIPPO_REALISTIC_LARGE.value,
                 "_id": "3"
             },
             {
@@ -247,7 +246,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
             "_id": "1_multimodal",
             "text_field_1": "New York",
             "text_field_2": "Los Angeles",
-            "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value,
+            # "image_field_2": TestImageUrls.HIPPO_REALISTIC.value, # png image with palette is not supported
             "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
             "video_field_2": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
             "audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
@@ -295,8 +295,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """Ensure media_repo can catch an unexpected error right in thread."""
         documents = [
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/"
-                                 "marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value,
                 "_id": "1"
             }
         ]
@@ -322,8 +321,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """Ensure vectorise receives tensor from add_documents when the model is OpenCLIP or CLIP."""
         documents = [
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/"
-                                 "marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value,
                 "_id": "1"
             }
         ]
@@ -354,7 +352,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": str(i),
-             "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+             "image_field": TestImageUrls.IMAGE2.value
              } for i in range(10)
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
@@ -382,7 +380,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs = [
             {"_id": "1",
-             "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"
+             "image_field_1": TestImageUrls.IMAGE2.value
              }
         ]
         for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
@@ -421,7 +419,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             {
                 "_id": "1",
                 "text_field_1": "This text should be ignored",
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": TestImageUrls.IMAGE2.value,
             }
         ]
 
@@ -474,7 +472,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_imageDownloadWithoutPreprocessor(self):
         media_repo = dict()
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url = TestImageUrls.HIPPO_REALISTIC.value
         test_doc = {
             'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
             'field_2': good_url
@@ -494,7 +492,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_imageDownloadWithPreprocessor(self):
         media_repo = dict()
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url = TestImageUrls.HIPPO_REALISTIC.value
         test_doc = {
             'field_1': 'https://google.com/my_dog.png',  # error because such an image doesn't exist
             'field_2': good_url
@@ -542,16 +540,16 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         docs_results = [
             ([{"_id": "123",
-               "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+               "image_field_1": TestImageUrls.HIPPO_REALISTIC.value},
               {"_id": "789",
-               "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+               "image_field_1": TestImageUrls.HIPPO_STATUE.value},
               {"_id": "456", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist.png"}],
              [("123", 200), ("789", 200), ("456", 400)]
              ),
             ([{"_id": "123",
-               "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
+               "image_field_1": TestImageUrls.HIPPO_REALISTIC.value},
               {"_id": "789",
-               "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"},
+               "image_field_1": TestImageUrls.HIPPO_STATUE.value},
               {"_id": "456", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist.png"},
               {"_id": "111", "image_field_1": "https://www.marqo.ai/this/image/doesnt/exist2.png"}],
              [("123", 200), ("789", 200), ("456", 400), ("111", 400)]
@@ -581,7 +579,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_threaded_download_images_non_tensor_field(self):
         """Tests add_docs.threaded_download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url = TestImageUrls.HIPPO_REALISTIC.value
         bad_url = 'https://google.com/my_dog.png'
         examples = [
             ([{
@@ -624,7 +622,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_download_images_non_tensor_field(self):
         """tests add_docs.download_images(). URLs not in tensor fields should not be downloaded """
-        good_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        good_url = TestImageUrls.HIPPO_REALISTIC.value
         bad_url = 'https://google.com/my_dog.png'
         examples = [
             ([{
@@ -693,26 +691,22 @@ class TestAddDocumentsCombined(MarqoTestCase):
         """
         test_docs = [
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image1.jpg",
+                "image_field_1": TestImageUrls.IMAGE1.value,
                  "text_field_1": "this is a valid image",
                  "_id": "1"
             },
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image2.jpg",
+                "image_field_1": TestImageUrls.IMAGE2.value,
                 "text_field_1": "this is a invalid image due to int id",
                 "_id": 2
             },
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image3.jpg",
+                "image_field_1": TestImageUrls.IMAGE3.value,
                 "text_field_1": "this is a invalid image due to None",
                 "_id": None
             },
             {
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline"
-                                 "/examples/ImageSearchGuide/data/image4.jpg",
+                "image_field_1": TestImageUrls.IMAGE4.value,
                 "text_field_1": "this is a invalid image due to ",
                 "_id": []
             }
