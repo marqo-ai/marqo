@@ -136,7 +136,6 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          export MARQO_MAX_CPU_MODEL_MEMORY=15
           
           cd marqo
           export PYTHONPATH="./tests:./src:."
