@@ -10,7 +10,7 @@ from marqo.core.structured_vespa_index import common
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
 import unittest
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
@@ -1014,8 +1014,8 @@ class TestHybridSearch(MarqoTestCase):
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
-                            {"_id": "hippo image", "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"},
-                            {"_id": "random image", "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"},
+                            {"_id": "hippo image", "image_field_1": TestImageUrls.HIPPO_REALISTIC.value},
+                            {"_id": "random image", "image_field_1": TestImageUrls.IMAGE2.value},
                             {"_id": "hippo text", "text_field_1": "hippo"},
                             {"_id": "hippo text low relevance", "text_field_1": "hippo text text random"},
                             {"_id": "random text", "text_field_1": "random text"}
@@ -1047,7 +1047,7 @@ class TestHybridSearch(MarqoTestCase):
                     hybrid_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
-                        text="https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                        text=TestImageUrls.HIPPO_REALISTIC.value,
                         search_method="HYBRID",
                         hybrid_parameters=HybridParameters(
                             retrievalMethod="disjunction",

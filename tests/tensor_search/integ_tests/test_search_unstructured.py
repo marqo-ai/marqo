@@ -19,7 +19,7 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.search import SearchContext
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.vespa.models import QueryResult
 
 
@@ -474,7 +474,7 @@ class TestSearchUnstructured(MarqoTestCase):
     #
     def test_filtering_list_case_image(self):
 
-        hippo_img = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        hippo_img = TestImageUrls.HIPPO_REALISTIC.value
         tensor_search.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
@@ -956,8 +956,8 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_image_search_highlights(self):
         """does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
-        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
-        url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
+        url_1 = TestImageUrls.HIPPO_REALISTIC.value
+        url_2 = TestImageUrls.HIPPO_STATUE.value
         docs = [
             {"_id": "123",
              "image_field": url_1,
@@ -1022,10 +1022,10 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_multi_search_images(self):
         docs = [
             {
-                "loc a": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "loc a": TestImageUrls.HIPPO_REALISTIC.value,
                 "_id": 'realistic_hippo'},
             {
-                "loc b": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png",
+                "loc b": TestImageUrls.HIPPO_STATUE.value,
                 "_id": 'artefact_hippo'
             }
         ]
@@ -1041,13 +1041,13 @@ class TestSearchUnstructured(MarqoTestCase):
             ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
             ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
             ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
+            ({TestImageUrls.HIPPO_STATUE.value: -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
+            ({TestImageUrls.HIPPO_STATUE.value: 2.0,
+              TestImageUrls.HIPPO_REALISTIC.value: -1.0},
              ['artefact_hippo', 'realistic_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+            ({TestImageUrls.HIPPO_STATUE.value: 2.0,
+              TestImageUrls.HIPPO_REALISTIC.value: -1.0,
               "artefact": 1.0, "photo realistic": -1,
               },
              ['artefact_hippo', 'realistic_hippo']),
@@ -1067,7 +1067,7 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_multi_search_images_invalid_queries(self):
         docs = [
             {
-                "loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "loc": TestImageUrls.HIPPO_REALISTIC.value,
                 "_id": 'realistic_hippo'},
             {
                 "field_a": "Some text about a weird forest",
@@ -1099,7 +1099,7 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_multi_search_images_edge_cases(self):
         docs = [
             {
-                "loc": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+                "loc": TestImageUrls.HIPPO_REALISTIC.value,
                 "_id": 'realistic_hippo'},
             {
                 "field_a": "Some text about a weird forest",
@@ -1156,7 +1156,7 @@ class TestSearchUnstructured(MarqoTestCase):
         The code paths for image and search have diverged quite a bit
         """
         hippo_image = (
-            'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+            TestImageUrls.HIPPO_REALISTIC.value
         )
         doc_dict = {
             'realistic_hippo': {"loc": hippo_image,

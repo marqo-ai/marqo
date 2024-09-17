@@ -1,0 +1,176 @@
+name: locust_performance_tests
+run-name: Locust test suite ${{ inputs.test_suite }} run on ${{ inputs.marqo_host }} with ${{ inputs.number_of_users }} users
+# runs Locust performance tests on local Marqo container or Marqo Cloud
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        type: choice
+        required: true
+        options:
+          - random_index_and_tensor_search.py
+        description: >
+          Location of the locustfile that contains the test suite. This works as the entrypoint
+
+      number_of_users:
+        type: string
+        required: true
+        default: "10"
+        description: >
+          Total number of simulated users
+
+      user_spawn_rate:
+        type: string
+        required: true
+        default: "1"
+        description: >
+          Users spawned per second
+
+      duration:
+        type: string
+        required: true
+        default: "5m"
+        description: >
+          How long stress testing will go on, default is 5 minutes
+
+      marqo_host:
+        type: string
+        required: true
+        default: "http://localhost:8882"
+        description: >
+          Marqo host to run performance test on. If it's set to be localhost, we will spin up a local Marqo container. 
+          Otherwise, the test will try to connect to the remote Marqo host.  
+
+      index_name:
+        type: string
+        required: true
+        default: "locust-test"
+        description: >
+          Index name to test. This index will be created before the local test run. You can also create it in Marqo Cloud
+          and specify the name here
+
+      # For test in cloud
+      marqo_cloud_api_key:
+        type: string
+        required: false
+        description: >
+          API key used to test Marqo Cloud instance
+
+      # For Local tests
+      image_to_test:
+        type: string
+        required: false
+        default: marqo_docker_0
+        description: >
+          This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
+          Otherwise, the specified docker image is tested. For example "marqoai/marqo:latest", ignored when testing Marqo Cloud
+
+      index_model_name:
+        type: string
+        required: false
+        default: "hf/e5-base-v2"
+        description: >
+          Embedding model to use to create the index. This is ignored when testing Marqo Cloud
+
+jobs:
+  Start-Runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          ec2-image-id:  ${{ secrets.AMD_EC2_IMAGE_ID }}
+          ec2-instance-type: t3.xlarge
+          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
+          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
+
+  Test-Marqo:
+    name: Run Locust Performance Tests
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+
+    environment: marqo-test-suite
+
+    steps:
+
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.marqo_ref }}
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.8"
+
+      - name: Set up Docker Buildx
+        if: github.event.inputs.marqo_host == 'http://localhost:8882' && github.event.inputs.image_to_test == 'marqo_docker_0'
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image
+        if: github.event.inputs.marqo_host == 'http://localhost:8882' && github.event.inputs.image_to_test == 'marqo_docker_0'
+        run: |
+          DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0
+
+      - name: Start local Marqo container
+        if: github.event.inputs.marqo_host == 'http://localhost:8882'
+        run: ./.github/scripts/start_docker_marqo.sh ${{ github.event.inputs.image_to_test }} -e MARQO_MODELS_TO_PRELOAD='["${{ github.event.inputs.index_model_name }}"]'
+
+      - name: Install Perf Tests Dependencies
+        run: |
+          cd perf_tests
+          pip install -r requirements.txt
+
+      - name: Run Perf Tests
+        run: |
+          cd perf_tests
+          mkdir -p report
+          locust -f ${{ github.event.inputs.test_suite }} -u ${{ github.event.inputs.number_of_users }} \
+          -r ${{ github.event.inputs.user_spawn_rate }} -t ${{ github.event.inputs.duration }} \
+          -H ${{ github.event.inputs.marqo_host }}
+        env:
+          MARQO_INDEX_NAME: ${{ github.event.inputs.index_name }}
+          MARQO_INDEX_MODEL_NAME: ${{ github.event.inputs.index_model_name }}
+          MARQO_CLOUD_API_KEY: ${{ github.event.inputs.marqo_cloud_api_key }}
+
+      - name: Upload Locust Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-locust-test-report
+          path: perf_tests/report/
+
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Test-Marqo # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}

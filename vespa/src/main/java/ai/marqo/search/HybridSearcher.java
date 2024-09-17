@@ -1,5 +1,6 @@
 package ai.marqo.search;
 
+import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.dependencies.Before;
 import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.search.Query;
@@ -21,6 +22,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +42,9 @@ public class HybridSearcher extends Searcher {
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
+
+    // Compile the regex pattern once and store it as a static final variable
+    private static final Pattern PATTERN = Pattern.compile("^index\\:[^\\s\\/]+\\/\\d+\\/(.+)$");
 
     @Override
     public Result search(Query query, Execution execution) {
@@ -149,8 +155,10 @@ public class HybridSearcher extends Searcher {
             HitGroup hitsTensor, HitGroup hitsLexical, Integer k, Double alpha, boolean verbose) {
 
         HashMap<String, Double> rrfScores = new HashMap<>();
+        HashMap<String, String> docIdsToHitIds = new HashMap<>();
         HitGroup result = new HitGroup();
         Double reciprocalRank, existingScore, newScore;
+        String extractedDocId;
 
         logIfVerbose("Beginning RRF process.", verbose);
         logIfVerbose("Beginning (empty) result state: ", verbose);
@@ -174,9 +182,12 @@ public class HybridSearcher extends Searcher {
                         verbose); // TODO: For easier debugging, expose marqo__id
                 logIfVerbose(hit.toString(), verbose);
 
+                extractedDocId = extractDocIdFromHitId(hit.getId().toString());
                 reciprocalRank = alpha * (1.0 / (rank + k));
-                rrfScores.put(
-                        hit.getId().toString(), reciprocalRank); // Store hit's score via its URI
+                // Map hit's score to its shortened doc ID
+                rrfScores.put(extractedDocId, reciprocalRank);
+                // Map hit's full URI to its shortened doc ID
+                docIdsToHitIds.put(extractedDocId, hit.getId().toString());
                 hit.setField(
                         "marqo__raw_tensor_score",
                         hit.getRelevance()
@@ -208,7 +219,8 @@ public class HybridSearcher extends Searcher {
                         verbose);
 
                 // Check if score already exists. If so, add to it.
-                existingScore = rrfScores.get(hit.getId().toString());
+                extractedDocId = extractDocIdFromHitId(hit.getId().toString());
+                existingScore = rrfScores.get(extractedDocId);
                 if (existingScore == null) {
                     // If the score doesn't exist, add new hit to result list (with rrf score).
                     logIfVerbose("No existing score found! Starting at 0.0.", verbose);
@@ -217,17 +229,21 @@ public class HybridSearcher extends Searcher {
                             hit.getRelevance()
                                     .getScore()); // Encode raw score for Marqo debugging purposes
                     hit.setRelevance(reciprocalRank); // Update score to be weighted RR (lexical)
-                    rrfScores.put(hit.getId().toString(), reciprocalRank); // Log score in hashmap
+                    // Map hit's score to its shortened doc ID
+                    rrfScores.put(extractedDocId, reciprocalRank);
+                    // Map hit's full URI to its shortened doc ID
+                    docIdsToHitIds.put(extractedDocId, hit.getId().toString());
                     result.add(hit);
 
                 } else {
                     // If it does, find that hit in the result list and update it, adding new rrf to
                     // its score.
                     newScore = existingScore + reciprocalRank;
-                    rrfScores.put(hit.getId().toString(), newScore);
+                    rrfScores.put(extractedDocId, newScore);
 
-                    // Update existing hit in result list
-                    Hit existingHit = result.get(hit.getId().toString());
+                    // Update existing hit in result list (use map to find the full hit ID)
+                    Hit existingHit = result.get(docIdsToHitIds.get(extractedDocId));
+
                     existingHit.setField(
                             "marqo__raw_lexical_score",
                             hit.getRelevance()
@@ -237,7 +253,8 @@ public class HybridSearcher extends Searcher {
 
                     logIfVerbose(
                             String.format(
-                                    "Existing score found for hit: %s.", hit.getId().toString()),
+                                    "Existing score found for hit: %s.",
+                                    extractDocIdFromHitId(hit.getId().toString())),
                             verbose);
                     logIfVerbose(String.format("Existing score is: %.7f", existingScore), verbose);
                     logIfVerbose(String.format("New score is: %.7f", newScore), verbose);
@@ -381,7 +398,9 @@ public class HybridSearcher extends Searcher {
                 logger.info(
                         String.format(
                                 "{IDX: %s, HIT ID: %s, RELEVANCE: %.7f}",
-                                idx, hit.getId().toString(), hit.getRelevance().getScore()));
+                                idx,
+                                extractDocIdFromHitId(hit.getId().toString()),
+                                hit.getRelevance().getScore()));
                 idx++;
             }
             logger.info("=======================");
@@ -423,5 +442,21 @@ public class HybridSearcher extends Searcher {
      */
     String addQueryWrapper(String str) {
         return "query(" + str + ")";
+    }
+
+    /*
+     * Extracts the document ID from a hit ID (use regex to extract the doc ID from the hit's URI)
+     */
+    static String extractDocIdFromHitId(String fullPath) {
+        // Create a matcher for the input string using the precompiled pattern
+        Matcher matcher = PATTERN.matcher(fullPath);
+
+        // Check if the pattern matches and extract the document ID
+        if (matcher.find()) {
+            return matcher.group(1); // Return the captured group (document ID)
+        } else {
+            throw new InternalException(
+                    "Vespa doc ID could not be extracted from the full hit ID: " + fullPath + ".");
+        }
     }
 }

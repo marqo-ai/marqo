@@ -13,6 +13,8 @@ from marqo.s2_inference.s2_inference import (
     _convert_vectorized_output,
 )
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
+from tests.marqo_test import TestImageUrls
+
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
 class TestEncoding(unittest.TestCase):
@@ -286,8 +288,8 @@ class TestOpenClipModelEncoding(unittest.TestCase):
             'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
             'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
             'open_clip/EVA02-B-16/merged2b_s8b_b131k',
-            "open_clip/MobileCLIP-B/datacompdr_lt",
-            "open_clip/MobileCLIP-S1/datacompdr"
+            # "open_clip/MobileCLIP-B/datacompdr_lt",
+            # "open_clip/MobileCLIP-S1/datacompdr"
         ]
 
     def tearDown(self) -> None:
@@ -338,9 +340,9 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
         device = 'cpu'
         eps = 1e-9
-        images = ["https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg",
-                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
-                  "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg"]
+        images = [TestImageUrls.IMAGE0.value,
+                  TestImageUrls.IMAGE1.value,
+                  TestImageUrls.IMAGE2.value]
 
         for name in names:
 
@@ -454,7 +456,7 @@ class TestOpenClipModelEncoding(unittest.TestCase):
     @patch("torch.cuda.amp.autocast")
     def test_autocast_called_when_cuda(self, mock_autocast):
         names = self.open_clip_test_model
-        contents = ['this is a test sentence. so is this.', "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg"]
+        contents = ['this is a test sentence. so is this.', TestImageUrls.IMAGE0.value]
         for model_name in names:
             for content in contents:
                 vectorise(model_name=model_name, content=content, device="cpu")

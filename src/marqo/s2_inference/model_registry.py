@@ -365,6 +365,8 @@ def _get_open_clip_properties() -> Dict:
 
         # New models as of Marqo 2.7.0
         # Added for: Open CLIP 2.24.0
+        # This model is not available on the environment with torch 12 and open_clip 2.26.0
+        # If we want to upgrade the open_clip version, we need to upgrade torch version as well to support this model
         "open_clip/ViT-SO400M-14-SigLIP-384/webli": {
             "name": "open_clip/ViT-SO400M-14-SigLIP-384/webli",
             "dimensions": 1152,
@@ -489,20 +491,21 @@ def _get_open_clip_properties() -> Dict:
             "note": "Marqo's fashionSigLIP model",
             "type": "open_clip"
         },
-        "open_clip/MobileCLIP-B/datacompdr_lt":{
-            "name": "open_clip/MobileCLIP-B/datacompdr_lt",
-            "dimensions": 512,
-            "note": "MobileCLIP model",
-            "type": "open_clip",
-            "pretrained": "datacompdr_lt"
-        },
-        "open_clip/MobileCLIP-S1/datacompdr": {
-            "name": "open_clip/MobileCLIP-S1/datacompdr",
-            "dimensions": 512,
-            "note": "MobileCLIP model",
-            "type": "open_clip",
-            "pretrained": "datacompdr"
-        },
+        # TODO Add these model back when we upgrade the open_clip version
+        # "open_clip/MobileCLIP-B/datacompdr_lt":{
+        #     "name": "open_clip/MobileCLIP-B/datacompdr_lt",
+        #     "dimensions": 512,
+        #     "note": "MobileCLIP model",
+        #     "type": "open_clip",
+        #     "pretrained": "datacompdr_lt"
+        # },
+        # "open_clip/MobileCLIP-S1/datacompdr": {
+        #     "name": "open_clip/MobileCLIP-S1/datacompdr",
+        #     "dimensions": 512,
+        #     "note": "MobileCLIP model",
+        #     "type": "open_clip",
+        #     "pretrained": "datacompdr"
+        # },
         "visheratin/nllb-clip-base-siglip": {
             "name": "hf-hub:visheratin/nllb-clip-base-siglip",
             "dimensions": 768,
@@ -1983,6 +1986,61 @@ def _get_onnx_clip_properties() -> Dict:
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
+def _get_languagebind_properties() -> Dict:
+    LANGUAGEBIND_MODEL_PROPERTIES = {
+        'LanguageBind/Video_V1.5_FT_Audio_FT_Image': {
+            "name": "LanguageBind/Video_V1.5_FT_Audio_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "model_size": 8,
+            "supported_modalities": ["video", "audio", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Video_V1.5_FT_Image': {
+            "name": "LanguageBind/Video_V1.5_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "model_size": 5,
+            "supported_modalities": ["video", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Audio_FT_Image': {
+            "name": "LanguageBind/Audio_FT_Image",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "model_size": 5,
+            "supported_modalities": ["audio", "language", "image"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Audio_FT': {
+            "name": "LanguageBind/Audio_FT",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "model_size": 2,
+            "supported_modalities": ["video", "language"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+        'LanguageBind/Video_V1.5_FT': {
+            "name": "LanguageBind/Video_V1.5_FT",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "model_size": 2,
+            "supported_modalities": ["video", "language"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 20,
+        },
+
+    }
+    return LANGUAGEBIND_MODEL_PROPERTIES
 
 def _get_fp16_clip_properties() -> Dict:
     FP16_CLIP_MODEL_PROPERTIES = {
@@ -2077,6 +2135,7 @@ def load_model_properties() -> Dict:
     multilingual_clip_model_properties = get_multilingual_clip_properties()
     fp16_clip_model_properties = _get_fp16_clip_properties()
     no_model_properties = _get_no_model_properties()
+    languagebind_model_properties = _get_languagebind_properties()
 
     # combine the above dicts
     model_properties = dict(clip_model_properties.items())
@@ -2090,6 +2149,7 @@ def load_model_properties() -> Dict:
     model_properties.update(multilingual_clip_model_properties)
     model_properties.update(fp16_clip_model_properties)
     model_properties.update(no_model_properties)
+    model_properties.update(languagebind_model_properties)
 
 
     all_properties = dict()

@@ -18,7 +18,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestSearchStructured(MarqoTestCase):
@@ -789,8 +789,8 @@ class TestSearchStructured(MarqoTestCase):
 
     def test_image_search_highlights(self):
         """Does the URL get returned as the highlight? (it should - because no rerankers are being used)"""
-        url_1 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
-        url_2 = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
+        url_1 = TestImageUrls.HIPPO_REALISTIC.value
+        url_2 = TestImageUrls.HIPPO_STATUE.value
         docs = [
             {"_id": "123", "image_field_1": url_1, "text_field_1": "irrelevant text"},
             {"_id": "789", "image_field_1": url_2},
@@ -849,11 +849,11 @@ class TestSearchStructured(MarqoTestCase):
         docs = [
             {
                 "_id": 'realistic_hippo',
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value
             },
             {
                 "_id": 'artefact_hippo',
-                "image_field_2": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png"
+                "image_field_2": TestImageUrls.HIPPO_STATUE.value
             }
         ]
         tensor_search.add_documents(
@@ -867,13 +867,13 @@ class TestSearchStructured(MarqoTestCase):
             ({"Nature photography": 2.0, "Artefact": -2}, ['realistic_hippo', 'artefact_hippo']),
             ({"Nature photography": -1.0, "Artefact": 1.0}, ['artefact_hippo', 'realistic_hippo']),
             ({"Nature photography": -1.5, "Artefact": 1.0, "hippo": 1.0}, ['artefact_hippo', 'realistic_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": -1.0,
+            ({TestImageUrls.HIPPO_STATUE.value: -1.0,
               "blah": 1.0}, ['realistic_hippo', 'artefact_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0},
+            ({TestImageUrls.HIPPO_STATUE.value: 2.0,
+              TestImageUrls.HIPPO_REALISTIC.value: -1.0},
              ['artefact_hippo', 'realistic_hippo']),
-            ({"https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue.png": 2.0,
-              "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png": -1.0,
+            ({TestImageUrls.HIPPO_STATUE.value: 2.0,
+              TestImageUrls.HIPPO_REALISTIC.value: -1.0,
               "artefact": 1.0, "photo realistic": -1},
              ['artefact_hippo', 'realistic_hippo']),
         ]
@@ -892,7 +892,7 @@ class TestSearchStructured(MarqoTestCase):
         docs = [
             {
                 "_id": 'realistic_hippo',
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value
             },
             {
                 "_id": 'artefact_hippo',
@@ -924,7 +924,7 @@ class TestSearchStructured(MarqoTestCase):
         docs = [
             {
                 "_id": 'realistic_hippo',
-                "image_field_1": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value
             },
             {
                 "_id": 'artefact_hippo',
@@ -975,7 +975,7 @@ class TestSearchStructured(MarqoTestCase):
 
     def test_image_search(self):
         """This test is to ensure image search works as expected"""
-        hippo_image = "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png"
+        hippo_image = TestImageUrls.HIPPO_REALISTIC.value
         doc_dict = {
             'realistic_hippo': {"image_field_1": hippo_image, "_id": 'realistic_hippo'},
             'artefact_hippo': {"text_field_1": "Some text about a weird forest", "_id": 'artefact_hippo'}

@@ -15,7 +15,7 @@ from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestAddDocumentsStructured(MarqoTestCase):
@@ -542,7 +542,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         Image URL as ID is not downloaded
         """
         docs = [{
-            "_id": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "_id": TestImageUrls.HIPPO_REALISTIC.value,
             "title": "wow"}
         ]
 
@@ -796,7 +796,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         assert 'desc' in doc_w_facets
 
     def test_various_image_count(self):
-        hippo_url = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+        hippo_url = TestImageUrls.HIPPO_REALISTIC.value
 
         def _check_get_docs(doc_count, title_value):
             approx_half = math.floor(doc_count / 2)
@@ -834,6 +834,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     index_name=self.index_name_img_random, device="cpu"
                 )
             ).dict(exclude_none=True, by_alias=True)
+            print(res1)
             self.assertEqual(
                 c,
                 self.config.monitoring.get_index_stats_by_name(
@@ -955,4 +956,4 @@ class TestAddDocumentsStructured(MarqoTestCase):
         self.assertEqual(3, len(r.items))
         for item in r.items:
             self.assertEqual(400, item.status)
-            self.assertIn("Could not find image at", item.message)
+            self.assertIn("Could not process the media file found at", item.message)

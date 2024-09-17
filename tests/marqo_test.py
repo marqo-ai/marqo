@@ -22,6 +22,18 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
 
+class TestImageUrls(Enum):
+    IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
+    IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'
+    IMAGE2 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
+    IMAGE3 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image3.jpg'
+    IMAGE4 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg'
+    COCO = 'https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg'
+    HIPPO_REALISTIC = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic_small.png'
+    HIPPO_REALISTIC_LARGE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png'
+    HIPPO_STATUE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png'
+
+
 class MarqoTestCase(unittest.TestCase):
     indexes = []
 
@@ -98,6 +110,14 @@ class MarqoTestCase(unittest.TestCase):
             image_preprocessing: ImagePreProcessing = ImagePreProcessing(
                 patch_method=None
             ),
+            video_preprocessing: VideoPreProcessing = VideoPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
+            audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
             vector_numeric_type: VectorNumericType = VectorNumericType.Float,
             hnsw_config: HnswConfig = HnswConfig(
@@ -118,6 +138,8 @@ class MarqoTestCase(unittest.TestCase):
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
             image_preprocessing=image_preprocessing,
+            video_preprocessing=video_preprocessing,
+            audio_preprocessing=audio_preprocessing,
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
@@ -145,6 +167,14 @@ class MarqoTestCase(unittest.TestCase):
             image_preprocessing: ImagePreProcessing = ImagePreProcessing(
                 patch_method=None
             ),
+            video_preprocessing: VideoPreProcessing = VideoPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
+            audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
             vector_numeric_type: VectorNumericType = VectorNumericType.Float,
             hnsw_config: HnswConfig = HnswConfig(
@@ -155,6 +185,7 @@ class MarqoTestCase(unittest.TestCase):
             created_at=time.time(),
             updated_at=time.time(),
             treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True,
             filter_string_max_length=100
     ) -> UnstructuredMarqoIndex:
         """
@@ -167,6 +198,8 @@ class MarqoTestCase(unittest.TestCase):
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
             image_preprocessing=image_preprocessing,
+            video_preprocessing=video_preprocessing,
+            audio_preprocessing=audio_preprocessing,
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
@@ -176,6 +209,7 @@ class MarqoTestCase(unittest.TestCase):
             created_at=created_at,
             updated_at=updated_at,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
+            treat_urls_and_pointers_as_media=treat_urls_and_pointers_as_media,
             filter_string_max_length=filter_string_max_length
         )
 
@@ -199,6 +233,14 @@ class MarqoTestCase(unittest.TestCase):
             image_preprocessing: ImagePreProcessing = ImagePreProcessing(
                 patch_method=None
             ),
+            video_preprocessing: VideoPreProcessing = VideoPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
+            audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
             vector_numeric_type: VectorNumericType = VectorNumericType.Float,
             hnsw_config: HnswConfig = HnswConfig(
@@ -221,6 +263,8 @@ class MarqoTestCase(unittest.TestCase):
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
             image_preprocessing=image_preprocessing,
+            video_preprocessing=video_preprocessing,
+            audio_preprocessing=audio_preprocessing,
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
@@ -249,6 +293,14 @@ class MarqoTestCase(unittest.TestCase):
             image_preprocessing: ImagePreProcessing = ImagePreProcessing(
                 patch_method=None
             ),
+            video_preprocessing: VideoPreProcessing = VideoPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
+            audio_preprocessing: AudioPreProcessing = AudioPreProcessing(
+                split_length=20,
+                split_overlap=1,
+            ),
             distance_metric: DistanceMetric = DistanceMetric.Angular,
             vector_numeric_type: VectorNumericType = VectorNumericType.Float,
             hnsw_config: HnswConfig = HnswConfig(
@@ -256,6 +308,7 @@ class MarqoTestCase(unittest.TestCase):
                 m=16
             ),
             treat_urls_and_pointers_as_images: bool = False,
+            treat_urls_and_pointers_as_media: bool = False,
             filter_string_max_length: int = 50,
             marqo_version=version.get_version(),
             created_at=time.time(),
@@ -272,10 +325,13 @@ class MarqoTestCase(unittest.TestCase):
             name=name,
             model=model,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
+            treat_urls_and_pointers_as_media=treat_urls_and_pointers_as_media,
             filter_string_max_length=filter_string_max_length,
             normalize_embeddings=normalize_embeddings,
             text_preprocessing=text_preprocessing,
             image_preprocessing=image_preprocessing,
+            video_preprocessing=video_preprocessing,
+            audio_preprocessing=audio_preprocessing,
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,

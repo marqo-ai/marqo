@@ -15,12 +15,13 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.core.models.marqo_index import StructuredMarqoIndex, FieldFeature, FieldType, Model
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
-    ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod, IndexType
+    ImagePreProcessing, VideoPreProcessing, AudioPreProcessing, Model, DistanceMetric, VectorNumericType, \
+    HnswConfig, TextSplitMethod, IndexType
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 
 from marqo.s2_inference import s2_inference
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 def pass_through_vectorise(*args, **kwargs):
@@ -258,7 +259,7 @@ class TestPrefix(MarqoTestCase):
                         docs=[{
                             "Title": "Horse rider",
                             "text_field": "hello",
-                            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field": TestImageUrls.IMAGE1.value,
                             "_id": "1"
                         }],
                         device="cpu",
@@ -280,13 +281,13 @@ class TestPrefix(MarqoTestCase):
                         docs=[{
                             "Title": "Horse rider",
                             "text_field": "passage: hello",
-                            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field": TestImageUrls.IMAGE1.value,
                             "_id": "2"
                         },
                         {
                             "Title": "Horse rider",
                             "text_field": "passage: passage: hello",
-                            "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field": TestImageUrls.IMAGE1.value,
                             "_id": "3"
                         }],
                         device="cpu",
@@ -331,14 +332,14 @@ class TestPrefix(MarqoTestCase):
                 # Dict query (text has prefix, image does not)
                 queries = [BulkSearchQueryEntity(
                     q={"text query": 0.5,
-                       "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5},
+                       TestImageUrls.HIPPO_REALISTIC.value: 0.5},
                     text_query_prefix="PREFIX: ",
                     index=index
                 )]
 
                 prefixed_queries = tensor_search.add_prefix_to_queries(queries)
                 self.assertEqual(prefixed_queries[0].q, {"PREFIX: text query": 0.5,
-                                                         "https://marqo-assets.s3.amazonaws.com/tests/images/ai_hippo_realistic.png": 0.5})
+                                                         TestImageUrls.HIPPO_REALISTIC.value: 0.5})
 
     def test_determine_text_chunk_prefix(self):
         """
@@ -451,6 +452,7 @@ class TestPrefix(MarqoTestCase):
             ),
             normalize_embeddings=True,
             treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=False,
             filter_string_max_length=1000,
             text_preprocessing=TextPreProcessing(
                 splitLength=6,
@@ -458,6 +460,14 @@ class TestPrefix(MarqoTestCase):
                 splitMethod=TextSplitMethod.Character
             ),
             image_preprocessing=ImagePreProcessing(),
+            video_preprocessing=VideoPreProcessing(
+                splitLength=20,
+                splitOverlap=1,
+            ),
+            audio_preprocessing=AudioPreProcessing(
+                splitLength=20,
+                splitOverlap=1,
+            ),
             distance_metric=DistanceMetric.DotProduct,
             vector_numeric_type=VectorNumericType.Float,
             hnsw_config=HnswConfig(

@@ -12,7 +12,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.tensor_search import vectorise_multimodal_combination_field_unstructured, vectorise_multimodal_combination_field_structured
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 import unittest
 
 
@@ -213,7 +213,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 doc = {
                     "Title": "Horse rider",
                     "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field": TestImageUrls.IMAGE1.value,
                     "_id": "1"
                 }
 
@@ -252,7 +252,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 doc = {
                     "Title": "Horse rider",
                     "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field": TestImageUrls.IMAGE1.value,
                     "_id": "1"
                 }
 
@@ -306,7 +306,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 doc = {
                     "Title": "Horse rider",
                     "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field": TestImageUrls.IMAGE1.value,
                     "_id": "1"
                 }
 
@@ -350,7 +350,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             {
                 "Title": "Horse rider",
                 "text_field": "A rider is riding a horse jumping over the barrier.",
-                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                "image_field": TestImageUrls.IMAGE1.value,
                 "_id": "1"
             },
             {
@@ -413,7 +413,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     ({"bad_test_text_field": "test", "bad_field_int": 1}, "received bad_field_int:1"),
                     ({"bad_test_text_field": "test", "bad_field_bool": True}, "received bad_field_bool:True"),
                     ({"bad_test_text_field": "test", "bad_field_list": ["123", "23"]}, f'received bad_field_list:{["123", "23"]}'),
-                    ({"bad_test_text_field": "test", "bad_field_img": "https://a-void-image.jpg"}, "Could not find image"),
+                    ({"bad_test_text_field": "test", "bad_field_img": "https://a-void-image.jpg"}, "Could not find media"),
                     ({"bad_multimodal_field": "test"}, "Document and mappings object have conflicting fields")
                 ]
 
@@ -467,17 +467,17 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 score_1 = get_score({
                     "text_field": "A rider is riding a horse jumping over the barrier.",
-                    # "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    # "image_field": TestImageUrls.IMAGE1.value,
                 })
 
                 score_2 = get_score({
                     # "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field": TestImageUrls.IMAGE1.value,
                 })
 
                 score_3 = get_score({
                     "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "image_field": TestImageUrls.IMAGE1.value,
                 })
 
                 assert (score_3 >= min(score_1, score_2)) and (score_3 <= max(score_1, score_2))
@@ -491,29 +491,29 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         {
                             "text_field_1": "A rider is riding a horse jumping over the barrier.",
                             "text_field_2": "What is the best to wear on the moon?",
-                            "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-                            "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                            "image_field_1": TestImageUrls.IMAGE1.value,
+                            "image_field_2": TestImageUrls.IMAGE2.value,
                             "_id": "c1"
                         },
                         {
                             "text_field_1": "A rider is riding a horse jumping over the barrier.",
-                            "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field_1": TestImageUrls.IMAGE1.value,
                             "text_field_2": "What is the best to wear on the moon?",
-                            "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                            "image_field_2": TestImageUrls.IMAGE2.value,
                             "_id": "c2"
                         },
                         {
-                            "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-                            "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                            "image_field_1": TestImageUrls.IMAGE1.value,
+                            "image_field_2": TestImageUrls.IMAGE2.value,
                             "text_field_1": "A rider is riding a horse jumping over the barrier.",
                             "text_field_2": "What is the best to wear on the moon?",
                             "_id": "c3"
                         },
                         {
-                            "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field_1": TestImageUrls.IMAGE1.value,
                             "text_field_1": "A rider is riding a horse jumping over the barrier.",
                             "text_field_2": "What is the best to wear on the moon?",
-                            "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                            "image_field_2": TestImageUrls.IMAGE2.value,
                             "_id": "c4"
                         }],
                     tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None,
@@ -537,11 +537,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                             "_id": "2"
                         },
                         {
-                            "image_field_3": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                            "image_field_3": TestImageUrls.IMAGE1.value,
                             "_id": "3"
                         },
                         {
-                            "image_field_4": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                            "image_field_4": TestImageUrls.IMAGE2.value,
                             "_id": "4"
                         }],
                     tensor_fields=["text_field_3", "text_field_4", "image_field_3", "image_field_4"] if isinstance(index, UnstructuredMarqoIndex) else None,
@@ -560,6 +560,8 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 expected_tensor = np.mean(
                     [text_tensor_1 * 0.32, text_tensor_2 * 0, image_tensor_1 * -0.48, image_tensor_2 * 1.34], axis=0)
 
+                print(f"combo_tensor_1: {combo_tensor_1}")
+                print(f"expected_tensor: {expected_tensor}")
                 assert np.allclose(combo_tensor_1, expected_tensor, atol=1e-5)
                 assert np.allclose(combo_tensor_2, expected_tensor, atol=1e-5)
                 assert np.allclose(combo_tensor_3, expected_tensor, atol=1e-5)
@@ -589,7 +591,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 score_2 = get_score({
                     "zero_weight_text_field": "A rider is riding a horse jumping over the barrier.",
-                    "zero_weight_image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                    "zero_weight_image_field": TestImageUrls.IMAGE1.value,
                     "_id": "1"
                 })
 
@@ -612,16 +614,16 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 index_name=self.unstructured_random_multimodal_index.name, docs=[
                     {
                         "text_field": "A rider is riding a horse jumping over the barrier.",
-                        "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                        "image_field": TestImageUrls.IMAGE1.value,
                         "_id": "123",
                     },
                     {
                         "text_field": "test-text-two.",
-                        "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                        "image_field": TestImageUrls.IMAGE2.value,
                         "_id": "234",
                     },
                     {  # a normal doc
-                        "combo_text_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                        "combo_text_image": TestImageUrls.IMAGE2.value,
                         "_id": "534",
                     }],
                 mappings={
@@ -638,7 +640,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert real_field_0 == "combo_text_image"
             assert field_content_0 == {
                 "text_field": "A rider is riding a horse jumping over the barrier.",
-                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                "image_field": TestImageUrls.IMAGE1.value,
             }
 
             # second multimodal=doc
@@ -647,7 +649,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert real_field_1 == "combo_text_image"
             assert field_content_1 == {
                 "text_field": "test-text-two.",
-                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                "image_field": TestImageUrls.IMAGE2.value,
             }
             # ensure we only call multimodal-combination twice
             assert len(mock_multimodal_combination.call_args_list) == 2
@@ -677,16 +679,16 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 index_name=self.structured_random_multimodal_index.name, docs=[
                     {
                         "text_field": "A rider is riding a horse jumping over the barrier.",
-                        "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                        "image_field": TestImageUrls.IMAGE1.value,
                         "_id": "123",
                     },
                     {
                         "text_field": "test-text-two.",
-                        "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                        "image_field": TestImageUrls.IMAGE2.value,
                         "_id": "234",
                     },
                     {  # a normal doc
-                        "combo_text_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                        "combo_text_image": TestImageUrls.IMAGE2.value,
                         "_id": "534",
                     }],
             )
@@ -699,7 +701,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert real_field_0 == "combo_text_image"
             assert field_content_0 == {
                 "text_field": "A rider is riding a horse jumping over the barrier.",
-                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+                "image_field": TestImageUrls.IMAGE1.value,
             }
 
             # second multimodal=doc
@@ -708,7 +710,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             assert real_field_1 == "combo_text_image"
             assert field_content_1 == {
                 "text_field": "test-text-two.",
-                "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+                "image_field": TestImageUrls.IMAGE2.value,
             }
             # ensure we only call multimodal-combination twice
             assert len(mock_multimodal_combination.call_args_list) == 2
@@ -737,10 +739,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                 "text_field_2": "A rider is riding a horse jumping over the barrier_2.",
                                 "text_field_3": "A rider is riding a horse jumping over the barrier_3.",
                                 "text_field_4": "A rider is riding a horse jumping over the barrier_4.",
-                                "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-                                "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
-                                "image_field_3": "https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg",
-                                "image_field_4": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                                "image_field_1": TestImageUrls.IMAGE1.value,
+                                "image_field_2": TestImageUrls.IMAGE2.value,
+                                "image_field_3": TestImageUrls.IMAGE3.value,
+                                "image_field_4": TestImageUrls.IMAGE4.value,
                                 "_id": "111",
                             }],
                         mappings={"multi_combo_text_image": {"type": "multimodal_combination", "weights": {
@@ -796,10 +798,10 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                 "text_field_2": "A rider is riding a horse jumping over the barrier_2.",
                                 "text_field_3": "A rider is riding a horse jumping over the barrier_3.",
                                 "text_field_4": "A rider is riding a horse jumping over the barrier_4.",
-                                "image_field_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-                                "image_field_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
-                                "image_field_3": "https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg",
-                                "image_field_4": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                                "image_field_1": TestImageUrls.IMAGE1.value,
+                                "image_field_2": TestImageUrls.IMAGE2.value,
+                                "image_field_3": TestImageUrls.IMAGE3.value,
+                                "image_field_4": TestImageUrls.IMAGE4.value,
                                 "_id": "111",
                             }],
                         mappings={
@@ -818,8 +820,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                     text_content = [f"A rider is riding a horse jumping over the barrier_{i}." for i in range(1, 5)]
                     text_content = text_content + [
-                        f"https://marqo-assets.s3.amazonaws.com/tests/images/image{i}.jpg"
-                        for i in range(1, 5)]
+                        TestImageUrls.IMAGE1.value,
+                        TestImageUrls.IMAGE2.value,
+                        TestImageUrls.IMAGE3.value,
+                        TestImageUrls.IMAGE4.value,
+                    ]
 
                     real_text_content = [call_kwargs['content'] for call_args, call_kwargs
                                          in mock_vectorise.call_args_list][0]
@@ -848,11 +853,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         "text_2": "A rider is riding a horse jumping over the barrier_2.",
                         "text_3": "A rider is riding a horse jumping over the barrier_3.",
                         "text_4": "A rider is riding a horse jumping over the barrier_4.",
-                        "image_0": "https://marqo-assets.s3.amazonaws.com/tests/images/image0.jpg",
-                        "image_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
-                        "image_2": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
-                        "image_3": "https://marqo-assets.s3.amazonaws.com/tests/images/image3.jpg",
-                        "image_4": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                        "image_0": TestImageUrls.IMAGE0.value,
+                        "image_1": TestImageUrls.IMAGE1.value,
+                        "image_2": TestImageUrls.IMAGE2.value,
+                        "image_3": TestImageUrls.IMAGE3.value,
+                        "image_4": TestImageUrls.IMAGE4.value,
                         "_id": "111",
                     }],
                 mappings={
@@ -877,7 +882,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "Description": "The EMU is a spacesuit that provides environmental protection",
                     "_id": "article_591",
                     "Genre": "Science",
-                    "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                    "my_image": TestImageUrls.IMAGE4.value,
                     "some_text": "hello there",
                     "lexical_field": "search me please"
                 }
@@ -901,7 +906,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "Description": "text_2",
                     "_id": "article_592",
                     "Genre": "text",
-                    "my_image_1": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                    "my_image_1": TestImageUrls.IMAGE4.value,
                     "some_text_1": "hello there",
                     "lexical_field_1": "no no no",
                     "additional_field_1": "test_search here"}
@@ -933,21 +938,21 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     {
                         "Title": "Extravehicular Mobility Unit (EMU)",
                         "_id": "0",
-                        "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                        "my_image": TestImageUrls.IMAGE4.value,
                         "some_text": "hello there",
                         "filter_field": "test_this_0"
                     },
                     {
                         "Title": "Extravehicular Mobility Unit (EMU)",
                         "_id": "1",
-                        "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                        "my_image": TestImageUrls.IMAGE4.value,
                         "some_text": "hello there",
                         "filter_field": "test_this_1",
                     },
                     {
                         "Title": "Extravehicular Mobility Unit (EMU)",
                         "_id": "2",
-                        "my_image": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                        "my_image": TestImageUrls.IMAGE4.value,
                         "some_text": "hello there",
                         "filter_field": "test_this_2",
                     }
@@ -982,7 +987,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         for index in [self.unstructured_random_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
                 test_doc = {
-                    "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg",
+                    "image_field": TestImageUrls.IMAGE4.value,
                     "text_field": "marqo is good",
                     "_id": "123",
                 }
@@ -1006,7 +1011,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 self.assertEqual(doc_w_facets[TensorField.tensor_facets][0]['combo_text_image'],
                                  json.dumps({"text_field": "marqo is good",
-                                             "image_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image4.jpg"}
+                                             "image_field": TestImageUrls.IMAGE4.value}
                                             )
                                  )
 

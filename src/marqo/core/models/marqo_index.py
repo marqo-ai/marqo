@@ -38,6 +38,8 @@ class FieldType(str, Enum):
     ArrayFloat = 'array<float>'
     ArrayDouble = 'array<double>'
     ImagePointer = 'image_pointer'
+    VideoPointer = 'video_pointer'
+    AudioPointer = 'audio_pointer'
     MultimodalCombination = 'multimodal_combination'
     CustomVector = "custom_vector"
     MapInt = 'map<text, int>'
@@ -117,6 +119,13 @@ class TextPreProcessing(ImmutableStrictBaseModel):
     split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
     split_method: TextSplitMethod = pydantic.Field(alias='splitMethod')
 
+class VideoPreProcessing(ImmutableStrictBaseModel):
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
+
+class AudioPreProcessing(ImmutableStrictBaseModel):
+    split_length: int = pydantic.Field(gt=0, alias='splitLength')
+    split_overlap: int = pydantic.Field(ge=0, alias='splitOverlap')
 
 class ImagePreProcessing(ImmutableStrictBaseModel):
     patch_method: Optional[PatchMethod] = pydantic.Field(alias='patchMethod')
@@ -250,6 +259,8 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     normalize_embeddings: bool
     text_preprocessing: TextPreProcessing
     image_preprocessing: ImagePreProcessing
+    video_preprocessing: Optional[VideoPreProcessing] = None
+    audio_preprocessing: Optional[AudioPreProcessing] = None
     distance_metric: DistanceMetric
     vector_numeric_type: VectorNumericType
     hnsw_config: HnswConfig
@@ -324,6 +335,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
 class UnstructuredMarqoIndex(MarqoIndex):
     type = IndexType.Unstructured
     treat_urls_and_pointers_as_images: bool
+    treat_urls_and_pointers_as_media: Optional[bool] = None
     filter_string_max_length: int
 
     def __init__(self, **data):
