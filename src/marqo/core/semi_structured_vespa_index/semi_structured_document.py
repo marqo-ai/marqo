@@ -6,8 +6,9 @@ from pydantic import Field
 from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants, constants
 from marqo.core.document.add_documents_handler import ORIGINAL_ID
-from marqo.core.exceptions import VespaDocumentParsingError
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, FieldType, logger
+from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError, InvalidFieldNameError, \
+    InvalidTensorFieldError
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index import common
 
 
@@ -56,10 +57,10 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         for field_name in fields:
             if field_name in marqo_index.tensor_subfield_map:
                 tensor_fields[field_name] = fields[field_name]
-            elif field_name in marqo_index.lexical_field_map:  # TODO used by get_by_id, why?
+            elif field_name in marqo_index.lexical_field_map:  # lexical fields are returned with prefixed name from get_by_ids
                 text_field_name = marqo_index.lexical_field_map[field_name].name
                 text_fields[text_field_name] = fields[field_name]
-            elif field_name in marqo_index.field_map:   # TODO used during search, why?
+            elif field_name in marqo_index.field_map:   # lexical fields are returned as us from search
                 text_fields[field_name] = fields[field_name]
 
         return cls(id=document[cls._VESPA_DOC_ID],
@@ -73,7 +74,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
     @classmethod
     def extract_field(cls, fields, name: str, default: Any):
-        return fields.pop(name) if name in fields else default
+        return fields[name] if name in fields else default
 
     @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
@@ -92,18 +93,16 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 continue
             if isinstance(field_content, str):
                 if field_name not in marqo_index.field_map:
-                    raise ValueError()  # TODO find a better error
-
+                    # All string fields will be added to the index as lexical fields before this convertion happens
+                    raise MarqoDocumentParsingError(f'Field {field_name} is not in index {marqo_index.name}')
                 field = marqo_index.field_map[field_name]
-                if field.type == FieldType.Text:
-                    instance.text_fields[field.lexical_field_name] = field_content
-                    if len(field_content) <= marqo_index.filter_string_max_length:  # TODO the combined field content of a multimodal field appear here. find out why
-                        instance.fixed_fields.short_string_fields[field_name] = field_content
-                else:
-                    instance.text_fields[field.name] = field_content
+                instance.text_fields[field.lexical_field_name] = field_content
+                if len(field_content) <= marqo_index.filter_string_max_length:
+                    instance.fixed_fields.short_string_fields[field_name] = field_content
             elif isinstance(field_content, bool):
                 instance.fixed_fields.bool_fields[field_name] = int(field_content)
             elif isinstance(field_content, list) and all(isinstance(elem, str) for elem in field_content):
+                # TODO check the expected behaviour of a string array field
                 instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
             elif isinstance(field_content, int):
                 instance.fixed_fields.int_fields[field_name] = field_content
@@ -130,9 +129,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 for marqo_tensor_field in document[constants.MARQO_DOC_TENSORS]:
                     marqo_tensor_value = document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
 
-                    # TODO check if these validation is required
-                    # self._verify_marqo_tensor_field_name(marqo_tensor_field)
-                    # self._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
+                    cls._verify_marqo_tensor_field_name(marqo_tensor_field, marqo_index)
+                    cls._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
 
                     # If chunking an image, chunks will be a list of tuples, hence the str(c)
                     chunks = [str(c) for c in marqo_tensor_value[constants.MARQO_DOC_CHUNKS]]
@@ -163,7 +161,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         return {self._VESPA_DOC_ID: self.id, self._VESPA_DOC_FIELDS: vespa_fields}
 
-    def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex, return_highlights: bool = False) -> Dict[str, Any]:
+    def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
         """Convert VespaDocumentObject to marqo document document structure."""
         marqo_document = {}
         for string_array in self.fixed_fields.string_arrays:
@@ -208,9 +206,6 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 marqo_document[common.MARQO_DOC_MULTIMODAL_PARAMS][multimodal_field_name] = \
                     json.loads(serialized_multimodal_params)
 
-        if return_highlights and self.match_features:
-            marqo_document[index_constants.MARQO_DOC_HIGHLIGHTS] = self.extract_highlights(marqo_index)
-
         # Hybrid search raw scores
         if self.raw_tensor_score is not None:
             marqo_document[index_constants.MARQO_DOC_HYBRID_TENSOR_SCORE] = self.raw_tensor_score
@@ -219,66 +214,16 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         return marqo_document
 
-    def extract_highlights(self, marqo_index: SemiStructuredMarqoIndex) -> List[Dict[str, str]]:
-        # FIXME logic copied from structured
-        # For each tensor field we will have closest(tensor_field) and distance(tensor_field) in match features
-        # If a tensor field hasn't been searched, closest(tensor_field)[cells] will be empty and distance(tensor_field)
-        # will be max double
-        match_features = self.match_features
+    @classmethod
+    def _verify_marqo_tensor_field_name(cls, field_name: str, marqo_index: SemiStructuredMarqoIndex):
+        tensor_field_map = marqo_index.tensor_field_map
+        if field_name not in tensor_field_map:
+            raise InvalidFieldNameError(f'Invalid tensor field name {field_name} for index {marqo_index.name}. '
+                                        f'Valid tensor field names are {", ".join(tensor_field_map.keys())}')
 
-        min_distance = None
-        closest_tensor_field = None
-        for tensor_field in marqo_index.tensor_fields:
-            closest_feature = f'closest({tensor_field.embeddings_field_name})'
-            if closest_feature in match_features and len(match_features[closest_feature]['cells']) > 0:
-                distance_feature = f'distance(field,{tensor_field.embeddings_field_name})'
-                if distance_feature not in match_features:
-                    raise VespaDocumentParsingError(
-                        f'Expected {distance_feature} in match features but it was not found'
-                    )
-                distance = match_features[distance_feature]
-                if min_distance is None or distance < min_distance:
-                    min_distance = distance
-                    closest_tensor_field = tensor_field
-
-        if closest_tensor_field is None:
-            return []
-            # TODO verify if this is expected in unstructured search. Lexical search + tensor ranking can ended up in this situation. See test_hybrid_search.py test_hybrid_search_unstructured_highlights_for_lexical_tensor
-            # raise VespaDocumentParsingError('Failed to extract highlights from Vespa document. Could not find '
-            #                                 'closest tensor field in response')
-
-        # Get chunk index
-        chunk_index_str = next(iter(
-            match_features[f'closest({closest_tensor_field.embeddings_field_name})']['cells']
-        ))
-        try:
-            chunk_index = int(chunk_index_str)
-        except ValueError as e:
-            raise VespaDocumentParsingError(
-                f'Expected integer as chunk index, but found {chunk_index_str}', cause=e
-            ) from e
-
-        # Get chunk value
-        try:
-            chunk_field_name = closest_tensor_field.chunk_field_name
-
-            if chunk_field_name in self.tensor_fields:
-                chunk = self.tensor_fields[chunk_field_name][chunk_index]
-            else:
-                # Note: WARN level will create verbose logs in production as this is per result
-                logger.debug(f'Failed to extract highlights as Vespa document is missing chunk field '
-                             f'{chunk_field_name}. This can happen if attributes_to_retrieve does not include '
-                             f'all searchable tensor fields (searchable_attributes)')
-
-                chunk = None
-
-        except (KeyError, TypeError, IndexError) as e:
-            raise VespaDocumentParsingError(
-                f'Cannot extract chunk value from {closest_tensor_field.chunk_field_name}: {str(e)}',
-                cause=e
-            ) from e
-
-        if chunk is not None:
-            return [{closest_tensor_field.name: chunk}]
-        else:
-            return []
+    @classmethod
+    def _verify_marqo_tensor_field(cls, field_name: str, field_value: Dict[str, Any]):
+        if not set(field_value.keys()) == {constants.MARQO_DOC_CHUNKS, constants.MARQO_DOC_EMBEDDINGS}:
+            raise InvalidTensorFieldError(f'Invalid tensor field {field_name}. '
+                                          f'Expected keys {constants.MARQO_DOC_CHUNKS}, {constants.MARQO_DOC_EMBEDDINGS} '
+                                          f'but found {", ".join(field_value.keys())}')

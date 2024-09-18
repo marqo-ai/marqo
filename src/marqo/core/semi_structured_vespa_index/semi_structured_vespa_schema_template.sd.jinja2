@@ -64,7 +64,7 @@ schema {{ index.schema_name }} {
             indexing: summary
         }
 
-        {% for lexical_field in index.lexical_field_map.values() -%}
+        {% for lexical_field in index.lexical_fields -%}
         field {{ lexical_field.lexical_field_name }} type string {
             indexing: index | summary
             index: enable-bm25
@@ -103,7 +103,7 @@ schema {{ index.schema_name }} {
 
     rank-profile base_rank_profile inherits default {
         inputs {
-            {% for lexical_field in index.lexical_field_map.values() -%}
+            {% for lexical_field in index.lexical_fields -%}
             query({{ lexical_field.lexical_field_name }}): 0
             {% endfor -%}
             {% for field in index.tensor_fields -%}

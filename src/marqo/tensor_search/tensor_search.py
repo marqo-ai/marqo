@@ -1244,7 +1244,7 @@ def _determine_thread_count(marqo_index, add_docs_params):
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name, force_refresh=True)
 
     try:
         res = config.vespa_client.get_document(document_id, marqo_index.schema_name)
@@ -1299,7 +1299,7 @@ def _get_marqo_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return []
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name, force_refresh=True)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -1353,7 +1353,7 @@ def get_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name, force_refresh=True)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 

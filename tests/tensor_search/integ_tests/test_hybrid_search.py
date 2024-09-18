@@ -110,6 +110,16 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=[]
         )
 
+        structured_index_one_tensor_field = cls.structured_marqo_index_request(
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_field_2", type=FieldType.Text,
+                             features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+            ],
+            tensor_fields=["text_field_1"]
+        )
+
         cls.indexes = cls.create_indexes([
             unstructured_default_text_index,
             unstructured_default_image_index,
@@ -119,7 +129,8 @@ class TestHybridSearch(MarqoTestCase):
             structured_text_index_score_modifiers,
             structured_index_with_no_model,
             structured_index_empty,
-            structured_index_2_9
+            structured_index_2_9,
+            structured_index_one_tensor_field
         ])
 
         # Assign to objects so they can be used in tests
@@ -133,6 +144,7 @@ class TestHybridSearch(MarqoTestCase):
         cls.structured_index_with_no_model = cls.indexes[6]
         cls.structured_index_empty = cls.indexes[7]
         cls.structured_index_2_9 = cls.indexes[8]
+        cls.structured_index_one_tensor_field = cls.indexes[9]
 
     def setUp(self) -> None:
         super().setUp()
@@ -1312,7 +1324,7 @@ class TestHybridSearch(MarqoTestCase):
                     # If score is 0, it should not be in lexical search results
                     self.assertNotIn(hybrid_hit["_id"], [doc["_id"] for doc in lexical_res["hits"]])
 
-    def test_hybrid_search_unstructured_highlights_for_lexical_tensor(self):
+    def test_hybrid_search_highlights_for_lexical_tensor(self):
         """
         Tests that hybrid search with highlights:
         retrievalMethod = "lexical", rankingMethod = "tensor"
@@ -1321,64 +1333,65 @@ class TestHybridSearch(MarqoTestCase):
         No highlights on the results retrieved from the non-tensor field (text_field_2 in this case),
         so list should be empty.
         """
+        for index in [self.unstructured_default_image_index, self.structured_index_one_tensor_field]:
+            with self.subTest(msg=f'{index.type}', index=index):
 
-        # Add documents
-        tensor_search.add_documents(
-            config=self.config,
-            add_docs_params=AddDocsParams(
-                index_name=self.unstructured_default_image_index.name,
-                docs=self.docs_list,
-                tensor_fields=["text_field_1"]
-            )
-        )
+                # Add documents
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
 
-        # Reference results
-        tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
-            config=self.config,
-            index_name=self.unstructured_default_image_index.name,
-            text="dogs",
-            search_method="TENSOR",
-            result_count=20,
-        )
-        lexical_res = tensor_search.search(
-            config=self.config,
-            index_name=self.unstructured_default_image_index.name,
-            text="dogs",
-            search_method="LEXICAL",
-            result_count=10,
-        )
+                # Reference results
+                tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="TENSOR",
+                    result_count=20,
+                )
+                lexical_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="LEXICAL",
+                    result_count=10,
+                )
 
-        # Lexical retrieval with Tensor ranking
-        with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
-            hybrid_res = tensor_search.search(
-                config=self.config,
-                index_name=self.unstructured_default_image_index.name,
-                text="dogs",
-                search_method="HYBRID",
-                hybrid_parameters=HybridParameters(
-                    retrievalMethod=RetrievalMethod.Lexical,
-                    rankingMethod=RankingMethod.Tensor,
-                    verbose=True
-                ),
-                result_count=10
-            )
-            self.assertIn("hits", hybrid_res)
+                # Lexical retrieval with Tensor ranking
+                hybrid_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Lexical,
+                        rankingMethod=RankingMethod.Tensor,
+                        verbose=True
+                    ),
+                    result_count=10
+                )
+                self.assertIn("hits", hybrid_res)
 
-            # RETRIEVAL: 10 documents must match the 10 from lexical search (order may differ)
-            self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
-            lexical_res_ids = [doc["_id"] for doc in lexical_res["hits"]]
-            for hybrid_hit in hybrid_res["hits"]:
-                self.assertIn(hybrid_hit["_id"], lexical_res_ids)
+                # RETRIEVAL: 10 documents must match the 10 from lexical search (order may differ)
+                self.assertEqual(len(hybrid_res["hits"]), len(lexical_res["hits"]))
+                lexical_res_ids = [doc["_id"] for doc in lexical_res["hits"]]
+                for hybrid_hit in hybrid_res["hits"]:
+                    self.assertIn(hybrid_hit["_id"], lexical_res_ids)
 
-            # RANKING: scores must match the tensor search scores
-            for hybrid_hit in hybrid_res["hits"]:
-                # All docs have highlights (text_field_1) except doc11 (from text_field_2)
-                if hybrid_hit["_id"] == "doc11":
-                    self.assertEqual(hybrid_hit["_highlights"], [])
-                else:
-                    self.assertIn("text_field_1", hybrid_hit["_highlights"][0])
-                    tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
-                    self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
+                # RANKING: scores must match the tensor search scores
+                for hybrid_hit in hybrid_res["hits"]:
+                    # All docs have highlights (text_field_1) except doc11 (from text_field_2)
+                    if hybrid_hit["_id"] == "doc11":
+                        self.assertEqual(hybrid_hit["_highlights"], [])
+                    else:
+                        self.assertIn("text_field_1", hybrid_hit["_highlights"][0])
+                        tensor_hit = next(doc for doc in tensor_res_all_docs["hits"] if doc["_id"] == hybrid_hit["_id"])
+                        self.assertEqual(hybrid_hit["_score"], tensor_hit["_score"])
 
     def test_hybrid_search_invalid_parameters_fails(self):
         test_cases = [
