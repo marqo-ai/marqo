@@ -1,4 +1,5 @@
 import os
+import unittest
 from typing import cast
 
 from marqo.core.models.marqo_index import *
@@ -32,15 +33,16 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
         ]
 
         for test_case in test_cases:
-            with self.subTest(msg=test_case[0]):
+            with (self.subTest(msg=test_case[0])):
                 lexical_fields = test_case[1]
                 tensor_fields = test_case[2]
                 expected_schema = self._read_schema_from_file(f'test_schemas/{test_case[3]}')
 
-                test_marqo_index_request = cast(UnstructuredMarqoIndexRequest, IndexSettings(
-                    type="semi-structured",
-                    model="random/small"
-                ).to_marqo_index_request("test_semi_structured_schema"))
+                test_marqo_index_request = self.unstructured_marqo_index_request(
+                    name="test_semi_structured_schema",
+                    hnsw_config=HnswConfig(ef_construction=512, m=16),
+                    distance_metric=DistanceMetric.PrenormalizedAngular
+                )
 
                 _, index = SemiStructuredVespaSchema(test_marqo_index_request).generate_schema()
                 marqo_index = cast(SemiStructuredMarqoIndex, index)
@@ -56,7 +58,7 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
                         chunk_field_name=f'{SemiStructuredVespaSchema.FIELD_CHUNKS_PREFIX}{tensor_field}',
                         embeddings_field_name=f'{SemiStructuredVespaSchema.FIELD_EMBEDDING_PREFIX}{tensor_field}',
                     ))
-
+                marqo_index.clear_cache()
                 generated_schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
 
                 self.maxDiff = None
