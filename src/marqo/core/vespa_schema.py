@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 
-from marqo.core import constants
-from marqo.core.models import MarqoIndex
+import semver
+
 from marqo.core.models.marqo_index_request import MarqoIndexRequest, StructuredMarqoIndexRequest, \
     UnstructuredMarqoIndexRequest
 
 from marqo.core.models.marqo_index import *
 
+MINIMUM_SEMI_STRUCTURED_INDEX_VERSION = semver.VersionInfo.parse('2.13.0')
 
 class VespaSchema(ABC):
     """
@@ -91,10 +92,11 @@ def for_marqo_index_request(marqo_index_request: MarqoIndexRequest):
         from marqo.core.structured_vespa_index.structured_vespa_schema import StructuredVespaSchema
         return StructuredVespaSchema(marqo_index_request)
     elif isinstance(marqo_index_request, UnstructuredMarqoIndexRequest):
-        # TODO find a way to test UnstructuredIndex
-        # from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
-        # return UnstructuredVespaSchema(marqo_index_request)
-        from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
-        return SemiStructuredVespaSchema(marqo_index_request)
+        if semver.Version.parse(marqo_index_request.marqo_version) < MINIMUM_SEMI_STRUCTURED_INDEX_VERSION:
+            from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
+            return UnstructuredVespaSchema(marqo_index_request)
+        else:
+            from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+            return SemiStructuredVespaSchema(marqo_index_request)
     else:
         raise ValueError(f"No known implementation for index type {type(marqo_index_request)}")
