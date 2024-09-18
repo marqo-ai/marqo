@@ -57,13 +57,6 @@ class IndexSettings(StrictBaseModel):
     def validate_url_pointer_treatment(cls, values):
         treat_as_images = values.get('treatUrlsAndPointersAsImages')
         treat_as_media = values.get('treatUrlsAndPointersAsMedia')
-        if treat_as_images is None:
-            if treat_as_media is True:
-                treat_as_images = None #False
-            else:
-                treat_as_images = False
-        if treat_as_media is None:
-            treat_as_media = False
 
         if treat_as_images and not treat_as_media:
             # Deprecation warning
