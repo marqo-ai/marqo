@@ -156,9 +156,7 @@ class IndexSettings(StrictBaseModel):
             if self.treatUrlsAndPointersAsImages is None:
                 # Default value for treat_urls_and_pointers_as_images is False, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
-                if self.treatUrlsAndPointersAsMedia is True:
-                    self.treatUrlsAndPointersAsImages = None #False
-                else:
+                if self.treatUrlsAndPointersAsMedia is False:
                     self.treatUrlsAndPointersAsImages = False
             
             if self.treatUrlsAndPointersAsMedia is None:
