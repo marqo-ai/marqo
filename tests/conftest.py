@@ -10,6 +10,8 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "largemodel: mark test as largemodels")
+    config.addinivalue_line("markers", "cpu_only: mark test as cpu_only")
+    config.addinivalue_line("markers", "unittest: mark test as unit test, it does not require vespa to run")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -30,5 +32,5 @@ def pytest_collection_modifyitems(config, items):
     if config.getoption("--legacy-unstructured"):
         MarqoTestCase.legacy_unstructured = True
         for item in items:
-            if not issubclass(item.cls, MarqoTestCase):
+            if not item.cls or not issubclass(item.cls, MarqoTestCase):
                 item.add_marker(skip_non_marqo_test)
