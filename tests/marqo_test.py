@@ -35,6 +35,7 @@ class TestImageUrls(Enum):
 
 
 class MarqoTestCase(unittest.TestCase):
+    legacy_unstructured = False
     indexes = []
 
     @classmethod
@@ -76,6 +77,18 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
         cls.index_management.bootstrap_vespa()
+        if cls.legacy_unstructured:
+            legacy_unstructured_version = '2.12.0'
+
+            def maybe_downgrade(index_req: MarqoIndexRequest) -> MarqoIndexRequest:
+                if (isinstance(index_req, UnstructuredMarqoIndexRequest) and
+                        index_req.marqo_version == version.get_version()):
+                    return index_req.copy(update={'marqo_version': legacy_unstructured_version})
+                else:
+                    return index_req
+
+            index_requests = [maybe_downgrade(req) for req in index_requests]
+
         indexes = cls.index_management.batch_create_indexes(index_requests)
         cls.indexes = indexes
 
