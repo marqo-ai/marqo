@@ -26,6 +26,8 @@ class HuggingFaceModelProperties(MarqoBaseModel):
 
     Attributes:
         name: The name of the model. This will be used as the repo_id in the Hugging Face model hub.
+            This attribute is neglected if 'url' or 'model_location' is provided.
+            We are not raising an error right now as that would be a breaking change.
         token: The token length of the model. It is default to 128.
         type: The type of the model. It should be "hf".
         url: The URL of the model checkpoint. It is optional.
@@ -41,7 +43,7 @@ class HuggingFaceModelProperties(MarqoBaseModel):
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     model_auth: Optional[ModelAuth] = Field(default=None, alias="modelAuth")
     note: Optional[str] = None
-    pooling_method: PoolingMethod = Field(default=PoolingMethod.Mean, alias="poolingMethod")
+    pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
 
     @validator("type")
     def _validate_type(cls, v):
@@ -49,14 +51,22 @@ class HuggingFaceModelProperties(MarqoBaseModel):
             raise ValueError("The type of the model should be 'hf'.")
         return v
 
-    @validator('pooling_method', pre=True, always=True)
-    def validate_or_infer_pooling_method(cls, v, values):
-        if v is not None:
-            return v
+    @root_validator(pre=True, skip_on_failure=True)
+    def _validate_or_infer_pooling_method(cls, values):
+        """Infer the pooling method from the model name if it is not provided.
+
+        If the pooling method is provided, return the values as is.
+        """
+        pooling_method = values.get("pooling_method") or values.get("poolingMethod")
+        if pooling_method is not None:
+            return values
         name = values.get('name')
-        if name and isinstance(name, str):
-            return cls._infer_pooling_method_from_name(name)
-        return PoolingMethod.Mean
+        if isinstance(name, str) and name:
+            pooling_method =  cls._infer_pooling_method_from_name(name)
+        else:
+            pooling_method = PoolingMethod.Mean
+        values["pooling_method"] = pooling_method
+        return values
 
     @staticmethod
     def _infer_pooling_method_from_name(name: str) -> PoolingMethod:
@@ -95,9 +105,15 @@ class HuggingFaceModelProperties(MarqoBaseModel):
             logger.warn(f"Could not infer pooling method from the model {name}. Defaulting to mean pooling.")
             return PoolingMethod.Mean
 
-
-    @root_validator(pre=True)
-    def _validate_url_and_model_location(cls, values):
+    @root_validator(skip_on_failure=True)
+    def _validate_minimum_required_fields_to_load(cls, values):
+        """
+        Validate that at least one of 'name', 'url', or 'model_location' is provided.
+        But 'url' and 'model_location' should not be provided together.
+        """
         if values.get("url") and values.get("model_location"):
             raise ValueError("Only one of 'url' and 'model_location' should be provided.")
+        is_custom = values.get("url") or values.get("model_location")
+        if not values.get("name") and not is_custom:
+            raise ValueError("At least one of 'name', 'url', or 'model_location' should be provided.")
         return values

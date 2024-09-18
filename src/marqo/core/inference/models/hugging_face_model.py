@@ -1,31 +1,21 @@
-from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
-from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo import marqo_docs
+import os
+import tarfile
+import zipfile
 from typing import Tuple, Callable
-import os, validators
-import zipfile, tarfile
-from urllib.error import HTTPError
-import numpy as np
-from typing import Optional
-import torch
-from torch import nn
-from transformers import (AutoModel, AutoTokenizer)
 
-from marqo.s2_inference.hf_utils import AutoModelForSentenceEmbedding
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
-from marqo.tensor_search.enums import ModelProperties, InferenceParams
-from marqo.s2_inference.sbert_utils import Model
-from marqo.s2_inference.types import Union, FloatTensor, List
-from marqo.s2_inference.logger import get_logger
-from marqo.tensor_search.enums import ModelProperties
-from marqo.s2_inference.errors import InvalidModelPropertiesError, ModelDownloadError
-from marqo.core.inference.model_download import download_model
-from marqo.s2_inference.configs import ModelCache
-from test import average_pool
+import numpy as np
+import torch
 import torch.nn.functional as F
 from pydantic import ValidationError
+from transformers import (AutoModel, AutoTokenizer)
 
+from marqo import marqo_docs
+from marqo.core.inference.model_download import download_model
+from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
+from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.types import Union, FloatTensor, List
 
 
 def _average_pool_func(model_output, attention_mask):
