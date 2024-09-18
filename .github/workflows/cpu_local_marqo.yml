@@ -69,17 +69,13 @@ jobs:
         with:
           registry: ${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo
 
-      - name: Dry-run
-        run: |
-          echo "${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo:${{ github.event.inputs.image_tag || github.sha }}"
-
-#      - name: Build and push
-#        uses: docker/build-push-action@v4
-#        with:
-#          context: .
-#          push: true
-#          platforms: linux/amd64,linux/arm64
-#          tags: ${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo:${{ github.event.inputs.image_tag || github.sha }}
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo:${{ github.event.inputs.image_tag || github.sha }}
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
