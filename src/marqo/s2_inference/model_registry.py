@@ -2033,7 +2033,7 @@ def _get_languagebind_properties() -> Dict:
             "type": "languagebind",
             "loader": "languagebind",
             "model_size": 2,
-            "supported_modalities": ["video", "language"],
+            "supported_modalities": ["audio", "language"],
             "video_chunk_length": 20,
             "audio_chunk_length": 10,
         },
