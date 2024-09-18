@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import os
 import uuid
 from abc import ABC, abstractmethod
@@ -19,6 +20,7 @@ from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, Mar
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
+from marqo.logging import get_logger
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.multimodal_model_load import Modality
@@ -38,6 +40,8 @@ MODALITY_FIELD_TYPE_MAP = {
     Modality.VIDEO: FieldType.VideoPointer,
     Modality.AUDIO: FieldType.AudioPointer,
 }
+
+logger = get_logger(__name__)
 
 
 class AddDocumentsResponseCollector:
@@ -61,6 +65,9 @@ class AddDocumentsResponseCollector:
             self.visited_doc_ids.add(marqo_doc[ORIGINAL_ID])
 
     def collect_error_response(self, doc_id: Optional[str], error: AddDocumentsError, loc: Optional[int] = None):
+        # log errors in one place, log in warn level for each individual doc error
+        logger.warn(f'Encountered error when adding doc {doc_id}', exc_info=(type(error), error, error.__traceback__))
+
         if isinstance(error, DuplicateDocumentError):
             # This is the current logic, docs with same id supersedes previous ones defined in the batch
             # TODO change the logic when we need to report duplicates as error in the response
@@ -71,8 +78,6 @@ class AddDocumentsResponseCollector:
 
         if doc_id in self.marqo_docs:
             doc_id = self.marqo_docs.pop(doc_id)[ORIGINAL_ID]
-
-        # TODO log errors in one place
 
         # Even if the last document is invalid, we should not use previous ones?
         if doc_id:
@@ -227,7 +232,7 @@ class AddDocumentsHandler(ABC):
 
         return doc_id
 
-    # Follow logic are to handle preprocessing, chunking and vectorisation of all tensor fields
+    # Code to handle preprocessing, chunking and vectorisation of all tensor fields
     # TODO see if these should be moved to some other classes.
     def vectorise_tensor_fields(self) -> None:
         self.vectorise_tensor_fields_in_batch_per_doc()
@@ -275,6 +280,7 @@ class AddDocumentsHandler(ABC):
                     if doc_id in doc_chunks_map:
                         del doc_chunks_map[doc_id]
 
+            # TODO check if we should capture total vectorise time
             for doc_id, chunks_to_vectorise in doc_chunks_map.items():
                 try:
                     vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
@@ -440,7 +446,7 @@ class AddDocumentsHandler(ABC):
                     image_data, device=self.add_docs_params.device, method=image_method.value)
                 return text_chunks, content_chunks
             except s2_inference_errors.S2InferenceError as e:
-                raise AddDocumentsError(e.message)
+                raise AddDocumentsError(e.message) from e
 
         return chunk
 
@@ -480,7 +486,10 @@ class AddDocumentsHandler(ABC):
     def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], modality: Modality) -> Vectoriser:
         def dict_key(chunk: Union[str, Image, tensor, Dict[str, tensor]]):
             if isinstance(chunk, Image):
-                return hash((chunk.format, chunk.size))
+                chunk = chunk.convert('RGB')
+                pixel_bytes = chunk.tobytes()
+                # Use md5 hash for faster hashing. TODO find a more efficient way to generate a hash of the image
+                return hashlib.md5(pixel_bytes).hexdigest()
             elif isinstance(chunk, dict):
                 # Generate a hash based on sorted key-value pairs to ensure consistency.
                 return hash(frozenset((k, dict_key(v)) for k, v in chunk.items()))
@@ -489,6 +498,8 @@ class AddDocumentsHandler(ABC):
 
         embedding_cache = dict()
         if chunks_to_vectorise:
+            # TODO this might be a breaking change since the create_vectors metrics is not consistent
+            #   for individual tensor fields and subfields of multimodal fields
             with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
                 if modality in [Modality.AUDIO, Modality.VIDEO]:
                     # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
@@ -525,5 +536,5 @@ class AddDocumentsHandler(ABC):
                 link=marqo_docs.list_of_models()
             )
         except s2_inference_errors.S2InferenceError as e:
-            raise AddDocumentsError(e.message)
+            raise AddDocumentsError(e.message) from e
 
