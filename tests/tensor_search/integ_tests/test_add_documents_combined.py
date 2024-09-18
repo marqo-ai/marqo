@@ -179,7 +179,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                                                                "vectorise for add_documents")
                 mock_vectorise.reset_mock()
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="GPU testing device needs to be investigated")
+    @pytest.mark.largemodel
+    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_add_multimodal_single_documents(self):
         """ """
         documents = [
@@ -240,7 +241,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         self.assertNotIn(embedding, embeddings, f"Duplicate embedding found in document {i}")
                         embeddings.append(embedding)
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="GPU testing device needs to be investigated")
+    @pytest.mark.largemodel
+    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_add_multimodal_field_document(self):
         multimodal_document = {
             "_id": "1_multimodal",

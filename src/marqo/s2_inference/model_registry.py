@@ -1995,7 +1995,17 @@ def _get_languagebind_properties() -> Dict:
             "model_size": 8,
             "supported_modalities": ["video", "audio", "language", "image"],
             "video_chunk_length": 20,
-            "audio_chunk_length": 20,
+            "audio_chunk_length": 10,
+        },
+        'LanguageBind/Video_V1.5_FT_Audio_FT': {
+            "name": "LanguageBind/Video_V1.5_FT_Audio_FT",
+            "dimensions": 768,
+            "type": "languagebind",
+            "loader": "languagebind",
+            "model_size": 5,
+            "supported_modalities": ["video", "audio", "language"],
+            "video_chunk_length": 20,
+            "audio_chunk_length": 10,
         },
         'LanguageBind/Video_V1.5_FT_Image': {
             "name": "LanguageBind/Video_V1.5_FT_Image",
@@ -2005,7 +2015,7 @@ def _get_languagebind_properties() -> Dict:
             "model_size": 5,
             "supported_modalities": ["video", "language", "image"],
             "video_chunk_length": 20,
-            "audio_chunk_length": 20,
+            "audio_chunk_length": 10,
         },
         'LanguageBind/Audio_FT_Image': {
             "name": "LanguageBind/Audio_FT_Image",
@@ -2015,7 +2025,7 @@ def _get_languagebind_properties() -> Dict:
             "model_size": 5,
             "supported_modalities": ["audio", "language", "image"],
             "video_chunk_length": 20,
-            "audio_chunk_length": 20,
+            "audio_chunk_length": 10,
         },
         'LanguageBind/Audio_FT': {
             "name": "LanguageBind/Audio_FT",
@@ -2025,7 +2035,7 @@ def _get_languagebind_properties() -> Dict:
             "model_size": 2,
             "supported_modalities": ["video", "language"],
             "video_chunk_length": 20,
-            "audio_chunk_length": 20,
+            "audio_chunk_length": 10,
         },
         'LanguageBind/Video_V1.5_FT': {
             "name": "LanguageBind/Video_V1.5_FT",
@@ -2035,7 +2045,7 @@ def _get_languagebind_properties() -> Dict:
             "model_size": 2,
             "supported_modalities": ["video", "language"],
             "video_chunk_length": 20,
-            "audio_chunk_length": 20,
+            "audio_chunk_length": 10,
         },
 
     }
