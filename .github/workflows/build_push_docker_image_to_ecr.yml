@@ -1,6 +1,6 @@
 name: Build and push marqo docker image to ECR
 
-on: 
+on:
   workflow_dispatch:
     inputs:
       marqo_ref:
@@ -22,8 +22,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_EC2_GH_RUNNER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_EC2_GH_RUNNER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Start EC2 runner
         id: start-ec2-runner
@@ -36,12 +36,12 @@ jobs:
           ec2-instance-type: t3.xlarge
           subnet-id: ${{ secrets.AMD_SUBNET_ID }}
           security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
-          
+
   Docker-Build:
     name: Build docker image
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-                
+
     environment: marqo-build-environment
 
     steps:
@@ -50,7 +50,7 @@ jobs:
         with:
           repository: marqo-ai/marqo
           ref: ${{ github.event.inputs.marqo_ref }}
-          
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -69,18 +69,14 @@ jobs:
         with:
           registry: ${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo
 
-      - name: Dry-run
-        run: |
-          echo "${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo:${{ github.event.inputs.image_tag || github.sha }}"
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo:${{ github.event.inputs.image_tag || github.sha }}
 
-#      - name: Build and push
-#        uses: docker/build-push-action@v4
-#        with:
-#          context: .
-#          push: true
-#          platforms: linux/amd64,linux/arm64
-#          tags: ${{ secrets.ECR_DEV_MARQO_BASE_REGISTRY }}/marqo:${{ github.event.inputs.image_tag || github.sha }}
-          
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:
@@ -92,8 +88,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_EC2_GH_RUNNER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_EC2_GH_RUNNER_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
       - name: Stop EC2 runner
         uses: machulav/ec2-github-runner@fcfb31a5760dad1314a64a0e172b78ec6fc8a17e  # v2.3.6
