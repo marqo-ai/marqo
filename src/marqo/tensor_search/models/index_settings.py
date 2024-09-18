@@ -201,6 +201,9 @@ class IndexSettings(StrictBaseModel):
     @classmethod
     def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
         if isinstance(marqo_index, core.UnstructuredMarqoIndex):
+            # This covers both UnstructuredMarqoIndex and SemiStructuredMarqoIndex
+            # We intentionally hide the lexical and tensor fields info in SemiStructuredMarqoIndex from customers since
+            # this information and the SemiStructured concept are internal implementation details only.
             return cls(
                 type=core.IndexType.Unstructured,
                 treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
