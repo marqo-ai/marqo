@@ -22,12 +22,11 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
-    vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
-                                                    alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
+    vespa_multimodal_params: Dict[str, str] = Field(default_factory=str, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
 
 
 class SemiStructuredVespaDocument(MarqoBaseModel):
-    """A helper class to handle the conversion between Vespa and Marqo documents for an unstructured index.
+    """A helper class to handle the conversion between Vespa and Marqo documents for an semi-structured index.
     The object can be instantiated from a Marqo document using the from_marqo_document method,
     or can be instantiated from a Vespa document using the from_vespa_document method.
     """
@@ -60,7 +59,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             elif field_name in marqo_index.lexical_field_map:  # lexical fields are returned with prefixed name from get_by_ids
                 text_field_name = marqo_index.lexical_field_map[field_name].name
                 text_fields[text_field_name] = fields[field_name]
-            elif field_name in marqo_index.field_map:   # lexical fields are returned as us from search
+            elif field_name in marqo_index.field_map:   # lexical fields are returned with the original name from search
                 text_fields[field_name] = fields[field_name]
 
         return cls(id=document[cls._VESPA_DOC_ID],
@@ -102,7 +101,6 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             elif isinstance(field_content, bool):
                 instance.fixed_fields.bool_fields[field_name] = int(field_content)
             elif isinstance(field_content, list) and all(isinstance(elem, str) for elem in field_content):
-                # TODO check the expected behaviour of a string array field
                 instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
             elif isinstance(field_content, int):
                 instance.fixed_fields.int_fields[field_name] = field_content

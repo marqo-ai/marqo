@@ -1,5 +1,3 @@
-# A file to store common variables shared between unstructured_vespa_index,
-# unstructured_vespa_schema, and unstructured_document.
 VESPA_FIELD_ID = "marqo__id"
 STRINGS = "marqo__strings"
 SHORT_STRINGS_FIELDS = "marqo__short_string_fields"

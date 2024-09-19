@@ -25,7 +25,6 @@ class SemiStructuredVespaSchema(VespaSchema):
     def generate_vespa_schema(cls, marqo_index: SemiStructuredMarqoIndex) -> str:
         template_path = str(os.path.dirname(os.path.abspath(__file__)))
         environment = Environment(loader=FileSystemLoader(template_path))
-        environment.filters['values_to_list'] = lambda d: list(d.values())
         vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
         return vespa_schema_template.render(index=marqo_index, dimension=str(marqo_index.model.get_dimension()))
 
