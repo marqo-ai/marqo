@@ -13,7 +13,7 @@ from marqo.s2_inference.s2_inference import (
     validate_model_properties
 )
 
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from unittest import mock
 
 @unittest.skip
@@ -323,7 +323,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "_id": "123",
                 "title 1": "content 1",
                 "desc 2": "content 2. blah blah blah",
-                "image" : "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
+                "image" : TestImageUrls.COCO.value
             }]
 
         tensor_search.add_documents(config=config, add_docs_params=AddDocsParams(
@@ -371,7 +371,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         epsilon = 1e-7
 
-        image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
+        image = TestImageUrls.COCO.value
 
         model_name = "test-model"
         model_properties = {
@@ -410,7 +410,7 @@ class TestGenericModelSupport(MarqoTestCase):
 
         epsilon = 1e-7
 
-        image = "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg"
+        image = TestImageUrls.COCO.value
 
         model_name = "test-model"
         model_properties = {

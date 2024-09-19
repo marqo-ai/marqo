@@ -1,5 +1,6 @@
 import unittest
 import unittest.mock
+import pytest
 from unittest.mock import patch
 from marqo.api.exceptions import ModelCacheManagementError
 from marqo.tensor_search import tensor_search
@@ -69,6 +70,7 @@ class TestAutomaticModelEject(unittest.TestCase):
         self.assertEqual(len(checked_devices), len(small_list_of_models))
         self.assertEqual(set(checked_devices), {"cpu"})
 
+    @pytest.mark.skip(reason="skipping since we have increased max model size to 15 GB")
     def test_load_very_large_model(self):
         huge_models = ['open_clip/ViT-g-14/laion2b_s12b_b42k']
         for model in huge_models:

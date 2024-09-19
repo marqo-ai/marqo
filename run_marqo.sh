@@ -47,6 +47,7 @@ See https://docs.marqo.ai/2.0.0/Guides/Advanced-Usage/configuration/ for more in
 elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_CONFIG_URL" ]; then
   # Start local vespa
   echo "External vector store not configured. Using local vector store"
+  chown -R vespa:vespa /opt/vespa/var/
   tmux new-session -d -s vespa "bash /usr/local/bin/start_vespa.sh"
 
   echo "Waiting for vector store to start"

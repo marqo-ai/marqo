@@ -1,5 +1,6 @@
 import os
 import random
+import uuid
 import threading
 from unittest import mock
 
@@ -14,7 +15,7 @@ from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists
-from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 
 
@@ -57,6 +58,25 @@ class TestUpdate(MarqoTestCase):
             model=Model(name="random/small")
         )
 
+        structured_image_index_request = cls.structured_marqo_index_request(
+            name="structured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            fields=[
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
+                FieldRequest(
+                    name="multimodal_field", 
+                    type=FieldType.MultimodalCombination,
+                    dependent_fields={
+                        "image_field_1": 1.0,
+                        "text_field_1": 0.0
+                    }
+                )
+            ],
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            tensor_fields=["image_field_1", "text_field_1", "multimodal_field"]
+        )
+
         large_score_modifiers_index_fields = [
             FieldRequest(name=f"float_field_{i}", type=FieldType.Float,
                          features=[FieldFeature.Filter, FieldFeature.ScoreModifier]) for i in range(100)
@@ -72,19 +92,29 @@ class TestUpdate(MarqoTestCase):
 
         )
 
+        unstructured_image_index_request = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            treat_urls_and_pointers_as_images=True
+        )
+
         test_unstructured_index_request = cls.unstructured_marqo_index_request(
             model=Model(name="random/small"),
         )
 
         cls.indexes = cls.create_indexes([
             structured_index_request_1,
+            structured_image_index_request,
             large_score_modifiers_index_request,
-            test_unstructured_index_request
+            test_unstructured_index_request,
+            unstructured_image_index_request
         ])
 
         cls.structured_index_name = structured_index_request_1.name
+        cls.structured_image_index_name = structured_image_index_request.name
         cls.large_score_modifier_index_name = large_score_modifiers_index_request.name
         cls.test_unstructured_index_name = test_unstructured_index_request.name
+        cls.unstructured_image_index_name = unstructured_image_index_request.name
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -368,7 +398,7 @@ class TestUpdate(MarqoTestCase):
 
         Note: We can only update an image pointer field when it is not a tensor field."""
         original_doc = {
-            "image_pointer_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg",
+            "image_pointer_field": TestImageUrls.IMAGE1.value,
             "text_field_tensor": "search me",
             "_id": "1"
         }
@@ -379,15 +409,95 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(1, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
         updated_doc = {
-            "image_pointer_field": "https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+            "image_pointer_field": TestImageUrls.IMAGE2.value,
             "_id": "1"
         }
         r = update_documents(body=UpdateDocumentsBodyParams(documents=[updated_doc]),
                              index_name=self.structured_index_name, marqo_config=self.config)
         updated_doc = tensor_search.get_document_by_id(self.config, self.structured_index_name, updated_doc["_id"])
 
-        self.assertEqual("https://marqo-assets.s3.amazonaws.com/tests/images/image2.jpg",
+        self.assertEqual(TestImageUrls.IMAGE2.value,
                          updated_doc["image_pointer_field"])
+        
+    def test_update_multimodal_image_field(self):
+        """
+        Test that updating an image field in a multimodal context properly embeds the image as an image and not as text.
+        """
+        original_image_url = TestImageUrls.HIPPO_REALISTIC.value
+        updated_image_url = TestImageUrls.IMAGE2.value
+        
+        original_doc = {
+            "_id": "1",
+            "text_field_1": "This text should be ignored",
+            "image_field_1": original_image_url,
+        }
+        
+        # Expected vector for the updated image (image2.jpg)
+        expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
+                        -0.032505638897418976, -0.06116769462823868, -0.03929287940263748]
+
+        for index_name in [self.structured_image_index_name, self.unstructured_image_index_name]:
+            with self.subTest(index_name=index_name):
+                # For unstructured index, we need to define the multimodal field and its weights
+                if "unstructured" in index_name:
+                    tensor_fields = ["multimodal_field"]
+                    mappings = {
+                        "multimodal_field": {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "text_field_1": 0.0,
+                                "image_field_1": 1.0,  # Only consider the image
+                            }
+                        }
+                    }
+                else:
+                    tensor_fields = None
+                    mappings = None
+
+                # Add the original document
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=[original_doc],
+                        tensor_fields=tensor_fields,
+                        mappings=mappings
+                    )
+                )
+
+                # Update the document with a new image
+                updated_doc = {
+                    "_id": "1",
+                    "image_field_1": updated_image_url
+                }
+                r = tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index_name,
+                        docs=[updated_doc],
+                        tensor_fields=tensor_fields,
+                        mappings=mappings
+                    )
+                )
+
+                # Retrieve the updated document
+                doc = tensor_search.get_documents_by_ids(
+                    config=self.config,
+                    index_name=index_name,
+                    document_ids=["1"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)
+
+                # Get the actual vector
+                actual_vector = doc['results'][0]['_tensor_facets'][0]['_embedding']
+
+                # Assert that the vector is similar to expected_vector
+                for i, expected_value in enumerate(expected_vector):
+                    self.assertAlmostEqual(actual_vector[i], expected_value, places=4,
+                                        msg=f"Mismatch at index {i} for {index_name}")
+
+                # Check that the image_field_1 has been updated
+                self.assertEqual(doc['results'][0]['image_field_1'], updated_image_url)
 
     def test_update_multimodal_dependent_field(self):
         """Ensure that we CAN NOT update a multimodal dependent field."""
