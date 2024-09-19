@@ -586,6 +586,15 @@ class VespaApplicationPackage:
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
 
+    def update_index_setting_and_schema(self, index: MarqoIndex, schema: str) -> None:
+        if not self.has_index(index.name):
+            raise IndexNotFoundError(f"Index {index.name} not found")
+
+        version = index.version + 1 if index.version is not None else 1
+        self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
+        self._index_setting_store.save_index_setting(index.copy(update={'version': version}))
+        self._persist_index_settings()
+
     def has_schema(self, name: str) -> bool:
         return self._store.file_exists('schemas', f'{name}.sd')
 

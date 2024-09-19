@@ -193,6 +193,12 @@ class IndexManagement:
             with self._vespa_application_with_deployment_session() as app:
                 app.batch_delete_index_setting_and_schema(index_names)
 
+    def update_index(self, marqo_index: SemiStructuredMarqoIndex):
+        with self._vespa_deployment_lock():
+            with self._vespa_application_with_deployment_session() as app:
+                schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+                app.update_index_setting_and_schema(marqo_index, schema)
+
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
         Get all Marqo indexes storing in _MARQO_SETTINGS_SCHEMA_NAME schema (used prior to Marqo v2.12.0).
@@ -355,16 +361,3 @@ class IndexManagement:
                 raise OperationConflictError("Another index creation/deletion operation is in progress. "
                                              "Your request is rejected. Please try again later")
 
-    # TODO This will be replaced when the index setting is moved to application package
-    def update_index(self, marqo_index: SemiStructuredMarqoIndex):
-        with self._deployment_lock_context_manager():
-            app = self.vespa_client.download_application(check_for_application_convergence=True)
-
-            schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
-            with open(os.path.join(app, 'schemas', f'{marqo_index.schema_name}.sd'), 'w') as f:
-                f.write(schema)
-
-            self.vespa_client.deploy_application(app)
-            self.vespa_client.wait_for_application_convergence()
-            self._save_index_settings(marqo_index)
-            return marqo_index
