@@ -6,7 +6,7 @@ import pytest
 
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.s2_inference.hf_utils import extract_huggingface_archive
+from marqo.core.inference.models.hugging_face_model import extract_huggingface_archive
 from marqo.s2_inference.s2_inference import _load_model
 
 
