@@ -79,8 +79,9 @@ class TensorFieldContent(BaseModel):
         if not self.content_chunks:
             return
 
-        vectorise = vectorisers[self.field_type]
-        self.embeddings.extend(vectorise(self.content_chunks))
+        embeddings = vectorisers[self.field_type](self.content_chunks)
+        self.embeddings.extend(embeddings)
+        self.content_chunks = []  # drop it after vectorisation so memory can be freed
 
     @property
     def tensor_field_chunks(self):
@@ -182,7 +183,7 @@ class TensorFieldsContainer:
         if doc_id in self._tensor_field_map:
             del self._tensor_field_map[doc_id]
 
-    def add_tensor_field_content(self, doc_id: str, field_name: str, content: TensorFieldContent) -> None:
+    def _add_tensor_field_content(self, doc_id: str, field_name: str, content: TensorFieldContent) -> None:
         if doc_id not in self._tensor_field_map:
             self._tensor_field_map[doc_id] = dict()
         self._tensor_field_map[doc_id][field_name] = content
@@ -272,7 +273,7 @@ class TensorFieldsContainer:
             tensor_content.populate_chunks_and_embeddings(existing_tensor[constants.MARQO_DOC_CHUNKS],
                                                           existing_tensor[constants.MARQO_DOC_EMBEDDINGS])
 
-    def collect(self, doc_id: str, field_name: str, field_content: Any, text_field_type: FieldType) -> Any:
+    def collect(self, doc_id: str, field_name: str, field_content: Any, text_field_type: Optional[FieldType]) -> Any:
         if field_name not in self._tensor_fields and field_name not in self._multimodal_sub_field_reverse_map:
             # not tensor fields, no need to collect
             return field_content
@@ -287,7 +288,7 @@ class TensorFieldsContainer:
                 is_multimodal_subfield=False,  # for now custom vectors can only be top level
             )
             tensor_field_content.populate_chunks_and_embeddings([content], [embedding])
-            self.add_tensor_field_content(doc_id, field_name, tensor_field_content)
+            self._add_tensor_field_content(doc_id, field_name, tensor_field_content)
             return content
 
         if self.is_multimodal_field(field_name):
@@ -300,7 +301,7 @@ class TensorFieldsContainer:
                 f'Invalid type {type(field_content)} for tensor field {field_name}'
             )
 
-        self.add_tensor_field_content(
+        self._add_tensor_field_content(
             doc_id, field_name, TensorFieldContent(
                 field_content=field_content,
                 field_type=text_field_type,
@@ -312,7 +313,7 @@ class TensorFieldsContainer:
 
     def collect_multi_modal_fields(self, doc_id: str, normalize_embeddings: bool):
         for field_name, weights in self._multimodal_combo_fields.items():
-            self.add_tensor_field_content(doc_id, field_name, MultiModalTensorFieldContent(
+            self._add_tensor_field_content(doc_id, field_name, MultiModalTensorFieldContent(
                 weights=weights,
                 field_content='',
                 field_type=FieldType.MultimodalCombination,
