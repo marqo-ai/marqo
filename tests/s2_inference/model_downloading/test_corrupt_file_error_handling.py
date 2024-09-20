@@ -204,7 +204,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
         with patch('os.path.isfile', return_value=True), \
              patch('os.path.splitext', return_value=('/path/to/file', '.txt')), \
              patch('os.makedirs'), \
-             patch("marqo.s2_inference.hf_utils.download_model", return_value = "/path/to/file.txt"):
+             patch("marqo.core.inference.models.hugging_face_model.download_model", return_value = "/path/to/file.txt"):
             for model_properties in self.dummy_model_properties:
                 with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
@@ -215,7 +215,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
              patch('os.path.splitext', return_value=('/path/to/file', '.zip')), \
              patch('os.makedirs') as mock_makedirs, \
              patch('zipfile.ZipFile') as mock_zipfile, \
-             patch("marqo.s2_inference.hf_utils.download_model", return_value="/path/to/file.zip"),\
+             patch("marqo.core.inference.models.hugging_face_model.download_model", return_value="/path/to/file.zip"),\
              patch("transformers.AutoModel.from_pretrained") as mock_model,\
              patch("transformers.AutoTokenizer.from_pretrained") as mock_tokenizer:
 
@@ -237,7 +237,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
             patch('os.path.splitext', return_value=('/path/to/file', '.tar')), \
             patch('os.makedirs') as mock_makedirs, \
             patch('tarfile.open') as mock_tarfile,\
-            patch("marqo.s2_inference.hf_utils.download_model", return_value="/path/to/file.tar"), \
+            patch("marqo.core.inference.models.hugging_face_model.download_model", return_value="/path/to/file.tar"), \
             patch("transformers.AutoModel.from_pretrained") as mock_model, \
             patch("transformers.AutoTokenizer.from_pretrained") as mock_tokenizer:
 
@@ -256,7 +256,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
 
     def test_directory(self):
         with patch('os.path.isfile', return_value=False),\
-            patch("marqo.s2_inference.hf_utils.download_model", return_value="/path/to/file.tar"), \
+            patch("marqo.core.inference.models.hugging_face_model.download_model", return_value="/path/to/file.tar"), \
             patch("transformers.AutoModel.from_pretrained") as mock_model, \
             patch("transformers.AutoTokenizer.from_pretrained") as mock_tokenizer:
             self.assertEqual(extract_huggingface_archive('/path/to/directory'), '/path/to/directory')
