@@ -1,8 +1,9 @@
 import unittest
+from typing import cast
 
 import pytest
 
-from marqo.core.document.tensor_fields_container import TensorFieldsContainer
+from marqo.core.document.tensor_fields_container import TensorFieldsContainer, MultiModalTensorFieldContent
 from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
 
@@ -152,3 +153,45 @@ class TestTensorFieldsContainer(unittest.TestCase):
 
         self.assertNotIn('doc_id1', self.container._tensor_field_map)
         self.assertIn('doc_id2', self.container._tensor_field_map)
+
+    def test_collect_multimodal_fields_should_return_all(self):
+        fields = [(field_name, weights) for field_name, weights in self.container.collect_multi_modal_fields('doc_id1', True)]
+        self.assertEquals(('combo_field1', {'subfield1': 1.0}), fields[0])
+        self.assertEquals(('combo_field2', {'subfield1': 2.0, 'tensor_field2': 5.0}), fields[1])
+
+    def test_collect_multimodal_fields_should_populate_subfields(self):
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+
+        fields = [1 for _, _ in self.container.collect_multi_modal_fields('doc_id1', True)]
+
+        self.assertIn('doc_id1', self.container._tensor_field_map)
+        self.assertIn('combo_field1', self.container._tensor_field_map['doc_id1'])
+
+        combo_field1 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field1'])
+        self.assertEquals(FieldType.MultimodalCombination, combo_field1.field_type)
+        self.assertEquals('', combo_field1.field_content)
+        self.assertTrue(combo_field1.is_tensor_field)
+        self.assertFalse(combo_field1.is_multimodal_subfield)
+        self.assertEquals({'subfield1': 1.0}, combo_field1.weights)
+        self.assertEquals({'subfield1': self.container._tensor_field_map['doc_id1']['subfield1']},
+                          combo_field1.subfields)
+        self.assertTrue(combo_field1.normalize_embeddings)
+
+        combo_field2 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field2'])
+        self.assertEquals({'subfield1': self.container._tensor_field_map['doc_id1']['subfield1'],
+                           'tensor_field2': self.container._tensor_field_map['doc_id1']['tensor_field2']},
+                          combo_field2.subfields)
+
+    def test_collect_multimodal_fields_should_not_populate_subfields_not_existing(self):
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+
+        fields = [1 for _, _ in self.container.collect_multi_modal_fields('doc_id1', True)]
+
+        combo_field1 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field1'])
+        self.assertEquals({}, combo_field1.subfields)
+
+        combo_field2 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field2'])
+        self.assertEquals({'tensor_field2': self.container._tensor_field_map['doc_id1']['tensor_field2']},
+                          combo_field2.subfields)
+
