@@ -3,6 +3,7 @@ from typing import cast
 
 import pytest
 
+from marqo.core.constants import MARQO_DOC_ID, MARQO_DOC_TENSORS, MARQO_DOC_CHUNKS, MARQO_DOC_EMBEDDINGS
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer, MultiModalTensorFieldContent
 from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
@@ -195,3 +196,185 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEquals({'tensor_field2': self.container._tensor_field_map['doc_id1']['tensor_field2']},
                           combo_field2.subfields)
 
+    def test_populate_tensor_from_existing_docs_will_not_populate_if_doc_id_does_not_match(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id2',
+            'tensor_field1': 'tensor_field1_content',
+            MARQO_DOC_TENSORS: {
+                'tensor_field1': {MARQO_DOC_CHUNKS: ['tensor_field1_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }
+        }, {})
+
+        self.assertEquals([], tensor_field1.chunks)
+        self.assertEquals([], tensor_field1.embeddings)
+
+    def test_populate_tensor_from_existing_docs_should_populate_if_doc_id_matches(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field1': 'tensor_field1_content',
+            MARQO_DOC_TENSORS: {
+                'tensor_field1': {MARQO_DOC_CHUNKS: ['tensor_field1_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }
+        }, {})
+
+        self.assertEquals(['tensor_field1_content'], tensor_field1.chunks)
+        self.assertEquals([[1.0, 2.0]], tensor_field1.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_if_content_changes(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'changed_content', FieldType.Text)
+        tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field1': 'tensor_field1_content',
+            MARQO_DOC_TENSORS: {
+                'tensor_field1': {MARQO_DOC_CHUNKS: ['tensor_field1_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }
+        }, {})
+
+        self.assertEquals([], tensor_field1.chunks)
+        self.assertEquals([], tensor_field1.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_if_field_does_not_exist(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field2': 'tensor_field2_content',  # tensor_field1 does not exist in the existing doc
+            MARQO_DOC_TENSORS: {}
+        }, {})
+
+        self.assertEquals([], tensor_field1.chunks)
+        self.assertEquals([], tensor_field1.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_if_embedding_does_not_exist(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field1': 'tensor_field1_content',
+            MARQO_DOC_TENSORS: {}  # embedding for tensor_field1 does not exist in the existing doc
+        }, {})
+
+        self.assertEquals([], tensor_field1.chunks)
+        self.assertEquals([], tensor_field1.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_if_existing_field_is_multimodal_combo_field(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            MARQO_DOC_TENSORS: {
+                'tensor_field1': {MARQO_DOC_CHUNKS: ['tensor_field1_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }
+        }, {'tensor_field1': {'subfield1': 1.0}})  # tensor_field1 is a multimodal combo field
+
+        self.assertEquals([], tensor_field1.chunks)
+        self.assertEquals([], tensor_field1.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_for_custom_vector_field(self):
+        self.container.collect('doc_id1', 'custom_vector_field1', {
+            'content': 'content1',
+            'vector': [1.0, 2.0]
+        }, None)
+        custom_vector_field1 = self.container._tensor_field_map['doc_id1']['custom_vector_field1']
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'custom_vector_field1': 'content1',
+            MARQO_DOC_TENSORS: {
+                'custom_vector_field1': {MARQO_DOC_CHUNKS: ['content2'], MARQO_DOC_EMBEDDINGS: [[3.0, 4.0]]}
+            }  # embedding for tensor_field1 does not exist in the existing doc
+        }, {})
+
+        self.assertEquals(['content1'], custom_vector_field1.chunks)
+        self.assertEquals([[1.0, 2.0]], custom_vector_field1.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_for_multimodal_field_if_it_does_not_exist(self):
+        combo_field2 = self._get_combo_field2()
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field2': 'tensor_field2_content',
+            'subfield1': 'subfield1_content',
+            MARQO_DOC_TENSORS: {}  # embedding for combo_field2 does not exist in the existing doc
+        }, {})
+
+        self.assertEquals([], combo_field2.chunks)
+        self.assertEquals([], combo_field2.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_multimodal_field_with_another_type(self):
+        combo_field2 = self._get_combo_field2()
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field2': 'tensor_field2_content',
+            'subfield1': 'subfield1_content',
+            'combo_field2': 'combo_field2_content',
+            MARQO_DOC_TENSORS: {
+                'combo_field2': {MARQO_DOC_CHUNKS: ['combo_field2_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }  # although called combo_field2, it is not a multimodal_tensor field in the existing doc
+        }, {})
+
+        self.assertEquals([], combo_field2.chunks)
+        self.assertEquals([], combo_field2.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_multimodal_field_with_different_weight(self):
+        combo_field2 = self._get_combo_field2()
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field2': 'tensor_field2_content',
+            'subfield1': 'subfield1_content',
+            MARQO_DOC_TENSORS: {
+                'combo_field2': {MARQO_DOC_CHUNKS: ['combo_field2_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }
+        }, {'combo_field2': {'subfield1': 0.5, 'tensor_field2': 5.0}})  # weight is different
+
+        self.assertEquals([], combo_field2.chunks)
+        self.assertEquals([], combo_field2.embeddings)
+
+    def test_populate_tensor_from_existing_docs_will_not_populate_multimodal_field_with_different_subfields(self):
+        combo_field2 = self._get_combo_field2()
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field2': 'changed_tensor_field2_content',  # content of this field is changed
+            'subfield1': 'subfield1_content',
+            MARQO_DOC_TENSORS: {
+                'combo_field2': {MARQO_DOC_CHUNKS: ['combo_field2_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }
+        }, {'combo_field2': {'subfield1': 2.0, 'tensor_field2': 5.0}})
+
+        self.assertEquals([], combo_field2.chunks)
+        self.assertEquals([], combo_field2.embeddings)
+
+    def test_populate_tensor_from_existing_docs_should_populate_multimodal_field_if_all_conditions_match(self):
+        combo_field2 = self._get_combo_field2()
+
+        self.container.populate_tensor_from_existing_doc({
+            MARQO_DOC_ID: 'doc_id1',
+            'tensor_field2': 'tensor_field2_content',
+            'subfield1': 'subfield1_content',
+            MARQO_DOC_TENSORS: {
+                'combo_field2': {MARQO_DOC_CHUNKS: ['combo_field2_content'], MARQO_DOC_EMBEDDINGS: [[1.0, 2.0]]}
+            }  # although called combo_field2, it is not a multimodal_tensor field in the existing doc
+        }, {'combo_field2': {'subfield1': 2.0, 'tensor_field2': 5.0}})
+
+        self.assertEquals(['combo_field2_content'], combo_field2.chunks)
+        self.assertEquals([[1.0, 2.0]], combo_field2.embeddings)
+
+    def _get_combo_field2(self):
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        fields = [1 for _, _ in self.container.collect_multi_modal_fields('doc_id1', True)]
+        return self.container._tensor_field_map['doc_id1']['combo_field2']
