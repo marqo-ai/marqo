@@ -69,8 +69,14 @@ class HuggingFaceModel(AbstractEmbeddingModel):
 
     def _load_from_hugging_face_repo(self) -> Tuple:
         """Load the model from the Hugging Face model hub based on the repo_id."""
-        model = AutoModel.from_pretrained(self.model_properties.name)
-        tokenizer = AutoTokenizer.from_pretrained(self.model_properties.name)
+        try:
+            model = AutoModel.from_pretrained(self.model_properties.name)
+            tokenizer = AutoTokenizer.from_pretrained(self.model_properties.name)
+        except (OSError, ValueError, RuntimeError) as e:
+            raise InvalidModelPropertiesError(
+                f"Marqo encountered an error loading the Hugging Face model, modelProperties={self.model_properties}. "
+                f"Please ensure that the model is a valid Hugging Face model and retry.\n"
+                f" Original error message = {e}") from e
         return model, tokenizer
 
     def _load_from_zip_file(self) -> Tuple:
@@ -89,7 +95,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encountered an error loading the Hugging Face model, modelProperties={self.model_properties}. "
-                f"Please ensure that the model is a valid Hugging Face model and retry.\n"
+                f"Please ensure that the provided zip file is valid.\n"
                 f" Original error message = {e}") from e
         return model, tokenizer
 

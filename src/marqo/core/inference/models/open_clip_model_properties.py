@@ -45,6 +45,7 @@ class OpenCLIPModelProperties(MarqoBaseModel):
         size: The size of the image. It is optional. If provided, it will override the default size of the image.
         note: A note about the model. It is optional.
         pretrained: The name of the pretrained model. It is optional.
+
     """
     name: str
     type: str

@@ -53,9 +53,9 @@ class HuggingFaceModelProperties(MarqoBaseModel):
 
     @root_validator(pre=True, skip_on_failure=True)
     def _validate_or_infer_pooling_method(cls, values):
-        """Infer the pooling method from the model name if it is not provided.
+        """Infer the pooling_method from the model name if it is not provided.
 
-        If the pooling method is provided, return the values as is.
+        If the pooling_method is provided, return the values as is.
         """
         pooling_method = values.get("pooling_method") or values.get("poolingMethod")
         if pooling_method is not None:

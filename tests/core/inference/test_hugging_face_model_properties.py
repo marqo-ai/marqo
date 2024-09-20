@@ -1,9 +1,11 @@
 import unittest
-from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
-from pydantic import ValidationError
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
-from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from unittest import mock
+
+from pydantic import ValidationError
+
+from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
+from marqo.tensor_search.models.external_apis.hf import HfModelLocation
+from marqo.tensor_search.models.private_models import ModelLocation
 
 
 class TestHuggingFaceModelProperties(unittest.TestCase):
@@ -52,8 +54,11 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
                 self.assertEqual(pooling_method, model.pooling_method)
 
     def test_explicit_valid_pooling_method(self):
-        model = HuggingFaceModelProperties(name="test-model", type="hf", pooling_method=PoolingMethod.CLS)
+        with mock.patch("marqo.core.inference.models.hugging_face_model_properties."
+                        "HuggingFaceModelProperties._infer_pooling_method_from_name") as mock_infer:
+            model = HuggingFaceModelProperties(name="test-model", type="hf", pooling_method=PoolingMethod.CLS)
         self.assertEqual(model.pooling_method, PoolingMethod.CLS)
+        mock_infer.assert_not_called()
 
     def test_explicit_invalid_pooling_method(self):
         with self.assertRaises(ValidationError) as excinfo:
