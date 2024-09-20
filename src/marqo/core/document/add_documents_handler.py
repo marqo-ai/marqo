@@ -7,6 +7,7 @@ from contextlib import ExitStack
 from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any, Tuple, Set, Union
 
+import torch
 from PIL.Image import Image
 from torch import tensor
 
@@ -303,7 +304,8 @@ class AddDocumentsHandler(ABC):
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
-                    chunks_to_vectorise = tensor_field_content.chunk(chunkers)
+                    tensor_field_content.chunk(chunkers)
+                    chunks_to_vectorise = tensor_field_content.content_chunks
                     field_type = tensor_field_content.field_type
                     chunks_map[field_type].extend(chunks_to_vectorise)
                 except AddDocumentsError as err:
@@ -485,17 +487,20 @@ class AddDocumentsHandler(ABC):
         return vectorise
 
     def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], modality: Modality) -> Vectoriser:
-        def dict_key(chunk: Union[str, Image, tensor, Dict[str, tensor]]):
+        def dict_key(chunk: Union[str, Image, torch.Tensor, Dict[str, torch.Tensor]]):
             if isinstance(chunk, Image):
                 chunk = chunk.convert('RGB')
                 pixel_bytes = chunk.tobytes()
-                # Use md5 hash for faster hashing. TODO find a more efficient way to generate a hash of the image
+                # Use md5 hash for faster hashing.
                 return hashlib.md5(pixel_bytes).hexdigest()
             elif isinstance(chunk, dict):
-                # Generate a hash based on sorted key-value pairs to ensure consistency.
-                return hash(frozenset((k, dict_key(v)) for k, v in chunk.items()))
+                # Generate a sorted key-value pairs to ensure consistency.
+                return frozenset((k, dict_key(v)) for k, v in chunk.items())
+            elif isinstance(chunk, torch.Tensor):
+                # Convert to a tuple to be hashable
+                return (chunk.tolist(),)
             else:
-                return hash(chunk)
+                return chunk
 
         embedding_cache = dict()
         if chunks_to_vectorise:
