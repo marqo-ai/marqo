@@ -137,7 +137,7 @@ jobs:
           
           cd marqo
           export PYTHONPATH="./tests:./src:."
-          pytest --legacy-unstructured --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
