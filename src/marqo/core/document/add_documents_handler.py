@@ -499,7 +499,7 @@ class AddDocumentsHandler(ABC):
                 return frozenset((k, dict_key(v)) for k, v in chunk.items())
             elif isinstance(chunk, torch.Tensor):
                 # Convert to a tuple to be hashable
-                return (chunk.tolist(),)
+                return frozenset({'tensor': chunk.tolist()})
             else:
                 return chunk
 
