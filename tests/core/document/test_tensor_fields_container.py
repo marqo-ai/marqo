@@ -459,3 +459,34 @@ class TestTensorFieldsContainer(unittest.TestCase):
         # tensor_fields2 does not need to be vectorised since its embeddings are populated and the combo field that
         #   needs it is already resolved
 
+    def test_get_tensor_field_content_for_persisting(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)  # subfield is not persisted
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
+
+        self.container._tensor_field_map['doc_id1']['tensor_field1'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+        self.container._tensor_field_map['doc_id1']['tensor_field2'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+
+        fields = self.container.get_tensor_field_content('doc_id1')
+        self.assertEquals(4, len(fields))
+        self.assertIn('tensor_field1', fields)
+        self.assertIn('tensor_field2', fields)
+        self.assertIn('combo_field1', fields)
+        self.assertIn('combo_field2', fields)
+
+    def test_get_tensor_field_content_for_persisting_skips_multimodal_field_with_no_subfields(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
+
+        self.container._tensor_field_map['doc_id1']['tensor_field1'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+        self.container._tensor_field_map['doc_id1']['tensor_field2'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+
+        fields = self.container.get_tensor_field_content('doc_id1')
+        self.assertEquals(3, len(fields))
+        self.assertIn('tensor_field1', fields)
+        self.assertIn('tensor_field2', fields)
+        self.assertIn('combo_field2', fields)  # combo_field2 has tensor_field2 as subfield
+        # combo_field1 has subfield1 as the only subfield, since subfield1 is not present, combo_field1 does not
+        # have content either
