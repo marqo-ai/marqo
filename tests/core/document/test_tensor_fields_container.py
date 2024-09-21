@@ -156,7 +156,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertIn('doc_id2', self.container._tensor_field_map)
 
     def test_collect_multimodal_fields_should_return_all(self):
-        fields = [(field_name, weights) for field_name, weights in self.container.collect_multi_modal_fields('doc_id1', True)]
+        fields = list(self.container.collect_multi_modal_fields('doc_id1', True))
         self.assertEquals(('combo_field1', {'subfield1': 1.0}), fields[0])
         self.assertEquals(('combo_field2', {'subfield1': 2.0, 'tensor_field2': 5.0}), fields[1])
 
@@ -164,7 +164,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
         self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
 
-        fields = [1 for _, _ in self.container.collect_multi_modal_fields('doc_id1', True)]
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
 
         self.assertIn('doc_id1', self.container._tensor_field_map)
         self.assertIn('combo_field1', self.container._tensor_field_map['doc_id1'])
@@ -187,7 +187,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
     def test_collect_multimodal_fields_should_not_populate_subfields_not_existing(self):
         self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
 
-        fields = [1 for _, _ in self.container.collect_multi_modal_fields('doc_id1', True)]
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
 
         combo_field1 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field1'])
         self.assertEquals({}, combo_field1.subfields)
@@ -376,5 +376,86 @@ class TestTensorFieldsContainer(unittest.TestCase):
     def _get_combo_field2(self):
         self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
         self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
-        fields = [1 for _, _ in self.container.collect_multi_modal_fields('doc_id1', True)]
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
         return self.container._tensor_field_map['doc_id1']['combo_field2']
+
+    def test_traversing_tensor_fields_to_vectorise_should_return_all_fields(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.ImagePointer)
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
+        self.container.collect('doc_id2', 'tensor_field1', 'tensor_field1_content', FieldType.AudioPointer)
+        self.container.collect('doc_id2', 'tensor_field2', 'tensor_field2_content', FieldType.VideoPointer)
+        list(self.container.collect_multi_modal_fields('doc_id2', True))
+
+        fields = list(self.container.tensor_fields_to_vectorise(FieldType.Text, FieldType.ImagePointer,
+                                                                FieldType.VideoPointer, FieldType.AudioPointer))
+        self.assertIn(('doc_id1', 'tensor_field1', self.container._tensor_field_map['doc_id1']['tensor_field1']), fields)
+        self.assertIn(('doc_id1', 'tensor_field2', self.container._tensor_field_map['doc_id1']['tensor_field2']), fields)
+        self.assertIn(('doc_id1', 'subfield1', self.container._tensor_field_map['doc_id1']['subfield1']), fields)
+        self.assertIn(('doc_id2', 'tensor_field1', self.container._tensor_field_map['doc_id2']['tensor_field1']), fields)
+        self.assertIn(('doc_id2', 'tensor_field2', self.container._tensor_field_map['doc_id2']['tensor_field2']), fields)
+
+    def test_traversing_tensor_fields_to_vectorise_skips_resolved_fields(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
+
+        # resolve tensor_field1
+        tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
+        tensor_field1.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+
+        fields = list(self.container.tensor_fields_to_vectorise(FieldType.Text))
+        self.assertEquals(1, len(fields))
+        (doc_id, field_name, _) = fields[0]
+        self.assertEquals('doc_id1', doc_id)
+        self.assertEquals('subfield1', field_name)
+
+    def test_traversing_tensor_fields_to_vectorise_skips_removed_doc(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id2', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id2', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+
+        fields = []
+        for doc_id, field_name, _ in self.container.tensor_fields_to_vectorise(FieldType.Text):
+            fields.append((doc_id, field_name))
+            if doc_id == 'doc_id1':  # after taking in the first field of doc_id1, remove doc_id1 to simulate a failure
+                self.container.remove_doc(doc_id)
+
+        self.assertEquals(3, len(fields))
+        self.assertIn(('doc_id1', 'tensor_field1'), fields)
+        self.assertIn(('doc_id2', 'tensor_field1'), fields)
+        self.assertIn(('doc_id2', 'tensor_field2'), fields)
+
+    def test_traversing_tensor_fields_to_vectorise_by_type(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.ImagePointer)
+
+        fields = list(self.container.tensor_fields_to_vectorise(FieldType.ImagePointer))
+        self.assertEquals(1, len(fields))
+        (doc_id, field_name, _) = fields[0]
+        self.assertEquals('doc_id1', doc_id)
+        self.assertEquals('tensor_field2', field_name)
+
+    def test_traversing_tensor_fields_to_vectorise_skips_subfields_for_resolved_multimodal_fields(self):
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        list(self.container.collect_multi_modal_fields('doc_id1', True))
+
+        tensor_field2 = self.container._tensor_field_map['doc_id1']['tensor_field2']
+        tensor_field2.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+        combo_field1 = self.container._tensor_field_map['doc_id1']['combo_field1']
+        combo_field1.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+        combo_field2 = self.container._tensor_field_map['doc_id1']['combo_field2']
+        combo_field2.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+
+        fields = list(self.container.tensor_fields_to_vectorise(FieldType.Text))
+        self.assertEquals(1, len(fields))
+        self.assertEquals('tensor_field1', fields[0][1])
+
+        # subfield 1 does not need to be vectorised since all the combo fields using it are resolved
+        # tensor_fields2 does not need to be vectorised since its embeddings are populated and the combo field that
+        #   needs it is already resolved
+

@@ -14,13 +14,66 @@ from marqo.core.models.marqo_index import FieldType
 @pytest.mark.unittest
 class TestTensorFieldContent(unittest.TestCase):
 
-    def test_chunk_resolved_field(self):
+    def test_populate_chunks_and_embeddings(self):
+        test_cases = [
+            # (type, is_tensor_field, is_subfield, resolved_after_population)
+            (FieldType.Text, True, False, True),
+            (FieldType.Text, True, True, False),  # populate method won't be run for a non-toplevel tensor field
+            (FieldType.ImagePointer, True, False, True),
+            (FieldType.ImagePointer, True, True, False),
+            (FieldType.AudioPointer, True, False, True),
+            (FieldType.AudioPointer, True, True, True),  # audio subfield does not need to generate single chunk
+            (FieldType.VideoPointer, True, False, True),
+            (FieldType.VideoPointer, True, True, True),  # video subfield does not need to generate single chunk
+        ]
+
+        for (field_type, is_tensor_field, is_subfield, resolved_after_population) in test_cases:
+            with self.subTest(msg=f'field of type {field_type} (toplevel: {is_tensor_field}, subfield: {is_subfield})'):
+                tensor_field_content = TensorFieldContent(
+                    field_type=field_type,
+                    field_content="hello world!",
+                    is_tensor_field=is_tensor_field,
+                    is_multimodal_subfield=is_subfield
+                )
+
+                tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+                self.assertEquals(['hello world'], tensor_field_content.chunks)
+                self.assertEquals([], tensor_field_content.content_chunks)
+                self.assertEquals([[1.0, 1.2]], tensor_field_content.embeddings)
+                self.assertEquals(resolved_after_population, tensor_field_content.is_resolved)
+
+    def test_chunk_resolved_field_will_not_generate_more_content_chunks(self):
         tensor_field_content = TensorFieldContent(
             field_type=FieldType.Text,
             field_content="hello world!",
             is_tensor_field=True
         )
         tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+        self.assertTrue(tensor_field_content.is_resolved)
+        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        self.assertEqual([], tensor_field_content.content_chunks)
+
+    def test_chunk_populated_multimodal_subfield_will_generate_content_chunks(self):
+        tensor_field_content = TensorFieldContent(
+            field_type=FieldType.Text,
+            field_content="hello world!",
+            is_tensor_field=True,
+            is_multimodal_subfield=True
+        )
+        tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
+        self.assertFalse(tensor_field_content.is_resolved)
+        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        self.assertEqual(['single_content_chunk'], tensor_field_content.content_chunks)
+
+    def test_chunk_populated_multimodal_subfield_will_not_generate_content_chunks_if_chunk_is_same(self):
+        tensor_field_content = TensorFieldContent(
+            field_type=FieldType.Text,
+            field_content="hello world!",
+            is_tensor_field=True,
+            is_multimodal_subfield=True
+        )
+        tensor_field_content.populate_chunks_and_embeddings(['single_chunk'], [[1.0, 1.2]])
+        self.assertFalse(tensor_field_content.is_resolved)
         tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
         self.assertEqual([], tensor_field_content.content_chunks)
 
