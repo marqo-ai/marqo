@@ -266,7 +266,8 @@ class AddDocumentsHandler(ABC):
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
-                    chunks_to_vectorise = tensor_field_content.chunk(chunkers)
+                    tensor_field_content.chunk(chunkers)
+                    chunks_to_vectorise = tensor_field_content.content_chunks
                     field_type = tensor_field_content.field_type
                     if doc_id not in doc_chunks_map:
                         doc_chunks_map[doc_id] = {field_type: [] for field_type in chunkers.keys()}
