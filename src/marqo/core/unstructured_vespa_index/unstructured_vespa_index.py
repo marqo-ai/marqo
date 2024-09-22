@@ -21,7 +21,7 @@ class UnstructuredVespaIndex(VespaIndex):
     _RESERVED_FIELD_SUBSTRING = "::"
     _SUPPORTED_FIELD_CONTENT_TYPES = [str, int, float, bool, list, dict]
 
-    _HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse(constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION)
+    _HYBRID_SEARCH_MINIMUM_VERSION = constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION
 
     def get_vespa_id_field(self) -> str:
         return unstructured_common.VESPA_FIELD_ID

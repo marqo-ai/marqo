@@ -62,3 +62,6 @@ class InvalidTensorFieldError(MarqoDocumentParsingError):
 
 class UnsupportedFeatureError(InvalidArgumentError):
     pass
+
+class ZeroMagnitudeVectorError(InvalidArgumentError):
+    pass

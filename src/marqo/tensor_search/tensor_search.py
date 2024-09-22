@@ -32,6 +32,7 @@ Notes on search behaviour with caching and searchable attributes:
 """
 import copy
 import json
+import traceback
 import typing
 import uuid
 import os
@@ -42,14 +43,13 @@ from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 
 import numpy as np
 import psutil
-import semver
-from PIL import Image
 from numpy import ndarray
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
 from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
+from marqo.core.constants import MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -295,10 +295,23 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     # Generate exactly 1 chunk with the custom vector.
                     chunks = [f"{field}::{copied[field]['content']}"]
                     embeddings = [copied[field]["vector"]]
-                    # If normalize_embeddings is true and the index version is > 2.12.0, normalize the embeddings.
+                    # If normalize_embeddings is true and the index version is > 2.13.0, normalize the embeddings.
                     # We have added version specific check here to prevent backwards compatibility issues.
-                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > semver.VersionInfo.parse(constants.MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION):
-                        embeddings = normalize_vector(embeddings)
+                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
+                        try:
+                            embeddings = normalize_vector(embeddings)
+                        except core_exceptions.ZeroMagnitudeVectorError as e:
+                            document_is_valid = False
+                            unsuccessful_docs.append(
+                                (i, MarqoAddDocumentsItem(
+                                    id=doc_id if doc_id is not None else '',
+                                    error=e.message,
+                                    message=e.message,
+                                    status=int(errors.InvalidArgError.status_code),
+                                    code=errors.InvalidArgError.code)
+                                 )
+                            )
+                            break
 
                     # Update parent document (copied) to fit new format. Use content (text) to replace input dict
                     copied[field] = field_content["content"]
@@ -827,10 +840,23 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                     chunks = [copied[field]['content']]
                     embeddings = [copied[field]["vector"]]
 
-                    # If normalize_embeddings is true and the index version is > 2.12.0, normalize the embeddings.
+                    # If normalize_embeddings is true and the index version is > 2.13.0, normalize the embeddings.
                     # We have added version specific check here to prevent backwards compatibility issues.
-                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > semver.VersionInfo.parse(constants.MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION):
-                        embeddings = normalize_vector(embeddings)
+                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
+                        try:
+                            embeddings = normalize_vector(embeddings)
+                        except core_exceptions.ZeroMagnitudeVectorError as e:
+                            document_is_valid = False
+                            unsuccessful_docs.append(
+                                (i, MarqoAddDocumentsItem(
+                                    id=doc_id if doc_id is not None else '',
+                                    error=e.message,
+                                    message=e.message,
+                                    status=int(errors.InvalidArgError.status_code),
+                                    code=errors.InvalidArgError.code)
+                                 )
+                            )
+                            break
 
                     # Update parent document (copied) to fit new format. Use content (text) to replace input dict
                     copied[field] = field_content["content"]
@@ -1917,7 +1943,15 @@ def get_query_vectors_from_jobs(
             merged_vector = np.mean(weighted_vectors, axis=0)
 
             if q.index.normalize_embeddings:
-                merged_vector = normalize_vector(merged_vector)
+                try:
+                    merged_vector = normalize_vector(merged_vector)
+                except core_exceptions.ZeroMagnitudeVectorError as e:
+                    tb = traceback.extract_tb(e.__traceback__)[-1]
+                    raise core_exceptions.ZeroMagnitudeVectorError(
+                        f"Zero magnitude vector detected at file name: {tb.filename}, line number: {tb.lineno}, inside function name: {tb.name}. "
+                        f"If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation. "
+                        f"Original error: " + e.message
+                    )
             result[qidx] = list(merged_vector)
         elif isinstance(q.q, str):
             # result[qidx] = vectors[0]
@@ -2682,7 +2716,7 @@ def normalize_vector(embeddings: Union[List[List[float]], ndarray]) -> List[List
     if magnitude != 0:
         embeddings_array = embeddings_array / magnitude
     else:
-        embeddings_array = embeddings_array # Handle the zero vector case
+        raise core_exceptions.ZeroMagnitudeVectorError(f"Zero magnitude vector detected, cannot normalize.")
 
     # Convert the normalized numpy array back to a list and return
     return embeddings_array.tolist()

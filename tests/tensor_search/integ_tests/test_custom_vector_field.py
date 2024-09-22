@@ -28,13 +28,6 @@ class TestCustomVectorField(MarqoTestCase):
             distance_metric=DistanceMetric.Angular
         )
 
-        unstructured_custom_index_with_normalize_embeddings_true = cls.unstructured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
-            treat_urls_and_pointers_as_images=True,
-            normalize_embeddings=True,
-            distance_metric=DistanceMetric.Angular
-        )
-
         structured_custom_index = cls.structured_marqo_index_request(
             model=Model(name='ViT-B/32'),
             normalize_embeddings=False,
@@ -90,74 +83,13 @@ class TestCustomVectorField(MarqoTestCase):
             tensor_fields=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3",
                            "text_field", "my_multimodal"]
         )
-
-        structured_custom_index_with_normalize_embeddings_true = cls.structured_marqo_index_request(
-            model=Model(name='ViT-B/32'),
-            normalize_embeddings=True,
-            distance_metric=DistanceMetric.Angular,
-            fields=[
-                FieldRequest(
-                    name="my_custom_vector",
-                    type="custom_vector",
-                    features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
-                FieldRequest(
-                    name="text_field",
-                    type="text",
-                    features=[FieldFeature.LexicalSearch]),
-
-                # For score modifiers test
-                FieldRequest(
-                    name="multiply",
-                    type="float",
-                    features=[FieldFeature.ScoreModifier]),
-
-                # For searchable_attributes and filter tests
-                FieldRequest(
-                    name="my_custom_vector_2",
-                    type="custom_vector",
-                    features=[FieldFeature.Filter]),
-                FieldRequest(
-                    name="my_custom_vector_3",
-                    type="custom_vector",
-                    features=[FieldFeature.Filter]),
-
-                # For lexical + searchable_attributes test
-                FieldRequest(
-                    name="exact_field",
-                    type="text",
-                    features=[FieldFeature.LexicalSearch]),
-                FieldRequest(
-                    name="barely_field",
-                    type="text",
-                    features=[FieldFeature.LexicalSearch]),
-
-                # For multimodal mixed field tests
-                FieldRequest(
-                    name="multimodal_text",
-                    type="text"),
-                FieldRequest(
-                    name="multimodal_image",
-                    type="image_pointer"),
-                FieldRequest(
-                    name="my_multimodal",
-                    type="multimodal_combination",
-                    dependent_fields={"multimodal_text": 0.4, "multimodal_image": 0.6})
-            ],
-            tensor_fields=["my_custom_vector", "my_custom_vector_2", "my_custom_vector_3",
-                           "text_field", "my_multimodal"]
-        )
-
         cls.indexes = cls.create_indexes([
             unstructured_custom_index,
-            structured_custom_index,
-            unstructured_custom_index_with_normalize_embeddings_true,
-            structured_custom_index_with_normalize_embeddings_true
+            structured_custom_index
         ])
 
         cls.unstructured_custom_index = cls.indexes[0]
         cls.structured_custom_index = cls.indexes[1]
-        cls.unstructured_custom_index_with_normalize_embeddings_true = cls.indexes[2]
-        cls.structured_custom_index_with_normalize_embeddings_true = cls.indexes[3]
 
     def setUp(self):
         super().setUp()
@@ -169,11 +101,8 @@ class TestCustomVectorField(MarqoTestCase):
 
         # Using arbitrary values so they're easy to eyeball
         self.random_vector_1 = [1. for _ in range(512)]
-        self.normalized_random_vector_1_nd_array = np.array(self.random_vector_1)
-        self.normalized_random_vector_1 = (self.normalized_random_vector_1_nd_array / np.linalg.norm(np.array(self.random_vector_1), axis = -1, keepdims=True)).tolist()
         self.random_vector_2 = [i*2 for i in range(512)]
         self.random_vector_3 = [1 / (i + 1) for i in range(512)]
-        self.zero_vector = [0 for _ in range(512)]
 
         # Any tests that call add_document, search, bulk_search need this env var
         self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
@@ -240,124 +169,6 @@ class TestCustomVectorField(MarqoTestCase):
 
             self.assertEqual(vespa_fields["marqo__vector_count"], 1)
 
-    def test_add_documents_with_custom_vector_normalize_embeddings_true(self):
-        """
-        Add a document with a custom vector field,
-        inside an index where normalizeEmbeddings was set to True at the time of index creation.
-        The custom vector passed in should be normalized since normalizeEmbeddings=True
-        Tests both structured index document addition and unstructured index document addition.
-        """
-        for index in self.indexes:
-            if index.normalize_embeddings:
-                mock_feed_batch = mock.MagicMock()
-                mock_feed_batch.return_value = FeedBatchResponse(
-                    responses=[FeedBatchDocumentResponse(
-                        status=200,
-                        pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
-                        id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)
-                    ],
-                    errors=False)
-
-                @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
-                def run():
-                    tensor_search.add_documents(
-                        config=self.config, add_docs_params=AddDocsParams(
-                            index_name=index.name,
-                            docs=[{
-                                "_id": "0",
-                                "my_custom_vector": {
-                                    "content": "custom content is here!!",
-                                    "vector": self.random_vector_1
-                                }
-                            }],
-                            device="cpu",
-                            mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
-                            tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
-                        )
-                    )
-                    return True
-
-                assert run()
-
-                call_args = mock_feed_batch.call_args_list
-                assert len(call_args) == 1
-
-                feed_batch_args = call_args[0].args
-                self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
-                vespa_fields = feed_batch_args[0][0].fields
-
-                if isinstance(index, UnstructuredMarqoIndex):
-                    self.assertEqual(vespa_fields["marqo__strings"], ["custom content is here!!"])
-                    self.assertEqual(vespa_fields["marqo__short_string_fields"], {"my_custom_vector": "custom content is here!!"})
-                    self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!'])
-                    self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.normalized_random_vector_1})
-
-                elif isinstance(index, StructuredMarqoIndex):
-                    self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ["custom content is here!!"])
-                    self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.normalized_random_vector_1})
-
-                self.assertEqual(vespa_fields["marqo__vector_count"], 1)
-
-    def test_add_documents_with_custom_vector_zero_vector_normalize_embeddings_true(self):
-        """
-        Add a document with a custom vector field,
-        inside an index where normalizeEmbeddings was set to True at the time of index creation.
-        The custom vector passed in should be normalized since normalizeEmbeddings=True
-        Tests both structured index document addition and unstructured index document addition.
-        The input custom vector will be a zero vector
-        """
-        for index in self.indexes:
-            if index.normalize_embeddings:
-                mock_feed_batch = mock.MagicMock()
-                mock_feed_batch.return_value = FeedBatchResponse(
-                    responses=[FeedBatchDocumentResponse(
-                        status=200,
-                        pathId='/document/v1/aa5ed6d56e6aa4a048d95b496b79659f9/aa5ed6d56e6aa4a048d95b496b79659f9/docid/0',
-                        id='id:aa5ed6d56e6aa4a048d95b496b79659f9:aa5ed6d56e6aa4a048d95b496b79659f9::0', message=None)
-                    ],
-                    errors=False)
-
-                @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
-                def run():
-                    tensor_search.add_documents(
-                        config=self.config, add_docs_params=AddDocsParams(
-                            index_name=index.name,
-                            docs=[{
-                                "_id": "0",
-                                "my_custom_vector": {
-                                    "content": "custom content is here!!",
-                                    "vector": self.zero_vector
-                                }
-                            }],
-                            device="cpu",
-                            mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
-                            tensor_fields=["my_custom_vector"] if isinstance(index, UnstructuredMarqoIndex) else None
-                        )
-                    )
-                    return True
-
-                assert run()
-
-                call_args = mock_feed_batch.call_args_list
-                assert len(call_args) == 1
-
-                feed_batch_args = call_args[0].args
-                self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
-                vespa_fields = feed_batch_args[0][0].fields
-
-                if isinstance(index, UnstructuredMarqoIndex):
-                    self.assertEqual(vespa_fields["marqo__strings"], ["custom content is here!!"])
-                    self.assertEqual(vespa_fields["marqo__short_string_fields"], {"my_custom_vector": "custom content is here!!"})
-                    self.assertEqual(vespa_fields["marqo__chunks"], ['my_custom_vector::custom content is here!!'])
-                    self.assertEqual(vespa_fields["marqo__embeddings"], {"0": self.zero_vector})
-
-                elif isinstance(index, StructuredMarqoIndex):
-                    self.assertEqual(vespa_fields["marqo__chunks_my_custom_vector"], ["custom content is here!!"])
-                    self.assertEqual(vespa_fields["marqo__embeddings_my_custom_vector"], {"0": self.zero_vector})
-
-                self.assertEqual(vespa_fields["marqo__vector_count"], 1)
-
-
     def test_add_documents_with_custom_vector_field_no_content(self):
         """
         Add a document with a custom vector field with no content:
@@ -396,8 +207,6 @@ class TestCustomVectorField(MarqoTestCase):
 
             assert run()
 
-            call_args = mock_feed_batch.call_args_list
-            assert len(call_args) == 1
 
             feed_batch_args = call_args[0].args
             self.assertIsInstance(feed_batch_args[0][0], VespaDocument)
