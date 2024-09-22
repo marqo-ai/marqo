@@ -145,6 +145,7 @@ class AddDocumentsHandler(ABC):
 
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
+                # TODO capture the telemetry data for retrieving exiting docs?
                 result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.visited_doc_ids),
                                                             self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
@@ -233,10 +234,21 @@ class AddDocumentsHandler(ABC):
 
         return doc_id
 
-    # Code to handle preprocessing, chunking and vectorisation of all tensor fields
-    # TODO see if these should be moved to some other classes.
+    # The following code are about handling all tensor fields
+    # TODO see if we should move these code to some other classes. They are kept here due to the dependency on
+    #   both the marqo_index and add_docs_params
     def vectorise_tensor_fields(self) -> None:
+        """
+        Download, preprocess, chunk and vectorise collected tensor fields.
+        Three different batching strategies can be chosen to do tradeoff between resource usage and performance.
+        - Batching by field: Chunk and vectorise field by field (Default?)
+        - Batching by doc: Chunk and vectorise fields of a doc by field type (text, image, audio, video, etc.)
+        - Batching by add-doc batch: Chunk and vectorise all fields of a batch of docs by type
+        """
+        # TODO add a parameter to choose batching strategy? Do a performance test to decide the default approach
+        # self.vectorise_tensor_fields_per_field()
         self.vectorise_tensor_fields_in_batch_per_doc()
+        # self.vectorise_tensor_fields_in_batch_per_add_doc_batch()
 
     def vectorise_tensor_fields_per_field(self) -> None:
         with ExitStack() as exit_stack:
@@ -315,8 +327,12 @@ class AddDocumentsHandler(ABC):
                 vectorisers = {field_type: self.batch_vectoriser(chunks_map[field_type], modality)
                                for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
             except AddDocumentsError as err:
-                # TODO we need to fail the batch
-                return
+                # TODO check if it is too verbose to log out traceback
+                logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err, exc_info=True)
+                # TODO raise a core exception
+                raise api_errors.BadRequestError(
+                    message=f'Encountered problem when vectorising batch of documents. Reason: {str(err)}'
+                )
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
@@ -388,6 +404,7 @@ class AddDocumentsHandler(ABC):
         return image_repo
 
     def _determine_thread_count(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams):
+        # TODO this logic is copied from tensor search. Can be simplified
         model_properties = marqo_index.model.get_properties()
         is_languagebind_model = model_properties.get('type') == 'languagebind'
 

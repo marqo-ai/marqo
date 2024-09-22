@@ -17,6 +17,7 @@ from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARA
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_tensor_fields, validate_field_name, \
     validate_mappings_object_format, validate_coupling_of_mappings_and_doc
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+from marqo.s2_inference.errors import MediaDownloadError
 from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
 
 from marqo.vespa.models import VespaDocument
@@ -72,15 +73,18 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         if not isinstance(field_content, str):
             return None
 
-        modality = infer_modality(field_content)
+        try:
+            modality = infer_modality(field_content)
 
-        if not self.marqo_index.treat_urls_and_pointers_as_media and modality in [Modality.AUDIO, Modality.VIDEO]:
-            modality = Modality.TEXT
+            if not self.marqo_index.treat_urls_and_pointers_as_media and modality in [Modality.AUDIO, Modality.VIDEO]:
+                modality = Modality.TEXT
 
-        if not self.marqo_index.treat_urls_and_pointers_as_images and modality == Modality.IMAGE:
-            modality = Modality.TEXT
+            if not self.marqo_index.treat_urls_and_pointers_as_images and modality == Modality.IMAGE:
+                modality = Modality.TEXT
 
-        return MODALITY_FIELD_TYPE_MAP[modality]
+            return MODALITY_FIELD_TYPE_MAP[modality]
+        except MediaDownloadError as err:
+            raise AddDocumentsError(err.message) from err
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:
