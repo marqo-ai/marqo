@@ -9,7 +9,6 @@ from typing import List, Dict, Optional, Any, Tuple, Set, Union
 
 import torch
 from PIL.Image import Image
-from torch import tensor
 
 from marqo import marqo_docs
 from marqo.api import exceptions as api_errors
@@ -68,7 +67,7 @@ class AddDocumentsResponseCollector:
     def collect_error_response(self, doc_id: Optional[str], error: AddDocumentsError, loc: Optional[int] = None):
         # log errors in one place, log in warn level for each individual doc error
         # TODO it might be too verbose, but check if we need exc_info=(type(error), error, error.__traceback__)
-        logger.warn(f'Encountered error when adding doc {doc_id}', exc_info=(type(error), error, None))
+        logger.warn(f'Encountered error when adding doc {doc_id}: {str(error)}')
 
         if isinstance(error, DuplicateDocumentError):
             # This is the current logic, docs with same id supersedes previous ones defined in the batch
@@ -267,11 +266,10 @@ class AddDocumentsHandler(ABC):
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
                     tensor_field_content.chunk(chunkers)
-                    chunks_to_vectorise = tensor_field_content.content_chunks
                     field_type = tensor_field_content.field_type
                     if doc_id not in doc_chunks_map:
                         doc_chunks_map[doc_id] = {field_type: [] for field_type in chunkers.keys()}
-                    doc_chunks_map[doc_id][field_type].extend(chunks_to_vectorise)
+                    doc_chunks_map[doc_id][field_type].extend(tensor_field_content.content_chunks)
 
                     if doc_id not in doc_field_map:
                         doc_field_map[doc_id] = []
@@ -314,7 +312,7 @@ class AddDocumentsHandler(ABC):
                     self.tensor_fields_container.remove_doc(doc_id)
 
             try:
-                vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
+                vectorisers = {field_type: self.batch_vectoriser(chunks_map[field_type], modality)
                                for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
             except AddDocumentsError as err:
                 # TODO we need to fail the batch
@@ -498,8 +496,8 @@ class AddDocumentsHandler(ABC):
                 # Generate a sorted key-value pairs to ensure consistency.
                 return frozenset((k, dict_key(v)) for k, v in chunk.items())
             elif isinstance(chunk, torch.Tensor):
-                # Convert to a tuple to be hashable
-                return frozenset({'tensor': chunk.tolist()})
+                # Convert to a tuple to be hashable  # TODO find a more memory efficient way, maybe hashlib.md5?
+                return tuple(chunk.flatten().tolist())
             else:
                 return chunk
 
