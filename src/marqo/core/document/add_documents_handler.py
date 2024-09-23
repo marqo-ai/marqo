@@ -67,7 +67,7 @@ class AddDocumentsResponseCollector:
     def collect_error_response(self, doc_id: Optional[str], error: AddDocumentsError, loc: Optional[int] = None):
         # log errors in one place, log in warn level for each individual doc error
         # TODO it might be too verbose, but check if we need exc_info=(type(error), error, error.__traceback__)
-        logger.warn(f'Encountered error when adding doc {doc_id}: {str(error)}')
+        logger.warning(f'Encountered error when adding doc {doc_id}: {str(error)}')
 
         if isinstance(error, DuplicateDocumentError):
             # This is the current logic, docs with same id supersedes previous ones defined in the batch
