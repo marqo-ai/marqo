@@ -47,7 +47,6 @@ logger = get_logger(__name__)
 class AddDocumentsResponseCollector:
     def __init__(self):
         self.start_time = timer()
-        # TODO we ignore the location for now, and will add it if needed in the future
         self.responses: List[Tuple[int, MarqoAddDocumentsItem]] = []
         self.errors = False
         self.marqo_docs: Dict[str, Dict[str, Any]] = dict()
@@ -61,17 +60,17 @@ class AddDocumentsResponseCollector:
         doc_id = marqo_doc[MARQO_DOC_ID]
         self.marqo_docs[doc_id] = marqo_doc
         self.marqo_doc_loc_map[doc_id] = loc
-        if marqo_doc[ORIGINAL_ID] is not None:
+        if ORIGINAL_ID in marqo_doc and marqo_doc[ORIGINAL_ID] is not None:
             self.visited_doc_ids.add(marqo_doc[ORIGINAL_ID])
 
     def collect_error_response(self, doc_id: Optional[str], error: AddDocumentsError, loc: Optional[int] = None):
-        # log errors in one place, log in warn level for each individual doc error
+        # log errors in one place, log in warning level for each individual doc error
         # TODO it might be too verbose, but check if we need exc_info=(type(error), error, error.__traceback__)
         logger.warning(f'Encountered error when adding doc {doc_id}: {str(error)}')
 
         if isinstance(error, DuplicateDocumentError):
-            # This is the current logic, docs with same id supersedes previous ones defined in the batch
-            # TODO change the logic when we need to report duplicates as error in the response
+            # This is the current behaviour, docs with same id silently supersedes previous ones defined in the batch
+            # TODO change the logic when we need to report duplicates as an error in the response
             return
 
         if not loc and doc_id and doc_id in self.marqo_doc_loc_map:
@@ -80,7 +79,6 @@ class AddDocumentsResponseCollector:
         if doc_id in self.marqo_docs:
             doc_id = self.marqo_docs.pop(doc_id)[ORIGINAL_ID]
 
-        # Even if the last document is invalid, we should not use previous ones?
         if doc_id:
             self.visited_doc_ids.add(doc_id)
 
@@ -278,14 +276,9 @@ class AddDocumentsHandler(ABC):
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
                     tensor_field_content.chunk(chunkers)
-                    field_type = tensor_field_content.field_type
-                    if doc_id not in doc_chunks_map:
-                        doc_chunks_map[doc_id] = {field_type: [] for field_type in chunkers.keys()}
-                    doc_chunks_map[doc_id][field_type].extend(tensor_field_content.content_chunks)
-
-                    if doc_id not in doc_field_map:
-                        doc_field_map[doc_id] = []
-                    doc_field_map[doc_id].append(tensor_field_content)
+                    doc_chunks_map.setdefault(doc_id, {}).setdefault(
+                        tensor_field_content.field_type, []).extend(tensor_field_content.content_chunks)
+                    doc_field_map.setdefault(doc_id, []).append(tensor_field_content)
 
                 except AddDocumentsError as err:
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
@@ -348,24 +341,17 @@ class AddDocumentsHandler(ABC):
         return chunkers
 
     def _download_media_contents(self, exit_stack):
-        # collect image urls
-        # consider collect these info while building tensor_fields_container
         url_doc_id_map = dict()
         doc_media_fields = dict()
         media_field_types_mapping = dict()
+
         media_field_types = [FieldType.ImagePointer, FieldType.AudioPointer, FieldType.VideoPointer]
+
         for doc_id, field_name, tensor_field_content in (
                 self.tensor_fields_container.tensor_fields_to_vectorise(*media_field_types)):
             url = tensor_field_content.field_content
-
-            if url not in url_doc_id_map:
-                url_doc_id_map[url] = set()
-            url_doc_id_map[url].add(doc_id)
-
-            if doc_id not in doc_media_fields:
-                doc_media_fields[doc_id] = dict()
-            doc_media_fields[doc_id][field_name] = url
-
+            url_doc_id_map.setdefault(url, set()).add(doc_id)
+            doc_media_fields.setdefault(doc_id, dict())[field_name] = url
             media_field_types_mapping[field_name] = tensor_field_content.field_type
 
         if not doc_media_fields:
