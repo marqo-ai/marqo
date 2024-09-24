@@ -41,7 +41,7 @@ class IndexSettings(StrictBaseModel):
         splitOverlap=3,
     )
     audioPreprocessing: core.AudioPreProcessing = core.AudioPreProcessing(
-        splitLength=20,
+        splitLength=10,
         splitOverlap=3,
     )
     vectorNumericType: core.VectorNumericType = core.VectorNumericType.Float
@@ -58,17 +58,12 @@ class IndexSettings(StrictBaseModel):
         treat_as_images = values.get('treatUrlsAndPointersAsImages')
         treat_as_media = values.get('treatUrlsAndPointersAsMedia')
 
-        if treat_as_images is None:
-            treat_as_images = False
-        if treat_as_media is None:
-            treat_as_media = False
-
         if treat_as_images and not treat_as_media:
             # Deprecation warning
             import warnings
             warnings.warn("'treatUrlsAndPointersAsImages' is deprecated. Use 'treatUrlsAndPointersAsMedia' instead.", DeprecationWarning)
 
-        if not treat_as_images and treat_as_media:
+        if treat_as_images == False and treat_as_media:
             raise api_exceptions.InvalidArgError(
                 "Invalid combination: 'treatUrlsAndPointersAsImages' cannot be False when 'treatUrlsAndPointersAsMedia' is True."
             )
@@ -161,7 +156,10 @@ class IndexSettings(StrictBaseModel):
             if self.treatUrlsAndPointersAsImages is None:
                 # Default value for treat_urls_and_pointers_as_images is False, but we can't set it in the model
                 # as it is not a valid parameter for structured indexes
-                self.treatUrlsAndPointersAsImages = False
+                if self.treatUrlsAndPointersAsMedia is True:
+                    self.treatUrlsAndPointersAsImages = True
+                else:
+                    self.treatUrlsAndPointersAsImages = False
             
             if self.treatUrlsAndPointersAsMedia is None:
                 # Default value for treat_urls_and_pointers_as_media is False, but we can't set it in the model

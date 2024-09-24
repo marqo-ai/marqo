@@ -1,3 +1,10 @@
+# Release 2.12.1
+
+## Bug fixes and minor changes
+- Fix a bug where when `treatUrlsAndPointersAsImages` is unset and `treatUrlsAndPointersAsMedia` is set, Marqo returns an error where `treatUrlsAndPointersAsImages` cannot be `False` when `treatUrlsAndPointersAsMedia` is `True` 
+- Add new video-audio model `LanguageBind/Video_V1.5_FT_Audio_FT` to the model registry.
+
+
 # Release 2.12.0
 
 ## New features

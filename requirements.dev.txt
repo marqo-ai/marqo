@@ -17,6 +17,7 @@ kazoo==2.10.0
 pycurl==7.45.3
 certifi==2019.11.28
 transformers==4.41.2
+huggingface-hub==0.25.0
 
 # s2_inference:
 more_itertools

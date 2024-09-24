@@ -272,7 +272,8 @@ class TestEmbed(MarqoTestCase):
                                         msg=f"Mismatch at index {i} for {index.type}")
                     
 
-    @pytest.mark.skipif(torch.cuda.is_available() is True, reason="Skip this test if we have cuda support.")
+    @pytest.mark.largemodel
+    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_embed_languagebind(self):
         content = [
             #TestImageUrls.HIPPO_REALISTIC.value, # image

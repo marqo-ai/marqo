@@ -373,3 +373,35 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         self.assertIn(self.mock_video_url, media_repo)
         self.assertIsInstance(media_repo[self.mock_video_url], MediaDownloadError)
         self.assertIn("Network error while inferring modality", str(media_repo[self.mock_video_url]))
+
+    @patch("marqo.tensor_search.add_docs.download_and_chunk_media")
+    @patch("marqo.tensor_search.add_docs.infer_modality")
+    def test_audio_with_video_only_model(self, mock_infer_modality, mock_download_and_chunk):
+        # Set up the mock model to support only video
+        self.mock_model.properties["type"] = ModelType.LanguageBind
+        self.mock_model.properties["supported_modalities"] = [Modality.VIDEO, Modality.TEXT]
+        self.mock_model.name = "LanguageBind/Video_V1.5_FT"
+
+        # Test data
+        docs = [{"field1": self.mock_audio_url}]
+        media_repo = {}
+        tensor_fields = ["field1"]
+
+        # Mock the infer_modality function to return AUDIO
+        mock_infer_modality.return_value = Modality.AUDIO
+
+        # Call the function
+        threaded_download_and_preprocess_content(
+            docs, media_repo, tensor_fields, {}, device="cpu",
+            marqo_index_type=self.mock_marqo_index.type,
+            marqo_index_model=self.mock_marqo_index.model,
+        )
+
+        # Assertions
+        self.assertIn(self.mock_audio_url, media_repo)
+        self.assertIsInstance(media_repo[self.mock_audio_url], UnsupportedModalityError)
+        self.assertIn(f"Model LanguageBind/Video_V1.5_FT does not support {Modality.AUDIO}", 
+                    str(media_repo[self.mock_audio_url]))
+
+        # Verify that download_and_chunk_media was not called
+        mock_download_and_chunk.assert_not_called()
