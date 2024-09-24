@@ -127,7 +127,6 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
         The test covers the following scenarios:
         1. Adding documents with custom vector fields to both structured and unstructured indexes.
         2. Ensuring that the custom vectors are normalized correctly.
-        3. Verifying the response when a zero vector is provided.
 
         The test uses the `mock` library to mock the `feed_batch` method of the `VespaClient`.
         """
@@ -234,7 +233,7 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
 
     def test_search_with_custom_vector_field_normalize_embeddings_true(self):
         """
-        Tensor search for the document, with highlights.
+        Tensor search for a document in an index where normalize_embeddings was set to true at the time of index creation.
 
         This test method adds documents with custom vector fields to the index and performs tensor searches.
         It verifies that the search results and highlights are as expected when `normalize_embeddings` is set to True
@@ -243,7 +242,6 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
         The test covers the following scenarios:
         1. Adding documents with custom vector fields to both structured and unstructured indexes.
         2. Performing tensor searches with context matching custom vectors.
-        3. Ensuring tensor search works even if the content is empty.
         4. Verifying that searching with normal text returns the expected text.
 
         The test uses the `self.subTest` context manager to create subtests for different index types.
@@ -306,13 +304,14 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
                 assert res["hits"][0]["_id"] == "normal_doc"
 
 
-    def test_search_with_custom_zero_vector_field_normalize_embeddings_true_wit(self):
+    def test_search_with_custom_zero_vector_field_normalize_embeddings_true(self):
         """
         Test tensor search with a custom vector field where the query vector is a zero vector,
         in an index where normalize_embeddings is set to True during index creation.
 
-        This test method verifies that when documents with custom vector fields are added to the index and tensor searches
-        are performed, an appropriate error is thrown during search.
+        This test method verifies that when documents with custom vector fields are added to the index
+        (in an index where normalizeEmbeddings = True) and tensor searches are performed, an appropriate
+        error is thrown during search.
 
         The test covers the following scenarios:
         1. Adding documents with custom vector fields to both structured and unstructured indexes.
@@ -350,4 +349,4 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
                         context=SearchContext(**{"tensor": [{"vector": self.zero_vector, "weight": 1}], })
                     )
 
-                self.assertIn("Zero magnitude vector detected, cannot normalize.", str(e.exception))
+                self.assertIn("Magnitude of combined query and context vectors cannot be zero. If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation. ", str(e.exception))

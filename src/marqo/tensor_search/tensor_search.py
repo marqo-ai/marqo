@@ -297,7 +297,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                     embeddings = [copied[field]["vector"]]
                     # If normalize_embeddings is true and the index version is > 2.13.0, normalize the embeddings.
                     # We have added version specific check here to prevent backwards compatibility issues.
-                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
+                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() >= MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
                         try:
                             embeddings = normalize_vector(embeddings)
                         except core_exceptions.ZeroMagnitudeVectorError as e:
@@ -305,7 +305,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             unsuccessful_docs.append(
                                 (i, MarqoAddDocumentsItem(
                                     id=doc_id if doc_id is not None else '',
-                                    error=e.message,
+                                    error=e.__str__(),
                                     message=e.message,
                                     status=int(errors.InvalidArgError.status_code),
                                     code=errors.InvalidArgError.code)
@@ -842,7 +842,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
 
                     # If normalize_embeddings is true and the index version is > 2.13.0, normalize the embeddings.
                     # We have added version specific check here to prevent backwards compatibility issues.
-                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() > MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
+                    if marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version() >= MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
                         try:
                             embeddings = normalize_vector(embeddings)
                         except core_exceptions.ZeroMagnitudeVectorError as e:
@@ -850,7 +850,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             unsuccessful_docs.append(
                                 (i, MarqoAddDocumentsItem(
                                     id=doc_id if doc_id is not None else '',
-                                    error=e.message,
+                                    error=e.__str__(),
                                     message=e.message,
                                     status=int(errors.InvalidArgError.status_code),
                                     code=errors.InvalidArgError.code)
@@ -1946,11 +1946,9 @@ def get_query_vectors_from_jobs(
                 try:
                     merged_vector = normalize_vector(merged_vector)
                 except core_exceptions.ZeroMagnitudeVectorError as e:
-                    tb = traceback.extract_tb(e.__traceback__)[-1]
                     raise core_exceptions.ZeroMagnitudeVectorError(
-                        f"Zero magnitude vector detected at file name: {tb.filename}, line number: {tb.lineno}, inside function name: {tb.name}. "
+                        f"Magnitude of combined query and context vectors cannot be zero. "
                         f"If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation. "
-                        f"Original error: " + e.message
                     )
             result[qidx] = list(merged_vector)
         elif isinstance(q.q, str):
@@ -2692,7 +2690,7 @@ def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
         )
     )
 
-def normalize_vector(embeddings: Union[List[List[float]], ndarray]) -> List[List[float]]:
+def normalize_vector(embeddings: Union[List[List[float]], ndarray, List[float]]) -> List[List[float]]:
     """
     Normalizes a list of vectors (embeddings) to have unit length.
 

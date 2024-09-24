@@ -6,10 +6,10 @@ from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
 from marqo import exceptions as base_exceptions
+from marqo.api.exceptions import BadRequestError
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.index_management.index_management import IndexManagement
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
@@ -49,6 +49,60 @@ class ApiTests(MarqoTestCase):
                 },
             )
             self.assertEqual(response.status_code, 200)
+            mock_add_documents.assert_called_once()
+
+    def test_add_or_replace_documents_normalize_embeddings_true_zero_vector_passed(self):
+        """
+        Test adding or replacing documents with `normalize_embeddings` set to True and a zero vector passed.
+
+        This test method verifies that when a document with a zero vector is added to the index, the addition fails
+        with an appropriate error message indicating that zero magnitude vectors cannot be normalized. The API response
+        will still be 200 OK, as in a single add_documents request, multiple documents can be added, and the failure will be
+        for only the specific documents which have a zero vector passed with them (in this case document with id = 1.
+
+        The test covers the following scenarios:
+        1. Mocking the `add_documents` method to return a response with an error for zero magnitude vectors.
+        2. Performing a POST request to add a document with a zero vector.
+        3. Verifying that the response contains the expected error message, status code, and other details.
+
+        The test ensures that the system correctly handles the case where a zero vector is passed and normalization is enabled.
+        """
+
+        with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
+            mock_add_documents.return_value = MarqoAddDocumentsResponse(
+                errors=True,
+                processingTimeMs=0.0,
+                index_name="index1",
+                items=[
+                    MarqoAddDocumentsItem(
+                        status=400,
+                        id="1",
+                        message='Zero magnitude vector detected, cannot normalize.',
+                        error='Zero magnitude vector detected, cannot normalize.',
+                        code='invalid_argument'
+                    )
+                ],
+            )
+            response = self.client.post(
+                "/indexes/index1/documents?device=cpu",
+                json={
+                    "documents": [
+                        {
+                            "id": "1",
+                            "text": "This is a test document",
+                        }
+                    ],
+                    "tensorFields": ['text']
+                },
+            )
+            response_json = response.json()
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response_json["errors"], True)
+            self.assertEqual(response_json["items"][0]["status"], 400)
+            self.assertEqual(response_json["items"][0]["_id"], '1')
+            self.assertEqual(response_json["items"][0]["message"], 'Zero magnitude vector detected, cannot normalize.')
+            self.assertEqual(response_json["items"][0]["error"], 'Zero magnitude vector detected, cannot normalize.')
+            self.assertEqual(response_json["items"][0]["code"], 'invalid_argument')
             mock_add_documents.assert_called_once()
 
     def test_memory(self):
@@ -123,6 +177,41 @@ class ApiTests(MarqoTestCase):
                                 f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
                                 response.json()["message"])
 
+    @patch('marqo.tensor_search.tensor_search.search')
+    def test_search_api_with_normalize_embeddings_true_zero_custom_vector(self, mock_search):
+        """
+        Test the search API with `normalize_embeddings` set to True and a custom vector field containing a zero vector.
+
+        This test method verifies that when a search is performed with a custom vector field containing a zero vector,
+        the API returns an appropriate error message indicating that the magnitude of combined query and context vectors
+        cannot be zero. Along with the error message it should also return the status code, code and type of the error.
+
+        The test covers the following scenarios:
+        1. Mocking the search method to raise a `BadRequestError` with a specific message. It raises a 'BadRequestError'
+        because this specific scenario is supposed to raise a ZeroMagnitudeVectorError which is mapped to BadRequestError here:
+        https://github.com/marqo-ai/marqo/blob/0a8384e8ef1d26731848ad5cb69de8f6b7d0a585/src/marqo/tensor_search/api.py#L109
+        2. Performing a search request with a zero vector in the context.
+        3. Verifying that the response contains the expected error message, code, error type and status code.
+
+        Args:
+            mock_search (Mock): A mock object for the `search` method.
+        """
+
+        mock_search.side_effect = BadRequestError(
+            message='Magnitude of combined query and context vectors cannot be zero. If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation.',
+        )
+        response = self.client.post(
+            "/indexes/index1/search?device=cpu",
+            json={
+                "q": "test",
+                "searchMethod": "TENSOR",
+                "context": {"tensor": [{"vector": [0.0]*512, "weight": 1}]}
+            })
+        response_json = response.json()
+        self.assertEquals(response_json["message"], "Magnitude of combined query and context vectors cannot be zero. If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation.")
+        self.assertEquals(response_json["code"], 'bad_request')
+        self.assertEquals(response_json["type"], 'invalid_request')
+        self.assertEquals(response.status_code, 400)
 
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):
