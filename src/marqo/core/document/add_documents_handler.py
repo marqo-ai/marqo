@@ -119,7 +119,19 @@ class AddDocumentsHandler(ABC):
 
     def add_documents(self):
         """
-        Template method for adding documents to Marqo index
+        Template method for adding documents to a Marqo index. This method define a generic workflow to add documents
+        in batches:
+        1. Traverse the docs list in reserved order to skip duplicate documents
+        2. for each document, do validation first, and collect it to a dictionary
+        3. tensor field information will be collected in `tensor_fields_container`
+        4. Populate tensors from existing docs if `use_existing_tensors` is specified in the add_docs_params
+        5. Vectorise the remaining tensor fields (including downloading, preprocessing, chunking)
+        6. Convert the marqo docs to Vespa docs
+        7. Persist all Vespa docs to vespa in batches
+        8. Collect the response and return
+
+        Index-type-agnostic logic are implemented in this class, and type-specific logic are extracted as abstract
+        methods and implemented in add_docs_handler for individual types.
         """
         with RequestMetricsStore.for_request().time("add_documents.processing_before_vespa"):
             for loc, original_doc in enumerate(reversed(self.add_docs_params.docs)):
@@ -167,25 +179,46 @@ class AddDocumentsHandler(ABC):
 
     @abstractmethod
     def _create_tensor_fields_container(self) -> TensorFieldsContainer:
+        """
+        This method generates a tensor fields container using information in marqo_index and add_docs_params.
+        The information includes the tensor fields, mappings, etc.
+        """
         pass
 
     @abstractmethod
-    def handle_field(self, marqo_doc, field_name, field_content):
+    def handle_field(self, marqo_doc, field_name, field_content) -> None:
+        """
+        This method handles each individual field in a marqo doc, validates it, collect tensor info into
+        `tensor_fields_container`, and change the field content if necessary (e.g. custom vector fields)
+        """
         pass
 
     @abstractmethod
     def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]):
+        """
+        This method collect the information for multimodal combo fields in a Marqo doc.
+        """
         pass
 
     @abstractmethod
     def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
+        """
+        This method populates embeddings from existing documents. We could save some resources and time
+        by skipping vectorisation of existing tensor fields with the same content.
+        """
         pass
 
     @abstractmethod
     def to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
+        """
+        Convert a marqo doc into a VespaDocument.
+        """
         pass
 
     def pre_persist_to_vespa(self) -> None:
+        """
+        A hook method to do extra handling before we persist docs to Vespa.
+        """
         pass
 
     def convert_to_vespa_docs(self) -> List[VespaDocument]:
