@@ -8,7 +8,7 @@ from pydantic import BaseModel, validator, root_validator
 from marqo.api.exceptions import InvalidArgError
 from typing import Optional
 from pydantic import Field
-from marqo.base_model import ImmutableBaseModel
+from marqo.base_model import ImmutableBaseModel, MarqoBaseModel
 
 class ModelAuth(ImmutableBaseModel):
     """TODO: insert links to docs in error message"""
@@ -35,14 +35,11 @@ class ModelAuth(ImmutableBaseModel):
         return v
 
 
-class ModelLocation(BaseModel):
-
-    class Config:
-        allow_mutation = True
+class ModelLocation(MarqoBaseModel):
 
     s3: Optional[S3Location] = None
     hf: Optional[HfModelLocation] = None
-    auth_required: bool = Field(default=False, alias="authRequired")
+    auth_required: bool = Field(default=False, aliase="authRequired")
 
 
     @root_validator(skip_on_failure=True)
@@ -58,21 +55,3 @@ class ModelLocation(BaseModel):
                 "More than one model location object was provided. "
                 "Only one model location object is allowed")
         return values
-    #
-    # @validator('s3', 'hf', pre=True, always=True)
-    # def _ensure_exactly_one_location(cls, v, values, field):
-    #     """TODO: insert links to docs in error message"""
-    #     other_field = 's3' if field.name == 'hf' else 'hf'
-    #     if other_field in values and values[other_field] is not None and v is not None:
-    #         raise InvalidArgError(
-    #             "More than one model location object was provided. "
-    #             "Only one model authentication object is allowed")
-    #     return v
-    #
-    # def __init__(self, **data):
-    #     super().__init__(**data)
-    #     if self.s3 is None and self.hf is None:
-    #         raise InvalidArgError(
-    #             "Missing model location object. A location object, for example `s3` or  "
-    #             "`hf`, must be provided. ")
-

@@ -224,7 +224,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
 
                 mock_makedirs.assert_called_once_with('/path/to/file', exist_ok=True)
                 mock_zipfile.assert_called_once_with('/path/to/file.zip', 'r')
-                mock_model.assert_called_once_with('/path/to/file', use_auth_token=None, cache_dir = ModelCache.hf_cache_path)
+                mock_model.assert_called_once_with('/path/to/file')
                 mock_tokenizer.assert_called_once_with('/path/to/file')
 
                 mock_makedirs.reset_mock()
@@ -246,7 +246,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
 
                 mock_makedirs.assert_called_once_with('/path/to/file', exist_ok=True)
                 mock_tarfile.assert_called_once_with('/path/to/file.tar', 'r')
-                mock_model.assert_called_once_with('/path/to/file', use_auth_token=None, cache_dir=ModelCache.hf_cache_path)
+                mock_model.assert_called_once_with('/path/to/file')
                 mock_tokenizer.assert_called_once_with('/path/to/file')
 
                 mock_makedirs.reset_mock()

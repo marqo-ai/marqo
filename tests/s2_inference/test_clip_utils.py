@@ -106,7 +106,9 @@ class TestDownloadFromRepo(unittest.TestCase):
     def test__download_from_repo_with_auth(self, mock_download_model, ):
         mock_download_model.return_value = 'model.pth'
         location = ModelLocation(
-            s3=S3Location(Bucket='some_bucket', Key='some_key'), auth_required=True)
+            s3=S3Location(Bucket='some_bucket', Key='some_key'),
+            auth_required=True
+        )
         s3_auth = S3Auth(aws_access_key_id='some_key_id', aws_secret_access_key='some_secret')
 
         model_props = {
