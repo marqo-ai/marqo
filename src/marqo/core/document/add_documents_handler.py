@@ -290,7 +290,8 @@ class AddDocumentsHandler(ABC):
             for doc_id, chunks_to_vectorise in doc_chunks_map.items():
                 try:
                     vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
-                                   for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
+                                   for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()
+                                   if field_type in chunks_to_vectorise}
 
                     for tensor_field_content in doc_field_map[doc_id]:
                         tensor_field_content.vectorise(vectorisers)
