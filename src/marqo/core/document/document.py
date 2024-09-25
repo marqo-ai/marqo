@@ -233,7 +233,7 @@ class Document:
         elif status == 507:
             return 400, "Marqo vector store is out of memory or disk space"
         # TODO Block the invalid special characters before sending to Vespa
-        elif status == 400 and isinstance(message, str) and "could not parse field" in message:
+        elif status == 400 and isinstance(message, str) and "could not parse field" in message.lower():
             return 400, f"The document contains invalid characters in the fields. Original error: {message} "
         else:
             logger.error(f"An unexpected error occurred from the Vespa document response. "

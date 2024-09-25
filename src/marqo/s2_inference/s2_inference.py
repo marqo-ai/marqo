@@ -285,9 +285,8 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
         model_size = get_model_size(model_name, validated_model_properties)
         if lock.locked():
             raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while "
-                                            "another request was updating the model cache at the same time.\n "
-                                            "Please wait for 10 seconds and send the request again.\n "
-                                            "Marqo's documentation can be found here: `https://docs.marqo.ai/latest/`")
+                                            "another request was updating the model cache at the same time. "
+                                            "Please wait for 10 seconds and send the request again ")
         with lock:
             _validate_model_into_device(model_name, validated_model_properties, device,
                                        calling_func=_update_available_models.__name__)
@@ -483,7 +482,7 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
             f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshold = `{threshold}`. "
             f"Marqo CANNOT find enough space for the model. Please change the threshold by adjusting the environment variables.\n"
             f"Please modify the threshold by setting the environment variable `MARQO_MAX_CUDA_MODEL_MEMORY` or `MARQO_MAX_CPU_MODEL_MEMORY`."
-            f"You can find more detailed information at `https://docs.marqo.ai/latest/other-resources/guides/advanced-usage/configuration/`.")
+            f"You can find more detailed information at {marqo_docs.configuring_marqo()}.")
     return (used_memory + model_size) < threshold
 
 

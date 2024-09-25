@@ -377,7 +377,7 @@ class CLIP:
                 raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
                                                   f"The provided model path `{path}` is neither a local file nor a valid url."
                                                   f"Please check your provided model url and retry"
-                                                  f"Check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+                                                  f"Check {marqo_docs.bring_your_own_model()} for more info.")
 
             self.jit = self.model_properties.get("jit", False)
             self.model, self.preprocess = self.custom_clip_load()
@@ -510,7 +510,7 @@ class FP16_CLIP(CLIP):
                            f"FP16 clip model `{self.model_type}` is only available with device `cuda`.\n"
                            f"With current device `{self.device}`, the model will be loaded in `float32` mode. \n"
                            f"Please check you cuda availability or try the fp32 version `{self.model_type.replace('fp16/', '')}`"
-                           f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
+                           f"Check {marqo_docs.generic_models()} for more info.")
 
         self.model_name = self.model_type.replace("fp16/", "")
 
