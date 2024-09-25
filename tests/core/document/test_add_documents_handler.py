@@ -6,7 +6,8 @@ from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
 from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer
-from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError
+from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
 from tests.marqo_test import MarqoTestCase
@@ -30,6 +31,7 @@ class TestAddDocumentHandler(MarqoTestCase):
 
         def handle_field(self, marqo_doc, field_name, field_content) -> None:
             doc_id = marqo_doc[MARQO_DOC_ID]
+            marqo_doc[field_name] = field_content
             self.handled_fields.append((doc_id, field_name))
 
         def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
@@ -147,6 +149,67 @@ class TestAddDocumentHandler(MarqoTestCase):
 
         self.assertEqual(1, mock_feed_batch.call_count)
         self.assertEqual(([], 'index1'), mock_feed_batch.call_args_list[0][0])  # no vespa docs to persist
+
+    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
+    def test_add_documents_should_handle_various_errors(self, mock_feed_batch):
+        mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
+            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=400, message='could not parse field field1'),
+            FeedBatchDocumentResponse(id='id:index1:index1::2', pathId='path_id2', status=429, message='vespa error2'),
+            FeedBatchDocumentResponse(id='id:index1:index1::3', pathId='path_id3', status=507, message='vespa error3'),
+        ])]
+
+        handler = self.DummyAddDocumentsHandler(
+            config=self.config,
+            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                    {'_id': '2', 'field1': 'hello again'},
+                    {'_id': '3', 'field1': 'hello world'},
+                    {'bad_field': 'bad_content'},  # error out when converting to vespa doc
+                    {'_id': [5], 'field4': ['de']},  # doc with invalid id
+                    {'field4': ['de'], 'field5': 'a very large string object' * 10000},  # doc too large
+                    {},  # empty doc
+                    [2.0] * 32  # doc is not a dict
+                ])
+        )
+
+        def to_vespa_doc_throw_error(_, marqo_doc: Dict[str, Any]) -> VespaDocument:
+            if marqo_doc.get('bad_field') == 'bad_content':
+                raise MarqoDocumentParsingError('MarqoDocumentParsingError')
+            return VespaDocument(id=marqo_doc[MARQO_DOC_ID], fields={})
+        handler.to_vespa_doc = to_vespa_doc_throw_error.__get__(handler)
+
+        response = handler.add_documents()
+        self.assertTrue(response.errors)
+
+        self.assertEquals([
+            MarqoAddDocumentsItem(status=400, id='1',
+                                  message='The document contains invalid characters in the fields. Original error: could not parse field field1 ',
+                                  error='The document contains invalid characters in the fields. Original error: could not parse field field1 ',
+                                  code='vespa_error'),
+            MarqoAddDocumentsItem(status=429, id='2',
+                                  message='Marqo vector store receives too many requests. Please try again later',
+                                  error='Marqo vector store receives too many requests. Please try again later',
+                                  code='vespa_error'),
+            MarqoAddDocumentsItem(status=400, id='3', message='Marqo vector store is out of memory or disk space',
+                                  error='Marqo vector store is out of memory or disk space', code='vespa_error'),
+            MarqoAddDocumentsItem(status=400, id='', message='MarqoDocumentParsingError',
+                                  error='MarqoDocumentParsingError', code='invalid_argument'),
+            MarqoAddDocumentsItem(status=400, id='',
+                                  message='Document _id must be a string type! Received _id [5] of type `list`',
+                                  error='Document _id must be a string type! Received _id [5] of type `list`',
+                                  code='invalid_document_id'),
+            MarqoAddDocumentsItem(status=400, id='',
+                                  message='Document with length `260032` exceeds the allowed document size limit of [100000].',
+                                  error='Document with length `260032` exceeds the allowed document size limit of [100000].',
+                                  code='doc_too_large'),
+            MarqoAddDocumentsItem(status=400, id='', message="Can't index an empty dict.",
+                                  error="Can't index an empty dict.", code='invalid_argument'),
+            MarqoAddDocumentsItem(status=400, id='', message='Docs must be dicts', error='Docs must be dicts',
+                                  code='invalid_argument')
+        ], response.items)
 
 
 class TestAddDocumentsResponseCollector(unittest.TestCase):

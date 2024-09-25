@@ -135,6 +135,7 @@ class AddDocumentsHandler(ABC):
         """
         with RequestMetricsStore.for_request().time("add_documents.processing_before_vespa"):
             for loc, doc in enumerate(reversed(self.add_docs_params.docs)):
+                original_id = None
                 try:
                     self.validate_doc(doc)
                     # If _id is not provide, generate a ramdom one
@@ -237,7 +238,7 @@ class AddDocumentsHandler(ABC):
             status, message = self.config.document.translate_vespa_document_response(resp.status, message=resp.message)
             if status != 200:
                 self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(
-                    error_message=resp.message, status_code=resp.status, error_code='vespa_error'  # breaking?
+                    error_message=message, status_code=status, error_code='vespa_error'  # breaking?
                 ))
             else:
                 self.add_docs_response_collector.collect_successful_response(doc_id)
