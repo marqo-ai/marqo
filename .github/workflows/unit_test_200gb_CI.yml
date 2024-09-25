@@ -65,12 +65,6 @@ jobs:
           repository: marqo-ai/marqo-base
           path: marqo-base
 
-      - name: Install FFmpeg and libmagic
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg libmagic1
-          ffmpeg -version  # Verify installation
-          file --version   # Verify libmagic installation and version
       - name: Install dependencies
         run: |
           pip install -r marqo-base/requirements.txt
@@ -136,7 +130,6 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          export MARQO_MAX_CPU_MODEL_MEMORY=15
           
           cd marqo
           export PYTHONPATH="./tests:./src:."

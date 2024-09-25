@@ -95,7 +95,7 @@ class TestGetSettings(MarqoTestCase):
                     'textPreprocessing': {'splitLength': 2,
                                         'splitMethod': TextSplitMethod.Sentence,
                                         'splitOverlap': 0},
-                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
                     'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'treatUrlsAndPointersAsImages': False,
                     'treatUrlsAndPointersAsMedia': False,
@@ -136,7 +136,7 @@ class TestGetSettings(MarqoTestCase):
                         'splitMethod': TextSplitMethod.Sentence,
                         'splitOverlap': 0
                     },
-                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
                     'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'type': IndexType.Structured,
                     'vectorNumericType': VectorNumericType.Float
@@ -165,7 +165,7 @@ class TestGetSettings(MarqoTestCase):
                     'textPreprocessing': {'splitLength': 3,
                                         'splitMethod': TextSplitMethod.Word,
                                         'splitOverlap': 1},
-                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
                     'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'treatUrlsAndPointersAsImages': False,
                     'treatUrlsAndPointersAsMedia': False,
@@ -175,7 +175,6 @@ class TestGetSettings(MarqoTestCase):
             # Get unstructured custom settings
             retrieved_index = self.config.index_management.get_index(self.unstructured_custom_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
-            print(f"retrieved_settings: {retrieved_settings}")
             self.assertEqual(retrieved_settings, expected_unstructured_custom_settings)
         
         with self.subTest("Structured index custom settings"):
@@ -206,7 +205,7 @@ class TestGetSettings(MarqoTestCase):
                         'splitMethod': TextSplitMethod.Word,
                         'splitOverlap': 1
                     },
-                    'audioPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                    'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
                     'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
                     'type': IndexType.Structured,
                     'vectorNumericType': VectorNumericType.Float
@@ -214,6 +213,5 @@ class TestGetSettings(MarqoTestCase):
             # Get unstructured default settings
             retrieved_index = self.config.index_management.get_index(self.structured_custom_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
-            print(f"retrieved_settings: {retrieved_settings}")
             self.assertEqual(retrieved_settings, expected_structured_custom_settings)
             
