@@ -1,8 +1,8 @@
 import logging
 
+from marqo import marqo_docs
 from marqo.api.exceptions import EnvVarError
 from marqo.tensor_search.utils import read_env_vars_and_defaults
-from marqo_docs import configuring_marqo
 
 
 def get_logger(name):
@@ -21,6 +21,6 @@ def get_logger(name):
     else:
         raise EnvVarError(f"The provided environment variable `MARQO_LOG_LEVEL` = `{log_level}` is not supported."
                           f"The environment variable `MARQO_LOG_LEVEL` should be one of `error`, `warning`, `info`, `debug`."
-                          f"Check {configuring_marqo()} for more info.")
+                          f"Check {marqo_docs.configuring_marqo()} for more info.")
 
     return logger
