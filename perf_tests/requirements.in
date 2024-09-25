@@ -1,3 +1,5 @@
 locust==2.25.0
 marqo==3.7.0
 wonderwords==2.2.0
+requests==2.31.0
+pandas==2.0.3
