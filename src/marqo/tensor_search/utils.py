@@ -271,13 +271,9 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
         blob = blob[:blob_opening_quote_idx] + " " + blob[blob_opening_quote_idx + 1:]
 
     # Remove double/leading white spaces
-    blob = blob.split()
+    optional_terms = blob.split()
 
-    # Remove escape character. `\"` becomes just `"`
-    required_terms = [term.replace('\\"', '"') for term in required_terms]
-    blob = [term.replace('\\"', '"') for term in blob]
-
-    return required_terms, blob
+    return required_terms, optional_terms
 
 
 def get_marqo_root_from_env() -> str:
