@@ -15,7 +15,8 @@ from marqo.api import exceptions as api_errors
 from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
-from marqo.core.document.tensor_fields_container import Chunker, Vectoriser, TensorFieldsContainer, TensorFieldContent
+from marqo.core.document.tensor_fields_container import Chunker, Vectoriser, TensorFieldsContainer, TensorFieldContent, \
+    ContentChunkType
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
@@ -513,7 +514,7 @@ class AddDocumentsHandler(ABC):
         return chunk
 
     def single_vectoriser(self, modality: Modality) -> Vectoriser:
-        def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+        def vectorise(content_chunks: List[ContentChunkType]) -> List[List[float]]:
             with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
                 if modality in [Modality.AUDIO, Modality.VIDEO]:
                     # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
@@ -523,8 +524,8 @@ class AddDocumentsHandler(ABC):
 
         return vectorise
 
-    def batch_vectoriser(self, chunks_to_vectorise: Union[List[str], List[Image]], modality: Modality) -> Vectoriser:
-        def dict_key(chunk: Union[str, Image, torch.Tensor, Dict[str, torch.Tensor]]):
+    def batch_vectoriser(self, chunks_to_vectorise: List[ContentChunkType], modality: Modality) -> Vectoriser:
+        def dict_key(chunk: ContentChunkType):
             if isinstance(chunk, Image):
                 chunk = chunk.convert('RGB')
                 pixel_bytes = chunk.tobytes()
@@ -552,12 +553,12 @@ class AddDocumentsHandler(ABC):
                     embeddings = self._s2inference_vectorise(chunks_to_vectorise, modality)
                 embedding_cache = {dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
 
-        def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+        def vectorise(content_chunks: List[ContentChunkType]) -> List[List[float]]:
             return [embedding_cache[dict_key(chunk)] for chunk in content_chunks]
 
         return vectorise
 
-    def _s2inference_vectorise(self, content_chunks: Union[List[str], List[Image]], modality: Modality):
+    def _s2inference_vectorise(self, content_chunks: List[ContentChunkType], modality: Modality):
         try:
             return s2_inference.vectorise(
                 model_name=self.marqo_index.model.name,

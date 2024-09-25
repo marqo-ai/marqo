@@ -1,9 +1,10 @@
 import json
-from typing import List, Dict, Set, Optional, Any, Generator, Tuple, Protocol, cast, Union
+from typing import List, Dict, Set, Optional, Any, Generator, Tuple, Protocol, cast, Union, TypeVar
 
 import numpy as np
 from PIL.Image import Image
 from pydantic.main import BaseModel
+from torch import Tensor
 
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
@@ -11,13 +12,20 @@ from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
 
 
+# Content chunk of different modality can have different types
+# - Text: str
+# - Image: PIL.Image.Image if not chunked, torch.Tensor if chunked
+# - Audio, Video: Dict[str, Tensor]
+ContentChunkType = TypeVar('ContentChunkType', str, Image, Tensor, Dict[str, Tensor])
+
+
 class Chunker(Protocol):
-    def __call__(self, field_content: str, single_chunk: bool = False) -> Tuple[List[str], List[str]]:
+    def __call__(self, field_content: str, single_chunk: bool = False) -> Tuple[List[str], List[ContentChunkType]]:
         ...
 
 
 class Vectoriser(Protocol):
-    def __call__(self, content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+    def __call__(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
         ...
 
 
@@ -25,8 +33,8 @@ class TensorFieldContent(BaseModel):
     field_content: str
     field_type: FieldType
 
-    chunks: Optional[List[str]] = []  # TODO check other types
-    content_chunks: Optional[Union[List[str], List[Image]]] = []  # TODO check other types
+    chunks: Optional[List[str]] = []
+    content_chunks: Optional[List[ContentChunkType]] = []
     embeddings: Optional[List[List[float]]] = []
 
     # metadata fields
