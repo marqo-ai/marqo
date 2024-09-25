@@ -32,15 +32,6 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.models.get_document_response import Document
 
-ORIGINAL_ID = '_original_id'
-
-MODALITY_FIELD_TYPE_MAP = {
-    Modality.TEXT: FieldType.Text,
-    Modality.IMAGE: FieldType.ImagePointer,
-    Modality.VIDEO: FieldType.VideoPointer,
-    Modality.AUDIO: FieldType.AudioPointer,
-}
-
 logger = get_logger(__name__)
 
 
@@ -51,17 +42,23 @@ class AddDocumentsResponseCollector:
         self.errors = False
         self.marqo_docs: Dict[str, Dict[str, Any]] = dict()
         self.marqo_doc_loc_map: Dict[str, int] = dict()
-        self.visited_doc_ids: Set[str] = set()
+
+        # stores all the visited docs with _id provided by user, for dedup and retrieving existing docs
+        # key is the provided _id, value is whether it's valid or not
+        self.visited_doc_ids: Dict[str, bool] = dict()
 
     def visited(self, doc_id: str) -> bool:
         return doc_id in self.visited_doc_ids
 
-    def collect_marqo_doc(self, loc: int, marqo_doc: Dict[str, Any]):
+    def valid_original_ids(self) -> Set[str]:
+        return {_id for _id, valid in self.visited_doc_ids.items() if valid}
+
+    def collect_marqo_doc(self, loc: int, marqo_doc: Dict[str, Any], original_id: Optional[str]):
         doc_id = marqo_doc[MARQO_DOC_ID]
         self.marqo_docs[doc_id] = marqo_doc
         self.marqo_doc_loc_map[doc_id] = loc
-        if ORIGINAL_ID in marqo_doc and marqo_doc[ORIGINAL_ID] is not None:
-            self.visited_doc_ids.add(marqo_doc[ORIGINAL_ID])
+        if original_id:
+            self.visited_doc_ids[original_id] = True
 
     def collect_error_response(self, doc_id: Optional[str], error: AddDocumentsError, loc: Optional[int] = None):
         # log errors in one place, log in warning level for each individual doc error
@@ -73,17 +70,20 @@ class AddDocumentsResponseCollector:
             # TODO change the logic when we need to report duplicates as an error in the response
             return
 
-        if not loc and doc_id and doc_id in self.marqo_doc_loc_map:
-            loc = self.marqo_doc_loc_map[doc_id]
+        if doc_id and doc_id not in self.marqo_docs:
+            # We mark it as visited even when there's an error. This prevents following doc with the same id from
+            # being handled. doc_id not in self.marqo_docs means it's not collected yet, so the error is thrown
+            # during the first validation phase
+            self.visited_doc_ids[doc_id] = False
+
+        if not loc:
+            loc = self.marqo_doc_loc_map.get(doc_id)
 
         if doc_id in self.marqo_docs:
-            doc_id = self.marqo_docs.pop(doc_id)[ORIGINAL_ID]
-
-        if doc_id:
-            self.visited_doc_ids.add(doc_id)
+            self.marqo_docs.pop(doc_id, None)
 
         self.responses.append((loc, MarqoAddDocumentsItem(
-            id=doc_id if doc_id is not None else '',
+            id=doc_id if doc_id in self.visited_doc_ids else '',
             error=error.error_message,
             message=error.error_message,
             status=error.status_code,
@@ -134,29 +134,28 @@ class AddDocumentsHandler(ABC):
         methods and implemented in add_docs_handler for individual types.
         """
         with RequestMetricsStore.for_request().time("add_documents.processing_before_vespa"):
-            for loc, original_doc in enumerate(reversed(self.add_docs_params.docs)):
-                doc = copy.deepcopy(original_doc)
-                original_id = None
+            for loc, doc in enumerate(reversed(self.add_docs_params.docs)):
                 try:
                     self.validate_doc(doc)
-
-                    original_id = self.validate_and_pop_doc_id(doc)
-                    doc_id = original_id or str(uuid.uuid4())
-                    marqo_doc = {ORIGINAL_ID: original_id, MARQO_DOC_ID: doc_id}  # keep this info for error report
+                    # If _id is not provide, generate a ramdom one
+                    original_id = doc.get(MARQO_DOC_ID)
+                    marqo_doc = {MARQO_DOC_ID: original_id or str(uuid.uuid4())}
 
                     for field_name, field_content in doc.items():
+                        if field_name == MARQO_DOC_ID:
+                            continue  # we don't handle _id field
                         self.handle_field(marqo_doc, field_name, field_content)
 
                     self.handle_multi_modal_fields(marqo_doc)
 
-                    self.add_docs_response_collector.collect_marqo_doc(loc, marqo_doc)
+                    self.add_docs_response_collector.collect_marqo_doc(loc, marqo_doc, original_id)
                 except AddDocumentsError as err:
                     self.add_docs_response_collector.collect_error_response(original_id, err, loc)
 
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
                 # TODO capture the telemetry data for retrieving exiting docs?
-                result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.visited_doc_ids),
+                result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
                                                             self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
                 self.handle_existing_tensors(existing_vespa_docs)
@@ -194,14 +193,14 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]):
+    def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
         """
         This method collect the information for multimodal combo fields in a Marqo doc.
         """
         pass
 
     @abstractmethod
-    def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
+    def handle_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
         """
         This method populates embeddings from existing documents. We could save some resources and time
         by skipping vectorisation of existing tensor fields with the same content.
@@ -217,7 +216,7 @@ class AddDocumentsHandler(ABC):
 
     def pre_persist_to_vespa(self) -> None:
         """
-        A hook method to do extra handling before we persist docs to Vespa.
+        A hook method to do extra handling before we persist docs to Vespa. By default, it does nothing
         """
         pass
 
@@ -246,28 +245,29 @@ class AddDocumentsHandler(ABC):
     def validate_doc(self, doc) -> None:
         try:
             validation.validate_doc(doc)
-        except (api_errors.InvalidArgError, api_errors.DocTooLargeError) as err:
+
+            if MARQO_DOC_ID in doc:
+                # validate _id field
+                doc_id = doc[MARQO_DOC_ID]
+                validation.validate_id(doc_id)
+                if self.add_docs_response_collector.visited(doc_id):
+                    raise DuplicateDocumentError(f"Document will be ignored since doc with the same id"
+                                                 f" `{doc_id}` supersedes this one")
+
+        except (api_errors.InvalidArgError, api_errors.DocTooLargeError, api_errors.InvalidDocumentIdError) as err:
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
-
-    def validate_and_pop_doc_id(self, doc) -> Optional[str]:
-        if MARQO_DOC_ID not in doc:
-            return None
-
-        doc_id = doc.pop(MARQO_DOC_ID)
-        try:
-            validation.validate_id(doc_id)
-        except api_errors.InvalidDocumentIdError as err:
-            raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
-
-        if self.add_docs_response_collector.visited(doc_id):
-            raise DuplicateDocumentError(f"Document will be ignored since doc with the same id"
-                                         f" `{doc_id}` supersedes this one")
-
-        return doc_id
 
     # The following code are about handling all tensor fields
     # TODO see if we should move these code to some other classes. They are kept here due to the dependency on
     #   both the marqo_index and add_docs_params
+
+    MODALITY_FIELD_TYPE_MAP = {
+        Modality.TEXT: FieldType.Text,
+        Modality.IMAGE: FieldType.ImagePointer,
+        Modality.VIDEO: FieldType.VideoPointer,
+        Modality.AUDIO: FieldType.AudioPointer,
+    }
+
     def vectorise_tensor_fields(self) -> None:
         """
         Download, preprocess, chunk and vectorise collected tensor fields.
@@ -286,7 +286,7 @@ class AddDocumentsHandler(ABC):
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
             vectorisers = {field_type: self.single_vectoriser(modality)
-                           for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
+                           for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()}
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
@@ -323,7 +323,7 @@ class AddDocumentsHandler(ABC):
             for doc_id, chunks_to_vectorise in doc_chunks_map.items():
                 try:
                     vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
-                                   for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()
+                                   for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()
                                    if field_type in chunks_to_vectorise}
 
                     for tensor_field_content in doc_field_map[doc_id]:
@@ -352,7 +352,7 @@ class AddDocumentsHandler(ABC):
 
             try:
                 vectorisers = {field_type: self.batch_vectoriser(chunks_map[field_type], modality)
-                               for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
+                               for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()}
             except AddDocumentsError as err:
                 # TODO check if it is too verbose to log out traceback
                 logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err, exc_info=True)
@@ -424,7 +424,7 @@ class AddDocumentsHandler(ABC):
         return image_repo
 
     def _determine_thread_count(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams):
-        # TODO this logic is copied from tensor search. Can be simplified
+        # TODO this logic is copied from tensor search. Can be simplified and moved to AddDocsParams?
         model_properties = marqo_index.model.get_properties()
         is_languagebind_model = model_properties.get('type') == 'languagebind'
 

@@ -7,7 +7,6 @@ from pydantic import Field, BaseModel
 from marqo.base_model import MarqoBaseModel
 
 from marqo.core import constants as index_constants
-from marqo.core.document.add_documents_handler import ORIGINAL_ID
 from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 
@@ -98,7 +97,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
 
         for key, value in document.items():
             if key in [index_constants.MARQO_DOC_EMBEDDINGS, index_constants.MARQO_DOC_CHUNKS,
-                       unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, index_constants.MARQO_DOC_ID, ORIGINAL_ID]:
+                       unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, index_constants.MARQO_DOC_ID]:
                 continue
             if isinstance(value, str):
                 if len(value) <= filter_string_max_length:

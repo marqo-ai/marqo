@@ -1,5 +1,4 @@
 import marqo.core.search.search_filter as search_filter
-from marqo.core.document.add_documents_handler import ORIGINAL_ID
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
                                    InvalidDataRangeError, MarqoDocumentParsingError)
 from marqo.core.models import MarqoQuery
@@ -182,7 +181,7 @@ class StructuredVespaIndex(VespaIndex):
 
         # Fields
         for marqo_field in marqo_document:
-            if marqo_field in [constants.MARQO_DOC_TENSORS, constants.MARQO_DOC_ID, ORIGINAL_ID]:
+            if marqo_field in [constants.MARQO_DOC_TENSORS, constants.MARQO_DOC_ID]:
                 continue  # process tensor fields later
 
             marqo_value = marqo_document[marqo_field]

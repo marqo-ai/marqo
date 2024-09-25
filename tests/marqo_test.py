@@ -172,8 +172,6 @@ class MarqoTestCase(unittest.TestCase):
             cls,
             name: str,
             schema_name: str,
-            fields: List[Field] = None,
-            tensor_fields: List[TensorField] = None,
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
@@ -221,8 +219,6 @@ class MarqoTestCase(unittest.TestCase):
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
-            fields=fields,
-            tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
             updated_at=updated_at,

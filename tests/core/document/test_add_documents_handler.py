@@ -1,26 +1,171 @@
 import unittest
+from typing import Dict, Any, List
 from unittest.mock import patch
 
-from marqo.core.document.add_documents_handler import AddDocumentsResponseCollector
+from marqo.core.constants import MARQO_DOC_ID
+from marqo.core.document.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
+from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError
+from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
+from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
+from tests.marqo_test import MarqoTestCase
+
+
+class TestAddDocumentHandler(MarqoTestCase):
+
+    class DummyAddDocumentsHandler(AddDocumentsHandler):
+        """
+        We create a dummy implementation of the AddDocumentsHandler to verify the main workflow
+        """
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.handled_fields = []
+            self.handled_multimodal_fields = []
+            self.existing_vespa_docs = []
+            self.to_vespa_doc_call_count = 0
+
+        def _create_tensor_fields_container(self) -> TensorFieldsContainer:
+            return TensorFieldsContainer([], [], {})
+
+        def handle_field(self, marqo_doc, field_name, field_content) -> None:
+            doc_id = marqo_doc[MARQO_DOC_ID]
+            self.handled_fields.append((doc_id, field_name))
+
+        def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
+            doc_id = marqo_doc[MARQO_DOC_ID]
+            self.handled_multimodal_fields.append(doc_id)
+
+        def handle_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
+            self.existing_vespa_docs = existing_vespa_docs
+
+        def to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
+            self.to_vespa_doc_call_count += 1
+            return VespaDocument(id=marqo_doc[MARQO_DOC_ID], fields={})
+
+    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
+    @patch('marqo.vespa.vespa_client.VespaClient.get_batch')
+    def test_add_documents_main_workflow_happy_path(self, mock_get_batch, mock_feed_batch):
+        mock_get_batch.side_effect = [GetBatchResponse(errors=True, responses=[
+            GetBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1',
+                                     document=Document(id='id:index1:index1:1', fields={'marqo__id': '1'}), status=200),
+            GetBatchDocumentResponse(id='id:index1:index1::2', pathId='path_id2', status=404),
+            GetBatchDocumentResponse(id='id:index1:index1::3', pathId='path_id3', status=404)
+        ])]
+        mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
+            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
+            FeedBatchDocumentResponse(id='id:index1:index1::2', pathId='path_id2', status=200),
+            FeedBatchDocumentResponse(id='id:index1:index1::3', pathId='path_id3', status=200),
+        ])]
+
+        handler = self.DummyAddDocumentsHandler(
+            config=self.config,
+            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1',
+                tensor_fields=['field1'],
+                use_existing_tensors=True,
+                docs=[
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                    {'_id': '2', 'field1': 'hello again', 'field2': 3.0, 'field4': ['abcd']},
+                    {'_id': '3', 'field2': ['de'], 'field5': {'content': 'a', 'vector': [0.1] * 32}},
+                ])
+        )
+
+        response = handler.add_documents()
+
+        self.assertFalse(response.errors)
+        self.assertEqual('index1', response.index_name)
+        self.assertEqual(3, len(response.items))
+        for i in range(3):
+            self.assertEqual(str(i+1), response.items[i].id)
+            self.assertEqual(200, response.items[i].status)
+
+        # verify the workflow call the abstract methods
+        self.assertEqual({
+            ('1', 'field1'), ('1', 'field2'), ('1', 'field3'),
+            ('2', 'field1'), ('2', 'field2'), ('2', 'field4'),
+            ('3', 'field2'), ('3', 'field5')
+        }, set(handler.handled_fields))
+
+        self.assertEqual({'3', '2', '1'}, set(handler.handled_multimodal_fields))
+
+        self.assertEqual([Document(id='id:index1:index1:1', fields={'marqo__id': '1'})],
+                         handler.existing_vespa_docs)  # only the doc with 200 status code is passed to the method
+
+        self.assertEquals(3, handler.to_vespa_doc_call_count)
+
+    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
+    def test_add_documents_should_skip_duplicate_documents(self, mock_feed_batch):
+        mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
+            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
+        ])]
+        handler = self.DummyAddDocumentsHandler(
+            config=self.config,
+            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                    {'_id': '1', 'field4': ['de'], 'field5': {'content': 'a', 'vector': [0.1] * 32}},
+                ])
+        )
+
+        self.assertFalse(handler.add_documents().errors)
+        self.assertEqual({
+            ('1', 'field4'), ('1', 'field5'),  # the second doc with the same id overrides the first one
+        }, set(handler.handled_fields))
+        self.assertEquals(1, handler.to_vespa_doc_call_count)
+
+    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
+    def test_add_documents_should_skip_duplicate_documents_even_when_the_latter_one_errors_out(self, mock_feed_batch):
+        handler = self.DummyAddDocumentsHandler(
+            config=self.config,
+            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1'],
+                docs=[
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                    {'_id': '1', 'field4': ['de'], 'field5': {'content': 'a', 'vector': [0.1] * 32}},
+                ])
+        )
+
+        # override the handle field method to raise an error when handling field5
+        def handle_field_raise_error(self, marqo_doc, field_name, _) -> None:
+            if field_name == 'field5':
+                raise AddDocumentsError('some error')
+            self.handled_fields.append((marqo_doc[MARQO_DOC_ID], field_name))
+        handler.handle_field = handle_field_raise_error.__get__(handler)
+
+        response = handler.add_documents()
+        self.assertTrue(response.errors)
+        self.assertTrue(1, len(response.items))
+        self.assertEqual('some error', response.items[0].message)
+
+        self.assertEqual([('1', 'field4')], handler.handled_fields)
+        self.assertEquals(0, handler.to_vespa_doc_call_count)
+
+        self.assertEqual(1, mock_feed_batch.call_count)
+        self.assertEqual(([], 'index1'), mock_feed_batch.call_args_list[0][0])  # no vespa docs to persist
 
 
 class TestAddDocumentsResponseCollector(unittest.TestCase):
 
     def test_should_collect_marqo_docs(self):
         collector = AddDocumentsResponseCollector()
-        marqo_doc1 = {'_id': 'doc_id1', '_original_id': 'doc_id1'}
-        marqo_doc2 = {'_id': 'doc_id2', '_original_id': None}
+        marqo_doc1 = {'_id': 'doc_id1'}
+        marqo_doc2 = {'_id': 'doc_id2'}
 
-        collector.collect_marqo_doc(1, marqo_doc=marqo_doc1)
-        collector.collect_marqo_doc(2, marqo_doc=marqo_doc2)
+        collector.collect_marqo_doc(1, marqo_doc1, 'doc_id1')
+        collector.collect_marqo_doc(2, marqo_doc2, None)
 
         self.assertEquals(marqo_doc1, collector.marqo_docs['doc_id1'])
         self.assertEquals(marqo_doc2, collector.marqo_docs['doc_id2'])
         self.assertEquals(1, collector.marqo_doc_loc_map['doc_id1'])
         self.assertEquals(2, collector.marqo_doc_loc_map['doc_id2'])
         self.assertTrue(collector.visited('doc_id1'))
-        self.assertFalse(collector.visited('doc_id2'))  # we don't mark generated id as visited
+        self.assertFalse(collector.visited('doc_id2'))
+        self.assertEquals({'doc_id1'}, collector.valid_original_ids())
 
     def test_collect_error_response_should_skip_duplicate_document_error(self):
         collector = AddDocumentsResponseCollector()
@@ -55,7 +200,7 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
 
     def test_collect_error_response_should_infer_loc_if_not_provided(self):
         collector = AddDocumentsResponseCollector()
-        collector.collect_marqo_doc(5, marqo_doc={'_id': 'doc_id1', '_original_id': 'doc_id1'})
+        collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, 'doc_id1')
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'))
         loc, _ = collector.responses[0]
         self.assertEquals(5, loc)
@@ -68,7 +213,7 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
 
     def test_collect_marqo_error_response_should_remove_the_collected_marqo_doc(self):
         collector = AddDocumentsResponseCollector()
-        collector.collect_marqo_doc(5, marqo_doc={'_id': 'doc_id1', '_original_id': 'doc_id1'})
+        collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, 'doc_id1')
         self.assertIn('doc_id1', collector.marqo_docs)
 
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'))
@@ -89,24 +234,23 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         returned to customer if this doc is not persisted. So we set the id in the error response to empty string
         """
         collector = AddDocumentsResponseCollector()
-        collector.collect_marqo_doc(5, marqo_doc={'_id': 'doc_id1', '_original_id': None})
+        collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, None)
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'))
         _, add_document_item = collector.responses[0]
         self.assertEquals('', add_document_item.id)
-        self.assertFalse(collector.visited('doc_id1'))  # we don't mark generated id as visited
 
     def test_collect_marqo_error_response_should_set_doc_visited_if_original_id_is_present(self):
         """
         When dealing with duplicates, we only consider the last doc with that id, even it's not valid
         """
         collector = AddDocumentsResponseCollector()
-        collector.collect_marqo_doc(5, marqo_doc={'_id': 'doc_id1', '_original_id': 'doc_id1'})
+        collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, 'doc_id1')
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'))
         self.assertTrue(collector.visited('doc_id1'))
 
     def test_collect_successful_response_should_add_200_as_status_code(self):
         collector = AddDocumentsResponseCollector()
-        collector.collect_marqo_doc(5, marqo_doc={'_id': 'doc_id1', '_original_id': 'doc_id1'})
+        collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, 'doc_id1')
         collector.collect_successful_response('doc_id1')
         loc, add_doc_item = collector.responses[0]
         self.assertEquals(5, loc)
@@ -120,9 +264,9 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
     def test_collect_final_responses(self, mock_timer):
         mock_timer.side_effect = [1.0, 2.0]
         collector = AddDocumentsResponseCollector()
-        collector.collect_marqo_doc(1, marqo_doc={'_id': 'doc_id1', '_original_id': 'doc_id1'})
-        collector.collect_marqo_doc(2, marqo_doc={'_id': 'gen_doc_id2', '_original_id': None})
-        collector.collect_marqo_doc(3, marqo_doc={'_id': 'doc_id3', '_original_id': None})
+        collector.collect_marqo_doc(1, {'_id': 'doc_id1'}, 'doc_id1')
+        collector.collect_marqo_doc(2, {'_id': 'gen_doc_id2'}, None)
+        collector.collect_marqo_doc(3, {'_id': 'doc_id3'}, None)
         collector.collect_error_response('doc_id4', AddDocumentsError('error message 4'), loc=4)
         collector.collect_error_response(None, AddDocumentsError('error message 1'))
         collector.collect_error_response('gen_doc_id2', AddDocumentsError('error message 2'))

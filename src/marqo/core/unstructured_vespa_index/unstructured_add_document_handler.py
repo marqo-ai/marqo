@@ -8,7 +8,7 @@ from marqo.api import exceptions as api_errors
 from marqo.config import Config
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.add_documents_handler import AddDocumentsHandler, AddDocumentsError, MODALITY_FIELD_TYPE_MAP
+from marqo.core.document.add_documents_handler import AddDocumentsHandler, AddDocumentsError
 from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models import UnstructuredMarqoIndex
@@ -82,7 +82,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             if not self.marqo_index.treat_urls_and_pointers_as_images and modality == Modality.IMAGE:
                 modality = Modality.TEXT
 
-            return MODALITY_FIELD_TYPE_MAP[modality]
+            return self.MODALITY_FIELD_TYPE_MAP[modality]
         except MediaDownloadError as err:
             raise AddDocumentsError(err.message) from err
 

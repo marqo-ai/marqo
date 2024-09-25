@@ -56,7 +56,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
     def tearDown(self) -> None:
         self.device_patcher.stop()
 
-    def _add_and_get_doc(self, index_name: str, doc_id: str, tensor_fields: List[str]):
+    def _add_and_get_doc(self, index_name: str, doc_id: str, tensor_fields: List[str], use_existing_tensors=False):
         add_doc_result = tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=index_name,
@@ -65,7 +65,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                     "title": "content 1",
                     "desc": "content 2. blah blah blah"
                 }],
-                device="cpu", tensor_fields=tensor_fields
+                device="cpu", tensor_fields=tensor_fields, use_existing_tensors=use_existing_tensors
             )
         )
         self.assertFalse(add_doc_result.errors)
@@ -97,6 +97,15 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         doc1 = self._add_and_get_doc(self.text_index_1, "123", ["desc"])
         self.assertEquals(1, len(doc1['_tensor_facets']))
         self.assertIn('desc', doc1['_tensor_facets'][0])
+
+    def test_add_documents_should_use_existing_tensors_from_the_same_doc(self):
+        doc1 = self._add_and_get_doc(self.text_index_1, "123", ["title"])
+
+        with mock.patch('marqo.s2_inference.s2_inference.vectorise') as mock_vectorise:
+            doc2 = self._add_and_get_doc(self.text_index_1, "123", ["title"],
+                                         use_existing_tensors=True)
+            self.assertFalse(mock_vectorise.called)
+            self.assertEquals(doc1['_tensor_facets'], doc2['_tensor_facets'])
 
     def test_add_documents_should_add_string_fields_as_lexical_fields(self):
         self._add_and_get_doc(self.text_index_2, "123", [])
@@ -237,7 +246,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
         # batch 2: tensor field is a custom vector field
-        result = tensor_search.add_documents(
+        tensor_search.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{

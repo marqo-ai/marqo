@@ -5,7 +5,6 @@ from pydantic import Field
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants, constants
-from marqo.core.document.add_documents_handler import ORIGINAL_ID
 from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError, InvalidFieldNameError, \
     InvalidTensorFieldError
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
@@ -88,7 +87,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id))
 
         for field_name, field_content in document.items():
-            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS, ORIGINAL_ID]:
+            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS]:
                 continue
             if isinstance(field_content, str):
                 if field_name not in marqo_index.field_map:
