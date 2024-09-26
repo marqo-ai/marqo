@@ -249,9 +249,6 @@ class AddDocumentsHandler(ABC):
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
     # The following code are about handling all tensor fields
-    # TODO see if we should move these code to some other classes. They are kept here due to the dependency on
-    #   both the marqo_index and add_docs_params
-
     MODALITY_FIELD_TYPE_MAP = {
         Modality.TEXT: FieldType.Text,
         Modality.IMAGE: FieldType.ImagePointer,
@@ -284,6 +281,7 @@ class AddDocumentsHandler(ABC):
         elif batch_mode == 'PER_ADD_DOC_BATCH':
             self.vectorise_tensor_fields_in_batch_per_add_doc_batch(model_config)
         else:
+            # TODO replace with core error
             raise api_errors.BadRequestError(
                 message=f'Unsupported vectorisation batch mode: {str(batch_mode)}'
             )
