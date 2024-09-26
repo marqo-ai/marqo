@@ -11,6 +11,26 @@ from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
 
 
+class DummyChunker(Chunker):
+    def __init__(self, no_chunking=False):
+        self.no_chunking = no_chunking
+
+    def chunk(self, _: str, single_chunk: bool = False) -> Tuple[List[str], List[str]]:
+        if single_chunk or self.no_chunking:
+            return ['single_chunk'], ['single_content_chunk']
+        else:
+            return ['chunk1', 'chunk2'], ['content_chunk1', 'content_chunk2']
+
+
+class DummyVectoriser(Vectoriser):
+    def __init__(self):
+        self.vectorise_call_count = 0
+
+    def vectorise(self, content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+        self.vectorise_call_count += 1
+        return [[1.0 * (i + 1), 2.0 * (i + 1)] for i in range(len(content_chunks))]
+
+
 @pytest.mark.unittest
 class TestTensorFieldContent(unittest.TestCase):
 
@@ -50,7 +70,7 @@ class TestTensorFieldContent(unittest.TestCase):
         )
         tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
         self.assertTrue(tensor_field_content.is_resolved)
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
         self.assertEqual([], tensor_field_content.content_chunks)
 
     def test_chunk_populated_multimodal_subfield_will_generate_content_chunks(self):
@@ -62,7 +82,7 @@ class TestTensorFieldContent(unittest.TestCase):
         )
         tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
         self.assertFalse(tensor_field_content.is_resolved)
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
         self.assertEqual(['single_content_chunk'], tensor_field_content.content_chunks)
 
     def test_chunk_populated_multimodal_subfield_will_not_generate_content_chunks_if_chunk_is_same(self):
@@ -74,7 +94,7 @@ class TestTensorFieldContent(unittest.TestCase):
         )
         tensor_field_content.populate_chunks_and_embeddings(['single_chunk'], [[1.0, 1.2]])
         self.assertFalse(tensor_field_content.is_resolved)
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
         self.assertEqual([], tensor_field_content.content_chunks)
 
     def test_chunk_with_no_chunker_for_the_type(self):
@@ -84,7 +104,7 @@ class TestTensorFieldContent(unittest.TestCase):
             is_tensor_field=True
         )
         with self.assertRaises(AddDocumentsError) as e:
-            tensor_field_content.chunk({FieldType.ImagePointer: self._dummy_chunker()})
+            tensor_field_content.chunk({FieldType.ImagePointer: DummyChunker(False)})
         self.assertIn('Chunking is not supported for field type: Text', str(e.exception))
         self.assertEqual([], tensor_field_content.chunks)
         self.assertEqual([], tensor_field_content.content_chunks)
@@ -95,7 +115,7 @@ class TestTensorFieldContent(unittest.TestCase):
             field_content="hello world!",
             is_tensor_field=True
         )
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
         self.assertEqual(['chunk1', 'chunk2'], tensor_field_content.chunks)
         self.assertEqual(['content_chunk1', 'content_chunk2'], tensor_field_content.content_chunks)
 
@@ -106,7 +126,7 @@ class TestTensorFieldContent(unittest.TestCase):
             is_tensor_field=False,
             is_multimodal_subfield=True
         )
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
         self.assertEqual(['single_chunk'], tensor_field_content.chunks)
         self.assertEqual(['single_content_chunk'], tensor_field_content.content_chunks)
 
@@ -122,7 +142,7 @@ class TestTensorFieldContent(unittest.TestCase):
             is_tensor_field=True,
             is_multimodal_subfield=True
         )
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
         self.assertEqual(['chunk1', 'chunk2', 'single_chunk'], tensor_field_content.chunks)
         self.assertEqual(['content_chunk1', 'content_chunk2', 'single_content_chunk'],
                          tensor_field_content.content_chunks)
@@ -141,7 +161,7 @@ class TestTensorFieldContent(unittest.TestCase):
             is_tensor_field=True,
             is_multimodal_subfield=True
         )
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker(no_chunking=True)})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(True)})
         self.assertEqual(['single_chunk'], tensor_field_content.chunks)
         self.assertEqual(['single_content_chunk'], tensor_field_content.content_chunks)
         self.assertEqual(['single_chunk'], tensor_field_content.tensor_field_chunks)
@@ -155,7 +175,7 @@ class TestTensorFieldContent(unittest.TestCase):
             is_multimodal_subfield=True
         )
         tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
         self.assertEqual(['hello world', 'single_chunk'], tensor_field_content.chunks)
         self.assertEqual(['single_content_chunk'], tensor_field_content.content_chunks)
         self.assertEqual(['hello world'], tensor_field_content.tensor_field_chunks)
@@ -184,7 +204,7 @@ class TestTensorFieldContent(unittest.TestCase):
                     is_multimodal_subfield=is_multimodal_subfield
                 )
 
-                tensor_field_content.chunk({field_type: self._dummy_chunker()})
+                tensor_field_content.chunk({field_type: DummyChunker(False)})
                 self.assertEqual(['chunk1', 'chunk2'], tensor_field_content.chunks)
                 self.assertEqual(['content_chunk1', 'content_chunk2'], tensor_field_content.content_chunks)
                 self.assertEqual(['chunk1', 'chunk2'], tensor_field_content.tensor_field_chunks)
@@ -207,10 +227,10 @@ class TestTensorFieldContent(unittest.TestCase):
             field_content="hello world!",
             is_tensor_field=True
         )
-        call_counter = self.CallCounter()
-        tensor_field_content.vectorise({FieldType.Text: self._dummy_vectoriser(call_counter)})
+        vectoriser = DummyVectoriser()
+        tensor_field_content.vectorise({FieldType.Text: vectoriser})
         self.assertEqual([], tensor_field_content.embeddings)
-        self.assertEqual(0, call_counter.count)
+        self.assertEqual(0, vectoriser.vectorise_call_count)
         self.assertEqual([], tensor_field_content.tensor_field_embeddings)
         self.assertEqual(None, tensor_field_content.sub_field_embedding)
 
@@ -220,11 +240,11 @@ class TestTensorFieldContent(unittest.TestCase):
             field_content="hello world!",
             is_tensor_field=True
         )
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
-        call_counter = self.CallCounter()
-        tensor_field_content.vectorise({FieldType.Text: self._dummy_vectoriser(call_counter)})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
+        vectoriser = DummyVectoriser()
+        tensor_field_content.vectorise({FieldType.Text: vectoriser})
         self.assertEqual([[1.0, 2.0], [2.0, 4.0]], tensor_field_content.embeddings)
-        self.assertEqual(1, call_counter.count)
+        self.assertEqual(1, vectoriser.vectorise_call_count)
         self.assertEqual([[1.0, 2.0], [2.0, 4.0]], tensor_field_content.tensor_field_embeddings)
         self.assertEqual(None, tensor_field_content.sub_field_embedding)
 
@@ -235,12 +255,12 @@ class TestTensorFieldContent(unittest.TestCase):
             is_tensor_field=True,
             is_multimodal_subfield=True
         )
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
-        call_counter = self.CallCounter()
-        tensor_field_content.vectorise({FieldType.Text: self._dummy_vectoriser(call_counter)})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
+        vectoriser = DummyVectoriser()
+        tensor_field_content.vectorise({FieldType.Text: vectoriser})
         # There are in total 3 chunks to vectorise
         self.assertEqual([[1.0, 2.0], [2.0, 4.0], [3.0, 6.0]], tensor_field_content.embeddings)
-        self.assertEqual(1, call_counter.count)
+        self.assertEqual(1, vectoriser.vectorise_call_count)
         self.assertEqual([[1.0, 2.0], [2.0, 4.0]], tensor_field_content.tensor_field_embeddings)
         self.assertEqual([3.0, 6.0], tensor_field_content.sub_field_embedding)
 
@@ -252,12 +272,12 @@ class TestTensorFieldContent(unittest.TestCase):
             is_multimodal_subfield=True
         )
         tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.1, 1.2]])
-        tensor_field_content.chunk({FieldType.Text: self._dummy_chunker()})
-        call_counter = self.CallCounter()
-        tensor_field_content.vectorise({FieldType.Text: self._dummy_vectoriser(call_counter)})
+        tensor_field_content.chunk({FieldType.Text: DummyChunker(False)})
+        vectoriser = DummyVectoriser()
+        tensor_field_content.vectorise({FieldType.Text: vectoriser})
         # The first embeddings is the pre-populated value
         self.assertEqual([[1.1, 1.2], [1.0, 2.0]], tensor_field_content.embeddings)
-        self.assertEqual(1, call_counter.count)
+        self.assertEqual(1, vectoriser.vectorise_call_count)
         self.assertEqual([[1.1, 1.2]], tensor_field_content.tensor_field_embeddings)
         self.assertEqual([1.0, 2.0], tensor_field_content.sub_field_embedding)
 
@@ -284,11 +304,11 @@ class TestTensorFieldContent(unittest.TestCase):
                     is_multimodal_subfield=is_multimodal_subfield
                 )
 
-                tensor_field_content.chunk({field_type: self._dummy_chunker()})
-                call_counter = self.CallCounter()
-                tensor_field_content.vectorise({field_type: self._dummy_vectoriser(call_counter)})
+                tensor_field_content.chunk({field_type: DummyChunker(False)})
+                vectoriser = DummyVectoriser()
+                tensor_field_content.vectorise({field_type: vectoriser})
                 self.assertEqual([[1.0, 2.0], [2.0, 4.0]], tensor_field_content.embeddings)
-                self.assertEqual(1, call_counter.count)
+                self.assertEqual(1, vectoriser.vectorise_call_count)
                 self.assertEqual([[1.0, 2.0], [2.0, 4.0]], tensor_field_content.tensor_field_embeddings)
                 if is_multimodal_subfield:
                     # average will be returned for multi-modal calculation
@@ -353,8 +373,8 @@ class TestTensorFieldContent(unittest.TestCase):
                     normalize_embeddings=normalize_embeddings
                 )
 
-                subfield1.chunk({FieldType.Text: self._dummy_chunker()})
-                subfield1.vectorise({FieldType.Text: self._dummy_vectoriser()})
+                subfield1.chunk({FieldType.Text: DummyChunker(False)})
+                subfield1.vectorise({FieldType.Text: DummyVectoriser()})
                 self.assertEqual(['{"field_1": "single_chunk"}'], multimodal_field.tensor_field_chunks)
                 self.assertEqual(expected_embeddings, multimodal_field.tensor_field_embeddings)
 
@@ -390,32 +410,11 @@ class TestTensorFieldContent(unittest.TestCase):
                     normalize_embeddings=normalize_embeddings
                 )
 
-                chunkers = {FieldType.Text: self._dummy_chunker()}
-                vectorisers = {FieldType.Text: self._dummy_vectoriser()}
+                chunkers = {FieldType.Text: DummyChunker(False)}
+                vectorisers = {FieldType.Text: DummyVectoriser()}
                 subfield1.chunk(chunkers)
                 subfield1.vectorise(vectorisers)
                 subfield2.chunk(chunkers)
                 subfield2.vectorise(vectorisers)
                 self.assertEqual(['{"field_1": "single_chunk", "field_2": "single_chunk"}'], multimodal_field.tensor_field_chunks)
                 self.assertEqual(expected_embeddings, multimodal_field.tensor_field_embeddings)
-
-    def _dummy_chunker(self, no_chunking=False) -> Chunker:
-        def chunk(_: str, single_chunk: bool = False) -> Tuple[List[str], List[str]]:
-            if single_chunk or no_chunking:
-                return ['single_chunk'], ['single_content_chunk']
-            else:
-                return ['chunk1', 'chunk2'], ['content_chunk1', 'content_chunk2']
-
-        return chunk
-
-    class CallCounter:
-        def __init__(self):
-            self.count = 0
-
-    def _dummy_vectoriser(self, call_counter=CallCounter()) -> Vectoriser:
-
-        def vectorise(content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
-            call_counter.count += 1
-            return [[1.0 * (i+1), 2.0 * (i+1)] for i in range(len(content_chunks))]
-
-        return vectorise

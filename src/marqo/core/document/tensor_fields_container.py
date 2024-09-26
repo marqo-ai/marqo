@@ -1,16 +1,28 @@
+import hashlib
 import json
-from typing import List, Dict, Set, Optional, Any, Generator, Tuple, Protocol, cast, Union, TypeVar
+from abc import ABC, abstractmethod
+from typing import List, Dict, Set, Optional, Any, Generator, Tuple, cast, TypeVar
 
 import numpy as np
 from PIL.Image import Image
 from pydantic.main import BaseModel
 from torch import Tensor
 
+from marqo import marqo_docs
+from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import AddDocumentsError
-from marqo.core.models.marqo_index import FieldType
+from marqo.core.models.marqo_index import FieldType, TextPreProcessing, ImagePreProcessing
+from marqo.s2_inference import errors as s2_inference_errors
+from marqo.s2_inference import s2_inference
+from marqo.s2_inference.multimodal_model_load import Modality
+from marqo.s2_inference.processing import image as image_processor
+from marqo.s2_inference.processing import text as text_processor
 
+# TODO remove these deps
+from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.tensor_search.models.private_models import ModelAuth
 
 # Content chunk of different modality can have different types
 # - Text: str
@@ -19,14 +31,162 @@ from marqo.core.models.marqo_index import FieldType
 ContentChunkType = TypeVar('ContentChunkType', str, Image, Tensor, Dict[str, Tensor])
 
 
-class Chunker(Protocol):
-    def __call__(self, field_content: str, single_chunk: bool = False) -> Tuple[List[str], List[ContentChunkType]]:
-        ...
+class Chunker(ABC):
+    @abstractmethod
+    def chunk(self, field_content: str, single_chunk: bool = False) -> Tuple[List[str], List[ContentChunkType]]:
+        pass
 
 
-class Vectoriser(Protocol):
-    def __call__(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
-        ...
+class TextChunker(Chunker):
+    def __init__(self, text_preprocessing: TextPreProcessing, text_chunk_prefix: str):
+        self.text_preprocessing = text_preprocessing
+        self.text_chunk_prefix = text_chunk_prefix
+
+    def chunk(self, field_content: str, single_chunk: bool = False) -> Tuple[List[str], List[str]]:
+        chunks = [field_content] if single_chunk else (
+            text_processor.split_text(text=field_content,
+                                      split_by=self.text_preprocessing.split_method.value,
+                                      split_length=self.text_preprocessing.split_length,
+                                      split_overlap=self.text_preprocessing.split_overlap))
+        return chunks, text_processor.prefix_text_chunks(chunks, self.text_chunk_prefix)
+
+
+class ImageChunker(Chunker):
+    def __init__(self, media_repo, image_preprocessing: ImagePreProcessing, device: Optional[str]):
+        self.image_preprocessing = image_preprocessing
+        self.device = device
+        self.media_repo = media_repo
+
+    def chunk(self, field_content: str, single_chunk: bool = False):
+        image_method = self.image_preprocessing.patch_method
+        url = field_content
+        image_data = self.media_repo[url]
+        if single_chunk or image_method is None:
+            return [url], [image_data]
+
+        try:
+            content_chunks, text_chunks = image_processor.chunk_image(
+                image_data, device=self.device, method=image_method.value)
+            return text_chunks, content_chunks
+        except s2_inference_errors.S2InferenceError as e:
+            raise AddDocumentsError(e.message) from e
+
+
+class AudioVideoChunker(Chunker):
+    def __init__(self, media_repo):
+        self.media_repo = media_repo
+
+    def _chunk_id(self, media_chunk: dict) -> str:
+        chunk_start = media_chunk['start_time']
+        chunk_end = media_chunk['end_time']
+        return f"{[chunk_start, chunk_end]}"
+
+    def chunk(self, field_content: str, single_chunk: bool = False):
+        url = field_content
+        media_chunks = self.media_repo[url]
+
+        # single_chunk does not apply to video and audio fields. Instead, it needs to calculate the
+        # embedding for each chunk and average them
+        if single_chunk:
+            raise RuntimeError("Video and Audio chunker does not support single_chunk")
+
+        text_chunks = [self._chunk_id(media_chunk) for media_chunk in media_chunks]
+        content_chunks = [media_chunk['tensor'] for media_chunk in media_chunks]
+
+        return text_chunks, content_chunks
+
+
+class ModelConfig(BaseModel):
+    model_name: str
+    model_properties: Optional[Dict[str, Any]]
+    model_auth: Optional[ModelAuth]
+    device: Optional[str]
+    normalize_embeddings: bool
+
+
+class Vectoriser(ABC):
+    @abstractmethod
+    def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
+        pass
+
+    def _s2inference_vectorise(self, content_chunks: List[ContentChunkType],
+                               modality: Modality, model_config: ModelConfig):
+        try:
+            return s2_inference.vectorise(
+                model_name=model_config.model_name,
+                model_properties=model_config.model_properties,
+                content=content_chunks,
+                device=model_config.device,
+                normalize_embeddings=model_config.normalize_embeddings,
+                model_auth=model_config.model_auth,
+                modality=modality
+            )
+        except (s2_inference_errors.UnknownModelError,
+                s2_inference_errors.InvalidModelPropertiesError,
+                s2_inference_errors.ModelLoadError,
+                s2_inference.ModelDownloadError) as model_error:
+            # Fail the whole batch due to a malfunctioning embedding model
+            # TODO Add a core exception
+            raise api_errors.BadRequestError(
+                message=f'Problem vectorising query. Reason: {str(model_error)}',
+                link=marqo_docs.list_of_models()
+            )
+        except s2_inference_errors.S2InferenceError as e:
+            raise AddDocumentsError(e.message) from e
+
+
+class SingleVectoriser(Vectoriser):
+    def __init__(self, modality: Modality, model_config: ModelConfig):
+        self.modality = modality
+        self.model_config = model_config
+
+    def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
+        with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+            if self.modality in [Modality.AUDIO, Modality.VIDEO]:
+                # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
+                return [vector for content_chunk in content_chunks for vector in
+                        self._s2inference_vectorise([content_chunk], self.modality, self.model_config)]
+            return self._s2inference_vectorise(content_chunks, self.modality, self.model_config)
+
+
+class BatchCachingVectoriser(Vectoriser):
+    def __init__(self, modality: Modality, chunks_to_vectorise: List[ContentChunkType], model_config: ModelConfig):
+        self.modality = modality
+        self.model_config = model_config
+        self.embedding_cache = self._vectorise_and_cache(chunks_to_vectorise)
+
+    def _dict_key(self, chunk: ContentChunkType):
+        if isinstance(chunk, Image):
+            chunk = chunk.convert('RGB')
+            pixel_bytes = chunk.tobytes()
+            # Use md5 hash for faster hashing.
+            return hashlib.md5(pixel_bytes).hexdigest()
+        elif isinstance(chunk, dict):
+            # Generate a sorted key-value pairs to ensure consistency.
+            return frozenset((k, self._dict_key(v)) for k, v in chunk.items())
+        elif isinstance(chunk, Tensor):
+            # Convert to a tuple to be hashable  # TODO find a more memory efficient way, maybe hashlib.md5?
+            return tuple(chunk.flatten().tolist())
+        else:
+            return chunk
+
+    def _vectorise_and_cache(self, chunks_to_vectorise: List[ContentChunkType]) -> dict:
+        if not chunks_to_vectorise:
+            return dict()
+
+        # TODO this might be a breaking change since the create_vectors metrics is not consistent
+        #   for individual tensor fields and subfields of multimodal fields
+        with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
+            if self.modality in [Modality.AUDIO, Modality.VIDEO]:
+                # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
+                embeddings = [vector for content_chunk in chunks_to_vectorise for vector in
+                              self._s2inference_vectorise([content_chunk], self.modality, self.model_config)]
+            else:
+                embeddings = self._s2inference_vectorise(chunks_to_vectorise, self.modality, self.model_config)
+            return {self._dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
+
+    def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
+        return [self.embedding_cache[self._dict_key(chunk)] for chunk in content_chunks]
 
 
 class TensorFieldContent(BaseModel):
@@ -75,7 +235,7 @@ class TensorFieldContent(BaseModel):
 
         # chunk top-level fields
         if not self.chunks and (self.is_tensor_field or self._is_audio_or_video()):
-            chunks, content_chunks = chunker(self.field_content, single_chunk=False)
+            chunks, content_chunks = chunker.chunk(self.field_content, single_chunk=False)
             self.chunks.extend(chunks)
             self.content_chunks.extend(content_chunks)
             self.tensor_field_chunk_count = len(chunks)
@@ -86,7 +246,7 @@ class TensorFieldContent(BaseModel):
             # If this field is also a top level tensor field, it might already have the chunk we need.
             # So we check if the single chunk generated by chunker matches the last chunk of the tensor field.
             # If not, we attach the single chunk to the exiting chunk for embedding.
-            chunks, content_chunks = chunker(self.field_content, single_chunk=True)
+            chunks, content_chunks = chunker.chunk(self.field_content, single_chunk=True)
 
             if not self.chunks or chunks[0] != self.chunks[-1]:
                 self.chunks.extend(chunks)
@@ -99,7 +259,7 @@ class TensorFieldContent(BaseModel):
         if not self.content_chunks:
             return
 
-        embeddings = vectorisers[self.field_type](self.content_chunks)
+        embeddings = vectorisers[self.field_type].vectorise(self.content_chunks)
         self.embeddings.extend(embeddings)
         self.content_chunks = []  # drop it after vectorisation so memory can be freed
         self.is_resolved = True

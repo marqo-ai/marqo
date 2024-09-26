@@ -1,34 +1,23 @@
-import copy
-import hashlib
-import os
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import ExitStack
 from timeit import default_timer as timer
-from typing import List, Dict, Optional, Any, Tuple, Set, Union
+from typing import List, Dict, Optional, Any, Tuple, Set
 
-import torch
-from PIL.Image import Image
-
-from marqo import marqo_docs
 from marqo.api import exceptions as api_errors
 from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
-from marqo.core.document.tensor_fields_container import Chunker, Vectoriser, TensorFieldsContainer, TensorFieldContent, \
-    ContentChunkType
+from marqo.core.document.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
+    TextChunker, ImageChunker, AudioVideoChunker, SingleVectoriser, ModelConfig, \
+    BatchCachingVectoriser
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
-from marqo.core.models.marqo_index import FieldType, TextPreProcessing, ImagePreProcessing
+from marqo.core.models.marqo_index import FieldType
 from marqo.logging import get_logger
-from marqo.s2_inference import errors as s2_inference_errors
-from marqo.s2_inference import s2_inference
 from marqo.s2_inference.multimodal_model_load import Modality
-from marqo.s2_inference.processing import image as image_processor
-from marqo.s2_inference.processing import text as text_processor
 from marqo.tensor_search import validation, add_docs
-from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.models.get_document_response import Document
@@ -278,16 +267,32 @@ class AddDocumentsHandler(ABC):
         - Batching by doc: Chunk and vectorise fields of a doc by field type (text, image, audio, video, etc.)
         - Batching by add-doc batch: Chunk and vectorise all fields of a batch of docs by type
         """
+        model_config = ModelConfig(
+            model_name=self.marqo_index.model.name,
+            model_properties=self.marqo_index.model.get_properties(),
+            model_auth=self.add_docs_params.model_auth,
+            device=self.add_docs_params.device,
+            normalize_embeddings=self.marqo_index.normalize_embeddings
+        )
         # TODO add a parameter to choose batching strategy? Do a performance test to decide the default approach
-        # self.vectorise_tensor_fields_per_field()
-        self.vectorise_tensor_fields_in_batch_per_doc()
-        # self.vectorise_tensor_fields_in_batch_per_add_doc_batch()
+        batch_mode = 'PER_DOC'  # extract a enum
 
-    def vectorise_tensor_fields_per_field(self) -> None:
+        if batch_mode == 'PER_FIELD':
+            self.vectorise_tensor_fields_per_field(model_config)
+        elif batch_mode == 'PER_DOC':
+            self.vectorise_tensor_fields_in_batch_per_doc(model_config)
+        elif batch_mode == 'PER_ADD_DOC_BATCH':
+            self.vectorise_tensor_fields_in_batch_per_add_doc_batch(model_config)
+        else:
+            raise api_errors.BadRequestError(
+                message=f'Unsupported vectorisation batch mode: {str(batch_mode)}'
+            )
+
+    def vectorise_tensor_fields_per_field(self, model_config: ModelConfig) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
-            vectorisers = {field_type: self.single_vectoriser(modality)
+            vectorisers = {field_type: SingleVectoriser(modality, model_config)
                            for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()}
 
             for doc_id, field_name, tensor_field_content in (
@@ -299,7 +304,7 @@ class AddDocumentsHandler(ABC):
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
 
-    def vectorise_tensor_fields_in_batch_per_doc(self) -> None:
+    def vectorise_tensor_fields_in_batch_per_doc(self, model_config: ModelConfig) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
@@ -324,7 +329,8 @@ class AddDocumentsHandler(ABC):
             # TODO check if we should capture total vectorise time
             for doc_id, chunks_to_vectorise in doc_chunks_map.items():
                 try:
-                    vectorisers = {field_type: self.batch_vectoriser(chunks_to_vectorise[field_type], modality)
+                    vectorisers = {field_type: BatchCachingVectoriser(modality, chunks_to_vectorise[field_type],
+                                                                      model_config)
                                    for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()
                                    if field_type in chunks_to_vectorise}
 
@@ -335,7 +341,7 @@ class AddDocumentsHandler(ABC):
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
 
-    def vectorise_tensor_fields_in_batch_per_add_doc_batch(self) -> None:
+    def vectorise_tensor_fields_in_batch_per_add_doc_batch(self, model_config: ModelConfig) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
@@ -353,7 +359,7 @@ class AddDocumentsHandler(ABC):
                     self.tensor_fields_container.remove_doc(doc_id)
 
             try:
-                vectorisers = {field_type: self.batch_vectoriser(chunks_map[field_type], modality)
+                vectorisers = {field_type: BatchCachingVectoriser(modality, chunks_map[field_type], model_config)
                                for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()}
             except AddDocumentsError as err:
                 # TODO check if it is too verbose to log out traceback
@@ -406,134 +412,14 @@ class AddDocumentsHandler(ABC):
 
     def _field_type_chunker_map(self, media_repo):
         chunkers: Dict[FieldType, Chunker] = {
-            FieldType.Text: self.text_chunker(text_preprocessing=self.marqo_index.text_preprocessing,
-                                              text_chunk_prefix=self.marqo_index.model.get_text_chunk_prefix(
-                                                  self.add_docs_params.text_chunk_prefix)),
-            FieldType.ImagePointer: self.image_chunker(media_repo=media_repo,
-                                                       image_preprocessing=self.marqo_index.image_preprocessing,
-                                                       device=self.add_docs_params.device),
-            FieldType.AudioPointer: self.video_audio_chunker(media_repo=media_repo),
-            FieldType.VideoPointer: self.video_audio_chunker(media_repo=media_repo),
+            FieldType.Text: TextChunker(text_preprocessing=self.marqo_index.text_preprocessing,
+                                        text_chunk_prefix=self.marqo_index.model.get_text_chunk_prefix(
+                                            self.add_docs_params.text_chunk_prefix)),
+            FieldType.ImagePointer: ImageChunker(media_repo=media_repo,
+                                                 image_preprocessing=self.marqo_index.image_preprocessing,
+                                                 device=self.add_docs_params.device),
+            FieldType.AudioPointer: AudioVideoChunker(media_repo=media_repo),
+            FieldType.VideoPointer: AudioVideoChunker(media_repo=media_repo),
         }
         return chunkers
-
-    def text_chunker(self, text_preprocessing: TextPreProcessing, text_chunk_prefix: str) -> Chunker:
-        def chunk(field_content: str, single_chunk: bool = False) -> Tuple[List[str], List[str]]:
-            chunks = [field_content] if single_chunk else (
-                text_processor.split_text(text=field_content,
-                                          split_by=text_preprocessing.split_method.value,
-                                          split_length=text_preprocessing.split_length,
-                                          split_overlap=text_preprocessing.split_overlap))
-            return chunks, text_processor.prefix_text_chunks(chunks, text_chunk_prefix)
-
-        return chunk
-
-    def image_chunker(self, media_repo, image_preprocessing: ImagePreProcessing, device: Optional[str]) -> Chunker:
-        image_method = image_preprocessing.patch_method
-
-        def chunk(field_content: str, single_chunk: bool = False):
-            url = field_content
-            image_data = media_repo[url]
-            if single_chunk or image_method is None:
-                return [url], [image_data]
-
-            try:
-                content_chunks, text_chunks = image_processor.chunk_image(
-                    image_data, device=device, method=image_method.value)
-                return text_chunks, content_chunks
-            except s2_inference_errors.S2InferenceError as e:
-                raise AddDocumentsError(e.message) from e
-
-        return chunk
-
-    def video_audio_chunker(self, media_repo) -> Chunker:
-        def chunk_id(media_chunk: dict) -> str:
-            chunk_start = media_chunk['start_time']
-            chunk_end = media_chunk['end_time']
-            return f"{[chunk_start, chunk_end]}"
-
-        def chunk(field_content: str, single_chunk: bool = False):
-            url = field_content
-            media_chunks = media_repo[url]
-
-            # single_chunk does not apply to video and audio fields. Instead, it needs to calculate the
-            # embedding for each chunk and average them
-            if single_chunk:
-                raise RuntimeError("Video and Audio chunker does not support single_chunk")
-
-            text_chunks = [chunk_id(media_chunk) for media_chunk in media_chunks]
-            content_chunks = [media_chunk['tensor'] for media_chunk in media_chunks]
-
-            return text_chunks, content_chunks
-
-        return chunk
-
-    def single_vectoriser(self, modality: Modality) -> Vectoriser:
-        def vectorise(content_chunks: List[ContentChunkType]) -> List[List[float]]:
-            with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
-                if modality in [Modality.AUDIO, Modality.VIDEO]:
-                    # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
-                    return [vector for content_chunk in content_chunks for vector in
-                            self._s2inference_vectorise([content_chunk], modality)]
-                return self._s2inference_vectorise(content_chunks, modality)
-
-        return vectorise
-
-    def batch_vectoriser(self, chunks_to_vectorise: List[ContentChunkType], modality: Modality) -> Vectoriser:
-        def dict_key(chunk: ContentChunkType):
-            if isinstance(chunk, Image):
-                chunk = chunk.convert('RGB')
-                pixel_bytes = chunk.tobytes()
-                # Use md5 hash for faster hashing.
-                return hashlib.md5(pixel_bytes).hexdigest()
-            elif isinstance(chunk, dict):
-                # Generate a sorted key-value pairs to ensure consistency.
-                return frozenset((k, dict_key(v)) for k, v in chunk.items())
-            elif isinstance(chunk, torch.Tensor):
-                # Convert to a tuple to be hashable  # TODO find a more memory efficient way, maybe hashlib.md5?
-                return tuple(chunk.flatten().tolist())
-            else:
-                return chunk
-
-        embedding_cache = dict()
-        if chunks_to_vectorise:
-            # TODO this might be a breaking change since the create_vectors metrics is not consistent
-            #   for individual tensor fields and subfields of multimodal fields
-            with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
-                if modality in [Modality.AUDIO, Modality.VIDEO]:
-                    # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
-                    embeddings = [vector for content_chunk in chunks_to_vectorise for vector in
-                                  self._s2inference_vectorise([content_chunk], modality)]
-                else:
-                    embeddings = self._s2inference_vectorise(chunks_to_vectorise, modality)
-                embedding_cache = {dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
-
-        def vectorise(content_chunks: List[ContentChunkType]) -> List[List[float]]:
-            return [embedding_cache[dict_key(chunk)] for chunk in content_chunks]
-
-        return vectorise
-
-    def _s2inference_vectorise(self, content_chunks: List[ContentChunkType], modality: Modality):
-        try:
-            return s2_inference.vectorise(
-                model_name=self.marqo_index.model.name,
-                model_properties=self.marqo_index.model.get_properties(),
-                content=content_chunks,
-                device=self.add_docs_params.device,
-                normalize_embeddings=self.marqo_index.normalize_embeddings,
-                model_auth=self.add_docs_params.model_auth,
-                modality=modality
-            )
-        except (s2_inference_errors.UnknownModelError,
-                s2_inference_errors.InvalidModelPropertiesError,
-                s2_inference_errors.ModelLoadError,
-                s2_inference.ModelDownloadError) as model_error:
-            # Fail the whole batch due to a malfunctioning embedding model
-            # TODO Add a core exception
-            raise api_errors.BadRequestError(
-                message=f'Problem vectorising query. Reason: {str(model_error)}',
-                link=marqo_docs.list_of_models()
-            )
-        except s2_inference_errors.S2InferenceError as e:
-            raise AddDocumentsError(e.message) from e
 
