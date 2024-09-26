@@ -1,3 +1,4 @@
+import enum
 from typing import List
 from typing import Optional, Union, Any, Sequence
 
@@ -13,6 +14,11 @@ from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
 from marqo.tensor_search.enums import EnvVars
 
+
+class BatchVectorisationMode(enum.Enum):
+    PER_FIELD = 'per_field'
+    PER_DOCUMENT = 'per_document'
+    PER_BATCH = 'per_batch'
 
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
@@ -48,6 +54,7 @@ class AddDocsParams(BaseModel):
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
     text_chunk_prefix: Optional[str] = None
+    batch_vectorisation_mode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device

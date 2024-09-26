@@ -7,11 +7,12 @@ from typing import List, Dict, Optional, Any, Tuple, Set
 from marqo.api import exceptions as api_errors
 from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.document.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.document.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
     TextChunker, ImageChunker, AudioVideoChunker, SingleVectoriser, ModelConfig, \
     BatchCachingVectoriser
-from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError
+from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \
+    UnsupportedFeatureError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
@@ -271,19 +272,17 @@ class AddDocumentsHandler(ABC):
             device=self.add_docs_params.device,
             normalize_embeddings=self.marqo_index.normalize_embeddings
         )
-        # TODO add a parameter to choose batching strategy? Do a performance test to decide the default approach
-        batch_mode = 'PER_DOC'  # extract a enum
+        batch_mode = self.add_docs_params.batch_vectorisation_mode
 
-        if batch_mode == 'PER_FIELD':
+        if batch_mode == BatchVectorisationMode.PER_FIELD:
             self.vectorise_tensor_fields_per_field(model_config)
-        elif batch_mode == 'PER_DOC':
+        elif batch_mode == BatchVectorisationMode.PER_DOCUMENT:
             self.vectorise_tensor_fields_in_batch_per_doc(model_config)
-        elif batch_mode == 'PER_ADD_DOC_BATCH':
+        elif batch_mode == BatchVectorisationMode.PER_BATCH:
             self.vectorise_tensor_fields_in_batch_per_add_doc_batch(model_config)
         else:
-            # TODO replace with core error
-            raise api_errors.BadRequestError(
-                message=f'Unsupported vectorisation batch mode: {str(batch_mode)}'
+            raise UnsupportedFeatureError(
+                message=f'Unsupported batch vectorisation mode: {str(batch_mode)}'
             )
 
     def vectorise_tensor_fields_per_field(self, model_config: ModelConfig) -> None:
@@ -360,10 +359,8 @@ class AddDocumentsHandler(ABC):
                 vectorisers = {field_type: BatchCachingVectoriser(modality, chunks_map[field_type], model_config)
                                for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()}
             except AddDocumentsError as err:
-                # TODO check if it is too verbose to log out traceback
                 logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err, exc_info=True)
-                # TODO raise a core exception
-                raise api_errors.BadRequestError(
+                raise InternalError(
                     message=f'Encountered problem when vectorising batch of documents. Reason: {str(err)}'
                 )
 

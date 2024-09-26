@@ -9,6 +9,7 @@ from marqo.core.document.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.exceptions import InvalidArgumentError
 
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.get_document_response import Document
@@ -44,9 +45,9 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _validate_add_docs_params(self, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
         if add_docs_params.tensor_fields is not None:
-            raise api_errors.InvalidArgError("Cannot specify 'tensorFields' when adding documents to a "
-                                             "structured index. 'tensorFields' must be defined in structured "
-                                             "index schema at index creation time")
+            raise InvalidArgumentError("Cannot specify 'tensorFields' when adding documents to a "
+                                       "structured index. 'tensorFields' must be defined in structured "
+                                       "index schema at index creation time")
 
         # TODO confirm if the customer vector mapping is allowed for structured index. I guess it's ignored
         if add_docs_params.mappings is not None:

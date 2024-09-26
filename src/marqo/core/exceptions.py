@@ -86,6 +86,10 @@ class FieldTypeMismatchError(InvalidArgumentError):
     pass
 
 
+class ModelError(MarqoError):
+    pass
+
+
 class AddDocumentsError(Exception):
     status_code: int = int(HTTPStatus.BAD_REQUEST)
     error_code: str = 'invalid_argument'

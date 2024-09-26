@@ -12,7 +12,7 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import AddDocumentsError
+from marqo.core.exceptions import AddDocumentsError, ModelError
 from marqo.core.models.marqo_index import FieldType, TextPreProcessing, ImagePreProcessing
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
@@ -152,11 +152,7 @@ class Vectoriser(ABC):
                 s2_inference_errors.ModelLoadError,
                 s2_inference.ModelDownloadError) as model_error:
             # Fail the whole batch due to a malfunctioning embedding model
-            # TODO Add a core exception
-            raise api_errors.BadRequestError(
-                message=f'Problem vectorising query. Reason: {str(model_error)}',
-                link=marqo_docs.list_of_models()
-            )
+            raise ModelError(f'Problem vectorising query. Reason: {str(model_error)}')
         except s2_inference_errors.S2InferenceError as e:
             raise AddDocumentsError(e.message) from e
 

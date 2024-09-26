@@ -3,16 +3,14 @@ from unittest.mock import patch
 
 import torch
 from PIL.Image import Image
-from torch import Tensor
 
 from marqo.core.document.tensor_fields_container import SingleVectoriser, ModelConfig, BatchCachingVectoriser
-from marqo.core.exceptions import AddDocumentsError
+from marqo.core.exceptions import AddDocumentsError, ModelError
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.errors import ModelDownloadError
 from marqo.s2_inference.multimodal_model_load import Modality
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.s2_inference import errors as s2_inference_errors
-from marqo.api import exceptions as api_errors
 
 
 class TestTensorFieldVectorisers(MarqoTestCase):
@@ -125,7 +123,7 @@ class TestTensorFieldVectorisers(MarqoTestCase):
                 mock_vectorise.reset_mock()
                 mock_vectorise.side_effect = error
 
-                with self.assertRaises(api_errors.BadRequestError) as context:
+                with self.assertRaises(ModelError) as context:
                     SingleVectoriser(Modality.TEXT, self.model_config).vectorise(['chunk'])
 
                 self.assertIn('Problem vectorising query. Reason:', str(context.exception))
