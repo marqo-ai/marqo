@@ -64,11 +64,4 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         if self.should_update_index:
             with RequestMetricsStore.for_request().time("add_documents.update_index"):
                 self.config.index_management.update_index(self.marqo_index)
-            # We will force refresh when get_document_by_id(s), but still use the staled index during search.
-            # This is because get_by_id usually expect consistent read-the-write behaviour but search is always
-            # considered eventual consistent.
-            # This line here makes sure the search result following the add_doc uses up-to-date index settings
-            # if there's only one marqo instance. Some integration tests rely on this to pass
-            index_meta_cache.get_index(config=self.config, index_name=self.marqo_index.name, force_refresh=True)
-
 
