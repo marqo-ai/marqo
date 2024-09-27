@@ -8,8 +8,6 @@ from PIL.Image import Image
 from pydantic.main import BaseModel
 from torch import Tensor
 
-from marqo import marqo_docs
-from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import AddDocumentsError, ModelError
@@ -121,6 +119,13 @@ class ModelConfig(BaseModel):
 
 
 class Vectoriser(ABC):
+    _MODALITY_FIELD_TYPE_MAP = {
+        Modality.TEXT: FieldType.Text,
+        Modality.IMAGE: FieldType.ImagePointer,
+        Modality.VIDEO: FieldType.VideoPointer,
+        Modality.AUDIO: FieldType.AudioPointer,
+    }
+
     @abstractmethod
     def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
         """
@@ -155,6 +160,19 @@ class Vectoriser(ABC):
             raise ModelError(f'Problem vectorising query. Reason: {str(model_error)}')
         except s2_inference_errors.S2InferenceError as e:
             raise AddDocumentsError(e.message) from e
+
+    @classmethod
+    def single_vectorisers_by_modality(cls, model_config: ModelConfig) -> Dict[FieldType, 'Vectoriser']:
+        return {field_type: SingleVectoriser(modality, model_config)
+                for modality, field_type in cls._MODALITY_FIELD_TYPE_MAP.items()}
+
+    @classmethod
+    def batch_vectorisers_by_modality(cls, model_config: ModelConfig,
+                                      chunks_to_vectorise: Dict[FieldType, List[ContentChunkType]]
+                                      ) -> Dict[FieldType, 'Vectoriser']:
+        return {field_type: BatchCachingVectoriser(modality, chunks_to_vectorise[field_type], model_config)
+                for modality, field_type in cls._MODALITY_FIELD_TYPE_MAP.items()
+                if field_type in chunks_to_vectorise}
 
 
 class SingleVectoriser(Vectoriser):

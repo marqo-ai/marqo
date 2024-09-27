@@ -8,15 +8,13 @@ from marqo.api import exceptions as api_errors
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.document.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
-    TextChunker, ImageChunker, AudioVideoChunker, SingleVectoriser, ModelConfig, \
-    BatchCachingVectoriser
+    TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \
     UnsupportedFeatureError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
 from marqo.logging import get_logger
-from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search import validation, add_docs
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import VespaDocument, FeedBatchResponse
@@ -128,7 +126,7 @@ class AddDocumentsHandler(ABC):
             for loc, doc in enumerate(reversed(self.add_docs_params.docs)):
                 original_id = None
                 try:
-                    self.validate_doc(doc)
+                    self._validate_doc(doc)
                     # If _id is not provide, generate a ramdom one
                     original_id = doc.get(MARQO_DOC_ID)
                     marqo_doc = {MARQO_DOC_ID: original_id or str(uuid.uuid4())}
@@ -136,9 +134,9 @@ class AddDocumentsHandler(ABC):
                     for field_name, field_content in doc.items():
                         if field_name == MARQO_DOC_ID:
                             continue  # we don't handle _id field
-                        self.handle_field(marqo_doc, field_name, field_content)
+                        self._handle_field(marqo_doc, field_name, field_content)
 
-                    self.handle_multi_modal_fields(marqo_doc)
+                    self._handle_multi_modal_fields(marqo_doc)
 
                     self.add_docs_response_collector.collect_marqo_doc(loc, marqo_doc, original_id)
                 except AddDocumentsError as err:
@@ -150,22 +148,22 @@ class AddDocumentsHandler(ABC):
                 result = self.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
                                                             self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
-                self.populate_existing_tensors(existing_vespa_docs)
+                self._populate_existing_tensors(existing_vespa_docs)
 
             # vectorise tensor fields
-            self.vectorise_tensor_fields()
+            self._vectorise_tensor_fields()
 
         # FIXME this step is not timed in the original implementation
-        vespa_docs = self.convert_to_vespa_docs()
+        vespa_docs = self._convert_to_vespa_docs()
 
-        self.pre_persist_to_vespa()
+        self._pre_persist_to_vespa()
 
         # persist to vespa if there are still valid docs
         with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
             response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
         with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-            self.handle_vespa_response(response)
+            self._handle_vespa_response(response)
             return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
 
     @abstractmethod
@@ -177,7 +175,7 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def handle_field(self, marqo_doc, field_name, field_content) -> None:
+    def _handle_field(self, marqo_doc, field_name, field_content) -> None:
         """
         This method handles each individual field in a marqo doc, validates it, collect tensor info into
         `tensor_fields_container`, and change the field content if necessary (e.g. custom vector fields)
@@ -185,14 +183,14 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
+    def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
         """
         This method collect the information for multimodal combo fields in a Marqo doc.
         """
         pass
 
     @abstractmethod
-    def populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
+    def _populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
         """
         This method populates embeddings from existing documents. We could save some resources and time
         by skipping vectorisation of existing tensor fields with the same content.
@@ -200,29 +198,29 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
+    def _to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
         """
         Convert a marqo doc into a VespaDocument.
         """
         pass
 
-    def pre_persist_to_vespa(self) -> None:
+    def _pre_persist_to_vespa(self) -> None:
         """
         A hook method to do extra handling before we persist docs to Vespa. By default, it does nothing
         """
         pass
 
-    def convert_to_vespa_docs(self) -> List[VespaDocument]:
+    def _convert_to_vespa_docs(self) -> List[VespaDocument]:
         vespa_docs = []
         for doc_id, doc in self.add_docs_response_collector.marqo_docs.copy().items():
             try:
-                vespa_docs.append(self.to_vespa_doc(doc))
+                vespa_docs.append(self._to_vespa_doc(doc))
             except MarqoDocumentParsingError as e:
                 self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(e.message))
 
         return list(reversed(vespa_docs))
 
-    def handle_vespa_response(self, response: FeedBatchResponse):
+    def _handle_vespa_response(self, response: FeedBatchResponse):
         for resp in response.responses:
             # FIXME doc_id is not url encoded
             doc_id = resp.id.split('::')[-1] if resp.id else None
@@ -234,7 +232,7 @@ class AddDocumentsHandler(ABC):
             else:
                 self.add_docs_response_collector.collect_successful_response(doc_id)
 
-    def validate_doc(self, doc) -> None:
+    def _validate_doc(self, doc) -> None:
         try:
             validation.validate_doc(doc)
 
@@ -249,15 +247,7 @@ class AddDocumentsHandler(ABC):
         except (api_errors.InvalidArgError, api_errors.DocTooLargeError, api_errors.InvalidDocumentIdError) as err:
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
-    # The following code are about handling all tensor fields
-    MODALITY_FIELD_TYPE_MAP = {
-        Modality.TEXT: FieldType.Text,
-        Modality.IMAGE: FieldType.ImagePointer,
-        Modality.VIDEO: FieldType.VideoPointer,
-        Modality.AUDIO: FieldType.AudioPointer,
-    }
-
-    def vectorise_tensor_fields(self) -> None:
+    def _vectorise_tensor_fields(self) -> None:
         """
         Download, preprocess, chunk and vectorise collected tensor fields.
         Three different batching strategies can be chosen to do tradeoff between resource usage and performance.
@@ -275,22 +265,21 @@ class AddDocumentsHandler(ABC):
         batch_mode = self.add_docs_params.batch_vectorisation_mode
 
         if batch_mode == BatchVectorisationMode.PER_FIELD:
-            self.vectorise_tensor_fields_per_field(model_config)
+            self._vectorise_tensor_fields_per_field(model_config)
         elif batch_mode == BatchVectorisationMode.PER_DOCUMENT:
-            self.vectorise_tensor_fields_in_batch_per_doc(model_config)
+            self._vectorise_tensor_fields_in_batch_per_doc(model_config)
         elif batch_mode == BatchVectorisationMode.PER_BATCH:
-            self.vectorise_tensor_fields_in_batch_per_add_doc_batch(model_config)
+            self._vectorise_tensor_fields_in_batch_per_add_doc_batch(model_config)
         else:
             raise UnsupportedFeatureError(
                 message=f'Unsupported batch vectorisation mode: {str(batch_mode)}'
             )
 
-    def vectorise_tensor_fields_per_field(self, model_config: ModelConfig) -> None:
+    def _vectorise_tensor_fields_per_field(self, model_config: ModelConfig) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
-            vectorisers = {field_type: SingleVectoriser(modality, model_config)
-                           for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()}
+            vectorisers = Vectoriser.single_vectorisers_by_modality(model_config)
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
@@ -301,7 +290,7 @@ class AddDocumentsHandler(ABC):
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
 
-    def vectorise_tensor_fields_in_batch_per_doc(self, model_config: ModelConfig) -> None:
+    def _vectorise_tensor_fields_in_batch_per_doc(self, model_config: ModelConfig) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
@@ -326,10 +315,7 @@ class AddDocumentsHandler(ABC):
             # TODO check if we should capture total vectorise time
             for doc_id, chunks_to_vectorise in doc_chunks_map.items():
                 try:
-                    vectorisers = {field_type: BatchCachingVectoriser(modality, chunks_to_vectorise[field_type],
-                                                                      model_config)
-                                   for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()
-                                   if field_type in chunks_to_vectorise}
+                    vectorisers = Vectoriser.batch_vectorisers_by_modality(model_config, chunks_to_vectorise)
 
                     for tensor_field_content in doc_field_map[doc_id]:
                         tensor_field_content.vectorise(vectorisers)
@@ -338,26 +324,24 @@ class AddDocumentsHandler(ABC):
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
 
-    def vectorise_tensor_fields_in_batch_per_add_doc_batch(self, model_config: ModelConfig) -> None:
+    def _vectorise_tensor_fields_in_batch_per_add_doc_batch(self, model_config: ModelConfig) -> None:
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
-            chunks_map = {field_type: [] for field_type in chunkers.keys()}
+            chunks_map = dict()
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
                     tensor_field_content.chunk(chunkers)
-                    chunks_to_vectorise = tensor_field_content.content_chunks
                     field_type = tensor_field_content.field_type
-                    chunks_map[field_type].extend(chunks_to_vectorise)
+                    chunks_map.setdefault(field_type, []).extend(tensor_field_content.content_chunks)
                 except AddDocumentsError as err:
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
 
             try:
-                vectorisers = {field_type: BatchCachingVectoriser(modality, chunks_map[field_type], model_config)
-                               for modality, field_type in self.MODALITY_FIELD_TYPE_MAP.items()}
+                vectorisers = Vectoriser.batch_vectorisers_by_modality(model_config, chunks_map)
             except AddDocumentsError as err:
                 logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err, exc_info=True)
                 raise InternalError(

@@ -22,7 +22,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         self.vespa_index = SemiStructuredVespaIndex(marqo_index)
         self.should_update_index = False
 
-    def handle_field(self, marqo_doc, field_name, field_content):
+    def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
         text_field_type = self._infer_field_type(field_content)
         content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name,
@@ -40,7 +40,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                 self.marqo_index.clear_cache()
                 self.should_update_index = True
 
-    def to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
+    def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])
         processed_tensor_fields = dict()
         for field_name, tensor_field_content in doc_tensor_fields.items():
@@ -62,7 +62,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
 
         return VespaDocument(**self.vespa_index.to_vespa_document(marqo_document=doc))
 
-    def pre_persist_to_vespa(self):
+    def _pre_persist_to_vespa(self):
         if self.should_update_index:
             with RequestMetricsStore.for_request().time("add_documents.update_index"):
                 self.index_management.update_index(self.marqo_index)

@@ -54,7 +54,7 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
         if add_docs_params.mappings is not None:
             validation.validate_mappings_object(add_docs_params.mappings, marqo_index)
 
-    def handle_field(self, marqo_doc, field_name, field_content):
+    def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
         field_type = self.marqo_index.field_map[field_name].type
         content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name, field_content, field_type)
@@ -94,7 +94,7 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
         except (api_errors.InvalidFieldNameError, api_errors.InvalidArgError) as err:
             raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
-    def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
+    def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
         doc_id = marqo_doc[MARQO_DOC_ID]
         for field_name, weights in self.tensor_fields_container.collect_multi_modal_fields(
                 doc_id, self.marqo_index.normalize_embeddings):
@@ -103,7 +103,7 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
             if self.marqo_index.field_map.get(field_name).dependent_fields != weights:
                 marqo_doc[field_name] = weights
 
-    def populate_existing_tensors(self, existing_vespa_docs: List[Document]):
+    def _populate_existing_tensors(self, existing_vespa_docs: List[Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
             return
 
@@ -116,7 +116,7 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
             self.tensor_fields_container.populate_tensor_from_existing_doc(existing_marqo_doc,
                                                                            existing_multimodal_weights)
 
-    def to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
+    def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])
         processed_tensor_fields = dict()
         for field_name, tensor_field_content in doc_tensor_fields.items():

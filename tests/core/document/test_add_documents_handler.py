@@ -29,19 +29,19 @@ class TestAddDocumentHandler(MarqoTestCase):
         def _create_tensor_fields_container(self) -> TensorFieldsContainer:
             return TensorFieldsContainer([], [], {})
 
-        def handle_field(self, marqo_doc, field_name, field_content) -> None:
+        def _handle_field(self, marqo_doc, field_name, field_content) -> None:
             doc_id = marqo_doc[MARQO_DOC_ID]
             marqo_doc[field_name] = field_content
             self.handled_fields.append((doc_id, field_name))
 
-        def handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
+        def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
             doc_id = marqo_doc[MARQO_DOC_ID]
             self.handled_multimodal_fields.append(doc_id)
 
-        def populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
+        def _populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
             self.existing_vespa_docs = existing_vespa_docs
 
-        def to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
+        def _to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
             self.to_vespa_doc_call_count += 1
             return VespaDocument(id=marqo_doc[MARQO_DOC_ID], fields={})
 
@@ -137,7 +137,7 @@ class TestAddDocumentHandler(MarqoTestCase):
             if field_name == 'field5':
                 raise AddDocumentsError('some error')
             self.handled_fields.append((marqo_doc[MARQO_DOC_ID], field_name))
-        handler.handle_field = handle_field_raise_error.__get__(handler)
+        handler._handle_field = handle_field_raise_error.__get__(handler)
 
         response = handler.add_documents()
         self.assertTrue(response.errors)
@@ -179,7 +179,7 @@ class TestAddDocumentHandler(MarqoTestCase):
             if marqo_doc.get('bad_field') == 'bad_content':
                 raise MarqoDocumentParsingError('MarqoDocumentParsingError')
             return VespaDocument(id=marqo_doc[MARQO_DOC_ID], fields={})
-        handler.to_vespa_doc = to_vespa_doc_throw_error.__get__(handler)
+        handler._to_vespa_doc = to_vespa_doc_throw_error.__get__(handler)
 
         response = handler.add_documents()
         self.assertTrue(response.errors)
