@@ -28,6 +28,13 @@ from marqo.tensor_search.models.private_models import ModelAuth
 # - Audio, Video: Dict[str, Tensor]
 ContentChunkType = TypeVar('ContentChunkType', str, Image, Tensor, Dict[str, Tensor])
 
+MODALITY_FIELD_TYPE_MAP = {
+    Modality.TEXT: FieldType.Text,
+    Modality.IMAGE: FieldType.ImagePointer,
+    Modality.VIDEO: FieldType.VideoPointer,
+    Modality.AUDIO: FieldType.AudioPointer,
+}
+
 
 class Chunker(ABC):
     @abstractmethod
@@ -119,13 +126,6 @@ class ModelConfig(BaseModel):
 
 
 class Vectoriser(ABC):
-    _MODALITY_FIELD_TYPE_MAP = {
-        Modality.TEXT: FieldType.Text,
-        Modality.IMAGE: FieldType.ImagePointer,
-        Modality.VIDEO: FieldType.VideoPointer,
-        Modality.AUDIO: FieldType.AudioPointer,
-    }
-
     @abstractmethod
     def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
         """
@@ -164,14 +164,14 @@ class Vectoriser(ABC):
     @classmethod
     def single_vectorisers_by_modality(cls, model_config: ModelConfig) -> Dict[FieldType, 'Vectoriser']:
         return {field_type: SingleVectoriser(modality, model_config)
-                for modality, field_type in cls._MODALITY_FIELD_TYPE_MAP.items()}
+                for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()}
 
     @classmethod
     def batch_vectorisers_by_modality(cls, model_config: ModelConfig,
                                       chunks_to_vectorise: Dict[FieldType, List[ContentChunkType]]
                                       ) -> Dict[FieldType, 'Vectoriser']:
         return {field_type: BatchCachingVectoriser(modality, chunks_to_vectorise[field_type], model_config)
-                for modality, field_type in cls._MODALITY_FIELD_TYPE_MAP.items()
+                for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()
                 if field_type in chunks_to_vectorise}
 
 
@@ -504,7 +504,7 @@ class TensorFieldsContainer:
             tensor_content.populate_chunks_and_embeddings(existing_tensor[constants.MARQO_DOC_CHUNKS],
                                                           existing_tensor[constants.MARQO_DOC_EMBEDDINGS])
 
-    def collect(self, doc_id: str, field_name: str, field_content: Any, text_field_type: Optional[FieldType]) -> Any:
+    def collect(self, doc_id: str, field_name: str, field_content: Any, field_type: Optional[FieldType]) -> Any:
         if field_name not in self._tensor_fields and field_name not in self._multimodal_sub_field_reverse_map:
             # not tensor fields, no need to collect
             return field_content
@@ -535,7 +535,7 @@ class TensorFieldsContainer:
         self._add_tensor_field_content(
             doc_id, field_name, TensorFieldContent(
                 field_content=field_content,
-                field_type=text_field_type,
+                field_type=field_type,
                 is_tensor_field=field_name in self._tensor_fields,
                 is_multimodal_subfield=field_name in self._multimodal_sub_field_reverse_map
             )

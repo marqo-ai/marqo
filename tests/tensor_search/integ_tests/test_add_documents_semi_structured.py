@@ -118,6 +118,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.assertIn('marqo__lexical_title', updated_index.lexical_field_map)
         self.assertIn('marqo__lexical_desc', updated_index.lexical_field_map)
 
+        self.refresh_index(self.text_index_2)
+
         res = tensor_search.search(
             text="content", search_method=SearchMethod.LEXICAL,
             config=self.config, index_name=self.text_index_2,
@@ -149,7 +151,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 }
             )
         )
-
+        self.refresh_index(self.text_index_3)
         res = tensor_search.search(
             text="dog", search_method=SearchMethod.LEXICAL,
             config=self.config, index_name=self.text_index_3,
@@ -174,6 +176,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
 
+        self.refresh_index(self.image_index_with_chunking)
         res = tensor_search.search(
             text="hippo", search_method=SearchMethod.LEXICAL,
             config=self.config, index_name=self.image_index_with_chunking,
@@ -206,6 +209,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         self.assertFalse(add_doc_result.errors)
 
+        self.refresh_index(self.text_index_4)
         res = tensor_search.search(
             text="content", search_method=SearchMethod.LEXICAL,
             config=self.config, index_name=self.text_index_4,
@@ -287,6 +291,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
 
+        self.refresh_index(self.text_index_5)
         res = tensor_search.search(
             text="content", search_method=SearchMethod.TENSOR,
             config=self.config, index_name=self.text_index_5,
@@ -302,6 +307,3 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         # only the last 2 should return in a lexical search since nothing is indexed as universal_tensor_field
         # lexical field for doc 1
         self.assertEqual({'2', '3'}, {hit['_id'] for hit in res['hits']})
-
-
-
