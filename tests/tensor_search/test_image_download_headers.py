@@ -12,7 +12,7 @@ from requests import get as requests_get
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQuery
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 

@@ -11,7 +11,6 @@ import torch
 import ffmpeg
 
 import logging
-from typing import List, Dict
 
 import numpy as np
 import PIL
@@ -19,7 +18,7 @@ from PIL.ImageFile import ImageFile
 from torchvision.transforms import Compose
 
 import marqo.exceptions as base_exceptions
-from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference import clip_utils
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \

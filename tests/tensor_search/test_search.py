@@ -17,7 +17,7 @@ from marqo.api.exceptions import (
 from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 from tests.utils.transition import add_docs_caller
 from marqo.core.utils.prefix import determine_text_prefix

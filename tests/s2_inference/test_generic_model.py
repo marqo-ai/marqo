@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search

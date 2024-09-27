@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
-from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.document.tensor_fields_container import TensorFieldsContainer
 from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem

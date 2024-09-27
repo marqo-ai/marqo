@@ -11,7 +11,7 @@ from marqo.api.models.embed_request import EmbedRequest
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import embed
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.core.models.marqo_index import StructuredMarqoIndex, FieldFeature, FieldType, Model
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \

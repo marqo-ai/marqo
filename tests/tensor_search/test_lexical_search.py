@@ -9,7 +9,7 @@ from tests.marqo_test import MarqoTestCase
 import random
 import requests
 import json
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 
 @unittest.skip
 class TestLexicalSearch(MarqoTestCase):

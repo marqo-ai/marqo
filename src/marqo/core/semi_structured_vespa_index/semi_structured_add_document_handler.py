@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex

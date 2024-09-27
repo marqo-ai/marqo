@@ -3,7 +3,7 @@
 multiprocessing should be tested manually -problem with mocking (deadlock esque)
 """
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
 from marqo.api.exceptions import InvalidArgError, IndexNotFoundError, BadRequestError
 from tests.marqo_test import MarqoTestCase

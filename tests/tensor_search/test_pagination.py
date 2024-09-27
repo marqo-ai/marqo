@@ -16,7 +16,7 @@ from marqo.core.models.marqo_index import FieldType, FieldFeature, IndexType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import SearchMethod, EnvVars
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from tests.utils.transition import add_docs_caller
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters

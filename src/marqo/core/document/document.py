@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple, Optional
 
 import marqo.api.exceptions as api_exceptions
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem

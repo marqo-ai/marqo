@@ -20,6 +20,7 @@ class BatchVectorisationMode(enum.Enum):
     PER_DOCUMENT = 'per_document'
     PER_BATCH = 'per_batch'
 
+
 class AddDocsParams(BaseModel):
     """Represents the parameters of the tensor_search.add_documents() function
 
@@ -47,7 +48,8 @@ class AddDocsParams(BaseModel):
     index_name: str
     device: Optional[str]
     tensor_fields: Optional[List] = Field(default_factory=None)
-    image_download_thread_count: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
+    image_download_thread_count: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
     media_download_thread_count: Optional[int]
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False

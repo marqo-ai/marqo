@@ -10,7 +10,7 @@ from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.s2_inference import vectorise
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.tensor_search import vectorise_multimodal_combination_field_unstructured, vectorise_multimodal_combination_field_structured
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 import unittest

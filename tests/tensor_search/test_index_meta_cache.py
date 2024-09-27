@@ -6,7 +6,7 @@ import time
 import unittest
 
 import requests
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import index_meta_cache
 from marqo.config import Config

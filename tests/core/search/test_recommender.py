@@ -10,7 +10,7 @@ from marqo.core.search.recommender import Recommender
 from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from tests.marqo_test import MarqoTestCase
 

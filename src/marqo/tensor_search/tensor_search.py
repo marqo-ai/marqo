@@ -88,7 +88,7 @@ from marqo.tensor_search.enums import (
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search.index_meta_cache import get_cache
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth

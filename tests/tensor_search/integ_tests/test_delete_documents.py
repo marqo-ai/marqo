@@ -2,7 +2,7 @@ import datetime
 from copy import copy
 import marqo.tensor_search.delete_docs
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest, MqDeleteDocsResponse
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 import marqo.tensor_search.tensor_search
 from marqo.tensor_search import tensor_search, delete_docs
 from tests.marqo_test import MarqoTestCase

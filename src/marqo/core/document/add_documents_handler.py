@@ -6,7 +6,7 @@ from typing import List, Dict, Optional, Any, Tuple, Set
 
 from marqo.api import exceptions as api_errors
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.models.add_docs_params import AddDocsParams, BatchVectorisationMode
+from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.document.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
     TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \

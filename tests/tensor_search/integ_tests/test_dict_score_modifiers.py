@@ -8,7 +8,7 @@ from marqo.core.structured_vespa_index.structured_vespa_index import StructuredV
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.api import update_documents
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from tests.marqo_test import MarqoTestCase
 

@@ -2,7 +2,7 @@ import os
 from typing import cast, List
 from unittest import mock
 
-from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model, ImagePreProcessing, PatchMethod, SemiStructuredMarqoIndex
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
