@@ -387,7 +387,7 @@ class AddDocumentsHandler(ABC):
 
         with RequestMetricsStore.for_request().time("image_download.full_time"):
             media_repo = exit_stack.enter_context(
-                add_docs.download_and_preprocess_content(
+                add_docs.download_and_preprocess_multimedia_content(
                     docs=list(doc_media_fields.values()),
                     media_field_types_mapping=media_field_types_mapping,
                     marqo_index=self.marqo_index,

@@ -215,7 +215,7 @@ def download_and_chunk_media(url: str, device: str, headers: dict, modality: Mod
 
 
 @contextmanager
-def download_and_preprocess_content(
+def download_and_preprocess_multimedia_content(
         docs: List[Dict[str, str]],
         media_field_types_mapping: Dict[str, FieldType],
         marqo_index: MarqoIndex,
