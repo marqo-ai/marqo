@@ -343,7 +343,7 @@ class AddDocumentsHandler(ABC):
             try:
                 vectorisers = Vectoriser.batch_vectorisers_by_modality(model_config, chunks_map)
             except AddDocumentsError as err:
-                logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err, exc_info=True)
+                logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err)
                 raise InternalError(
                     message=f'Encountered problem when vectorising batch of documents. Reason: {str(err)}'
                 )

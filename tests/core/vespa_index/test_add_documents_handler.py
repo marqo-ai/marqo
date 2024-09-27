@@ -2,17 +2,23 @@ import unittest
 from typing import Dict, Any, List
 from unittest.mock import patch
 
+import pytest
+
 from marqo.core.constants import MARQO_DOC_ID
+from marqo.core.models.marqo_index import FieldType
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
-from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
-from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError
+from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError, InternalError
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
+from marqo.s2_inference import s2_inference
+from marqo.s2_inference.errors import S2InferenceError
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
 from tests.marqo_test import MarqoTestCase
 
 
+@pytest.mark.unittest
 class TestAddDocumentHandler(MarqoTestCase):
 
     class DummyAddDocumentsHandler(AddDocumentsHandler):
@@ -27,11 +33,12 @@ class TestAddDocumentHandler(MarqoTestCase):
             self.to_vespa_doc_call_count = 0
 
         def _create_tensor_fields_container(self) -> TensorFieldsContainer:
-            return TensorFieldsContainer([], [], {})
+            return TensorFieldsContainer(self.add_docs_params.tensor_fields, [], {})
 
         def _handle_field(self, marqo_doc, field_name, field_content) -> None:
             doc_id = marqo_doc[MARQO_DOC_ID]
             marqo_doc[field_name] = field_content
+            self.tensor_fields_container.collect(doc_id, field_name, field_content, FieldType.Text)
             self.handled_fields.append((doc_id, field_name))
 
         def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
@@ -211,7 +218,111 @@ class TestAddDocumentHandler(MarqoTestCase):
                                   code='invalid_argument')
         ], response.items)
 
+    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
+    @patch('marqo.s2_inference.s2_inference.vectorise', wraps=s2_inference.vectorise)
+    def test_add_documents_should_vectorise_tensor_fields_using_different_strategies(self, mock_vectorise, _):
+        for batch_mode, expected_vectorise_call_count, expected_call_args in [
+            (BatchVectorisationMode.PER_FIELD, 3, [['hello'], ['hello world'], ['ok']]),
+            (BatchVectorisationMode.PER_DOCUMENT, 2, [['hello'], ['hello world', 'ok']]),
+            (BatchVectorisationMode.PER_BATCH, 1, [['hello world', 'ok', 'hello']]),
+        ]:
+            with self.subTest(batch_mode=batch_mode):
+                handler = self.DummyAddDocumentsHandler(
+                    vespa_client=self.vespa_client,
+                    marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+                    add_docs_params=AddDocsParams(
+                        index_name='index1', tensor_fields=['field1', 'field4'],
+                        batch_vectorisation_mode=batch_mode,
+                        docs=[
+                            {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                            {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
+                        ])
+                )
 
+                mock_vectorise.reset_mock()
+
+                handler.add_documents()
+                self.assertEquals(expected_vectorise_call_count, mock_vectorise.call_count)
+                # please note that assertCountEqual compares two list ignoring order
+                self.assertCountEqual(expected_call_args,
+                                      [args.kwargs['content'] for args in mock_vectorise.call_args_list])
+
+    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
+    @patch('marqo.s2_inference.s2_inference.vectorise')
+    def test_add_documents_should_fail_a_doc_using_vectorise_per_field_strategy(self, mock_vectorise, mock_feed_batch):
+        mock_vectorise.side_effect = [S2InferenceError('vectorise error'), [[1.0, 2.0]]]
+        mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
+            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
+        ])]
+        handler = self.DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1', 'field4'],
+                batch_vectorisation_mode=BatchVectorisationMode.PER_FIELD,
+                docs=[
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                    {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
+                ])
+        )
+
+        response = handler.add_documents()
+        self.assertEquals(2, mock_vectorise.call_count)
+        self.assertTrue(response.errors)
+        self.assertEquals(200, response.items[0].status)
+        self.assertEquals(400, response.items[1].status)
+        self.assertEquals('vectorise error', response.items[1].message)
+
+    @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
+    @patch('marqo.s2_inference.s2_inference.vectorise')
+    def test_add_documents_should_fail_a_doc_using_vectorise_per_doc_strategy(self, mock_vectorise, mock_feed_batch):
+        mock_vectorise.side_effect = [S2InferenceError('vectorise error'), [[1.0, 2.0]]]
+        mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
+            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
+        ])]
+        handler = self.DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1', 'field4'],
+                batch_vectorisation_mode=BatchVectorisationMode.PER_DOCUMENT,
+                docs=[
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                    {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
+                ])
+        )
+
+        response = handler.add_documents()
+        self.assertEquals(2, mock_vectorise.call_count)
+        self.assertTrue(response.errors)
+        self.assertEquals(200, response.items[0].status)
+        self.assertEquals(400, response.items[1].status)
+        self.assertEquals('vectorise error', response.items[1].message)
+
+    @patch('marqo.s2_inference.s2_inference.vectorise')
+    def test_add_documents_should_fail_a_batch_using_vectorise_per_doc_strategy(self, mock_vectorise):
+        mock_vectorise.side_effect = [S2InferenceError('vectorise error')]
+
+        handler = self.DummyAddDocumentsHandler(
+            vespa_client=self.vespa_client,
+            marqo_index=self.unstructured_marqo_index('index1', 'index1'),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=['field1', 'field4'],
+                batch_vectorisation_mode=BatchVectorisationMode.PER_BATCH,
+                docs=[
+                    {'_id': '1', 'field1': 'hello', 'field2': 2.0, 'field3': {'a': 1.0}},
+                    {'_id': '2', 'field1': 'hello world', 'field4': 'ok'},
+                ])
+        )
+
+        with self.assertRaises(InternalError) as context:
+            handler.add_documents()
+
+        self.assertEquals('Encountered problem when vectorising batch of documents. Reason: vectorise error',
+                          str(context.exception))
+
+
+@pytest.mark.unittest
 class TestAddDocumentsResponseCollector(unittest.TestCase):
 
     def test_should_collect_marqo_docs(self):
