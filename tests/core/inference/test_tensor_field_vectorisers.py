@@ -1,10 +1,11 @@
 from typing import Dict
 from unittest.mock import patch
 
+import pytest
 import torch
 from PIL.Image import Image
 
-from marqo.core.document.tensor_fields_container import SingleVectoriser, ModelConfig, BatchCachingVectoriser
+from marqo.core.inference.tensor_fields_container import SingleVectoriser, ModelConfig, BatchCachingVectoriser
 from marqo.core.exceptions import AddDocumentsError, ModelError
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.errors import ModelDownloadError
@@ -13,6 +14,7 @@ from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.s2_inference import errors as s2_inference_errors
 
 
+@pytest.mark.unittest
 class TestTensorFieldVectorisers(MarqoTestCase):
     def setUp(self):
         self.model_config = ModelConfig(

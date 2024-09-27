@@ -62,19 +62,17 @@ from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex
-from marqo.s2_inference.models.model_type import ModelType
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.s2_inference import infer_modality, Modality
 from marqo.s2_inference.clip_utils import _is_image, validate_url
-from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
@@ -83,10 +81,9 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars
+    Device, TensorField, SearchMethod
 )
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search.index_meta_cache import get_cache
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
@@ -97,7 +94,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
-from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)

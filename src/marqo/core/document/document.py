@@ -14,7 +14,7 @@ from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler
     SemiStructuredAddDocumentsHandler
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.logging import get_logger
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse

@@ -4,7 +4,7 @@ from marqo.core import constants
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex, FieldFeature, Field, TensorField, MarqoIndex
 from marqo.core.models.marqo_index_request import StructuredMarqoIndexRequest
 from marqo.core.structured_vespa_index import common
-from marqo.core.vespa_schema import VespaSchema
+from marqo.core.vespa_index.vespa_schema import VespaSchema
 from marqo.exceptions import InternalError
 
 

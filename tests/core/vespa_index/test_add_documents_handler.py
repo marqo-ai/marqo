@@ -3,9 +3,9 @@ from typing import Dict, Any, List
 from unittest.mock import patch
 
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
+from marqo.core.vespa_index.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.document.tensor_fields_container import TensorFieldsContainer
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
 from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
@@ -323,7 +323,7 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         self.assertIsNone(add_doc_item.message)
         self.assertFalse(collector.errors)
 
-    @patch('marqo.core.document.add_documents_handler.timer')
+    @patch('marqo.core.vespa_index.add_documents_handler.timer')
     def test_collect_final_responses(self, mock_timer):
         mock_timer.side_effect = [1.0, 2.0]
         collector = AddDocumentsResponseCollector()

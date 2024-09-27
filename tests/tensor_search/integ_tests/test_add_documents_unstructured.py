@@ -4,13 +4,10 @@ import os
 import uuid
 from unittest import mock
 
-import PIL
 import pytest
-from torch import Tensor
 
 from marqo.api.exceptions import IndexNotFoundError, BadRequestError
 from marqo.core.models.marqo_index import *
-from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
 from marqo.core.models.add_docs_params import AddDocsParams

@@ -2,7 +2,7 @@ import unittest
 
 from marqo.core import constants
 from marqo.core.models import MarqoIndex
-from marqo.core.vespa_schema import VespaSchema
+from marqo.core.vespa_index.vespa_schema import VespaSchema
 
 
 class VespaSchemaImplementation(VespaSchema):

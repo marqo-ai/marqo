@@ -6,7 +6,7 @@ from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.structured_vespa_index import common
-from marqo.core.vespa_index import VespaIndex
+from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
 
 

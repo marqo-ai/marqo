@@ -3,9 +3,9 @@ from typing import Dict, Any, List
 from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.document.add_documents_handler import AddDocumentsHandler, AddDocumentsError
+from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.document.tensor_fields_container import TensorFieldsContainer
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models.marqo_index import FieldType, StructuredMarqoIndex
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.exceptions import InvalidArgumentError

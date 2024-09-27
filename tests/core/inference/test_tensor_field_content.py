@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from PIL.Image import Image
 
-from marqo.core.document.tensor_fields_container import TensorFieldContent, Chunker, MultiModalTensorFieldContent, \
+from marqo.core.inference.tensor_fields_container import TensorFieldContent, Chunker, MultiModalTensorFieldContent, \
     Vectoriser
 from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import FieldType
