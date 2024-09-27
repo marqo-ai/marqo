@@ -45,7 +45,7 @@ class TestSearchableAttributes(MarqoTestCase):
         self.device_patcher.stop()
 
     def test_searchable_attributes_works(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
             index_name=self.default_text_index,
@@ -82,7 +82,7 @@ class TestSearchableAttributes(MarqoTestCase):
                 self.assertEqual(expected_id, res["hits"][0]["_id"])
 
     def test_searchable_attributes_works_with_filter(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
             index_name=self.default_text_index,
@@ -121,7 +121,7 @@ class TestSearchableAttributes(MarqoTestCase):
                     self.assertEqual(expected_id, res["hits"][0]["_id"])
 
     def test_searchable_attributes_empty_list(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
             index_name=self.default_text_index,
@@ -153,7 +153,7 @@ class TestSearchableAttributes(MarqoTestCase):
                 self.assertEqual(0, len(res["hits"]))
 
     def test_searchable_attributes_empty_list_with_filter(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
             index_name=self.default_text_index,
@@ -190,7 +190,7 @@ class TestSearchableAttributes(MarqoTestCase):
                     self.assertEqual(0, len(res["hits"]))
 
     def test_searchable_attributes_None(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
             index_name=self.default_text_index,

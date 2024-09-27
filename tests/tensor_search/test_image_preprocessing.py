@@ -52,7 +52,7 @@ class TestImagePreprocessing(MarqoTestCase):
             tensor_fields = None if index_name == self.structured_image_index else ["image_field_1"]
 
             with self.subTest(f"index_name = {index_name}"):
-                tensor_search.add_documents(config=self.config,
+                self.add_documents(config=self.config,
                                             add_docs_params=AddDocsParams(index_name=index_name,
                                                                           docs=documents,
                                                                           tensor_fields=tensor_fields))
@@ -74,7 +74,7 @@ class TestImagePreprocessing(MarqoTestCase):
             tensor_fields = None if index_name == self.structured_image_index else ["image_field_1"]
 
             with self.subTest(f"index_name = {index_name}"):
-                tensor_search.add_documents(config=self.config,
+                self.add_documents(config=self.config,
                                             add_docs_params=AddDocsParams(index_name=index_name,
                                                                           docs=documents,
                                                                           tensor_fields=tensor_fields))

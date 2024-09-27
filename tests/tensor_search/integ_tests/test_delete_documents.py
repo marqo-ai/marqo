@@ -52,7 +52,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_delete_documents(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -67,7 +67,7 @@ class TestDeleteDocuments(MarqoTestCase):
 
                 count0_res = self.monitoring.get_index_stats_by_name(index.name).number_of_documents
 
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -92,7 +92,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_delete_docs_format(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -118,7 +118,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_only_specified_documents_are_deleted(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -152,7 +152,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_delete_multiple_documents(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -184,7 +184,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_document_is_actually_deleted(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -206,7 +206,7 @@ class TestDeleteDocuments(MarqoTestCase):
     def test_multiple_documents_are_actually_deleted(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -274,7 +274,7 @@ class TestDeleteDocuments(MarqoTestCase):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
                 # Add a document
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -308,7 +308,7 @@ class TestDeleteDocuments(MarqoTestCase):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
                 # Add a document
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, 
                     add_docs_params=AddDocsParams(
                         index_name=index.name,

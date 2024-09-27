@@ -11,8 +11,8 @@ import uvicorn
 import vespa.application as pyvespa
 from starlette.applications import Starlette
 
-from marqo import config, version
-from marqo.tensor_search import index_meta_cache
+from marqo import config, version, tensor_search
+from marqo.tensor_search import index_meta_cache, tensor_search
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
@@ -96,8 +96,12 @@ class MarqoTestCase(unittest.TestCase):
 
         return indexes
 
-    def refresh_index(self, index_name: str):
-        index_meta_cache.get_index(config=self.config, index_name=index_name, force_refresh=True)
+    @classmethod
+    def add_documents(cls, *args, **kwargs):
+        index_name = kwargs['add_docs_params'].index_name
+        result = tensor_search.add_documents(*args, **kwargs)
+        index_meta_cache.get_index(config=cls.config, index_name=index_name, force_refresh=True)
+        return result
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)

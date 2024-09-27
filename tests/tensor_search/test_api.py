@@ -25,7 +25,7 @@ class ApiTests(MarqoTestCase):
         self.client = TestClient(api.app)
 
     def test_add_or_replace_documents_tensor_fields(self):
-        with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
+        with mock.patch('marqo.core.document.document.Document.add_documents') as mock_add_documents:
             mock_add_documents.return_value = MarqoAddDocumentsResponse(
                 errors=False,
                 processingTimeMs=0.0,

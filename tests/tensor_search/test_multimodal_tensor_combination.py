@@ -226,7 +226,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         }
                 }
 
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[doc, ],
                     mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
                     device="cpu",
@@ -279,7 +279,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         }
                 }
 
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[doc, ],
                     mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
                     device="cpu",
@@ -319,7 +319,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                         }
                 }
 
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[doc, ],
                     mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
                     device="cpu",
@@ -389,7 +389,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         for mappings, tensor_fields, number_of_documents, number_of_vectors in test_cases:
             with self.subTest(f"{mappings}, {tensor_fields}"):
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.unstructured_random_multimodal_index.name, docs=doc,
                     mappings=mappings,
                     device="cpu",
@@ -431,7 +431,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     error_msg = error_msg_unstructured if isinstance(index, UnstructuredMarqoIndex) else error_msg_structured
                     with self.subTest(error_msg):
                         with mock.patch("marqo.s2_inference.s2_inference.vectorise") as mock_vectorise:
-                            res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                            res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                                 index_name=index.name, docs=[document, ],
                                 mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
                                 device="cpu",
@@ -450,7 +450,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
                 def get_score(document):
                     self.clear_indexes(self.indexes)
-                    res = tensor_search.add_documents(
+                    res = self.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=index.name, docs=[document],
                             mappings={"combo_text_image": {"type": "multimodal_combination",
@@ -486,7 +486,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
     def test_multimodal_tensor_combination_tensor_value(self):
         for index in [self.unstructured_unnormalized_multimodal_index, self.structured_unnormalized_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[
                         {
                             "text_field_1": "A rider is riding a horse jumping over the barrier.",
@@ -526,7 +526,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     } if isinstance(index, UnstructuredMarqoIndex) else None
                 ))
 
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[
                         {
                             "text_field_3": "A rider is riding a horse jumping over the barrier.",
@@ -572,7 +572,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
                 def get_score(document):
                     self.clear_indexes(self.indexes)
-                    tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name, docs=[document], device="cpu", mappings={
                             "zero_weight_combo_text_image": {
                                 "type": "multimodal_combination",
@@ -611,7 +611,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         @mock.patch("marqo.tensor_search.tensor_search.vectorise_multimodal_combination_field_unstructured",
                     mock_multimodal_combination)
         def run():
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.unstructured_random_multimodal_index.name, docs=[
                     {
                         "text_field": "A rider is riding a horse jumping over the barrier.",
@@ -676,7 +676,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         @mock.patch("marqo.tensor_search.tensor_search.vectorise_multimodal_combination_field_structured",
                     mock_multimodal_combination)
         def run():
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.structured_random_multimodal_index.name, docs=[
                     {
                         "text_field": "A rider is riding a horse jumping over the barrier.",
@@ -733,7 +733,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
                 def run():
-                    res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name, docs=[
                             {
                                 "text_field_1": "A rider is riding a horse jumping over the barrier_1.",
@@ -792,7 +792,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
                 @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
                 def run():
-                    res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                    res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name, docs=[
                             {
                                 "text_field_1": "A rider is riding a horse jumping over the barrier_1.",
@@ -846,7 +846,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
         @mock.patch("marqo.s2_inference.clip_utils.load_image_from_path", mock_load_image_from_path)
         def run():
-            res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.unstructured_random_multimodal_index.name, docs=[
                     {
                         "text_0": "A rider is riding a horse jumping over the barrier_0.",
@@ -876,7 +876,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
     def test_lexical_search_on_multimodal_combination(self):
         # TODO: Make structured index
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.unstructured_multimodal_index.name, docs=[
                 {
                     "Title": "Extravehicular Mobility Unit (EMU)",
@@ -900,7 +900,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 }}, device="cpu", tensor_fields=["my_combination_field"]
         ))
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.unstructured_multimodal_index.name, docs=[
                 {
                     "Title": "text",
@@ -933,7 +933,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
 
     def test_search_with_filtering_and_infer_image_false(self):
         # TODO: Make structured index
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.unstructured_random_multimodal_index.name, docs=[
                     {
@@ -993,7 +993,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                     "_id": "123",
                 }
 
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=[test_doc], index_name=index.name, device="cpu",

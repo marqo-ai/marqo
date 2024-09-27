@@ -193,7 +193,7 @@ class TestHybridSearch(MarqoTestCase):
 
                 if index == self.unstructured_default_text_index:
                     # this is required to create the tensor fields in the semi-structured index
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index.name,
@@ -426,7 +426,7 @@ class TestHybridSearch(MarqoTestCase):
         mock_vespa_client_query = unittest.mock.MagicMock()
         mock_vespa_client_query.side_effect = pass_through_query
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.unstructured_index_with_no_model.name,
@@ -558,7 +558,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                add_docs_res = tensor_search.add_documents(
+                add_docs_res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -609,7 +609,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -655,7 +655,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers]:
             with self.subTest(index=index.name):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -729,7 +729,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -881,7 +881,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=type(index)):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -947,7 +947,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1000,7 +1000,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1046,7 +1046,7 @@ class TestHybridSearch(MarqoTestCase):
         for index in [self.structured_default_image_index, self.unstructured_default_image_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1113,7 +1113,7 @@ class TestHybridSearch(MarqoTestCase):
         """
 
         # Add documents
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.structured_text_index_score_modifiers.name,
@@ -1225,7 +1225,7 @@ class TestHybridSearch(MarqoTestCase):
         """
 
         # Add documents
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.unstructured_default_image_index.name,
@@ -1337,7 +1337,7 @@ class TestHybridSearch(MarqoTestCase):
             with self.subTest(msg=f'{index.type}', index=index):
 
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1721,7 +1721,7 @@ class TestHybridSearch(MarqoTestCase):
                                                     if isinstance(index, UnstructuredMarqoIndex) else None,
                                                 mappings={"custom_field_1": {"type": "custom_vector"}} \
                                                     if isinstance(index, UnstructuredMarqoIndex) else None)
-                _ = tensor_search.add_documents(config=self.config,
+                _ = self.add_documents(config=self.config,
                                                 add_docs_params=add_docs_params)
 
                 r = tensor_search.search(config=self.config, index_name=index.name, text=None,

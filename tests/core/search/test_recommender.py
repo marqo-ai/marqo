@@ -159,7 +159,7 @@ class TestRecommender(MarqoTestCase):
         else:
             tensor_fields = None
 
-        tensor_search.add_documents(
+        self.add_documents(
             self.config,
             add_docs_params=AddDocsParams(
                 index_name=index.name,
@@ -354,7 +354,7 @@ class TestRecommender(MarqoTestCase):
             }
         ]
         index = self.unstructured_text_index
-        tensor_search.add_documents(
+        self.add_documents(
             self.config,
             add_docs_params=AddDocsParams(
                 index_name=index.name,

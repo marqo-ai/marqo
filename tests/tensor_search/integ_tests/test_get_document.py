@@ -47,7 +47,7 @@ class TestGetDocument(MarqoTestCase):
         """Also ensures that the _id is returned"""
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(index_name=index.name, docs=[
                         {
                             "_id": "123",
@@ -101,7 +101,7 @@ class TestGetDocument(MarqoTestCase):
 
                 keys = ("title1", "desc2")
                 vals = ("content 1", "content 2. blah blah blah")
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[{"_id": "123", **dict(zip(keys, vals))}],
                     auto_refresh=True, device="cpu",
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None)

@@ -155,7 +155,7 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,
@@ -177,7 +177,7 @@ class TestMonitoring(MarqoTestCase):
         get_index_stats returns the correct stats for a multimodal index
         """
         marqo_index = self.structured_index_multimodal
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 docs=[
                     {"title": "2",
@@ -205,7 +205,7 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"desc": "2"}, {"desc": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
@@ -228,7 +228,7 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
@@ -281,7 +281,7 @@ class TestMonitoring(MarqoTestCase):
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
                 for operation, docs, expected_stats in operations:
                     if operation == 'add':
-                        tensor_search.add_documents(
+                        self.add_documents(
                             config=self.config, add_docs_params=AddDocsParams(
                                 docs=docs,
                                 index_name=marqo_index.name,
@@ -309,7 +309,7 @@ class TestMonitoring(MarqoTestCase):
 
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "test " * number_of_words}, {"title": "2"}],  # 3 + 1 vectors expected
                         index_name=marqo_index.name,
@@ -332,7 +332,7 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,

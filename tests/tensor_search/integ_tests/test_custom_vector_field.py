@@ -131,7 +131,7 @@ class TestCustomVectorField(MarqoTestCase):
 
             @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
             def run():
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[{
@@ -188,7 +188,7 @@ class TestCustomVectorField(MarqoTestCase):
 
             @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
             def run():
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[{
@@ -257,7 +257,7 @@ class TestCustomVectorField(MarqoTestCase):
 
             @mock.patch("marqo.vespa.vespa_client.VespaClient.feed_batch", mock_feed_batch)
             def run():
-                add_docs_res = tensor_search.add_documents(
+                add_docs_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[{
@@ -318,7 +318,7 @@ class TestCustomVectorField(MarqoTestCase):
         for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
                 # If we change the custom vector, doc should change
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[{
@@ -338,7 +338,7 @@ class TestCustomVectorField(MarqoTestCase):
                     config=self.config, index_name=index.name,
                     document_id="0", show_vectors=True)
 
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[{
@@ -364,7 +364,7 @@ class TestCustomVectorField(MarqoTestCase):
                 assert get_doc_2[enums.TensorField.tensor_facets][0][enums.TensorField.embedding] == self.random_vector_2
 
                 # If we do not, it should remain the same, no errors
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[{
@@ -394,7 +394,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[{
@@ -431,7 +431,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -524,7 +524,7 @@ class TestCustomVectorField(MarqoTestCase):
                 for case in test_cases:
                     with self.subTest(f"Case: {case}"):
                         with self.assertRaises(pydantic.ValidationError):
-                            res = tensor_search.add_documents(
+                            res = self.add_documents(
                                 config=self.config, add_docs_params=AddDocsParams(
                                     index_name=index.name,
                                     docs=[{
@@ -543,7 +543,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -605,7 +605,7 @@ class TestCustomVectorField(MarqoTestCase):
         """
         for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -664,7 +664,7 @@ class TestCustomVectorField(MarqoTestCase):
         # Using another field as score modifier on a custom vector:
         for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
-                add_docs_res = tensor_search.add_documents(
+                add_docs_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -731,7 +731,7 @@ class TestCustomVectorField(MarqoTestCase):
 
         for index in self.indexes:
             with self.subTest(f"Index: {index.name}, type: {index.type}"):
-                add_docs_res = tensor_search.add_documents(
+                add_docs_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -843,7 +843,7 @@ class TestCustomVectorField(MarqoTestCase):
                 if isinstance(index, UnstructuredMarqoIndex):
                     break
 
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -910,7 +910,7 @@ class TestCustomVectorField(MarqoTestCase):
                 # Skip this test for unstructured indexes.
                 if isinstance(index, UnstructuredMarqoIndex):
                     break
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -994,7 +994,7 @@ class TestCustomVectorField(MarqoTestCase):
         Remove this test when this functionality becomes available.
         """
 
-        add_docs_res = tensor_search.add_documents(
+        add_docs_res = self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.unstructured_custom_index.name,
                 docs=[
@@ -1043,7 +1043,7 @@ class TestCustomVectorField(MarqoTestCase):
             },
         }
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1,
                 docs=[

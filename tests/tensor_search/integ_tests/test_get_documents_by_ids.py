@@ -59,7 +59,7 @@ class TestGetDocuments(MarqoTestCase):
                     {"_id": "1", "title1": "content 1"}, {"_id": "2", "title1": "content 2"},
                     {"_id": "3", "title1": "content 3"}
                 ]
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name, docs=docs, device="cpu",
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None)
@@ -83,7 +83,7 @@ class TestGetDocuments(MarqoTestCase):
         
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[dict(zip(k, v)) for k, v in zip(keys, vals)],
                     device="cpu",
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None))
@@ -126,7 +126,7 @@ class TestGetDocuments(MarqoTestCase):
     def test_get_document_vectors_resilient(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[
                         {"_id": '456', "title1": "alexandra"},
                         {'_id': '221', 'desc2': 'hello'}],

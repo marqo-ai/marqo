@@ -98,7 +98,7 @@ class TestDefaultDevice(MarqoTestCase):
                 with patch.dict("marqo.tensor_search.utils.os.environ", {EnvVars.MARQO_BEST_AVAILABLE_DEVICE: best_available_device}),\
                      patch("marqo.tensor_search.utils.check_device_is_available", return_value=True) as mock_check_device_is_available,\
                      patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise:
-                        tensor_search.add_documents(
+                        self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(**AddDocsParams_kwargs)
                         )
@@ -119,7 +119,7 @@ class TestDefaultDevice(MarqoTestCase):
 
         for AddDocsParams_kwargs in AddDocsParams_kwargs_list:
             try:
-                tensor_search.add_documents(
+                self.add_documents(
                 config=self.config,
                 add_docs_params=AddDocsParams(**AddDocsParams_kwargs)
                 )
@@ -139,7 +139,7 @@ class TestDefaultDevice(MarqoTestCase):
         for explicitly_set_device in devices_list:
             with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_vector) as mock_vectorise,\
                  patch("marqo.tensor_search.models.add_docs_objects.get_best_available_device") as mock_get_best_available_device:
-                    tensor_search.add_documents(
+                    self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=self.index_name_1,
                                     docs=[{"Title": "blah"} for _ in range(5)],
@@ -171,7 +171,7 @@ class TestDefaultDevice(MarqoTestCase):
                 mocks = [patcher.start() for patcher in patchers]
 
                 # Add docs
-                tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params = AddDocsParams(
                     auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[{"test": "blah"}])
                 )
 
@@ -215,7 +215,7 @@ class TestDefaultDevice(MarqoTestCase):
                 mocks = [patcher.start() for patcher in patchers]
 
                 # Add docs
-                tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params = AddDocsParams(
                     auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[{"test": "blah"}])
                 )
 
@@ -246,7 +246,7 @@ class TestDefaultDevice(MarqoTestCase):
         """
         self.assertNotIn("MARQO_BEST_AVAILABLE_DEVICE", os.environ)
         # Add docs
-        tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params = AddDocsParams(
             auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[{"test": "blah"}])
         )
 
@@ -287,7 +287,7 @@ class TestDefaultDevice(MarqoTestCase):
                         mock_obj.return_value = self.mock_bulk_vector_text_search_results
 
                 # Add docs
-                tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params = AddDocsParams(
                     auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[
                         {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                         {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"}
@@ -351,7 +351,7 @@ class TestDefaultDevice(MarqoTestCase):
                         mock_obj.return_value = self.mock_bulk_vector_text_search_results
 
                 # Add docs
-                tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params = AddDocsParams(
                     auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[
                         {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "id1-first"},
                         {"abc": "random text", "other field": "Close match hehehe", "_id": "id1-second"}
@@ -398,7 +398,7 @@ class TestDefaultDevice(MarqoTestCase):
         """
         self.assertNotIn("MARQO_BEST_AVAILABLE_DEVICE", os.environ)
         # Add docs
-        tensor_search.add_documents(config=self.config, add_docs_params = AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params = AddDocsParams(
             auto_refresh=True, device="cpu", index_name=self.index_name_1, docs=[{"test": "blah"}])
         )
 
