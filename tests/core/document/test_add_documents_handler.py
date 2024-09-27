@@ -61,7 +61,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         ])]
 
         handler = self.DummyAddDocumentsHandler(
-            config=self.config,
+            vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1',
@@ -103,7 +103,7 @@ class TestAddDocumentHandler(MarqoTestCase):
             FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
         ])]
         handler = self.DummyAddDocumentsHandler(
-            config=self.config,
+            vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
@@ -122,7 +122,7 @@ class TestAddDocumentHandler(MarqoTestCase):
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     def test_add_documents_should_skip_duplicate_documents_even_when_the_latter_one_errors_out(self, mock_feed_batch):
         handler = self.DummyAddDocumentsHandler(
-            config=self.config,
+            vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
@@ -159,7 +159,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         ])]
 
         handler = self.DummyAddDocumentsHandler(
-            config=self.config,
+            vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
             add_docs_params=AddDocsParams(
                 index_name='index1', tensor_fields=['field1'],
