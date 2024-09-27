@@ -3,11 +3,17 @@ from typing import Dict, List, Tuple, Optional
 
 import marqo.api.exceptions as api_exceptions
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import UnsupportedFeatureError, ParsingError
+from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
-from marqo.core.models.marqo_index import IndexType
+from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
+    UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
+from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
+    SemiStructuredAddDocumentsHandler
+from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
+from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.logging import get_logger
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
@@ -24,6 +30,21 @@ class Document:
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
         self.vespa_client = vespa_client
         self.index_management = index_management
+
+    def add_documents(self, add_docs_params: AddDocsParams) -> MarqoAddDocumentsResponse:
+        marqo_index = self.index_management.get_index(add_docs_params.index_name)
+
+        if isinstance(marqo_index, StructuredMarqoIndex):
+            add_docs_handler = StructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
+        elif isinstance(marqo_index, SemiStructuredMarqoIndex):
+            add_docs_handler = SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params,
+                                                                 self.vespa_client, self.index_management)
+        elif isinstance(marqo_index, UnstructuredMarqoIndex):
+            add_docs_handler = UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
+        else:
+            raise InternalError(f"Unknown index type {type(marqo_index)}")
+
+        return add_docs_handler.add_documents()
 
     def delete_all_docs_by_index_name(self, index_name: str) -> int:
         """Delete all documents in the given index by index name.

@@ -5,7 +5,6 @@ from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any, Tuple, Set
 
 from marqo.api import exceptions as api_errors
-from marqo.config import Config
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.document.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
@@ -22,6 +21,7 @@ from marqo.tensor_search import validation, add_docs
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import VespaDocument, FeedBatchResponse
 from marqo.vespa.models.get_document_response import Document
+from marqo.vespa.vespa_client import VespaClient
 
 logger = get_logger(__name__)
 
@@ -101,10 +101,10 @@ class AddDocumentsResponseCollector:
 
 class AddDocumentsHandler(ABC):
 
-    def __init__(self, marqo_index: MarqoIndex, config: Config, add_docs_params: AddDocsParams):
+    def __init__(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
         self.marqo_index = marqo_index
         self.add_docs_params = add_docs_params
-        self.config = config
+        self.vespa_client = vespa_client
         self.add_docs_response_collector = AddDocumentsResponseCollector()
         self.tensor_fields_container = self._create_tensor_fields_container()
 
@@ -147,7 +147,7 @@ class AddDocumentsHandler(ABC):
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
                 # TODO capture the telemetry data for retrieving exiting docs?
-                result = self.config.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
+                result = self.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
                                                             self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
                 self.handle_existing_tensors(existing_vespa_docs)
@@ -162,7 +162,7 @@ class AddDocumentsHandler(ABC):
 
         # persist to vespa if there are still valid docs
         with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            response = self.config.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
+            response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
         with RequestMetricsStore.for_request().time("add_documents.postprocess"):
             self.handle_vespa_response(response)
@@ -226,7 +226,7 @@ class AddDocumentsHandler(ABC):
         for resp in response.responses:
             # FIXME doc_id is not url encoded
             doc_id = resp.id.split('::')[-1] if resp.id else None
-            status, message = self.config.document.translate_vespa_document_response(resp.status, message=resp.message)
+            status, message = self.vespa_client.translate_vespa_document_response(resp.status, message=resp.message)
             if status != 200:
                 self.add_docs_response_collector.collect_error_response(doc_id, AddDocumentsError(
                     error_message=message, status_code=status, error_code='vespa_error'  # breaking?

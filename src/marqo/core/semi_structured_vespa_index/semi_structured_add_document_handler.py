@@ -1,21 +1,23 @@
 from typing import Dict, Any
 
-from marqo.config import Config
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.models.add_docs_params import AddDocsParams
+from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
-from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import VespaDocument
+from marqo.vespa.vespa_client import VespaClient
 
 
 class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
-    def __init__(self, marqo_index: SemiStructuredMarqoIndex, config: Config, add_docs_params: AddDocsParams):
-        super().__init__(marqo_index, config, add_docs_params)
+    def __init__(self, marqo_index: SemiStructuredMarqoIndex, add_docs_params: AddDocsParams,
+                 vespa_client: VespaClient, index_management: IndexManagement):
+        super().__init__(marqo_index, add_docs_params, vespa_client)
+        self.index_management = index_management
         self.marqo_index = marqo_index
         self.vespa_index = SemiStructuredVespaIndex(marqo_index)
         self.should_update_index = False
@@ -63,5 +65,5 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
     def pre_persist_to_vespa(self):
         if self.should_update_index:
             with RequestMetricsStore.for_request().time("add_documents.update_index"):
-                self.config.index_management.update_index(self.marqo_index)
+                self.index_management.update_index(self.marqo_index)
 

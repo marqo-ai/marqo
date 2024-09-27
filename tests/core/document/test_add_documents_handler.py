@@ -153,7 +153,7 @@ class TestAddDocumentHandler(MarqoTestCase):
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     def test_add_documents_should_handle_various_errors(self, mock_feed_batch):
         mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
-            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=400, message='could not parse field field1'),
+            FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=400, message='Could not parse field field1'),
             FeedBatchDocumentResponse(id='id:index1:index1::2', pathId='path_id2', status=429, message='vespa error2'),
             FeedBatchDocumentResponse(id='id:index1:index1::3', pathId='path_id3', status=507, message='vespa error3'),
         ])]
@@ -186,8 +186,8 @@ class TestAddDocumentHandler(MarqoTestCase):
 
         self.assertEquals([
             MarqoAddDocumentsItem(status=400, id='1',
-                                  message='The document contains invalid characters in the fields. Original error: could not parse field field1 ',
-                                  error='The document contains invalid characters in the fields. Original error: could not parse field field1 ',
+                                  message='The document contains invalid characters in the fields. Original error: Could not parse field field1 ',
+                                  error='The document contains invalid characters in the fields. Original error: Could not parse field field1 ',
                                   code='vespa_error'),
             MarqoAddDocumentsItem(status=429, id='2',
                                   message='Marqo vector store receives too many requests. Please try again later',

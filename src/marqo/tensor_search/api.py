@@ -322,9 +322,7 @@ def add_or_replace_documents(
                                                              device=device)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        res = tensor_search.add_documents(
-            config=marqo_config, add_docs_params=add_docs_params
-        )
+        res = marqo_config.document.add_documents(add_docs_params=add_docs_params)
         return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 

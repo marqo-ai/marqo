@@ -122,13 +122,14 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
             f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
     if isinstance(marqo_index, SemiStructuredMarqoIndex):
-        return SemiStructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
+        return SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client,
+                                                 config.index_management).add_documents()
     if isinstance(marqo_index, UnstructuredMarqoIndex):
         # return _add_documents_unstructured(config, add_docs_params, marqo_index)
-        return UnstructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
+        return UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client).add_documents()
     elif isinstance(marqo_index, StructuredMarqoIndex):
         # return _add_documents_structured(config, add_docs_params, marqo_index)
-        return StructuredAddDocumentsHandler(marqo_index, config, add_docs_params).add_documents()
+        return StructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client).add_documents()
     else:
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 

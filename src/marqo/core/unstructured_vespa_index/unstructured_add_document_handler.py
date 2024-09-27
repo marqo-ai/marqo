@@ -27,12 +27,13 @@ from marqo.vespa.models.get_document_response import Document
 from marqo.tensor_search.constants import ALLOWED_UNSTRUCTURED_FIELD_TYPES
 from marqo.tensor_search.validation import list_types_valid, validate_custom_vector, \
     validate_multimodal_combination, validate_map_numeric_field
+from marqo.vespa.vespa_client import VespaClient
 
 
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
-    def __init__(self, marqo_index: UnstructuredMarqoIndex, config: Config, add_docs_params: AddDocsParams):
+    def __init__(self, marqo_index: UnstructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
         self._validate_add_docs_params(add_docs_params)
-        super().__init__(marqo_index, config, add_docs_params)
+        super().__init__(marqo_index, add_docs_params, vespa_client)
         self.marqo_index = marqo_index
         self.vespa_index = UnstructuredVespaIndex(marqo_index)
 

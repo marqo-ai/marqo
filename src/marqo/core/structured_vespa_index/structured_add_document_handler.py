@@ -16,12 +16,13 @@ from marqo.vespa.models.get_document_response import Document
 
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search import validation
+from marqo.vespa.vespa_client import VespaClient
 
 
 class StructuredAddDocumentsHandler(AddDocumentsHandler):
-    def __init__(self, marqo_index: StructuredMarqoIndex, config: Config, add_docs_params: AddDocsParams):
+    def __init__(self, marqo_index: StructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
         self._validate_add_docs_params(add_docs_params, marqo_index)
-        super().__init__(marqo_index, config, add_docs_params)
+        super().__init__(marqo_index, add_docs_params, vespa_client)
         self.marqo_index = marqo_index
         self.vespa_index = StructuredVespaIndex(marqo_index)
 
