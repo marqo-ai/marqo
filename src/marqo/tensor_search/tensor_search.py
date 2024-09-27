@@ -301,12 +301,14 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         try:
                             embeddings = normalize_vector(embeddings)
                         except core_exceptions.ZeroMagnitudeVectorError as e:
+                            error_message = (f" Zero magnitude vector found while normalizing custom vector field. "
+                                             f"Please check `{marqo_docs.api_reference_document_body()}` for more info.")
                             document_is_valid = False
                             unsuccessful_docs.append(
                                 (i, MarqoAddDocumentsItem(
                                     id=doc_id if doc_id is not None else '',
-                                    error=e.__str__(),
-                                    message=e.message,
+                                    error=e.message + error_message,
+                                    message=e.message + error_message,
                                     status=int(errors.InvalidArgError.status_code),
                                     code=errors.InvalidArgError.code)
                                  )
@@ -847,11 +849,13 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                             embeddings = normalize_vector(embeddings)
                         except core_exceptions.ZeroMagnitudeVectorError as e:
                             document_is_valid = False
+                            error_message = (f" Zero magnitude vector found while normalizing custom vector field. "
+                                             f"Please check `{marqo_docs.api_reference_document_body()}` for more info.")
                             unsuccessful_docs.append(
                                 (i, MarqoAddDocumentsItem(
                                     id=doc_id if doc_id is not None else '',
-                                    error=e.__str__(),
-                                    message=e.message,
+                                    error=e.message + error_message,
+                                    message=e.message + error_message,
                                     status=int(errors.InvalidArgError.status_code),
                                     code=errors.InvalidArgError.code)
                                  )
@@ -1946,10 +1950,12 @@ def get_query_vectors_from_jobs(
                 try:
                     merged_vector = normalize_vector(merged_vector)
                 except core_exceptions.ZeroMagnitudeVectorError as e:
-                    raise core_exceptions.ZeroMagnitudeVectorError(
-                        f"Magnitude of combined query and context vectors cannot be zero. "
-                        f"If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation. "
-                    )
+                    if q.index.parsed_marqo_version() >= MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
+                        raise core_exceptions.ZeroMagnitudeVectorError(
+                            f"Magnitude of combined query and context vectors cannot be zero. "
+                            f"If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation. "
+                            f"Please check `{marqo_docs.search_context()}` for more info."
+                        )
             result[qidx] = list(merged_vector)
         elif isinstance(q.q, str):
             # result[qidx] = vectors[0]
@@ -2695,7 +2701,7 @@ def normalize_vector(embeddings: Union[List[List[float]], ndarray, List[float]])
     Normalizes a list of vectors (embeddings) to have unit length.
 
     Args:
-        embeddings (Union[List[List[float]], ndarray]): A list of vectors or a numpy ndarray of vectors to be normalized.
+        embeddings (Union[List[List[float]], ndarray], List[float]): A list of vectors or a numpy ndarray of vectors to be normalized.
 
     Returns:
         List[List[float]]: A list of normalized vectors.

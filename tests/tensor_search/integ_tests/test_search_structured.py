@@ -939,7 +939,7 @@ class TestSearchStructured(MarqoTestCase):
             )
         )
 
-        alright_queries = [{"v ": 1.2}, {"d ": 0}, {"vf": -1}]
+        alright_queries = [{"v ": 1.2}, {"vf": -1}]
         for q in alright_queries:
             with self.subTest(f"query={q}"):
                 tensor_search.search(

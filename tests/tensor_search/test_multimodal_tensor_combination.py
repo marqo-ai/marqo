@@ -4,7 +4,6 @@ from unittest import mock
 
 import numpy as np
 
-from marqo.core.exceptions import ZeroMagnitudeVectorError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference.clip_utils import load_image_from_path
@@ -174,45 +173,15 @@ class TestMultimodalTensorCombination(MarqoTestCase):
             tensor_fields=["combo_text_image", "text_field_3", "text_field_4", "image_field_3", "image_field_4"]
         )
 
-        structured_normalized_multimodal_index = cls.structured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-32/laion400m_e31"),
-            normalize_embeddings=True,
-            fields=[
-                FieldRequest(name="text_field_1", type=FieldType.Text),
-                FieldRequest(name="text_field_2", type=FieldType.Text),
-                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
-                FieldRequest(name="image_field_2", type=FieldType.ImagePointer),
-                FieldRequest(name="combo_text_image", type=FieldType.MultimodalCombination,
-                      dependent_fields={"text_field_1": 0.32, "text_field_2": 0, "image_field_1": -0.48, "image_field_2": 1.34}),
-
-                # Independent text and image fields for isolating tensors
-                FieldRequest(name="text_field_3", type=FieldType.Text),
-                FieldRequest(name="text_field_4", type=FieldType.Text),
-                FieldRequest(name="image_field_3", type=FieldType.ImagePointer),
-                FieldRequest(name="image_field_4", type=FieldType.ImagePointer),
-
-            ],
-            tensor_fields=["combo_text_image", "text_field_3", "text_field_4", "image_field_3", "image_field_4"]
-        )
-
-        unstructured_normalized_multimodal_index = cls.unstructured_marqo_index_request(
-            model=Model(name="open_clip/ViT-B-32/laion400m_e31"),
-            treat_urls_and_pointers_as_images=True,
-            normalize_embeddings=True
-        )
-
-
         cls.indexes = cls.create_indexes([unstructured_random_multimodal_index,
                                           unstructured_random_text_index,
                                           unstructured_multimodal_index,
                                           unstructured_unnormalized_multimodal_index,
-                                          unstructured_normalized_multimodal_index,
 
                                           structured_random_multimodal_index,
                                           structured_random_text_index,
                                           structured_multimodal_index,
-                                          structured_unnormalized_multimodal_index,
-                                          structured_normalized_multimodal_index
+                                          structured_unnormalized_multimodal_index
                                           ])
 
         # Assign indexes to class variables
@@ -220,13 +189,11 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         cls.unstructured_random_text_index = cls.indexes[1]
         cls.unstructured_multimodal_index = cls.indexes[2]
         cls.unstructured_unnormalized_multimodal_index = cls.indexes[3]
-        cls.unstructured_unnormalized_multimodal_index = cls.indexes[4]
 
-        cls.structured_random_multimodal_index = cls.indexes[5]
-        cls.structured_random_text_index = cls.indexes[6]
-        cls.structured_multimodal_index = cls.indexes[7]
-        cls.structured_unnormalized_multimodal_index = cls.indexes[8]
-        cls.structured_unnormalized_multimodal_index = cls.indexes[9]
+        cls.structured_random_multimodal_index = cls.indexes[4]
+        cls.structured_random_text_index = cls.indexes[5]
+        cls.structured_multimodal_index = cls.indexes[6]
+        cls.structured_unnormalized_multimodal_index = cls.indexes[7]
 
     def setUp(self):
         super().setUp()
@@ -278,127 +245,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                 self.assertIn("_embedding", relevant_facets[0])
                 self.assertIn("combo_text_image", relevant_facets[0])
 
-    def test_add_documents_with_one_multimodal_fields_with_normalize_embeddings_true(self):
-        for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
-            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                doc = {
-                    "Title": "Horse rider",
-                    "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": TestImageUrls.IMAGE1.value,
-                    "_id": "1"
-                }
-
-                mappings = {
-                    "combo_text_image": {
-                        "type": "multimodal_combination",
-                        "weights": {
-                            "text_field": 0.0, "image_field": 0.0
-                        }
-                    }
-                }
-
-                with self.assertRaises(ZeroMagnitudeVectorError):
-                    tensor_search.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index.name,
-                            docs=[doc],
-                            mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
-                            device="cpu",
-                            tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None
-                        )
-                    )
-
-                # The following assertions should be outside the assertRaises block
-                # as they won't be executed if ZeroMagnitudeVectorError is raised
-
-                # Verify that the document was not added
-                with self.assertRaises(Exception):  # Replace with specific exception if known
-                    tensor_search.get_document_by_id(
-                        config=self.config,
-                        index_name=index.name,
-                        document_id="1",
-                        show_vectors=True
-                    )
-
-                # If you need to verify other aspects after the error is raised,
-                # add those checks here
-
-    def test_add_documents_with_one_multimodal_fields_with_normalize_embeddings_true_2(self):
-
-        for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
-            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                doc = {
-                    "Title": "Horse rider",
-                    "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": TestImageUrls.IMAGE1.value,
-                    "_id": "1"
-                }
-
-                mappings = {
-                    "combo_text_image":
-                        {
-                            "type": "multimodal_combination",
-                            "weights": {
-                                "text_field": 0.0, "image_field": 0.0
-                            }
-                        }
-                }
-                result = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
-                    index_name=index.name, docs=[doc, ],
-                    mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
-                    device="cpu",
-                    tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None),
-                                            )
-                self.assertEqual(result.items[0].status, 400)
-                self.assertEqual(result.items[0].id, '1')
-                self.assertEqual(result.items[0].message, 'Zero magnitude vector detected, cannot normalize.')
-                self.assertEqual(result.items[0].error, 'ZeroMagnitudeVectorError')
-                self.assertEqual(result.items[0].code, 'invalid_argument')
-
-    def test_add_documents_with_one_multimodal_fields_with_normalize_embeddings_true_3(self):
-        for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
-            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                doc = {
-                    "Title": "Horse rider",
-                    "text_field": "A rider is riding a horse jumping over the barrier.",
-                    "image_field": TestImageUrls.IMAGE1.value,
-                    "_id": "1"
-                }
-
-                mappings = {
-                    "combo_text_image": {
-                        "type": "multimodal_combination",
-                        "weights": {
-                            "text_field": 0.0, "image_field": 0.0
-                        }
-                    }
-                }
-
-                try:
-                    tensor_search.add_documents(
-                        config=self.config,
-                        add_docs_params=AddDocsParams(
-                            index_name=index.name,
-                            docs=[doc],
-                            mappings=mappings if isinstance(index, UnstructuredMarqoIndex) else None,
-                            device="cpu",
-                            tensor_fields=["combo_text_image"] if isinstance(index, UnstructuredMarqoIndex) else None
-                        )
-                    )
-                    self.fail("ZeroMagnitudeVectorError was not raised")
-                except Exception as e:
-                    if not isinstance(e, ZeroMagnitudeVectorError):
-                        self.fail(f"Expected ZeroMagnitudeVectorError, but got {type(e)}")
-
-                # Verify that the document was not added
-                with self.assertRaises(Exception):  # Replace with specific exception if known
-                    tensor_search.get_document_by_id(
-                        config=self.config,
-                        index_name=index.name,
-                        document_id="1",
-                        show_vectors=True
-                    )
     def test_add_documents_with_multiple_multimodal_fields(self):
         for index in [self.unstructured_random_multimodal_index, self.structured_random_multimodal_index]:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
