@@ -5,7 +5,6 @@ import semver
 
 from marqo import marqo_docs
 from marqo.api import exceptions as api_errors
-from marqo.config import Config
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.document.add_documents_handler import AddDocumentsHandler, AddDocumentsError
