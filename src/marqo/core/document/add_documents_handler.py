@@ -150,7 +150,7 @@ class AddDocumentsHandler(ABC):
                 result = self.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
                                                             self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
-                self.handle_existing_tensors(existing_vespa_docs)
+                self.populate_existing_tensors(existing_vespa_docs)
 
             # vectorise tensor fields
             self.vectorise_tensor_fields()
@@ -192,7 +192,7 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
-    def handle_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
+    def populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
         """
         This method populates embeddings from existing documents. We could save some resources and time
         by skipping vectorisation of existing tensor fields with the same content.

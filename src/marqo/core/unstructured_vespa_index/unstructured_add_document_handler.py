@@ -139,7 +139,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                 'type': FieldType.MultimodalCombination
             })
 
-    def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
+    def populate_existing_tensors(self, existing_vespa_docs: List[Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
             return
 

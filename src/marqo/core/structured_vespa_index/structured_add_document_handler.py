@@ -103,7 +103,7 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
             if self.marqo_index.field_map.get(field_name).dependent_fields != weights:
                 marqo_doc[field_name] = weights
 
-    def handle_existing_tensors(self, existing_vespa_docs: List[Document]):
+    def populate_existing_tensors(self, existing_vespa_docs: List[Document]):
         if not self.add_docs_params.use_existing_tensors or not existing_vespa_docs:
             return
 

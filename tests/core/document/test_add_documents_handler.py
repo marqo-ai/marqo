@@ -38,7 +38,7 @@ class TestAddDocumentHandler(MarqoTestCase):
             doc_id = marqo_doc[MARQO_DOC_ID]
             self.handled_multimodal_fields.append(doc_id)
 
-        def handle_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
+        def populate_existing_tensors(self, existing_vespa_docs: List[Document]) -> None:
             self.existing_vespa_docs = existing_vespa_docs
 
         def to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
