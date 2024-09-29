@@ -17,6 +17,7 @@ from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
+
 class StreamingMediaProcessor:
     def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index_type: IndexType,
                  marqo_index_model: Model, preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
@@ -105,14 +106,16 @@ class StreamingMediaProcessor:
 
                 try:
                     # Use ffmpeg-python to process the chunk
-                    stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
-
                     if self.modality == Modality.VIDEO:
-                        stream = ffmpeg.output(stream, output_file, vcodec='libx264', acodec='aac', **{'f': 'mp4'})
+                        command = [
+                            'ffmpeg', '-ss', str(chunk_start), '-t', str(chunk_end - chunk_start), '-i',
+                            str(self.url), '-vcodec', 'h264_nvenc', '-acodec', 'aac', '-f', 'mp4', output_file
+                        ]
+                        subprocess.run(command, check=True)
                     else:  # AUDIO
+                        stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
                         stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
-
-                    ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+                        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
 
                     processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
                     processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
