@@ -1,24 +1,19 @@
 import os
-import uuid
+import unittest
 from unittest import mock
 
+import numpy as np
+
 import marqo.core.exceptions as core_exceptions
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
-from marqo.core.structured_vespa_index import common
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.add_docs_params import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo import exceptions as base_exceptions
-import unittest
-from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
+from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
-from marqo.tensor_search import api
-import numpy as np
-from marqo.tensor_search.models.api_models import CustomVectorQuery
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -29,19 +24,36 @@ class TestHybridSearch(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        # UNSTRUCTURED indexes
-        unstructured_default_text_index = cls.unstructured_marqo_index_request(
+        semi_structured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='sentence-transformers/all-MiniLM-L6-v2')
         )
 
-        unstructured_default_image_index = cls.unstructured_marqo_index_request(
+        semi_structured_default_image_index = cls.unstructured_marqo_index_request(
             model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
             treat_urls_and_pointers_as_images=True
         )
 
-        unstructured_index_with_no_model = cls.unstructured_marqo_index_request(
+        semi_structured_index_with_no_model = cls.unstructured_marqo_index_request(
             model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
             normalize_embeddings=False
+        )
+
+        # Legacy UNSTRUCTURED indexes
+        unstructured_default_text_index = cls.unstructured_marqo_index_request(
+            model=Model(name='sentence-transformers/all-MiniLM-L6-v2'),
+            marqo_version='2.12.0'
+        )
+
+        unstructured_default_image_index = cls.unstructured_marqo_index_request(
+            model=Model(name='open_clip/ViT-B-32/laion400m_e31'),  # Used to be ViT-B/32 in old structured tests
+            treat_urls_and_pointers_as_images=True,
+            marqo_version='2.12.0'
+        )
+
+        unstructured_index_with_no_model = cls.unstructured_marqo_index_request(
+            model=Model(name="no_model", properties={"dimensions": 16, "type": "no_model"}, custom=True),
+            normalize_embeddings=False,
+            marqo_version='2.12.0'
         )
 
         unstructured_index_2_10 = cls.unstructured_marqo_index_request(
@@ -130,7 +142,10 @@ class TestHybridSearch(MarqoTestCase):
             structured_index_with_no_model,
             structured_index_empty,
             structured_index_2_9,
-            structured_index_one_tensor_field
+            structured_index_one_tensor_field,
+            semi_structured_default_text_index,
+            semi_structured_default_image_index,
+            semi_structured_index_with_no_model,
         ])
 
         # Assign to objects so they can be used in tests
@@ -145,6 +160,10 @@ class TestHybridSearch(MarqoTestCase):
         cls.structured_index_empty = cls.indexes[7]
         cls.structured_index_2_9 = cls.indexes[8]
         cls.structured_index_one_tensor_field = cls.indexes[9]
+
+        cls.semi_structured_default_text_index = cls.indexes[10]
+        cls.semi_structured_default_image_index = cls.indexes[11]
+        cls.semi_structured_index_with_no_model = cls.indexes[12]
 
     def setUp(self) -> None:
         super().setUp()
@@ -182,7 +201,8 @@ class TestHybridSearch(MarqoTestCase):
         Test all hybrid search calls the correct vespa queries.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 original_query = self.config.vespa_client.query
                 def pass_through_query(*arg, **kwargs):
@@ -191,7 +211,7 @@ class TestHybridSearch(MarqoTestCase):
                 mock_vespa_client_query = unittest.mock.MagicMock()
                 mock_vespa_client_query.side_effect = pass_through_query
 
-                if index == self.unstructured_default_text_index:
+                if isinstance(index, UnstructuredMarqoIndex):
                     # this is required to create the tensor fields in the semi-structured index
                     self.add_documents(
                         config=self.config,
@@ -412,7 +432,7 @@ class TestHybridSearch(MarqoTestCase):
                              sample_vector)
             self.assertIn("hits", res)
 
-    def test_hybrid_search_unstructured_with_custom_vector_query(self):
+    def test_hybrid_search_semi_structured_with_custom_vector_query(self):
         """
         Tests that using a custom vector query sends the correct arguments to vespa
         Unstructured. Does not use searchable attributes.
@@ -429,7 +449,7 @@ class TestHybridSearch(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.unstructured_index_with_no_model.name,
+                index_name=self.semi_structured_index_with_no_model.name,
                 docs=[{"_id": "doc1", "custom_field_1":
                     {
                         "content": "test custom field content_1",
@@ -445,7 +465,7 @@ class TestHybridSearch(MarqoTestCase):
             def run():
                 res = tensor_search.search(
                     config=self.config,
-                    index_name=self.unstructured_index_with_no_model.name,
+                    index_name=self.semi_structured_index_with_no_model.name,
                     text=CustomVectorQuery(
                         customVector=CustomVectorQuery.CustomVector(
                             content= "sample",
@@ -480,7 +500,7 @@ class TestHybridSearch(MarqoTestCase):
             def run():
                 res = tensor_search.search(
                     config=self.config,
-                    index_name=self.unstructured_index_with_no_model.name,
+                    index_name=self.semi_structured_index_with_no_model.name,
                     text=CustomVectorQuery(
                         customVector=CustomVectorQuery.CustomVector(
                             content= "sample",
@@ -517,7 +537,7 @@ class TestHybridSearch(MarqoTestCase):
             def run():
                 res = tensor_search.search(
                     config=self.config,
-                    index_name=self.unstructured_index_with_no_model.name,
+                    index_name=self.semi_structured_index_with_no_model.name,
                     text=CustomVectorQuery(
                         customVector=CustomVectorQuery.CustomVector(
                             content=None,
@@ -555,7 +575,8 @@ class TestHybridSearch(MarqoTestCase):
         is the same as a lexical search (in terms of result order).
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 add_docs_res = self.add_documents(
@@ -606,7 +627,8 @@ class TestHybridSearch(MarqoTestCase):
         is the same as a tensor search (in terms of result order).
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 self.add_documents(
@@ -652,14 +674,16 @@ class TestHybridSearch(MarqoTestCase):
         TODO: Add unstructured index once searchable attributes are supported
         """
 
-        for index in [self.structured_text_index_score_modifiers]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
-                        docs=self.docs_list
+                        docs=self.docs_list,
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
 
@@ -726,7 +750,8 @@ class TestHybridSearch(MarqoTestCase):
         Tests that score modifiers work as expected for all methods
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 self.add_documents(
@@ -878,7 +903,8 @@ class TestHybridSearch(MarqoTestCase):
         affect the order and score.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=type(index)):
                 # Add documents
                 self.add_documents(
@@ -944,7 +970,8 @@ class TestHybridSearch(MarqoTestCase):
         Results must be the same as lexical search and tensor search respectively.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 self.add_documents(
@@ -997,7 +1024,8 @@ class TestHybridSearch(MarqoTestCase):
         Tests that filter is applied correctly in hybrid search.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 self.add_documents(
@@ -1043,7 +1071,8 @@ class TestHybridSearch(MarqoTestCase):
         For structured, only the image is indexed, thus the doc will ONLY have a tensor score.
         """
 
-        for index in [self.structured_default_image_index, self.unstructured_default_image_index]:
+        for index in [self.structured_default_image_index, self.semi_structured_default_image_index,
+                      self.unstructured_default_image_index]:
             with self.subTest(index=index.name):
                 # Add documents
                 self.add_documents(
@@ -1211,7 +1240,7 @@ class TestHybridSearch(MarqoTestCase):
                     # If score is 0, it should not be in lexical search results
                     self.assertNotIn(hybrid_hit["_id"], [doc["_id"] for doc in lexical_res["hits"]])
 
-    def test_hybrid_search_unstructured_opposite_retrieval_and_ranking(self):
+    def test_hybrid_search_semi_structured_opposite_retrieval_and_ranking(self):
         """
         Tests that hybrid search with:
         retrievalMethod = "lexical", rankingMethod = "tensor" and
@@ -1228,7 +1257,7 @@ class TestHybridSearch(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.unstructured_default_image_index.name,
+                index_name=self.semi_structured_default_image_index.name,
                 docs=self.docs_list,
                 tensor_fields=["text_field_1", "text_field_2"]
             )
@@ -1237,7 +1266,7 @@ class TestHybridSearch(MarqoTestCase):
         # Reference results
         tensor_res_all_docs = tensor_search.search(  # To get tensor scores of every doc, for reference
             config=self.config,
-            index_name=self.unstructured_default_image_index.name,
+            index_name=self.semi_structured_default_image_index.name,
             text="dogs",
             search_method="TENSOR",
             result_count=20,
@@ -1245,7 +1274,7 @@ class TestHybridSearch(MarqoTestCase):
         )
         lexical_res = tensor_search.search(
             config=self.config,
-            index_name=self.unstructured_default_image_index.name,
+            index_name=self.semi_structured_default_image_index.name,
             text="dogs",
             search_method="LEXICAL",
             result_count=10,
@@ -1253,7 +1282,7 @@ class TestHybridSearch(MarqoTestCase):
         )
         tensor_res = tensor_search.search(
             config=self.config,
-            index_name=self.unstructured_default_image_index.name,
+            index_name=self.semi_structured_default_image_index.name,
             text="dogs",
             search_method="TENSOR",
             result_count=10,
@@ -1264,7 +1293,7 @@ class TestHybridSearch(MarqoTestCase):
         with self.subTest(retrievalMethod=RetrievalMethod.Lexical, rankingMethod=RankingMethod.Tensor):
             hybrid_res = tensor_search.search(
                 config=self.config,
-                index_name=self.unstructured_default_image_index.name,
+                index_name=self.semi_structured_default_image_index.name,
                 text="dogs",
                 search_method="HYBRID",
                 hybrid_parameters=HybridParameters(
@@ -1293,7 +1322,7 @@ class TestHybridSearch(MarqoTestCase):
         with self.subTest(retrievalMethod=RetrievalMethod.Tensor, rankingMethod=RankingMethod.Lexical):
             hybrid_res = tensor_search.search(
                 config=self.config,
-                index_name=self.unstructured_default_image_index.name,
+                index_name=self.semi_structured_default_image_index.name,
                 text="dogs",
                 search_method="HYBRID",
                 hybrid_parameters=HybridParameters(
@@ -1333,7 +1362,8 @@ class TestHybridSearch(MarqoTestCase):
         No highlights on the results retrieved from the non-tensor field (text_field_2 in this case),
         so list should be empty.
         """
-        for index in [self.unstructured_default_image_index, self.structured_index_one_tensor_field]:
+        for index in [self.unstructured_default_image_index, self.semi_structured_default_image_index,
+                      self.structured_index_one_tensor_field]:
             with self.subTest(msg=f'{index.type}', index=index):
 
                 # Add documents
@@ -1460,7 +1490,8 @@ class TestHybridSearch(MarqoTestCase):
                 "not a valid enumeration member")
         ]
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
                     final_test_cases = test_cases + [
@@ -1497,7 +1528,8 @@ class TestHybridSearch(MarqoTestCase):
         Ensure that searchable_attributes and score_modifiers cannot be set in hybrid search.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 with self.subTest("searchable_attributes active"):
                     with self.assertRaises(ValueError) as e:
@@ -1738,11 +1770,9 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual("1", r["hits"][1]["_id"])
                 self.assertTrue(r["hits"][1]["_score"], r["hits"][0]["_score"])
 
-    @unittest.skip(reason="semi-structured-index-now-supports it")
     def test_hybrid_search_unstructured_with_searchable_attributes_fails(self):
         """
-        Test that hybrid search with unstructured index and searchable attributes fails.
-        TODO: Remove when this is supported
+        Test that hybrid search with legacy unstructured index and searchable attributes fails.
         """
 
         with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:

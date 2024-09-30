@@ -25,46 +25,34 @@ from marqo.vespa.models import QueryResult
 
 
 class TestSearchUnstructured(MarqoTestCase):
-    """
-    This has the same test suite as test_search_semi_structured.py, we only specify the marqo_version of
-    each index request to test legacy unstructured index.
-    """
 
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
 
         default_text_index = cls.unstructured_marqo_index_request(
-            model=Model(name='hf/all_datasets_v4_MiniLM-L6'),
-            marqo_version='2.12.0'
+            model=Model(name='hf/all_datasets_v4_MiniLM-L6')
         )
         default_text_index_encoded_name = cls.unstructured_marqo_index_request(
-            name='a-b_' + str(uuid.uuid4()).replace('-', ''),
-            marqo_version='2.12.0'
+            name='a-b_' + str(uuid.uuid4()).replace('-', '')
         )
 
         default_image_index = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
-            treat_urls_and_pointers_as_images=True,
-            marqo_version='2.12.0'
+            treat_urls_and_pointers_as_images=True
         )
 
         image_index_with_chunking = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
-            treat_urls_and_pointers_as_images=True,
-            marqo_version='2.12.0'
+            treat_urls_and_pointers_as_images=True
         )
 
         image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random/small'),
-            treat_urls_and_pointers_as_images=True,
-            marqo_version='2.12.0'
+            treat_urls_and_pointers_as_images=True
         )
 
-        index_with_version_2_10 = cls.unstructured_marqo_index_request(
-            marqo_version="2.10.0",
-        )
 
         cls.indexes = cls.create_indexes([
             default_text_index,
@@ -72,7 +60,6 @@ class TestSearchUnstructured(MarqoTestCase):
             default_image_index,
             image_index_with_chunking,
             image_index_with_random_model,
-            index_with_version_2_10
         ])
 
         cls.default_text_index = default_text_index.name
@@ -80,7 +67,6 @@ class TestSearchUnstructured(MarqoTestCase):
         cls.default_image_index = default_image_index.name
         cls.image_index_with_chunking = image_index_with_chunking.name
         cls.image_index_with_random_model = image_index_with_random_model.name
-        cls.index_with_version_2_10 = index_with_version_2_10.name
 
     def setUp(self) -> None:
         super().setUp()
@@ -1126,7 +1112,7 @@ class TestSearchUnstructured(MarqoTestCase):
             )
         )
 
-        alright_queries = [{"v ": 1.2}, {"vf": -1}]
+        alright_queries = [{"v ": 1.2}, {"d ": 0}, {"vf": -1}]
         for q in alright_queries:
             with self.subTest(f"query={alright_queries}"):
                 tensor_search.search(
@@ -1393,51 +1379,3 @@ class TestSearchUnstructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)
-
-    @unittest.skip(reason="expected query result is wrong with added support for searchable attributes")
-    def test_tensor_search_with_version_below_2_11_query_input_embedding(self):
-        """
-        If the unstructured index is version 2.10 or below, the query will have query input:
-        embedding_query instead of marqo__query_embedding
-        """
-
-        mock_vespa_client_query = mock.MagicMock()
-        mock_vespa_client_query.return_value = QueryResult(
-            **{'root': {
-                'id': 'toplevel',
-                'relevance': 1.0,
-                'fields': {'totalCount': 2},
-                'coverage': {'coverage': 100, 'documents': 2, 'full': True, 'nodes': 1, 'results': 1, 'resultsFull': 1},
-                'children': [{'id': 'index:content_default/0/c81e728d5f3b597225351eac',
-                              'relevance': 0.39966427718009545,
-                              'source': 'content_default',
-                              'fields': {
-                                  'matchfeatures': {'closest(marqo__embeddings)': {'type': 'tensor<float>(p{})', 'cells': {'1': 1.0}}},
-                                  'sddocname': 'aa4f36de0c4f4433a8c31e4143b28029b',
-                                  'marqo__id': '2',
-                                  'marqo__strings': ['defgh', 'on the mat'],
-                                  'marqo__chunks': ['abc::defgh', 'this_cat_sat::on the mat'],
-                                  'marqo__short_string_fields': {'abc': 'defgh', 'this_cat_sat': 'on the mat'}}}]
-            }}
-        )
-
-        @mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
-        def run():
-            res = tensor_search.search(
-                config=self.config,
-                index_name=self.index_with_version_2_10,
-                text="dogs",
-                search_method="TENSOR",
-            )
-            return res
-
-        res = run()
-
-        call_args = mock_vespa_client_query.call_args_list
-        self.assertEqual(len(call_args), 1)
-
-        vespa_query_kwargs = call_args[0][1]
-        self.assertIn("nearestNeighbor(marqo__embeddings, embedding_query)",
-                      vespa_query_kwargs["yql"])
-        self.assertIn("embedding_query", vespa_query_kwargs["query_features"])
-        self.assertNotIn("marqo__query_embedding", vespa_query_kwargs["query_features"])

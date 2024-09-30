@@ -81,28 +81,47 @@ class TestAddDocumentsCombined(MarqoTestCase):
             normalize_embeddings=True,
         )
 
-        unstructured_image_index_request = cls.unstructured_marqo_index_request(
+        semi_structured_image_index_request = cls.unstructured_marqo_index_request(
             name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
             model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
             treat_urls_and_pointers_as_images=True
         )
 
-        unstructured_languagebind_index_request = cls.unstructured_marqo_index_request(
+        semi_structured_languagebind_index_request = cls.unstructured_marqo_index_request(
             name="unstructured_languagebind_index" + str(uuid.uuid4()).replace('-', ''),
             model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
             treat_urls_and_pointers_as_images=True,
             treat_urls_and_pointers_as_media=True
         )
 
+        unstructured_image_index_request = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            treat_urls_and_pointers_as_images=True,
+            marqo_version='2.12.0'
+        )
+
+        unstructured_languagebind_index_request = cls.unstructured_marqo_index_request(
+            name="unstructured_languagebind_index" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True,
+            marqo_version='2.12.0'
+        )
+
         cls.indexes = cls.create_indexes([
             structured_image_index_request,
             structured_languagebind_index_request,
+            semi_structured_image_index_request,
+            semi_structured_languagebind_index_request,
             unstructured_image_index_request,
             unstructured_languagebind_index_request
         ])
 
         cls.structured_marqo_index_name = structured_image_index_request.name
         cls.structured_languagebind_index_name = structured_languagebind_index_request.name
+        cls.semi_structured_marqo_index_name = semi_structured_image_index_request.name
+        cls.semi_structured_languagebind_index_name = semi_structured_languagebind_index_request.name
         cls.unstructured_marqo_index_name = unstructured_image_index_request.name
         cls.unstructured_languagebind_index_name = unstructured_languagebind_index_request.name
 
@@ -134,8 +153,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
             }
         ]
 
-        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1", "text_field_1"] if index_name == self.unstructured_marqo_index_name \
+        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1", "text_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with self.subTest(f"test add documents with truncated image for {index_name}"):
                 r = self.add_documents(
@@ -161,8 +181,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
             }
         ]
         dummy_return = [[1.0, ] * 512, ]
-        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
-            tensor_fields = ["text_field_1"] if index_name == self.unstructured_marqo_index_name \
+        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.unstructured_marqo_index_name]:
+            tensor_fields = ["text_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with self.subTest(index_name):
                 with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
@@ -201,7 +222,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 "_id": "4"
             },
         ]
-        for index_name in [self.structured_languagebind_index_name, self.unstructured_languagebind_index_name]:
+        for index_name in [self.structured_languagebind_index_name, self.semi_structured_languagebind_index_name,
+                           self.unstructured_languagebind_index_name]:
             with self.subTest(index_name):
                 res = self.add_documents(
                     self.config,
@@ -209,7 +231,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         docs=documents,
                         index_name=index_name,
                         tensor_fields=["text_field_3", "image_field_2", "video_field_3",
-                                       "audio_field_2"] if "unstructured" in index_name else None
+                                       "audio_field_2"] if index_name != self.structured_languagebind_index_name else None
                     )
                 )
                 print(res)
@@ -254,7 +276,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
             "video_field_2": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
             "audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
         },
-        for index_name in [self.structured_languagebind_index_name, self.unstructured_languagebind_index_name]:
+        for index_name in [self.structured_languagebind_index_name, self.semi_structured_languagebind_index_name,
+                           self.unstructured_languagebind_index_name]:
             mappings = {
                 "multimodal_field": {
                     "type": "multimodal_combination",
@@ -273,7 +296,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 add_docs_params=AddDocsParams(
                     docs=multimodal_document,
                     index_name=index_name,
-                    tensor_fields=["multimodal_field"] if "unstructured" in index_name else None,
+                    tensor_fields=["multimodal_field"] if index_name != self.structured_languagebind_index_name else None,
                     mappings=mappings
                 )
             )
@@ -302,9 +325,10 @@ class TestAddDocumentsCombined(MarqoTestCase):
             }
         ]
 
-        for index_name in [self.unstructured_marqo_index_name, self.structured_marqo_index_name]:
+        for index_name in [self.unstructured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.structured_marqo_index_name]:
             error = Exception("Unexpected error during image download")
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with (self.subTest(f"{index_name}-{error}")):
                 with patch("marqo.s2_inference.clip_utils.requests.get", side_effect=error) \
@@ -328,8 +352,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
             }
         ]
         dummy_return = [[1.0, ] * 512, ]
-        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with self.subTest(index_name):
                 with patch("marqo.s2_inference.s2_inference.vectorise", return_value=dummy_return) as mock_vectorise:
@@ -357,8 +382,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
              "image_field_1": TestImageUrls.IMAGE2.value
              } for i in range(10)
         ]
-        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with self.subTest(index_name):
                 for thread_count in [2, 5]:
@@ -385,8 +411,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
              "image_field_1": TestImageUrls.IMAGE2.value
              }
         ]
-        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with self.subTest(index_name):
                 res = self.add_documents(
@@ -429,10 +456,11 @@ class TestAddDocumentsCombined(MarqoTestCase):
         expected_vector = [-0.06504671275615692, -0.03672310709953308, -0.06603428721427917,
                            -0.032505638897418976, -0.06116769462823868, -0.03929287940263748]
 
-        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
+        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.unstructured_marqo_index_name]:
             with self.subTest(index_name):
                 # For unstructured index, we need to define the multimodal field and its weights
-                if "unstructured" in index_name:
+                if index_name != self.structured_marqo_index_name:
                     tensor_fields = ["multimodal_field"]
                     mappings = {
                         "multimodal_field": {
@@ -565,8 +593,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
              [("505", 400)]
              ),
         ]
-        for index_name in [self.structured_marqo_index_name, self.unstructured_marqo_index_name]:
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+        for index_name in [self.structured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with self.subTest(index_name):
                 for docs, expected_results in docs_results:
@@ -714,8 +743,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
             }
         ]
 
-        for index_name in [self.unstructured_marqo_index_name, self.structured_marqo_index_name]:
-            tensor_fields = ["image_field_1", "text_field_1"] if index_name == self.unstructured_marqo_index_name \
+        for index_name in [self.unstructured_marqo_index_name, self.semi_structured_marqo_index_name,
+                           self.structured_marqo_index_name]:
+            tensor_fields = ["image_field_1", "text_field_1"] if index_name != self.structured_marqo_index_name \
                 else None
             with self.subTest(index_name):
                 r = self.add_documents(

@@ -15,29 +15,40 @@ from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestAddDocumentsUnstructured(MarqoTestCase):
+    """
+    This has the same test suite as test_add_documents_semi_structured.py, we only specify the marqo_version of
+    each index request to test legacy unstructured index.
+    """
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        default_text_index = cls.unstructured_marqo_index_request()
+        default_text_index = cls.unstructured_marqo_index_request(
+            # legacy
+            marqo_version='2.12.0'
+        )
         default_text_index_encoded_name = cls.unstructured_marqo_index_request(
-            name='a-b_' + str(uuid.uuid4()).replace('-', '')
+            name='a-b_' + str(uuid.uuid4()).replace('-', ''),
+            marqo_version='2.12.0'
         )
 
         default_image_index = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
-            treat_urls_and_pointers_as_images=True
+            treat_urls_and_pointers_as_images=True,
+            marqo_version='2.12.0'
         )
 
         image_index_with_chunking = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
-            treat_urls_and_pointers_as_images=True
+            treat_urls_and_pointers_as_images=True,
+            marqo_version='2.12.0'
         )
 
         image_index_with_random_model = cls.unstructured_marqo_index_request(
             model=Model(name='random'),
-            treat_urls_and_pointers_as_images=True
+            treat_urls_and_pointers_as_images=True,
+            marqo_version='2.12.0'
         )
 
         cls.indexes = cls.create_indexes([
