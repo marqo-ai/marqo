@@ -1947,15 +1947,9 @@ def get_query_vectors_from_jobs(
             merged_vector = np.mean(weighted_vectors, axis=0)
 
             if q.index.normalize_embeddings:
-                try:
-                    merged_vector = normalize_vector(merged_vector)
-                except core_exceptions.ZeroMagnitudeVectorError as e:
-                    if q.index.parsed_marqo_version() >= MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION:
-                        raise core_exceptions.ZeroMagnitudeVectorError(
-                            f"Magnitude of combined query and context vectors cannot be zero. "
-                            f"If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation. "
-                            f"Please check `{marqo_docs.search_context()}` for more info."
-                        )
+                norm = np.linalg.norm(merged_vector, axis=-1, keepdims=True)
+                if norm > 0:
+                    merged_vector /= np.linalg.norm(merged_vector, axis=-1, keepdims=True)
             result[qidx] = list(merged_vector)
         elif isinstance(q.q, str):
             # result[qidx] = vectors[0]

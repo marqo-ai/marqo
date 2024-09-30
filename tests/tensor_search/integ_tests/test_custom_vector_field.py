@@ -4,7 +4,6 @@ from unittest import mock
 
 import numpy as np
 
-from marqo.core.exceptions import ZeroMagnitudeVectorError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import enums
@@ -1384,50 +1383,3 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
                 )
                 assert res["hits"][0]["_id"] == "normal_doc"
 
-
-    def test_search_with_custom_zero_vector_field_normalize_embeddings_true(self):
-        """
-        Test tensor search with a custom vector field where the query vector is a zero vector,
-        in an index where normalize_embeddings is set to True during index creation.
-
-        This test method verifies that when documents with custom vector fields are added to the index
-        (in an index where normalizeEmbeddings = True) and tensor searches are performed, an appropriate
-        error is thrown during search.
-
-        The test covers the following scenarios:
-        1. Adding documents with custom vector fields to both structured and unstructured indexes.
-        2. Performing tensor searches with zero vector as the query vector.
-        3. Ensuring that the search fails with a ZeroMagnitudeVectorError.
-
-        The test uses the `self.subTest` context manager to create subtests for different index types.
-        """
-
-        for index in self.indexes:
-            with self.subTest(f"Index: {index.name}, type: {index.type}"):
-                tensor_search.add_documents(
-                    config=self.config, add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=[
-                            {
-                                "_id": "custom_vector_doc",
-                                "my_custom_vector": {
-                                    "content": "custom content is here!!",
-                                    "vector": self.random_vector_1  # size is 512
-                                }
-                            }
-                        ],
-                        device="cpu",
-                        mappings=self.mappings if isinstance(index, UnstructuredMarqoIndex) else None,
-                        tensor_fields=["my_custom_vector", "text_field"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                # Searching with context matching custom vector returns custom vector
-                with self.assertRaises(ZeroMagnitudeVectorError) as e:
-                    tensor_search.search(
-                        config=self.config, index_name=index.name, text={"dummy text": 0},
-                        search_method=enums.SearchMethod.TENSOR,
-                        context=SearchContext(**{"tensor": [{"vector": self.zero_vector, "weight": 1}], })
-                    )
-
-                self.assertIn("Magnitude of combined query and context vectors cannot be zero. If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation", str(e.exception))

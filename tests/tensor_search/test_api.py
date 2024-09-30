@@ -124,40 +124,6 @@ class ApiTests(MarqoTestCase):
                                 f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
                                 response.json()["message"])
 
-    @patch('marqo.tensor_search.tensor_search.search')
-    def test_search_api_with_normalize_embeddings_true_zero_custom_vector(self, mock_search):
-        """
-        Test the search API with `normalize_embeddings` set to True and a custom vector field containing a zero vector.
-
-        This test method verifies that when a search is performed with a custom vector field containing a zero vector,
-        the API returns an appropriate error message indicating that the magnitude of combined query and context vectors
-        cannot be zero. Along with the error message it should also return the status code, code and type of the error.
-
-        The test covers the following scenarios:
-        1. Mocking the search method to raise a ZeroMagnitudeVectorError
-        2. Performing a search request with a zero vector in the context.
-        3. Verifying that the response contains the expected error message, code, error type and status code.
-
-        Args:
-            mock_search (Mock): A mock object for the `search` method.
-        """
-
-        mock_search.side_effect = ZeroMagnitudeVectorError(
-            message='Magnitude of combined query and context vectors cannot be zero. If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation',
-        )
-        response = self.client.post(
-            "/indexes/index1/search?device=cpu",
-            json={
-                "q": "test",
-                "searchMethod": "TENSOR",
-                "context": {"tensor": [{"vector": [0.0]*512, "weight": 1}]}
-            })
-        response_json = response.json()
-        self.assertIn("Magnitude of combined query and context vectors cannot be zero. If you want to pass a zero vector, please set normalizeEmbeddings = False during index creation", response_json["message"])
-        self.assertEquals(response_json["code"], 'bad_request')
-        self.assertEquals(response_json["type"], 'invalid_request')
-        self.assertEquals(response.status_code, 400)
-
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):
         self.client = TestClient(api.app)
