@@ -25,6 +25,11 @@ logger = get_logger(__name__)
 
 
 class AddDocumentsResponseCollector:
+    """
+    During the processing of add document batches, errors could be raised in every step. This class collects the failed
+    and successful result of each individual documents along the way, and generates the final response containing this
+    information.
+    """
     def __init__(self):
         self.start_time = timer()
         self.responses: List[Tuple[int, MarqoAddDocumentsItem]] = []
@@ -98,6 +103,12 @@ class AddDocumentsResponseCollector:
 
 
 class AddDocumentsHandler(ABC):
+    """
+    This class contains all the generic logic of batch adding document for all type of indexes.
+    It has a template method of `add_documents` that implements the main workflow of batch adding documents and allow
+    its subclass to fill in the different logic for handling individual fields, existing tensors and converting Marqo
+    docs to Vespa docs, etc.
+    """
 
     def __init__(self, marqo_index: MarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
         self.marqo_index = marqo_index

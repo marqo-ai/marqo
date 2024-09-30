@@ -81,6 +81,12 @@ class VespaSchema(ABC):
 def for_marqo_index_request(marqo_index_request: MarqoIndexRequest):
     """
     Get the VespaSchema implementation for the given MarqoIndexRequest.
+    From Marqo 2.13.0, we introduced the SemiStructuredVespaSchema to replace UnstructuredVespaSchema to support
+    searchable attributes for unstructured index. All the logic related to unstructured index is still kept to support
+    existing legacy indexes. Since there's no change in the API, we kept the UnstructuredMarqoIndexRequest unchanged.
+    By default, a SemiStructuredVespaSchema will be created from this type of request. But if a older marqo version is
+    specified, a legacy UnstructuredVespaSchema will be created instead. This logic is necessary to allow testing of
+    the legacy unstructured index.
 
     Args:
         marqo_index_request: The MarqoIndexRequest to get the implementation for

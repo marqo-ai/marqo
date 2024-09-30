@@ -2,18 +2,13 @@ from typing import List
 from typing import Optional, Union, Any, Sequence
 
 import numpy as np
-from pydantic import BaseModel, validator, root_validator
+from pydantic import BaseModel, root_validator
 from pydantic import Field
 
-from marqo import marqo_docs
-from marqo.api.exceptions import BadRequestError
-from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
+from marqo.core.models.add_docs_params import BatchVectorisationMode
 from marqo.tensor_search.enums import EnvVars
-
-
-class AddDocsParamsConfig:
-    arbitrary_types_allowed = True
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 
 
 class AddDocsBodyParams(BaseModel):
@@ -33,6 +28,7 @@ class AddDocsBodyParams(BaseModel):
     imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
     mediaDownloadThreadCount: Optional[int]
     textChunkPrefix: Optional[str] = None
+    batchVectorisationMode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     @root_validator
     def validate_thread_counts(cls, values):
