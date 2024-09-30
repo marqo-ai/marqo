@@ -1,7 +1,5 @@
-from typing import List
-from typing import Optional, Union, Any, Sequence
+from typing import Optional, Any, Sequence, List, Dict
 
-import numpy as np
 from pydantic import BaseModel, validator, root_validator
 from pydantic import Field
 
@@ -29,7 +27,7 @@ class AddDocsBodyParams(BaseModel):
     imageDownloadHeaders: dict = Field(default_factory=dict)
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
-    documents: Union[Sequence[Union[dict, Any]], list]
+    documents: Sequence[Dict[str, Any]]
     imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
     mediaDownloadThreadCount: Optional[int]
     textChunkPrefix: Optional[str] = None
@@ -65,7 +63,7 @@ class AddDocsParams(BaseModel):
         allow_mutation = False
 
     # this should only accept Sequences of dicts, but currently validation lies elsewhere
-    docs: Union[Sequence[Union[dict, Any]], list]
+    docs: Sequence[Dict[str, Any]]
 
     index_name: str
     device: Optional[str]
