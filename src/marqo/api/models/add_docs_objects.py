@@ -28,6 +28,7 @@ class AddDocsBodyParams(BaseModel):
     imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
     mediaDownloadThreadCount: Optional[int]
     textChunkPrefix: Optional[str] = None
+    # This parameter is experimental for now. we will add it to the document and py-marqo once it has been verified
     batchVectorisationMode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     @root_validator

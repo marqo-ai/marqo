@@ -36,6 +36,8 @@ class AddDocsParams(BaseModel):
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
         text_chunk_prefix: an optional prefix to add to each text chunk
+        batch_vectorisation_mode: choose how we batch vectorisation requests to the embedding model.
+                                  supports per_field, per_document and per_batch [Experimental]
     """
 
     class Config:
@@ -56,6 +58,7 @@ class AddDocsParams(BaseModel):
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
     text_chunk_prefix: Optional[str] = None
+    # This parameter is experimental for now. we will add it to the document and py-marqo once it has been verified
     batch_vectorisation_mode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     def __init__(self, **data: Any):
