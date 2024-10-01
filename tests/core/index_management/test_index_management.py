@@ -74,7 +74,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_skip_boostrap_if_already_bootstrapped_for_older_vespa_version(self):
         if (semver.Version.parse(self.vespa_client.get_vespa_version()) >=
-                IndexManagement.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
+                IndexManagement._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
             self.skipTest(reason="In newer version of vespa, we use deployment session for bootstrapping")
 
         def modified_post(*args, **kwargs):
@@ -94,7 +94,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_skip_boostrap_if_already_bootstrapped_for_newer_vespa_version(self):
         if (semver.Version.parse(self.vespa_client.get_vespa_version()) <
-                IndexManagement.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
+                IndexManagement._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
             self.skipTest(reason="In older version of vespa, we use prepareandactivate for bootstrapping")
 
         def modified_put(*args, **kwargs):

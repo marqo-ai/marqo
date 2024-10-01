@@ -26,7 +26,7 @@ logger = marqo.logging.get_logger(__name__)
 
 
 class IndexManagement:
-    MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES = semver.VersionInfo.parse('8.382.22')
+    _MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES = semver.VersionInfo.parse('8.382.22')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
 
@@ -34,9 +34,9 @@ class IndexManagement:
                  vespa_client: VespaClient,
                  zookeeper_client: Optional[ZookeeperClient] = None,
                  enable_index_operations: bool = False,
-                 deployment_timeout_seconds = 60,
-                 convergence_timeout_seconds = 120,
-                 deployment_lock_timeout = 0,
+                 deployment_timeout_seconds: int = 60,
+                 convergence_timeout_seconds: int = 120,
+                 deployment_lock_timeout: int = 0,
                  ):
         """Instantiate an IndexManagement object.
 
@@ -53,8 +53,8 @@ class IndexManagement:
         self._deployment_timeout_seconds = deployment_timeout_seconds
         self._convergence_timeout_seconds = convergence_timeout_seconds
 
-    @staticmethod
-    def validate_index_settings(index_name: str, settings_dict: dict) -> None:
+    @classmethod
+    def validate_index_settings(cls, index_name: str, settings_dict: dict) -> None:
         """
         Validates index settings using the IndexSettings model.
 
@@ -82,15 +82,16 @@ class IndexManagement:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
         with self._vespa_deployment_lock():
-            application = self._get_application_context_manager_for_bootstrapping_and_rollback(check_configured=False)
-            with application as app:
+            application_context_manager = self._get_application_context_manager_for_bootstrapping_and_rollback(
+                check_configured=False)
+            with application_context_manager as app:
 
                 marqo_version = version.get_version()
                 has_marqo_settings_schema = app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
                 marqo_config_doc = self._get_marqo_config() if has_marqo_settings_schema else None
 
                 if not app.need_bootstrapping(marqo_version, marqo_config_doc):
-                    application.gen.send(False)  # tell context manager to skip deployment
+                    application_context_manager.gen.send(False)  # tell context manager to skip deployment
                     return False
 
                 existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else ()
@@ -99,13 +100,13 @@ class IndexManagement:
 
     def rollback_vespa(self) -> None:
         with self._vespa_deployment_lock():
-            application = self._get_application_context_manager_for_bootstrapping_and_rollback()
-            with application as app:
+            application_context_manager = self._get_application_context_manager_for_bootstrapping_and_rollback()
+            with application_context_manager as app:
                 try:
                     app.rollback(version.get_version())
                 except ApplicationRollbackError as e:
                     logger.error(e.message)
-                    application.gen.send(False)  # tell context manager to skip deployment
+                    application_context_manager.gen.send(False)  # tell context manager to skip deployment
                     raise e
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
@@ -212,7 +213,7 @@ class IndexManagement:
 
     def _get_marqo_config(self) -> Optional[MarqoConfig]:
         """
-        We store Marqo config in _MARQO_CONFIG_DOC_ID doc prior to Marqo v2.12.0
+        We store Marqo config in _MARQO_CONFIG_DOC_ID doc prior to Marqo v2.13.0
         This method is now only used to retrieve the existing marqo config for bootstrapping
         """
         try:
@@ -316,7 +317,7 @@ class IndexManagement:
     def _get_application_context_manager_for_bootstrapping_and_rollback(self, check_configured: bool = True):
         vespa_version = semver.VersionInfo.parse(self.vespa_client.get_vespa_version())
 
-        if vespa_version < self.MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
+        if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
             return self._vespa_application(check_configured=check_configured)
         else:
             return self._vespa_application_with_deployment_session(check_configured=check_configured)
