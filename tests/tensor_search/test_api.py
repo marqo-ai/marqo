@@ -6,10 +6,11 @@ from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
 from marqo import exceptions as base_exceptions
+from marqo.api.exceptions import BadRequestError
 from marqo.core import exceptions as core_exceptions
+from marqo.core.exceptions import ZeroMagnitudeVectorError
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.index_management.index_management import IndexManagement
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
@@ -122,7 +123,6 @@ class ApiTests(MarqoTestCase):
                 self.assertIn(f"The search result offset must be less than or equal "
                                 f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
                                 response.json()["message"])
-
 
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):
