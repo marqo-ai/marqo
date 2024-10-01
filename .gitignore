@@ -151,3 +151,8 @@ dump.rdb
 
 # Tester app for unit tests
 scripts/vespa_local/vespa_tester_app.zip
+
+# Large scale performance testing
+/perf_tests/*.csv
+/perf_tests/*/*.csv
+/perf_tests/*.json
