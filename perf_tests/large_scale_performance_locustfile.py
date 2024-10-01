@@ -237,8 +237,12 @@ def save_telemetry_on_quit(environment, **kw):
 # Optionally, define a LoadTestShape to simulate burst traffic patterns
 class BurstLoadShape(LoadTestShape):
     stages = [
-        {"duration": 300, "users": 100, "spawn_rate": 10},   # First 5 minutes: ramp up to 100 users
-        {"duration": 600, "users": 500, "spawn_rate": 50},   # Next 10 minutes: ramp up to 500 users
+        {"duration": 300, "users": 20, "spawn_rate": 2},     # First 5 minutes: ramp up to 20 users
+        {"duration": 300, "users": 50, "spawn_rate": 5},     # Next 5 minutes: ramp up to 50 users
+        {"duration": 300, "users": 100, "spawn_rate": 10},   # Next 5 minutes: ramp up to 100 users
+        {"duration": 600, "users": 300, "spawn_rate": 30},   # Next 10 minutes: ramp up to 300 users
+        {"duration": 300, "users": 500, "spawn_rate": 50},   # Next 5 minutes: ramp up to 500 users
+        {"duration": 600, "users": 300, "spawn_rate": 30},  # Next 10 minutes: ramp down to 300 users
         {"duration": 900, "users": 100, "spawn_rate": 50},   # Next 15 minutes: ramp down to 100 users
     ]
 
