@@ -1382,7 +1382,8 @@ def get_documents_by_ids(
                 }
             )
         else:
-            status, message = config.document.translate_vespa_document_response(response.status)
+            document = config.document
+            status, message = document.vespa_client.translate_vespa_document_response(response.status, None)
             results.append(
                 MarqoGetDocumentsByIdsItem(
                     id=_get_id_from_vespa_id(response.id), status=status,

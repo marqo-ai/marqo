@@ -157,7 +157,7 @@ class Document:
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
-                status, message = self.translate_vespa_document_response(resp.status)
+                status, message = self.vespa_client.translate_vespa_document_response(resp.status, None)
                 new_item = MarqoUpdateDocumentsItem(id=doc_id, status=status, message=message, error=message)
                 items.append(new_item)
 
@@ -221,7 +221,7 @@ class Document:
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
-                status, message = self.translate_vespa_document_response(resp.status, message=resp.message)
+                status, message = self.vespa_client.translate_vespa_document_response(resp.status, resp.message)
                 new_item = MarqoAddDocumentsItem(id=doc_id, status=status, message=message)
                 new_items.append(new_item)
 
@@ -231,32 +231,3 @@ class Document:
 
         return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
                                          processingTimeMs=add_docs_processing_time_ms)
-
-    def translate_vespa_document_response(self, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
-        """A helper function to translate Vespa document response into the expected status, message that
-        is used in Marqo document API responses.
-
-        Args:
-            status: The status code from Vespa document response
-
-        Return:
-            A tuple of status code and the message in the response
-        """
-        if status == 200:
-            return 200, None
-        elif status == 404:
-            return 404, "Document does not exist in the index"
-        # Update documents get 412 from Vespa for document not found as we use condition
-        elif status == 412:
-            return 404, "Document does not exist in the index"
-        elif status == 429:
-            return 429, "Marqo vector store receives too many requests. Please try again later"
-        elif status == 507:
-            return 400, "Marqo vector store is out of memory or disk space"
-        # TODO Block the invalid special characters before sending to Vespa
-        elif status == 400 and isinstance(message, str) and "could not parse field" in message.lower():
-            return 400, f"The document contains invalid characters in the fields. Original error: {message} "
-        else:
-            logger.error(f"An unexpected error occurred from the Vespa document response. "
-                         f"status: {status}, message: {message}")
-            return 500, f"Marqo vector store returns an unexpected error with this document. Original error: {message}"

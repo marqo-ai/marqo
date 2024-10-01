@@ -572,7 +572,6 @@ class VespaClient:
         raise VespaError(f'Get all index settings returns invalid response: {index_list}')
 
     def translate_vespa_document_response(self, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
-        # TODO copied from document, find a better place for this code
         """A helper function to translate Vespa document response into the expected status, message that
         is used in Marqo document API responses.
 
@@ -582,19 +581,19 @@ class VespaClient:
         Return:
             A tuple of status code and the message in the response
         """
-        if status == 200:
-            return 200, None
-        elif status == 404:
-            return 404, "Document does not exist in the index"
-        # Update documents get 412 from Vespa for document not found as we use condition
-        elif status == 412:
-            return 404, "Document does not exist in the index"
-        elif status == 429:
-            return 429, "Marqo vector store receives too many requests. Please try again later"
-        elif status == 507:
-            return 400, "Marqo vector store is out of memory or disk space"
-        # TODO Block the invalid special characters before sending to Vespa
-        elif status == 400 and isinstance(message, str) and "Could not parse field" in message:
+        vespa_status_code_to_marqo_doc_error_map = {
+            200: (200, None),
+            404: (404, "Document does not exist in the index"),
+            # Update documents get 412 from Vespa for document not found as we use condition
+            412: (404, "Document does not exist in the index"),
+            429: (429, "Marqo vector store receives too many requests. Please try again later"),
+            507: (400, "Marqo vector store is out of memory or disk space"),
+        }
+
+        if status in vespa_status_code_to_marqo_doc_error_map:
+            return vespa_status_code_to_marqo_doc_error_map[status]
+        elif status == 400 and isinstance(message, str) and "could not parse field" in message.lower():
+            # TODO Block the invalid special characters before sending to Vespa
             return 400, f"The document contains invalid characters in the fields. Original error: {message} "
         else:
             logger.error(f"An unexpected error occurred from the Vespa document response. "
