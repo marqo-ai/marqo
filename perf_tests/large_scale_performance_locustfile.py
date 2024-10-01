@@ -66,8 +66,8 @@ QUERIES = load_queries(QUERIES_CSV)
 NUM_QUERIES = len(QUERIES)
 
 # Regions and their probabilities
-REGIONS = ['US', 'AU', 'CA', 'GB', 'DE', 'FR', 'JP', 'ALL_WORLD']
-REGION_PROBABILITIES = [0.5, 0.15, 0.05, 0.05, 0.02, 0.02, 0.01, 0.2]
+REGIONS = ['US', 'AU', 'CA', 'GB', 'DE', 'FR', 'JP']
+REGION_PROBABILITIES = [0.7, 0.15, 0.05, 0.05, 0.02, 0.02, 0.01]
 
 # Index name from environment variable
 INDEX_NAME = os.getenv('MARQO_INDEX_NAME', 'locust-test')
