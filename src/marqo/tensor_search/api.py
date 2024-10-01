@@ -506,7 +506,6 @@ def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(g
 
 
 @app.post("/rollback-vespa")
-@utils.enable_upgrade_api()
 def rollback_vespa_app_to_current_version(marqo_config: config.Config = Depends(get_config)):
     marqo_config.index_management.rollback_vespa()
     return JSONResponse(
