@@ -255,6 +255,11 @@ class MarqoConfigStore:
 
 
 class VespaAppBackup:
+    """
+    This class represents a backup zip file for a Vespa application package. It contains all the config files we changed
+    or added in the previous bootstrapping process. (Binary files are excluded.) During a rollback, we will recover all
+    changed files, and remove all added files from this zip file.
+    """
     _REMOVE_FILE_LIST = "files_to_remove.json"
 
     def __init__(self, backup_zip_file_content: Optional[bytes] = None) -> None:
@@ -329,31 +334,98 @@ class VespaAppBackup:
 
 
 class VespaApplicationStore(ABC):
+    """
+    All Marqo index related operations need to change and redeploy VespaApplicationPackage. There are several ways to
+    handle the change and deployment of the application. This class extracted an interface for low-level operations.
+    """
+    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int):
+        self._deploy_timeout = deploy_timeout
+        self._wait_for_convergence_timeout = wait_for_convergence_timeout
+        self._vespa_client = vespa_client
 
     @abstractmethod
     def file_exists(self, *paths: str) -> bool:
+        """
+        Check if a file exists at the given paths in the application package
+
+        Args:
+            *paths (str): The relative paths to check
+
+        Returns:
+            bool: True if file exists, False otherwise
+        """
         pass
 
     @abstractmethod
     def read_text_file(self, *paths: str) -> Optional[str]:
+        """
+        Return the content of a text file at the given paths in the application package
+
+        Args:
+            *paths (str): The relative paths to read
+
+        Returns:
+            str: The content of a text file at the given paths in the application package
+            None if the file does not exist
+        """
         pass
 
     @abstractmethod
     def read_binary_file(self, *paths: str) -> Optional[bytes]:
+        """
+        Return the content of a binary file at the given paths in the application package
+
+        Args:
+            *paths (str): The relative paths to read
+
+        Returns:
+            bytes: The content of a text file at the given paths in the application package
+            None if the file does not exist
+        """
         pass
 
     @abstractmethod
     def save_file(self, content: Union[str, bytes], *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        """
+        Save the content to a file at the given paths in the application package
+
+        Args:
+            content (Union[str, bytes]): The content to save
+            *paths (str): The relative paths to save
+            backup (Optional[VespaAppBackup]): If provided, backup the old file
+        """
         pass
 
     @abstractmethod
     def remove_file(self, *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
+        """
+        Remove the content of a file at the given paths in the application package
+
+        Args:
+            *paths (str): The relative paths to remove
+            backup (Optional[VespaAppBackup]): If provided, backup the old file
+        """
+        pass
+
+    @abstractmethod
+    def deploy_application(self) -> None:
+        """
+        Deploy the application package
+        """
         pass
 
 
 class VespaApplicationFileStore(VespaApplicationStore):
-    def __init__(self, app_root_path: str):
-        self._app_root_path = app_root_path
+    """
+    This implementation handles the deployment of a Vespa application package by downloading all contents in one
+    deployment session and deploying the updated app in another deployment session by using prepareandactivate endpoint
+    of Vespa deployment API. See https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepareandactivate for
+    more details. This is the only viable option to deploy changes of binary files before Vespa version 8.382.22.
+    We implement this approach to support bootstrapping and rollback for Vespa version prior to 8.382.22.
+    """
+    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int):
+        super().__init__(vespa_client, deploy_timeout, wait_for_convergence_timeout)
+        self._app_root_path = vespa_client.download_application(check_for_application_convergence=True)
 
     def _full_path(self, *paths: str) -> str:
         return os.path.join(self._app_root_path, *paths)
@@ -397,12 +469,22 @@ class VespaApplicationFileStore(VespaApplicationStore):
                 backup.backup_file(self.read_binary_file(*paths), *paths)
             os.remove(path)
 
+    def deploy_application(self) -> None:
+        self._vespa_client.deploy_application(self._app_root_path, timeout=self._deploy_timeout)
+        self._vespa_client.wait_for_application_convergence(timeout=self._wait_for_convergence_timeout)
+
 
 class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
-    def __init__(self, content_base_url: str, vespa_client: VespaClient):
-        self._content_base_url = content_base_url
-        self._vespa_client = vespa_client
-        self._all_contents = vespa_client.list_contents(content_base_url)
+    """
+    This implementation handles the deployment of a Vespa application package in the same deployment session.
+    This is a preferred solution since it leverages the optimistic locking mechanism to avoid race conditions.
+    See https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#create-session for more details.
+    However, this approach does not support binary files for Vespa version prior to 8.382.22.
+    """
+    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int):
+        super().__init__(vespa_client, deploy_timeout, wait_for_convergence_timeout)
+        self._content_base_url, self._prepare_url = vespa_client.create_deployment_session()
+        self._all_contents = vespa_client.list_contents(self._content_base_url)
 
     def file_exists(self, *paths: str) -> bool:
         content_url = self._vespa_client.get_content_url(self._content_base_url, *paths)
@@ -433,6 +515,13 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
                 backup.backup_file(self.read_binary_file(*paths), *paths)
             self._vespa_client.delete_content(self._content_base_url, *paths)
 
+    def deploy_application(self) -> None:
+        prepare_response = self._vespa_client.prepare(self._prepare_url, timeout=self._deploy_timeout)
+        # TODO handle prepare configChangeActions
+        # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
+        self._vespa_client.activate(prepare_response['activate'], timeout=self._deploy_timeout)
+        self._vespa_client.wait_for_application_convergence(timeout=self._wait_for_convergence_timeout)
+
 
 class VespaApplicationPackage:
     """
@@ -443,14 +532,14 @@ class VespaApplicationPackage:
       | -- hosts.xml
       | -- schemas
              | -- schema_name1.sd
-             \ -- marqo__settings.sd    # this is used to store index settings prior to v2.12.0
+             \ -- marqo__settings.sd    # this is used to store index settings prior to v2.13.0
       | -- search
              \ -- query-profiles
                     \ -- default.xml    # default query profile
       | -- components
              \ -- marqo-custom-searchers-deploy.jar
       | -- validation-overrides.xml
-      | -- marqo_index_settings.json          # NEW, stores index settings after v2.12.0
+      | -- marqo_index_settings.json          # NEW, stores index settings after v2.13.0
       | -- marqo_index_settings_history.json  # NEW, stores history of index
       \ -- marqo_config.json                  # NEW, stores marqo config (version info)
     """
@@ -478,23 +567,22 @@ class VespaApplicationPackage:
         """
         Bootstrapping is needed when
         - the version of Marqo is higher than the version of the deployed application
-        - the version of Marqo is lower but allow downgrade is enabled (used for rollback)
         The version of the application is retrieved in the following order:
-        - from the 'marqo_config.json' file (Post v2.12.0)
+        - from the 'marqo_config.json' file (Post v2.13.0)
         - from the marqo_config_doc passed in which is marqo__config doc saved in marqo__settings schema (Post v2.1.0)
         - if neither is available, return 2.0.0 as default (Pre v2.1.0 or not bootstrapped yet)
         """
-        logger.info(f'Marqo version is {marqo_version}')
-
         if self.is_configured and self.get_marqo_config() is not None:
             app_version = self.get_marqo_config().version
-            logger.info(f'Vespa app version is detected in marqo_config.json: {app_version}')
+            logger.debug(f'Vespa app version is detected in marqo_config.json: {app_version}')
         elif marqo_config_doc:
             app_version = marqo_config_doc.version
-            logger.info(f'Vespa app version is detected in marqo__config doc: {app_version}')
+            logger.debug(f'Vespa app version is detected in marqo__config doc: {app_version}')
         else:
             app_version = '2.0.0'
-            logger.info(f'Vespa app version is not detected, set to default: {app_version}')
+            logger.debug(f'Vespa app version is not detected, set to default: {app_version}')
+
+        logger.info(f'Marqo version is {marqo_version}, and the vector store is bootstrapped by Marqo {app_version}')
 
         marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
         app_sem_version = semver.VersionInfo.parse(app_version, optional_minor_and_patch=True)
@@ -502,34 +590,35 @@ class VespaApplicationPackage:
         return app_sem_version < marqo_sem_version
 
     def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
-        logger.info(f'Bootstrapping Vespa app to {marqo_version}')
+        logger.info(f'Bootstrapping the vector store to {marqo_version}')
         # Migrate existing index settings from previous versions of Marqo
         if not self.is_configured:
             if existing_index_settings is not None and len(existing_index_settings) > 0:
-                logger.info(f'Importing existing index settings {[index.json for index in existing_index_settings]}')
+                logger.debug(f'Importing existing index settings {[index.json for index in existing_index_settings]}')
                 for index in existing_index_settings:
                     self._index_setting_store.save_index_setting(index)
             self._persist_index_settings()
 
         backup = VespaAppBackup()
         self._config_query_profiles(backup)
-        self._copy_components_jar()  # we do not back jar file
+        self._copy_components_jar()  # we do not back up jar file
         self._service_xml.config_components()
         self._marqo_config_store.update_version(marqo_version)
 
-        logger.info(f'Persisting services.xml file: {self._service_xml}')
+        logger.debug(f'Persisting services.xml file: {self._service_xml}')
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE, backup=backup)
 
-        logger.info(f'Persisting marqo config: {self._marqo_config_store.get().json()}')
+        logger.debug(f'Persisting marqo config: {self._marqo_config_store.get().json()}')
         self._store.save_file(self._marqo_config_store.get().json(), self._MARQO_CONFIG_FILE, backup=backup)
 
-        logger.info(f'Generating backup file {self._BACKUP_FILE} from {backup}')
+        logger.debug(f'Generating backup file {self._BACKUP_FILE} from {backup}')
         self._store.save_file(backup.to_zip_stream().read(), self._BACKUP_FILE)
+        self._deploy()
 
     def rollback(self, marqo_version: str) -> None:
-        logger.info(f'Rolling Vespa app back to {marqo_version}')
+        vespa_app_version = self.get_marqo_config().version
         marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
-        app_sem_version = semver.VersionInfo.parse(self.get_marqo_config().version, optional_minor_and_patch=True)
+        app_sem_version = semver.VersionInfo.parse(vespa_app_version, optional_minor_and_patch=True)
         if marqo_sem_version >= app_sem_version:
             raise ApplicationRollbackError(f"Cannot rollback from ${app_sem_version} to ${marqo_sem_version}. "
                                            f"The target version must be lower than the current one.")
@@ -538,28 +627,31 @@ class VespaApplicationPackage:
             raise ApplicationRollbackError(f"{self._BACKUP_FILE} does not exist in current session, failed to rollback")
 
         old_backup = VespaAppBackup(self._store.read_binary_file(self._BACKUP_FILE))
-        logger.info(f'Old backup {old_backup}')
+        logger.debug(f'Old backup {old_backup}')
 
         marqo_config = MarqoConfigStore(old_backup.read_text_file(self._MARQO_CONFIG_FILE)).get()
         if marqo_config is not None and marqo_config.version != marqo_version:
             raise ApplicationRollbackError(f"Cannot rollback to {marqo_config.version}, current Marqo version is {marqo_version}")
+
+        logger.info(f'Rolling the vector store back from {vespa_app_version} to {marqo_version}')
 
         # Copy components jar files from the old Marqo version
         self._copy_components_jar()
 
         new_backup = VespaAppBackup()
         for paths in old_backup.files_to_remove():
-            logger.info(f'Removing file {paths}')
+            logger.debug(f'Removing file {paths}')
             self._store.remove_file(*paths, backup=new_backup)
 
         for (path, file_content) in old_backup.files_to_rollback():
-            logger.info(f'Rolling back file {path}')
+            logger.debug(f'Rolling back file {path}')
             if path == self._SERVICES_XML_FILE:
                 self._validate_services_xml_for_rollback(file_content.decode('utf-8'))
             self._store.save_file(file_content, path, backup=new_backup)
 
-        logger.info(f'Generating backup file {self._BACKUP_FILE} from {new_backup}')
+        logger.debug(f'Generating backup file {self._BACKUP_FILE} from {new_backup}')
         self._store.save_file(new_backup.to_zip_stream().read(), self._BACKUP_FILE)
+        self._deploy()
 
     def batch_add_index_setting_and_schema(self, indexes: List[Tuple[str, MarqoIndex]]) -> None:
         for schema, index in indexes:
@@ -572,6 +664,7 @@ class VespaApplicationPackage:
 
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
+        self._deploy()
 
     def batch_delete_index_setting_and_schema(self, index_names: List[str]) -> None:
         for name in index_names:
@@ -585,12 +678,16 @@ class VespaApplicationPackage:
         self._add_schema_removal_override()
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
+        self._deploy()
 
     def has_schema(self, name: str) -> bool:
         return self._store.file_exists('schemas', f'{name}.sd')
 
     def has_index(self, name: str) -> bool:
         return self._index_setting_store.get_index(name) is not None
+
+    def _deploy(self):
+        self._store.deploy_application()
 
     def _persist_index_settings(self):
         index_setting_json, index_setting_history_json = self._index_setting_store.to_json()
@@ -606,13 +703,13 @@ class VespaApplicationPackage:
             </query-profile>
             '''
         )
-        logger.info(f'Configuring query profiles {content}')
+        logger.debug(f'Configuring query profiles {content}')
         self._store.save_file(content, 'search', 'query-profiles', 'default.xml', backup=backup)
 
     def _copy_components_jar(self) -> None:
         components_jar_file = 'marqo-custom-searchers-deploy.jar'
 
-        logger.info(f'Copying components jar file {components_jar_file}')
+        logger.debug(f'Copying components jar file {components_jar_file}')
         with open(self._COMPONENTS_JAR_FOLDER/components_jar_file, 'rb') as f:
             self._store.save_file(f.read(), 'components', components_jar_file)
 
@@ -629,8 +726,10 @@ class VespaApplicationPackage:
     def _validate_services_xml_for_rollback(self, services_xml_backup: str) -> None:
         services_xml_old = ServiceXml(services_xml_backup)
         if not self._service_xml.compare_element(services_xml_old, 'content/documents'):
-            # TODO should we capture diff in the log?
+            logger.debug(f'Indexes have been added or removed since last backup. '
+                         f'services.xml in backup: {services_xml_old} vs. current service.xml: {self._service_xml}')
             raise ApplicationRollbackError('Indexes have been added or removed since last backup. Aborting rollback.')
         if not self._service_xml.compare_element(services_xml_old, '*/nodes'):
-            # TODO should we capture diff in the log?
+            logger.debug(f'Server nodes have been added or removed since last backup. '
+                         f'services.xml in backup: {services_xml_old} vs. current service.xml: {self._service_xml}')
             raise ApplicationRollbackError('Nodes have been added or removed since last backup. Aborting rollback.')

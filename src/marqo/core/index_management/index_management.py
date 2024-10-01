@@ -9,7 +9,7 @@ import marqo.vespa.vespa_client
 from marqo import version
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
-from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError, ApplicationRollbackError
+from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
 from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig, \
@@ -82,32 +82,22 @@ class IndexManagement:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
         with self._vespa_deployment_lock():
-            application_context_manager = self._get_application_context_manager_for_bootstrapping_and_rollback(
-                check_configured=False)
-            with application_context_manager as app:
+            vespa_app = self._get_vespa_application(check_configured=False)
 
-                marqo_version = version.get_version()
-                has_marqo_settings_schema = app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
-                marqo_config_doc = self._get_marqo_config() if has_marqo_settings_schema else None
+            marqo_version = version.get_version()
+            has_marqo_settings_schema = vespa_app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
+            marqo_config_doc = self._get_marqo_config() if has_marqo_settings_schema else None
 
-                if not app.need_bootstrapping(marqo_version, marqo_config_doc):
-                    application_context_manager.gen.send(False)  # tell context manager to skip deployment
-                    return False
+            if not vespa_app.need_bootstrapping(marqo_version, marqo_config_doc):
+                return False
 
-                existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else ()
-                app.bootstrap(marqo_version, existing_indexes)
-                return True
+            existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else ()
+            vespa_app.bootstrap(marqo_version, existing_indexes)
+            return True
 
     def rollback_vespa(self) -> None:
         with self._vespa_deployment_lock():
-            application_context_manager = self._get_application_context_manager_for_bootstrapping_and_rollback()
-            with application_context_manager as app:
-                try:
-                    app.rollback(version.get_version())
-                except ApplicationRollbackError as e:
-                    logger.error(e.message)
-                    application_context_manager.gen.send(False)  # tell context manager to skip deployment
-                    raise e
+            self._get_vespa_application().rollback(version.get_version())
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
@@ -158,8 +148,7 @@ class IndexManagement:
             index_to_create.append(vespa_schema_factory(request).generate_schema())
 
         with self._vespa_deployment_lock():
-            with self._vespa_application_with_deployment_session() as app:
-                app.batch_add_index_setting_and_schema(index_to_create)
+            self._get_vespa_application().batch_add_index_setting_and_schema(index_to_create)
 
         return [index for _, index in index_to_create]
 
@@ -189,8 +178,7 @@ class IndexManagement:
                 in progress and the lock cannot be acquired
         """
         with self._vespa_deployment_lock():
-            with self._vespa_application_with_deployment_session() as app:
-                app.batch_delete_index_setting_and_schema(index_names)
+            self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
@@ -252,75 +240,49 @@ class IndexManagement:
 
     def get_marqo_version(self) -> str:
         """
-        This method is only used during upgrade and rollback
-        TODO check if this is still needed
+        This method is only used during legacy upgrade and rollback process. Please note that this will create a
+        Vespa deployment session and download the margo_config json from the Vespa config server. If we need to
+        retrieve this information more often in the future, consider exposing it from Vespa container.
+
+        Returns:
+            The marqo version stored in the vespa application package
         """
-        application = self._vespa_application_with_deployment_session()
-        with application as app:
-            marqo_version = app.get_marqo_config().version
-            application.gen.send(False)  # do not deploy
-            return marqo_version
+        return self._get_vespa_application().get_marqo_config().version
 
-    @contextmanager
-    def _vespa_application(self, check_configured: bool = True):
+    def _get_vespa_application(self, check_configured: bool = True, need_binary_file_support: bool = False) \
+            -> VespaApplicationPackage:
         """
-        A context manager that handles the deployment of a Vespa application package by downloading
-        all contents in one session and deploying the updated app in another session.
-        This is only used for bootstrapping. A better way is to use _vespa_application_with_deployment_session.
-        We need to upload a component jar file during bootstrapping. Due to a bug in Vespa, the better
-        approach does not support uploading binary files. Therefore, we still need this method.
-        With the protection of the distributed lock context manager, we would not run into race condition, unless
-        the connection to zookeeper is lost, and more than one instance holds the lock. This should happen very rarely.
+        Retrieve a Vespa application package. Depending on whether we need to handle binary files and the Vespa version,
+        it uses different implementation of VespaApplicationStore.
+
+        Args:
+            check_configured: if set to True, it checks whether the application package is configured or not.
+            need_binary_file_support: indicates whether the support for binary file is needed.
+
+        Returns:
+            The VespaApplicationPackage instance we can use to do bootstrapping/rollback and any index operations.
         """
-        app_root_path = self.vespa_client.download_application(check_for_application_convergence=True)
-        app = VespaApplicationPackage(VespaApplicationFileStore(app_root_path))
-
-        if check_configured and not app.is_configured:
-            raise ApplicationNotInitializedError()
-
-        should_deploy = yield app
-
-        if should_deploy is None or should_deploy is True:
-            self.vespa_client.deploy_application(app_root_path, timeout=self._deployment_timeout_seconds)
-            self.vespa_client.wait_for_application_convergence(timeout=self._convergence_timeout_seconds)
-
-        if should_deploy is not None:
-            yield
-
-    @contextmanager
-    def _vespa_application_with_deployment_session(self, check_configured: bool = True):
-        """
-        A context manager that handles the deployment of a Vespa application package in a deployment session
-        This is a recommended way to deploy a Vespa application package. It leverages the optimistic locking mechanism
-        to avoid race conditions. Changes to the application package that do not touch any binary files should use
-        this context manager for deployment.
-        """
-        content_base_url, prepare_url = self.vespa_client.create_deployment_session()
-        store = ApplicationPackageDeploymentSessionStore(content_base_url, self.vespa_client)
-        app = VespaApplicationPackage(store)
-
-        if check_configured and not app.is_configured:
-            raise ApplicationNotInitializedError()
-
-        should_deploy = yield app
-
-        if should_deploy is None or should_deploy is True:
-            prepare_response = self.vespa_client.prepare(prepare_url)
-            # TODO handle prepare configChangeActions
-            # https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#prepare-session
-            self.vespa_client.activate(prepare_response['activate'])
-            self.vespa_client.wait_for_application_convergence(timeout=self._convergence_timeout_seconds)
-
-        if should_deploy is not None:
-            yield
-
-    def _get_application_context_manager_for_bootstrapping_and_rollback(self, check_configured: bool = True):
         vespa_version = semver.VersionInfo.parse(self.vespa_client.get_vespa_version())
-
-        if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
-            return self._vespa_application(check_configured=check_configured)
+        if need_binary_file_support and vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
+            # Binary files are only supported using VespaApplicationFileStore prior to Vespa version 8.382.22
+            application_package_store = VespaApplicationFileStore(
+                vespa_client=self.vespa_client,
+                deploy_timeout=self._deployment_timeout_seconds,
+                wait_for_convergence_timeout=self._convergence_timeout_seconds
+            )
         else:
-            return self._vespa_application_with_deployment_session(check_configured=check_configured)
+            application_package_store = ApplicationPackageDeploymentSessionStore(
+                vespa_client=self.vespa_client,
+                deploy_timeout=self._deployment_timeout_seconds,
+                wait_for_convergence_timeout=self._convergence_timeout_seconds
+            )
+
+        application = VespaApplicationPackage(application_package_store)
+
+        if check_configured and not application.is_configured:
+            raise ApplicationNotInitializedError()
+
+        return application
 
     @contextmanager
     def _vespa_deployment_lock(self):

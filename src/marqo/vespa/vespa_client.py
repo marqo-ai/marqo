@@ -648,15 +648,15 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-    def prepare(self, prepare_url: str):
-        response = self.http_client.put(prepare_url)
+    def prepare(self, prepare_url: str, timeout: int):
+        response = self.http_client.put(prepare_url, timeout=timeout)
 
         self._raise_for_status(response)
 
         return response.json()
 
-    def activate(self, activate_url: str):
-        response = self.http_client.put(activate_url)
+    def activate(self, activate_url: str, timeout: int):
+        response = self.http_client.put(activate_url, timeout=timeout)
 
         self._raise_for_status(response)
 
