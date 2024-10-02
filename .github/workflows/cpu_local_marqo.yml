@@ -39,6 +39,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cpu-local-api-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Start-Runner:
     name: Start self-hosted EC2 runner

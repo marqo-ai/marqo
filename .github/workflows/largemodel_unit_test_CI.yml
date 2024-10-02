@@ -13,6 +13,10 @@ on:
     branches:
       - mainline
 
+concurrency:
+  group: large-model-unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -36,7 +40,7 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ami-063c787e8018d6d9f
+          ec2-image-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
           ec2-instance-type: g4dn.2xlarge
           subnet-id: ${{ secrets.LARGEMODELTEST_SUBNET_ID }}
           security-group-id: ${{ secrets.LARGEMODELTEST_SECURITY_GROUP }}
@@ -64,12 +68,6 @@ jobs:
         with:
           repository: marqo-ai/marqo-base
           path: marqo-base
-
-      # The FFmpeg and Libmgic is already installed on the AMI
-      - name: Check FFmpeg and libmagic
-        run: |
-          ffmpeg -version  # Verify installation
-          file --version   # Verify libmagic installation and version
 
       - name: Install dependencies
         run: |
