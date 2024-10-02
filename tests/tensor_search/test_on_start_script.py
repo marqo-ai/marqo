@@ -1,11 +1,12 @@
 import json
-
-from tests.marqo_test import MarqoTestCase
+import os
 from unittest import mock
+
+from marqo.api import exceptions, configs
 from marqo.tensor_search import enums
 from marqo.tensor_search import on_start_script
-from marqo.api import exceptions, configs
-import os
+from marqo.tensor_search.enums import EnvVars
+from tests.marqo_test import MarqoTestCase
 
 
 class TestOnStartScript(MarqoTestCase):
@@ -269,9 +270,53 @@ class TestOnStartScript(MarqoTestCase):
 
         assert run()
 
+    def test_SetEnableVideoGPUAcceleration_none_input_check_fails(self):
+        """Test when the env variable is None(not set by the users) and the check fails, the env var is set to 'FALSE'."""
+        with mock.patch.dict('marqo.tensor_search.on_start_script.os.environ',
+                             {}), \
+        mock.patch('marqo.tensor_search.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
+            mock_check_gpu_acceleration.side_effect = exceptions.StartupSanityCheckError('GPU not available')
 
+            # Create instance of the class
+            obj = on_start_script.SetEnableVideoGPUAcceleration()
 
+            # Run the method
+            obj.run()
 
+            # Assertions
+            mock_check_gpu_acceleration.assert_called_once()
+            self.assertEqual("FALSE", os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION])
 
+    def test_SetEnableVideoGPUAcceleration_none_input_check_pass(self):
+        """Test when the env variable is None(not set by the users) and the check pass, the env var is set to 'TRUE'."""
+        with mock.patch.dict('marqo.tensor_search.on_start_script.os.environ',
+                             {}), \
+        mock.patch('marqo.tensor_search.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
+            mock_check_gpu_acceleration.return_value = None
 
+            # Create instance of the class
+            obj = on_start_script.SetEnableVideoGPUAcceleration()
 
+            # Run the method
+            obj.run()
+
+            # Assertions
+            mock_check_gpu_acceleration.assert_called_once()
+            self.assertEqual("TRUE", os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION])
+
+    def test_SetEnableVideoGPUAccelerationTrueButCheckFails(self):
+        """Test when the env variable is TRUE and the check fails, an error raised."""
+        with mock.patch.dict('marqo.tensor_search.on_start_script.os.environ',
+                             {EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION: "TRUE"}), \
+        mock.patch('marqo.tensor_search.on_start_script.SetEnableVideoGPUAcceleration._check_video_gpu_acceleration_availability') as mock_check_gpu_acceleration:
+            mock_check_gpu_acceleration.side_effect = exceptions.StartupSanityCheckError('GPU not available')
+
+            # Create instance of the class
+            obj = on_start_script.SetEnableVideoGPUAcceleration()
+
+            # Run the method
+            with self.assertRaises(exceptions.StartupSanityCheckError):
+                obj.run()
+
+            # Assertions
+            mock_check_gpu_acceleration.assert_called_once()

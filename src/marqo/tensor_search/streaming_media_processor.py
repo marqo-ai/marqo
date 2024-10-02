@@ -6,6 +6,7 @@ import subprocess
 # for multimodal processing
 import tempfile
 import time
+from typing import List, Dict, Union, Any
 
 import ffmpeg
 import torch
@@ -112,27 +113,21 @@ class StreamingMediaProcessor:
                         # Use ffmpeg-python to process the chunk
                         stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
                         stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
-
-                    ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
-
-                    processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
-                    processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
-
-                    processed_chunk = {
-                        'tensor': processed_chunk_tensor,
-                        'start_time': chunk_start,
-                        'end_time': chunk_end
-                    }
-
-                    processed_chunks.append(processed_chunk)
-
-                except subprocess.CalledProcessError as e:
+                        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+                except (subprocess.CalledProcessError, MediaDownloadError) as e:
                     logger.error(f"Error processing chunk starting at {chunk_start}: {e.stderr}")
                     continue  # Skip this chunk and continue with the next one
-                finally:
-                    # Clean up temporary files
-                    if os.path.exists(output_file):
-                        os.remove(output_file)
+
+                processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
+                processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
+
+                processed_chunk = {
+                    'tensor': processed_chunk_tensor,
+                    'start_time': chunk_start,
+                    'end_time': chunk_end
+                }
+
+                processed_chunks.append(processed_chunk)
 
         return processed_chunks
 
