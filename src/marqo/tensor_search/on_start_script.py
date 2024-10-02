@@ -271,11 +271,11 @@ class SetEnableVideoGPUAcceleration:
         if env_value is None:
             try:
                 self._check_video_gpu_acceleration_availability()
+                os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION] = "TRUE"
             except exceptions.StartupSanityCheckError as e:
                 self.logger.debug(f"Failed to use GPU acceleration for video processing. We will disable it. "
                                   f"Original error message: {e}")
                 os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION] = "FALSE"
-            os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION] = "TRUE"
         elif env_value == "TRUE":
             self._check_video_gpu_acceleration_availability()
         elif env_value == "FALSE":

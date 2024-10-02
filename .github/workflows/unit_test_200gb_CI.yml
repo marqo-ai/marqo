@@ -69,6 +69,14 @@ jobs:
           repository: marqo-ai/marqo-base
           path: marqo-base
 
+      # TODO Bake these into the AMIs later
+      - name: Install FFmpeg and Libmagic1
+        run: |
+          sudo apt-get install ffmpeg -y
+          sudo apt-get install libmagic1 -y
+          ffmpeg -version
+          file --version
+
       - name: Install dependencies
         run: |
           pip install -r marqo-base/requirements.txt
