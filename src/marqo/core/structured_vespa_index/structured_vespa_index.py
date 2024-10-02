@@ -59,7 +59,7 @@ class StructuredVespaIndex(VespaIndex):
     _MAX_LONG = 9223372036854775807
     _MIN_LONG = -9223372036854775808
 
-    _HYBRID_SEARCH_MINIMUM_VERSION = semver.VersionInfo.parse(constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION)
+    _HYBRID_SEARCH_MINIMUM_VERSION = constants.MARQO_STRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION
 
     def get_vespa_id_field(self) -> str:
         return common.FIELD_ID
