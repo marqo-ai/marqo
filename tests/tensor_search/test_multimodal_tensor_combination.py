@@ -181,7 +181,7 @@ class TestMultimodalTensorCombination(MarqoTestCase):
                                           structured_random_multimodal_index,
                                           structured_random_text_index,
                                           structured_multimodal_index,
-                                          structured_unnormalized_multimodal_index,
+                                          structured_unnormalized_multimodal_index
                                           ])
 
         # Assign indexes to class variables
@@ -194,7 +194,6 @@ class TestMultimodalTensorCombination(MarqoTestCase):
         cls.structured_random_text_index = cls.indexes[5]
         cls.structured_multimodal_index = cls.indexes[6]
         cls.structured_unnormalized_multimodal_index = cls.indexes[7]
-
 
     def setUp(self):
         super().setUp()

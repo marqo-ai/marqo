@@ -58,7 +58,7 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
 
           # CUDA AMD64 instance
-          ec2-image-id: ${{ secrets.LARGEMODELTEST_AMI }}
+          ec2-image-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
           ec2-instance-type: g4dn.2xlarge
           subnet-id: ${{ secrets.LARGEMODELTEST_SUBNET_ID }}
           security-group-id: ${{ secrets.LARGEMODELTEST_SECURITY_GROUP }}

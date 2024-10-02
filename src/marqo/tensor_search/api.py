@@ -106,6 +106,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.OperationConflictError,
          api_exceptions.OperationConflictError, None),
         (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None),
+        (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None),
 
         # Vespa client exceptions
         (
