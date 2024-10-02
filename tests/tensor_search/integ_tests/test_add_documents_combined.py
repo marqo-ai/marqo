@@ -3,14 +3,12 @@ import uuid
 from unittest import mock
 from unittest.mock import patch
 import pytest
-import torch
 
 
 import PIL
 import requests
 import torch
 from torch import Tensor
-from urllib3.exceptions import ProtocolError
 import unittest.mock
 
 
@@ -19,9 +17,9 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import tensor_search
-from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
+from marqo.s2_inference.multimodal_model_load import infer_modality
 from marqo.tensor_search import streaming_media_processor
 
 
@@ -36,6 +34,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
                 FieldRequest(name="text_field_1", type=FieldType.Text,
                              features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
+                FieldRequest(name="text_field_2", type=FieldType.Text,
+                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
                 FieldRequest(
                     name="multimodal_field", 
                     type=FieldType.MultimodalCombination,
@@ -46,7 +46,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 )
             ],
             model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
-            tensor_fields=["image_field_1", "text_field_1", "multimodal_field"]
+            tensor_fields=["image_field_1", "text_field_1", "text_field_2", "multimodal_field"]
         )
 
         structured_languagebind_index_request = cls.structured_marqo_index_request(
@@ -111,10 +111,10 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
         cls.indexes = cls.create_indexes([
             structured_image_index_request,
-            structured_languagebind_index_request,
             semi_structured_image_index_request,
-            semi_structured_languagebind_index_request,
             unstructured_image_index_request,
+            structured_languagebind_index_request,
+            semi_structured_languagebind_index_request,
             unstructured_languagebind_index_request
         ])
 
@@ -124,6 +124,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
         cls.semi_structured_languagebind_index_name = semi_structured_languagebind_index_request.name
         cls.unstructured_marqo_index_name = unstructured_image_index_request.name
         cls.unstructured_languagebind_index_name = unstructured_languagebind_index_request.name
+
+        cls.image_indexes = cls.indexes[:3]
+        cls.languagebind_indexes = cls.indexes[3:6]
 
     def setUp(self) -> None:
         super().setUp()
@@ -838,3 +841,56 @@ class TestAddDocumentsCombined(MarqoTestCase):
         image_url_no_extension = "https://il.redbubble.net/catalogue/image/by-rb-work/157037551/simple-preview"
         modality = infer_modality(image_url_no_extension)
         self.assertEqual(modality, streaming_media_processor.Modality.IMAGE)
+
+    def test_different_batching_strategy_adds_the_same_documents(self):
+        test_docs = [
+            {
+                "image_field_1": TestImageUrls.IMAGE1.value,
+                "text_field_1": "this is a valid image",
+                "text_field_2": "some dogs biting me",
+                "_id": "1"
+            },
+            {
+                "image_field_1": TestImageUrls.IMAGE2.value,
+                "text_field_1": "this is another image due to int id",
+                "text_field_2": "cats walking on the wall",
+                "_id": "2"
+            }
+        ]
+
+        for index in self.image_indexes:
+            tensor_fields = ["image_field_1", "text_field_1", "text_field_2"] \
+                if isinstance(index, UnstructuredMarqoIndex) else None
+
+            def add_docs(batch_vectorisation_mode: BatchVectorisationMode):
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=test_docs,
+                        batch_vectorisation_mode=batch_vectorisation_mode,
+                        tensor_fields=tensor_fields)
+                )
+
+            def get_docs():
+                return tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index.name,
+                    document_ids=[doc['_id'] for doc in test_docs],
+                    show_vectors=True
+                )
+
+            with self.subTest(f'{index.name} with type {index.type}'):
+                self.clear_index_by_name(index_name=index.schema_name)
+                add_docs(BatchVectorisationMode.PER_FIELD)
+                docs_added_using_per_field_strategy = get_docs()
+
+                self.clear_index_by_name(index_name=index.schema_name)
+                add_docs(BatchVectorisationMode.PER_DOCUMENT)
+                docs_added_using_per_doc_strategy = get_docs()
+
+                self.clear_index_by_name(index_name=index.schema_name)
+                add_docs(BatchVectorisationMode.PER_DOCUMENT)
+                docs_added_using_per_batch_strategy = get_docs()
+
+                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy)
+                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy)
