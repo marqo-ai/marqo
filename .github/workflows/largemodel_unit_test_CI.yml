@@ -65,10 +65,9 @@ jobs:
           repository: marqo-ai/marqo-base
           path: marqo-base
 
+      # They are already installed on the AMI
       - name: Install FFmpeg and libmagic
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg libmagic1
           ffmpeg -version  # Verify installation
           file --version   # Verify libmagic installation and version
 
