@@ -48,7 +48,7 @@ class TestIndexManagement(MarqoTestCase):
         self._test_dir = str(os.path.dirname(os.path.abspath(__file__)))
         self._deploy_initial_app_package()
 
-    def test_clean_bootstrap_vespa(self):
+    def test_bootstrap_vespa_should_successfully_bootstrap_a_new_vespa_application_package(self):
         bootstrapped = self.index_management.bootstrap_vespa()
         self.assertTrue(bootstrapped)
 
@@ -74,7 +74,8 @@ class TestIndexManagement(MarqoTestCase):
         self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
 
     @patch('marqo.vespa.vespa_client.VespaClient.get_vespa_version')
-    def test_clean_bootstrap_vespa_with_old_vespa_version(self, mock_vespa_version):
+    def test_bootstrap_vespa_should_successfully_bootstrap_a_new_vespa_application_package_with_old_vespa_version(
+            self, mock_vespa_version):
         mock_vespa_version.return_value = '8.382.21'  # a fake version prior to minimum version supporting binary upload
         bootstrapped = self.index_management.bootstrap_vespa()
         self.assertTrue(bootstrapped)
@@ -101,7 +102,8 @@ class TestIndexManagement(MarqoTestCase):
         self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
 
     @patch('marqo.vespa.vespa_client.VespaClient.get_vespa_version')
-    def test_skip_boostrap_if_already_bootstrapped_for_older_vespa_version(self, mock_vespa_version):
+    def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped_for_older_vespa_version(
+            self, mock_vespa_version):
         mock_vespa_version.return_value = '8.382.21'
 
         def modified_post(*args, **kwargs):
@@ -119,7 +121,7 @@ class TestIndexManagement(MarqoTestCase):
             self.assertEqual(mock_post.call_count, 1)
             self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
 
-    def test_skip_boostrap_if_already_bootstrapped_for_newer_vespa_version(self):
+    def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped(self):
         def modified_put(*args, **kwargs):
             return httpx.put(*args, **kwargs)
 
@@ -134,7 +136,12 @@ class TestIndexManagement(MarqoTestCase):
             self.assertFalse(self.index_management.bootstrap_vespa())
             self.assertEqual(mock_post.call_count, 0)
 
-    def test_boostrap_from_existing_app_should_populate_index_settings(self):
+    def test_boostrap_vespa_should_migrate_index_settings_from_existing_vespa_app(self):
+        """
+        When we upgrade Marqo from prior to 2.13.0 to the latest version, we will migrate the index settings in the
+        marqo__settings vespa schema to json files stored in the application package. This test cases tests if this
+        migration is done correctly
+        """
         existing_index = self._deploy_existing_app_package()
         existing_index_with_version = existing_index.copy(update={'version': 1})
 
@@ -158,7 +165,7 @@ class TestIndexManagement(MarqoTestCase):
         with open(os.path.join(app, 'marqo_config.json')) as f:
             self.assertEqual(json.loads(f'{{"version": "{version.get_version()}"}}'), json.load(f))
 
-    def test_bootstrap_overrides_and_backup_configs(self):
+    def test_bootstrap_vespa_should_override_and_backup_configs(self):
         self._deploy_existing_app_package()
         self.index_management.bootstrap_vespa()
 
@@ -192,7 +199,7 @@ class TestIndexManagement(MarqoTestCase):
                 os.path.join(self._test_dir, 'existing_vespa_app', *file)
             )
 
-    def test_rollback(self):
+    def test_rollback_should_succeed(self):
         self._deploy_existing_app_package()
         self.index_management.bootstrap_vespa()
 
@@ -298,7 +305,7 @@ class TestIndexManagement(MarqoTestCase):
             self.assertEqual("Aborting rollback. Reason: Vector store config has been changed since the last backup.",
                              str(e.exception))
 
-    def test_index_operation_fails_if_disabled(self):
+    def test_index_operation_methods_should_raise_error_if_index_operation_is_disabled(self):
         # Create an index management instance with index operation disabled (by default)
         self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
         index_request_1 = self.structured_marqo_index_request(
@@ -307,38 +314,38 @@ class TestIndexManagement(MarqoTestCase):
         )
         index_request_2 = self.unstructured_marqo_index_request()
 
-        with self.assertRaises(InternalError):
+        with self.assertRaisesStrict(InternalError):
             self.index_management.create_index(index_request_1)
 
-        with self.assertRaises(InternalError):
+        with self.assertRaisesStrict(InternalError):
             self.index_management.batch_create_indexes([index_request_1, index_request_2])
 
-        with self.assertRaises(InternalError):
+        with self.assertRaisesStrict(InternalError):
             self.index_management.delete_index_by_name(index_request_1.name)
 
-        with self.assertRaises(InternalError):
+        with self.assertRaisesStrict(InternalError):
             self.index_management.batch_delete_indexes_by_name([index_request_1.name, index_request_2.name])
 
-    def test_index_operation_fails_if_not_bootstrapped(self):
+    def test_index_operation_methods_should_raise_error_if_marqo_is_not_bootstrapped(self):
         index_request_1 = self.structured_marqo_index_request(
             fields=[FieldRequest(name='title', type=FieldType.Text)],
             tensor_fields=['title']
         )
         index_request_2 = self.unstructured_marqo_index_request()
 
-        with self.assertRaises(ApplicationNotInitializedError):
+        with self.assertRaisesStrict(ApplicationNotInitializedError):
             self.index_management.create_index(index_request_1)
 
-        with self.assertRaises(ApplicationNotInitializedError):
+        with self.assertRaisesStrict(ApplicationNotInitializedError):
             self.index_management.batch_create_indexes([index_request_1, index_request_2])
 
-        with self.assertRaises(ApplicationNotInitializedError):
+        with self.assertRaisesStrict(ApplicationNotInitializedError):
             self.index_management.delete_index_by_name(index_request_1.name)
 
-        with self.assertRaises(ApplicationNotInitializedError):
+        with self.assertRaisesStrict(ApplicationNotInitializedError):
             self.index_management.batch_delete_indexes_by_name([index_request_1.name, index_request_2.name])
 
-    def test_create_and_delete_index_successful(self):
+    def test_create_and_delete_index_should_succeed(self):
         # merge batch create and delete happy path to save some testing time
         request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
         schema, index = vespa_schema_factory(request).generate_schema()
@@ -353,7 +360,7 @@ class TestIndexManagement(MarqoTestCase):
         app = self.vespa_client.download_application()
         self._assert_index_is_not_present(app, index.name, index.schema_name)
 
-    def test_create_index_fails_if_exists(self):
+    def test_create_index_should_fail_if_index_already_exists(self):
         request = self.unstructured_marqo_index_request(name="test-index")
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
@@ -361,13 +368,13 @@ class TestIndexManagement(MarqoTestCase):
         with self.assertRaises(IndexExistsError):
             self.index_management.create_index(request)
 
-    def test_delete_index_fails_when_index_not_found(self):
+    def test_delete_index_should_fail_when_index_is_not_found(self):
         self.index_management.bootstrap_vespa()
 
         with self.assertRaises(IndexNotFoundError):
             self.index_management.delete_index_by_name('index-does-not-exist')
 
-    def test_batch_create_and_delete_index_successful(self):
+    def test_batch_create_and_delete_index_should_succeed(self):
         # merge batch create and delete happy path to save some testing time
         request1 = self.unstructured_marqo_index_request()
         request2 = self.structured_marqo_index_request(
@@ -398,7 +405,7 @@ class TestIndexManagement(MarqoTestCase):
 
         self.assertEqual(0, len(self.index_management.get_all_indexes()))
 
-    def test_batch_create_index_fails_atomically(self):
+    def test_batch_create_index_should_fail_atomically(self):
         request = self.unstructured_marqo_index_request(name="index1")
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
@@ -412,7 +419,7 @@ class TestIndexManagement(MarqoTestCase):
         app = self.vespa_client.download_application()
         self._assert_index_is_not_present(app, index2.name, index2.schema_name)
 
-    def test_batch_delete_index_fails_atomically(self):
+    def test_batch_delete_index_should_fail_atomically(self):
         request = self.unstructured_marqo_index_request(name="index1")
         schema, index1 = vespa_schema_factory(request).generate_schema()
 
@@ -537,7 +544,8 @@ class TestIndexManagement(MarqoTestCase):
         self.vespa_client.wait_for_application_convergence()
 
     def _deploy_existing_app_package(self) -> MarqoIndex:
-        _, index = vespa_schema_factory(self.unstructured_marqo_index_request(name="existing_index")).generate_schema()
+        _, index = vespa_schema_factory(self.unstructured_marqo_index_request(
+            name="existing_index", marqo_version='2.10.0')).generate_schema()
 
         app_root_path = os.path.join(self._test_dir, 'existing_vespa_app')
         self._add_schema_removal_override(app_root_path)

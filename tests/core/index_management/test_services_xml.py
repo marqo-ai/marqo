@@ -6,7 +6,7 @@ from string import Template
 import pytest
 
 from marqo.core.exceptions import InternalError
-from marqo.core.index_management.vespa_application_package import ServiceXml
+from marqo.core.index_management.vespa_application_package import ServicesXml
 
 
 @pytest.mark.unnittest
@@ -34,8 +34,8 @@ class TestIndexSettingStore(unittest.TestCase):
                     <document mode="index" type="marqo__settings"></document>
                 """)
 
-        self.assertTrue(ServiceXml(xml1).compare_element(ServiceXml(xml2), 'content/documents'))
-        self.assertTrue(ServiceXml(xml1).compare_element(ServiceXml(xml2), 'content/documents/document'))
+        self.assertTrue(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents'))
+        self.assertTrue(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents/document'))
 
     def test_compare_element_should_return_false_when_not_equal_semantically(self):
         xml1 = self._TEMPLATE.substitute(documents="""
@@ -51,8 +51,8 @@ class TestIndexSettingStore(unittest.TestCase):
         ]:
             with self.subTest():
                 xml2 = self._TEMPLATE.substitute(documents=test_case)
-                self.assertFalse(ServiceXml(xml1).compare_element(ServiceXml(xml2), 'content/documents'))
-                self.assertFalse(ServiceXml(xml1).compare_element(ServiceXml(xml2), 'content/documents/document'))
+                self.assertFalse(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents'))
+                self.assertFalse(ServicesXml(xml1).compare_element(ServicesXml(xml2), 'content/documents/document'))
 
     def test_compare_element_should_detect_any_difference_in_multiple_elements(self):
         xml1 = """<?xml version="1.0" encoding="utf-8" ?>
@@ -79,7 +79,7 @@ class TestIndexSettingStore(unittest.TestCase):
                     </services>
                 """
 
-        self.assertFalse(ServiceXml(xml1).compare_element(ServiceXml(xml2), '*/nodes'))
+        self.assertFalse(ServicesXml(xml1).compare_element(ServicesXml(xml2), '*/nodes'))
 
     def test_should_not_have_more_than_one_content_documents_element(self):
         xml = """<?xml version="1.0" encoding="utf-8" ?>
@@ -98,7 +98,7 @@ class TestIndexSettingStore(unittest.TestCase):
         """
 
         with self.assertRaises(InternalError) as e:
-            ServiceXml(xml)
+            ServicesXml(xml)
         self.assertEqual('Multiple content/documents elements found in services.xml. Only one is allowed',
                          str(e.exception))
 
@@ -111,18 +111,18 @@ class TestIndexSettingStore(unittest.TestCase):
                 """
 
         with self.assertRaises(InternalError) as e:
-            ServiceXml(xml)
+            ServicesXml(xml)
         self.assertEqual('No content/documents element found in services.xml', str(e.exception))
 
     def test_add_schema_should_skip_when_schema_exists(self):
         xml = self._TEMPLATE.substitute(documents="""<document type="marqo__existing_00index" mode="index"/>""")
-        service_xml = ServiceXml(xml)
+        service_xml = ServicesXml(xml)
         service_xml.add_schema("marqo__existing_00index")
         self._assertStringsEqualIgnoringWhitespace(xml, service_xml.to_xml())
 
     def test_add_schema(self):
         xml = self._TEMPLATE.substitute(documents="""""")
-        service_xml = ServiceXml(xml)
+        service_xml = ServicesXml(xml)
 
         expected_xml = self._TEMPLATE.substitute(documents="""<document type="marqo__existing_00index" mode="index"/>""")
         service_xml.add_schema("marqo__existing_00index")
@@ -131,7 +131,7 @@ class TestIndexSettingStore(unittest.TestCase):
 
     def test_remove_schema_should_skip_if_not_exist(self):
         xml = self._TEMPLATE.substitute(documents="""<document type="marqo__existing_00index" mode="index"/>""")
-        service_xml = ServiceXml(xml)
+        service_xml = ServicesXml(xml)
         service_xml.remove_schema("new_00schema")
         self._assertStringsEqualIgnoringWhitespace(xml, service_xml.to_xml())
 
@@ -140,7 +140,7 @@ class TestIndexSettingStore(unittest.TestCase):
             <document type="marqo__existing_00index" mode="index"/>
             <document type="new_00index" mode="index"/>
         """)
-        service_xml = ServiceXml(xml)
+        service_xml = ServicesXml(xml)
         service_xml.remove_schema("marqo__existing_00index")
         expected_xml = self._TEMPLATE.substitute(documents="""<document type="new_00index" mode="index"/>""")
         self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
@@ -163,7 +163,7 @@ class TestIndexSettingStore(unittest.TestCase):
                     </services>
                 """
 
-        service_xml = ServiceXml(xml)
+        service_xml = ServicesXml(xml)
         service_xml.config_components()
 
         # removed all random element and custom components from container element

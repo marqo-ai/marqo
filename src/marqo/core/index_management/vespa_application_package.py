@@ -25,9 +25,9 @@ from marqo.vespa.vespa_client import VespaClient
 logger = marqo.logging.get_logger(__name__)
 
 
-class ServiceXml:
+class ServicesXml:
     """
-    Represents a Vespa service XML file.
+    Represents a Vespa services XML file.
     """
     _CUSTOM_COMPONENT_BUNDLE_NAME = "marqo-custom-searchers"
 
@@ -36,7 +36,7 @@ class ServiceXml:
         self._documents = self._ensure_only_one('content/documents')
 
     def __repr__(self) -> str:
-        return f'ServiceXml({self.to_xml()})'
+        return f'ServicesXml({self.to_xml()})'
 
     def to_xml(self) -> str:
         # Add the namespace attribute to the root element
@@ -122,7 +122,7 @@ class ServiceXml:
         element.set('bundle', self._CUSTOM_COMPONENT_BUNDLE_NAME)
         return element
 
-    def compare_element(self, other: 'ServiceXml', xml_path: str) -> bool:
+    def compare_element(self, other: 'ServicesXml', xml_path: str) -> bool:
         def normalize(elem: ET.Element):
             # Sort attributes and child elements to normalize
             normalized = ET.Element(elem.tag, dict(sorted(elem.attrib.items())))
@@ -553,8 +553,9 @@ class VespaApplicationPackage:
 
     def __init__(self, store: VespaApplicationStore):
         self._store = store
+        # Mark the app package as configured if Marqo config file exists
         self.is_configured = self._store.file_exists(self._MARQO_CONFIG_FILE)
-        self._service_xml = ServiceXml(self._store.read_text_file(self._SERVICES_XML_FILE))
+        self._service_xml = ServicesXml(self._store.read_text_file(self._SERVICES_XML_FILE))
         self._marqo_config_store = MarqoConfigStore(self._store.read_text_file(self._MARQO_CONFIG_FILE))
         self._index_setting_store = IndexSettingStore(
             self._store.read_text_file(self._MARQO_INDEX_SETTINGS_FILE) or '{}',
@@ -591,16 +592,21 @@ class VespaApplicationPackage:
 
     def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
         logger.info(f'Bootstrapping the vector store to {marqo_version}')
-        # Migrate existing index settings from previous versions of Marqo
+
         if not self.is_configured:
+            # Migrate existing index settings from previous versions of Marqo. Please note that this once-off migration
+            # is only done when the app package is not configured (Marqo config file does not exist)
             if existing_index_settings is not None and len(existing_index_settings) > 0:
-                logger.debug(f'Importing existing index settings {[index.json for index in existing_index_settings]}')
+                logger.debug(f'Migrating existing index settings {[index.json for index in existing_index_settings]}')
                 for index in existing_index_settings:
                     self._index_setting_store.save_index_setting(index)
+            logger.debug(f'Persisting index settings: {self._index_setting_store.to_json()}')
             self._persist_index_settings()
 
+        # A backup is created and passed to all the places a config file is updated or added, so that the older
+        # version of the config can be backed up, or marked as need-to-remove when rolling back.
         backup = VespaAppBackup()
-        self._config_query_profiles(backup)
+        self._configure_query_profiles(backup)
         self._copy_components_jar()  # we do not back up jar file
         self._service_xml.config_components()
         self._marqo_config_store.update_version(marqo_version)
@@ -694,7 +700,7 @@ class VespaApplicationPackage:
         self._store.save_file(index_setting_json, self._MARQO_INDEX_SETTINGS_FILE)
         self._store.save_file(index_setting_history_json, self._MARQO_INDEX_SETTINGS_HISTORY_FILE)
 
-    def _config_query_profiles(self, backup: VespaAppBackup) -> None:
+    def _configure_query_profiles(self, backup: VespaAppBackup) -> None:
         content = textwrap.dedent(
             '''
             <query-profile id="default">
@@ -724,7 +730,7 @@ class VespaApplicationPackage:
         self._store.save_file(content, 'validation-overrides.xml')
 
     def _validate_services_xml_for_rollback(self, services_xml_backup: str) -> None:
-        services_xml_old = ServiceXml(services_xml_backup)
+        services_xml_old = ServicesXml(services_xml_backup)
         elements_to_check = [
             # (xml_path, error_message)
             ('content/documents', 'Indexes have been added or removed since last backup.'),
