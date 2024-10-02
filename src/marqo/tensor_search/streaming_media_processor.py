@@ -35,7 +35,7 @@ class StreamingMediaProcessor:
         self.preprocessor = self.preprocessors[modality]
         self.total_size, self.duration = self._fetch_file_metadata()
         self.enable_video_gpu_acceleration = (
-                utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'True'
+                utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'TRUE'
         )
 
         self._set_split_parameters(modality)
