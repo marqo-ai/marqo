@@ -12,10 +12,11 @@ from typing import List, Dict
 import time
 import ffmpeg
 
+from examples.GPT3NewsSummary.main import output
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-
+from marqo.s2_inference.errors import MediaDownloadError
 
 class StreamingMediaProcessor:
     def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index_type: IndexType,
@@ -104,12 +105,16 @@ class StreamingMediaProcessor:
                 output_file = self._get_output_file_path(temp_dir, chunk_start)
 
                 try:
-                    # Use ffmpeg-python to process the chunk
-                    stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
-
                     if self.modality == Modality.VIDEO:
-                        stream = ffmpeg.output(stream, output_file, vcodec='libx264', acodec='aac', **{'f': 'mp4'})
+                        output_file = self.fetch_video_chunk(
+                            url=self.url,
+                            start_time=chunk_start,
+                            duration=chunk_end - chunk_start,
+                            output_file=output_file
+                        )
                     else:  # AUDIO
+                        # Use ffmpeg-python to process the chunk
+                        stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
                         stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
 
                     ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
@@ -138,3 +143,55 @@ class StreamingMediaProcessor:
     def _progress(self, download_total, downloaded, upload_total, uploaded):
         if download_total > 0:
             progress = downloaded / download_total * 100
+
+    @staticmethod
+    def fetch_video_chunk(url: str, start_time: float, duration: float, output_file: str,
+                          enable_gpu_acceleration: bool = False) -> str:
+        """
+        Fetch a video chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
+        downloaded video chunk.
+        Args:
+            url: The url of the video
+            start_time: The start time of the video chunk
+            duration: The duration of the video chunk
+            output_file: The path to save the video chunk
+            enable_gpu_acceleration: Whether to use GPU acceleration for downloading the video chunk
+
+        Returns:
+            THe path to the downloaded video chunk
+
+        Raises:
+            MediaDownloadError: If there is an error downloading the video chunk
+        """
+        if enable_gpu_acceleration:
+            ffmpeg_command = [
+                'ffmpeg',
+                '-y',  # Enable overwrite
+                '-v', 'error', # Suppress warnings and other output
+                '-ss', str(start_time), # Start time
+                '-t', str(duration), # Duration
+                '-hwaccel', 'cuda', # Use GPU acceleration
+                '-hwaccel_output_format', 'cuda', # Use GPU acceleration
+                '-i', url, # Input file
+                '-c:a', 'copy', # Copy audio codec to speed up the conversion process by avoiding unnecessary re-encoding of the audio stream.
+                '-c:v', 'h264_nvenc', # Use NVIDIA NVENC H.264 encoder
+                '-b:v', '5M', # Set the video bitrate to 5M
+                output_file
+            ]
+        else:
+            ffmpeg_command = [
+                'ffmpeg','-y',
+                '-ss', str(start_time),
+                '-t', str(duration),
+                '-i', url,
+                '-vcodec', 'libx264',
+                '-acodec', 'aac',
+                '-f', 'mp4',
+                output_file
+            ]
+        result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            raise MediaDownloadError(f"Error downloading video chunk with url={url}, start_time={start_time}, "
+                                     f"duration={duration}. "
+                                     f"Original error message: {result.stderr.decode()}")
+        return output_file
