@@ -19,6 +19,7 @@ from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
+import subprocess
 
 
 
@@ -32,6 +33,7 @@ def on_start(config: config.Config):
         DownloadStartText(),
         CUDAAvailable(),
         SetBestAvailableDevice(),
+        SetEnableVideoGPUAcceleration(),
         CacheModels(),
         InitializeRedis("localhost", 6379),
         CachePatchModels(),
@@ -258,7 +260,59 @@ class CachePatchModels:
         for message in messages:
             self.logger.info(message)
         self.logger.info("completed prewarming patch models")
-            
+
+class SetEnableVideoGPUAcceleration:
+
+    logger = get_logger('SetVideoProcessingDevice')
+
+    def run(self):
+        """This method will set the env var MARQO_ENABLE_VIDEO_GPU_ACCELERATION to TRUE or FALSE."""
+        env_value = utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION)
+        if env_value is None:
+            try:
+                self._check_video_gpu_acceleration_availability()
+            except exceptions.StartupSanityCheckError as e:
+                self.logger.debug(f"Failed to use GPU acceleration for video processing. We will disable it. "
+                                  f"Original error message: {e}")
+                os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION] = "FALSE"
+        elif env_value == "TRUE":
+            self._check_video_gpu_acceleration_availability()
+        elif env_value == "FALSE":
+            pass
+        else:
+            raise exceptions.EnvVarError(
+                f"Invalid value for {EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION}. "
+                f"Please set it to either 'TRUE' or 'FALSE'."
+            )
+
+    def _check_video_gpu_acceleration_availability(self):
+        """Check if the required dependencies are available for video processing with GPU acceleration for ffmpeg.
+
+        Raises:
+            exceptions.StartupSanityCheckError: If the required dependencies are not available.
+        """
+        ffmpeg_command_gpu_check = [
+            'ffmpeg',
+            '-v', 'error',  # Suppress output
+            '-hwaccel', 'cuda',  # Use CUDA for hardware acceleration
+            '-f', 'lavfi',  # Input format is a lavfi (FFmpeg's built-in filter)
+            '-i', 'nullsrc=s=1280x720',  # Generate a blank video source of 1280x720 resolution
+            '-vframes', '1',  # Process only 1 frame
+            '-c:v', 'h264_nvenc',  # Use NVENC encoder
+            '-f', 'null',  # Output to null (discard the output)
+            '-'  # Output to stdout (discarded)
+        ]
+
+        result = subprocess.run(ffmpeg_command_gpu_check, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            raise exceptions.StartupSanityCheckError(
+                f"Failed to use GPU acceleration for video processing. "
+                f"Ensure that your system has the required dependencies installed. "
+                f"You can set 'MARQO_ENABLE_VIDEO_GPU_ACCELERATION=FALSE' to disable GPU acceleration. "
+                f"Check {marqo_docs.configuring_marqo()} for more information. "
+                f"Original error message: {result.stderr.decode()}"
+            )
+
 
 def _preload_model(model, content, device):
     """

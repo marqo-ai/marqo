@@ -1,22 +1,22 @@
 """Functions used to download and preprocess audio and video files"""
 
-from contextlib import contextmanager
-import torch
 import math
-
-# for multimodal processing
-import tempfile
 import os
 import subprocess
-from typing import List, Dict
+# for multimodal processing
+import tempfile
 import time
-import ffmpeg
 
-from examples.GPT3NewsSummary.main import output
+import ffmpeg
+import torch
+
 from marqo.core.models.marqo_index import *
+from marqo.s2_inference.errors import MediaDownloadError
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-from marqo.s2_inference.errors import MediaDownloadError
+from marqo.tensor_search import index_meta_cache, utils
+from marqo.tensor_search.enums import EnvVars
+
 
 class StreamingMediaProcessor:
     def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index_type: IndexType,
@@ -33,9 +33,11 @@ class StreamingMediaProcessor:
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
         self.total_size, self.duration = self._fetch_file_metadata()
+        self.enable_video_gpu_acceleration = (
+                utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'True'
+        )
 
         self._set_split_parameters(modality)
-        self._log_initialization_details()
 
     def _set_split_parameters(self, modality):
         preprocessing = self.video_preprocessing if modality == Modality.VIDEO else self.audio_preprocessing
@@ -49,13 +51,6 @@ class StreamingMediaProcessor:
 
         if modality not in [Modality.VIDEO, Modality.AUDIO]:
             raise ValueError(f"Unsupported modality: {modality}")
-
-    def _log_initialization_details(self):
-        # print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
-        # print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
-        # print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
-        # print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
-        pass
 
     def _fetch_file_metadata(self):
         start_time = time.time()
@@ -110,7 +105,8 @@ class StreamingMediaProcessor:
                             url=self.url,
                             start_time=chunk_start,
                             duration=chunk_end - chunk_start,
-                            output_file=output_file
+                            output_file=output_file,
+                            enable_gpu_acceleration=self.enable_video_gpu_acceleration
                         )
                     else:  # AUDIO
                         # Use ffmpeg-python to process the chunk
