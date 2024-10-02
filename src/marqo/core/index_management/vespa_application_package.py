@@ -576,15 +576,17 @@ class VespaApplicationPackage:
         """
         logger.info(f'Bootstrapping the vector store to {to_version}')
 
-        if not self.is_configured:
+        if not self._store.file_exists(self._MARQO_INDEX_SETTINGS_FILE):
             # Migrate existing index settings from previous version of Marqo. This migration is a once-off operation.
-            # It will be skipped if the app package is marked as configured after the first bootstrapping.
+            # It will be skipped if the index setting json files exists after the first bootstrapping.
             if existing_index_settings:
                 logger.debug(f'Migrating existing index settings {[index.json for index in existing_index_settings]}')
                 for index in existing_index_settings:
                     self._index_setting_store.save_index_setting(index)
-            # We need to persist index setting files regardless of existing index settings
+
             logger.debug(f'Persisting index settings: {self._index_setting_store.to_json()}')
+            # please note that the index settings are not saved in backup since rolling back index settings might
+            # cause corruption of an index.
             self._persist_index_settings()
 
         # A backup is created and passed to all the places a config file is updated or added, so that the older
