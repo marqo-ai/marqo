@@ -82,7 +82,7 @@ class IndexManagement:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
         with self._vespa_deployment_lock():
-            vespa_app = self._get_vespa_application(check_configured=False)
+            vespa_app = self._get_vespa_application(check_configured=False, need_binary_file_support=True)
 
             marqo_version = version.get_version()
             has_marqo_settings_schema = vespa_app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
@@ -97,7 +97,7 @@ class IndexManagement:
 
     def rollback_vespa(self) -> None:
         with self._vespa_deployment_lock():
-            self._get_vespa_application().rollback(version.get_version())
+            self._get_vespa_application(need_binary_file_support=True).rollback(version.get_version())
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """

@@ -725,11 +725,15 @@ class VespaApplicationPackage:
 
     def _validate_services_xml_for_rollback(self, services_xml_backup: str) -> None:
         services_xml_old = ServiceXml(services_xml_backup)
-        if not self._service_xml.compare_element(services_xml_old, 'content/documents'):
-            logger.debug(f'Indexes have been added or removed since last backup. '
-                         f'services.xml in backup: {services_xml_old} vs. current service.xml: {self._service_xml}')
-            raise ApplicationRollbackError('Indexes have been added or removed since last backup. Aborting rollback.')
-        if not self._service_xml.compare_element(services_xml_old, '*/nodes'):
-            logger.debug(f'Server nodes have been added or removed since last backup. '
-                         f'services.xml in backup: {services_xml_old} vs. current service.xml: {self._service_xml}')
-            raise ApplicationRollbackError('Nodes have been added or removed since last backup. Aborting rollback.')
+        elements_to_check = [
+            # (xml_path, error_message)
+            ('content/documents', 'Indexes have been added or removed since last backup.'),
+            ('*/nodes', 'Vector store config has been changed since the last backup.'),
+            ('admin', 'Vector store config has been changed since the last backup.'),
+        ]
+
+        for (xml_path, error_message) in elements_to_check:
+            if not self._service_xml.compare_element(services_xml_old, xml_path):
+                logger.debug(f'{error_message} services.xml in backup: {services_xml_old} vs. '
+                             f'current service.xml: {self._service_xml}')
+                raise ApplicationRollbackError(f'Aborting rollback. Reason: {error_message}')

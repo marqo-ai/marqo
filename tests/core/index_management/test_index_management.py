@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 from datetime import datetime
+from unittest.mock import patch
 
 import httpx
 
@@ -72,10 +73,36 @@ class TestIndexManagement(MarqoTestCase):
 
         self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
 
-    def test_skip_boostrap_if_already_bootstrapped_for_older_vespa_version(self):
-        if (semver.Version.parse(self.vespa_client.get_vespa_version()) >=
-                IndexManagement._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
-            self.skipTest(reason="In newer version of vespa, we use deployment session for bootstrapping")
+    @patch('marqo.vespa.vespa_client.VespaClient.get_vespa_version')
+    def test_clean_bootstrap_vespa_with_old_vespa_version(self, mock_vespa_version):
+        mock_vespa_version.return_value = '8.382.21'  # a fake version prior to minimum version supporting binary upload
+        bootstrapped = self.index_management.bootstrap_vespa()
+        self.assertTrue(bootstrapped)
+
+        app = self.vespa_client.download_application()
+        # TODO find a better way to test this, it assume the jar file is generated in target folder
+        self._assert_file_exists(app, 'components', 'marqo-custom-searchers-deploy.jar')
+        self._assert_file_exists(app, 'search', 'query-profiles', 'default.xml')
+        self._assert_file_exists(app, 'marqo_index_settings.json')
+        self._assert_file_exists(app, 'marqo_index_settings_history.json')
+        self._assert_file_exists(app, 'marqo_config.json')
+
+        # Verify no index setting is present
+        with open(os.path.join(app, 'marqo_index_settings.json')) as f:
+            self.assertEqual('{}', f.read())
+
+        # Verify no index setting history is present
+        with open(os.path.join(app, 'marqo_index_settings_history.json')) as f:
+            self.assertEqual('{}', f.read())
+
+        with open(os.path.join(app, 'marqo_config.json')) as f:
+            self.assertEqual(json.loads(f'{{"version": "{version.get_version()}"}}'), json.load(f))
+
+        self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
+
+    @patch('marqo.vespa.vespa_client.VespaClient.get_vespa_version')
+    def test_skip_boostrap_if_already_bootstrapped_for_older_vespa_version(self, mock_vespa_version):
+        mock_vespa_version.return_value = '8.382.21'
 
         def modified_post(*args, **kwargs):
             return httpx.post(*args, **kwargs)
@@ -93,10 +120,6 @@ class TestIndexManagement(MarqoTestCase):
             self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
 
     def test_skip_boostrap_if_already_bootstrapped_for_newer_vespa_version(self):
-        if (semver.Version.parse(self.vespa_client.get_vespa_version()) <
-                IndexManagement._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES):
-            self.skipTest(reason="In older version of vespa, we use prepareandactivate for bootstrapping")
-
         def modified_put(*args, **kwargs):
             return httpx.put(*args, **kwargs)
 
@@ -240,7 +263,40 @@ class TestIndexManagement(MarqoTestCase):
         with mock.patch.object(version, 'get_version', return_value='2.10.0'):
             with self.assertRaises(ApplicationRollbackError) as e:
                 self.index_management.rollback_vespa()
-            self.assertEqual("Indexes have been added or removed since last backup. Aborting rollback.", str(e.exception))
+            self.assertEqual("Aborting rollback. Reason: Indexes have been added or removed since last backup.", str(e.exception))
+
+    def test_rollback_should_fail_when_nodes_are_changed(self):
+        self.index_management.bootstrap_vespa()
+
+        # Change the container nodes to add a JVM setting
+        application = self.index_management._get_vespa_application()
+        container_nodes_element = application._service_xml._ensure_only_one('container/nodes')
+        # add <jvm options="-Xms32M -Xmx128M"/> to container/nodes
+        ET.SubElement(container_nodes_element, 'jvm', {'options': '-Xms32M -Xmx128M'})
+        application._store.save_file(application._service_xml.to_xml(), application._SERVICES_XML_FILE)
+        application._deploy()
+
+        with mock.patch.object(version, 'get_version', return_value='2.10.0'):
+            with self.assertRaises(ApplicationRollbackError) as e:
+                self.index_management.rollback_vespa()
+            self.assertEqual("Aborting rollback. Reason: Vector store config has been changed since the last backup.", str(e.exception))
+
+    def test_rollback_should_fail_when_admin_config_is_changed(self):
+        self.index_management.bootstrap_vespa()
+
+        application = self.index_management._get_vespa_application()
+        root_element = application._service_xml._root
+        # add <admin version="2.0"><adminserver hostalias="node1" /></admin> to root element
+        admin_element = ET.SubElement(root_element, 'admin', {'version': '2.0'})
+        ET.SubElement(admin_element, 'adminserver', {'hostalias': 'node1'})
+        application._store.save_file(application._service_xml.to_xml(), application._SERVICES_XML_FILE)
+        application._deploy()
+
+        with mock.patch.object(version, 'get_version', return_value='2.10.0'):
+            with self.assertRaises(ApplicationRollbackError) as e:
+                self.index_management.rollback_vespa()
+            self.assertEqual("Aborting rollback. Reason: Vector store config has been changed since the last backup.",
+                             str(e.exception))
 
     def test_index_operation_fails_if_disabled(self):
         # Create an index management instance with index operation disabled (by default)
