@@ -81,7 +81,7 @@ class StreamingMediaProcessor:
         return os.path.join(temp_dir, f"chunk_{chunk_start}.{extension}")
 
     def process_media(self) -> List[Dict[str, torch.Tensor]]:
-        processed_chunks = []
+        processed_chunks: List[Dict[str, torch.Tensor]] = []
         chunk_duration = self.split_length
         overlap_duration = self.split_overlap
 
@@ -109,11 +109,13 @@ class StreamingMediaProcessor:
                             output_file=output_file,
                             enable_gpu_acceleration=self.enable_video_gpu_acceleration
                         )
-                    else:  # AUDIO
+                    elif self.modality == Modality.AUDIO:  # AUDIO
                         # Use ffmpeg-python to process the chunk
                         stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
                         stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
                         ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+                    else:
+                        raise ValueError(f"Unsupported modality: {self.modality}")
                 except (subprocess.CalledProcessError, MediaDownloadError) as e:
                     logger.error(f"Error processing chunk starting at {chunk_start}: {e.stderr}")
                     continue  # Skip this chunk and continue with the next one
@@ -128,7 +130,6 @@ class StreamingMediaProcessor:
                 }
 
                 processed_chunks.append(processed_chunk)
-
         return processed_chunks
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):
