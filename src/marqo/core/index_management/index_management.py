@@ -84,15 +84,19 @@ class IndexManagement:
         with self._vespa_deployment_lock():
             vespa_app = self._get_vespa_application(check_configured=False, need_binary_file_support=True)
 
-            marqo_version = version.get_version()
-            has_marqo_settings_schema = vespa_app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
-            marqo_config_doc = self._get_legacy_marqo_config_from_marqo_settings_schema() if has_marqo_settings_schema else None
+            to_version = version.get_version()
+            from_version = vespa_app.get_marqo_config().version if vespa_app.is_configured else None
 
-            if not vespa_app.need_bootstrapping(marqo_version, marqo_config_doc):
+            if from_version and semver.VersionInfo.parse(from_version) >= semver.VersionInfo.parse(to_version):
+                # skip bootstrapping if already bootstrapped to this version or later
                 return False
 
-            existing_indexes = self._get_existing_indexes() if has_marqo_settings_schema else ()
-            vespa_app.bootstrap(marqo_version, existing_indexes)
+            # Only retrieving existing index when the vespa app is not configured and the index settings schema exists
+            existing_indexes = self._get_existing_indexes() if not vespa_app.is_configured and \
+                vespa_app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME) else None
+
+            vespa_app.bootstrap(to_version, existing_indexes)
+
             return True
 
     def rollback_vespa(self) -> None:
@@ -198,21 +202,6 @@ class IndexManagement:
             for document in batch_response.documents
             if not document.id.split('::')[-1].startswith(constants.MARQO_RESERVED_PREFIX)
         ]
-
-    def _get_legacy_marqo_config_from_marqo_settings_schema(self) -> Optional[MarqoConfig]:
-        """
-        We store Marqo config in _MARQO_CONFIG_DOC_ID doc prior to Marqo v2.13.0
-        This method is now only used to retrieve the existing marqo config for bootstrapping
-        """
-        try:
-            response = self.vespa_client.get_document(self._MARQO_CONFIG_DOC_ID, self._MARQO_SETTINGS_SCHEMA_NAME)
-        except VespaStatusError as e:
-            if e.status_code == 404:
-                logger.warn(f'Marqo config document is not found in {self._MARQO_SETTINGS_SCHEMA_NAME}')
-                return None
-            raise e
-
-        return MarqoConfig.parse_raw(response.document.fields['settings'])
 
     def get_all_indexes(self) -> List[MarqoIndex]:
         """

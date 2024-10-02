@@ -553,7 +553,7 @@ class VespaApplicationPackage:
 
     def __init__(self, store: VespaApplicationStore):
         self._store = store
-        # Mark the app package as configured if Marqo config file exists
+        # Mark the app package as configured if Marqo config json file exist
         self.is_configured = self._store.file_exists(self._MARQO_CONFIG_FILE)
         self._service_xml = ServicesXml(self._store.read_text_file(self._SERVICES_XML_FILE))
         self._marqo_config_store = MarqoConfigStore(self._store.read_text_file(self._MARQO_CONFIG_FILE))
@@ -564,42 +564,26 @@ class VespaApplicationPackage:
     def get_marqo_config(self) -> MarqoConfig:
         return self._marqo_config_store.get()
 
-    def need_bootstrapping(self, marqo_version: str, marqo_config_doc: Optional[MarqoConfig] = None) -> bool:
+    def bootstrap(self, to_version: str, existing_index_settings: Optional[List[MarqoIndex]]) -> None:
         """
-        Bootstrapping is needed when
-        - the version of Marqo is higher than the version of the deployed application
-        The version of the application is retrieved in the following order:
-        - from the 'marqo_config.json' file (Post v2.13.0)
-        - from the marqo_config_doc passed in which is marqo__config doc saved in marqo__settings schema (Post v2.1.0)
-        - if neither is available, return 2.0.0 as default (Pre v2.1.0 or not bootstrapped yet)
+        Bootstrap the Vespa application package to match the Marqo version. This will
+        1. Migrate the existing index settings (once-off for the first time)
+        2. Configure query profiles
+        3. Configure custom components and copy component jar files
+        4. Update the MarqoConfig version to match Marqo version
+        5. Create a backup zip file containing old version of changed files for rollback
+        6. Deploy the application pacakge
         """
-        if self.is_configured and self.get_marqo_config() is not None:
-            app_version = self.get_marqo_config().version
-            logger.debug(f'Vespa app version is detected in marqo_config.json: {app_version}')
-        elif marqo_config_doc:
-            app_version = marqo_config_doc.version
-            logger.debug(f'Vespa app version is detected in marqo__config doc: {app_version}')
-        else:
-            app_version = '2.0.0'
-            logger.debug(f'Vespa app version is not detected, set to default: {app_version}')
-
-        logger.info(f'Marqo version is {marqo_version}, and the vector store is bootstrapped by Marqo {app_version}')
-
-        marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
-        app_sem_version = semver.VersionInfo.parse(app_version, optional_minor_and_patch=True)
-
-        return app_sem_version < marqo_sem_version
-
-    def bootstrap(self, marqo_version: str, existing_index_settings: List[MarqoIndex] = ()) -> None:
-        logger.info(f'Bootstrapping the vector store to {marqo_version}')
+        logger.info(f'Bootstrapping the vector store to {to_version}')
 
         if not self.is_configured:
-            # Migrate existing index settings from previous versions of Marqo. Please note that this once-off migration
-            # is only done when the app package is not configured (Marqo config file does not exist)
-            if existing_index_settings is not None and len(existing_index_settings) > 0:
+            # Migrate existing index settings from previous version of Marqo. This migration is a once-off operation.
+            # It will be skipped if the app package is marked as configured after the first bootstrapping.
+            if existing_index_settings:
                 logger.debug(f'Migrating existing index settings {[index.json for index in existing_index_settings]}')
                 for index in existing_index_settings:
                     self._index_setting_store.save_index_setting(index)
+            # We need to persist index setting files regardless of existing index settings
             logger.debug(f'Persisting index settings: {self._index_setting_store.to_json()}')
             self._persist_index_settings()
 
@@ -609,7 +593,7 @@ class VespaApplicationPackage:
         self._configure_query_profiles(backup)
         self._copy_components_jar()  # we do not back up jar file
         self._service_xml.config_components()
-        self._marqo_config_store.update_version(marqo_version)
+        self._marqo_config_store.update_version(to_version)
 
         logger.debug(f'Persisting services.xml file: {self._service_xml}')
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE, backup=backup)
@@ -622,6 +606,12 @@ class VespaApplicationPackage:
         self._deploy()
 
     def rollback(self, marqo_version: str) -> None:
+        """
+        Rollback the Vespa application package to match the current Marqo version. This will
+        1. Check if rollback is feasible (version matches, backup file exists and no irreversible changes)
+        2. Recover the files from backup and remove the added files (marked as removal in backup)
+        3. Create a backup of this rollback
+        """
         vespa_app_version = self.get_marqo_config().version
         marqo_sem_version = semver.VersionInfo.parse(marqo_version, optional_minor_and_patch=True)
         app_sem_version = semver.VersionInfo.parse(vespa_app_version, optional_minor_and_patch=True)
