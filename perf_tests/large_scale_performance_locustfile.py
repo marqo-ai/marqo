@@ -330,6 +330,11 @@ class BurstLoadShape(LoadTestShape):
     def __init__(self):
         super().__init__()
         self.stages = [
+            #{"duration": 30, "users": 10, "spawn_rate": 1},     # First 2 minutes: ramp up to 10 users
+            #{"duration": 30, "users": 20, "spawn_rate": 1},     # First 2 minutes: ramp up to 10 users
+            #{"duration": 30, "users": 30, "spawn_rate": 1},     # First 2 minutes: ramp up to 10 users
+            #{"duration": 30, "users": 20, "spawn_rate": 1},     # First 2 minutes: ramp up to 10 users
+            #{"duration": 30, "users": 10, "spawn_rate": 1},     # First 2 minutes: ramp up to 10 users
             {"duration": 120, "users": 10, "spawn_rate": 1},     # First 2 minutes: ramp up to 10 users
             {"duration": 300, "users": 55, "spawn_rate": 2},    # Next 5 minutes: ramp up to 55 users
             {"duration": 300, "users": 100, "spawn_rate": 5},   # Next 5 minutes: ramp up to 100 users
@@ -372,20 +377,19 @@ class BurstLoadShape(LoadTestShape):
         if run_time >= self.max_duration:
             return None  # Stop the test
 
-        # Initialize stage start time
-        if self.stage_start_time == 0:
-            self.stage_start_time = run_time
+        # Calculate total duration of all stages
+        total_duration = sum(stage["duration"] for stage in self.stages)
 
-        current_stage = self.stages[self.stage_index]
-        stage_elapsed = run_time - self.stage_start_time
+        # Calculate time within current cycle
+        cycle_time = run_time % total_duration
 
-        if stage_elapsed >= current_stage["duration"]:
-            # Move to the next stage
-            self.stage_index += 1
-            if self.stage_index >= len(self.stages):
-                self.stage_index = len(self.stages) - 1  # Stay at the last stage
-            self.stage_start_time = run_time
-            current_stage = self.stages[self.stage_index]
+        cumulative_duration = 0
+        for stage in self.stages:
+            cumulative_duration += stage["duration"]
+            if cycle_time < cumulative_duration:
+                return (stage["users"], stage["spawn_rate"])
 
-        return (current_stage["users"], current_stage["spawn_rate"])
+        # Should not reach here, but return the last stage
+        last_stage = self.stages[-1]
+        return (last_stage["users"], last_stage["spawn_rate"])
 
