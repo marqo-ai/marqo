@@ -33,10 +33,6 @@ on:
     paths-ignore:
       - '**.md'
 
-concurrency:
-  group: cuda-api-tests-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
