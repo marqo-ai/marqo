@@ -156,3 +156,4 @@ scripts/vespa_local/vespa_tester_app.zip
 /perf_tests/*.csv
 /perf_tests/*/*.csv
 /perf_tests/*.json
+/perf_tests/*.json1

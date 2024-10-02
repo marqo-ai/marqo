@@ -1,26 +1,26 @@
 from __future__ import annotations
 
-import random
-import os
-import csv
-import time
+import argparse
 import json
+import os
+import random
+import re
+import threading
+import time
 from datetime import datetime
 
-from locust import events, task, between, FastHttpUser, LoadTestShape
-from locust.env import Environment
 import marqo
 import marqo.errors
 import numpy as np
 import pandas as pd
-import sys
-import argparse
-import os
-import re
+from locust import FastHttpUser, LoadTestShape, between, events, task
 
+# ---------------------------
+# Data Loading Functions
+# ---------------------------
 
-# Load queries from the CSV file
 def load_queries(csv_path):
+    """Load search queries from a CSV file."""
     queries = []
     df = pd.read_csv(csv_path)
     for _, row in df.iterrows():
@@ -30,35 +30,35 @@ def load_queries(csv_path):
         })
     return queries
 
-# Load necessary data from extracted CSV files
 def load_data(data_dir):
+    """Load necessary data from extracted CSV files."""
     data = {}
 
     # Load available product codes
-    data['available_product_codes'] = set()
     available_product_codes_csv = os.path.join(data_dir, 'extracted_available_product_codes.csv')
     df = pd.read_csv(available_product_codes_csv)
     data['available_product_codes'] = set(df['available_ia_code'].dropna().unique())
 
     # Load ia_codes
-    data['ia_codes'] = set()
     ia_codes_csv = os.path.join(data_dir, 'extracted_ia_codes.csv')
     df = pd.read_csv(ia_codes_csv)
     data['ia_codes'] = set(df['ia_code'].dropna().unique())
 
     # Load ro_queries
-    data['ro_queries'] = set()
     ro_queries_csv = os.path.join(data_dir, 'extracted_ro_queries.csv')
     df = pd.read_csv(ro_queries_csv)
     data['ro_queries'] = set(df['query'].dropna().unique())
 
     # Load truncated_tags
-    data['truncated_tags'] = set()
     truncated_tags_csv = os.path.join(data_dir, 'extracted_truncated_tags.csv')
     df = pd.read_csv(truncated_tags_csv)
     data['truncated_tags'] = set(df['truncated_tags'].dropna().unique())
 
     return data
+
+# ---------------------------
+# Configuration and Initialization
+# ---------------------------
 
 # Paths
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
@@ -78,25 +78,47 @@ REGION_PROBABILITIES = [0.7, 0.15, 0.05, 0.05, 0.02, 0.02, 0.01]
 # Index name from environment variable
 INDEX_NAME = os.getenv('MARQO_INDEX_NAME', 'locust-test')
 
+# ---------------------------
+# Locust User Class
+# ---------------------------
+
 class MarqoUser(FastHttpUser):
+    """
+    Locust user that performs search operations against a Marqo index.
+    """
     wait_time = between(1, 5)  # Simulate user think time
     client = None
-    telemetry_data = []
+    telemetry_filename = None
+    telemetry_file = None
+    telemetry_lock = threading.Lock()
+    summary_stats = {
+        'total_times': [],
+        'total_requests': 0,
+        'successful_requests': 0,
+        'failed_requests': 0,
+    }
 
     def on_start(self):
+        """Initialize Marqo client and telemetry file."""
         host = self.environment.host
         api_key = os.getenv('MARQO_CLOUD_API_KEY', None)
         if api_key:
             self.client = marqo.Client(url=host, api_key=api_key, return_telemetry=True)
         else:
             self.client = marqo.Client(url=host, return_telemetry=True)
+        
+        # Initialize telemetry file
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        self.telemetry_filename = f"telemetry_data_{timestamp}.jsonl"
+        self.telemetry_file = open(self.telemetry_filename, 'a')  # Use append mode
 
     @task
     def perform_search(self):
+        """Perform a search operation with retry mechanism and telemetry collection."""
         max_retries = 3
-        retry_delay = 1  # Start with 1 second
+        retry_delay = 2  # Initial delay in seconds
         attempt = 0
-        while attempt < max_retries:
+        while attempt <= max_retries:
             attempt += 1
             # Randomly select a query
             query_info = random.choice(QUERIES)
@@ -172,11 +194,19 @@ class MarqoUser(FastHttpUser):
             try:
                 response = self.client.index(INDEX_NAME).search(**search_params)
                 total_time = (time.time() - start_time) * 1000  # in ms
+
                 # Extract telemetry data
                 telemetry = response.get('telemetry', {})
                 telemetry['total_time_ms'] = total_time
-                self.telemetry_data.append(telemetry)
-                # Record success
+
+                # Write telemetry to file and update summary stats
+                with self.telemetry_lock:
+                    self.telemetry_file.write(json.dumps(telemetry) + '\n')
+                    self.summary_stats['total_times'].append(total_time)
+                    self.summary_stats['total_requests'] += 1
+                    self.summary_stats['successful_requests'] += 1
+
+                # Record success in Locust
                 self.environment.events.request.fire(
                     request_type='SEARCH',
                     name='perform_search',
@@ -185,15 +215,23 @@ class MarqoUser(FastHttpUser):
                     exception=None,
                     context={},
                 )
-                break  # Break out of the retry loop if successful
+                break  # Exit loop on success
+
             except marqo.errors.MarqoWebError as e:
-                if e.code == 'too_many_requests':
-                    # Implement exponential backoff
-                    time.sleep(retry_delay)
+                if e.code == 'too_many_requests' and attempt <= max_retries:
+                    # Implement exponential backoff with jitter
+                    jitter = random.uniform(0, 0.1)  # Add up to 100ms jitter
+                    sleep_time = retry_delay + jitter
+                    time.sleep(sleep_time)
                     retry_delay *= 2  # Exponential backoff
                 else:
                     total_time = (time.time() - start_time) * 1000  # in ms
-                    # Record failure
+                    # Record failure in telemetry
+                    with self.telemetry_lock:
+                        self.summary_stats['total_requests'] += 1
+                        self.summary_stats['failed_requests'] += 1
+
+                    # Record failure in Locust
                     self.environment.events.request.fire(
                         request_type='SEARCH',
                         name='perform_search',
@@ -202,10 +240,15 @@ class MarqoUser(FastHttpUser):
                         exception=e,
                         context={},
                     )
-                    break
+                    break  # Exit loop on failure
             except Exception as e:
                 total_time = (time.time() - start_time) * 1000  # in ms
-                # Record failure
+                # Record failure in telemetry
+                with self.telemetry_lock:
+                    self.summary_stats['total_requests'] += 1
+                    self.summary_stats['failed_requests'] += 1
+
+                # Record failure in Locust
                 self.environment.events.request.fire(
                     request_type='SEARCH',
                     name='perform_search',
@@ -214,53 +257,76 @@ class MarqoUser(FastHttpUser):
                     exception=e,
                     context={},
                 )
-                break
+                break  # Exit loop on failure
 
     def on_stop(self):
-        # Save telemetry data to a file
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        telemetry_filename = f"telemetry_data_{timestamp}.json"
-        summary_filename = f"telemetry_summary_{timestamp}.json"
-        with open(telemetry_filename, 'w') as f:
-            json.dump(self.telemetry_data, f)
+        """Finalize telemetry data and generate summary report."""
+        # Close telemetry file
+        if self.telemetry_file:
+            self.telemetry_file.close()
 
-        # Process telemetry data and output summary
-        if self.telemetry_data:
-            total_times = [t.get('total_time_ms', 0) for t in self.telemetry_data]
-            # Calculate average, median, percentiles, etc.
+        # Generate summary from summary_stats
+        if self.summary_stats['total_times']:
+            total_times = self.summary_stats['total_times']
             avg_time = np.mean(total_times)
             median_time = np.median(total_times)
             p95_time = np.percentile(total_times, 95)
-            # Calculate error rate
-            total_requests = len(total_times)
-            successful_requests = sum(1 for t in self.telemetry_data if 'total_time_ms' in t)
-            error_rate = ((total_requests - successful_requests) / total_requests) * 100 if total_requests > 0 else 0.0
-            # Save summary
+            error_rate = (self.summary_stats['failed_requests'] / self.summary_stats['total_requests']) * 100 if self.summary_stats['total_requests'] > 0 else 0.0
+
             summary = {
                 'avg_response_time_ms': avg_time,
                 'median_response_time_ms': median_time,
                 '95th_percentile_response_time_ms': p95_time,
-                'total_requests': total_requests,
-                'successful_requests': successful_requests,
+                'total_requests': self.summary_stats['total_requests'],
+                'successful_requests': self.summary_stats['successful_requests'],
                 'error_rate_percent': error_rate,
             }
+            summary_filename = f"telemetry_summary_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
             with open(summary_filename, 'w') as f:
-                json.dump(summary, f)
+                json.dump(summary, f, indent=4)
 
-# Event listener to ensure telemetry data is saved even if the test stops prematurely
+# ---------------------------
+# Event Listener for Quitting
+# ---------------------------
+
 @events.quitting.add_listener
 def save_telemetry_on_quit(environment, **kw):
-    for user in environment.runner.user_classes:
-        if hasattr(user, 'telemetry_data') and user.telemetry_data:
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            telemetry_filename = f"telemetry_data_{timestamp}.json"
-            summary_filename = f"telemetry_summary_{timestamp}.json"
-            with open(telemetry_filename, 'w') as f:
-                json.dump(user.telemetry_data, f)
-            # Optionally, add summary processing here if needed
+    """
+    Event listener to save telemetry data when Locust quits unexpectedly.
+    """
+    for user_class in environment.runner.user_classes:
+        if isinstance(user_class, MarqoUser):
+            user = user_class()
+            if hasattr(user, 'telemetry_file') and user.telemetry_file:
+                user.telemetry_file.close()
+            # Generate summary if possible
+            if user.summary_stats['total_times']:
+                total_times = user.summary_stats['total_times']
+                avg_time = np.mean(total_times)
+                median_time = np.median(total_times)
+                p95_time = np.percentile(total_times, 95)
+                error_rate = (user.summary_stats['failed_requests'] / user.summary_stats['total_requests']) * 100 if user.summary_stats['total_requests'] > 0 else 0.0
 
+                summary = {
+                    'avg_response_time_ms': avg_time,
+                    'median_response_time_ms': median_time,
+                    '95th_percentile_response_time_ms': p95_time,
+                    'total_requests': user.summary_stats['total_requests'],
+                    'successful_requests': user.summary_stats['successful_requests'],
+                    'error_rate_percent': error_rate,
+                }
+                summary_filename = f"telemetry_summary_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
+                with open(summary_filename, 'w') as f:
+                    json.dump(summary, f, indent=4)
+
+# ---------------------------
+# Load Test Shape Class
+# ---------------------------
 
 class BurstLoadShape(LoadTestShape):
+    """
+    Defines a burst load pattern with multiple stages.
+    """
     def __init__(self):
         super().__init__()
         self.stages = [
@@ -299,6 +365,9 @@ class BurstLoadShape(LoadTestShape):
         return total_seconds
 
     def tick(self):
+        """
+        Determine the current stage based on elapsed time and return the user count and spawn rate.
+        """
         run_time = self.get_run_time()
         if run_time >= self.max_duration:
             return None  # Stop the test
@@ -312,7 +381,9 @@ class BurstLoadShape(LoadTestShape):
 
         if stage_elapsed >= current_stage["duration"]:
             # Move to the next stage
-            self.stage_index = (self.stage_index + 1) % len(self.stages)
+            self.stage_index += 1
+            if self.stage_index >= len(self.stages):
+                self.stage_index = len(self.stages) - 1  # Stay at the last stage
             self.stage_start_time = run_time
             current_stage = self.stages[self.stage_index]
 
