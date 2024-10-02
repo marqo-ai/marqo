@@ -268,9 +268,10 @@ class BurstLoadShape(LoadTestShape):
             {"duration": 300, "users": 55, "spawn_rate": 2},    # Next 5 minutes: ramp up to 55 users
             {"duration": 300, "users": 100, "spawn_rate": 5},   # Next 5 minutes: ramp up to 100 users
             {"duration": 600, "users": 250, "spawn_rate": 7},   # Next 10 minutes: ramp up to 250 users
-            {"duration": 600, "users": 350, "spawn_rate": 10},  # Next 10 minutes: ramp up to 350 users
+            {"duration": 600, "users": 300, "spawn_rate": 10},  # Next 10 minutes: ramp up to 300 users
             {"duration": 600, "users": 250, "spawn_rate": 7},   # Next 10 minutes: ramp down to 250 users
             {"duration": 900, "users": 50, "spawn_rate": 5},    # Next 15 minutes: ramp down to 50 users
+            {"duration": 900, "users": 25, "spawn_rate": 2},    # Next 15 minutes: ramp down to 25 users
         ]
         self.stage_index = 0
         self.stage_start_time = 0
