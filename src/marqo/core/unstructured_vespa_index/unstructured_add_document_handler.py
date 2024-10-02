@@ -49,6 +49,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                                   if mapping.get("type", None) == FieldType.CustomVector],
             multimodal_combo_fields={field_name: mapping['weights'] for field_name, mapping in mappings.items()
                                      if mapping.get("type", None) == FieldType.MultimodalCombination},
+            should_normalise_custom_vector=self.should_normalise_custom_vector
         )
 
     def _validate_doc(self, doc):

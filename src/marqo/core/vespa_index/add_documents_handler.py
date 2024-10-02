@@ -5,7 +5,7 @@ from timeit import default_timer as timer
 from typing import List, Dict, Optional, Any, Tuple, Set
 
 from marqo.api import exceptions as api_errors
-from marqo.core.constants import MARQO_DOC_ID
+from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
 from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.inference.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
     TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser
@@ -114,6 +114,9 @@ class AddDocumentsHandler(ABC):
         self.marqo_index = marqo_index
         self.add_docs_params = add_docs_params
         self.vespa_client = vespa_client
+        # only normalise custom vector in new indexes to keep the backward compatibility
+        self.should_normalise_custom_vector = (marqo_index.normalize_embeddings and marqo_index.parsed_marqo_version()
+                                               >= MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION)
         self.add_docs_response_collector = AddDocumentsResponseCollector()
         self.tensor_fields_container = self._create_tensor_fields_container()
 

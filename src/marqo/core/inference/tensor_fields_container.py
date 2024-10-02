@@ -380,10 +380,12 @@ class MultiModalTensorFieldContent(TensorFieldContent):
 
 class TensorFieldsContainer:
 
-    def __init__(self, tensor_fields: List[str], custom_vector_fields: List[str], multimodal_combo_fields: dict):
+    def __init__(self, tensor_fields: List[str], custom_vector_fields: List[str],
+                 multimodal_combo_fields: dict, should_normalise_custom_vector: bool):
         self._tensor_field_map: Dict[str, Dict[str, TensorFieldContent]] = dict()
         self._tensor_fields = set(tensor_fields)
         self._custom_tensor_fields: Set[str] = set(custom_vector_fields)
+        self._should_normalise_custom_vector = should_normalise_custom_vector
         self._multimodal_combo_fields = multimodal_combo_fields
         self._multimodal_sub_field_reverse_map: Dict[str, Set[str]] = dict()
 
@@ -510,17 +512,7 @@ class TensorFieldsContainer:
             return field_content
 
         if self.is_custom_tensor_field(field_name):
-            content = field_content['content']
-            embedding = field_content['vector']
-            tensor_field_content = TensorFieldContent(
-                field_content=content,
-                field_type=FieldType.CustomVector,
-                is_tensor_field=True,
-                is_multimodal_subfield=False,  # for now custom vectors can only be top level
-            )
-            tensor_field_content.populate_chunks_and_embeddings([content], [embedding])
-            self._add_tensor_field_content(doc_id, field_name, tensor_field_content)
-            return content
+            return self._collect_custom_vector_field(doc_id, field_name, field_content)
 
         if self.is_multimodal_field(field_name):
             raise AddDocumentsError(
@@ -541,6 +533,29 @@ class TensorFieldsContainer:
             )
         )
         return field_content
+
+    def _collect_custom_vector_field(self, doc_id, field_name, field_content):
+        content = field_content['content']
+        embedding = field_content['vector']
+
+        if self._should_normalise_custom_vector:
+            # normalise custom vector
+            magnitude = np.linalg.norm(np.array(embedding), axis=-1, keepdims=True)
+            if magnitude == 0:
+                raise AddDocumentsError(f"Field {field_name} has zero magnitude vector, cannot normalize.")
+            embedding = (np.array(embedding) / magnitude).tolist()
+
+        tensor_field_content = TensorFieldContent(
+            field_content=content,
+            field_type=FieldType.CustomVector,
+            is_tensor_field=True,
+            is_multimodal_subfield=False,  # for now custom vectors can only be top level
+        )
+
+        tensor_field_content.populate_chunks_and_embeddings([content], [embedding])
+        self._add_tensor_field_content(doc_id, field_name, tensor_field_content)
+
+        return content
 
     def collect_multi_modal_fields(self, doc_id: str, normalize_embeddings: bool):
         for field_name, weights in self._multimodal_combo_fields.items():

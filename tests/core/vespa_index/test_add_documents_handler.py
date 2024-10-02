@@ -33,7 +33,7 @@ class TestAddDocumentHandler(MarqoTestCase):
             self.to_vespa_doc_call_count = 0
 
         def _create_tensor_fields_container(self) -> TensorFieldsContainer:
-            return TensorFieldsContainer(self.add_docs_params.tensor_fields, [], {})
+            return TensorFieldsContainer(self.add_docs_params.tensor_fields, [], {}, True)
 
         def _handle_field(self, marqo_doc, field_name, field_content) -> None:
             doc_id = marqo_doc[MARQO_DOC_ID]

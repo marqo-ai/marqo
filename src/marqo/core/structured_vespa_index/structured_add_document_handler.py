@@ -41,6 +41,7 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
             tensor_fields=list(self.marqo_index.tensor_field_map.keys()),
             custom_vector_fields=[field.name for field in self.marqo_index.field_map_by_type[FieldType.CustomVector]],
             multimodal_combo_fields=multimodal_combo_fields,
+            should_normalise_custom_vector=self.should_normalise_custom_vector
         )
 
     def _validate_add_docs_params(self, add_docs_params: AddDocsParams, marqo_index: StructuredMarqoIndex):
