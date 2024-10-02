@@ -86,7 +86,7 @@ class IndexManagement:
 
             marqo_version = version.get_version()
             has_marqo_settings_schema = vespa_app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME)
-            marqo_config_doc = self._get_marqo_config() if has_marqo_settings_schema else None
+            marqo_config_doc = self._get_legacy_marqo_config_from_marqo_settings_schema() if has_marqo_settings_schema else None
 
             if not vespa_app.need_bootstrapping(marqo_version, marqo_config_doc):
                 return False
@@ -199,7 +199,7 @@ class IndexManagement:
             if not document.id.split('::')[-1].startswith(constants.MARQO_RESERVED_PREFIX)
         ]
 
-    def _get_marqo_config(self) -> Optional[MarqoConfig]:
+    def _get_legacy_marqo_config_from_marqo_settings_schema(self) -> Optional[MarqoConfig]:
         """
         We store Marqo config in _MARQO_CONFIG_DOC_ID doc prior to Marqo v2.13.0
         This method is now only used to retrieve the existing marqo config for bootstrapping
