@@ -6,9 +6,7 @@ from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
 from marqo import exceptions as base_exceptions
-from marqo.api.exceptions import BadRequestError
 from marqo.core import exceptions as core_exceptions
-from marqo.core.exceptions import ZeroMagnitudeVectorError
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.enums import EnvVars

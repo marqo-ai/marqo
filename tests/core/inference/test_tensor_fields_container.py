@@ -20,7 +20,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             multimodal_combo_fields={
                 'combo_field1': {'subfield1': 1.0},
                 'combo_field2': {'subfield1': 2.0, 'tensor_field2': 5.0},
-            }
+            },
+            should_normalise_custom_vector=True
         )
 
     def test_initialisation(self):
@@ -75,8 +76,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEquals('content1', tensor_field_content.field_content)
         self.assertEquals(FieldType.CustomVector, tensor_field_content.field_type)
         self.assertEquals(['content1'], tensor_field_content.chunks)
-        self.assertEquals([[1.0, 2.0]], tensor_field_content.embeddings)
-        # TODO verify if this is also true, what if it's not included in the tensor_fields?
+        self.assertEquals([[0.4472135954999579, 0.8944271909999159]], tensor_field_content.embeddings)  # normalised
         self.assertTrue(tensor_field_content.is_tensor_field)
         self.assertFalse(tensor_field_content.is_multimodal_subfield)
 
@@ -297,7 +297,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         }, {})
 
         self.assertEquals(['content1'], custom_vector_field1.chunks)
-        self.assertEquals([[1.0, 2.0]], custom_vector_field1.embeddings)
+        self.assertEquals([[0.4472135954999579, 0.8944271909999159]], custom_vector_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_for_multimodal_field_if_it_does_not_exist(self):
         combo_field2 = self._get_combo_field2()
