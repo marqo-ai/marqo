@@ -6,16 +6,13 @@ import tempfile
 import textwrap
 import threading
 import time
-import unittest
+import xml.etree.ElementTree as ET
+from datetime import datetime
 from pathlib import Path
 from unittest import mock
-from datetime import datetime
 from unittest.mock import patch
 
 import httpx
-
-import xml.etree.ElementTree as ET
-
 import pytest
 
 from marqo import version
@@ -27,14 +24,9 @@ from marqo.core.index_management.vespa_application_package import (MarqoConfig, 
                                                                    ApplicationPackageDeploymentSessionStore)
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.vespa.exceptions import VespaActivationConflictError
-from marqo.core.models.marqo_index_request import MarqoIndexRequest
-from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
-from marqo.tensor_search import tensor_search
-from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument
 from tests.marqo_test import MarqoTestCase
 
