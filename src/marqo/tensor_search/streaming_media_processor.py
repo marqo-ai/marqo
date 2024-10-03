@@ -206,9 +206,9 @@ class StreamingMediaProcessor:
         ffmpeg_command = [
             'ffmpeg', '-y' # Enable overwrite
             '-v', 'error',  # Suppress warnings and other output
-            '-i', url,  # Input file
+            '-i', str(url),  # Input file
             '-ss', str(start_time),  # Start time
-            '-t', duration,  # Duration
+            '-t', str(duration),  # Duration
             '-acodec', 'pcm_s16le',  # Audio codec
             '-ar', '44100',  # Audio sample rate
             '-f', 'wav',  # Output format
