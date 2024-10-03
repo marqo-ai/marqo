@@ -184,6 +184,9 @@ class StreamingMediaProcessor:
             ]
         result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
+            # Even if there is an error, the output file may still be created. Remove it if it exists.
+            if os.path.exists(output_file):
+                os.remove(output_file)
             raise MediaDownloadError(f"Error downloading the video chunk with url={url}, start_time={start_time}, "
                                      f"duration={duration}. "
                                      f"Original error message: {result.stderr.decode()}")
