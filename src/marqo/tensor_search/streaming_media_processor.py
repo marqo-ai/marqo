@@ -110,14 +110,16 @@ class StreamingMediaProcessor:
                             enable_gpu_acceleration=self.enable_video_gpu_acceleration
                         )
                     elif self.modality == Modality.AUDIO:  # AUDIO
-                        # Use ffmpeg-python to process the chunk
-                        stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
-                        stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
-                        ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+                        output_file = self.fetch_audio_chunk(
+                            url=self.url,
+                            start_time=chunk_start,
+                            duration=chunk_end - chunk_start,
+                            output_file=output_file
+                        )
                     else:
                         raise ValueError(f"Unsupported modality: {self.modality}")
                 except (subprocess.CalledProcessError, MediaDownloadError) as e:
-                    logger.error(f"Error processing chunk starting at {chunk_start}: {e.stderr}")
+                    logger.error(f"Error processing chunk starting at {chunk_start}: {e}")
                     continue  # Skip this chunk and continue with the next one
 
                 processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
@@ -183,7 +185,40 @@ class StreamingMediaProcessor:
             ]
         result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
-            raise MediaDownloadError(f"Error downloading video chunk with url={url}, start_time={start_time}, "
+            raise MediaDownloadError(f"Error downloading the video chunk with url={url}, start_time={start_time}, "
+                                     f"duration={duration}. "
+                                     f"Original error message: {result.stderr.decode()}")
+        return output_file
+
+    @staticmethod
+    def fetch_audio_chunk(url: str, start_time: float, duration: float, output_file: str) -> str:
+        """
+        Fetch an audio chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
+        downloaded audio chunk.
+        Args:
+            url: The url of the audio
+            start_time: The start time of the audio chunk
+            duration: The duration of the audio chunk
+            output_file: The path to save the audio chunk
+
+        Returns:
+            The path to the downloaded audio chunk
+        """
+        ffmpeg_command = [
+            'ffmpeg', '-y' # Enable overwrite
+            '-v', 'error',  # Suppress warnings and other output
+            '-i', url,  # Input file
+            '-ss', str(start_time),  # Start time
+            '-t', duration,  # Duration
+            '-acodec', 'pcm_s16le',  # Audio codec
+            '-ar', '44100',  # Audio sample rate
+            '-f', 'wav',  # Output format
+            output_file  # Output file
+        ]
+
+        result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            raise MediaDownloadError(f"Error downloading the audio chunk with url={url}, start_time={start_time}, "
                                      f"duration={duration}. "
                                      f"Original error message: {result.stderr.decode()}")
         return output_file

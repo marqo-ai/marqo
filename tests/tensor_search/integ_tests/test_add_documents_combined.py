@@ -1,28 +1,25 @@
 import os
+import unittest.mock
 import uuid
 from unittest import mock
+from unittest.mock import call
 from unittest.mock import patch
-import pytest
-import torch
-
 
 import PIL
+import pytest
 import requests
 import torch
 from torch import Tensor
-from urllib3.exceptions import ProtocolError
-import unittest.mock
-
 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference import types
+from marqo.s2_inference.multimodal_model_load import infer_modality
 from marqo.tensor_search import add_docs
+from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
-from marqo.tensor_search import streaming_media_processor
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -732,12 +729,13 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     self.assertEqual(400, r["items"][i]["status"])
                     self.assertIn("Document _id must be a string", r["items"][i]["error"])
 
-
+    @unittest.mock.patch('marqo.tensor_search.streaming_media_processor.StreamingMediaProcessor.fetch_video_chunk')
     @unittest.mock.patch('marqo.tensor_search.streaming_media_processor.ffmpeg')
     @unittest.mock.patch('marqo.tensor_search.streaming_media_processor.tempfile.TemporaryDirectory')
-    def test_process_media_chunk_calculation(self, mock_temp_dir, mock_ffmpeg):
+    def test_process_media_chunk_calculation(self, mock_temp_dir, mock_ffmpeg, mock_decode_video):
         # Mock the TemporaryDirectory context manager
         mock_temp_dir.return_value.__enter__.return_value = '/tmp/mock_dir'
+        mock_decode_video.return_value = '/tmp/mock_dir/chunk.mp4'
 
         # Create a mock MarqoIndex
         mock_index = unittest.mock.Mock()
@@ -782,19 +780,23 @@ class TestAddDocumentsCombined(MarqoTestCase):
             self.assertEqual(chunk['start_time'], expected_chunks[i]['start_time'])
             self.assertEqual(chunk['end_time'], expected_chunks[i]['end_time'])
 
-        # Verify that ffmpeg.input was called for each chunk
-        self.assertEqual(mock_ffmpeg.input.call_count, len(expected_chunks))
+        # Verify that fetch_video_chunk was called for each chunk
+        self.assertEqual(len(expected_chunks), mock_decode_video.call_count)
+        # Verify that ffmpeg.probe was called once
+        self.assertEqual(1, mock_ffmpeg.probe.call_count)
 
-        # Verify the ffmpeg.input calls
-        for i, expected_chunk in enumerate(expected_chunks):
-            mock_ffmpeg.input.assert_any_call(
-                'http://example.com/video.mp4',
-                ss=expected_chunk['start_time'],
-                t=expected_chunk['end_time'] - expected_chunk['start_time']
+        # Create the expected calls
+        expected_calls = [
+            call(
+                url='http://example.com/video.mp4',
+                start_time=expected_chunk['start_time'],
+                duration=expected_chunk['end_time'] - expected_chunk['start_time'],
+                output_file=f"/tmp/mock_dir/chunk_{expected_chunk['start_time']}.mp4",
+                enable_gpu_acceleration=False
             )
-
-        # Verify that ffmpeg.run was called for each chunk
-        self.assertEqual(mock_ffmpeg.run.call_count, len(expected_chunks))
+            for expected_chunk in expected_chunks
+        ]
+        mock_decode_video.assert_has_calls(expected_calls, any_order=False)
 
     def test_webp_image_download_infer_modality(self):
         """the webp extension is not predefined among the extensions in infer_modality.

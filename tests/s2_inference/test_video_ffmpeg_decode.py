@@ -66,9 +66,8 @@ class TestVideoFFmpegDecode(unittest.TestCase):
         duration = 1
 
         for enable_gpu_acceleration in (True, False):
-            with self.assertRaises(MediaDownloadError):
-                StreamingMediaProcessor.fetch_video_chunk(
-                    valid_url, start_time, duration, self.output_file, enable_gpu_acceleration
-                )
+            StreamingMediaProcessor.fetch_video_chunk(
+                valid_url, start_time, duration, self.output_file, enable_gpu_acceleration
+            )
             self.assertTrue(os.path.exists(self.output_file))
             os.remove(self.output_file)

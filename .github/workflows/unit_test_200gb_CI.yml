@@ -70,12 +70,12 @@ jobs:
           path: marqo-base
 
       # TODO Bake these into the AMIs later
-      - name: Install FFmpeg and Libmagic1
+      - name: Install FFmpeg and libmagic
         run: |
-          sudo apt-get install ffmpeg -y
-          sudo apt-get install libmagic1 -y
-          ffmpeg -version
-          file --version
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libmagic1
+          ffmpeg -version  # Verify installation
+          file --version   # Verify libmagic installation and version
 
       - name: Install dependencies
         run: |
