@@ -156,7 +156,7 @@ class StreamingMediaProcessor:
         Raises:
             MediaDownloadError: If there is an error downloading the video chunk
         """
-        if enable_gpu_acceleration:
+        if enable_gpu_acceleration is True:
             ffmpeg_command = [
                 'ffmpeg',
                 '-y',  # Enable overwrite

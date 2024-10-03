@@ -9,7 +9,7 @@ from marqo.tensor_search.streaming_media_processor import StreamingMediaProcesso
 
 class TestVideoFFmpegDecode(unittest.TestCase):
     def setUp(self):
-        self.output_file = "/tmp/test.mp4"
+        self.output_file = "./test.mp4"
         if os.path.exists(self.output_file):
             os.remove(self.output_file)
 
