@@ -173,7 +173,9 @@ class StreamingMediaProcessor:
             ]
         else:
             ffmpeg_command = [
-                'ffmpeg','-y',
+                'ffmpeg',
+                '-y',
+                '-v', 'error',
                 '-ss', str(start_time),
                 '-t', str(duration),
                 '-i', url,
@@ -207,7 +209,8 @@ class StreamingMediaProcessor:
             The path to the downloaded audio chunk
         """
         ffmpeg_command = [
-            'ffmpeg', '-y' # Enable overwrite
+            'ffmpeg',
+            '-y' # Enable overwrite
             '-v', 'error',  # Suppress warnings and other output
             '-i', str(url),  # Input file
             '-ss', str(start_time),  # Start time
