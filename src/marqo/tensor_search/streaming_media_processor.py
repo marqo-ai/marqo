@@ -1,19 +1,20 @@
 """Functions used to download and preprocess audio and video files"""
 
-from contextlib import contextmanager
-import torch
 import math
-
-# for multimodal processing
-import tempfile
 import os
 import subprocess
-from typing import List, Dict
+# for multimodal processing
+import tempfile
 import time
+
 import ffmpeg
+import torch
 
 from marqo.core.models.marqo_index import *
+from marqo.s2_inference.errors import MediaDownloadError
 from marqo.s2_inference.multimodal_model_load import Modality
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
@@ -32,9 +33,11 @@ class StreamingMediaProcessor:
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
         self.total_size, self.duration = self._fetch_file_metadata()
+        self.enable_video_gpu_acceleration = (
+                utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'TRUE'
+        )
 
         self._set_split_parameters(modality)
-        self._log_initialization_details()
 
     def _set_split_parameters(self, modality):
         preprocessing = self.video_preprocessing if modality == Modality.VIDEO else self.audio_preprocessing
@@ -48,13 +51,6 @@ class StreamingMediaProcessor:
 
         if modality not in [Modality.VIDEO, Modality.AUDIO]:
             raise ValueError(f"Unsupported modality: {modality}")
-
-    def _log_initialization_details(self):
-        # print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
-        # print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
-        # print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
-        # print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
-        pass
 
     def _fetch_file_metadata(self):
         start_time = time.time()
@@ -84,7 +80,7 @@ class StreamingMediaProcessor:
         return os.path.join(temp_dir, f"chunk_{chunk_start}.{extension}")
 
     def process_media(self) -> List[Dict[str, torch.Tensor]]:
-        processed_chunks = []
+        processed_chunks: List[Dict[str, torch.Tensor]] = []
         chunk_duration = self.split_length
         overlap_duration = self.split_overlap
 
@@ -104,37 +100,130 @@ class StreamingMediaProcessor:
                 output_file = self._get_output_file_path(temp_dir, chunk_start)
 
                 try:
-                    # Use ffmpeg-python to process the chunk
-                    stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
-
                     if self.modality == Modality.VIDEO:
-                        stream = ffmpeg.output(stream, output_file, vcodec='libx264', acodec='aac', **{'f': 'mp4'})
-                    else:  # AUDIO
-                        stream = ffmpeg.output(stream, output_file, acodec='pcm_s16le', ar=44100, **{'f': 'wav'})
-
-                    ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
-
-                    processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
-                    processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
-
-                    processed_chunk = {
-                        'tensor': processed_chunk_tensor,
-                        'start_time': chunk_start,
-                        'end_time': chunk_end
-                    }
-
-                    processed_chunks.append(processed_chunk)
-
-                except subprocess.CalledProcessError as e:
-                    logger.error(f"Error processing chunk starting at {chunk_start}: {e.stderr}")
+                        output_file = self.fetch_video_chunk(
+                            url=self.url,
+                            start_time=chunk_start,
+                            duration=chunk_end - chunk_start,
+                            output_file=output_file,
+                            enable_gpu_acceleration=self.enable_video_gpu_acceleration
+                        )
+                    elif self.modality == Modality.AUDIO:  # AUDIO
+                        output_file = self.fetch_audio_chunk(
+                            url=self.url,
+                            start_time=chunk_start,
+                            duration=chunk_end - chunk_start,
+                            output_file=output_file
+                        )
+                    else:
+                        raise ValueError(f"Unsupported modality: {self.modality}")
+                except (subprocess.CalledProcessError, MediaDownloadError) as e:
+                    logger.error(f"Error processing chunk starting at {chunk_start}: {e}")
                     continue  # Skip this chunk and continue with the next one
-                finally:
-                    # Clean up temporary files
-                    if os.path.exists(output_file):
-                        os.remove(output_file)
 
+                processed_chunk_tensor = self.preprocessor(output_file, return_tensors='pt')
+                processed_chunk_tensor['pixel_values'] = processed_chunk_tensor['pixel_values'].to(self.device)
+
+                processed_chunk = {
+                    'tensor': processed_chunk_tensor,
+                    'start_time': chunk_start,
+                    'end_time': chunk_end
+                }
+
+                processed_chunks.append(processed_chunk)
         return processed_chunks
 
     def _progress(self, download_total, downloaded, upload_total, uploaded):
         if download_total > 0:
             progress = downloaded / download_total * 100
+
+    @staticmethod
+    def fetch_video_chunk(url: str, start_time: float, duration: float, output_file: str,
+                          enable_gpu_acceleration: bool = False) -> str:
+        """
+        Fetch a video chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
+        downloaded video chunk.
+        Args:
+            url: The url of the video
+            start_time: The start time of the video chunk
+            duration: The duration of the video chunk
+            output_file: The path to save the video chunk
+            enable_gpu_acceleration: Whether to use GPU acceleration for downloading the video chunk
+
+        Returns:
+            THe path to the downloaded video chunk
+
+        Raises:
+            MediaDownloadError: If there is an error downloading the video chunk
+        """
+        if enable_gpu_acceleration is True:
+            ffmpeg_command = [
+                'ffmpeg',
+                '-y',  # Enable overwrite
+                '-v', 'error', # Suppress warnings and other output
+                '-ss', str(start_time), # Start time
+                '-t', str(duration), # Duration
+                '-hwaccel', 'cuda', # Use GPU acceleration
+                '-hwaccel_output_format', 'cuda', # Use GPU acceleration
+                '-i', url, # Input file
+                '-c:a', 'copy', # Copy audio codec to speed up the conversion process by avoiding unnecessary re-encoding of the audio stream.
+                '-c:v', 'h264_nvenc', # Use NVIDIA NVENC H.264 encoder
+                '-b:v', '5M', # Set the video bitrate to 5M
+                output_file
+            ]
+        else:
+            ffmpeg_command = [
+                'ffmpeg',
+                '-y',
+                '-v', 'error',
+                '-ss', str(start_time),
+                '-t', str(duration),
+                '-i', url,
+                '-vcodec', 'libx264',
+                '-acodec', 'aac',
+                '-f', 'mp4',
+                output_file
+            ]
+        result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            # Even if there is an error, the output file may still be created. Remove it if it exists.
+            if os.path.exists(output_file):
+                os.remove(output_file)
+            raise MediaDownloadError(f"Error downloading the video chunk with url={url}, start_time={start_time}, "
+                                     f"duration={duration}. "
+                                     f"Original error message: {result.stderr.decode()}")
+        return output_file
+
+    @staticmethod
+    def fetch_audio_chunk(url: str, start_time: float, duration: float, output_file: str) -> str:
+        """
+        Fetch an audio chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
+        downloaded audio chunk.
+        Args:
+            url: The url of the audio
+            start_time: The start time of the audio chunk
+            duration: The duration of the audio chunk
+            output_file: The path to save the audio chunk
+
+        Returns:
+            The path to the downloaded audio chunk
+        """
+        ffmpeg_command = [
+            'ffmpeg',
+            '-y', # Enable overwrite
+            '-v', 'error',  # Suppress warnings and other output
+            '-i', str(url),  # Input file
+            '-ss', str(start_time),  # Start time
+            '-t', str(duration),  # Duration
+            '-acodec', 'pcm_s16le',  # Audio codec
+            '-ar', '44100',  # Audio sample rate
+            '-f', 'wav',  # Output format
+            output_file  # Output file
+        ]
+
+        result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            raise MediaDownloadError(f"Error downloading the audio chunk with url={url}, start_time={start_time}, "
+                                     f"duration={duration}. "
+                                     f"Original error message: {result.stderr.decode()}")
+        return output_file

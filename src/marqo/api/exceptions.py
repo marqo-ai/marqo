@@ -28,6 +28,13 @@ class EnvVarError(MarqoError):
         self.message = message
 
 
+class StartupSanityCheckError(MarqoError):
+    code = "startup_sanity_check_error"
+
+    def __init__(self, message: str):
+        self.message = message
+
+
 # TODO: DELETE
 class MarqoApiError(MarqoError):
     """Error sent by Marqo API"""
