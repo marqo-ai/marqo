@@ -210,7 +210,7 @@ class StreamingMediaProcessor:
         """
         ffmpeg_command = [
             'ffmpeg',
-            '-y' # Enable overwrite
+            '-y', # Enable overwrite
             '-v', 'error',  # Suppress warnings and other output
             '-i', str(url),  # Input file
             '-ss', str(start_time),  # Start time
