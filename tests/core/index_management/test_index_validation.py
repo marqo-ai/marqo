@@ -1,10 +1,12 @@
 import unittest
 
+import pytest
 from pydantic import ValidationError
 
 from marqo.core.index_management.index_management import IndexManagement
 
 
+@pytest.mark.unittest
 class TestIndexValidateSettings(unittest.TestCase):
     def generate_test_input(
         self, model="hf/e5-large", treat_urls_and_pointers_as_images=False

@@ -268,6 +268,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     created_at: int = pydantic.Field(gt=0)
     updated_at: int = pydantic.Field(gt=0)
     _cache: Dict[str, Any] = PrivateAttr()
+    version: Optional[int] = pydantic.Field(default=None)
 
     class Config(ImmutableBaseModel.Config):
         extra = "allow"

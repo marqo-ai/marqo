@@ -6,16 +6,17 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union, Tuple
 from urllib.parse import urlparse
 
 import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
+from marqo.core.models import MarqoIndex
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
-                                    VespaTimeoutError, VespaNotConvergedError)
-from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchResponse, \
+                                    VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
+from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
@@ -28,7 +29,8 @@ logger = marqo.logging.get_logger(__name__)
 
 class VespaClient:
     _VESPA_ERROR_CODE_TO_EXCEPTION = {
-        'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError
+        'INVALID_APPLICATION_PACKAGE': InvalidVespaApplicationError,
+        'ACTIVATION_CONFLICT': VespaActivationConflictError
     }
 
     class _ConvergenceStatus:
@@ -38,8 +40,8 @@ class VespaClient:
             self.converged = converged
 
     def __init__(self, config_url: str, document_url: str, query_url: str,
-                 content_cluster_name: str, default_search_timeout_ms: int = 1000, 
-                 pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10, 
+                 content_cluster_name: str, default_search_timeout_ms: int = 1000,
+                 pool_size: int = 10, feed_pool_size: int = 10, get_pool_size: int = 10,
                  delete_pool_size: int = 10, partial_update_pool_size: int = 10):
         """
         Create a VespaClient object.
@@ -92,6 +94,24 @@ class VespaClient:
 
         self._raise_for_status(response)
 
+    def create_deployment_session(self) -> Tuple[str, str]:
+        """
+        Create a Vespa deployment session.
+        Returns:
+            Tuple[str, str]:
+             - content_base_url is the base url for contents in this session
+             - prepare_url is the url for prepare this session
+
+        Please note that the session created is local in one config server and will be replicated to multiple servers
+        via Zookeeper. Following requests should use content_base_url and prepare_url to make sure it can hit the right
+        config server that this session is created on.
+        """
+        self.check_for_application_convergence()
+        res = self._create_deploy_session(self.http_client)
+        content_base_url = res['content']
+        prepare_url = res['prepared']
+        return content_base_url, prepare_url
+
     def download_application(self, check_for_application_convergence: bool = False) -> str:
         """
         Args:
@@ -119,7 +139,7 @@ class VespaClient:
             self.check_for_application_convergence()
 
         with httpx.Client() as httpx_client:
-            session_id = self._create_deploy_session(httpx_client)
+            session_id = self._create_deploy_session(httpx_client)['session-id']
             return self._download_application(session_id, httpx_client)
 
     def check_for_application_convergence(self) -> None:
@@ -524,6 +544,33 @@ class VespaClient:
 
         return ApplicationMetrics(**resp.json())
 
+    def get_index_setting_by_name(self, index_name: str) -> Optional[MarqoIndex]:
+        try:
+            resp = self.http_client.get(f'{self.document_url}/index-settings/{index_name}')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        if resp.status_code == 404:
+            return None
+
+        self._raise_for_status(resp)
+
+        return MarqoIndex.parse_obj(resp.json())
+
+    def get_all_index_settings(self) -> List[MarqoIndex]:
+        try:
+            resp = self.http_client.get(f'{self.document_url}/index-settings')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        index_list = resp.json()
+        if isinstance(index_list, list):
+            return [MarqoIndex.parse_obj(item) for item in index_list]
+
+        raise VespaError(f'Get all index settings returns invalid response: {index_list}')
+
     def _add_query_params(self, url: str, query_params: Dict[str, str]) -> str:
         if not query_params:
             return url
@@ -546,7 +593,7 @@ class VespaClient:
         byte_stream.seek(0)
         return byte_stream
 
-    def _create_deploy_session(self, httpx_client: httpx.Client) -> int:
+    def _create_deploy_session(self, httpx_client: httpx.Client) -> Dict:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session?from=' \
                    f'{self.config_url}/application/v2/tenant/default/application/default/environment' \
                    f'/default/region/default/instance/default'
@@ -555,7 +602,74 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-        return response.json()['session-id']
+        return response.json()
+
+    def get_content_url(self, content_base_url: str, *paths: str) -> str:
+        return f'{content_base_url}{"/".join(paths)}'
+
+    def list_contents(self, content_base_url: str) -> List[str]:
+        endpoint = f'{content_base_url}?recursive=true'
+
+        response = self.http_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.json()
+
+    def get_text_content(self, content_base_url: str, *path: str) -> str:
+        endpoint = f'{content_base_url}{"/".join(path)}'
+
+        response = self.http_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.text
+
+    def get_binary_content(self, content_base_url: str, *path: str) -> bytes:
+        endpoint = f'{content_base_url}{"/".join(path)}'
+
+        response = self.http_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.content
+
+    def put_content(self, content_base_url: str, content: Union[str, bytes], *path: str) -> None:
+        endpoint = f'{content_base_url}{"/".join(path)}'
+
+        response = self.http_client.put(endpoint, content=content)
+
+        self._raise_for_status(response)
+
+    def delete_content(self, content_base_url: str, *path: str) -> None:
+        endpoint = f'{content_base_url}{"/".join(path)}'
+
+        response = self.http_client.delete(endpoint)
+
+        self._raise_for_status(response)
+
+    def prepare(self, prepare_url: str, timeout: int):
+        response = self.http_client.put(prepare_url, timeout=timeout)
+
+        self._raise_for_status(response)
+
+        return response.json()
+
+    def activate(self, activate_url: str, timeout: int):
+        response = self.http_client.put(activate_url, timeout=timeout)
+
+        self._raise_for_status(response)
+
+        return response.json()
+
+    def get_vespa_version(self) -> str:
+        endpoint = f'{self.config_url}/state/v1/version'
+
+        response = self.http_client.get(endpoint)
+
+        self._raise_for_status(response)
+
+        return response.json()['version']
 
     def _download_application(self, session_id: int, httpx_client: httpx.Client) -> str:
         endpoint = f'{self.config_url}/application/v2/tenant/default/session/{session_id}/content/?recursive=true'
