@@ -1,17 +1,10 @@
 import os.path
-
-import PIL
-from marqo.s2_inference import random_utils, s2_inference
-from marqo.s2_inference.s2_inference import get_available_models
 import unittest
-from unittest import mock
-from marqo.api.exceptions import ConfigurationError, InternalError
-from marqo.tensor_search.enums import AvailableModelsKey
-from marqo.s2_inference.multimodal_model_load import Modality
-import datetime
-from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+
 from pytest import mark
+
 from marqo.s2_inference.errors import MediaDownloadError
+from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 
 
 class TestVideoFFmpegDecode(unittest.TestCase):
@@ -47,7 +40,7 @@ class TestVideoFFmpegDecode(unittest.TestCase):
         self.assertIn("404", str(e.exception))
 
     @mark.cpu_only
-    def test_video_decode_cpu_works(self):
+    def test_video_decode_gpu_does_not_work(self):
         valid_url = "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
         start_time = 0
         duration = 1
