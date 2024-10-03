@@ -6,7 +6,6 @@ import subprocess
 # for multimodal processing
 import tempfile
 import time
-from typing import List, Dict, Union, Any
 
 import ffmpeg
 import torch
@@ -14,9 +13,9 @@ import torch
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.errors import MediaDownloadError
 from marqo.s2_inference.multimodal_model_load import Modality
-from marqo.tensor_search.models.preprocessors_model import Preprocessors
-from marqo.tensor_search import index_meta_cache, utils
+from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 class StreamingMediaProcessor:
