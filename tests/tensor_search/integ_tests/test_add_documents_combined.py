@@ -869,6 +869,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         for doc in get_documents_results]
 
             def all_embeddings(get_documents_results: list) -> Dict[str, List[float]]:
+                """Extract embeddings from _tensor_facet in to a map {docid_field: embedding}"""
                 embeddings_map = {}
                 for doc in get_documents_results:
                     for field in doc['_tensor_facets']:
@@ -885,7 +886,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
             self.assertSetEqual(set(result1_embeddings.keys()), set(result2_embeddings.keys()),
                                 msg=f'{msg}: tensor fields differ')
             for key in result1_embeddings.keys():
-                self.assertTrue(np.allclose(result1_embeddings[key], result2_embeddings[key]),
+                # assert two embeddings are close enough: abs(a - b) < 1e-5 * abs(b) + 1e-6
+                self.assertTrue(np.allclose(result1_embeddings[key], result2_embeddings[key], atol=1e-6),
                                 msg=f'{msg}: embeddings for {key} differ, '
                                     f'result1: {result1_embeddings[key]} '
                                     f'result2: {result2_embeddings[key]}')
