@@ -1,8 +1,6 @@
 import os
 from unittest import mock
 
-from annotated_types import test_cases
-
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
