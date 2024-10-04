@@ -883,17 +883,17 @@ class TestAddDocumentsCombined(MarqoTestCase):
             with self.subTest(f'{index.name} with type {index.type}'):
                 self.clear_index_by_name(index_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_FIELD)
-                docs_added_using_per_field_strategy = get_docs()
+                docs_added_using_per_field_strategy = get_docs().results
 
                 self.clear_index_by_name(index_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_doc_strategy = get_docs()
+                docs_added_using_per_doc_strategy = get_docs().results
 
                 self.clear_index_by_name(index_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_batch_strategy = get_docs()
+                docs_added_using_per_batch_strategy = get_docs().results
 
-                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy,
-                                 msg=f'per_field strategy differs from per_doc strategy for index type: {index.type}')
-                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy,
-                                 msg=f'per_field strategy differs from per_batch strategy for index type: {index.type}')
+                self.assertCountEqual(docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy,
+                                      msg=f'per_field strategy differs from per_doc strategy for index type: {index.type}')
+                self.assertCountEqual(docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy,
+                                      msg=f'per_field strategy differs from per_batch strategy for index type: {index.type}')

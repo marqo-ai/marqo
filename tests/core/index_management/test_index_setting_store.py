@@ -104,7 +104,7 @@ class TestIndexSettingStore(MarqoTestCase):
         with self.assertRaises(OperationConflictError) as e:
             store.save_index_setting(updated_index)
 
-        self.assertIn("Current version 1, new version 1", str(e.exception))
+        self.assertIn("Current version is 1, and cannot be upgraded to target version 1", str(e.exception))
 
     def test_delete_index_should_succeed(self):
         index = self._get_index(version=1)
