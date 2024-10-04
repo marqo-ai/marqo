@@ -2,16 +2,19 @@ import os
 import uuid
 from unittest import mock
 from unittest.mock import patch
+
+import numpy as np
 import pytest
 
 
 import PIL
 import requests
 import torch
+from more_itertools import flatten
 from torch import Tensor
 import unittest.mock
 
-
+from marqo.core.models.marqo_get_documents_by_id_response import MarqoGetDocumentsByIdsResponse
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference import types
@@ -842,7 +845,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
         modality = infer_modality(image_url_no_extension)
         self.assertEqual(modality, streaming_media_processor.Modality.IMAGE)
 
-    @unittest.skip("The embeddings are slightly different when running in GH pipeline, will investigate")
     def test_different_batching_strategy_adds_the_same_documents(self):
         test_docs = [
             {
@@ -858,6 +860,35 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 "_id": "2"
             }
         ]
+
+        def assert_get_documents_response_equals(result1: MarqoGetDocumentsByIdsResponse,
+                                                 result2: MarqoGetDocumentsByIdsResponse,
+                                                 msg: str):
+            def remove_tensor_facets(get_documents_results: list):
+                return [{key: value for key, value in doc.items() if key != '_tensor_facets'}
+                        for doc in get_documents_results]
+
+            def all_embeddings(get_documents_results: list) -> Dict[str, List[float]]:
+                embeddings_map = {}
+                for doc in get_documents_results:
+                    for field in doc['_tensor_facets']:
+                        for key, value in field.items():
+                            if key != '_embedding':
+                                embeddings_map[f'{doc["_id"]}_{key}'] = field['_embedding']
+                return embeddings_map
+
+            self.assertListEqual(remove_tensor_facets(result1.results), remove_tensor_facets(result2.results),
+                                 msg=f'{msg}: documents differ')
+
+            result1_embeddings = all_embeddings(result1.results)
+            result2_embeddings = all_embeddings(result2.results)
+            self.assertSetEqual(set(result1_embeddings.keys()), set(result2_embeddings.keys()),
+                                msg=f'{msg}: tensor fields differ')
+            for key in result1_embeddings.keys():
+                self.assertTrue(np.allclose(result1_embeddings[key], result2_embeddings[key]),
+                                msg=f'{msg}: embeddings for {key} differ, '
+                                    f'result1: {result1_embeddings[key]} '
+                                    f'result2: {result2_embeddings[key]}')
 
         for index in self.image_indexes:
             tensor_fields = ["image_field_1", "text_field_1", "text_field_2"] \
@@ -884,17 +915,19 @@ class TestAddDocumentsCombined(MarqoTestCase):
             with self.subTest(f'{index.name} with type {index.type}'):
                 self.clear_index_by_name(index_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_FIELD)
-                docs_added_using_per_field_strategy = get_docs().results
+                docs_added_using_per_field_strategy = get_docs()
 
                 self.clear_index_by_name(index_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_doc_strategy = get_docs().results
+                docs_added_using_per_doc_strategy = get_docs()
 
                 self.clear_index_by_name(index_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
-                docs_added_using_per_batch_strategy = get_docs().results
+                docs_added_using_per_batch_strategy = get_docs()
 
-                self.assertCountEqual(docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy,
-                                      msg=f'per_field strategy differs from per_doc strategy for index type: {index.type}')
-                self.assertCountEqual(docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy,
-                                      msg=f'per_field strategy differs from per_batch strategy for index type: {index.type}')
+                assert_get_documents_response_equals(
+                    docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy,
+                    msg=f'per_field strategy differs from per_doc strategy for index type: {index.type}')
+                assert_get_documents_response_equals(
+                    docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy,
+                    msg=f'per_field strategy differs from per_batch strategy for index type: {index.type}')
