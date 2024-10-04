@@ -84,7 +84,7 @@ class MarqoTestCase(unittest.TestCase):
         return indexes
 
     @classmethod
-    def add_documents(cls, *args, **kwargs):
+    def add_documents_and_refresh_index(cls, *args, **kwargs):
         index_name = kwargs['add_docs_params'].index_name
         result = tensor_search.add_documents(*args, **kwargs)
         index_meta_cache.get_index(config=cls.config, index_name=index_name, force_refresh=True)

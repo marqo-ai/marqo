@@ -113,7 +113,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
 
     def test_after_downloading_auth_doesnt_matter(self):
         """on this instance, at least"""
-        res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        res = self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, auto_refresh=True, docs=[{'c': 'd'}], device=self.device
         ))
         assert not res['errors']
@@ -123,7 +123,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         tensor_search.eject_model(model_name=self.custom_model_name, device=self.device)
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
-            res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            res = self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True, docs=[{'c': 'd'}],
                 device=self.device
             ))

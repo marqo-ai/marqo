@@ -1242,7 +1242,7 @@ def _determine_thread_count(marqo_index, add_docs_params):
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name, force_refresh=True)
+    marqo_index = _get_latest_index(config, index_name)
 
     try:
         res = config.vespa_client.get_document(document_id, marqo_index.schema_name)
@@ -1297,7 +1297,7 @@ def _get_marqo_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return []
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name, force_refresh=True)
+    marqo_index = _get_latest_index(config, index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -1351,7 +1351,7 @@ def get_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name, force_refresh=True)
+    marqo_index = _get_latest_index(config, index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -1396,6 +1396,19 @@ def get_documents_by_ids(
         errors = True
 
     return MarqoGetDocumentsByIdsResponse(errors=errors, results=results)
+
+
+def _get_latest_index(config: Config, index_name: str) -> MarqoIndex:
+    """
+    Get index from the cache first. If index is semi-structured, get the latest setting bypassing the cache
+    This approach makes sure we don't add extra latency to structured indexes or legacy unstructured indexes since they
+    never change. It also makes sure we always get the latest version of semi-structured index to guarantee the strong
+    consistency.
+    """
+    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    if marqo_index.type == IndexType.SemiStructured:
+        return config.index_management.get_index(index_name=index_name)
+    return marqo_index
 
 
 def _get_id_from_vespa_id(vespa_id: str) -> str:

@@ -901,7 +901,7 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                                                               docs=[{"Title": "a " + (
                                                                   " ".join(random.choices(population=vocab, k=25)))}

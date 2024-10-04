@@ -57,7 +57,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.device_patcher.stop()
 
     def _add_and_get_doc(self, index_name: str, doc_id: str, tensor_fields: List[str], use_existing_tensors=False):
-        add_doc_result = self.add_documents(
+        add_doc_result = self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=index_name,
                 docs=[{
@@ -133,7 +133,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.assertEqual(1, len(res['hits']))
 
     def test_add_documents_should_add_custom_vector_field_content_as_lexical_fields(self):
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.text_index_3,
                 docs=[{
@@ -162,7 +162,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.assertIn('marqo__lexical_custom_vector_field', updated_index.lexical_field_map.keys())
 
     def test_add_documents_should_add_image_field_as_lexical_fields(self):
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.image_index_with_chunking,
                 docs=[{
@@ -187,7 +187,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.assertIn('marqo__lexical_image_field', updated_index.lexical_field_map.keys())
 
     def test_add_documents_should_add_multimodal_subfield_as_lexical_fields(self):
-        add_doc_result = self.add_documents(
+        add_doc_result = self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.text_index_4,
                 docs=[{
@@ -228,7 +228,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
     def test_add_documents_should_allow_the_same_field_to_have_different_types_in_different_batches(self):
         # batch 1: tensor field is a combo field
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{
@@ -245,7 +245,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
         # batch 2: tensor field is a custom vector field
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{
@@ -263,7 +263,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
         # batch 3: tensor field is a text field
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{
@@ -274,7 +274,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
         # batch 4: same field name is used as a non-tensor field
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{

@@ -72,9 +72,9 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "content 2. blah blah blah"
             }]
 
-        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=docs, device="cpu")
-        )
+                                             )
 
         # test if we can get the document by _id
         assert tensor_search.get_document_by_id(
@@ -93,7 +93,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "test again test again test again"
             }]
 
-        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=docs2, device="cpu"))
 
         assert tensor_search.get_document_by_id(
@@ -138,7 +138,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "content 2. blah blah blah"
             }]
 
-        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_2, docs=docs, device="cpu"
         ))
 
@@ -157,7 +157,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "test again test again test again"
             }]
 
-        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_2, docs=docs2, device="cpu"))
 
         assert tensor_search.get_document_by_id(
@@ -205,7 +205,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "content 2. blah blah blah"
             }]
 
-        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=docs, device="cpu"))
 
         assert tensor_search.get_document_by_id(
@@ -223,7 +223,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "test again test again test again"
             }]
 
-        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=docs2, device="cpu"))
 
         assert tensor_search.get_document_by_id(
@@ -326,7 +326,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "image" : TestImageUrls.COCO.value
             }]
 
-        self.add_documents(config=config, add_docs_params=AddDocsParams(
+        self.add_documents_and_refresh_index(config=config, add_docs_params=AddDocsParams(
             index_name=index_name, docs=docs, device="cpu"))
 
 

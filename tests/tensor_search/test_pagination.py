@@ -113,7 +113,7 @@ class TestPagination(MarqoTestCase):
                            'desc': 'my description'}
                     docs.append(doc)
 
-                r = self.add_documents(
+                r = self.add_documents_and_refresh_index(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
                                                   # Add docs with increasing title word count, so each will have unique tensor and lexical scores
@@ -171,7 +171,7 @@ class TestPagination(MarqoTestCase):
                            "title": title,
                            'desc': 'my description'}
                     docs.append(doc)
-                r = self.add_documents(
+                r = self.add_documents_and_refresh_index(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
                                                   docs=docs,
@@ -235,7 +235,7 @@ class TestPagination(MarqoTestCase):
         for index in [self.index_structured, self.index_unstructured]:
             with self.subTest(index=type(index)):
                 # Add documents
-                add_docs_res = self.add_documents(
+                add_docs_res = self.add_documents_and_refresh_index(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -340,7 +340,7 @@ class TestPagination(MarqoTestCase):
         with mock.patch.object(utils, 'read_env_vars_and_defaults', new=read_var):
             for index in [self.index_structured, self.index_unstructured]:
                 for _ in range(0, num_docs, batch_size):
-                    r = self.add_documents(
+                    r = self.add_documents_and_refresh_index(
                         config=self.config,
                         add_docs_params=AddDocsParams(index_name=index.name,
                                                       docs=[{"title": 'my title', 'desc': 'my title'} for i in
@@ -561,7 +561,7 @@ class TestPagination(MarqoTestCase):
         d1 = {"title": "Marqo", "some doc 2": "some other thing", "_id": "abcdef"}
         d2 = {"some doc 1": "some 2 jnkerkbj", "field abc": "extravagant robodog is not a cat", "_id": "Jupyter_12"}
 
-        self.add_documents(
+        self.add_documents_and_refresh_index(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True,
                 docs=[d0, d1, d2], device="cpu")

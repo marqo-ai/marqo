@@ -115,7 +115,7 @@ class TestSearchRegression(MarqoTestCase):
                     docs_with_same_bm25_score.append(("doc7", "doc11"))
 
                 # Add documents
-                self.add_documents(
+                self.add_documents_and_refresh_index(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -163,7 +163,7 @@ class TestSearchRegression(MarqoTestCase):
         for index in [self.structured_text_index_score_modifiers, self.unstructured_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                self.add_documents(
+                self.add_documents_and_refresh_index(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
