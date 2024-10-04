@@ -879,6 +879,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     show_vectors=True
                 )
 
+            self.maxDiff = None  # allow output all diffs
             with self.subTest(f'{index.name} with type {index.type}'):
                 self.clear_index_by_name(index_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_FIELD)
@@ -892,5 +893,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
                 docs_added_using_per_batch_strategy = get_docs()
 
-                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy)
-                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy)
+                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_doc_strategy,
+                                 msg=f'per_field strategy differs from per_doc strategy for index type: {index.type}')
+                self.assertEqual(docs_added_using_per_field_strategy, docs_added_using_per_batch_strategy,
+                                 msg=f'per_field strategy differs from per_batch strategy for index type: {index.type}')
