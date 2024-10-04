@@ -193,7 +193,9 @@ class IndexSettingStore:
             current_version = self._index_settings[name].version
             if current_version + 1 != target_version:
                 raise OperationConflictError(f'Conflict in version detected while saving index {name}. '
-                                             f'Current version {current_version}, new version {target_version}.')
+                                             f'Current version is {current_version}, and cannot be upgraded to '
+                                             f'target version {target_version}. Some other request might have changed '
+                                             f'the index. Please try again. ')
             self._move_to_history(name)
         else:
             if target_version != 1:

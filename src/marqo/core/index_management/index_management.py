@@ -192,18 +192,23 @@ class IndexManagement:
             marqo_index: Index to update, only SemiStructuredMarqoIndex is supported
         Raises:
             IndexNotFoundError: If an index does not exist
+            InternalError: If the index is not a SemiStructuredMarqoIndex.
             RuntimeError: If deployment lock is not instantiated
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
+        if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            # This is just a sanity check, it should not happen since we do not expose this method to end user.
+            raise InternalError(f'Index {marqo_index.name} can not be updated.')
+
         with self._vespa_deployment_lock():
             schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
 
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
-        Get all Marqo indexes storing in _MARQO_SETTINGS_SCHEMA_NAME schema (used prior to Marqo v2.12.0).
-        This method is now only used to retrieve the existing indexes for bootstrapping from v2.12.0
+        Get all Marqo indexes storing in _MARQO_SETTINGS_SCHEMA_NAME schema (used prior to Marqo v2.13.0).
+        This method is now only used to retrieve the existing indexes for bootstrapping from v2.13.0
 
         Returns:
             List of Marqo indexes
