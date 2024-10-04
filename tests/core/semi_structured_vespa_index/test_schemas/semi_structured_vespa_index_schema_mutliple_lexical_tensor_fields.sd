@@ -134,7 +134,7 @@ schema marqo__test_00semi_00structured_00schema {
         }
 
         function lexical_score_avg() {
-            expression: 0
+            expression: if(query(marqo__lexical_text_field1) > 0, bm25(marqo__lexical_text_field1), 0) + if(query(marqo__lexical_text_field2) > 0, bm25(marqo__lexical_text_field2), 0) / min(1, if(query(marqo__lexical_text_field1) > 0, 1, 0) + if(query(marqo__lexical_text_field2) > 0, 1, 0))
         }
 
         function lexical_score_max() {

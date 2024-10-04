@@ -1,10 +1,8 @@
 import os
-import unittest
 from typing import cast
 
 from marqo.core.models.marqo_index import *
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
-from marqo.tensor_search.models.index_settings import *
 from tests.marqo_test import MarqoTestCase
 
 

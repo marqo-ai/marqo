@@ -150,9 +150,12 @@ schema {{ index.schema_name }} {
             expression: {{ sum_score(lexical_score, index.lexical_fields) }}
         }
 
+        {% macro count_lexical_fields() -%}
+            {%- set add = joiner(" + ") -%}
+            {%- for field in index.lexical_fields -%}{{ add() }}if(query({{ field.lexical_field_name }}) > 0, 1, 0){%- endfor -%}
+        {% endmacro -%}
         function lexical_score_avg() {
-            {# TODO calculate average lexical score -#}
-            expression: 0
+            expression: {{ sum_score(lexical_score, index.lexical_fields) }} / min(1, {{ count_lexical_fields() }})
         }
 
         function lexical_score_max() {
