@@ -247,7 +247,7 @@ class StructuredVespaSchema(VespaSchema):
             lexical_fields
         ])
         bm25_avg_denominator_sum = ' + '.join([f'bm25({field.lexical_field_name})' for field in lexical_fields])
-        bm25_avg_expression = (f'({bm25_sum_expression}) / min(1, ' +
+        bm25_avg_expression = (f'({bm25_sum_expression}) / max(1, ' +
                                ' + '.join([f'if (query({field.lexical_field_name}) > 0, 1, 0)'
                                            for field in lexical_fields]) + ')')
         bm25_max_expression = self._generate_max_bm25_expression(list(lexical_fields))

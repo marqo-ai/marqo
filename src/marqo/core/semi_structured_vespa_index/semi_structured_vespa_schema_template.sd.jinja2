@@ -133,11 +133,11 @@ schema {{ index.schema_name }} {
         {% endmacro -%}
 
         {% macro lexical_score(field) -%}
-            if(query({{ field.lexical_field_name }}) > 0, bm25({{ field.lexical_field_name }}), 0)
+            if (query({{ field.lexical_field_name }}) > 0, bm25({{ field.lexical_field_name }}), 0)
         {%- endmacro -%}
 
         {% macro embedding_score(field) -%}
-            if(query({{ field.embeddings_field_name }}) > 0, closeness(field, {{ field.embeddings_field_name }}), 0)
+            if (query({{ field.embeddings_field_name }}) > 0, closeness(field, {{ field.embeddings_field_name }}), 0)
         {%- endmacro -%}
 
         {% macro sum_score(score_macro, fields) -%}
@@ -152,10 +152,10 @@ schema {{ index.schema_name }} {
 
         {% macro count_lexical_fields() -%}
             {%- set add = joiner(" + ") -%}
-            {%- for field in index.lexical_fields -%}{{ add() }}if(query({{ field.lexical_field_name }}) > 0, 1, 0){%- endfor -%}
+            {%- for field in index.lexical_fields -%}{{ add() }}if (query({{ field.lexical_field_name }}) > 0, 1, 0){%- endfor -%}
         {% endmacro -%}
         function lexical_score_avg() {
-            expression: {{ sum_score(lexical_score, index.lexical_fields) }} / min(1, {{ count_lexical_fields() }})
+            expression: ({{ sum_score(lexical_score, index.lexical_fields) }}) / max(1, {{ count_lexical_fields() }})
         }
 
         function lexical_score_max() {

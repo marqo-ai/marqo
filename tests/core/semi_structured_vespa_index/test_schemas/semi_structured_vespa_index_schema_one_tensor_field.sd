@@ -97,7 +97,7 @@ schema marqo__test_00semi_00structured_00schema {
         }
 
         function embedding_score() {
-            expression: if(query(marqo__embeddings_tensor_field) > 0, closeness(field, marqo__embeddings_tensor_field), 0)
+            expression: if (query(marqo__embeddings_tensor_field) > 0, closeness(field, marqo__embeddings_tensor_field), 0)
         }
     }
 
