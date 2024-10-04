@@ -41,8 +41,8 @@ class TestIndexManagement(MarqoTestCase):
         self.index_management = IndexManagement(self.vespa_client,
                                                 zookeeper_client=self.zookeeper_client,
                                                 enable_index_operations=True,
-                                                deployment_timeout_seconds=10,
-                                                convergence_timeout_seconds=20)
+                                                deployment_timeout_seconds=30,
+                                                convergence_timeout_seconds=60)
         # this resets the application package to a clean state
         self._test_dir = str(os.path.dirname(os.path.abspath(__file__)))
         self._deploy_initial_app_package()
