@@ -105,3 +105,7 @@ class AddDocumentsError(Exception):
 
 class DuplicateDocumentError(AddDocumentsError):
     pass
+
+
+class TooManyFieldsError(MarqoError):
+    pass

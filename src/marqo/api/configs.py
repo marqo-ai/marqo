@@ -49,5 +49,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_INFERENCE_CACHE_SIZE: 0,
         EnvVars.MARQO_INFERENCE_CACHE_TYPE: "LRU",
         EnvVars.MARQO_BEST_AVAILABLE_DEVICE: "cpu",      # on_start_script will determine this.
+        EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED: 100,
+        EnvVars.MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED: 100,
         EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT: 15,
     }

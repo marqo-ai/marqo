@@ -245,7 +245,7 @@ class TensorFieldContent(BaseModel):
     embeddings: Optional[List[List[float]]] = []
 
     # metadata fields
-    is_tensor_field: bool
+    is_tensor_field: bool  # whether this is a toplevel tensor field
     is_multimodal_subfield: bool = False
     is_resolved: bool = False
     tensor_field_chunk_count: int = 0

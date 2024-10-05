@@ -1,10 +1,13 @@
 import os
+import threading
+import time
 from typing import cast, List
 from unittest import mock
 
+from marqo.core.exceptions import TooManyFieldsError, OperationConflictError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model, ImagePreProcessing, PatchMethod, SemiStructuredMarqoIndex
-from marqo.tensor_search import tensor_search
+from marqo.tensor_search import tensor_search, index_meta_cache
 from marqo.tensor_search.enums import SearchMethod
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 
@@ -24,6 +27,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         text_index_5 = cls.unstructured_marqo_index_request()
 
+        text_index_6 = cls.unstructured_marqo_index_request()
+
         image_index_with_chunking = cls.unstructured_marqo_index_request(
             model=Model(name='ViT-B/32'),
             image_preprocessing=ImagePreProcessing(patch_method=PatchMethod.Frcnn),
@@ -36,6 +41,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             text_index_3,
             text_index_4,
             text_index_5,
+            text_index_6,
             image_index_with_chunking,
         ])
 
@@ -44,6 +50,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         cls.text_index_3 = text_index_3.name
         cls.text_index_4 = text_index_4.name
         cls.text_index_5 = text_index_5.name
+        cls.text_index_6 = text_index_6.name
         cls.image_index_with_chunking = image_index_with_chunking.name
 
     def setUp(self) -> None:
@@ -228,8 +235,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
     def test_add_documents_should_allow_the_same_field_to_have_different_types_in_different_batches(self):
         # batch 1: tensor field is a combo field
-        self.add_documents_and_refresh_index(
-            config=self.config, add_docs_params=AddDocsParams(
+        self.config.document.add_documents(
+            AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{
                     "_id": "1",
@@ -245,8 +252,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
         # batch 2: tensor field is a custom vector field
-        self.add_documents_and_refresh_index(
-            config=self.config, add_docs_params=AddDocsParams(
+        self.config.document.add_documents(
+            AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{
                     "_id": "2",
@@ -263,8 +270,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
         # batch 3: tensor field is a text field
-        self.add_documents_and_refresh_index(
-            config=self.config, add_docs_params=AddDocsParams(
+        self.config.document.add_documents(
+            AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{
                     "_id": "3",
@@ -274,8 +281,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             )
         )
         # batch 4: same field name is used as a non-tensor field
-        self.add_documents_and_refresh_index(
-            config=self.config, add_docs_params=AddDocsParams(
+        self.config.document.add_documents(
+            AddDocsParams(
                 index_name=self.text_index_5,
                 docs=[{
                     "_id": "4",
@@ -285,6 +292,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 device="cpu", tensor_fields=["title"],
             )
         )
+
+        index_meta_cache.get_index(config=self.config, index_name=self.text_index_5, force_refresh=True)
 
         res = tensor_search.search(
             text="content", search_method=SearchMethod.TENSOR,
@@ -301,3 +310,55 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         # only the last 2 should return in a lexical search since nothing is indexed as universal_tensor_field
         # lexical field for doc 1
         self.assertEqual({'2', '3'}, {hit['_id'] for hit in res['hits']})
+
+    def test_add_documents_should_raise_error_when_field_count_exceeds_limit(self):
+        with mock.patch.dict(os.environ, {"MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED": "6",
+                                          "MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED": "5"}):
+            self.config.document.add_documents(
+                AddDocsParams(
+                    index_name=self.text_index_6,
+                    docs=[{
+                        "_id": "1",
+                        "tensor_field1": "content 1",  # tensor fields are also lexical fields
+                        "tensor_field2": "content 2",
+                        "tensor_field3": "content 3",
+                        "tensor_field4": "content 4",
+                        "tensor_field5": "content 5",
+                    }],
+                    device="cpu", tensor_fields=[
+                        "tensor_field1",
+                        "tensor_field2",
+                        "tensor_field3",
+                        "tensor_field4",
+                        "tensor_field5",
+                    ],
+                )
+            )
+
+            with self.assertRaises(TooManyFieldsError) as err:
+                self.config.document.add_documents(AddDocsParams(
+                    index_name=self.text_index_6,
+                    docs=[{
+                        "_id": "2", "tensor_field6": "content 6"
+                    }],
+                    tensor_fields=["tensor_field6"])
+                )
+            self.assertIn('has 5 tensor fields. Your request to add tensor_field6 as a tensor field is '
+                          'rejected since it exceeds the limit of 5. Please set a larger limit in '
+                          'MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err.exception))
+
+            with self.assertRaises(TooManyFieldsError) as err2:
+                self.config.document.add_documents(AddDocsParams(
+                    index_name=self.text_index_6,
+                    docs=[{
+                        "_id": "3",
+                        "tensor_field1": "content 1",
+                        "lexical_field6": "content 6",
+                        "lexical_field7": "content 7",
+                    }],
+                    tensor_fields=["tensor_field1"])
+                )
+            self.assertIn('has 6 lexical fields. Your request to add lexical_field7 as a lexical field is '
+                          'rejected since it exceeds the limit of 6. Please set a larger limit in '
+                          'MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err2.exception))
+
