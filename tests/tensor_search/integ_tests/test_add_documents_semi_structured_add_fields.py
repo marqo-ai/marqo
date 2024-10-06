@@ -1,10 +1,8 @@
 import os
-import threading
-import time
 from typing import cast, List
 from unittest import mock
 
-from marqo.core.exceptions import TooManyFieldsError, OperationConflictError
+from marqo.core.exceptions import TooManyFieldsError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model, ImagePreProcessing, PatchMethod, SemiStructuredMarqoIndex
 from marqo.tensor_search import tensor_search, index_meta_cache

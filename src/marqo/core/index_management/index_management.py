@@ -6,7 +6,7 @@ import semver
 
 import marqo.logging
 import marqo.vespa.vespa_client
-from marqo import version
+from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
 from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
@@ -28,6 +28,7 @@ logger = marqo.logging.get_logger(__name__)
 
 class IndexManagement:
     _MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES = semver.VersionInfo.parse('8.382.22')
+    _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse('8.396.18')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
 
@@ -273,6 +274,16 @@ class IndexManagement:
             The VespaApplicationPackage instance we can use to do bootstrapping/rollback and any index operations.
         """
         vespa_version = semver.VersionInfo.parse(self.vespa_client.get_vespa_version())
+        if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION:
+            # Please note that this warning message will only be logged out for OS users running Marqo on external
+            # Vespa servers with version prior to 8.396.18. This will be displayed when Marqo starts up and before
+            # each index CUD operation
+            logger.warning(f'You may encounter slowness when creating a Marqo index or adding documents to indexes '
+                           f'with the current Vespa version {vespa_version}. To improve the performance, please upgrade '
+                           f'Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
+                           f'higher and set the VESPA_FILE_DOWNLOAD_BACKOFF_INITIAL_TIME_MS environment variable to '
+                           f'a small value, such as 200. Please see {marqo_docs.troubleshooting()} for more details.')
+
         if need_binary_file_support and vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
             # Binary files are only supported using VespaApplicationFileStore prior to Vespa version 8.382.22
             application_package_store = VespaApplicationFileStore(
