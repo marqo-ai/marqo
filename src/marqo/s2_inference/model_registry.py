@@ -1,5 +1,6 @@
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
+from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
     get_multilingual_clip_properties
+from marqo.core.inference.models.open_clip_model import OPEN_CLIP
 from marqo.core.inference.models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.s2_inference.random_utils import Random

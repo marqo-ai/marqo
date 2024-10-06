@@ -205,7 +205,7 @@ def _lies_between(offset_tuple, offset):
 
 def _find_end_character_mapping(offset_mapping, offset):
     """assumes sorted offset_mapping. unless this was modified 
-       this will be the default from the tokenizer
+       this will be the default from the _tokenizer
     """
     # if the max length is bigger we just return the last index
     if offset >= max(offset_mapping[-1]):

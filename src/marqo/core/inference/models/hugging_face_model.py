@@ -16,15 +16,7 @@ from marqo.core.inference.models.hugging_face_model_properties import HuggingFac
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.types import Union, FloatTensor, List
-
-
-def _average_pool_func(model_output, attention_mask):
-    last_hidden = model_output.last_hidden_state.masked_fill(~attention_mask[..., None].bool(), 0.0)
-    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
-
-
-def _cls_pool_func(model_output, attention_mask = None):
-    return model_output[0][:,0]
+from marqo.core.exceptions import InternalError
 
 
 class HuggingFaceModel(AbstractEmbeddingModel):
@@ -33,9 +25,9 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     def __init__(self, model_properties: dict, device: str, model_auth: dict):
         super().__init__(model_properties, device, model_auth)
 
-        self.model = None
-        self.tokenizer = None
-        self.pooling_func = None
+        self._model = None
+        self._tokenizer = None
+        self._pooling_func = None
 
     def _build_model_properties(self, model_properties: dict):
         try:
@@ -45,27 +37,27 @@ class HuggingFaceModel(AbstractEmbeddingModel):
                 from e
 
     def _check_loaded_components(self):
-        if self.model is None:
-            raise RuntimeError("Model is not loaded!")
-        if self.tokenizer is None:
-            raise RuntimeError("Tokenizer is not loaded!")
-        if self.pooling_func is None:
-            raise RuntimeError("Pooling function is not loaded!")
+        if self._model is None:
+            raise InternalError("Model is not loaded!")
+        if self._tokenizer is None:
+            raise InternalError("Tokenizer is not loaded!")
+        if self._pooling_func is None:
+            raise InternalError("Pooling function is not loaded!")
 
     def _load_necessary_components(self):
         if self.model_properties.name:
-            self.model, self.tokenizer = self._load_from_hugging_face_repo()
+            self._model, self._tokenizer = self._load_from_hugging_face_repo()
         elif self.model_properties.url or self.model_properties.model_location:
-            self.model, self.tokenizer = self._load_from_zip_file()
+            self._model, self._tokenizer = self._load_from_zip_file()
         else:
             raise InvalidModelPropertiesError(
                 f"Invalid model properties for the 'hf' model. "
                 f"You do not have the necessary information to load the model. "
                 f"Check {marqo_docs.bring_your_own_model()} for more information."
             )
-        self.model = self.model.to(self.device)
-        self.pooling_func = self._load_pooling_method()
-        self.model.eval()
+        self._model = self._model.to(self.device)
+        self._pooling_func = self._load_pooling_method()
+        self._model.eval()
 
     def _load_from_hugging_face_repo(self) -> Tuple:
         """Load the model from the Hugging Face model hub based on the repo_id."""
@@ -88,7 +80,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             download_dir=ModelCache.hf_cache_path
         )
 
-        model_dir = extract_huggingface_archive(zip_file_path)
+        model_dir = self.extract_huggingface_archive(zip_file_path)
         try:
             model = AutoModel.from_pretrained(model_dir).to(self.device)
             tokenizer = AutoTokenizer.from_pretrained(model_dir)
@@ -102,9 +94,9 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     def _load_pooling_method(self) -> Callable:
         """Load the pooling method for the model."""
         if self.model_properties.pooling_method == PoolingMethod.Mean:
-            return _average_pool_func
+            return self._average_pool_func
         elif self.model_properties.pooling_method == PoolingMethod.CLS:
-            return _cls_pool_func
+            return self._cls_pool_func
         else:
             raise ValueError(f"Invalid pooling method: {self.model_properties.pooling_method}")
 
@@ -112,11 +104,10 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         if isinstance(sentence, str):
             sentence = [sentence]
 
-        if self.model is None:
+        if self._model is None:
             self.load()
 
-        self.model.normalize = normalize
-        tokenized_texts = self.tokenizer(
+        tokenized_texts = self._tokenizer(
             sentence,
             padding=True,
             truncation=True,
@@ -125,11 +116,11 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         ).to(self.device)
 
         with torch.no_grad():
-            model_output = self.model(**tokenized_texts)
+            model_output = self._model(**tokenized_texts)
 
         attention_mask = tokenized_texts['attention_mask']
 
-        embeddings = self.pooling_func(model_output, attention_mask)
+        embeddings = self._pooling_func(model_output, attention_mask)
 
         if normalize:
             embeddings = F.normalize(embeddings, p=2, dim=1)
@@ -142,60 +133,71 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         elif self.device.startswith('cuda'):
             return output.cpu().numpy()
 
-def extract_huggingface_archive(path: str) -> str:
-    '''
+    @staticmethod
+    def _average_pool_func(model_output, attention_mask):
+        """A pooling function that averages the hidden states of the model."""
+        last_hidden = model_output.last_hidden_state.masked_fill(~attention_mask[..., None].bool(), 0.0)
+        return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
 
-        This function takes the path as input. The path can must be a string that can be:
-        1. A downloaded archive file. This function will extract the model from the archive return the directory path.
-        2. A repo_id in huggingface. This function will return the input string directly.
+    @staticmethod
+    def _cls_pool_func(model_output, attention_mask=None):
+        """A pooling function that extracts the CLS token from the model."""
+        return model_output[0][:, 0]
 
-        path: the downloaded model archive path or a repo_id in huggingface
-    Returns:
-        The directory path to the model or the repo_id in huggingface
-    '''
-    if os.path.isfile(path):
-        # if it's a file, check if it's a compressed file
-        base, ext = os.path.splitext(path)
-        if ext in ['.bin', '.pt']:
-            raise InvalidModelPropertiesError(f"Marqo does not support loading Hugging Face SBERT models from the provided single `{ext}` file. "
-                                              "Please try to wrap the model in a Hugging Face archive file and try again. ")
-        try:
-            # create a new directory with the same name as the file
-            new_dir = base
-            os.makedirs(new_dir, exist_ok=True)
+    @staticmethod
+    def extract_huggingface_archive(path: str) -> str:
+        '''
+            This function takes the path as input. The path can must be a string that can be:
+            1. A downloaded archive file. This function will extract the model from the archive return the directory path.
+            2. A repo_id in huggingface. This function will return the input string directly.
 
-            # extract the compressed file
-            # If the target directory already exists, it will be overwritten by default without warning.
-            if ext == '.zip':
-                with zipfile.ZipFile(path, 'r') as zip_ref:
-                    zip_ref.extractall(new_dir)
-            else:
-                with tarfile.open(path, 'r') as tar_ref:
-                    tar_ref.extractall(new_dir)
-            # return the path to the new directory
-            return new_dir
-        except (tarfile.ReadError, zipfile.BadZipfile):
+            path: the downloaded model archive path or a repo_id in huggingface
+        Returns:
+            The directory path to the model or the repo_id in huggingface
+        '''
+        if os.path.isfile(path):
+            # if it's a file, check if it's a compressed file
+            base, ext = os.path.splitext(path)
+            if ext in ['.bin', '.pt']:
+                raise InvalidModelPropertiesError(f"Marqo does not support loading Hugging Face SBERT models from the provided single `{ext}` file. "
+                                                  "Please try to wrap the model in a Hugging Face archive file and try again. ")
             try:
-                os.remove(path)
-            except Exception as remove_e:
-                raise RuntimeError(
-                    f"Marqo encountered an error while attempting to delete a corrupted file `{path}`. "
-                    f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance with "
-                    f"a new one. \n "
-                    f"Error message: `{str(remove_e)}`"
-                )
-            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`.\n '
-                                              f'This is probably because the file is corrupted or the extension `{ext}` is not supported. '
-                                              f'Marqo has removed the corrupted file from the disk.'
-                                              f'Please ensure that the file is a valid compressed file and try again.')
-        # will this error really happen?
-        except PermissionError:
-            raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
-                                              f'This is probably because the Marqo does not have the permission to write to the directory. '
-                                              f'Please check the access permission of Marqo and try again.')
-        except Exception as e:
-            raise RuntimeError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
-                                              f'The original error message is `{str(e)}`')
-    else:
-        # return the directory path or repo_id directory
-        return path
+                # create a new directory with the same name as the file
+                new_dir = base
+                os.makedirs(new_dir, exist_ok=True)
+
+                # extract the compressed file
+                # If the target directory already exists, it will be overwritten by default without warning.
+                if ext == '.zip':
+                    with zipfile.ZipFile(path, 'r') as zip_ref:
+                        zip_ref.extractall(new_dir)
+                else:
+                    with tarfile.open(path, 'r') as tar_ref:
+                        tar_ref.extractall(new_dir)
+                # return the path to the new directory
+                return new_dir
+            except (tarfile.ReadError, zipfile.BadZipfile):
+                try:
+                    os.remove(path)
+                except Exception as remove_e:
+                    raise RuntimeError(
+                        f"Marqo encountered an error while attempting to delete a corrupted file `{path}`. "
+                        f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance with "
+                        f"a new one. \n "
+                        f"Error message: `{str(remove_e)}`"
+                    )
+                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`.\n '
+                                                  f'This is probably because the file is corrupted or the extension `{ext}` is not supported. '
+                                                  f'Marqo has removed the corrupted file from the disk.'
+                                                  f'Please ensure that the file is a valid compressed file and try again.')
+            # will this error really happen?
+            except PermissionError:
+                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
+                                                  f'This is probably because the Marqo does not have the permission to write to the directory. '
+                                                  f'Please check the access permission of Marqo and try again.')
+            except Exception as e:
+                raise RuntimeError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
+                                                  f'The original error message is `{str(e)}`')
+        else:
+            # return the directory path or repo_id directory
+            return path

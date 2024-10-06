@@ -8,7 +8,8 @@ import pytest
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference import clip_utils, types
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
+from marqo.s2_inference.clip_utils import CLIP, FP16_CLIP, MULTILINGUAL_CLIP
+from marqo.core.inference.models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import ImageDownloadError
 from marqo.tensor_search.enums import ModelProperties

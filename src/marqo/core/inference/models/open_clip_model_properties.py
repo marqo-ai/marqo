@@ -34,7 +34,7 @@ class OpenCLIPModelProperties(MarqoBaseModel):
         precision: The precision of the model. It should be either 'fp32' or 'fp16'.
         url: The URL of the model checkpoint. It is optional.
         model_location: The location of the model. It is optional.
-        tokenizer: The name of the tokenizer. It is optional.
+        tokenizer: The name of the _tokenizer. It is optional.
         model_auth: The authentication information for the model. It is optional.
         image_preprocessor: The image preprocessor used by the model. It should be one of the values in the
             ImagePreprocessor enum.

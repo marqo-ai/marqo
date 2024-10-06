@@ -652,7 +652,7 @@ class TestHuggingFaceModel(unittest.TestCase):
     @mock.patch("transformers.AutoModel.from_pretrained", return_value=mock.MagicMock())
     @mock.patch("transformers.AutoTokenizer.from_pretrained", side_effect=OSError("Tokenizer load failed"))
     def test_tokenizer_loading_failure(self, mock_auto_model, mock_auto_tokenizer):
-        """Test that an error is raised when the tokenizer fails to load."""
+        """Test that an error is raised when the _tokenizer fails to load."""
         model_properties = {
             "name": "test-model",
             "type": "hf",
