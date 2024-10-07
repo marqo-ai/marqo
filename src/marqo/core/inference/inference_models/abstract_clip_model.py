@@ -20,7 +20,7 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         model_properties (dict): A dictionary containing additional properties or configurations
             specific to the model. Defaults to an empty dictionary if not provided.
         model: The actual CLIP model instance, initialized to `None` and to be set by subclasses.
-        tokenizer: The _tokenizer associated with the model, initialized to `None` and to be set by subclasses.
+        tokenizer: The tokenizer associated with the model, initialized to `None` and to be set by subclasses.
         preprocess: The preprocessing pipeline for the model, initialized to `None` and to be set by subclasses.
     """
 

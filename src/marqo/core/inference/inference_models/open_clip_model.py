@@ -48,7 +48,7 @@ class OPEN_CLIP(AbstractCLIPModel):
                 from e
 
     def _load_necessary_components(self) -> None:
-        """Load the open_clip model and _tokenizer."""
+        """Load the open_clip model and tokenizer."""
         if self.model_properties.url is not None or self.model_properties.model_location is not None:
             self.model, self.preprocess = self._load_model_and_image_preprocessor_from_checkpoint()
             self.tokenizer = self._load_tokenizer_from_checkpoint()
@@ -205,11 +205,11 @@ class OPEN_CLIP(AbstractCLIPModel):
         return model, preprocess
 
     def _load_tokenizer_from_checkpoint(self) -> Callable:
-        if not self.model_properties._tokenizer:
+        if not self.model_properties.tokenizer:
             return open_clip.get_tokenizer(self.model_properties.name)
         else:
             logger.info(f"Custom HFTokenizer is provided. Loading...")
-            return HFTokenizer(self.model_properties._tokenizer)
+            return HFTokenizer(self.model_properties.tokenizer)
 
     def _load_tokenizer_from_hf_repo(self) -> Callable:
         return open_clip.get_tokenizer(self.model_properties.name)
