@@ -5,6 +5,7 @@ from urllib.error import HTTPError
 
 from tqdm import tqdm
 
+from marqo.core.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import ModelDownloadError, InvalidModelPropertiesError
 from marqo.core.inference.download_model_from_hf import download_model_from_hf
@@ -45,17 +46,19 @@ def download_model(
 
     if url:
         return download_pretrained_from_url(url=url, cache_dir=download_dir)
-
-    if repo_location.s3:
-        download_kwargs = {'location': repo_location.s3, 'download_dir': download_dir}
-        if auth is not None:
-            download_kwargs['auth'] = auth.s3
-        return download_pretrained_from_s3(**download_kwargs)
-    elif repo_location.hf:
-        download_kwargs = {'location': repo_location.hf, 'download_dir': download_dir}
-        if auth is not None:
-            download_kwargs['auth'] = auth.hf
-        return download_model_from_hf(**download_kwargs)
+    if isinstance(repo_location, ModelLocation):
+        if repo_location.s3:
+            download_kwargs = {'location': repo_location.s3, 'download_dir': download_dir}
+            if auth is not None:
+                download_kwargs['auth'] = auth.s3
+            return download_pretrained_from_s3(**download_kwargs)
+        elif repo_location.hf:
+            download_kwargs = {'location': repo_location.hf, 'download_dir': download_dir}
+            if auth is not None:
+                download_kwargs['auth'] = auth.hf
+            return download_model_from_hf(**download_kwargs)
+    else:
+        raise InternalError("Invalid model location object provided.")
 
 
 def download_pretrained_from_s3(
