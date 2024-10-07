@@ -6,7 +6,7 @@ from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.s2_inference.errors import UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
-from marqo.s2_inference.processing.custom_clip_utils import download_pretrained_from_url
+from marqo.core.inference.model_download import download_pretrained_from_s3
 from marqo.s2_inference.s2_inference import clear_loaded_models
 from marqo.s2_inference.s2_inference import (
     vectorise,

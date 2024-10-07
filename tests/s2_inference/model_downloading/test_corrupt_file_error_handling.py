@@ -6,7 +6,7 @@ import pytest
 
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.core.inference.models.hugging_face_model import extract_huggingface_archive
+from marqo.core.inference.models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.s2_inference import _load_model
 
 
@@ -259,11 +259,12 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
             patch("marqo.core.inference.models.hugging_face_model.download_model", return_value="/path/to/file.tar"), \
             patch("transformers.AutoModel.from_pretrained") as mock_model, \
             patch("transformers.AutoTokenizer.from_pretrained") as mock_tokenizer:
-            self.assertEqual(extract_huggingface_archive('/path/to/directory'), '/path/to/directory')
+            self.assertEqual(HuggingFaceModel.extract_huggingface_archive('/path/to/directory'), '/path/to/directory')
 
     def test_hf_repo_id(self):
         with patch('os.path.isfile', return_value=False):
-            self.assertEqual(extract_huggingface_archive('sentence-transformers/all-MiniLM-L6-v2'), 'sentence-transformers/all-MiniLM-L6-v2')
+            self.assertEqual(HuggingFaceModel.extract_huggingface_archive('sentence-transformers/all-MiniLM-L6-v2'),
+            'sentence-transformers/all-MiniLM-L6-v2')
 
     def test_extraction_failure(self):
         with patch('os.path.isfile', return_value=True), \
@@ -272,5 +273,5 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
              patch('zipfile.ZipFile', side_effect=zipfile.BadZipfile), \
              patch('os.remove') as mock_remove:
             with self.assertRaises(InvalidModelPropertiesError):
-                extract_huggingface_archive('/path/to/file.zip')
+                HuggingFaceModel.extract_huggingface_archive('/path/to/file.zip')
             mock_remove.assert_called_once_with('/path/to/file.zip')
