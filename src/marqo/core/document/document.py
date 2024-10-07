@@ -11,7 +11,7 @@ from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, S
     UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
-    SemiStructuredAddDocumentsHandler
+    SemiStructuredAddDocumentsHandler, SemiStructuredFieldCountConfig
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
@@ -31,14 +31,16 @@ class Document:
         self.vespa_client = vespa_client
         self.index_management = index_management
 
-    def add_documents(self, add_docs_params: AddDocsParams) -> MarqoAddDocumentsResponse:
+    def add_documents(self, add_docs_params: AddDocsParams,
+                      field_count_config=SemiStructuredFieldCountConfig()) -> MarqoAddDocumentsResponse:
         marqo_index = self.index_management.get_index(add_docs_params.index_name)
 
         if isinstance(marqo_index, StructuredMarqoIndex):
             add_docs_handler = StructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
         elif isinstance(marqo_index, SemiStructuredMarqoIndex):
             add_docs_handler = SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params,
-                                                                 self.vespa_client, self.index_management)
+                                                                 self.vespa_client, self.index_management,
+                                                                 field_count_config)
         elif isinstance(marqo_index, UnstructuredMarqoIndex):
             add_docs_handler = UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
         else:

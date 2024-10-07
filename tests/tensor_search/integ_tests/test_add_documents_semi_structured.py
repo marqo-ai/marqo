@@ -14,7 +14,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
-class TestAddDocumentsUnstructured(MarqoTestCase):
+class TestAddDocumentsSemiStructured(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()

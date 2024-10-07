@@ -5,12 +5,13 @@ from unittest import mock
 from marqo.core.exceptions import TooManyFieldsError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model, ImagePreProcessing, PatchMethod, SemiStructuredMarqoIndex
+from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import SemiStructuredFieldCountConfig
 from marqo.tensor_search import tensor_search, index_meta_cache
 from marqo.tensor_search.enums import SearchMethod
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
-class TestAddDocumentsSemiStructured(MarqoTestCase):
+class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -310,53 +311,55 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.assertEqual({'2', '3'}, {hit['_id'] for hit in res['hits']})
 
     def test_add_documents_should_raise_error_when_field_count_exceeds_limit(self):
-        with mock.patch.dict(os.environ, {"MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED": "6",
-                                          "MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED": "5"}):
-            self.config.document.add_documents(
-                AddDocsParams(
-                    index_name=self.text_index_6,
-                    docs=[{
-                        "_id": "1",
-                        "tensor_field1": "content 1",  # tensor fields are also lexical fields
-                        "tensor_field2": "content 2",
-                        "tensor_field3": "content 3",
-                        "tensor_field4": "content 4",
-                        "tensor_field5": "content 5",
-                    }],
-                    device="cpu", tensor_fields=[
-                        "tensor_field1",
-                        "tensor_field2",
-                        "tensor_field3",
-                        "tensor_field4",
-                        "tensor_field5",
-                    ],
-                )
+        field_count_config = SemiStructuredFieldCountConfig(max_lexical_field_count=6, max_tensor_field_count=5)
+        self.config.document.add_documents(
+            AddDocsParams(
+                index_name=self.text_index_6,
+                docs=[{
+                    "_id": "1",
+                    "tensor_field1": "content 1",  # tensor fields are also lexical fields
+                    "tensor_field2": "content 2",
+                    "tensor_field3": "content 3",
+                    "tensor_field4": "content 4",
+                    "tensor_field5": "content 5",
+                }],
+                device="cpu", tensor_fields=[
+                    "tensor_field1",
+                    "tensor_field2",
+                    "tensor_field3",
+                    "tensor_field4",
+                    "tensor_field5",
+                ],
+            ),
+            field_count_config=field_count_config
+        )
+
+        with self.assertRaises(TooManyFieldsError) as err:
+            self.config.document.add_documents(AddDocsParams(
+                index_name=self.text_index_6,
+                docs=[{
+                    "_id": "2", "tensor_field6": "content 6"
+                }],
+                tensor_fields=["tensor_field6"]),
+                field_count_config=field_count_config
             )
+        self.assertIn('has 5 tensor fields. Your request to add tensor_field6 as a tensor field is '
+                      'rejected since it exceeds the limit of 5. Please set a larger limit in '
+                      'MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err.exception))
 
-            with self.assertRaises(TooManyFieldsError) as err:
-                self.config.document.add_documents(AddDocsParams(
-                    index_name=self.text_index_6,
-                    docs=[{
-                        "_id": "2", "tensor_field6": "content 6"
-                    }],
-                    tensor_fields=["tensor_field6"])
-                )
-            self.assertIn('has 5 tensor fields. Your request to add tensor_field6 as a tensor field is '
-                          'rejected since it exceeds the limit of 5. Please set a larger limit in '
-                          'MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err.exception))
-
-            with self.assertRaises(TooManyFieldsError) as err2:
-                self.config.document.add_documents(AddDocsParams(
-                    index_name=self.text_index_6,
-                    docs=[{
-                        "_id": "3",
-                        "tensor_field1": "content 1",
-                        "lexical_field6": "content 6",
-                        "lexical_field7": "content 7",
-                    }],
-                    tensor_fields=["tensor_field1"])
-                )
-            self.assertIn('has 6 lexical fields. Your request to add lexical_field7 as a lexical field is '
-                          'rejected since it exceeds the limit of 6. Please set a larger limit in '
-                          'MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err2.exception))
+        with self.assertRaises(TooManyFieldsError) as err2:
+            self.config.document.add_documents(AddDocsParams(
+                index_name=self.text_index_6,
+                docs=[{
+                    "_id": "3",
+                    "tensor_field1": "content 1",
+                    "lexical_field6": "content 6",
+                    "lexical_field7": "content 7",
+                }],
+                tensor_fields=["tensor_field1"]),
+                field_count_config=field_count_config
+            )
+        self.assertIn('has 6 lexical fields. Your request to add lexical_field7 as a lexical field is '
+                      'rejected since it exceeds the limit of 6. Please set a larger limit in '
+                      'MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err2.exception))
 

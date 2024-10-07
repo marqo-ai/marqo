@@ -21,10 +21,9 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.vespa.models import QueryResult
 
 
-class TestSearchUnstructured(MarqoTestCase):
+class TestSearchSemiStructured(MarqoTestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
