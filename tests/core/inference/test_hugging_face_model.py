@@ -609,7 +609,7 @@ class TestHuggingFaceModel(unittest.TestCase):
             with self.subTest(test_case=test_case):
                 with self.assertRaises(InvalidModelPropertiesError) as excinfo:
                     _ = HuggingFaceModel(test_case, "cpu", {})
-                self.assertIn("Invalid model properties for the 'hf' model.", str(excinfo.exception))
+                self.assertIn("Invalid model properties: ", str(excinfo.exception))
 
     def test_hf_e5_base_v2_embeddings_load_from_hf(self):
         """A test to ensure the embeddings are generated correctly for the default text model, loading from
