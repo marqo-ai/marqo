@@ -274,6 +274,16 @@ class IndexManagement:
             The VespaApplicationPackage instance we can use to do bootstrapping/rollback and any index operations.
         """
         vespa_version = semver.VersionInfo.parse(self.vespa_client.get_vespa_version())
+
+        if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
+            # Please note that this warning message will only be logged out for OS users running Marqo on external
+            # Vespa servers with version prior to 8.382.22.
+            logger.warning(f'You may run into race conditions when Marqo bootstraps the Vespa application package '
+                           f'with the current Vespa version {vespa_version}. To avoid any changes to the Marqo indexes '
+                           f'from being accidentally overridden, please upgrade '
+                           f'Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
+                           f'higher. Please see {marqo_docs.troubleshooting()} for more details.')
+
         if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION:
             # Please note that this warning message will only be logged out for OS users running Marqo on external
             # Vespa servers with version prior to 8.396.18. This will be displayed when Marqo starts up and before
@@ -281,8 +291,7 @@ class IndexManagement:
             logger.warning(f'You may encounter slowness when creating a Marqo index or adding documents to indexes '
                            f'with the current Vespa version {vespa_version}. To improve the performance, please upgrade '
                            f'Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
-                           f'higher and set the VESPA_FILE_DOWNLOAD_BACKOFF_INITIAL_TIME_MS environment variable to '
-                           f'a small value, such as 200. Please see {marqo_docs.troubleshooting()} for more details.')
+                           f'higher. Please see {marqo_docs.troubleshooting()} for more details.')
 
         if need_binary_file_support and vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
             # Binary files are only supported using VespaApplicationFileStore prior to Vespa version 8.382.22
