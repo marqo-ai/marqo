@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from marqo.exceptions import (
     MarqoError,
     InvalidArgumentError,
@@ -75,5 +77,35 @@ class InvalidTensorFieldError(MarqoDocumentParsingError):
 class UnsupportedFeatureError(InvalidArgumentError):
     pass
 
+
 class ZeroMagnitudeVectorError(InvalidArgumentError):
+    pass
+
+
+class FieldTypeMismatchError(InvalidArgumentError):
+    pass
+
+
+class ModelError(MarqoError):
+    pass
+
+
+class AddDocumentsError(Exception):
+    status_code: int = int(HTTPStatus.BAD_REQUEST)
+    error_code: str = 'invalid_argument'
+    error_message: str
+
+    def __init__(self, error_message: str,
+                 error_code: str = 'invalid_argument',
+                 status_code: int = int(HTTPStatus.BAD_REQUEST)) -> None:
+        self.error_code = error_code
+        self.error_message = error_message
+        self.status_code = int(status_code)
+
+
+class DuplicateDocumentError(AddDocumentsError):
+    pass
+
+
+class TooManyFieldsError(MarqoError):
     pass

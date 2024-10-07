@@ -1,16 +1,14 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 import marqo.core.constants as index_constants
 import marqo.core.search.search_filter as search_filter
 from marqo.api import exceptions as errors
 from marqo.core.models import MarqoQuery
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex
 from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery)
-from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 from marqo.core.unstructured_vespa_index.unstructured_document import UnstructuredVespaDocument
-from marqo.core.vespa_index import VespaIndex
+from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.core import constants
 from marqo.exceptions import InternalError, InvalidArgumentError
 import semver

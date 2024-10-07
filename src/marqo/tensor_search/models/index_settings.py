@@ -17,7 +17,7 @@ class AnnParameters(StrictBaseModel):
 
 
 class IndexSettings(StrictBaseModel):
-    type: core.IndexType = core.IndexType.Unstructured
+    type: core.IndexType = core.IndexType.SemiStructured
     allFields: Optional[List[FieldRequest]]
     tensorFields: Optional[List[str]]
     treatUrlsAndPointersAsImages: Optional[bool]
@@ -143,7 +143,7 @@ class IndexSettings(StrictBaseModel):
                 created_at=time.time(),
                 updated_at=time.time(),
             )
-        elif self.type == core.IndexType.Unstructured:
+        elif self.type in [core.IndexType.Unstructured, core.IndexType.SemiStructured]:
             if self.allFields is not None:
                 raise api_exceptions.InvalidArgError(
                     "allFields is not a valid parameter for unstructured indexes"
@@ -200,18 +200,15 @@ class IndexSettings(StrictBaseModel):
 
     @classmethod
     def from_marqo_index(cls, marqo_index: core.MarqoIndex) -> "IndexSettings":
-        if isinstance(marqo_index, core.StructuredMarqoIndex):
+        if isinstance(marqo_index, core.UnstructuredMarqoIndex):
+            # This covers both UnstructuredMarqoIndex and SemiStructuredMarqoIndex
+            # We intentionally hide the lexical and tensor fields info in SemiStructuredMarqoIndex from customers since
+            # this information and the SemiStructured concept are internal implementation details only.
             return cls(
-                type=marqo_index.type,
-                allFields=[
-                    FieldRequest(
-                        name=field.name,
-                        type=field.type,
-                        features=field.features,
-                        dependent_fields=field.dependent_fields
-                    ) for field in marqo_index.fields
-                ],
-                tensorFields=[field.name for field in marqo_index.tensor_fields],
+                type=core.IndexType.Unstructured,
+                treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
+                treatUrlsAndPointersAsMedia=marqo_index.treat_urls_and_pointers_as_media,
+                filterStringMaxLength=marqo_index.filter_string_max_length,
                 model=marqo_index.model.name,
                 modelProperties=marqo_index.model.properties,
                 normalizeEmbeddings=marqo_index.normalize_embeddings,
@@ -225,12 +222,18 @@ class IndexSettings(StrictBaseModel):
                     parameters=marqo_index.hnsw_config
                 )
             )
-        elif isinstance(marqo_index, core.UnstructuredMarqoIndex):
+        elif isinstance(marqo_index, core.StructuredMarqoIndex):
             return cls(
                 type=marqo_index.type,
-                treatUrlsAndPointersAsImages=marqo_index.treat_urls_and_pointers_as_images,
-                treatUrlsAndPointersAsMedia=marqo_index.treat_urls_and_pointers_as_media,
-                filterStringMaxLength=marqo_index.filter_string_max_length,
+                allFields=[
+                    FieldRequest(
+                        name=field.name,
+                        type=field.type,
+                        features=field.features,
+                        dependent_fields=field.dependent_fields
+                    ) for field in marqo_index.fields
+                ],
+                tensorFields=[field.name for field in marqo_index.tensor_fields],
                 model=marqo_index.model.name,
                 modelProperties=marqo_index.model.properties,
                 normalizeEmbeddings=marqo_index.normalize_embeddings,

@@ -11,7 +11,8 @@ import uvicorn
 import vespa.application as pyvespa
 from starlette.applications import Starlette
 
-from marqo import config, version
+from marqo import config, version, tensor_search
+from marqo.tensor_search import index_meta_cache, tensor_search
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
@@ -23,6 +24,7 @@ from marqo.vespa.vespa_client import VespaClient
 
 
 class TestImageUrls(Enum):
+    __test__ = False  # Prevent pytest from collecting this class as a test
     IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
     IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'
     IMAGE2 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
@@ -80,6 +82,13 @@ class MarqoTestCase(unittest.TestCase):
         cls.indexes = indexes
 
         return indexes
+
+    @classmethod
+    def add_documents_and_refresh_index(cls, *args, **kwargs):
+        index_name = kwargs['add_docs_params'].index_name
+        result = tensor_search.add_documents(*args, **kwargs)
+        index_meta_cache.get_index(config=cls.config, index_name=index_name, force_refresh=True)
+        return result
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -158,8 +167,6 @@ class MarqoTestCase(unittest.TestCase):
             cls,
             name: str,
             schema_name: str,
-            fields: List[Field] = None,
-            tensor_fields: List[TensorField] = None,
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
@@ -207,8 +214,6 @@ class MarqoTestCase(unittest.TestCase):
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
-            fields=fields,
-            tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
             updated_at=updated_at,

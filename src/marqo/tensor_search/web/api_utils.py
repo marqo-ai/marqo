@@ -4,8 +4,9 @@ from typing import Union, List, Optional, Dict
 
 from marqo.api.exceptions import InvalidArgError
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams, AddDocsBodyParams
-from marqo.tensor_search.models.add_docs_objects import ModelAuth
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.api.models.add_docs_objects import AddDocsBodyParams
+from marqo.tensor_search.models.private_models import ModelAuth
 
 
 def translate_api_device(device: Optional[str]) -> Optional[str]:
@@ -138,5 +139,6 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
         device=device, tensor_fields=tensor_fields,
         use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
         image_download_thread_count=image_download_thread_count,
-        mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix
+        mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix,
+        batch_vectorisation_mode=body.batchVectorisationMode,
     )

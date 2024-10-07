@@ -6,19 +6,20 @@ import semver
 
 import marqo.logging
 import marqo.vespa.vespa_client
-from marqo import version
+from marqo import version, marqo_docs
 from marqo.core import constants
 from marqo.core.distributed_lock.zookeeper_distributed_lock import get_deployment_lock
 from marqo.core.exceptions import IndexNotFoundError, ApplicationNotInitializedError
 from marqo.core.exceptions import OperationConflictError
 from marqo.core.exceptions import ZookeeperLockNotAcquiredError, InternalError
-from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, MarqoConfig, \
-    VespaApplicationFileStore, ApplicationPackageDeploymentSessionStore
+from marqo.core.index_management.vespa_application_package import VespaApplicationPackage, VespaApplicationFileStore, \
+    ApplicationPackageDeploymentSessionStore
 from marqo.core.models import MarqoIndex
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index_request import MarqoIndexRequest
-from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.tensor_search.models.index_settings import IndexSettings
-from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
 
@@ -27,6 +28,7 @@ logger = marqo.logging.get_logger(__name__)
 
 class IndexManagement:
     _MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES = semver.VersionInfo.parse('8.382.22')
+    _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse('8.396.18')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
 
@@ -184,10 +186,30 @@ class IndexManagement:
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_delete_index_setting_and_schema(index_names)
 
+    def update_index(self, marqo_index: SemiStructuredMarqoIndex) -> None:
+        """
+        Update index settings and schema
+        Aars:
+            marqo_index: Index to update, only SemiStructuredMarqoIndex is supported
+        Raises:
+            IndexNotFoundError: If an index does not exist
+            InternalError: If the index is not a SemiStructuredMarqoIndex.
+            RuntimeError: If deployment lock is not instantiated
+            OperationConflictError: If another index creation/deletion operation is
+                in progress and the lock cannot be acquired
+        """
+        if not isinstance(marqo_index, SemiStructuredMarqoIndex):
+            # This is just a sanity check, it should not happen since we do not expose this method to end user.
+            raise InternalError(f'Index {marqo_index.name} can not be updated.')
+
+        with self._vespa_deployment_lock():
+            schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
+            self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
+
     def _get_existing_indexes(self) -> List[MarqoIndex]:
         """
-        Get all Marqo indexes storing in _MARQO_SETTINGS_SCHEMA_NAME schema (used prior to Marqo v2.12.0).
-        This method is now only used to retrieve the existing indexes for bootstrapping from v2.12.0
+        Get all Marqo indexes storing in _MARQO_SETTINGS_SCHEMA_NAME schema (used prior to Marqo v2.13.0).
+        This method is now only used to retrieve the existing indexes for bootstrapping from v2.13.0
 
         Returns:
             List of Marqo indexes
@@ -252,6 +274,27 @@ class IndexManagement:
             The VespaApplicationPackage instance we can use to do bootstrapping/rollback and any index operations.
         """
         vespa_version = semver.VersionInfo.parse(self.vespa_client.get_vespa_version())
+
+        if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
+            # Please note that this warning message will only be logged out for OS users running Marqo on external
+            # Vespa servers with version prior to 8.382.22. This will be displayed when Marqo starts up and before
+            # each index CUD operation
+            logger.warning(f'Your Vespa version {vespa_version} is lower than the minimum recommended Vespa version '
+                           f'{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. This could cause '
+                           f'unexpected behavior when bootstrapping Marqo. Please upgrade '
+                           f'Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
+                           f'later. Please see {marqo_docs.troubleshooting()} for more details.')
+
+        if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION:
+            # Please note that this warning message will only be logged out for OS users running Marqo on external
+            # Vespa servers with version prior to 8.396.18. This will be displayed when Marqo starts up and before
+            # each index CUD operation
+            logger.warning(f'Your Vespa version {vespa_version} is lower than the minimum recommended Vespa version '
+                           f'{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. You may encounter slower '
+                           f'response times when creating a Marqo index or adding documents to unstructured indexes. '
+                           f'Please upgrade Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
+                           f'later. Please see {marqo_docs.troubleshooting()} for more details.')
+
         if need_binary_file_support and vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
             # Binary files are only supported using VespaApplicationFileStore prior to Vespa version 8.382.22
             application_package_store = VespaApplicationFileStore(

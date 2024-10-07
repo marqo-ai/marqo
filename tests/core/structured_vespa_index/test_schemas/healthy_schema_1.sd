@@ -96,7 +96,7 @@ function lexical_score_sum() {
 expression: if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0) + if (query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0)
 }
 function lexical_score_avg() {
-expression: (if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0) + if (query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0)) / if (query(marqo__lexical_title) + query(marqo__lexical_category) == 0, 1, if (bm25(marqo__lexical_title) + bm25(marqo__lexical_category) == 0, 1, bm25(marqo__lexical_title) + bm25(marqo__lexical_category)))
+expression: (if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0) + if (query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0)) / max(1, if (query(marqo__lexical_title) > 0, 1, 0) + if(query(marqo__lexical_category) > 0, 1, 0))
 }
 function lexical_score_max() {
 expression: max(if(query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0), if(query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0))

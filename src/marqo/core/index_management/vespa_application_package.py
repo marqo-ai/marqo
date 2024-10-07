@@ -193,7 +193,9 @@ class IndexSettingStore:
             current_version = self._index_settings[name].version
             if current_version + 1 != target_version:
                 raise OperationConflictError(f'Conflict in version detected while saving index {name}. '
-                                             f'Current version {current_version}, new version {target_version}.')
+                                             f'Current version is {current_version}, and cannot be upgraded to '
+                                             f'target version {target_version}. Some other request might have changed '
+                                             f'the index. Please try again. ')
             self._move_to_history(name)
         else:
             if target_version != 1:
@@ -676,6 +678,16 @@ class VespaApplicationPackage:
         self._add_schema_removal_override()
         self._persist_index_settings()
         self._store.save_file(self._service_xml.to_xml(), self._SERVICES_XML_FILE)
+        self._deploy()
+
+    def update_index_setting_and_schema(self, index: MarqoIndex, schema: str) -> None:
+        if not self.has_index(index.name):
+            raise IndexNotFoundError(f"Index {index.name} not found")
+
+        version = index.version + 1 if index.version is not None else 1
+        self._store.save_file(schema, 'schemas', f'{index.schema_name}.sd')
+        self._index_setting_store.save_index_setting(index.copy(update={'version': version}))
+        self._persist_index_settings()
         self._deploy()
 
     def has_schema(self, name: str) -> bool:

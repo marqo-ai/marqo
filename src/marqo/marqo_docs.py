@@ -63,3 +63,7 @@ def indexing_images():
 
 def api_reference_document_body():
     return _build_url('API-Reference/Documents/add_or_replace_documents/#body')
+
+
+def troubleshooting():
+    return _build_url('other-resources/troubleshooting/troubleshooting/')

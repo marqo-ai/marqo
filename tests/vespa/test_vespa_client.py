@@ -428,3 +428,34 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         expected_vespa_version = '8.396.18'
         version = self.client.get_vespa_version()
         self.assertEqual(expected_vespa_version, version)
+
+    def test_translate_vespa_document_response_status(self):
+        test_cases = [
+            (200, 200, None),
+            (404, 404, "Document does not exist in the index"),
+            (412, 404, "Document does not exist in the index"),
+            (429, 429, "Marqo vector store receives too many requests. Please try again later"),
+            (507, 400, "Marqo vector store is out of memory or disk space"),
+            (123, 500, "Marqo vector store returns an unexpected error with this document"),
+            (400, 500, "Marqo vector store returns an unexpected error with this document"),
+            # generic 400 error without specific message
+            (400, 400, "The document contains invalid characters in the fields. Original error: could not parse field"),
+            # specific 400 error
+        ]
+        for status, expected_status, expected_message in test_cases:
+            with self.subTest(status=status):
+                if status == 400 and "could not parse field" in expected_message:
+                    result_status, result_message = self.client.translate_vespa_document_response(
+                        status, "could not parse field")
+                else:
+                    result_status, result_message = self.client.translate_vespa_document_response(
+                        status,None)
+                self.assertEqual(result_status, expected_status)
+                if expected_message:
+                    self.assertIn(expected_message, result_message)
+
+    def test_translate_vespa_document_response_logging(self):
+        with patch("marqo.vespa.vespa_client.logger.error") as mock_log_error:
+            status = 400
+            self.client.translate_vespa_document_response(status, None)
+        mock_log_error.assert_called_once()
