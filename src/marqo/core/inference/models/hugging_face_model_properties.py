@@ -44,10 +44,11 @@ class HuggingFaceModelProperties(MarqoBaseModel):
     model_auth: Optional[ModelAuth] = Field(default=None, alias="modelAuth")
     note: Optional[str] = None
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
+    dimensions: int
 
     @validator("type")
     def _validate_type(cls, v):
-        if v != "hf":
+        if v not in ["hf", "hf_stella"]:
             raise ValueError("The type of the model should be 'hf'.")
         return v
 
