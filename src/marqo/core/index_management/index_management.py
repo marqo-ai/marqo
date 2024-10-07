@@ -281,9 +281,9 @@ class IndexManagement:
             # each index CUD operation
             logger.warning(f'Your Vespa version {vespa_version} is lower than the minimum recommended Vespa version '
                            f'{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. This could cause '
-                           f'unexpected unexpected behavior when bootstrapping Marqo. Please upgrade '
+                           f'unexpected behavior when bootstrapping Marqo. Please upgrade '
                            f'Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
-                           f'higher. Please see {marqo_docs.troubleshooting()} for more details.')
+                           f'later. Please see {marqo_docs.troubleshooting()} for more details.')
 
         if vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION:
             # Please note that this warning message will only be logged out for OS users running Marqo on external
@@ -293,7 +293,7 @@ class IndexManagement:
                            f'{self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION}. You may encounter slower '
                            f'response times when creating a Marqo index or adding documents to unstructured indexes. '
                            f'Please upgrade Vespa to version {self._MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION} or '
-                           f'higher. Please see {marqo_docs.troubleshooting()} for more details.')
+                           f'later. Please see {marqo_docs.troubleshooting()} for more details.')
 
         if need_binary_file_support and vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
             # Binary files are only supported using VespaApplicationFileStore prior to Vespa version 8.382.22
