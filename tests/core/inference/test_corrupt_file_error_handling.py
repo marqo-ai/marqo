@@ -59,17 +59,18 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
     @patch('open_clip.create_model', autospec=True)
     @patch('os.remove', autospec=True)
     def test_corrupted_file_handling(self, mock_os_remove, mock_create_model_and_transforms):
-        # Setup
+        """Ensure that a proper error is raised when a corrupted file is encountered. The file should be removed."""
         mock_create_model_and_transforms.side_effect = RuntimeError("The file might be corrupted")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
-            for model_properties in self.dummpy_model_properties:
+        for model_properties in self.dummpy_model_properties:
+            with patch("marqo.core.inference.models.open_clip_model.download_model",
+                       return_value = self.dummpy_corrupted_file):
                 with self.assertRaises(InvalidModelPropertiesError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 # Verify
                 self.assertIn("Marqo encountered a corrupted file when loading open_clip file", str(context.exception))
                 mock_os_remove.assert_called_once_with(self.dummpy_corrupted_file)
 
-                # Reset necessary mock
+                # Reset the mock
                 mock_os_remove.reset_mock()
 
     @patch('open_clip.create_model', autospec=True)
@@ -78,7 +79,8 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         # Setup
         mock_create_model_and_transforms.side_effect = RuntimeError("The file might be corrupted")
         mock_os_remove.side_effect = OSError("Permission denied")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
+        with patch("marqo.core.inference.models.open_clip_model.download_model",
+                   return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(RuntimeError) as context:
@@ -96,7 +98,8 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
     def test_other_errors_handling(self, mock_os_remove, mock_create_model_and_transforms):
         # Setup
         mock_create_model_and_transforms.side_effect = Exception("An error occurred")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
+        with patch("marqo.core.inference.models.open_clip_model.download_model",
+                   return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(RuntimeError) as context:
@@ -110,7 +113,8 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         # Setup
         mock_create_model_and_transforms.side_effect = Exception(
             "This could be because the operator doesn't exist for this backend")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
+        with patch("marqo.core.inference.models.open_clip_model.download_model",
+                   return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(InvalidModelPropertiesError) as context:
