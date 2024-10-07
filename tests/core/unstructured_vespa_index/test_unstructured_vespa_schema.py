@@ -1,10 +1,7 @@
 import os
-import re
 
-from marqo.core.models.marqo_index_request import MarqoIndexRequest
-from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
-from marqo.tensor_search.models.index_settings import *
 from marqo.core.models.marqo_index import *
+from marqo.core.unstructured_vespa_index.unstructured_vespa_schema import UnstructuredVespaSchema
 from tests.marqo_test import MarqoTestCase
 
 
@@ -42,10 +39,11 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
         """A test for the unstructured Vespa schema generation with a random model."""
         index_name = "test_unstructured_schema"
 
-        test_marqo_index_request: MarqoIndexRequest = IndexSettings(
-            type="unstructured",
-            model="random/small"
-        ).to_marqo_index_request(index_name)
+        test_marqo_index_request = self.unstructured_marqo_index_request(
+            name=index_name,
+            hnsw_config=HnswConfig(ef_construction=512, m=16),
+            distance_metric=DistanceMetric.PrenormalizedAngular
+        )
 
         test_unstructured_schema_object = UnstructuredVespaSchema(test_marqo_index_request)
 
@@ -62,18 +60,13 @@ class TestUnstructuredVespaSchema(MarqoTestCase):
         index_name = "test_unstructured_schema_distance_metric"
 
         for distance_metric in DistanceMetric:
-            with self.subTest(f"Unstructured index with distance metric: {distance_metric.value}"):
-                test_marqo_index_request: MarqoIndexRequest = IndexSettings(
-                    type="unstructured",
-                    model="ViT-B/32",
-                    annParameters=AnnParameters(
-                        spaceType=distance_metric.value,        # Manually set distance metric to each one.
-                        parameters=core.HnswConfig(
-                            efConstruction=512,
-                            m=16
-                        )
-                    )
-                ).to_marqo_index_request(index_name)
+            with (self.subTest(f"Unstructured index with distance metric: {distance_metric.value}")):
+                test_marqo_index_request = self.unstructured_marqo_index_request(
+                    name=index_name,
+                    model=Model(name="ViT-B/32"),
+                    hnsw_config=HnswConfig(ef_construction=512, m=16),
+                    distance_metric=distance_metric
+                )
 
                 test_unstructured_schema_object = UnstructuredVespaSchema(test_marqo_index_request)
 

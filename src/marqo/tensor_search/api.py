@@ -4,13 +4,13 @@ from typing import List
 
 import pydantic
 import uvicorn
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
-from marqo import config
+from marqo import config, marqo_docs
 from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
@@ -27,7 +27,7 @@ from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import RequestType, EnvVars
-from marqo.tensor_search.models.add_docs_objects import (AddDocsBodyParams)
+from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
@@ -99,35 +99,38 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         # More specific errors should take precedence
 
         # Core exceptions
-        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError, None),
-        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError, None),
-        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None),
-        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None),
-        (core_exceptions.OperationConflictError,
-         api_exceptions.OperationConflictError, None),
-        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None),
-        (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None),
-        (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None),
+        (core_exceptions.InvalidFieldNameError, api_exceptions.InvalidFieldNameError, None, None),
+        (core_exceptions.IndexExistsError, api_exceptions.IndexAlreadyExistsError, None, None),
+        (core_exceptions.IndexNotFoundError, api_exceptions.IndexNotFoundError, None, None),
+        (core_exceptions.VespaDocumentParsingError, api_exceptions.BackendDataParsingError, None, None),
+        (core_exceptions.OperationConflictError, api_exceptions.OperationConflictError, None, None),
+        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
+        (core_exceptions.ZeroMagnitudeVectorError, api_exceptions.BadRequestError, None, None),
+        (core_exceptions.BackendCommunicationError, api_exceptions.BackendCommunicationError, None, None),
+        (core_exceptions.ModelError, api_exceptions.BadRequestError, None, marqo_docs.list_of_models()),
+        (core_exceptions.UnsupportedFeatureError, api_exceptions.BadRequestError, None, None),
+        (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
+        (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
+        (core_exceptions.TooManyFieldsError, api_exceptions.BadRequestError, None, None),
 
         # Vespa client exceptions
         (
             vespa_exceptions.VespaTimeoutError,
             api_exceptions.VectorStoreTimeoutError,
-            "Vector store request timed out. Try your request again later."
+            "Vector store request timed out. Try your request again later.",
+            None
         ),
 
         # Base exceptions
-        (base_exceptions.InternalError, api_exceptions.InternalError, None),
-        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None),
+        (base_exceptions.InternalError, api_exceptions.InternalError, None, None),
+        (base_exceptions.InvalidArgumentError, api_exceptions.InvalidArgError, None, None),
     ]
 
     converted_error = None
-    for base_exception, api_exception, message in api_exception_mappings:
+    for base_exception, api_exception, message, link in api_exception_mappings:
         if isinstance(exc, base_exception):
-            if message is None:
-                converted_error = api_exception(exc.message)
-            else:
-                converted_error = api_exception(message)
+            error_message = message or exc.message
+            converted_error = api_exception(message=error_message, link=link)
             break
 
     # Completely unhandled exception (500)
@@ -319,9 +322,7 @@ def add_or_replace_documents(
                                                              device=device)
 
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        res = tensor_search.add_documents(
-            config=marqo_config, add_docs_params=add_docs_params
-        )
+        res = marqo_config.document.add_documents(add_docs_params=add_docs_params)
         return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 

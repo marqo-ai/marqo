@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 class IndexType(Enum):
     Structured = 'structured'
     Unstructured = 'unstructured'
+    SemiStructured = 'semi-structured'
 
 
 class FieldType(str, Enum):
@@ -306,7 +307,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
         return name
 
     @classmethod
-    def parse_obj(cls, obj: Any) -> Union['UnstructuredMarqoIndex', 'StructuredMarqoIndex']:
+    def parse_obj(cls, obj: Any) -> 'MarqoIndex':
         obj = cls._enforce_dict_if_root(obj)
         if not isinstance(obj, dict):
             try:
@@ -320,10 +321,15 @@ class MarqoIndex(ImmutableBaseModel, ABC):
                 return StructuredMarqoIndex(**obj)
             elif obj['type'] == IndexType.Unstructured.value:
                 return UnstructuredMarqoIndex(**obj)
+            elif obj['type'] == IndexType.SemiStructured.value:
+                return SemiStructuredMarqoIndex(**obj)
             else:
                 raise ValidationError(f"Invalid index type {obj['type']}")
 
         raise ValidationError(f"Index type not found in {obj}")
+
+    def clear_cache(self):
+        self._cache.clear()
 
     def _cache_or_get(self, key: str, func):
         if key not in self._cache:
@@ -493,6 +499,86 @@ class StructuredMarqoIndex(MarqoIndex):
                                   lambda: {dependent_field for field in self.fields if field.dependent_fields
                                            for dependent_field in field.dependent_fields.keys()}
                                   )
+
+
+class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
+    type: IndexType = IndexType.SemiStructured
+    lexical_fields: List[Field]
+    tensor_fields: List[TensorField]
+
+    def __init__(self, **data):
+        super().__init__(**data)
+
+    @classmethod
+    def _valid_type(cls) -> IndexType:
+        return IndexType.SemiStructured
+
+    @property
+    def field_map(self) -> Dict[str, Field]:
+        """
+        A map from field name to the field.
+        """
+        return self._cache_or_get('field_map',
+                                  lambda: {field.name: field for field in self.lexical_fields}
+                                  )
+
+    @property
+    def lexical_field_map(self) -> Dict[str, Field]:
+        """Return a map from lexical field name to the field object.
+
+        The field.lexical_field_name is not the same as the field.name. It is the name of the field that is used in the
+        index schema with Marqo prefix."""
+        return self._cache_or_get('lexical_field_map',
+                                  lambda: {field.lexical_field_name: field for field in self.lexical_fields})
+
+    @property
+    def lexically_searchable_fields_names(self) -> Set[str]:
+        """Return a set of field names (str) that are lexically searchable.
+
+        These are the original field names without any Marqo prefix. You should use this to generate
+        the searchable fields in your lexical search query.
+
+        Note that field.name is not identical to field.lexical_field_name. The latter is the name of the field
+        that is used in the index schema"""
+        return self._cache_or_get('lexically_searchable_fields_names',
+                                  lambda: {field.name for field in self.lexical_fields}
+                                  )
+
+    @property
+    def tensor_field_map(self) -> Dict[str, TensorField]:
+        """
+        A map from tensor field name to the TensorField object.
+        """
+        return self._cache_or_get('tensor_field_map',
+                                  lambda: {tensor_field.name: tensor_field for tensor_field in self.tensor_fields}
+                                  )
+
+    @property
+    def tensor_subfield_map(self) -> Dict[str, TensorField]:
+        """
+        A map from tensor chunk and embeddings field name to the TensorField object.
+        """
+
+        def generate():
+            the_map = dict()
+            for tensor_field in self.tensor_fields:
+                if tensor_field.chunk_field_name in the_map:
+                    raise ValueError(
+                        f"Duplicate chunk field name {tensor_field.chunk_field_name} "
+                        f"for tensor field {tensor_field.name}"
+                    )
+                the_map[tensor_field.chunk_field_name] = tensor_field
+
+                if tensor_field.embeddings_field_name in the_map:
+                    raise ValueError(
+                        f"Duplicate embeddings field name {tensor_field.embeddings_field_name} "
+                        f"for tensor field {tensor_field.name}"
+                    )
+                the_map[tensor_field.embeddings_field_name] = tensor_field
+
+            return the_map
+
+        return self._cache_or_get('tensor_subfield_map', generate)
 
 
 _PROTECTED_FIELD_NAMES = ['_id', '_tensor_facets', '_highlights', '_score', '_found']

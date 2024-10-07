@@ -1,0 +1,215 @@
+schema marqo__test_00semi_00structured_00schema {
+    document {
+        field marqo__id type string {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+
+        field marqo__int_fields type map<string, long> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__bool_fields type map<string, byte> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                                attribute: fast-search
+                                rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field marqo__float_fields type map<string, double> {
+            indexing: summary
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+
+            struct-field value { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+        }
+
+        field marqo__short_string_fields type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
+        field marqo__string_array type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+
+        field marqo__score_modifiers type tensor<double>(p{}) {
+            indexing: attribute | summary
+        }
+
+        field marqo__multimodal_params type map<string, string> {
+            indexing: summary
+        }
+
+        field marqo__lexical_text_field1 type string {
+            indexing: index | summary
+            index: enable-bm25
+        }
+
+        field marqo__lexical_text_field2 type string {
+            indexing: index | summary
+            index: enable-bm25
+        }
+
+        field marqo__chunks_tensor_field1 type array<string> {
+            indexing: summary
+        }
+
+        field marqo__embeddings_tensor_field1 type tensor<float>(p{}, x[32]) {
+            indexing: attribute | index | summary
+            attribute {
+                distance-metric: prenormalized-angular
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 512
+                }
+            }
+        }
+        field marqo__chunks_tensor_field2 type array<string> {
+            indexing: summary
+        }
+
+        field marqo__embeddings_tensor_field2 type tensor<float>(p{}, x[32]) {
+            indexing: attribute | index | summary
+            attribute {
+                distance-metric: prenormalized-angular
+            }
+            index {
+                hnsw {
+                    max-links-per-node: 16
+                    neighbors-to-explore-at-insert: 512
+                }
+            }
+        }
+        field marqo__vector_count type int {
+            indexing: attribute | summary
+        }
+    }
+
+    fieldset default {
+        fields: marqo__lexical_text_field1, marqo__lexical_text_field2
+    }
+
+    rank-profile base_rank_profile inherits default {
+        inputs {
+            query(marqo__lexical_text_field1): 0
+            query(marqo__lexical_text_field2): 0
+            query(marqo__embeddings_tensor_field1): 0
+            query(marqo__embeddings_tensor_field2): 0
+            query(marqo__bm25_aggregator): 0
+            query(marqo__query_embedding) tensor<float>(x[32])
+            query(marqo__mult_weights_lexical) tensor<double>(p{})
+            query(marqo__add_weights_lexical) tensor<double>(p{})
+            query(marqo__mult_weights_tensor) tensor<double>(p{})
+            query(marqo__add_weights_tensor) tensor<double>(p{})
+        }
+
+        function modify(score, mult_weights, add_weights) {
+            expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod)) * score + reduce(add_weights * attribute(marqo__score_modifiers), sum)
+        }
+
+        function lexical_score_sum() {
+            expression: if (query(marqo__lexical_text_field1) > 0, bm25(marqo__lexical_text_field1), 0) + if (query(marqo__lexical_text_field2) > 0, bm25(marqo__lexical_text_field2), 0)
+        }
+
+        function lexical_score_avg() {
+            expression: (if (query(marqo__lexical_text_field1) > 0, bm25(marqo__lexical_text_field1), 0) + if (query(marqo__lexical_text_field2) > 0, bm25(marqo__lexical_text_field2), 0)) / max(1, if (query(marqo__lexical_text_field1) > 0, 1, 0) + if (query(marqo__lexical_text_field2) > 0, 1, 0))
+        }
+
+        function lexical_score_max() {
+            expression: max(if (query(marqo__lexical_text_field1) > 0, bm25(marqo__lexical_text_field1), 0), if (query(marqo__lexical_text_field2) > 0, bm25(marqo__lexical_text_field2), 0))
+        }
+
+        function lexical_score() {
+            expression: if (query(marqo__bm25_aggregator) == 0, lexical_score_sum(), if (query(marqo__bm25_aggregator) == 1, lexical_score_avg(), lexical_score_max()))
+        }
+        function embedding_score() {
+            expression: max(if (query(marqo__embeddings_tensor_field1) > 0, closeness(field, marqo__embeddings_tensor_field1), 0), if (query(marqo__embeddings_tensor_field2) > 0, closeness(field, marqo__embeddings_tensor_field2), 0))
+        }
+    }
+
+    rank-profile bm25 inherits base_rank_profile {
+        first-phase {
+            expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
+    rank-profile embedding_similarity inherits base_rank_profile {
+        first-phase {
+            expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
+        }
+        match-features: closest(marqo__embeddings_tensor_field1) closest(marqo__embeddings_tensor_field2) distance(field, marqo__embeddings_tensor_field1) distance(field, marqo__embeddings_tensor_field2)
+    }
+    rank-profile hybrid_custom_searcher inherits default {
+        inputs {
+            query(marqo__fields_to_rank_lexical) tensor<int8>(p{})
+            query(marqo__fields_to_rank_tensor) tensor<int8>(p{})
+            query(marqo__query_embedding) tensor<float>(x[32])
+            query(marqo__mult_weights_lexical) tensor<double>(p{})
+            query(marqo__add_weights_lexical) tensor<double>(p{})
+            query(marqo__mult_weights_tensor) tensor<double>(p{})
+            query(marqo__add_weights_tensor) tensor<double>(p{})
+        }
+    }
+
+    rank-profile hybrid_bm25_then_embedding_similarity inherits base_rank_profile {
+        first-phase {
+            expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+        second-phase {
+            expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
+        }
+        match-features: closest(marqo__embeddings_tensor_field1) closest(marqo__embeddings_tensor_field2) distance(field, marqo__embeddings_tensor_field1) distance(field, marqo__embeddings_tensor_field2)}
+
+    rank-profile hybrid_embedding_similarity_then_bm25 inherits base_rank_profile {
+        first-phase {
+            expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
+        }
+    }
+
+    document-summary all-non-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__string_array type array<string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        summary text_field1 type string {source: marqo__lexical_text_field1}
+        summary text_field2 type string {source: marqo__lexical_text_field2}
+        summary marqo__chunks_tensor_field1 type array<string> {}
+        summary marqo__chunks_tensor_field2 type array<string> {}
+    }
+
+    document-summary all-vector-summary {
+        summary marqo__id type string {}
+        summary marqo__string_array type array<string> {}
+        summary marqo__bool_fields type map<string, byte> {}
+        summary marqo__int_fields type map<string, long> {}
+        summary marqo__float_fields type map<string, double> {}
+        summary text_field1 type string {source: marqo__lexical_text_field1}
+        summary text_field2 type string {source: marqo__lexical_text_field2}
+        summary marqo__chunks_tensor_field1 type array<string> {}
+        summary marqo__embeddings_tensor_field1 type tensor<float>(p{}, x[32]) {}
+        summary marqo__chunks_tensor_field2 type array<string> {}
+        summary marqo__embeddings_tensor_field2 type tensor<float>(p{}, x[32]) {}
+    }
+}

@@ -1,3 +1,4 @@
+import enum
 from typing import List
 from typing import Optional, Union, Any, Sequence
 
@@ -7,40 +8,17 @@ from pydantic import Field
 
 from marqo import marqo_docs
 from marqo.api.exceptions import BadRequestError
+
+# TODO move deps
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import get_best_available_device, read_env_vars_and_defaults_ints
 from marqo.tensor_search.enums import EnvVars
 
 
-class AddDocsParamsConfig:
-    arbitrary_types_allowed = True
-
-
-class AddDocsBodyParams(BaseModel):
-    """The parameters of the body parameters of tensor_search_add_documents() function"""
-
-    class Config:
-        arbitrary_types_allowed = True
-        allow_mutation = False
-        extra = "forbid"  # Raise error on unknown fields
-
-    tensorFields: Optional[List] = None
-    useExistingTensors: bool = False
-    imageDownloadHeaders: dict = Field(default_factory=dict)
-    modelAuth: Optional[ModelAuth] = None
-    mappings: Optional[dict] = None
-    documents: Union[Sequence[Union[dict, Any]], np.ndarray]
-    imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
-    mediaDownloadThreadCount: Optional[int]
-    textChunkPrefix: Optional[str] = None
-
-    @root_validator
-    def validate_thread_counts(cls, values):
-        image_count = values.get('imageDownloadThreadCount')
-        media_count = values.get('mediaDownloadThreadCount')
-        if media_count is not None and image_count != read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST):
-            raise ValueError("Cannot set both imageDownloadThreadCount and mediaDownloadThreadCount")
-        return values
+class BatchVectorisationMode(enum.Enum):
+    PER_FIELD = 'per_field'
+    PER_DOCUMENT = 'per_document'
+    PER_BATCH = 'per_batch'
 
 
 class AddDocsParams(BaseModel):
@@ -58,6 +36,8 @@ class AddDocsParams(BaseModel):
             e.g., multimodal_combination field
         model_auth: an object used to authorise downloading an object from a datastore
         text_chunk_prefix: an optional prefix to add to each text chunk
+        batch_vectorisation_mode: choose how we batch vectorisation requests to the embedding model.
+                                  supports per_field, per_document and per_batch [Experimental]
     """
 
     class Config:
@@ -70,13 +50,16 @@ class AddDocsParams(BaseModel):
     index_name: str
     device: Optional[str]
     tensor_fields: Optional[List] = Field(default_factory=None)
-    image_download_thread_count: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
+    image_download_thread_count: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
     media_download_thread_count: Optional[int]
     image_download_headers: dict = Field(default_factory=dict)
     use_existing_tensors: bool = False
     mappings: Optional[dict] = None
     model_auth: Optional[ModelAuth] = None
     text_chunk_prefix: Optional[str] = None
+    # This parameter is experimental for now. we will add it to the document and py-marqo once it has been verified
+    batch_vectorisation_mode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     def __init__(self, **data: Any):
         # Ensure `None` and passing nothing are treated the same for device

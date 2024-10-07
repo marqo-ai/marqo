@@ -1,11 +1,16 @@
 import pytest
 
+from tests.marqo_test import MarqoTestCase
+
+
 def pytest_addoption(parser):
-    parser.addoption("--largemodel", action="store_true", default = False)
+    parser.addoption("--largemodel", action="store_true", default=False)
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "largemodel: mark test as largemodels")
+    config.addinivalue_line("markers", "cpu_only: mark test as cpu_only")
+    config.addinivalue_line("markers", "unittest: mark test as unit test, it does not require vespa to run")
 
 
 def pytest_collection_modifyitems(config, items):

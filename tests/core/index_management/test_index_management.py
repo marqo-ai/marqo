@@ -6,16 +6,14 @@ import tempfile
 import textwrap
 import threading
 import time
-import unittest
-from pathlib import Path
-from unittest import mock
+import xml.etree.ElementTree as ET
 from datetime import datetime
+from pathlib import Path
+from typing import cast
+from unittest import mock
 from unittest.mock import patch
 
 import httpx
-
-import xml.etree.ElementTree as ET
-
 import pytest
 
 from marqo import version
@@ -27,7 +25,8 @@ from marqo.core.index_management.vespa_application_package import (MarqoConfig, 
                                                                    ApplicationPackageDeploymentSessionStore)
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.vespa_schema import for_marqo_index_request as vespa_schema_factory
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
+from marqo.core.vespa_index.vespa_schema import for_marqo_index_request as vespa_schema_factory
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.vespa.exceptions import VespaActivationConflictError
 from marqo.vespa.models import VespaDocument
@@ -42,8 +41,8 @@ class TestIndexManagement(MarqoTestCase):
         self.index_management = IndexManagement(self.vespa_client,
                                                 zookeeper_client=self.zookeeper_client,
                                                 enable_index_operations=True,
-                                                deployment_timeout_seconds=10,
-                                                convergence_timeout_seconds=20)
+                                                deployment_timeout_seconds=30,
+                                                convergence_timeout_seconds=60)
         # this resets the application package to a clean state
         self._test_dir = str(os.path.dirname(os.path.abspath(__file__)))
         self._deploy_initial_app_package()
@@ -246,7 +245,7 @@ class TestIndexManagement(MarqoTestCase):
 
     def test_rollback_should_fail_when_target_version_is_current_version(self):
         self.index_management.bootstrap_vespa()
-        with self.assertRaises(ApplicationRollbackError) as e:
+        with self.assertRaisesStrict(ApplicationRollbackError) as e:
             self.index_management.rollback_vespa()
         self.assertIn("The target version must be lower than the current one", str(e.exception))
 
@@ -258,7 +257,7 @@ class TestIndexManagement(MarqoTestCase):
 
         with mock.patch.object(version, 'get_version', return_value='2.13.0'):
             # rolling back to 2.13.0 should raise error
-            with self.assertRaises(ApplicationRollbackError) as e:
+            with self.assertRaisesStrict(ApplicationRollbackError) as e:
                 self.index_management.rollback_vespa()
             self.assertEqual("Cannot rollback to 2.12.0, current Marqo version is 2.13.0", str(e.exception))
 
@@ -268,7 +267,7 @@ class TestIndexManagement(MarqoTestCase):
         self.index_management.create_index(self.unstructured_marqo_index_request())
 
         with mock.patch.object(version, 'get_version', return_value='2.10.0'):
-            with self.assertRaises(ApplicationRollbackError) as e:
+            with self.assertRaisesStrict(ApplicationRollbackError) as e:
                 self.index_management.rollback_vespa()
             self.assertEqual("Aborting rollback. Reason: Indexes have been added or removed since last backup.", str(e.exception))
 
@@ -284,7 +283,7 @@ class TestIndexManagement(MarqoTestCase):
         application._deploy()
 
         with mock.patch.object(version, 'get_version', return_value='2.10.0'):
-            with self.assertRaises(ApplicationRollbackError) as e:
+            with self.assertRaisesStrict(ApplicationRollbackError) as e:
                 self.index_management.rollback_vespa()
             self.assertEqual("Aborting rollback. Reason: Vector store config has been changed since the last backup.", str(e.exception))
 
@@ -300,7 +299,7 @@ class TestIndexManagement(MarqoTestCase):
         application._deploy()
 
         with mock.patch.object(version, 'get_version', return_value='2.10.0'):
-            with self.assertRaises(ApplicationRollbackError) as e:
+            with self.assertRaisesStrict(ApplicationRollbackError) as e:
                 self.index_management.rollback_vespa()
             self.assertEqual("Aborting rollback. Reason: Vector store config has been changed since the last backup.",
                              str(e.exception))
@@ -360,18 +359,84 @@ class TestIndexManagement(MarqoTestCase):
         app = self.vespa_client.download_application()
         self._assert_index_is_not_present(app, index.name, index.schema_name)
 
+    def test_update_index_should_succeed(self):
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        self.index_management.bootstrap_vespa()
+        self.index_management.create_index(request)
+
+        # update this index
+        semi_structured_marqo_index = cast(SemiStructuredMarqoIndex, self.index_management.get_index(request.name))
+        semi_structured_marqo_index.tensor_fields.append(TensorField(
+            name='title', chunk_field_name='marqo__chunks_title', embeddings_field_name='marqo__embeddings_title'))
+        vespa_schema = cast(SemiStructuredVespaSchema, vespa_schema_factory(request))
+        new_schema = vespa_schema.generate_vespa_schema(semi_structured_marqo_index)
+        self.index_management.update_index(semi_structured_marqo_index)
+
+        # verify if the index is updated
+        app = self.vespa_client.download_application()
+        self._assert_index_is_present(app, semi_structured_marqo_index, new_schema, expected_version=2)
+
+    def test_update_index_should_fail_under_race_condition(self):
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        self.index_management.bootstrap_vespa()
+        self.index_management.create_index(request)
+
+        semi_structured_marqo_index = cast(SemiStructuredMarqoIndex, self.index_management.get_index(request.name))
+
+        change1 = semi_structured_marqo_index.copy(deep=True)
+        change1.tensor_fields.append(TensorField(
+            name='title', chunk_field_name='marqo__chunks_title', embeddings_field_name='marqo__embeddings_title'))
+        self.index_management.update_index(change1)
+
+        change2 = semi_structured_marqo_index.copy(deep=True)
+        change2.tensor_fields.append(TensorField(
+            name='desc', chunk_field_name='marqo__chunks_desc', embeddings_field_name='marqo__embeddings_desc'))
+
+        with self.assertRaisesStrict(OperationConflictError) as err:
+            self.index_management.update_index(change2)
+
+        self.assertIn("Current version is 2, and cannot be upgraded to target version 2. "
+                      "Some other request might have changed the index. Please try again.", str(err.exception))
+
+    def test_update_index_should_fail_if_index_does_not_exist(self):
+        self.index_management.bootstrap_vespa()
+
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        _, index = vespa_schema_factory(request).generate_schema()
+
+        with self.assertRaisesStrict(IndexNotFoundError):
+            self.index_management.update_index(index)
+
+    def test_update_index_should_fail_for_wrong_index_types(self):
+        self.index_management.bootstrap_vespa()
+
+        for request in [
+            # legacy unstructured index cannot be updated
+            self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'), marqo_version='2.12.0'),
+            # structured index cannot be updated
+            self.structured_marqo_index_request(
+                fields=[FieldRequest(name='title', type=FieldType.Text)],
+                tensor_fields=['title']
+            )
+        ]:
+            with self.subTest(f'request_type={type(request)}'):
+                _, index = vespa_schema_factory(request).generate_schema()
+
+                with self.assertRaisesStrict(InternalError):
+                    self.index_management.update_index(index)
+
     def test_create_index_should_fail_if_index_already_exists(self):
         request = self.unstructured_marqo_index_request(name="test-index")
         self.index_management.bootstrap_vespa()
         self.index_management.create_index(request)
 
-        with self.assertRaises(IndexExistsError):
+        with self.assertRaisesStrict(IndexExistsError):
             self.index_management.create_index(request)
 
     def test_delete_index_should_fail_when_index_is_not_found(self):
         self.index_management.bootstrap_vespa()
 
-        with self.assertRaises(IndexNotFoundError):
+        with self.assertRaisesStrict(IndexNotFoundError):
             self.index_management.delete_index_by_name('index-does-not-exist')
 
     def test_batch_create_and_delete_index_should_succeed(self):
@@ -413,7 +478,7 @@ class TestIndexManagement(MarqoTestCase):
         request2 = self.unstructured_marqo_index_request(name="index2")
         _, index2 = vespa_schema_factory(request2).generate_schema()
 
-        with self.assertRaises(IndexExistsError):
+        with self.assertRaisesStrict(IndexExistsError):
             self.index_management.batch_create_indexes([request2, request])
 
         app = self.vespa_client.download_application()
@@ -429,7 +494,7 @@ class TestIndexManagement(MarqoTestCase):
         request2 = self.unstructured_marqo_index_request(name="index2")
         _, index2 = vespa_schema_factory(request2).generate_schema()
 
-        with self.assertRaises(IndexNotFoundError):
+        with self.assertRaisesStrict(IndexNotFoundError):
             self.index_management.batch_delete_indexes_by_name([request.name, request2.name])
 
         app = self.vespa_client.download_application()
@@ -442,7 +507,7 @@ class TestIndexManagement(MarqoTestCase):
             self.index_management.create_index(request)
 
         def worker2():
-            with self.assertRaises(OperationConflictError) as e:
+            with self.assertRaisesStrict(OperationConflictError) as e:
                 request = self.unstructured_marqo_index_request(name="index2")
                 self.index_management.create_index(request)
             self.assertEqual("Another index creation/deletion operation is in progress.", str(e.exception))
@@ -489,7 +554,7 @@ class TestIndexManagement(MarqoTestCase):
 
         prepare_res2 = self.vespa_client.prepare(prepare_url2)
         # this should fail due to optimistic locking
-        with self.assertRaises(VespaActivationConflictError):
+        with self.assertRaisesStrict(VespaActivationConflictError):
             self.vespa_client.activate(prepare_res2['activate'])
 
     def _assert_file_exists(self, *file_paths: str):
@@ -506,12 +571,12 @@ class TestIndexManagement(MarqoTestCase):
         self.assertFalse(filecmp.cmp(path1, path2),
                          f'Expect file {path1} and {path2} to have different content, but they are the same')
 
-    def _assert_index_is_present(self, app, expected_index, expected_schema):
+    def _assert_index_is_present(self, app, expected_index, expected_schema, expected_version=1):
         # assert index setting exists and equals to expected value
         saved_index = self.index_management.get_index(expected_index.name)
         exclude_fields = {'model', 'version'}
         self.assertEqual(saved_index.dict(exclude=exclude_fields), expected_index.dict(exclude=exclude_fields))
-        self.assertEqual(saved_index.version, 1)
+        self.assertEqual(saved_index.version, expected_version)
 
         # asser that the prefixes are set correctly
         model_properties = get_model_properties_from_registry(saved_index.model.name)
@@ -529,7 +594,7 @@ class TestIndexManagement(MarqoTestCase):
         self.assertIsNotNone(doc)
 
     def _assert_index_is_not_present(self, app, index_name, schema_name):
-        with self.assertRaises(IndexNotFoundError):
+        with self.assertRaisesStrict(IndexNotFoundError):
             self.index_management.get_index(index_name)
 
         self._assert_file_does_not_exist(app, 'schemas', f'{schema_name}.sd')

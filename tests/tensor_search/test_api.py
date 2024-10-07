@@ -6,9 +6,7 @@ from fastapi.testclient import TestClient
 
 import marqo.tensor_search.api as api
 from marqo import exceptions as base_exceptions
-from marqo.api.exceptions import BadRequestError
 from marqo.core import exceptions as core_exceptions
-from marqo.core.exceptions import ZeroMagnitudeVectorError
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.enums import EnvVars
@@ -25,7 +23,7 @@ class ApiTests(MarqoTestCase):
         self.client = TestClient(api.app)
 
     def test_add_or_replace_documents_tensor_fields(self):
-        with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
+        with mock.patch('marqo.core.document.document.Document.add_documents') as mock_add_documents:
             mock_add_documents.return_value = MarqoAddDocumentsResponse(
                 errors=False,
                 processingTimeMs=0.0,

@@ -132,10 +132,13 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                 if modality is None:
                     modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
 
-                encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings, **kwargs)
-
+                # TODO maybe the infer parameter can be replaced by modality
+                infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
+                encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings,
+                                               infer=infer, **kwargs)
+                
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
-
+            
             if not vector_batches or all(len(batch) == 0 for batch in vector_batches):
                 raise RuntimeError(f"Vectorise created an empty list of batches! Content: {content}")
             else:
@@ -144,13 +147,13 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                 # Clear CUDA cache
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-
+        
     except (UnidentifiedImageError, OSError) as e:
         if isinstance(e, UnidentifiedImageError) or "image file is truncated" in str(e):
             raise VectoriseError(f"Could not process given image: {content}. Original Error message: {e}") from e
         else:
             raise e
-
+    
     return _convert_vectorized_output(vectorised)
 
 
@@ -206,7 +209,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
     """
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
-
+    
     #if model_properties.get("type") in ['languagebind', 'imagebind']:
     #    model = load_multimodal_model(model_name, model_properties, device)
 
@@ -749,7 +752,7 @@ def _get_model_loader(model_name: str, model_properties: dict) -> Any:
 
     if model_type not in MODEL_PROPERTIES['loaders']:
         raise KeyError(f"model_name={model_name} for model_type={model_type} not in allowed model types")
-
+    
     return MODEL_PROPERTIES['loaders'][model_type]
 
 
