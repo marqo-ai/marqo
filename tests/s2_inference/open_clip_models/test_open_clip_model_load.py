@@ -27,9 +27,9 @@ class TestOpenCLIPModelLoad(TestCase):
             "type": "open_clip"
         }
 
-        with patch("marqo.core.inference.models.open_clip_model import OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
+        with patch("marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
                    return_value=(MagicMock(), MagicMock())) as mock_load_method:
-            with patch("marqo.core.inference.models.open_clip_model import OPEN_CLIP._load_tokenizer_from_checkpoint",
+            with patch("marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP._load_tokenizer_from_checkpoint",
                        return_value=MagicMock()) as mock_load_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                     model = OPEN_CLIP(model_properties=model_properties, device="cpu")

@@ -1236,7 +1236,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                    with unittest.mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                     "extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             res = tensor_search.search(
@@ -1297,7 +1297,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                    with unittest.mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                     "extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             res = tensor_search.search(
@@ -1369,7 +1369,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained',mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
                     with unittest.mock.patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url", mock_download_pretrained_from_url):
-                        with unittest.mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                        with unittest.mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                         "extract_huggingface_archive", mock_extract_huggingface_archive):
                             try:
                                 res = tensor_search.search(
@@ -1424,7 +1424,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
             with mock.patch('marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url', new=mock_download):
-                with mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                with mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                 "extract_huggingface_archive", new=mock_extract_huggingface_archive):
                     res = tensor_search.search(config=self.config, text='hello', index_name=self.index_name_1)
 
@@ -1571,7 +1571,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                    with unittest.mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                     "extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -1632,7 +1632,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         with unittest.mock.patch('transformers.AutoModel.from_pretrained', mock_automodel_from_pretrained):
             with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                 with unittest.mock.patch('marqo.s2_inference.model_downloading.from_hf.hf_hub_download', mock_hf_hub_download):
-                    with unittest.mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                    with unittest.mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                     "extract_huggingface_archive", mock_extract_huggingface_archive):
                         try:
                             tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
@@ -1704,7 +1704,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
                     with unittest.mock.patch(
                             "marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url",
                             mock_download_pretrained_from_url):
-                        with unittest.mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                        with unittest.mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                         "extract_huggingface_archive",
                                                  mock_extract_huggingface_archive):
                             try:
@@ -1762,7 +1762,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
 
         with mock.patch('transformers.AutoModel.from_pretrained', new=mock_automodel_from_pretrained):
             with mock.patch('marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url', new=mock_download):
-                with mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                with mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                 "extract_huggingface_archive", new=mock_extract_huggingface_archive):
                     tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, auto_refresh=True, docs=[{'a': 'b'}], device="cpu"))
@@ -2484,7 +2484,7 @@ class TestS3ModelAuthlLoadForHFModelVariants(MarqoTestCase):
                 with unittest.mock.patch('transformers.AutoTokenizer.from_pretrained', mock_autotokenizer_from_pretrained):
                     with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
                         with unittest.mock.patch("marqo.s2_inference.processing.custom_clip_utils.download_pretrained_from_url",mock_download_pretrained_from_url):
-                            with unittest.mock.patch("marqo.core.inference.models.hugging_face_model.HuggingFaceModel."
+                            with unittest.mock.patch("marqo.core.inference.inference_models.hugging_face_model.HuggingFaceModel."
                             "extract_huggingface_archive", mock_extract_huggingface_archive):
                                 try:
                                     tensor_search.bulk_search(

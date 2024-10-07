@@ -46,7 +46,7 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
     def test_infer_pooling_method(self):
         for pooling_method in (PoolingMethod.Mean, PoolingMethod.CLS):
             with self.subTest(f"Pooling method inferred from name with {pooling_method}"):
-                with mock.patch("marqo.core.inference.models.hugging_face_model_properties."
+                with mock.patch("marqo.core.inference.inference_models.hugging_face_model_properties."
                                 "HuggingFaceModelProperties._infer_pooling_method_from_name",
                                 return_value = pooling_method) as mock_infer:
                     model = HuggingFaceModelProperties(name="model-with-cls", type="hf")
@@ -54,7 +54,7 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
                 self.assertEqual(pooling_method, model.pooling_method)
 
     def test_explicit_valid_pooling_method(self):
-        with mock.patch("marqo.core.inference.models.hugging_face_model_properties."
+        with mock.patch("marqo.core.inference.inference_models.hugging_face_model_properties."
                         "HuggingFaceModelProperties._infer_pooling_method_from_name") as mock_infer:
             model = HuggingFaceModelProperties(name="test-model", type="hf", pooling_method=PoolingMethod.CLS)
         self.assertEqual(model.pooling_method, PoolingMethod.CLS)
