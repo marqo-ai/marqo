@@ -25,15 +25,18 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     def __init__(self, model_properties: dict, device: str, model_auth: dict):
         super().__init__(model_properties, device, model_auth)
 
+        self.model_properties = self._build_model_properties(model_properties)
+
         self._model = None
         self._tokenizer = None
         self._pooling_func = None
 
-    def _build_model_properties(self, model_properties: dict):
+    def _build_model_properties(self, model_properties: dict) -> HuggingFaceModelProperties:
+        """Convert the user input model_properties to HuggingFaceModelProperties."""
         try:
             return HuggingFaceModelProperties(**model_properties)
         except ValidationError as e:
-            raise InvalidModelPropertiesError(f"Invalid model properties for the 'hf' model. Original error {e}") \
+            raise InvalidModelPropertiesError(f"Invalid model properties: {model_properties}. Original error {e}") \
                 from e
 
     def _check_loaded_components(self):

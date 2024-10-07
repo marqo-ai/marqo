@@ -16,6 +16,7 @@ from marqo.core.inference.inference_models.hf_tokenizer import HFTokenizer
 from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelLocation
+from pydantic import ValidationError
 
 logger = get_logger(__name__)
 
@@ -33,11 +34,18 @@ class OPEN_CLIP(AbstractCLIPModel):
 
         super().__init__(device, model_properties, model_auth)
 
+        self.model_properties = self._build_model_properties(model_properties)
+
         # model_auth gets passed through add_docs and search requests:
         self.preprocess_config = None
 
-    def _build_model_properties(self, model_properties: dict):
-        return OpenCLIPModelProperties(**model_properties)
+    def _build_model_properties(self, model_properties: dict) -> OpenCLIPModelProperties:
+        """Convert the user input model_properties to OpenCLIPModelProperties."""
+        try:
+            return OpenCLIPModelProperties(**model_properties)
+        except ValidationError as e:
+            raise InvalidModelPropertiesError(f"Invalid model properties: {model_properties}. Original error: {e}") \
+                from e
 
     def _load_necessary_components(self) -> None:
         """Load the open_clip model and _tokenizer."""
