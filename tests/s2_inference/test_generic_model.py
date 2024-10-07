@@ -93,7 +93,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "content 2. blah blah blah"
             }]
 
-        self.add_documents_and_refresh_index(config=config, add_docs_params=AddDocsParams(
+        self.add_documents(config=config, add_docs_params=AddDocsParams(
             index_name=index_name, docs=docs, device="cpu"))
 
     def test_validate_model_properties_missing_required_keys(self):

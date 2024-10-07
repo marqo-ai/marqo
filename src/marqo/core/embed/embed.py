@@ -72,7 +72,7 @@ class Embed:
 
         # Generate input for the vectorise pipeline (Preprocessing)
         RequestMetricsStore.for_request().start("embed.query_preprocessing")
-        marqo_index = index_meta_cache.get_index(config=temp_config, index_name=index_name)
+        marqo_index = index_meta_cache.get_index(index_management=temp_config.index_management, index_name=index_name)
 
         # Transform content to list if it is not already
         if isinstance(content, List):

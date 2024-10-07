@@ -66,11 +66,11 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         if self.should_update_index:
             with RequestMetricsStore.for_request().time("add_documents.update_index"):
                 self.index_management.update_index(self.marqo_index)
-            # Empty the index cache so the latest version can be loaded
-            # TODO this is temporary solution to fix the consistency issue for single instance Marqo (used extensively
+            # Force fresh this index in the index cache to make sure the following search requests get the latest index
+            # TODO this is a temporary solution to fix the consistency issue for single instance Marqo (used extensively
             #   in api-tests and integration tests). Find a better way to solve consistency issue for Marqo clusters
             from marqo.tensor_search import index_meta_cache
-            index_meta_cache.empty_cache()
+            index_meta_cache.get_index(self.index_management, self.marqo_index.name, force_refresh=True)
 
     def _add_lexical_field_to_index(self, field_name):
         if field_name in self.marqo_index.field_map:
