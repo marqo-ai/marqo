@@ -4,9 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from marqo.s2_inference.configs import ModelCache
-from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.core.inference.models.hugging_face_model import HuggingFaceModel
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.s2_inference import _load_model
 
 

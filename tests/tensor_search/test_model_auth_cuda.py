@@ -4,10 +4,10 @@ multiprocessing should be tested manually -problem with mocking (deadlock esque)
 """
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
-from marqo.api.exceptions import InvalidArgError, IndexNotFoundError, BadRequestError
+from marqo.tensor_search.models.private_models import S3Auth, ModelAuth
+from marqo.api.exceptions import IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
-from marqo.s2_inference.model_downloading.from_s3 import get_s3_model_absolute_cache_path
+from marqo.core.inference.download_model_from_s3 import get_s3_model_absolute_cache_path
 from marqo.tensor_search.models.external_apis.s3 import S3Location
 from unittest import mock
 from tests.tensor_search.test_model_auth import _delete_file, _get_base_index_settings
@@ -15,7 +15,6 @@ import unittest
 import os
 import torch
 import pytest
-from marqo.api.exceptions import BadRequestError
 
 
 @pytest.mark.largemodel

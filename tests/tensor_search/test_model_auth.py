@@ -7,9 +7,9 @@ from marqo.s2_inference.s2_inference import _convert_vectorized_output
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
-from marqo.api.exceptions import InvalidArgError, IndexNotFoundError, BadRequestError
+from marqo.api.exceptions import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.s2_inference.model_downloading.from_s3 import get_s3_model_absolute_cache_path
+from marqo.core.inference.download_model_from_s3 import get_s3_model_absolute_cache_path
 from marqo.tensor_search.models.external_apis.s3 import S3Location
 from unittest import mock
 import unittest
@@ -22,7 +22,6 @@ from marqo.api.exceptions import BadRequestError, ModelNotInCacheError
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity
 from marqo.s2_inference.configs import ModelCache
 import shutil
-from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.private_models import ModelLocation
 from pydantic.error_wrappers import ValidationError
 

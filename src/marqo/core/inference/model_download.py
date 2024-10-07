@@ -7,8 +7,8 @@ from tqdm import tqdm
 
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import ModelDownloadError, InvalidModelPropertiesError
-from marqo.s2_inference.model_downloading.from_hf import download_model_from_hf
-from marqo.s2_inference.model_downloading.from_s3 import (
+from marqo.core.inference.download_model_from_hf import download_model_from_hf
+from marqo.core.inference.download_model_from_s3 import (
     get_presigned_s3_url, get_s3_model_cache_filename, check_s3_model_already_exists,
     get_s3_model_absolute_cache_path
 )
