@@ -3,10 +3,10 @@ from unittest import mock
 
 from pydantic import ValidationError
 
-from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
+from marqo.core.inference.inference_models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
 from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.private_models import ModelLocation
-from marqo.core.inference.models.hugging_face_model import HuggingFaceModel
+from marqo.core.inference.inference_models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 import numpy as np
 

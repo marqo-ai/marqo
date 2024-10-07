@@ -11,8 +11,8 @@ from transformers import (AutoModel, AutoTokenizer)
 
 from marqo import marqo_docs
 from marqo.core.inference.model_download import download_model
-from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
+from marqo.core.inference.inference_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.core.inference.inference_models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.types import Union, FloatTensor, List

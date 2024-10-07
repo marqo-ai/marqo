@@ -2,10 +2,10 @@ from abc import abstractmethod
 
 from PIL import UnidentifiedImageError
 
-from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.core.inference.inference_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.s2_inference.types import *
-from marqo.core.inference.models.image_download import (_is_image, format_and_load_CLIP_images,
-                                                        format_and_load_CLIP_image)
+from marqo.core.inference.inference_models.image_download import (_is_image, format_and_load_CLIP_images,
+                                                                  format_and_load_CLIP_image)
 from marqo.s2_inference.logger import get_logger
 import torch
 

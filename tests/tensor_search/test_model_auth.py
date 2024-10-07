@@ -16,7 +16,7 @@ import unittest
 from marqo.s2_inference.s2_inference import clear_loaded_models
 from transformers import AutoModel, AutoTokenizer
 from marqo.core.inference.model_download import download_pretrained_from_url
-from marqo.core.inference.models.hugging_face_model import HuggingFaceModel
+from marqo.core.inference.inference_models.hugging_face_model import HuggingFaceModel
 import os
 from marqo.api.exceptions import BadRequestError, ModelNotInCacheError
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity

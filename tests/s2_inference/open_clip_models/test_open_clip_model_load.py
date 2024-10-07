@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
-from marqo.core.inference.models.open_clip_model import OPEN_CLIP
+from marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.model_registry import _get_open_clip_properties
 
