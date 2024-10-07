@@ -1,0 +1,10 @@
+schema marqo__settings {
+    document marqo__settings {
+        field index_name type string {
+            indexing: attribute | summary
+        }
+        field settings type string {
+            indexing: attribute | summary
+        }
+    }
+}

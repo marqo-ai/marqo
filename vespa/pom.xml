@@ -5,7 +5,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>ai.vespa.examples</groupId>
+    <groupId>ai.marqo</groupId>
     <artifactId>marqo-custom-searchers</artifactId>  <!-- Note: When changing this, also change bundle names in services.xml -->
     <version>1.0.0</version>
     <packaging>container-plugin</packaging>
@@ -16,11 +16,21 @@
             <artifactId>slf4j-api</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
         <!-- Start: Test dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.8.2</version>
+            <version>${org.junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -144,5 +154,6 @@
         <test.hide>true</test.hide>
         <java.version>17</java.version>
         <error-prone.version>2.28.0</error-prone.version>
+        <org.junit.version>5.10.3</org.junit.version>
     </properties>
 </project>

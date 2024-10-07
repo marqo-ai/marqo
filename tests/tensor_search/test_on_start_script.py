@@ -1,11 +1,11 @@
 import json
-
-from tests.marqo_test import MarqoTestCase
+import os
 from unittest import mock
+
+from marqo.api import exceptions, configs
 from marqo.tensor_search import enums
 from marqo.tensor_search import on_start_script
-from marqo.api import exceptions, configs
-import os
+from tests.marqo_test import MarqoTestCase
 
 
 class TestOnStartScript(MarqoTestCase):
@@ -253,7 +253,6 @@ class TestOnStartScript(MarqoTestCase):
 
         assert run_empty()
 
-
     def test_concurrent_model_loading(self):
         valid_patch_models = ['dino-v1', 'dino-v2']
         mock_chunk_image = mock.MagicMock()
@@ -268,6 +267,16 @@ class TestOnStartScript(MarqoTestCase):
             return True
 
         assert run()
+
+    @mock.patch("marqo.config.Config")
+    def test_boostrap_failure_should_raise_error(self, mock_config):
+        mock_config.index_management.bootstrap_vespa.side_effect = Exception('some error')
+
+        with self.assertRaises(Exception) as context:
+            on_start_script.on_start(mock_config)
+
+        self.assertTrue('some error' in str(context.exception))
+
 
 
 

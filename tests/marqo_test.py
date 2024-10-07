@@ -51,7 +51,7 @@ class MarqoTestCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.patcher.stop()
         if cls.indexes:
-            cls.index_management.batch_delete_indexes(cls.indexes)
+            cls.index_management.batch_delete_indexes_by_name([index.name for index in cls.indexes])
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -75,6 +75,7 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
+        cls.index_management.bootstrap_vespa()
         indexes = cls.index_management.batch_create_indexes(index_requests)
         cls.indexes = indexes
 
@@ -126,7 +127,8 @@ class MarqoTestCase(unittest.TestCase):
             ),
             marqo_version=version.get_version(),
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
+            version=None
     ) -> StructuredMarqoIndex:
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndex.
@@ -147,7 +149,8 @@ class MarqoTestCase(unittest.TestCase):
             tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            version=version
         )
 
     @classmethod
@@ -186,7 +189,8 @@ class MarqoTestCase(unittest.TestCase):
             updated_at=time.time(),
             treat_urls_and_pointers_as_images=True,
             treat_urls_and_pointers_as_media=True,
-            filter_string_max_length=100
+            filter_string_max_length=100,
+            version=None
     ) -> UnstructuredMarqoIndex:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndex.
@@ -210,7 +214,8 @@ class MarqoTestCase(unittest.TestCase):
             updated_at=updated_at,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
             treat_urls_and_pointers_as_media=treat_urls_and_pointers_as_media,
-            filter_string_max_length=filter_string_max_length
+            filter_string_max_length=filter_string_max_length,
+            version=version
         )
 
     @classmethod
