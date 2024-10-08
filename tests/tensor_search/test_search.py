@@ -1170,7 +1170,7 @@ class TestVectorSearch(MarqoTestCase):
             docs=docs, auto_refresh=True
         )
         invalid_queries = [{}, None, {123: 123}, {'123': None},
-                           {"https://marqo_not_real.com/image_1.png": 3}, set()]
+                           {"https://marqo-not-real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             try:
                 tensor_search.search(

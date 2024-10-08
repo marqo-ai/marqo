@@ -1081,7 +1081,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         )
 
         invalid_queries = [{}, None, {123: 123}, {'123': None},
-                           {"https://marqo_not_real.com/image_1.png": 3}, set()]
+                           {"https://marqo-not-real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             with self.subTest(f"query={q}"):
                 with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
