@@ -106,6 +106,7 @@ class HuggingFaceStellaModel(AbstractEmbeddingModel):
                            map_location=torch.device(self.device)).items()
             }
             vector_linear.load_state_dict(vector_linear_dict)
+            vector_linear.to(self.device)
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encountered an error loading the Hugging Face model, modelProperties={self.model_properties}. "
