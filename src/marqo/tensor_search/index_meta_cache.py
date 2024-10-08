@@ -5,7 +5,7 @@ index in the search DB via a plugin.
 """
 import threading
 import time
-from typing import Dict, Optional
+from typing import Dict
 
 from marqo import marqo_docs
 from marqo.api import exceptions
