@@ -25,7 +25,7 @@ index_info_cache = dict()
 # Because it is non thread safe, there is a chance multiple threads push out
 # multiple refresh requests at the same. It isn't a critical problem if that
 # happens.
-cache_refresh_interval: int = 10  # seconds
+cache_refresh_interval: int = 1  # seconds
 cache_refresh_log_interval: int = 60
 cache_refresh_last_logged_time: float = 0
 refresh_thread = None
