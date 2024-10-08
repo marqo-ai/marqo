@@ -741,8 +741,8 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertIn("hits", hybrid_res)
                     self.assertEqual(len(hybrid_res["hits"]), 3)    # Only 3 documents have text field 2. Tensor retrieval will get them all.
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc12")
-                    self.assertEqual(hybrid_res["hits"][1]["_id"], "doc11")
-                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc13")
+                    # doc11 and doc13 has score 0, so their order is non-deterministic
+                    self.assertSetEqual({'doc11', 'doc13'}, {hit["_id"] for hit in hybrid_res["hits"][1:]})
 
     def test_hybrid_search_score_modifiers(self):
         """
