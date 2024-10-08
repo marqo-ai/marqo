@@ -671,7 +671,6 @@ class TestHybridSearch(MarqoTestCase):
     def test_hybrid_search_searchable_attributes(self):
         """
         Tests that searchable attributes work as expected for all methods
-        TODO: Add unstructured index once searchable attributes are supported
         """
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
