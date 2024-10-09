@@ -17,6 +17,7 @@ from tests.marqo_test import TestImageUrls
 
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
+
 class TestEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -48,13 +49,15 @@ class TestEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                for normalize_embeddings in [True, False]:
+                    output_v = vectorise(name, sentence, model_properties, device,
+                                         normalize_embeddings=normalize_embeddings)
 
-                assert _check_output_type(output_v)
+                    assert _check_output_type(output_v)
 
-                output_m = model.encode(sentence, normalize=True)
+                    output_m = model.encode(sentence, normalize=normalize_embeddings)
 
-                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+                    assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
             clear_loaded_models()
 
@@ -252,29 +255,6 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
-    def test_onnx_clip_vectorise(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32']
-
-        sentences = ['hello', 'this is a test sentence. so is this.',
-                     ['hello', 'this is a test sentence. so is this.']]
-        device = 'cpu'
-        eps = 1e-9
-
-        for name in names:
-            model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
-
-            for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
-
-                assert _check_output_type(output_v)
-
-                output_m = model.encode(sentence, normalize=True)
-
-                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
-
-            clear_loaded_models()
-
 
 class TestOpenClipModelEncoding(unittest.TestCase):
     '''
@@ -307,13 +287,15 @@ class TestOpenClipModelEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                for normalize_embeddings in [True, False]:
+                    output_v = vectorise(name, sentence, model_properties, device,
+                                         normalize_embeddings=normalize_embeddings)
 
-                assert _check_output_type(output_v)
+                    assert _check_output_type(output_v)
 
-                output_m = model.encode(sentence, normalize=True)
+                    output_m = model.encode(sentence, normalize=normalize_embeddings)
 
-                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+                    assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
             clear_loaded_models()
 

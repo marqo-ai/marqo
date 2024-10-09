@@ -126,7 +126,7 @@ class DefaultEncoder(ModelEncoder):
         self.model = model
 
     def encode(self, content, modality, **kwargs):
-        return self.model.encode(content)
+        return self.model.encode(content, **kwargs)
 
 
 @contextmanager
