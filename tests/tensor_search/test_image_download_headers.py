@@ -63,7 +63,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
             config=self.config, index_name=self.index_name_1, index_settings=self.image_index_settings()
         )
         image_download_headers = {"Authorization": "some secret key blah"}
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {"_id": "1", "image": self.real_img_url}],
             auto_refresh=True, image_download_headers=image_download_headers, device="cpu"))
@@ -105,7 +105,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
             image_download_headers = {"Authorization": "some secret key blah"}
 
             # Add a document with an image URL
-            self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+            self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
                     {"_id": "1", "image": self.real_img_url}
                 ], auto_refresh=True, image_download_headers=image_download_headers, device="cpu"
@@ -138,7 +138,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
         mock_load_image_from_path.side_effect = pass_through_load_image_from_path
 
         with unittest.mock.patch("marqo.s2_inference.clip_utils.load_image_from_path", mock_load_image_from_path):
-            self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+            self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
                     {
                         "_id": "1",

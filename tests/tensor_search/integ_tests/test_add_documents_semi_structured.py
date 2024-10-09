@@ -74,7 +74,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         ]
         for index_name, desc in tests:
             with self.subTest(desc):
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.default_text_index,
                         docs=[{
@@ -103,7 +103,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         """
 
         # Add once to get vectors
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=[{
@@ -117,7 +117,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             config=self.config, index_name=self.default_text_index,
             document_id="1", show_vectors=True)['_tensor_facets']
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=[
@@ -129,7 +129,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 device="cpu", tensor_fields=["title"]
             )
         )
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=[
@@ -157,7 +157,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         rand_index = 'a' + str(uuid.uuid4()).replace('-', '')
 
         with pytest.raises(IndexNotFoundError):
-            self.add_documents_and_refresh_index(
+            self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=rand_index, docs=[{"abc": "def"}], device="cpu"
                 )
@@ -176,7 +176,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             {"title": "\r\r"},
             {"title": "\r\t\n"},
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=docs, device="cpu", tensor_fields=[]
             )
@@ -188,7 +188,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         assert count == len(docs)
 
     def test_add_docs_response_format(self):
-        add_res = self.add_documents_and_refresh_index(
+        add_res = self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
                 docs=[
@@ -252,7 +252,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
                 with self.subTest(msg=f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'):
-                    add_res = self.add_documents_and_refresh_index(
+                    add_res = self.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=self.default_text_index, docs=bad_doc_arg,
                             use_existing_tensors=use_existing_tensors_flag, device="cpu",
@@ -285,7 +285,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
                 with self.subTest(f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'):
-                    add_res = self.add_documents_and_refresh_index(
+                    add_res = self.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=self.default_text_index, docs=bad_doc_arg[0],
                             use_existing_tensors=use_existing_tensors_flag, device="cpu", tensor_fields=["title"]
@@ -307,7 +307,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             [{"_id": "to_fail_123", "tags": ["wow", "this", "is"]}]
         ]
         for bad_doc_arg in good_docs:
-            add_res = self.add_documents_and_refresh_index(
+            add_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.default_text_index,
                     docs=bad_doc_arg,
@@ -327,7 +327,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         bad_doc_args = self.tags_
         for bad_doc_arg in bad_doc_args:
             with self.subTest(bad_doc_arg):
-                add_res = self.add_documents_and_refresh_index(
+                add_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.default_text_index,
                         docs=bad_doc_arg,
@@ -347,7 +347,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
-            self.add_documents_and_refresh_index(
+            self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.default_text_index, device="cuda:22", docs=[{"title": "doc"}, {"title": "doc"}],
                     tensor_fields=["title"]
@@ -364,7 +364,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         Adding empty documents raises BadRequestError
         """
         try:
-            self.add_documents_and_refresh_index(
+            self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.default_text_index, docs=[],
                     device="cpu")
@@ -383,8 +383,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         ]
 
         with mock.patch('PIL.Image.open') as mock_image_open:
-            self.add_documents_and_refresh_index(config=self.config,
-                                                 add_docs_params=AddDocsParams(
+            self.add_documents(config=self.config,
+                               add_docs_params=AddDocsParams(
                                             index_name=self.default_image_index, docs=docs,
                                             device="cpu", tensor_fields=["title"]
                                         ))
@@ -433,7 +433,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         ]
         for docs, expected_results in docs_results:
             with self.subTest(f'{expected_results}'):
-                add_res = self.add_documents_and_refresh_index(
+                add_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.default_text_index, docs=docs,
                         device="cpu", tensor_fields=[]
@@ -450,7 +450,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
     def test_add_document_with_tensor_fields(self):
         """Ensure tensor_fields only works for title but not desc"""
         docs_ = [{"_id": "789", "title": "Story of Alice Appleseed", "desc": "Alice grew up in Houston, Texas."}]
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.default_text_index, docs=docs_, device="cpu", tensor_fields=["title"]
         ))
         resp = tensor_search.get_document_by_id(config=self.config,
@@ -468,7 +468,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
-            update_res = self.add_documents_and_refresh_index(
+            update_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.default_text_index, docs=[
                         {"_id": "123", 'desc': "edf " * (max_size // 4)},
@@ -493,7 +493,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
-            update_res = self.add_documents_and_refresh_index(
+            update_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.default_text_index, docs=[
                         {"_id": "123", 'desc': "edf " * (max_size // 4)},
@@ -516,7 +516,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         for env_dict in [dict()]:
             @mock.patch.dict(os.environ, {**os.environ, **env_dict})
             def run():
-                update_res = self.add_documents_and_refresh_index(
+                update_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.default_text_index, docs=[
                             {"_id": "123", 'desc': "Some content"},
@@ -536,13 +536,13 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         If a document is re-indexed with a tensor field removed, the vectors are removed
         """
         # test replace and update workflows
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             self.config, add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "title": "mydata", "desc": "mydata2"}],
                 index_name=self.default_text_index, device="cpu", tensor_fields=["title"]
             )
         )
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             self.config,
             add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "desc": "mydata"}],
@@ -572,7 +572,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
                 if error:
                     with self.assertRaises(BadRequestError):
-                        self.add_documents_and_refresh_index(
+                        self.add_documents(
                             config=self.config, add_docs_params=AddDocsParams(
                                 index_name=self.default_text_index,
                                 docs=[{
@@ -584,7 +584,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                         )
                 else:
                     self.assertEqual(False,
-                                     self.add_documents_and_refresh_index(
+                                     self.add_documents(
                                          config=self.config, add_docs_params=AddDocsParams(
                                              index_name=self.default_text_index,
                                              docs=[{
@@ -600,7 +600,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         """
         If a document is indexed with no tensor fields on an empty index, no vectors are added
         """
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             self.config, add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "desc": "mydata"}],
                 index_name=self.default_text_index,
@@ -616,7 +616,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         """
         If a document is indexed with a tensor field vectors are added for the tensor field
         """
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             self.config, add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "title": "mydata", "desc": "mydata"}],
                 index_name=self.default_text_index, tensor_fields=["title"],
@@ -661,7 +661,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         for c in doc_counts:
             self.clear_index_by_name(self.image_index_with_random_model)
 
-            res1 = self.add_documents_and_refresh_index(
+            res1 = self.add_documents(
                 self.config,
                 add_docs_params=AddDocsParams(
                     docs=[{"_id": str(doc_num),
@@ -690,7 +690,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         for tensor_fields, error_message, msg in test_cases:
             with self.subTest(msg):
                 with self.assertRaises(BadRequestError) as e:
-                    self.add_documents_and_refresh_index(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(index_name=self.default_text_index,
                                                       docs=[{"some": "data"}], **tensor_fields))
@@ -715,7 +715,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         for doc, error in test_case:
             with self.subTest():
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.default_text_index, docs=[doc], device="cpu",
                         tensor_fields=[]
@@ -741,8 +741,8 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         for documents, number_of_docs, msg in test_cases:
             self.clear_index_by_name(self.default_text_index)
             with self.subTest(msg):
-                r = self.add_documents_and_refresh_index(config=self.config,
-                                                         add_docs_params=AddDocsParams(
+                r = self.add_documents(config=self.config,
+                                       add_docs_params=AddDocsParams(
                                                     index_name=self.default_text_index, docs=documents,
                                                     device="cpu", tensor_fields=["text_field"]
                                                 )).dict(exclude_none=True, by_alias=True)

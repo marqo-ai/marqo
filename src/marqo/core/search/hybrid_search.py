@@ -82,7 +82,7 @@ class HybridSearch:
 
         RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
 
-        marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+        marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
         # Version checks (different for structured and unstructured)
         marqo_index_version = marqo_index.parsed_marqo_version()
