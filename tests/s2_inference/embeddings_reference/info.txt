@@ -1,0 +1,6 @@
+16/10/24 - All embeddings were generated with:
+- Python 3.8.20
+- open_clip_torch==2.24.0
+- torch==1.12.1
+- Ubuntu 22.04.4 LTS
+- g4dn.xlarge EC2 instance
