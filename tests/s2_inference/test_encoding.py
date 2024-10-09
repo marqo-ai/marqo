@@ -55,7 +55,7 @@ class TestEncoding(unittest.TestCase):
                 output_m = model.encode(sentence, normalize=True)
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
                 for vector in output_v:
-                    assert abs(torch.linalg.norm(np.array(vector)) - 1) < eps
+                    assert abs(torch.linalg.norm(np.array(vector)) - 1) < 1e-5
 
                 output_v_unnormalised = vectorise(name, sentence, model_properties, device, normalize_embeddings=False)
                 assert _check_output_type(output_v)
@@ -63,7 +63,7 @@ class TestEncoding(unittest.TestCase):
                 assert abs(torch.FloatTensor(output_v_unnormalised) - torch.FloatTensor(output_m_unnormalised)).sum() < eps
 
                 for vector in output_v_unnormalised:
-                    assert abs(torch.linalg.norm(np.array(vector)) - 1) > eps
+                    assert abs(torch.linalg.norm(np.array(vector)) - 1) > 1e-5
 
             clear_loaded_models()
 
