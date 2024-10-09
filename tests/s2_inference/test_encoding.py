@@ -37,7 +37,9 @@ class TestEncoding(unittest.TestCase):
 
         names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
 
-        names = names + names_e5 + names_bge + names_snowflake
+        language_bind_models = ["LanguageBind/Video_V1.5_FT"]
+
+        names = names + names_e5 + names_bge + names_snowflake + language_bind_models
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
