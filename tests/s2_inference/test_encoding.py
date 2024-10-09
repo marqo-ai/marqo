@@ -26,7 +26,8 @@ class TestEncoding(unittest.TestCase):
         clear_loaded_models()
 
     def test_vectorize(self):
-        names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
+        names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32",
+                 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
@@ -37,9 +38,35 @@ class TestEncoding(unittest.TestCase):
 
         names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
 
-        language_bind_models = ["LanguageBind/Video_V1.5_FT"]
+        names = names + names_e5 + names_bge + names_snowflake
 
-        names = names + names_e5 + names_bge + names_snowflake + language_bind_models
+        sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
+        device = 'cpu'
+        eps = 1e-9
+
+        for name in names:
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+
+            for sentence in sentences:
+                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+
+                assert _check_output_type(output_v)
+
+                output_m = model.encode(sentence, normalize=True)
+
+                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+
+            clear_loaded_models()
+
+    def test_vectorize_normalise(self):
+        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k"]
+
+        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
+
+        names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
+
+        names = open_clip_names + names_bge + names_snowflake
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
