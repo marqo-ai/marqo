@@ -17,7 +17,6 @@ from tests.marqo_test import TestImageUrls
 
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
-
 class TestEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -38,7 +37,9 @@ class TestEncoding(unittest.TestCase):
 
         names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
 
-        names = names + names_e5 + names_bge + names_snowflake
+        language_bind_models = ["LanguageBind/Video_V1.5_FT"]
+
+        names = names + names_e5 + names_bge + names_snowflake + language_bind_models
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
@@ -49,15 +50,20 @@ class TestEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
-                for normalize_embeddings in [True, False]:
-                    output_v = vectorise(name, sentence, model_properties, device,
-                                         normalize_embeddings=normalize_embeddings)
+                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                assert _check_output_type(output_v)
+                output_m = model.encode(sentence, normalize=True)
+                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+                for vector in output_v:
+                    assert abs(torch.linalg.norm(np.array(vector)) - 1) < 1e-5
 
-                    assert _check_output_type(output_v)
+                output_v_unnormalised = vectorise(name, sentence, model_properties, device, normalize_embeddings=False)
+                assert _check_output_type(output_v)
+                output_m_unnormalised = model.encode(sentence, normalize=False)
+                assert abs(torch.FloatTensor(output_v_unnormalised) - torch.FloatTensor(output_m_unnormalised)).sum() < eps
 
-                    output_m = model.encode(sentence, normalize=normalize_embeddings)
-
-                    assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+                for vector in output_v_unnormalised:
+                    assert abs(torch.linalg.norm(np.array(vector)) - 1) > 1e-5
 
             clear_loaded_models()
 

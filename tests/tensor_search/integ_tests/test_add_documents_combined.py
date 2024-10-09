@@ -2,6 +2,8 @@ import os
 import uuid
 from unittest import mock
 from unittest.mock import patch
+
+import numpy as np
 import pytest
 import torch
 
@@ -9,6 +11,8 @@ import torch
 import PIL
 import requests
 import torch
+from sentence_transformers.util import normalize_embeddings
+from sklearn.metrics.pairwise import distance_metrics
 from torch import Tensor
 from urllib3.exceptions import ProtocolError
 import unittest.mock
@@ -47,6 +51,33 @@ class TestAddDocumentsCombined(MarqoTestCase):
             ],
             model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
             tensor_fields=["image_field_1", "text_field_1", "multimodal_field"]
+        )
+
+        structured_image_index_request_unnormalized = cls.structured_marqo_index_request(
+            name="structured_image_index_unnormalised" + str(uuid.uuid4()).replace('-', ''),
+            fields=[
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
+            ],
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            tensor_fields=["image_field_1", "text_field_1"],
+            normalize_embeddings=False,
+            distance_metric=DistanceMetric.DotProduct
+        )
+
+        structured_text_index_request_unnormalized = cls.structured_marqo_index_request(
+            name="structured_image_index_unnormalised" + str(uuid.uuid4()).replace('-', ''),
+            fields=[
+                FieldRequest(
+                    name="text_field_1", type=FieldType.Text,
+                    features=[FieldFeature.Filter, FieldFeature.LexicalSearch]
+                ),
+            ],
+            model=Model(name="hf/e5-base-v2"),
+            tensor_fields=["text_field_1"],
+            normalize_embeddings=False,
+            distance_metric=DistanceMetric.DotProduct
         )
 
         structured_languagebind_index_request = cls.structured_marqo_index_request(
@@ -94,17 +125,41 @@ class TestAddDocumentsCombined(MarqoTestCase):
             treat_urls_and_pointers_as_media=True
         )
 
+        unstructured_image_index_request_unnormalized = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index_unnormalised" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="open_clip/ViT-B-32/laion2b_s34b_b79k"),
+            normalize_embeddings=False,
+            distance_metric=DistanceMetric.DotProduct
+        )
+
+        unstructured_text_index_request_unnormalized = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index_unnormalised" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="hf/e5-base-v2"),
+            normalize_embeddings=False,
+            distance_metric=DistanceMetric.DotProduct
+        )
+
         cls.indexes = cls.create_indexes([
             structured_image_index_request,
             structured_languagebind_index_request,
+            structured_image_index_request_unnormalized,
+            structured_text_index_request_unnormalized,
+
             unstructured_image_index_request,
-            unstructured_languagebind_index_request
+            unstructured_languagebind_index_request,
+            unstructured_image_index_request_unnormalized,
+            unstructured_text_index_request_unnormalized
         ])
 
         cls.structured_marqo_index_name = structured_image_index_request.name
         cls.structured_languagebind_index_name = structured_languagebind_index_request.name
+        cls.structured_image_index_unnormalized_name = structured_image_index_request_unnormalized.name
+        cls.structured_text_index_unnormalized_name = structured_text_index_request_unnormalized.name
+
         cls.unstructured_marqo_index_name = unstructured_image_index_request.name
         cls.unstructured_languagebind_index_name = unstructured_languagebind_index_request.name
+        cls.unstructured_image_index_unnormalized_name = unstructured_image_index_request_unnormalized.name
+        cls.unstructured_text_index_unnormalized_name = unstructured_text_index_request_unnormalized.name
 
     def setUp(self) -> None:
         super().setUp()
@@ -808,3 +863,103 @@ class TestAddDocumentsCombined(MarqoTestCase):
         image_url_no_extension = "https://il.redbubble.net/catalogue/image/by-rb-work/157037551/simple-preview"
         modality = infer_modality(image_url_no_extension)
         self.assertEqual(modality, streaming_media_processor.Modality.IMAGE)
+
+    def test_imageIndexEmbeddingsUnnormalised(self):
+        """Test to ensure that the image embeddings are unnormalised when the index is unnormalised"""
+        documents = [
+            {
+                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value,
+                "_id": "1"
+            }
+        ]
+        for index_name in [self.unstructured_image_index_unnormalized_name, self.structured_image_index_unnormalized_name]:
+            tensor_fields = ["image_field_1"] if index_name == self.unstructured_image_index_unnormalized_name \
+                else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=tensor_fields
+                    )
+                )
+                for item in res.dict(exclude_none=True, by_alias=True)['items']:
+                    self.assertEqual(200, item['status'])
+
+                get_res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index_name,
+                    document_ids=["1"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)
+
+                embeddings = get_res['results'][0]['_tensor_facets'][0]['_embedding']
+                norm = np.linalg.norm(np.array(embeddings))
+                self.assertTrue(norm - 1.0 > 1e-5, f"Embedding norm is {norm}")
+
+    def test_imageIndexEmbeddingsNormalised(self):
+        """Test to ensure that the image embeddings are normalised when the index is normalised"""
+
+        documents = [
+            {
+                "image_field_1": TestImageUrls.HIPPO_REALISTIC.value,
+                "_id": "1"
+            }
+        ]
+        for index_name in [self.unstructured_marqo_index_name, self.unstructured_marqo_index_name]:
+            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
+                else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=tensor_fields
+                    )
+                )
+                for item in res.dict(exclude_none=True, by_alias=True)['items']:
+                    self.assertEqual(200, item['status'])
+
+                get_res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index_name,
+                    document_ids=["1"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)
+
+                embeddings = get_res['results'][0]['_tensor_facets'][0]['_embedding']
+                norm = np.linalg.norm(np.array(embeddings))
+                self.assertTrue(norm - 1.0 < 1e-5, f"Embedding norm is {norm}")
+
+    def test_textIndexEmbeddingsUnnormalized(self):
+        """A test to ensure that the text embeddings are unnormalised when the index is unnormalised"""
+        documents = [
+            {
+                "text_field_1": "This is a test text",
+                "_id": "1"
+            }
+        ]
+        for index_name in [self.unstructured_text_index_unnormalized_name, self.structured_text_index_unnormalized_name]:
+            tensor_fields = ["text_field_1"] if index_name == self.unstructured_text_index_unnormalized_name \
+                else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=tensor_fields
+                    )
+                )
+                for item in res.dict(exclude_none=True, by_alias=True)['items']:
+                    self.assertEqual(200, item['status'])
+
+                get_res = tensor_search.get_documents_by_ids(
+                    config=self.config, index_name=index_name,
+                    document_ids=["1"],
+                    show_vectors=True
+                ).dict(exclude_none=True, by_alias=True)
+
+                embeddings = get_res['results'][0]['_tensor_facets'][0]['_embedding']
+                norm = np.linalg.norm(np.array(embeddings))
+                self.assertTrue(norm - 1.0 > 1e-5, f"Embedding norm is {norm}")
