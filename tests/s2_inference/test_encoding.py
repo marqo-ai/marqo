@@ -49,12 +49,19 @@ class TestEncoding(unittest.TestCase):
 
             for sentence in sentences:
                 output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
-
                 assert _check_output_type(output_v)
-
                 output_m = model.encode(sentence, normalize=True)
-
                 assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+                for vector in output_v:
+                    assert abs(torch.linalg.norm(np.array(vector)) - 1) < eps
+
+                output_v_unnormalised = vectorise(name, sentence, model_properties, device, normalize_embeddings=False)
+                assert _check_output_type(output_v)
+                output_m_unnormalised = model.encode(sentence, normalize=False)
+                assert abs(torch.FloatTensor(output_v_unnormalised) - torch.FloatTensor(output_m_unnormalised)).sum() < eps
+
+                for vector in output_v_unnormalised:
+                    assert abs(torch.linalg.norm(np.array(vector)) - 1) > eps
 
             clear_loaded_models()
 
