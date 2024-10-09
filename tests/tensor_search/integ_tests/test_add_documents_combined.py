@@ -1,32 +1,25 @@
 import os
+import unittest.mock
 import uuid
 from unittest import mock
 from unittest.mock import patch
 
+import PIL
 import numpy as np
 import pytest
-import torch
-
-
-import PIL
 import requests
 import torch
-from sentence_transformers.util import normalize_embeddings
-from sklearn.metrics.pairwise import distance_metrics
 from torch import Tensor
-from urllib3.exceptions import ProtocolError
-import unittest.mock
-
 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.s2_inference import types
+from marqo.s2_inference.multimodal_model_load import infer_modality
 from marqo.tensor_search import add_docs
+from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.add_docs_objects import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
-from marqo.tensor_search import streaming_media_processor
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
