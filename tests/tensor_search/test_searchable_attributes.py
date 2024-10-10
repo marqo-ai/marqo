@@ -51,7 +51,7 @@ class TestSearchableAttributes(MarqoTestCase):
         self.device_patcher.stop()
 
     def _add_documents(self, index_name):
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=index_name,

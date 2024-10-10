@@ -311,7 +311,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                add_docs_res = self.add_documents_and_refresh_index(
+                add_docs_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -356,7 +356,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                add_docs_res = self.add_documents_and_refresh_index(
+                add_docs_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[

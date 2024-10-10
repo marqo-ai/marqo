@@ -133,7 +133,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "text field tensor",
             "_id": "1"
         }
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_doc]
         ))
@@ -149,7 +149,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "text field tensor",
             "_id": "1"
         }
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_doc]
         ))
@@ -165,7 +165,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "text field tensor",
             "_id": "1"
         }
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_doc]
         ))
@@ -369,7 +369,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "search me",
             "_id": "1"
         }
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_doc]
         ))
@@ -402,7 +402,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "search me",
             "_id": "1"
         }
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_doc]
         ))
@@ -455,7 +455,7 @@ class TestUpdate(MarqoTestCase):
                     mappings = None
 
                 # Add the original document
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index_name,
@@ -470,7 +470,7 @@ class TestUpdate(MarqoTestCase):
                     "_id": "1",
                     "image_field_1": updated_image_url
                 }
-                r = self.add_documents_and_refresh_index(
+                r = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index_name,
@@ -506,7 +506,7 @@ class TestUpdate(MarqoTestCase):
             "dependent_field_2": "dependent field 2",
             "_id": "1"
         }
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_doc]
         ))
@@ -529,7 +529,7 @@ class TestUpdate(MarqoTestCase):
             "text_field_tensor": "search me",
             "_id": "1"
         }
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_doc]
         ))
@@ -657,7 +657,7 @@ class TestUpdate(MarqoTestCase):
             "_id": "1"
         }
 
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.structured_index_name,
             docs=[original_document]
         ))
@@ -733,7 +733,7 @@ class TestUpdate(MarqoTestCase):
         original_document["text_field_tensor"] = "text field tensor"
         original_document["_id"] = "1"
 
-        self.add_documents_and_refresh_index(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.large_score_modifier_index_name,
             docs=[original_document]
         ))
