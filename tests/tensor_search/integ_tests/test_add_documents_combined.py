@@ -170,9 +170,9 @@ class TestAddDocumentsCombined(MarqoTestCase):
             unstructured_languagebind_index_request,
 
             unstructured_image_index_request_unnormalized,
-            unstructured_text_index_request_unnormalized
+            unstructured_text_index_request_unnormalized,
             structured_image_index_request_unnormalized,
-            structured_text_index_request_unnormalized,
+            structured_text_index_request_unnormalized
         ])
 
         cls.structured_marqo_index_name = structured_image_index_request.name
