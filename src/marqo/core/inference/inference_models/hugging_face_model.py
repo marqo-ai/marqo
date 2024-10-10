@@ -87,11 +87,12 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         try:
             model = AutoModel.from_pretrained(
                 self.model_properties.model_location.hf.repo_id,
-                token=hf_repo_token
+                token=hf_repo_token, trust_remote_code=True, use_memory_efficient_attention=False,
+                                              unpad_inputs=False, cache_dir='~/Downloads/hf/'
             )
             tokenizer = AutoTokenizer.from_pretrained(
                 self.model_properties.model_location.hf.repo_id,
-                token=hf_repo_token
+                token=hf_repo_token, trust_remote_code=True
             )
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
@@ -123,8 +124,9 @@ class HuggingFaceModel(AbstractEmbeddingModel):
 
         model_dir = self.extract_huggingface_archive(zip_file_path)
         try:
-            model = AutoModel.from_pretrained(model_dir).to(self.device)
-            tokenizer = AutoTokenizer.from_pretrained(model_dir)
+            model = AutoModel.from_pretrained(model_dir, trust_remote_code=True, use_memory_efficient_attention=False,
+                                              unpad_inputs=False).to(self.device)
+            tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True)
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encountered an error loading the Hugging Face model, modelProperties={self.model_properties}. "

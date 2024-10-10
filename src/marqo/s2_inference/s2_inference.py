@@ -15,7 +15,6 @@ from typing import List, Dict, Any, Optional
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
 from marqo.s2_inference import constants
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,

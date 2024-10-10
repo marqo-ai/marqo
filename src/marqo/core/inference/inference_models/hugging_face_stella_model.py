@@ -12,8 +12,9 @@ from transformers import (AutoModel, AutoTokenizer)
 
 from marqo import marqo_docs
 from marqo.core.inference.model_download import download_model
-from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
+from marqo.core.inference.inference_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.core.inference.inference_models.hugging_face_model_properties import HuggingFaceModelProperties, \
+    PoolingMethod
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.types import Union, FloatTensor, List
@@ -33,6 +34,8 @@ class HuggingFaceStellaModel(AbstractEmbeddingModel):
 
     def __init__(self, model_properties: dict, device: str, model_auth: dict):
         super().__init__(model_properties, device, model_auth)
+
+        self.model_properties = self._build_model_properties(model_properties)
 
         self.model = None
         self.tokenizer = None
@@ -57,8 +60,22 @@ class HuggingFaceStellaModel(AbstractEmbeddingModel):
     def _load_necessary_components(self):
         if self.model_properties.name:
             self.model, self.tokenizer = self._load_from_hugging_face_repo()
-        elif self.model_properties.url or self.model_properties.model_location:
+        elif self.model_properties.url:
             self.model, self.tokenizer, self.vector_linear = self._load_from_zip_file()
+        elif self.model_properties.model_location:
+            if self.model_properties.model_location.s3:
+                self.model, self.tokenizer = self._load_from_zip_file()
+            elif self.model_properties.model_location.hf:
+                if self.model_properties.model_location.hf.filename:
+                    self.model, self.tokenizer = self._load_from_zip_file()
+                else:
+                    self.model, self.tokenizer = self._load_from_private_hugging_face_repo()
+            else:
+                raise InvalidModelPropertiesError(
+                    f"Invalid model properties for the 'hf' model. "
+                    f"You do not have the necessary information to load the model. "
+                    f"Check {marqo_docs.bring_your_own_model()} for more information."
+                )
         else:
             raise InvalidModelPropertiesError(
                 f"Invalid model properties for the 'hf' model. "
@@ -68,6 +85,29 @@ class HuggingFaceStellaModel(AbstractEmbeddingModel):
         self.model = self.model.to(self.device)
         self.pooling_func = self._load_pooling_method()
         self.model.eval()
+
+    def _load_from_private_hugging_face_repo(self) -> Tuple:
+        """Load the model from the private Hugging Face model hub based on the model_location."""
+
+        hf_repo_token = None
+        if self.model_auth is not None and self.model_auth.hf is not None:
+            hf_repo_token = self.model_auth.hf.token
+
+        try:
+            model = AutoModel.from_pretrained(
+                self.model_properties.model_location.hf.repo_id,
+                token=hf_repo_token
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                self.model_properties.model_location.hf.repo_id,
+                token=hf_repo_token
+            )
+        except (OSError, ValueError, RuntimeError) as e:
+            raise InvalidModelPropertiesError(
+                f"Marqo encountered an error loading the private Hugging Face model, modelProperties={self.model_properties}. "
+                f"Please ensure that the model is a valid Hugging Face model and retry.\n"
+                f" Original error message = {e}") from e
+        return model, tokenizer
 
     def _load_from_hugging_face_repo(self) -> Tuple:
         """Load the model from the Hugging Face model hub based on the repo_id."""
