@@ -3,10 +3,10 @@ from unittest import mock
 
 from pydantic import ValidationError
 
-from marqo.core.inference.models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
+from marqo.core.inference.inference_models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
 from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.private_models import ModelLocation
-from marqo.core.inference.models.hugging_face_model import HuggingFaceModel
+from marqo.core.inference.inference_models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 import numpy as np
 
@@ -609,7 +609,7 @@ class TestHuggingFaceModel(unittest.TestCase):
             with self.subTest(test_case=test_case):
                 with self.assertRaises(InvalidModelPropertiesError) as excinfo:
                     _ = HuggingFaceModel(test_case, "cpu", {})
-                self.assertIn("Invalid model properties for the 'hf' model.", str(excinfo.exception))
+                self.assertIn("Invalid model properties: ", str(excinfo.exception))
 
     def test_hf_e5_base_v2_embeddings_load_from_hf(self):
         """A test to ensure the embeddings are generated correctly for the default text model, loading from
@@ -652,7 +652,7 @@ class TestHuggingFaceModel(unittest.TestCase):
     @mock.patch("transformers.AutoModel.from_pretrained", return_value=mock.MagicMock())
     @mock.patch("transformers.AutoTokenizer.from_pretrained", side_effect=OSError("Tokenizer load failed"))
     def test_tokenizer_loading_failure(self, mock_auto_model, mock_auto_tokenizer):
-        """Test that an error is raised when the tokenizer fails to load."""
+        """Test that an error is raised when the _tokenizer fails to load."""
         model_properties = {
             "name": "test-model",
             "type": "hf",

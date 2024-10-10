@@ -1,5 +1,7 @@
 import pydantic
-from marqo.tensor_search.models.add_docs_objects import ModelAuth, AddDocsParams, AddDocsBodyParams
+
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.api.models.add_docs_objects import ModelAuth, AddDocsBodyParams
 from marqo.tensor_search.web.api_utils import add_docs_params_orchestrator
 from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse

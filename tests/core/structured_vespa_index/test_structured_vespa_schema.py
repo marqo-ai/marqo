@@ -1,5 +1,4 @@
 import os
-import re
 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest

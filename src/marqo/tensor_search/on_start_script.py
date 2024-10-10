@@ -65,6 +65,7 @@ class BootstrapVespa:
                 "ensure that Marqo is configured properly for this. See "
                 f"{marqo_docs.configuring_marqo()} for more details. Error: {e}"
             )
+            raise e
 
 
 class PopulateCache:

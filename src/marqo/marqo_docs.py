@@ -64,6 +64,10 @@ def indexing_images():
 def api_reference_document_body():
     return _build_url('reference/api/documents/add-or-replace-documents/#body')
 
+
+def troubleshooting():
+    return _build_url('other-resources/troubleshooting/troubleshooting/')
+
 def generic_models():
     return _build_url('models/marqo/list-of-models/#generic-clip-models')
 
