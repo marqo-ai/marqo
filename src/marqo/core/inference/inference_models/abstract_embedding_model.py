@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class AbstractEmbeddingModel(ABC):
     """This is the abstract base class for all models in Marqo."""
 
     def __init__(self, model_properties: Optional[dict] = None, device: Optional[str] = None,
-                 model_auth: Optional[dict] = None):
+                 model_auth: Optional[ModelAuth] = None):
         """Load the model with the given properties.
 
         Args:

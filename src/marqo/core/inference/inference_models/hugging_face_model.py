@@ -96,8 +96,8 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encountered an error loading the private Hugging Face model, modelProperties={self.model_properties}. "
-                f"Please ensure that the model is a valid Hugging Face model and you have provided the right token. "
-                f"Original error message = {e}") from e
+                f"Please ensure that the model is a valid Hugging Face model and retry.\n"
+                f" Original error message = {e}") from e
         return model, tokenizer
 
     def _load_from_hugging_face_repo(self) -> Tuple:
