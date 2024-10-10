@@ -87,11 +87,11 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         try:
             model = AutoModel.from_pretrained(
                 self.model_properties.model_location.hf.repo_id,
-                use_auth_token=hf_repo_token
+                token=hf_repo_token
             )
             tokenizer = AutoTokenizer.from_pretrained(
                 self.model_properties.model_location.hf.repo_id,
-                use_auth_token=hf_repo_token
+                token=hf_repo_token
             )
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
