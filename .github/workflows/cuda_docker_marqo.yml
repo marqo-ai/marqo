@@ -64,11 +64,12 @@ jobs:
           security-group-id: ${{ secrets.LARGEMODELTEST_SECURITY_GROUP }}
           aws-resource-tags: > # optional, requires additional permissions
             [
-              {"Key": "Name", "Value": "Marqo-ec2-github-runner"},
-              {"Key": "GitHubRepository", "Value": "${{ github.repository }}"},
-              {"Key": "Workflow", "Value": "${{ github.workflow }}"},
-              {"Key": "role", "Value": "testing"},
-              {"Key": "Worlflow URL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"}
+              {"Key": "Name", "Value": "marqo-github-runner"},
+              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
+              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
+              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
+              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
+              {"Key": "PoloRole", "Value": "testing"}
             ]
 
   Test-Marqo:
