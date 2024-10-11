@@ -89,6 +89,17 @@ jobs:
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
           
+          # Function to wait for the dpkg lock to be released
+          function wait_for_dpkg_lock() {
+            while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+              echo "Waiting for the dpkg lock to be released..."
+              sleep 5
+            done
+          }
+      
+          # Wait for the dpkg lock before updating and installing
+          wait_for_dpkg_lock
+          
           echo "Updating package list"
           apt-get update -y
           
