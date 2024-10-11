@@ -70,8 +70,11 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def _set_default_modality(self) -> Modality:
-        """Set the default modality for the model.
+    def _set_modality(self) -> Modality:
+        """Set the modalities for the model.
+
+        We are inferring the modality of the content regardless of the model capabilities. For example, if user provides
+        an image url in the search query, we will infer the modality as image even if the model is a text model.
 
         Returns:
             Modality: The default modality for the model.
@@ -80,8 +83,7 @@ class AbstractEmbeddingModel(ABC):
 
     @abstractmethod
     def encode(self, content: Any, normalize: bool = True, modality: Optional[Modality] = None) -> np.ndarray:
-        if modality is None:
-            modality = self._set_default_modality()
+        modality = self._set_modality()
 
         self._validate_content_type(content, modality)
         return self._encode(content, modality, normalize)
