@@ -44,6 +44,14 @@ jobs:
           ec2-instance-type: g4dn.2xlarge
           subnet-id: ${{ secrets.LARGEMODELTEST_SUBNET_ID }}
           security-group-id: ${{ secrets.LARGEMODELTEST_SECURITY_GROUP }}
+          aws-resource-tags: > # optional, requires additional permissions
+            [
+              {"Key": "Name", "Value": "Marqo-ec2-github-runner"},
+              {"Key": "GitHubRepository", "Value": "${{ github.repository }}"},
+              {"Key": "Workflow", "Value": "${{ github.workflow }}"},
+              {"Key": "role", "Value": "testing"},
+              {"Key": "Worlflow URL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"}
+            ]
 
   Test-Marqo:
     name: Run Large Model Unit Tests
