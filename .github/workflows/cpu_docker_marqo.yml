@@ -54,9 +54,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.LARGEMODELTEST_ACCESSKEY }}
-          aws-secret-access-key: ${{ secrets.LARGEMODELTEST_SECRETACCESSKEY }}
-          aws-region: ${{ secrets.LARGEMODELTEST_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2
@@ -65,8 +65,8 @@ jobs:
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           ec2-image-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
           ec2-instance-type: m6i.xlarge
-          subnet-id: ${{ secrets.LARGEMODELTEST_SUBNET_ID }}
-          security-group-id: ${{ secrets.LARGEMODELTEST_SECURITY_GROUP }}
+          subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+          security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
           aws-resource-tags: > # optional, requires additional permissions
             [
               {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
@@ -148,9 +148,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.LARGEMODELTEST_ACCESSKEY }}
-          aws-secret-access-key: ${{ secrets.LARGEMODELTEST_SECRETACCESSKEY }}
-          aws-region: ${{ secrets.LARGEMODELTEST_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Stop EC2 runner
         uses: machulav/ec2-github-runner@v2
         with:
