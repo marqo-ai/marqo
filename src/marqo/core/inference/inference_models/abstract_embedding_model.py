@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Any
 from marqo.tensor_search.models.private_models import ModelAuth
+
+from marqo.s2_inference.multimodal_model_load import Modality
+import numpy as np
 
 
 class AbstractEmbeddingModel(ABC):
@@ -48,5 +51,37 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def encode(self):
+    def _validate_content_type(self, content: Any, modality: Modality):
+        """Validate if the provided content type is valid for the specific model and if it matches the modality.
+
+        Raise:
+            ValueError: If the content type is not valid.
+        """
         pass
+
+    @abstractmethod
+    def _encode(self, content: Any, modality: Modality, normalize: bool = True) -> np.ndarray:
+        """Encode the given content.
+
+        Args:
+            content (Any): The content to encode.
+            normalize (bool): Whether to normalize the output or not.
+        """
+        pass
+
+    @abstractmethod
+    def _set_default_modality(self) -> Modality:
+        """Set the default modality for the model.
+
+        Returns:
+            Modality: The default modality for the model.
+        """
+        pass
+
+    @abstractmethod
+    def encode(self, content: Any, normalize: bool = True, modality: Optional[Modality] = None) -> np.ndarray:
+        if modality is None:
+            modality = self._set_default_modality()
+
+        self._validate_content_type(content, modality)
+        return self._encode(content, modality, normalize)
