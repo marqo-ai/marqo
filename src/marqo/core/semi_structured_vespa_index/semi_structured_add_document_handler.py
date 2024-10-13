@@ -12,6 +12,7 @@ from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, Field
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
+from marqo.core.vespa_index.add_documents_handler import logger
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
@@ -84,6 +85,8 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                                      f'limit in MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         # Add missing lexical fields to marqo index
+        logger.debug(f'Adding lexical field {field_name} to index {self.marqo_index.name}')
+
         self.marqo_index.lexical_fields.append(
             Field(name=field_name, type=FieldType.Text,
                   features=[FieldFeature.LexicalSearch],
@@ -104,6 +107,8 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
                                      f'limit in MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         # Add missing tensor fields to marqo index
+        logger.debug(f'Adding tensor field {field_name} to index {self.marqo_index.name}')
+
         if field_name not in self.marqo_index.tensor_field_map:
             self.marqo_index.tensor_fields.append(TensorField(
                 name=field_name,
