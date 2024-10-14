@@ -1,8 +1,9 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
-from marqo.s2_inference.clip_utils import OPEN_CLIP
+from marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.model_registry import _get_open_clip_properties
 
 OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
@@ -27,9 +28,9 @@ class TestOpenCLIPModelLoad(TestCase):
             "type": "open_clip"
         }
 
-        with patch("marqo.s2_inference.clip_utils.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
+        with patch("marqo.core.inference.inference_models.open_clip_model.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
                    return_value=(MagicMock(), MagicMock())) as mock_load_method:
-            with patch("marqo.s2_inference.clip_utils.OPEN_CLIP._load_tokenizer_from_checkpoint",
+            with patch("marqo.core.inference.inference_models.open_clip_model.OPEN_CLIP._load_tokenizer_from_checkpoint",
                        return_value=MagicMock()) as mock_load_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                     model = OPEN_CLIP(model_properties=model_properties, device="cpu")
@@ -45,11 +46,11 @@ class TestOpenCLIPModelLoad(TestCase):
             "url": "https://openclipart.org/download/12345/my_test_model.pt",
             "type": "open_clip"
         }
-        with patch("marqo.s2_inference.clip_utils.open_clip.create_model", return_value=MagicMock()) \
+        with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
-            with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
+            with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
-                with patch("marqo.s2_inference.clip_utils.download_model", return_value="my_test_model.pt"):
+                with patch("marqo.core.inference.inference_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
@@ -80,11 +81,11 @@ class TestOpenCLIPModelLoad(TestCase):
             "image_preprocessor": "SigLIP",
             "size": 322  # Override the default size 224
         }
-        with patch("marqo.s2_inference.clip_utils.open_clip.create_model", return_value=MagicMock()) \
+        with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
-            with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
+            with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
-                with patch("marqo.s2_inference.clip_utils.download_model", return_value="my_test_model.pt"):
+                with patch("marqo.core.inference.inference_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
@@ -156,7 +157,7 @@ class TestOpenCLIPModelLoad(TestCase):
             # Missing 'name' and 'url'
         }
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(InvalidModelPropertiesError) as context:
             model = OPEN_CLIP(model_properties=model_properties, device="cpu")
             model.load()
 
@@ -172,7 +173,7 @@ class TestOpenCLIPModelLoad(TestCase):
             "image_preprocessor": "UnsupportedPreprocessor"
         }
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(InvalidModelPropertiesError) as context:
             model = OPEN_CLIP(model_properties=model_properties, device="cpu")
             model.load()
 
