@@ -342,7 +342,7 @@ class IndexManagement:
         else:
             try:
                 with self._zookeeper_deployment_lock:
-                    logger.info(f"Retrieved the distributed lock for index operations. ")
+                    logger.debug(f"Retrieved the distributed lock for index operations. ")
                     yield
             except ZookeeperLockNotAcquiredError:
                 raise OperationConflictError("Another index creation/deletion operation is in progress. "
