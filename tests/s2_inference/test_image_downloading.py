@@ -10,6 +10,8 @@ from starlette.routing import Route
 from marqo.s2_inference.clip_utils import encode_url, download_image_from_url
 from marqo.s2_inference.errors import ImageDownloadError
 from tests.marqo_test import MockHttpServer
+from marqo.tensor_search.enums import EnvVars
+from io import BytesIO
 
 
 @pytest.mark.unittest
@@ -90,3 +92,76 @@ class TestImageDownloading(TestCase):
         with MockHttpServer(app).run_in_thread() as base_url:
             result = download_image_from_url(f'{base_url}/missing_image.jpg', image_download_headers={})
             self.assertEqual(result.getvalue(), image_content)
+    
+    @patch('marqo.s2_inference.clip_utils.pycurl.Curl')
+    @patch('marqo.s2_inference.clip_utils.EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE', 5_000_000)  # 5MB limit
+    def test_video_audio_file_size_check_over_limit(self, mock_curl):
+        # Setup
+        test_url = "http://ipv4.download.thinkbroadband.com:8080/5GB.zip"
+        mock_curl_instance = MagicMock()
+        mock_curl.return_value = mock_curl_instance
+
+        # Simulate a file larger than the limit
+        def simulate_large_file(*args):
+            progress_callback = args[0]
+            # Simulate downloading more than the limit
+            progress_callback(0, 6_000_000, 0, 0)
+            return 1  # Simulate callback returning 1 to abort
+
+        mock_curl_instance.setopt.side_effect = simulate_large_file
+
+        # Test
+        with self.assertRaises(ImageDownloadError) as context:
+            download_image_from_url(test_url, {}, modality="video")
+
+        # Assert
+        self.assertIn("exceeds the maximum allowed size", str(context.exception))
+        mock_curl_instance.setopt.assert_any_call(pycurl.NOPROGRESS, False)
+        mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, MagicMock.ANY)
+
+    @patch('marqo.s2_inference.clip_utils.pycurl.Curl')
+    @patch('marqo.s2_inference.clip_utils.EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE', 5_000_000)  # 5MB limit
+    def test_video_audio_file_size_check_under_limit(self, mock_curl):
+        # Setup
+        test_url = "http://example.com/small_video.mp4"
+        mock_curl_instance = MagicMock()
+        mock_curl.return_value = mock_curl_instance
+
+        # Simulate a file smaller than the limit
+        def simulate_small_file(*args):
+            progress_callback = args[0]
+            # Simulate downloading less than the limit
+            progress_callback(0, 3_000_000, 0, 0)
+            return 0  # Simulate successful download
+
+        mock_curl_instance.setopt.side_effect = simulate_small_file
+        mock_curl_instance.getinfo.return_value = 200  # Simulate successful HTTP response
+
+        # Test
+        try:
+            result = download_image_from_url(test_url, {}, modality="audio")
+            self.assertIsInstance(result, BytesIO)
+        except ImageDownloadError:
+            self.fail("ImageDownloadError raised unexpectedly for file under size limit")
+
+        # Assert
+        mock_curl_instance.setopt.assert_any_call(pycurl.NOPROGRESS, False)
+        mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, MagicMock.ANY)
+        mock_curl_instance.perform.assert_called_once()
+
+    @patch('marqo.s2_inference.clip_utils.pycurl.Curl')
+    @patch('marqo.s2_inference.clip_utils.EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE', 5_000_000)  # 5MB limit
+    def test_image_file_size_not_checked(self, mock_curl):
+        # Setup
+        test_url = "http://ipv4.download.thinkbroadband.com:8080/5GB.zip"
+        mock_curl_instance = MagicMock()
+        mock_curl.return_value = mock_curl_instance
+
+        # Test
+        try:
+            download_image_from_url(test_url, {}, modality="image")
+        except ImageDownloadError:
+            self.fail("ImageDownloadError raised unexpectedly for image modality")
+
+        # Assert
+        mock_curl_instance.setopt.assert_not_called()
