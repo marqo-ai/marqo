@@ -106,3 +106,70 @@ class TestDetermineThreadCount(unittest.TestCase):
         os.environ[EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST] = '20'
         result = _determine_thread_count(marqo_index, add_docs_params)
         self.assertEqual(result, 20)
+
+    def test_both_thread_counts_set_in_params_non_languagebind_model(self):
+        """Test when both media_download_thread_count and image_download_thread_count are set in params for non-languagebind model."""
+        marqo_index = MarqoIndex(model_type='other')
+        add_docs_params = AddDocsParams(media_download_thread_count=8, image_download_thread_count=15)
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 8)
+
+    def test_media_thread_count_in_env_image_thread_count_in_params_non_languagebind_model(self):
+        """Test when media thread count is set in env and image thread count in params for non-languagebind model."""
+        marqo_index = MarqoIndex(model_type='other')
+        add_docs_params = AddDocsParams(image_download_thread_count=15)
+        os.environ[EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST] = '8'
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 8)
+
+    def test_media_thread_count_in_params_image_thread_count_in_env_non_languagebind_model(self):
+        """Test when media thread count is set in params and image thread count in env for non-languagebind model."""
+        marqo_index = MarqoIndex(model_type='other')
+        add_docs_params = AddDocsParams(media_download_thread_count=8)
+        os.environ[EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST] = '15'
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 8)
+
+    def test_both_thread_counts_set_in_env_non_languagebind_model(self):
+        """Test when both media_download_thread_count and image_download_thread_count are set in env for non-languagebind model."""
+        marqo_index = MarqoIndex(model_type='other')
+        add_docs_params = AddDocsParams()
+        os.environ[EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST] = '8'
+        os.environ[EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST] = '15'
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 8)
+
+    def test_media_thread_count_equals_default_image_thread_count_set_non_languagebind_model(self):
+        """Test when media_download_thread_count equals default and image_download_thread_count is set for non-languagebind model."""
+        marqo_index = MarqoIndex(model_type='other')
+        add_docs_params = AddDocsParams(media_download_thread_count=5, image_download_thread_count=15)
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 15)
+
+    def test_media_thread_count_set_languagebind_model(self):
+        """Test that media_download_thread_count from params is used for languagebind model."""
+        marqo_index = MarqoIndex(model_type='languagebind')
+        add_docs_params = AddDocsParams(media_download_thread_count=8)
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 8)
+
+    def test_image_thread_count_set_languagebind_model(self):
+        """Test that image_download_thread_count is ignored for languagebind model when media_download_thread_count is not set."""
+        marqo_index = MarqoIndex(model_type='languagebind')
+        add_docs_params = AddDocsParams(image_download_thread_count=15)
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 5)  # Should default to 5 for languagebind model
+
+    def test_media_thread_count_equals_default_languagebind_model(self):
+        """Test when media_download_thread_count equals default for languagebind model."""
+        marqo_index = MarqoIndex(model_type='languagebind')
+        add_docs_params = AddDocsParams(media_download_thread_count=5)
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 5)
+
+    def test_media_thread_count_not_set_image_thread_count_set_languagebind_model(self):
+        """Test when media_download_thread_count is not set and image_download_thread_count is set for languagebind model."""
+        marqo_index = MarqoIndex(model_type='languagebind')
+        add_docs_params = AddDocsParams(image_download_thread_count=15)
+        result = _determine_thread_count(marqo_index, add_docs_params)
+        self.assertEqual(result, 5)  # Should ignore image thread count for languagebind
