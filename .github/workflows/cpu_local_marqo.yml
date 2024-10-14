@@ -35,6 +35,9 @@ on:
   pull_request:
     branches:
       - mainline
+  pull_request_target:
+    branches:
+      - mainline
 
 permissions:
   contents: read
