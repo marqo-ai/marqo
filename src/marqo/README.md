@@ -130,7 +130,7 @@ Currently, only CUDA based (Nvidia) GPU's are supported. If you have a GPU on th
 ```bash
 docker rm -f marqo &&
      DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 && 
-     docker docker run --name --gpus all marqo -p 8882:8882 marqo_docker_0
+     docker run --name marqo --gpus all -p 8882:8882 marqo_docker_0
 ```
 note the `--gpus all` has been added.
 
@@ -161,7 +161,7 @@ Edit the SSH config file with `nano ~/.ssh/config` then insert the line: `Server
 3. Run Marqo
 
 ```bash
-docker docker run --name  marqo -p 8882:8882 marqoai/marqo:latest
+docker run --name  marqo -p 8882:8882 marqoai/marqo:latest
 ```
 
 #### Troubleshooting
