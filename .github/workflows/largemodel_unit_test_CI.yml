@@ -12,6 +12,9 @@ on:
   pull_request:
     branches:
       - mainline
+  pull_request_target:
+    branches:
+      - mainline
 
 concurrency:
   group: large-model-unit-tests-${{ github.ref }}
