@@ -74,7 +74,7 @@ If you don't have the exact python version specified in the `tox.ini` file, you 
 docker rm -f marqo-os
 docker run -p 9200:9200 -p 9600:9600 -e "discovery.type=single-node" --name marqo-os marqoai/marqo-os:0.0.3
 ```
-2. run `tox` in the Marqo home directory
+2. run `tox` in the Marqo home directory. By default this will perform the s2_inference tests as well, which are slow due to needing to load ML models. To run just the tensor_search (the API/routing layer) tests, then use the following snippet instead: `tox -- tests/tensor_search`
 
 #### Integration  tests
 To run integration tests, pull the [api testing repo](https://github.com/marqo-ai/marqo-api-tests). 
