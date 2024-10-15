@@ -374,39 +374,6 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
-    """
-    def test_open_clip_vectorize_record_embeddings(self):
-        names = self.open_clip_test_model
-
-        sentences = ['hello', 'this is a test sentence. so is this.',
-                     ['hello', 'this is a test sentence. so is this.']]
-        device = 'cpu'
-        eps = 1e-9
-
-        embeddings = dict()
-        for name in names:
-            embeddings[name] = dict()
-            model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
-
-            for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
-
-                assert _check_output_type(output_v)
-
-                output_m = model.encode(sentence, normalize=True)
-
-                if isinstance(sentence, str):
-                    embeddings[name][sentence] = output_v
-
-                # TODO: code in raw vectors here (separate file)
-                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
-
-            clear_loaded_models()
-
-        with open(f"embeddings_reference/embeddings_open_clip_python_3_8.json", "w") as f:
-            json.dump(embeddings, f)
-    """
     def test_load_clip_text_model(self):
         names = self.open_clip_test_model
 
