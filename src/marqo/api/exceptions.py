@@ -205,6 +205,11 @@ class OperationConflictError(__InvalidRequestError):
     status_code = HTTPStatus.CONFLICT
 
 
+class ApplicationRollbackError(__InvalidRequestError):
+    code = "application_rollback_error"
+    status_code = HTTPStatus.CONFLICT
+
+
 # ---MARQO INTERNAL ERROR---
 
 

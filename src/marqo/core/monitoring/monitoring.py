@@ -10,7 +10,7 @@ from marqo.core.models.marqo_cuda_info_response import MarqoCudaInfoResponse, Ma
 from marqo.core.models.marqo_index_health import MarqoHealthStatus, HealthStatus, VespaHealthStatus, \
     InferenceHealthStatus
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.exceptions import InternalError
 from marqo.vespa.exceptions import VespaError
 from marqo.vespa.vespa_client import VespaClient

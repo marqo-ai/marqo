@@ -5,11 +5,12 @@ import pytest
 
 from marqo.api.exceptions import HardwareCompatabilityError
 from marqo.core.exceptions import IndexNotFoundError
-from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, IndexType
+from marqo.core.models.marqo_index import FieldType, FieldFeature, TextPreProcessing, TextSplitMethod, \
+    UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.models.marqo_index_stats import MarqoIndexStats, VespaStats
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
@@ -154,12 +155,12 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -176,7 +177,7 @@ class TestMonitoring(MarqoTestCase):
         get_index_stats returns the correct stats for a multimodal index
         """
         marqo_index = self.structured_index_multimodal
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 docs=[
                     {"title": "2",
@@ -204,12 +205,12 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"desc": "2"}, {"desc": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -227,12 +228,12 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"desc": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -280,12 +281,12 @@ class TestMonitoring(MarqoTestCase):
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
                 for operation, docs, expected_stats in operations:
                     if operation == 'add':
-                        tensor_search.add_documents(
+                        self.add_documents(
                             config=self.config, add_docs_params=AddDocsParams(
                                 docs=docs,
                                 index_name=marqo_index.name,
                                 device="cpu",
-                                tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                                tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                             )
                         )
                     elif operation == 'delete':
@@ -308,12 +309,12 @@ class TestMonitoring(MarqoTestCase):
 
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "test " * number_of_words}, {"title": "2"}],  # 3 + 1 vectors expected
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(
@@ -331,12 +332,12 @@ class TestMonitoring(MarqoTestCase):
         """
         for marqo_index in self.indexes_to_test:
             with self.subTest(f'{marqo_index.name} - {marqo_index.type.value}'):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         docs=[{"title": "2"}, {"title": "2"}, {"title": "62"}],
                         index_name=marqo_index.name,
                         device="cpu",
-                        tensor_fields=['title'] if marqo_index.type == IndexType.Unstructured else None
+                        tensor_fields=['title'] if isinstance(marqo_index, UnstructuredMarqoIndex) else None
                     )
                 )
                 self.assertIndexStatsEqual(

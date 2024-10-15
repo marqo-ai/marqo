@@ -1,4 +1,4 @@
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifierLists
@@ -311,7 +311,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                add_docs_res = tensor_search.add_documents(
+                add_docs_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[
@@ -356,7 +356,7 @@ class TestEmbed(MarqoTestCase):
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                add_docs_res = tensor_search.add_documents(
+                add_docs_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index.name,
                         docs=[

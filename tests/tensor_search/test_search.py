@@ -17,7 +17,7 @@ from marqo.api.exceptions import (
 from marqo.s2_inference.s2_inference import vectorise, get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import TensorField, SearchMethod, EnvVars
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 from tests.utils.transition import add_docs_caller
 from marqo.core.utils.prefix import determine_text_prefix
@@ -901,7 +901,7 @@ class TestVectorSearch(MarqoTestCase):
 
         vocab = requests.get(vocab_source).text.splitlines()
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                                                               docs=[{"Title": "a " + (
                                                                   " ".join(random.choices(population=vocab, k=25)))}
@@ -1170,7 +1170,7 @@ class TestVectorSearch(MarqoTestCase):
             docs=docs, auto_refresh=True
         )
         invalid_queries = [{}, None, {123: 123}, {'123': None},
-                           {"https://marqo_not_real.com/image_1.png": 3}, set()]
+                           {"https://marqo-not-real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             try:
                 tensor_search.search(

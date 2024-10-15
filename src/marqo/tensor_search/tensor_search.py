@@ -50,6 +50,10 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 from marqo.core.constants import MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
+from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
+    SemiStructuredAddDocumentsHandler
+from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
+from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -57,20 +61,18 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
-from marqo.core.models.marqo_index import IndexType
-from marqo.s2_inference.models.model_type import ModelType
+from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.s2_inference import infer_modality, Modality
 from marqo.s2_inference.clip_utils import _is_image, validate_url
-from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
@@ -79,12 +81,11 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars
+    Device, TensorField, SearchMethod
 )
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search.index_meta_cache import get_cache
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -93,7 +94,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
-from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
@@ -109,7 +110,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
     """
     try:
         marqo_index = index_meta_cache.get_index(
-            config=config, index_name=add_docs_params.index_name, force_refresh=True
+            index_management=config.index_management, index_name=add_docs_params.index_name, force_refresh=True
         )
 
     # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
@@ -117,10 +118,15 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
         raise api_exceptions.IndexNotFoundError(
             f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
+    if isinstance(marqo_index, SemiStructuredMarqoIndex):
+        return SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client,
+                                                 config.index_management).add_documents()
     if isinstance(marqo_index, UnstructuredMarqoIndex):
-        return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        # return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        return UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client).add_documents()
     elif isinstance(marqo_index, StructuredMarqoIndex):
-        return _add_documents_structured(config, add_docs_params, marqo_index)
+        # return _add_documents_structured(config, add_docs_params, marqo_index)
+        return StructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client).add_documents()
     else:
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
@@ -1236,7 +1242,7 @@ def _determine_thread_count(marqo_index, add_docs_params):
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = _get_latest_index(config, index_name)
 
     try:
         res = config.vespa_client.get_document(document_id, marqo_index.schema_name)
@@ -1291,7 +1297,7 @@ def _get_marqo_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return []
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = _get_latest_index(config, index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -1345,7 +1351,7 @@ def get_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = _get_latest_index(config, index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -1376,7 +1382,8 @@ def get_documents_by_ids(
                 }
             )
         else:
-            status, message = config.document.translate_vespa_document_response(response.status)
+            document = config.document
+            status, message = document.vespa_client.translate_vespa_document_response(response.status, None)
             results.append(
                 MarqoGetDocumentsByIdsItem(
                     id=_get_id_from_vespa_id(response.id), status=status,
@@ -1389,6 +1396,19 @@ def get_documents_by_ids(
         errors = True
 
     return MarqoGetDocumentsByIdsResponse(errors=errors, results=results)
+
+
+def _get_latest_index(config: Config, index_name: str) -> MarqoIndex:
+    """
+    Get index from the cache first. If index is semi-structured, get the latest setting bypassing the cache
+    This approach makes sure we don't add extra latency to structured indexes or legacy unstructured indexes since they
+    never change. It also makes sure we always get the latest version of semi-structured index to guarantee the strong
+    consistency.
+    """
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
+    if marqo_index.type == IndexType.SemiStructured:
+        return config.index_management.get_index(index_name=index_name)
+    return marqo_index
 
 
 def _get_id_from_vespa_id(vespa_id: str) -> str:
@@ -1657,7 +1677,7 @@ def _lexical_search(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     # SEARCH TIMER-LOGGER (pre-processing)
     RequestMetricsStore.for_request().start("search.lexical.processing_before_vespa")
@@ -2116,7 +2136,7 @@ def _vector_text_search(
 
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     # Determine the text query prefix
     text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
@@ -2679,7 +2699,7 @@ def vectorise_multimodal_combination_field_structured(
 def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
     """Delete documents from the Marqo index with the given doc_ids """
     # Make sure the index exists
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     return delete_docs.delete_documents(
         config=config,

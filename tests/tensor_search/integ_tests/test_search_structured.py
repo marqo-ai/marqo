@@ -15,7 +15,7 @@ from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
@@ -157,7 +157,7 @@ class TestSearchStructured(MarqoTestCase):
         ]
         for index_name, desc in tests:
             with self.subTest(desc):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index_name,
@@ -234,7 +234,7 @@ class TestSearchStructured(MarqoTestCase):
                     The editor-in-chief Katharine Viner succeeded Alan Rusbridger in 2015.[10][11] Since 2018, the paper's main newsprint sections have been published in tabloid format. As of July 2021, its print edition had a daily circulation of 105,134.[4] The newspaper has an online edition, TheGuardian.com, as well as two international websites, Guardian Australia (founded in 2013) and Guardian US (founded in 2011). The paper's readership is generally on the mainstream left of British political opinion,[12][13][14][15] and the term "Guardian reader" is used to imply a stereotype of liberal, left-wing or "politically correct" views.[3] Frequent typographical errors during the age of manual typesetting led Private Eye magazine to dub the paper the "Grauniad" in the 1960s, a nickname still used occasionally by the editors for self-mockery.[16]
                     """
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -256,7 +256,7 @@ class TestSearchStructured(MarqoTestCase):
 
     def test_search_edge_case(self):
         """We ran into bugs with this doc"""
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -286,7 +286,7 @@ class TestSearchStructured(MarqoTestCase):
         """Is the result formatted correctly?"""
         q = "Exact match hehehe"
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -340,7 +340,7 @@ class TestSearchStructured(MarqoTestCase):
         assert search_res["limit"] > 0
 
     def test_result_count_validation(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -412,7 +412,7 @@ class TestSearchStructured(MarqoTestCase):
         assert len(search_res['hits']) >= 1
 
     def test_highlights_tensor(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -437,7 +437,7 @@ class TestSearchStructured(MarqoTestCase):
             assert "_highlights" not in hit
 
     def test_highlights_lexical(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -463,7 +463,7 @@ class TestSearchStructured(MarqoTestCase):
 
     def test_search_int_field(self):
         """doesn't error out if there is a random int field"""
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -515,7 +515,7 @@ class TestSearchStructured(MarqoTestCase):
         assert kwargs["device"] == "cuda:123"
 
     def test_search_other_types_subsearch(self):
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -544,7 +544,7 @@ class TestSearchStructured(MarqoTestCase):
             "text_field_1": "blah"
         }]
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -566,7 +566,7 @@ class TestSearchStructured(MarqoTestCase):
 
     def test_lexical_filtering(self):
         # Adding documents
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -622,7 +622,7 @@ class TestSearchStructured(MarqoTestCase):
     # def test_filter_on_id_and_more(self):
     #     """Test various filtering scenarios including _id and other conditions"""
     #     # Adding documents
-    #     tensor_search.add_documents(
+    #     self.add_documents(
     #         config=self.config,
     #         add_docs_params=AddDocsParams(
     #             index_name=self.default_text_index,
@@ -684,7 +684,7 @@ class TestSearchStructured(MarqoTestCase):
             #         "_highlights"}),
         )
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -708,7 +708,7 @@ class TestSearchStructured(MarqoTestCase):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
         vocab = requests.get(vocab_source).text.splitlines()
 
-        res = tensor_search.add_documents(
+        res = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.image_index_with_random_model,
@@ -795,7 +795,7 @@ class TestSearchStructured(MarqoTestCase):
             {"_id": "123", "image_field_1": url_1, "text_field_1": "irrelevant text"},
             {"_id": "789", "image_field_1": url_2},
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -819,7 +819,7 @@ class TestSearchStructured(MarqoTestCase):
             {"text_field_1": "Construction and scaffolding equipment",
              "_id": 'irrelevant_doc'}
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -856,7 +856,7 @@ class TestSearchStructured(MarqoTestCase):
                 "image_field_2": TestImageUrls.HIPPO_STATUE.value
             }
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -900,7 +900,7 @@ class TestSearchStructured(MarqoTestCase):
             }
         ]
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -909,7 +909,7 @@ class TestSearchStructured(MarqoTestCase):
         )
 
         invalid_queries = [{}, None, {123: 123}, {'123': None},
-                           {"https://marqo_not_real.com/image_1.png": 3}, set()]
+                           {"https://marqo-not-real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             with self.subTest(f"query={q}"):
                 with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
@@ -931,7 +931,7 @@ class TestSearchStructured(MarqoTestCase):
                 "text_field_1": "Some text about a weird forest"
             }
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -955,7 +955,7 @@ class TestSearchStructured(MarqoTestCase):
             {"_id": 'realistic_hippo', "image_field_1": "124"},
             {"_id": 'artefact_hippo', "text_field_1": "Some text about a weird forest"}
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -983,7 +983,7 @@ class TestSearchStructured(MarqoTestCase):
 
         docs = list(doc_dict.values())
 
-        res = tensor_search.add_documents(
+        res = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -1012,7 +1012,7 @@ class TestSearchStructured(MarqoTestCase):
 
         ]
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1039,7 +1039,7 @@ class TestSearchStructured(MarqoTestCase):
             {"_id": "2", "text_field_1": "some code", "text_field_2": "match", "int_field_1": 2},
 
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1076,7 +1076,7 @@ class TestSearchStructured(MarqoTestCase):
             # large negative float
             {'double_field_1': -9999999999.87675, '_id': '7', "text_field_1": "some text"}
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1135,7 +1135,7 @@ class TestSearchStructured(MarqoTestCase):
         docs = [
                    {"text_field_1": "some text", "text_field_2": "Close match hehehe", "int_field_1": 1},
                ] * 10
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,

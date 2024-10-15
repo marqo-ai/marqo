@@ -2,6 +2,7 @@
 import concurrent
 import copy
 import math
+import os
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import ContextManager
@@ -10,7 +11,6 @@ import torch
 import ffmpeg
 
 import logging
-from typing import List, Dict
 
 import numpy as np
 import PIL
@@ -18,11 +18,13 @@ from PIL.ImageFile import ImageFile
 from torchvision.transforms import Compose
 
 import marqo.exceptions as base_exceptions
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference import clip_utils
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
 from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -75,7 +77,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
     """
     # Determine index type
     is_structured_index = marqo_index_type == IndexType.Structured
-    is_unstructured_index = marqo_index_type == IndexType.Unstructured
+    is_unstructured_index = marqo_index_type in [IndexType.Unstructured, IndexType.SemiStructured]
 
     # Generate pseudo-unique ID for thread metrics.
     _id = f'image_download.{threading.get_ident()}'
@@ -209,6 +211,80 @@ def download_and_chunk_media(url: str, device: str, headers: dict, modality: Mod
             f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
 
     return processor.process_media()
+
+
+@contextmanager
+def download_and_preprocess_multimedia_content(
+        docs: List[Dict[str, str]],
+        media_field_types_mapping: Dict[str, FieldType],
+        marqo_index: MarqoIndex,
+        add_docs_params: AddDocsParams
+) -> ContextManager[dict]:
+    thread_count = _determine_thread_count(marqo_index, add_docs_params)
+
+    media_repo = process_batch(docs=docs,
+                               thread_count=thread_count,
+                               tensor_fields=list(media_field_types_mapping.keys()),
+                               media_field_types_mapping=media_field_types_mapping,
+                               image_download_headers=add_docs_params.image_download_headers,
+                               download_headers=None,  # TODO verify if this is used
+                               marqo_index_type=marqo_index.type,
+                               device=add_docs_params.device,
+                               marqo_index_model=marqo_index.model,
+                               model_name=marqo_index.model.name,
+                               model_properties=marqo_index.model.properties,
+                               normalize_embeddings=marqo_index.normalize_embeddings,
+                               model_auth=add_docs_params.model_auth,
+                               patch_method_exists=marqo_index.image_preprocessing.patch_method is not None,
+                               audio_preprocessing=marqo_index.audio_preprocessing,
+                               video_preprocessing=marqo_index.video_preprocessing,
+                               force_download=False,  # TODO verify if this is used
+                               )
+
+    try:
+        yield media_repo
+    finally:
+        for p in media_repo.values():
+            if isinstance(p, ImageFile):
+                p.close()
+            elif isinstance(p, (list, np.ndarray)):
+                # Clean up video/audio chunks if necessary
+                pass
+
+
+def _determine_thread_count(marqo_index: MarqoIndex, add_docs_params: AddDocsParams):
+    # TODO this logic is copied from tensor search. Can be simplified and moved to AddDocsParams?
+    model_properties = marqo_index.model.get_properties()
+    is_languagebind_model = model_properties.get('type') == 'languagebind'
+
+    default_image_thread_count = 20
+    default_media_thread_count = 5
+
+    # Check if media_download_thread_count is set in params
+    if (add_docs_params.media_download_thread_count is not None and
+            add_docs_params.media_download_thread_count != default_media_thread_count):
+        return add_docs_params.media_download_thread_count
+
+    env_media_thread_count = os.environ.get(EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+    if env_media_thread_count is not None and int(env_media_thread_count) != default_media_thread_count:
+        return int(env_media_thread_count)
+
+    # If it's a LanguageBind model and no explicit setting, use 5
+    if is_languagebind_model:
+        return 5
+
+    # Check if image_download_thread_count is explicitly set in params
+    if (add_docs_params.image_download_thread_count is not None and
+            add_docs_params.image_download_thread_count != default_image_thread_count):
+        return add_docs_params.image_download_thread_count
+
+    # Check if environment variable is explicitly set
+    env_image_thread_count = os.environ.get(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST)
+    if env_image_thread_count is not None and int(env_image_thread_count) != default_image_thread_count:
+        return int(env_image_thread_count)
+
+    # Default case
+    return default_image_thread_count
 
 
 @contextmanager

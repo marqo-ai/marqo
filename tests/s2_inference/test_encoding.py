@@ -38,11 +38,8 @@ class TestEncoding(unittest.TestCase):
     def test_vectorize(self):
         """
         Ensure that vectorised output from vectorise function matches both the model.encode output and
-        hardcoded embeddings from Python 3.8
+        hardcoded embeddings from Python 3.8.20
         """
-
-        # Create embeddings dict
-        # embeddings_python_3_8 = dict()
 
         names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
@@ -56,7 +53,7 @@ class TestEncoding(unittest.TestCase):
         names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
 
         names = names + names_e5 + names_bge + names_snowflake
-                 
+
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-9
@@ -79,7 +76,7 @@ class TestEncoding(unittest.TestCase):
 
                         output_m = model.encode(sentence, normalize=True)
 
-                        # Embeddings must match hardcoded python 3.8.17 embeddings
+                        # Embeddings must match hardcoded python 3.8.20 embeddings
                         if isinstance(sentence, str):
                             with self.subTest("Hardcoded Python 3.8 Embeddings Comparison"):
                                 try:
@@ -96,6 +93,40 @@ class TestEncoding(unittest.TestCase):
 
                 clear_loaded_models()
 
+
+    def test_vectorize_normalise(self):
+        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k"]
+
+        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
+
+        names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
+
+        names = open_clip_names + names_bge + names_snowflake
+                 
+        sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
+        device = 'cpu'
+        eps = 1e-9
+
+        for name in names:
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+
+            for sentence in sentences:
+                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                assert _check_output_type(output_v)
+                output_m = model.encode(sentence, normalize=True)
+                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
+                for vector in output_v:
+                    assert abs(np.linalg.norm(np.array(vector)) - 1) < 1e-5
+
+                output_v_unnormalised = vectorise(name, sentence, model_properties, device, normalize_embeddings=False)
+                assert _check_output_type(output_v)
+                output_m_unnormalised = model.encode(sentence, normalize=False)
+                assert abs(torch.FloatTensor(output_v_unnormalised) - torch.FloatTensor(output_m_unnormalised)).sum() < eps
+                for vector in output_v_unnormalised:
+                    assert abs(np.linalg.norm(np.array(vector)) - 1) > 1e-5
+
+            clear_loaded_models()
 
     def test_cpu_encode_type(self):
         names = ["fp16/ViT-B/32", "onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32',
@@ -292,29 +323,6 @@ class TestEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
-    def test_onnx_clip_vectorise(self):
-        names = ["onnx16/open_clip/ViT-B-32/laion400m_e32", 'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e32']
-
-        sentences = ['hello', 'this is a test sentence. so is this.',
-                     ['hello', 'this is a test sentence. so is this.']]
-        device = 'cpu'
-        eps = 1e-9
-
-        for name in names:
-            model_properties = get_model_properties_from_registry(name)
-            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
-
-            for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
-
-                assert _check_output_type(output_v)
-
-                output_m = model.encode(sentence, normalize=True)
-
-                assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
-
-            clear_loaded_models()
-
 
 class TestOpenClipModelEncoding(unittest.TestCase):
     '''
@@ -352,11 +360,13 @@ class TestOpenClipModelEncoding(unittest.TestCase):
             model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
 
             for sentence in sentences:
-                output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
+                for normalize_embeddings in [True, False]:
+                    output_v = vectorise(name, sentence, model_properties, device,
+                                         normalize_embeddings=normalize_embeddings)
 
-                assert _check_output_type(output_v)
+                    assert _check_output_type(output_v)
 
-                output_m = model.encode(sentence, normalize=True)
+                    output_m = model.encode(sentence, normalize=normalize_embeddings)
 
                 # Embeddings must match hardcoded python 3.8.20 embeddings
                 if isinstance(sentence, str):

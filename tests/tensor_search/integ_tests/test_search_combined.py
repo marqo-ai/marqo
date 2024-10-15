@@ -9,7 +9,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
 from marqo.core.models.marqo_query import MarqoLexicalQuery
@@ -211,7 +211,7 @@ class TestSearch(MarqoTestCase):
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
             with self.subTest(index=index.type):
-                response = tensor_search.add_documents(
+                response = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -246,7 +246,7 @@ class TestSearch(MarqoTestCase):
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
             with self.subTest(index=index.type):
-                response = tensor_search.add_documents(
+                response = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -272,7 +272,7 @@ class TestSearch(MarqoTestCase):
     def test_filtering_list_case_tensor(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(type=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -320,7 +320,7 @@ class TestSearch(MarqoTestCase):
     def test_filtering_list_case_lexical(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -368,7 +368,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index):
                 hippo_img = TestImageUrls.HIPPO_REALISTIC.value
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -421,7 +421,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents first
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -554,7 +554,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -606,7 +606,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -652,7 +652,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index):
                 # Adding documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -699,7 +699,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Adding documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -754,7 +754,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -784,7 +784,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -839,7 +839,7 @@ class TestSearch(MarqoTestCase):
             with self.subTest(msg=index.type):
                 tensor_fields = ["text_field_1", "text_field_2"] \
                     if isinstance(index, UnstructuredMarqoIndex) else None
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,

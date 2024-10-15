@@ -36,7 +36,7 @@ function lexical_score_sum() {
 expression: if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)
 }
 function lexical_score_avg() {
-expression: (if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)) / if (query(marqo__lexical_title) == 0, 1, if (bm25(marqo__lexical_title) == 0, 1, bm25(marqo__lexical_title)))
+expression: (if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)) / max(1, if (query(marqo__lexical_title) > 0, 1, 0))
 }
 function lexical_score_max() {
 expression: if(query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)

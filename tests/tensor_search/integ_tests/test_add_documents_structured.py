@@ -14,7 +14,7 @@ from marqo.s2_inference import types
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
@@ -196,7 +196,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         ]
         for index_name, desc in tests:
             with self.subTest(desc):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=index_name,
                         docs=[{
@@ -248,7 +248,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for index_name, desc in test_indexes:
             for test_case in test_cases:
                 with self.subTest(test_case[0] + ' - ' + desc):
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=index_name,
                             docs=[
@@ -271,7 +271,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         """
 
         # Add once to get vectors
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[{
@@ -285,7 +285,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
             config=self.config, index_name=self.index_name_1,
             document_id="1", show_vectors=True)['_tensor_facets']
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
@@ -297,7 +297,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                 device="cpu"
             )
         )
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
@@ -325,7 +325,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         rand_index = 'a' + str(uuid.uuid4()).replace('-', '')
 
         with pytest.raises(IndexNotFoundError):
-            tensor_search.add_documents(
+            self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=rand_index, docs=[{"abc": "def"}], auto_refresh=True, device="cpu"
                 )
@@ -344,7 +344,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
             {"title": "\r\r"},
             {"title": "\r\t\n"},
         ]
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=docs, device="cpu"
             )
@@ -356,7 +356,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         assert count == len(docs)
 
     def test_add_docs_response_format(self):
-        add_res = tensor_search.add_documents(
+        add_res = self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1,
                 docs=[
@@ -421,7 +421,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
                 with self.subTest(f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'):
-                    add_res = tensor_search.add_documents(
+                    add_res = self.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=self.index_name_1, docs=bad_doc_arg,
                             use_existing_tensors=use_existing_tensors_flag, device="cpu"
@@ -453,7 +453,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for use_existing_tensors_flag in (True, False):
             for bad_doc_arg in bad_doc_args:
                 with self.subTest(f'{bad_doc_arg} - use_existing_tensors={use_existing_tensors_flag}'):
-                    add_res = tensor_search.add_documents(
+                    add_res = self.add_documents(
                         config=self.config, add_docs_params=AddDocsParams(
                             index_name=self.index_name_1, docs=bad_doc_arg[0],
                             use_existing_tensors=use_existing_tensors_flag, device="cpu"
@@ -474,7 +474,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
             [{"_id": "to_fail_123", "tags": ["wow", "this", "is"]}]
         ]
         for bad_doc_arg in good_docs:
-            add_res = tensor_search.add_documents(
+            add_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1,
                     docs=bad_doc_arg,
@@ -492,7 +492,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         ]
         for bad_doc_arg in bad_doc_args:
             with self.subTest(bad_doc_arg):
-                add_res = tensor_search.add_documents(
+                add_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1,
                         docs=bad_doc_arg,
@@ -511,7 +511,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
-            tensor_search.add_documents(
+            self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, device="cuda:22", docs=[{"title": "doc"}, {"title": "doc"}],
 
@@ -528,7 +528,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         Adding empty documents raises BadRequestError
         """
         try:
-            tensor_search.add_documents(
+            self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, docs=[],
                     device="cpu")
@@ -547,8 +547,8 @@ class TestAddDocumentsStructured(MarqoTestCase):
         ]
 
         with mock.patch('PIL.Image.open') as mock_image_open:
-            tensor_search.add_documents(config=self.config,
-                                        add_docs_params=AddDocsParams(
+            self.add_documents(config=self.config,
+                               add_docs_params=AddDocsParams(
                                             index_name=self.index_name_img_no_chunking, docs=docs,
                                             device="cpu",
                                         ))
@@ -598,7 +598,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         ]
         for docs, expected_results in docs_results:
             with self.subTest(f'{expected_results}'):
-                add_res = tensor_search.add_documents(
+                add_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=docs,
                         device="cpu"
@@ -614,7 +614,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
     def test_add_document_with_tensor_fields(self):
         docs_ = [{"_id": "789", "title": "Story of Alice Appleseed", "desc": "Alice grew up in Houston, Texas."}]
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=docs_, device="cpu"
         ))
         resp = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id="789",
@@ -631,7 +631,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
-            update_res = tensor_search.add_documents(
+            update_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, docs=[
                         {"_id": "123", 'desc': "edf " * (max_size // 4)},
@@ -656,7 +656,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         @mock.patch.dict(os.environ, {**os.environ, **mock_environ})
         def run():
-            update_res = tensor_search.add_documents(
+            update_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(
                     index_name=self.index_name_1, docs=[
                         {"_id": "123", 'desc': "edf " * (max_size // 4)},
@@ -679,7 +679,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for env_dict in [dict()]:
             @mock.patch.dict(os.environ, {**os.environ, **env_dict})
             def run():
-                update_res = tensor_search.add_documents(
+                update_res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[
                             {"_id": "123", 'desc': "Some content"},
@@ -710,7 +710,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
                 if error:
                     with self.assertRaises(BadRequestError):
-                        tensor_search.add_documents(
+                        self.add_documents(
                             config=self.config, add_docs_params=AddDocsParams(
                                 index_name=self.index_name_1,
                                 docs=[{
@@ -721,7 +721,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
                         )
                 else:
                     self.assertEqual(False,
-                                     tensor_search.add_documents(
+                                     self.add_documents(
                                          config=self.config, add_docs_params=AddDocsParams(
                                              index_name=self.index_name_1,
                                              docs=[{
@@ -737,13 +737,13 @@ class TestAddDocumentsStructured(MarqoTestCase):
         If a document is re-indexed with a tensor field removed, the vectors are removed
         """
         # test replace and update workflows
-        tensor_search.add_documents(
+        self.add_documents(
             self.config, add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "title": "mydata", "desc": "mydata2"}],
                 index_name=self.index_name_1, device="cpu"
             )
         )
-        tensor_search.add_documents(
+        self.add_documents(
             self.config,
             add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "desc": "mydata"}],
@@ -761,7 +761,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         """
         If a document is indexed with no tensor fields on an empty index, no vectors are added
         """
-        tensor_search.add_documents(
+        self.add_documents(
             self.config, add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "desc": "mydata"}],
                 index_name=self.index_name_1,
@@ -779,7 +779,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         If a document is indexed with a tensor field and a non-tensor field on an empty index, vectors are added
         for the tensor field
         """
-        tensor_search.add_documents(
+        self.add_documents(
             self.config, add_docs_params=AddDocsParams(
                 docs=[{"_id": "123", "title": "mydata", "desc": "mydata"}],
                 index_name=self.index_name_1,
@@ -825,7 +825,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
         for c in doc_counts:
             self.clear_index_by_name(self.index_name_img_random)
 
-            res1 = tensor_search.add_documents(
+            res1 = self.add_documents(
                 self.config,
                 add_docs_params=AddDocsParams(
                     docs=[{"_id": str(doc_num),
@@ -881,7 +881,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         for doc, error, msg in test_case:
             with self.subTest(msg):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[doc], device="cpu",
                     )
@@ -910,7 +910,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         for doc, expected_doc, msg in test_case:
             with self.subTest(msg):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     config=self.config, add_docs_params=AddDocsParams(
                         index_name=self.index_name_1, docs=[doc], device="cpu",
                     )
@@ -945,7 +945,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         ]
 
-        r = tensor_search.add_documents(
+        r = self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_img_no_chunking, docs=documents
             )

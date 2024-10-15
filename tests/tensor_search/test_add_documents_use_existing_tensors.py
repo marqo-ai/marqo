@@ -7,7 +7,7 @@ import time
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
@@ -71,7 +71,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -85,7 +85,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -125,7 +125,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -139,7 +139,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -183,7 +183,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -198,7 +198,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -249,7 +249,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -262,7 +262,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -314,7 +314,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -329,7 +329,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 with mock.patch.object(s2_inference,
                                        'vectorise',
                                        side_effect=original_vectorise) as mock_vectorise:
-                    tensor_search.add_documents(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index_name,
@@ -361,7 +361,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             "desc 2": "content 2. blah blah blah"
         }
         # 1 valid ID doc:
-        res = tensor_search.add_documents(
+        res = self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                                                               docs=[d1, {'_id': 1224}, {"_id": "fork", "abc": "123"}],
                                                               auto_refresh=True, use_existing_tensors=True,
@@ -369,7 +369,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         assert [item['status'] for item in res['items']] == [201, 400, 201]
 
         # no valid IDs
-        res_no_valid_id = tensor_search.add_documents(
+        res_no_valid_id = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[d1, {'_id': 1224}, d1],
                                           auto_refresh=True, use_existing_tensors=True, device="cpu"))
@@ -384,11 +384,11 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             "title 1": "content 1",
             "desc 2": "content 2. blah blah blah"
         }
-        r1 = tensor_search.add_documents(
+        r1 = self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[d1],
                                                               auto_refresh=True, use_existing_tensors=True,
                                                               device="cpu"))
-        r2 = tensor_search.add_documents(
+        r2 = self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1, docs=[d1, d1],
                                                               auto_refresh=True, use_existing_tensors=True,
                                                               device="cpu"))
@@ -403,7 +403,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         """check parity between a doc created with and without use_existing_tensors, then overwritten,
         for a newly created doc.
         """
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -418,7 +418,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -430,7 +430,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             document_id="123", show_vectors=True)
         self.assertEqual(use_existing_tensors_doc, regular_doc)
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -449,7 +449,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         Should only use the latest inserted ID. Make sure it doesn't get the first/middle one
         """
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "3",
@@ -464,7 +464,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         tensor_search.delete_index(config=self.config, index_name=self.index_name_1)
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1)
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "1",
@@ -490,7 +490,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         self.assertEqual(doc_3_solo, doc_3_duped)
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "1",
@@ -526,7 +526,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         They should still have no tensors.
         """
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -541,7 +541,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             document_id="123", show_vectors=True)
         assert len(d1["_tensor_facets"]) == 0
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -563,7 +563,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         When we insert the doc again, with use_existing_tensors, because the content
         hasn't changed, we use the existing (non-existent) vectors
         """
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -576,7 +576,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         assert len(d1["_tensor_facets"]) == 1
         assert "title 1" in d1["_tensor_facets"][0]
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -589,7 +589,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         self.assertEqual(d1["_tensor_facets"], d2["_tensor_facets"])
 
         # The only field is a non-tensor field. This makes a chunkless doc.
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "999",
@@ -600,7 +600,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             document_id="999", show_vectors=True)
         assert len(d1["_tensor_facets"]) == 0
 
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "999",
@@ -615,7 +615,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
     def test_use_existing_tensors_check_updates(self):
         """ Check to see if the document has been appropriately updated
         """
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -635,7 +635,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         @unittest.mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
-            tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
                     {
                         "_id": "123",
@@ -661,7 +661,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
         Checks chunk meta data and vectors are as expected
 
         """
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -685,7 +685,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             "fl": 101.3,
             "new_bool": False
         }
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[{"_id": "123", **use_existing_tensor_doc}],
                 auto_refresh=True, non_tensor_fields=["2nd-non-tensor-field", "field_to_be_list", 'new_field_list'],
@@ -714,7 +714,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
     @unittest.skip
     def test_use_existing_tensors_check_meta_data_mappings(self):
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {
                     "_id": "123",
@@ -738,7 +738,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             "fl": 101.3,
             "new_bool": False
         }
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                                                               docs=[{"_id": "123", **use_existing_tensor_doc}],
                                                               auto_refresh=True,
@@ -781,7 +781,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
             index_name=self.index_name_2, index_settings=index_settings, config=self.config)
         hippo_img = TestImageUrls.HIPPO_REALISTIC.value
         artefact_hippo_img = TestImageUrls.HIPPO_STATUE.value
-        tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_2, docs=[
                 {
                     "_id": "123",
@@ -820,7 +820,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 "fl": 3.5,
                 "non-tensor-field": ["it", "is", "9", "o clock"]
             }
-            tensor_search.add_documents(
+            self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_2,
                                                                   docs=[{"_id": "123", **use_existing_tensor_doc}],
                                                                   auto_refresh=True,
@@ -900,7 +900,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
 
         for doc_arg in doc_args:
             # Add doc normally without use_existing_tensors
-            add_res = tensor_search.add_documents(
+            add_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                                                                   docs=doc_arg, auto_refresh=True, device="cpu"))
 
@@ -909,7 +909,7 @@ class TestAddDocumentsUseExistingTensors(MarqoTestCase):
                 document_ids=[doc["_id"] for doc in doc_arg], show_vectors=True)
 
             # Then replace doc with use_existing_tensors
-            add_res = tensor_search.add_documents(
+            add_res = self.add_documents(
                 config=self.config, add_docs_params=AddDocsParams(index_name=self.index_name_1,
                                                                   docs=doc_arg, auto_refresh=True,
                                                                   use_existing_tensors=True, device="cpu"))
