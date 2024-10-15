@@ -1,8 +1,14 @@
+# Release 2.12.2
+
+## Bug fixes and minor changes
+- Upgrade the `Pillow` and `nltk` packages ([#989](https://github.com/marqo-ai/marqo/pull/989)).
+- Fix a bug where `normalizeEmbeddings=False` is not honored for some indexes ([#994](https://github.com/marqo-ai/marqo/pull/994)).
+
 # Release 2.12.1
 
 ## Bug fixes and minor changes
-- Fix a bug where when `treatUrlsAndPointersAsImages` is unset and `treatUrlsAndPointersAsMedia` is set, Marqo returns an error where `treatUrlsAndPointersAsImages` cannot be `False` when `treatUrlsAndPointersAsMedia` is `True` 
-- Add new video-audio model `LanguageBind/Video_V1.5_FT_Audio_FT` to the model registry.
+- Fix a bug where when `treatUrlsAndPointersAsImages` is unset and `treatUrlsAndPointersAsMedia` is set, Marqo returns an error where `treatUrlsAndPointersAsImages` cannot be `False` when `treatUrlsAndPointersAsMedia` is `True` ([#971](https://github.com/marqo-ai/marqo/commit/a0084a86d5cf797616a1f8e185eba87417edbc15)) 
+- Add new video-audio model `LanguageBind/Video_V1.5_FT_Audio_FT` to the model registry ([#971](https://github.com/marqo-ai/marqo/commit/a0084a86d5cf797616a1f8e185eba87417edbc15)).
 
 
 # Release 2.12.0
