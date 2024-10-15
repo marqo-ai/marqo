@@ -445,6 +445,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                 )
 
                             end_time = timer()
+                            logger.debug(f"Vectorised {len(content_chunks)} chunks for field {field} in {end_time - start_time:.3f}s")
                             total_vectorise_time += (end_time - start_time)
                         except (s2_inference_errors.UnknownModelError,
                                 s2_inference_errors.InvalidModelPropertiesError,
