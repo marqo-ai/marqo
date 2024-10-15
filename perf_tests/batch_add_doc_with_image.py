@@ -21,7 +21,6 @@ class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
 
     @task
     def add_docs(self):
-        # Generate random documents batch (5-10 docs) with random length description of 1-5 sentences
         self.client.index(INDEX_NAME).add_documents(
             documents=[doc for docs in [[
                 {
@@ -45,9 +44,10 @@ class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
                     "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg"
                 },
             ] for i in range(int(32 / 4))] for doc in docs],
-            tensor_fields=["my_multi_modal_field"],
-            mappings={"my_multi_modal_field": {"type": "multimodal_combination",
-                                               "weights": {"title": 0.5, "image": 0.8}}})
+            tensor_fields=["title"],
+            # mappings={"my_multi_modal_field": {"type": "multimodal_combination",
+            #                                    "weights": {"title": 0.5, "image": 0.8}}}
+        )
 
 
 @events.quitting.add_listener

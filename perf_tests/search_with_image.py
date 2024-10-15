@@ -19,7 +19,7 @@ class SearchUnstructuredIndexUser(MarqoLocustHttpUser):
 
     wait_time = between(1, 2)
 
-    all_queries = [
+    all_text_queries = [
         'travel with plane',
         'travel',
         'horse',
@@ -27,6 +27,9 @@ class SearchUnstructuredIndexUser(MarqoLocustHttpUser):
         'green light',
         'take a bus',
         'some unrelated stuff',
+    ],
+
+    image_queries = [
         'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg',
         'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
         'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg',
@@ -36,7 +39,7 @@ class SearchUnstructuredIndexUser(MarqoLocustHttpUser):
 
     @task
     def search(self):
-        self.client.index(INDEX_NAME).search(q=random.choice(self.all_queries))
+        self.client.index(INDEX_NAME).search(q=random.choice(self.all_text_queries))
 
 
 @events.quitting.add_listener
