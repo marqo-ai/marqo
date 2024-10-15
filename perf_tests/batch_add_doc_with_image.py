@@ -14,7 +14,7 @@ telemetry_file = open('telemetry.jsonl', 'w')
 class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(return_telemetry=True)
+        super().__init__(return_telemetry=True, *args, **kwargs)
 
     wait_time = between(1, 2)
     s = RandomSentence()
