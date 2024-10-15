@@ -433,18 +433,20 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                             # errors of different types generated here, too.
 
                             # ADD DOCS TIMER-LOGGER (4)
+                            import torch
+                            torch.cuda.synchronize("cuda")
                             start_time = timer()
                             with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
-                                print("content_chunks:", content_chunks)
                                 logger.debug(
                                     f"The parameters for vectorisation are: "
                                     f"model_name={marqo_index.model.name}, ",
                                     f"model_properties={marqo_index.model.get_properties()}, ",
+                                    f"content={content_chunks}, ",
                                     f"device={add_docs_params.device}, ",
                                     f"normalize_embeddings={normalize_embeddings}, ",
                                     f"infer={marqo_index.treat_urls_and_pointers_as_images}, ",
                                     f"model_auth={add_docs_params.model_auth}, ",
-                                    f"modality={modality}"
+                                    f"modality={modality}", format="json"
                                 )
 
                                 vector_chunks = s2_inference.vectorise(
