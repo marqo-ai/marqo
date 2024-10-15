@@ -143,7 +143,7 @@ jobs:
           mkdir -p report
           locust -f ${{ github.event.inputs.test_suite }} -u ${{ github.event.inputs.number_of_users }} \
           -r ${{ github.event.inputs.user_spawn_rate }} -t ${{ github.event.inputs.duration }} \
-          -H ${{ github.event.inputs.marqo_host }} --skip-log-errors
+          -H ${{ github.event.inputs.marqo_host }} --exit-code-on-error 0
         env:
           MARQO_INDEX_NAME: ${{ github.event.inputs.index_name }}
           MARQO_INDEX_MODEL_NAME: ${{ github.event.inputs.index_model_name }}
