@@ -10,6 +10,7 @@ on:
         required: true
         options:
           - random_index_and_tensor_search.py
+          - batch_add_doc_with_image.py
         description: >
           Location of the locustfile that contains the test suite. This works as the entrypoint
 
@@ -142,6 +143,7 @@ jobs:
           locust -f ${{ github.event.inputs.test_suite }} -u ${{ github.event.inputs.number_of_users }} \
           -r ${{ github.event.inputs.user_spawn_rate }} -t ${{ github.event.inputs.duration }} \
           -H ${{ github.event.inputs.marqo_host }}
+          ls -l
         env:
           MARQO_INDEX_NAME: ${{ github.event.inputs.index_name }}
           MARQO_INDEX_MODEL_NAME: ${{ github.event.inputs.index_model_name }}
@@ -152,6 +154,12 @@ jobs:
         with:
           name: marqo-locust-test-report
           path: perf_tests/report/
+
+      - name: Upload Locust Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-telemetry-data
+          path: perf_tests/telemetry.jsonl
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner

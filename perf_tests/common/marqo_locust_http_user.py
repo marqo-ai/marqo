@@ -12,9 +12,11 @@ class MarqoLocustHttpUser(HttpUser):
     abstract = True
 
     def __init__(self, *args, **kwargs):
+        return_telemetry = kwargs.pop("return_telemetry", False)
         super().__init__(*args, **kwargs)
         session: HttpSession = self.client
-        marqo_client = marqo.Client(url=self.host, api_key=os.getenv('MARQO_CLOUD_API_KEY'))
+        marqo_client = marqo.Client(url=self.host, api_key=os.getenv('MARQO_CLOUD_API_KEY'),
+                                    return_telemetry=return_telemetry)
         marqo_client.http = MarqoLocustHttpRequests(session, marqo_client.config)
 
         def _get_locust_enhanced_index(index_name: str):
