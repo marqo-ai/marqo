@@ -30,6 +30,7 @@ from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
+import time
     
 logger = get_logger(__name__)
 
@@ -122,7 +123,9 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
         if isinstance(content, str):
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
+            start_time = time.time()
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
+            print(f"Time taken to encode tensor: {time.time() - start_time}")
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
