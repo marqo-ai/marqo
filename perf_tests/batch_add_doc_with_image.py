@@ -44,7 +44,7 @@ class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
                     "image": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image4.jpg"
                 },
             ] for i in range(int(32 / 4))] for doc in docs],
-            tensor_fields=["title"],
+            tensor_fields=["image"],
             # mappings={"my_multi_modal_field": {"type": "multimodal_combination",
             #                                    "weights": {"title": 0.5, "image": 0.8}}}
         )
