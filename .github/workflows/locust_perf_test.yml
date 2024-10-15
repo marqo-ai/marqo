@@ -11,6 +11,7 @@ on:
         options:
           - random_index_and_tensor_search.py
           - batch_add_doc_with_image.py
+          - search_with_image.py
         description: >
           Location of the locustfile that contains the test suite. This works as the entrypoint
 
