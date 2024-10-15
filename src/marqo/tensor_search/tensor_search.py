@@ -446,7 +446,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                                     f"normalize_embeddings={normalize_embeddings}, ",
                                     f"infer={marqo_index.treat_urls_and_pointers_as_images}, ",
                                     f"model_auth={add_docs_params.model_auth}, ",
-                                    f"modality={modality}", format="json"
+                                    f"modality={modality}"
                                 )
 
                                 vector_chunks = s2_inference.vectorise(
