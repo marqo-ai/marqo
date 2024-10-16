@@ -384,6 +384,43 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
             clear_loaded_models()
 
+    def test_open_clip_vectorise_record_embeddings(self):
+        names = self.open_clip_test_model
+
+        sentences = ['hello', 'this is a test sentence. so is this.',
+                     ['hello', 'this is a test sentence. so is this.']]
+        device = 'cpu'
+        eps = 1e-9
+
+        # Create embeddings dict
+        embeddings_python_3_8 = dict()
+
+        for name in names:
+            model_properties = get_model_properties_from_registry(name)
+            model = _load_model(model_properties['name'], model_properties=model_properties, device=device)
+            embeddings_python_3_8[name] = dict()
+            for sentence in sentences:
+                for normalize_embeddings in [True, False]:
+                    output_v = vectorise(name, sentence, model_properties, device,
+                                         normalize_embeddings=normalize_embeddings)
+
+                    assert _check_output_type(output_v)
+
+                    output_m = model.encode(sentence, normalize=normalize_embeddings)
+
+                # Embeddings must match hardcoded python 3.8.20 embeddings
+                if isinstance(sentence, str):
+                    if isinstance(sentence, str):
+                        embeddings_python_3_8[name][sentence] = output_v
+
+                self.assertEqual(np.allclose(output_m, output_v, atol=eps), True)
+
+            clear_loaded_models()
+
+        # Write everything to JSON
+        with open(f"embeddings_reference/embeddings_open_clip_python_3_8.json", "w") as f:
+            json.dump(embeddings_python_3_8, f)
+
     def test_load_clip_text_model(self):
         names = self.open_clip_test_model
 
