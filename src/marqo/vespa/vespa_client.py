@@ -9,6 +9,7 @@ from json import JSONDecodeError
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
+import httpcore
 import httpx
 
 import marqo.logging
@@ -162,11 +163,16 @@ class VespaClient:
         """
         start_time = time.time()
         while time.time() - start_time < timeout:
-            if self.get_application_has_converged():
-                return
-            else:
-                logger.debug('Waiting for Vespa application to converge')
-                time.sleep(1)
+            try:
+                if self.get_application_has_converged():
+                    return
+                else:
+                    logger.debug('Waiting for Vespa application to converge')
+                    time.sleep(1)
+            # TODO Find out what exceptions is raised here
+            except (httpx.TimeoutException, httpcore.TimeoutException):
+                logger.error("Marqo timed out waiting for Vespa application to converge. Will retry.")
+                pass
 
         raise VespaError(f"Vespa application did not converge within {timeout} seconds")
 

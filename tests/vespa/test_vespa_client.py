@@ -3,6 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 
+import httpcore
 import httpx
 import vespa.application as pyvespa
 
@@ -423,3 +424,31 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         for r in batch_response.responses:
             self.assertEqual(r.status, 500)
             self.assertIn("Network Error", r.message)
+
+    @patch.object(VespaClient, 'get_application_has_converged')
+    def test_vespa_client_timeout_exception_handled(self, mock_get_application_has_converged):
+        """If a timeout exception is raised, the method should retry until the total wait time is reached"""
+        side_effects = [
+            httpx._exceptions.ReadTimeout("Read Timeout"),
+            httpcore._exceptions.ReadTimeout("Read Timeout")
+        ]
+        for side_effect in side_effects:
+            with self.subTest(side_effect=side_effect):
+                mock_get_application_has_converged.side_effect = httpx._exceptions.ReadTimeout("Read Timeout")
+                vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
+                                           "http://localhost:8080", "content_default")
+                with self.assertRaises(VespaError) as e:
+                    vespa_client.wait_for_application_convergence(10)
+                self.assertGreaterEqual(mock_get_application_has_converged.call_count, 5)
+                self.assertIn("Vespa application did not converge", str(e.exception))
+
+    @patch.object(VespaClient, 'get_application_has_converged')
+    def test_wait_for_application_timeout(self, mock_get_application_has_converged):
+        """If the total wait time is reached, the method should raise a VespaError"""
+        mock_get_application_has_converged.return_value = False
+        vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
+                                   "http://localhost:8080", "content_default")
+
+        with self.assertRaises(VespaError) as e:
+            vespa_client.wait_for_application_convergence(timeout=2)
+        self.assertIn("Vespa application did not converge",str(e.exception))
