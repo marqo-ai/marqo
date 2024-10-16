@@ -162,11 +162,14 @@ class VespaClient:
         """
         start_time = time.time()
         while time.time() - start_time < timeout:
-            if self.get_application_has_converged():
-                return
-            else:
-                logger.debug('Waiting for Vespa application to converge')
-                time.sleep(1)
+            try:
+                if self.get_application_has_converged():
+                    return
+                else:
+                    logger.debug('Waiting for Vespa application to converge')
+                    time.sleep(1)
+            except httpx._exceptions.TimeoutException:
+                pass
 
         raise VespaError(f"Vespa application did not converge within {timeout} seconds")
 
