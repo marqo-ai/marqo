@@ -3,6 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 
+import httpcore
 import httpx
 import vespa.application as pyvespa
 
@@ -13,7 +14,6 @@ from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
 from tests.marqo_test import AsyncMarqoTestCase
 
-import httpcore
 
 class TestFeedDocumentAsync(AsyncMarqoTestCase):
     TEST_SCHEMA = "test_vespa_client"

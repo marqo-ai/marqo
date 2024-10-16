@@ -9,8 +9,8 @@ from json import JSONDecodeError
 from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
-import httpx
 import httpcore
+import httpx
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
