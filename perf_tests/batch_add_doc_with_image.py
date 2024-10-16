@@ -4,7 +4,6 @@ import json
 import os
 
 from locust import events, task, between, run_single_user
-from wonderwords import RandomSentence
 
 from common.marqo_locust_http_user import MarqoLocustHttpUser
 
@@ -14,10 +13,9 @@ telemetry_file = open('telemetry.jsonl', 'w')
 class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(return_telemetry=True, *args, **kwargs)
+        super().__init__(return_telemetry=True, add_doc_batch_mode='per_field', *args, **kwargs)
 
     wait_time = between(1, 2)
-    s = RandomSentence()
 
     @task
     def add_docs(self):
