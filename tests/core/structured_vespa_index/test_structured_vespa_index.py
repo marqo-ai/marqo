@@ -1,10 +1,14 @@
 import unittest
+from unittest.mock import patch
 
 from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index import common
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core import exceptions as core_exceptions
 from tests.marqo_test import MarqoTestCase
+from marqo.core.models.marqo_query import MarqoQuery
+from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
+
 
 
 class TestStructuredVespaIndex(MarqoTestCase):
@@ -251,3 +255,39 @@ class TestStructuredVespaIndex(MarqoTestCase):
                 }
             )
         
+    def test_score_modifier_with_dot_in_subfield(self):
+        """
+        Test case where the score modifier field contains a period ('.') in the subfield name.
+        Ensures that only the first occurrence of '.' is split, and the rest is retained as part of the subfield.
+        """
+        marqo_doc = {
+            '_id': 'my_id',
+            'title': 'my title',
+            'price': 100.0,
+            "map_float_field": {"sub.field": 1.23},
+            constants.MARQO_DOC_TENSORS: {
+                'title': {
+                    constants.MARQO_DOC_CHUNKS: ['my', 'title'],
+                    constants.MARQO_DOC_EMBEDDINGS: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+                }
+            }
+        }
+
+        actual_vespa_doc = self.vespa_index.to_vespa_document(marqo_doc)
+        expected_vespa_doc = {
+            'id': 'my_id',
+            'fields': {
+                common.FIELD_ID: 'my_id',
+                common.FIELD_SCORE_MODIFIERS_FLOAT: {'price': 100.0, 'map_float_field.sub.field': 1.23},
+                common.FIELD_VECTOR_COUNT: 2,
+                'price': 100.0,
+                "map_float_field": {'sub.field': 1.23},
+                self.marqo_index.field_map['title'].lexical_field_name: 'my title',
+                self.marqo_index.tensor_field_map['title'].chunk_field_name: ['my', 'title'],
+                self.marqo_index.tensor_field_map['title'].embeddings_field_name: {
+                    '0': [1.0, 2.0, 3.0], '1': [4.0, 5.0, 6.0]
+                }
+            }
+        }
+
+        self.assertEqual(expected_vespa_doc, actual_vespa_doc)

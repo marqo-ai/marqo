@@ -372,7 +372,7 @@ class StructuredVespaIndex(VespaIndex):
         if marqo_query.score_modifiers is not None:
             for modifier in marqo_query.score_modifiers:
                 if '.' in modifier.field:
-                    root_modifier_field, subfield = modifier.field.split('.')
+                    root_modifier_field, subfield = modifier.field.split('.', 1)
                 else:
                     root_modifier_field = modifier.field
                 if root_modifier_field not in self._marqo_index.score_modifier_fields_names:
