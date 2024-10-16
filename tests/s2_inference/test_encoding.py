@@ -373,7 +373,9 @@ class TestOpenClipModelEncoding(unittest.TestCase):
                     with self.subTest("Hardcoded Python 3.8 Embeddings Comparison"):
                         try:
                             self.assertEqual(np.allclose(output_m, embeddings_python_3_8[name][sentence], atol=1e-6),
-                                            True)
+                                            True, f"Calculated embedding is {output_m} but "
+                                                  f"hardcoded embedding is {embeddings_python_3_8[name][sentence]}"
+                                                f" for model {name} and sentence {sentence}")
                         except KeyError:
                             raise KeyError(f"Hardcoded Python 3.8 embeddings not found for "
                                            f"model: {name}, sentence: {sentence} in JSON file: "
