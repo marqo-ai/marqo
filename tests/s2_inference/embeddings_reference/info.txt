@@ -1,0 +1,7 @@
+16/10/24 - All embeddings were generated with:
+- Marqo mainline head: 055237ae6c4a8121b4026650582f3a23bd416564 (2.12.2 release notes)
+- Python 3.8.20
+- open_clip_torch==2.24.0
+- torch==1.12.1
+- Ubuntu 22.04.4 LTS
+- g4dn.xlarge EC2 instance
