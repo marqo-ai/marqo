@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
 import httpx
+import httpcore
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -168,7 +169,7 @@ class VespaClient:
                 else:
                     logger.debug('Waiting for Vespa application to converge')
                     time.sleep(1)
-            except httpx._exceptions.TimeoutException:
+            except (httpx.TimeoutException, httpcore.TimeoutException):
                 pass
 
         raise VespaError(f"Vespa application did not converge within {timeout} seconds")
