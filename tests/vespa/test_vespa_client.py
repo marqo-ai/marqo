@@ -444,7 +444,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
 
     @patch.object(VespaClient, 'get_application_has_converged')
     def test_wait_for_application_timeout(self, mock_get_application_has_converged):
-        """If the total wait time is reached, the method should raise a VespaTimeoutError"""
+        """If the total wait time is reached, the method should raise a VespaError"""
         mock_get_application_has_converged.return_value = False
         vespa_client = VespaClient("http://localhost:19071", "http://localhost:8080",
                                    "http://localhost:8080", "content_default")

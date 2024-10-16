@@ -169,7 +169,10 @@ class VespaClient:
                 else:
                     logger.debug('Waiting for Vespa application to converge')
                     time.sleep(1)
+            # TODO Find out what exceptions is raised here
             except (httpx.TimeoutException, httpcore.TimeoutException):
+                logger.debug("Marqo timed out waiting for Vespa application to converge. Will retry.")
+                time.sleep(1)
                 pass
 
         raise VespaError(f"Vespa application did not converge within {timeout} seconds")
