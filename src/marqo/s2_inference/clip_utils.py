@@ -188,7 +188,7 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
 
     # callback to check file size for video and audio
     if modality in ["video", "audio"]:
-        max_size = EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE.value
+        max_size = EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE
         def progress(download_total, downloaded, upload_total, uploaded):
             if downloaded > max_size:
                 return 1  # Abort the download

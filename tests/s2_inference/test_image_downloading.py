@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 
 import pycurl
 import pytest
@@ -101,23 +101,35 @@ class TestImageDownloading(TestCase):
         mock_curl_instance = MagicMock()
         mock_curl.return_value = mock_curl_instance
 
-        # Simulate a file larger than the limit
-        def simulate_large_file(*args):
-            progress_callback = args[0]
-            # Simulate downloading more than the limit
-            progress_callback(0, 6_000_000, 0, 0)
-            return 1  # Simulate callback returning 1 to abort
+        # Store the progress callback
+        progress_callback = None
 
-        mock_curl_instance.setopt.side_effect = simulate_large_file
+        def simulate_setopt(option, value):
+            nonlocal progress_callback
+            if option == pycurl.XFERINFOFUNCTION:
+                progress_callback = value
+            elif option == pycurl.WRITEFUNCTION:
+                # Simulate writing some data
+                value(b'Some data')
+
+        mock_curl_instance.setopt.side_effect = simulate_setopt
+        
+        # Simulate pycurl.error with E_ABORTED_BY_CALLBACK
+        mock_curl_instance.perform.side_effect = pycurl.error(pycurl.E_ABORTED_BY_CALLBACK, "Callback aborted")
 
         # Test
         with self.assertRaises(ImageDownloadError) as context:
             download_image_from_url(test_url, {}, modality="video")
+            
+            # Simulate the progress callback after download_image_from_url has set it
+            if progress_callback:
+                # Simulate downloading more than the limit
+                progress_callback(0, 6_000_000, 0, 0)
 
         # Assert
         self.assertIn("exceeds the maximum allowed size", str(context.exception))
         mock_curl_instance.setopt.assert_any_call(pycurl.NOPROGRESS, False)
-        mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, MagicMock.ANY)
+        mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, ANY)
 
     @patch('marqo.s2_inference.clip_utils.pycurl.Curl')
     @patch('marqo.s2_inference.clip_utils.EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE', 5_000_000)  # 5MB limit
@@ -127,41 +139,61 @@ class TestImageDownloading(TestCase):
         mock_curl_instance = MagicMock()
         mock_curl.return_value = mock_curl_instance
 
-        # Simulate a file smaller than the limit
-        def simulate_small_file(*args):
-            progress_callback = args[0]
-            # Simulate downloading less than the limit
-            progress_callback(0, 3_000_000, 0, 0)
-            return 0  # Simulate successful download
+        # Store the progress callback
+        progress_callback = None
 
-        mock_curl_instance.setopt.side_effect = simulate_small_file
+        def simulate_setopt(option, value):
+            nonlocal progress_callback
+            if option == pycurl.XFERINFOFUNCTION:
+                progress_callback = value
+
+        mock_curl_instance.setopt.side_effect = simulate_setopt
         mock_curl_instance.getinfo.return_value = 200  # Simulate successful HTTP response
 
         # Test
         try:
             result = download_image_from_url(test_url, {}, modality="audio")
+            
+            # Simulate the progress callback after download_image_from_url has set it
+            if progress_callback:
+                progress_callback(0, 3_000_000, 0, 0)
+            
             self.assertIsInstance(result, BytesIO)
         except ImageDownloadError:
             self.fail("ImageDownloadError raised unexpectedly for file under size limit")
 
         # Assert
         mock_curl_instance.setopt.assert_any_call(pycurl.NOPROGRESS, False)
-        mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, MagicMock.ANY)
+        mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, ANY)
         mock_curl_instance.perform.assert_called_once()
 
     @patch('marqo.s2_inference.clip_utils.pycurl.Curl')
     @patch('marqo.s2_inference.clip_utils.EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE', 5_000_000)  # 5MB limit
     def test_image_file_size_not_checked(self, mock_curl):
         # Setup
-        test_url = "http://ipv4.download.thinkbroadband.com:8080/5GB.zip"
+        test_url = "http://example.com/large_image.jpg"
         mock_curl_instance = MagicMock()
         mock_curl.return_value = mock_curl_instance
 
+        # Simulate successful download
+        mock_curl_instance.getinfo.return_value = 200
+
         # Test
         try:
-            download_image_from_url(test_url, {}, modality="image")
+            result = download_image_from_url(test_url, {}, modality="image")
+            self.assertIsInstance(result, BytesIO)
         except ImageDownloadError:
             self.fail("ImageDownloadError raised unexpectedly for image modality")
 
         # Assert
-        mock_curl_instance.setopt.assert_not_called()
+        mock_curl_instance.setopt.assert_any_call(pycurl.URL, test_url)
+        mock_curl_instance.setopt.assert_any_call(pycurl.WRITEDATA, ANY)
+        
+        # Check that NOPROGRESS and XFERINFOFUNCTION are not set for image modality
+        with self.assertRaises(AssertionError):
+            mock_curl_instance.setopt.assert_any_call(pycurl.NOPROGRESS, False)
+        with self.assertRaises(AssertionError):
+            mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, ANY)
+
+        # Verify that perform was called
+        mock_curl_instance.perform.assert_called_once()
