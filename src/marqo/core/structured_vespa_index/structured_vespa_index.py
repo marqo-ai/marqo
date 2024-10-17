@@ -231,7 +231,7 @@ class StructuredVespaIndex(VespaIndex):
                         encoded_key = custom_encode(f'{index_field.name}.{key}')
                         target_dict[encoded_key] = value
                 else:
-                    target_dict[encoded_key] = marqo_value
+                    target_dict[index_field.name] = marqo_value
 
         # Tensors
         vector_count = 0
