@@ -11,7 +11,8 @@ import uvicorn
 import vespa.application as pyvespa
 from starlette.applications import Starlette
 
-from marqo import config, version
+from marqo import config, version, tensor_search
+from marqo.tensor_search import index_meta_cache, tensor_search
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
@@ -23,6 +24,7 @@ from marqo.vespa.vespa_client import VespaClient
 
 
 class TestImageUrls(Enum):
+    __test__ = False  # Prevent pytest from collecting this class as a test
     IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
     IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'
     IMAGE2 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
@@ -51,7 +53,7 @@ class MarqoTestCase(unittest.TestCase):
     def tearDownClass(cls):
         cls.patcher.stop()
         if cls.indexes:
-            cls.index_management.batch_delete_indexes(cls.indexes)
+            cls.index_management.batch_delete_indexes_by_name([index.name for index in cls.indexes])
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -75,10 +77,16 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def create_indexes(cls, index_requests: List[MarqoIndexRequest]) -> List[MarqoIndex]:
+        cls.index_management.bootstrap_vespa()
         indexes = cls.index_management.batch_create_indexes(index_requests)
         cls.indexes = indexes
 
         return indexes
+
+    @classmethod
+    def add_documents(cls, *args, **kwargs):
+        # TODO change to use config.document.add_documents when tensor_search.add_documents is removed
+        return tensor_search.add_documents(*args, **kwargs)
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
@@ -126,7 +134,8 @@ class MarqoTestCase(unittest.TestCase):
             ),
             marqo_version=version.get_version(),
             created_at=time.time(),
-            updated_at=time.time()
+            updated_at=time.time(),
+            version=None
     ) -> StructuredMarqoIndex:
         """
         Helper method that provides reasonable defaults for StructuredMarqoIndex.
@@ -147,7 +156,8 @@ class MarqoTestCase(unittest.TestCase):
             tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            version=version
         )
 
     @classmethod
@@ -155,8 +165,6 @@ class MarqoTestCase(unittest.TestCase):
             cls,
             name: str,
             schema_name: str,
-            fields: List[Field] = None,
-            tensor_fields: List[TensorField] = None,
             model: Model = Model(name='hf/all_datasets_v4_MiniLM-L6'),
             normalize_embeddings: bool = True,
             text_preprocessing: TextPreProcessing = TextPreProcessing(
@@ -186,7 +194,8 @@ class MarqoTestCase(unittest.TestCase):
             updated_at=time.time(),
             treat_urls_and_pointers_as_images=True,
             treat_urls_and_pointers_as_media=True,
-            filter_string_max_length=100
+            filter_string_max_length=100,
+            version=None
     ) -> UnstructuredMarqoIndex:
         """
         Helper method that provides reasonable defaults for UnstructuredMarqoIndex.
@@ -203,14 +212,13 @@ class MarqoTestCase(unittest.TestCase):
             distance_metric=distance_metric,
             vector_numeric_type=vector_numeric_type,
             hnsw_config=hnsw_config,
-            fields=fields,
-            tensor_fields=tensor_fields,
             marqo_version=marqo_version,
             created_at=created_at,
             updated_at=updated_at,
             treat_urls_and_pointers_as_images=treat_urls_and_pointers_as_images,
             treat_urls_and_pointers_as_media=treat_urls_and_pointers_as_media,
-            filter_string_max_length=filter_string_max_length
+            filter_string_max_length=filter_string_max_length,
+            version=version
         )
 
     @classmethod

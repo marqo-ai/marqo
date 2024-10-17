@@ -9,7 +9,6 @@ from marqo import exceptions as base_exceptions
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.core.index_management.index_management import IndexManagement
 from marqo.tensor_search.enums import EnvVars
 from marqo.vespa import exceptions as vespa_exceptions
 from tests.marqo_test import MarqoTestCase
@@ -24,7 +23,7 @@ class ApiTests(MarqoTestCase):
         self.client = TestClient(api.app)
 
     def test_add_or_replace_documents_tensor_fields(self):
-        with mock.patch('marqo.tensor_search.tensor_search.add_documents') as mock_add_documents:
+        with mock.patch('marqo.core.document.document.Document.add_documents') as mock_add_documents:
             mock_add_documents.return_value = MarqoAddDocumentsResponse(
                 errors=False,
                 processingTimeMs=0.0,
@@ -122,7 +121,6 @@ class ApiTests(MarqoTestCase):
                 self.assertIn(f"The search result offset must be less than or equal "
                                 f"to the MARQO_MAX_SEARCH_OFFSET limit of [{custom_offset}]",
                                 response.json()["message"])
-
 
 class ValidationApiTests(MarqoTestCase):
     def setUp(self):

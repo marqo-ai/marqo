@@ -90,12 +90,12 @@ class TestContextVectors(MarqoTestCase):
         """Test to ensure that the score is the same for the same query with different context vectors combinations."""
         for index_name in [self.structured_index_with_random_model, self.unstructured_index_with_random_model]:
             tensor_fields = ["text_field_1"] if index_name == self.unstructured_index_with_random_model else None
-            tensor_search.add_documents(config=self.config, add_docs_params=
+            self.add_documents(config=self.config, add_docs_params=
                                         AddDocsParams(index_name=index_name,
                                                       docs=[{"text_field_1": "A rider", "_id": "1"}],
                                                       tensor_fields=tensor_fields
                                                       )
-                                        )
+                               )
             with self.subTest(msg=index_name):
                 query = {
                     "A rider is riding a horse jumping over the barrier": 1,

@@ -16,7 +16,7 @@ from marqo.core.models.marqo_index import FieldType, FieldFeature, IndexType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import SearchMethod, EnvVars
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from tests.utils.transition import add_docs_caller
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
@@ -113,13 +113,13 @@ class TestPagination(MarqoTestCase):
                            'desc': 'my description'}
                     docs.append(doc)
 
-                r = tensor_search.add_documents(
+                r = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
                                                   # Add docs with increasing title word count, so each will have unique tensor and lexical scores
                                                   docs=docs,
                                                   device="cpu",
-                                                  tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                  tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
                                                   else None
                                                   )
                 ).dict(exclude_none=True, by_alias=True)
@@ -171,12 +171,12 @@ class TestPagination(MarqoTestCase):
                            "title": title,
                            'desc': 'my description'}
                     docs.append(doc)
-                r = tensor_search.add_documents(
+                r = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name,
                                                   docs=docs,
                                                   device="cpu",
-                                                  tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                  tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
                                                   else None
                                                   )
                 ).dict(exclude_none=True, by_alias=True)
@@ -235,7 +235,7 @@ class TestPagination(MarqoTestCase):
         for index in [self.index_structured, self.index_unstructured]:
             with self.subTest(index=type(index)):
                 # Add documents
-                add_docs_res = tensor_search.add_documents(
+                add_docs_res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -340,13 +340,13 @@ class TestPagination(MarqoTestCase):
         with mock.patch.object(utils, 'read_env_vars_and_defaults', new=read_var):
             for index in [self.index_structured, self.index_unstructured]:
                 for _ in range(0, num_docs, batch_size):
-                    r = tensor_search.add_documents(
+                    r = self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(index_name=index.name,
                                                       docs=[{"title": 'my title', 'desc': 'my title'} for i in
                                                             range(batch_size)],
                                                       device="cpu",
-                                                      tensor_fields=['title'] if index.type == IndexType.Unstructured
+                                                      tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
                                                       else None,
                                                       )
                     ).dict(exclude_none=True, by_alias=True)
@@ -561,7 +561,7 @@ class TestPagination(MarqoTestCase):
         d1 = {"title": "Marqo", "some doc 2": "some other thing", "_id": "abcdef"}
         d2 = {"some doc 1": "some 2 jnkerkbj", "field abc": "extravagant robodog is not a cat", "_id": "Jupyter_12"}
 
-        tensor_search.add_documents(
+        self.add_documents(
             config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True,
                 docs=[d0, d1, d2], device="cpu")

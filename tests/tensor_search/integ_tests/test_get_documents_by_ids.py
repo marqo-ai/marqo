@@ -12,7 +12,7 @@ from marqo.api.exceptions import (
 )
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -59,7 +59,7 @@ class TestGetDocuments(MarqoTestCase):
                     {"_id": "1", "title1": "content 1"}, {"_id": "2", "title1": "content 2"},
                     {"_id": "3", "title1": "content 3"}
                 ]
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(index_name=index.name, docs=docs, device="cpu",
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None)
@@ -83,7 +83,7 @@ class TestGetDocuments(MarqoTestCase):
         
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[dict(zip(k, v)) for k, v in zip(keys, vals)],
                     device="cpu",
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None))
@@ -126,13 +126,13 @@ class TestGetDocuments(MarqoTestCase):
     def test_get_document_vectors_resilient(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                     index_name=index.name, docs=[
                         {"_id": '456', "title1": "alexandra"},
                         {'_id': '221', 'desc2': 'hello'}],
                     device="cpu",
                     tensor_fields=["title1", "desc2"] if isinstance(index, UnstructuredMarqoIndex) else None)
-                                            )
+                                   )
                 id_reqs = [
                     (['123', '456'], [False, True]), ([['456', '789'], [True, False]]),
                     ([['456', '789', '221'], [True, False, True]]), ([['vkj', '456', '4891'], [False, True, False]])

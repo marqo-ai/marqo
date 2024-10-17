@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.s2_inference.errors import InvalidModelPropertiesError, UnknownModelError, ModelLoadError
 from marqo.tensor_search import tensor_search
@@ -93,7 +93,7 @@ class TestGenericModelSupport(MarqoTestCase):
                 "desc 2": "content 2. blah blah blah"
             }]
 
-        tensor_search.add_documents(config=config, add_docs_params=AddDocsParams(
+        self.add_documents(config=config, add_docs_params=AddDocsParams(
             index_name=index_name, docs=docs, device="cpu"))
 
     def test_validate_model_properties_missing_required_keys(self):

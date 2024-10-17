@@ -25,7 +25,7 @@ index_info_cache = dict()
 # Because it is non thread safe, there is a chance multiple threads push out
 # multiple refresh requests at the same. It isn't a critical problem if that
 # happens.
-cache_refresh_interval: int = 10  # seconds
+cache_refresh_interval: int = 1  # seconds
 cache_refresh_log_interval: int = 60
 cache_refresh_last_logged_time: float = 0
 refresh_thread = None
@@ -41,22 +41,27 @@ def get_cache() -> Dict[str, MarqoIndex]:
     return index_info_cache
 
 
-def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoIndex:
+def get_index(index_management: IndexManagement, index_name: str, force_refresh=False) -> MarqoIndex:
     """
     Get an index.
 
     Args:
+        index_management: IndexManagement object to load the index if not found in cache
+        index_name (str): Name of the index to retrieve.
         force_refresh: Get index from Vespa even if already in cache. If False, Vespa is called only if index is not
         found in cache.
 
     Returns:
+        The latest index if the index is not found in cache or force_refresh flag is True. Otherwise, the cached index
 
+    Raises:
+        IndexNotFoundError: If index is not found in cache.
     """
     # Make sure refresh thread is running
-    _check_refresh_thread(config)
+    _check_refresh_thread(index_management)
 
     if force_refresh or index_name not in index_info_cache:
-        _refresh_index(config, index_name)
+        _refresh_index(index_management, index_name)
 
     if index_name in index_info_cache:
         return index_info_cache[index_name]
@@ -65,11 +70,10 @@ def get_index(config: Config, index_name: str, force_refresh=False) -> MarqoInde
     raise exceptions.IndexNotFoundError(f"Index {index_name} not found")
 
 
-def _refresh_index(config: Config, index_name: str) -> None:
+def _refresh_index(index_management: IndexManagement, index_name: str) -> None:
     """
     Refresh cache for a specific index
     """
-    index_management = IndexManagement(config.vespa_client)
     try:
         index = index_management.get_index(index_name)
     except IndexNotFoundError as e:
@@ -78,7 +82,7 @@ def _refresh_index(config: Config, index_name: str) -> None:
     index_info_cache[index_name] = index
 
 
-def _check_refresh_thread(config: Config):
+def _check_refresh_thread(index_management: IndexManagement):
     if refresh_lock.locked():
         # Another thread is running this function, skip as concurrent changes to the thread can error out
         logger.debug('Refresh thread is locked. Skipping')
@@ -98,7 +102,7 @@ def _check_refresh_thread(config: Config):
                     try:
                         global cache_refresh_last_logged_time
 
-                        populate_cache(config)
+                        populate_cache(index_management)
 
                         if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
                             cache_refresh_last_logged_time = time.time()
@@ -126,15 +130,14 @@ def _check_refresh_thread(config: Config):
 
 
 def start_refresh_thread(config: Config):
-    _check_refresh_thread(config)
+    _check_refresh_thread(config.index_management)
 
 
-def populate_cache(config: Config):
+def populate_cache(index_management: IndexManagement):
     """
     Refresh cache for all indexes
     """
     global index_info_cache
-    index_management = IndexManagement(config.vespa_client)
     indexes = index_management.get_all_indexes()
 
     # Enable caching and reset any existing model caches
