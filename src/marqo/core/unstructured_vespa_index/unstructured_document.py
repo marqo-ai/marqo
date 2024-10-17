@@ -9,6 +9,7 @@ from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants
 from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.utils.special_characters_encoding import custom_encode, decode_key
 
 
 class UnstructuredVespaDocumentFields(MarqoBaseModel):
@@ -87,7 +88,6 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     def from_marqo_document(cls, document: Dict, filter_string_max_length: int) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
-
         if index_constants.MARQO_DOC_ID not in document:
             raise VespaDocumentParsingError(f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
                              f"This should be assigned for a valid document")
@@ -99,30 +99,34 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             if key in [index_constants.MARQO_DOC_EMBEDDINGS, index_constants.MARQO_DOC_CHUNKS,
                        unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, index_constants.MARQO_DOC_ID]:
                 continue
+
+            encoded_key = custom_encode(key)
+
             if isinstance(value, str):
                 if len(value) <= filter_string_max_length:
-                    instance.fields.short_string_fields[key] = value
+                    instance.fields.short_string_fields[encoded_key] = value
                 else:
-                    instance.fields.long_string_fields[key] = value
+                    instance.fields.long_string_fields[encoded_key] = value
                 instance.fields.strings.append(value)
             elif isinstance(value, bool):
-                instance.fields.bool_fields[key] = int(value)
+                instance.fields.bool_fields[encoded_key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
-                instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
+                instance.fields.string_arrays.extend([f"{encoded_key}::{custom_encode(element)}" for element in value])
             elif isinstance(value, int):
-                instance.fields.int_fields[key] = value
-                instance.fields.score_modifiers_fields[key] = value
+                instance.fields.int_fields[encoded_key] = value
+                instance.fields.score_modifiers_fields[encoded_key] = value
             elif isinstance(value, float):
-                instance.fields.float_fields[key] = value
-                instance.fields.score_modifiers_fields[key] = value
+                instance.fields.float_fields[encoded_key] = value
+                instance.fields.score_modifiers_fields[encoded_key] = value
             elif isinstance(value, dict):
                 for k, v in value.items():
+                    encoded_nested_key = custom_encode(f"{key}.{k}")
                     if isinstance(v, int):
-                        instance.fields.int_fields[f"{key}.{k}"] = v
-                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                        instance.fields.int_fields[encoded_nested_key] = v
+                        instance.fields.score_modifiers_fields[encoded_nested_key] = v
                     elif isinstance(v, float):
-                        instance.fields.float_fields[f"{key}.{k}"] = float(v)
-                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                        instance.fields.float_fields[encoded_nested_key] = float(v)
+                        instance.fields.score_modifiers_fields[encoded_nested_key] = v
             else:
                 raise VespaDocumentParsingError(f"In document {doc_id}, field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
@@ -144,19 +148,21 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         """Convert VespaDocumentObject back to the original document structure."""
         marqo_document = {}
         # Processing short_string_fields and long_string_fields back into original format
-        marqo_document.update(self.fields.short_string_fields)
-        marqo_document.update(self.fields.long_string_fields)
+        marqo_document.update({decode_key(k): v for k, v in self.fields.short_string_fields.items()})
+        marqo_document.update({decode_key(k): v for k, v in self.fields.long_string_fields.items()})
+        
         # Reconstruct string arrays
         for string_array in self.fields.string_arrays:
             key, value = string_array.split("::", 1)
-            if key not in marqo_document:
-                marqo_document[key] = []
-            marqo_document[key].append(value)
+            decoded_key = decode_key(key)
+            if decoded_key not in marqo_document:
+                marqo_document[decoded_key] = []
+            marqo_document[decoded_key].append(decode_key(value))
 
-        # Add int and float fields back
-        marqo_document.update(self.fields.int_fields)
-        marqo_document.update(self.fields.float_fields)
-        marqo_document.update({k: bool(v) for k, v in self.fields.bool_fields.items()})
+         # Add int and float fields back
+        marqo_document.update({decode_key(k): v for k, v in self.fields.int_fields.items()})
+        marqo_document.update({decode_key(k): v for k, v in self.fields.float_fields.items()})
+        marqo_document.update({decode_key(k): bool(v) for k, v in self.fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fields.marqo__id
 
         # This normally means the document is return with show_vectors=True

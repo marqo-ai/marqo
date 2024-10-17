@@ -8,6 +8,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
+from marqo.core.utils.special_characters_encoding import custom_encode
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -137,9 +138,11 @@ class StructuredVespaIndex(VespaIndex):
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        target_dict[f'{index_field.name}.{key}'] = value
+                        encoded_key = custom_encode(f'{index_field.name}.{key}')
+                        target_dict[encoded_key] = value
                 else:
-                    target_dict[index_field.name] = marqo_value
+                    encoded_key = custom_encode(index_field.name)
+                    target_dict[encoded_key] = marqo_value
 
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = {
@@ -225,9 +228,11 @@ class StructuredVespaIndex(VespaIndex):
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        target_dict[f'{index_field.name}.{key}'] = value
+                        encoded_key = custom_encode(f'{index_field.name}.{key}')
+                        target_dict[encoded_key] = value
                 else:
-                    target_dict[index_field.name] = marqo_value
+                    encoded_key = custom_encode(index_field.name)
+                    target_dict[encoded_key] = marqo_value
 
         # Tensors
         vector_count = 0

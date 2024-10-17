@@ -9,6 +9,7 @@ from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsin
     InvalidTensorFieldError
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index import common
+from marqo.core.utils.special_characters_encoding import custom_encode, decode_key
 
 
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
@@ -89,36 +90,40 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         for field_name, field_content in document.items():
             if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS]:
                 continue
+
+            encoded_field_name = custom_encode(field_name)
+
             if isinstance(field_content, str):
                 if field_name not in marqo_index.field_map:
-                    # All string fields will be added to the index as lexical fields before this convertion happens
                     raise MarqoDocumentParsingError(f'Field {field_name} is not in index {marqo_index.name}')
                 field = marqo_index.field_map[field_name]
-                instance.text_fields[field.lexical_field_name] = field_content
+                instance.text_fields[custom_encode(field.lexical_field_name)] = field_content
                 if len(field_content) <= marqo_index.filter_string_max_length:
-                    instance.fixed_fields.short_string_fields[field_name] = field_content
+                    instance.fixed_fields.short_string_fields[encoded_field_name] = field_content
             elif isinstance(field_content, bool):
-                instance.fixed_fields.bool_fields[field_name] = int(field_content)
+                instance.fixed_fields.bool_fields[encoded_field_name] = int(field_content)
             elif isinstance(field_content, list) and all(isinstance(elem, str) for elem in field_content):
-                instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
+                instance.fixed_fields.string_arrays.extend([f"{encoded_field_name}::{custom_encode(element)}" for element in field_content])
             elif isinstance(field_content, int):
-                instance.fixed_fields.int_fields[field_name] = field_content
-                instance.fixed_fields.score_modifiers_fields[field_name] = field_content
+                instance.fixed_fields.int_fields[encoded_field_name] = field_content
+                instance.fixed_fields.score_modifiers_fields[encoded_field_name] = field_content
             elif isinstance(field_content, float):
-                instance.fixed_fields.float_fields[field_name] = field_content
-                instance.fixed_fields.score_modifiers_fields[field_name] = field_content
+                instance.fixed_fields.float_fields[encoded_field_name] = field_content
+                instance.fixed_fields.score_modifiers_fields[encoded_field_name] = field_content
             elif isinstance(field_content, dict):
                 for k, v in field_content.items():
+                    encoded_nested_key = custom_encode(f"{field_name}.{k}")
                     if isinstance(v, int):
-                        instance.fixed_fields.int_fields[f"{field_name}.{k}"] = v
-                        instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
+                        instance.fixed_fields.int_fields[encoded_nested_key] = v
+                        instance.fixed_fields.score_modifiers_fields[encoded_nested_key] = v
                     elif isinstance(v, float):
-                        instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
-                        instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
+                        instance.fixed_fields.float_fields[encoded_nested_key] = float(v)
+                        instance.fixed_fields.score_modifiers_fields[encoded_nested_key] = v
             else:
                 raise VespaDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "
                     f"unsupported type {type(field_content)} which has not been validated in advance.")
+
 
             # Tensors
             vector_count = 0
@@ -159,23 +164,23 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         return {self._VESPA_DOC_ID: self.id, self._VESPA_DOC_FIELDS: vespa_fields}
 
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
-        """Convert VespaDocumentObject to marqo document document structure."""
         marqo_document = {}
         for string_array in self.fixed_fields.string_arrays:
             key, value = string_array.split("::", 1)
-            if key not in marqo_document:
-                marqo_document[key] = []
-            marqo_document[key].append(value)
+            decoded_key = decode_key(key)
+            if decoded_key not in marqo_document:
+                marqo_document[decoded_key] = []
+            marqo_document[decoded_key].append(decode_key(value))
 
-        # marqo_document.update(self.fixed_fields.short_string_fields)
-        marqo_document.update(self.fixed_fields.int_fields)
-        marqo_document.update(self.fixed_fields.float_fields)
-        marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
+        marqo_document.update({decode_key(k): v for k, v in self.fixed_fields.int_fields.items()})
+        marqo_document.update({decode_key(k): v for k, v in self.fixed_fields.float_fields.items()})
+        marqo_document.update({decode_key(k): bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
+
 
         # text fields
         for field_name, field_content in self.text_fields.items():
-            marqo_document[field_name] = field_content
+            marqo_document[decode_key(field_name)] = field_content
 
         # tensor fields
         for field_name, field_content in self.tensor_fields.items():
