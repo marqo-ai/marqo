@@ -231,7 +231,6 @@ class StructuredVespaIndex(VespaIndex):
                         encoded_key = custom_encode(f'{index_field.name}.{key}')
                         target_dict[encoded_key] = value
                 else:
-                    encoded_key = custom_encode(index_field.name)
                     target_dict[encoded_key] = marqo_value
 
         # Tensors
@@ -305,8 +304,8 @@ class StructuredVespaIndex(VespaIndex):
                         )
                 else:
                     if isinstance(value, dict) and marqo_field.type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapLong, FieldType.MapDouble]:
-                        decoded_value = {custom_encode(k): v for k, v in value.items()}
-                        marqo_document[marqo_name] = decoded_value
+                        encoded_value = {custom_encode(k): v for k, v in value.items()}
+                        marqo_document[marqo_name] = encoded_value
                     else:
                         marqo_document[marqo_name] = value
 

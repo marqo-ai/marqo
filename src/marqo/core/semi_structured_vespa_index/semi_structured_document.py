@@ -100,7 +100,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             elif isinstance(field_content, bool):
                 instance.fixed_fields.bool_fields[field_name] = int(field_content)
             elif isinstance(field_content, list) and all(isinstance(elem, str) for elem in field_content):
-                instance.fixed_fields.string_arrays.extend([f"{field_name}::{custom_encode(element)}" for element in field_content])
+                instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
             elif isinstance(field_content, int):
                 instance.fixed_fields.int_fields[field_name] = field_content
                 instance.fixed_fields.score_modifiers_fields[field_name] = field_content
