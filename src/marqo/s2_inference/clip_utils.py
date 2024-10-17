@@ -200,12 +200,13 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
         if c.getinfo(pycurl.RESPONSE_CODE) != 200:
             raise ImageDownloadError(f"media url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}")
     except pycurl.error as e:
-        error_code = e.args[0]
-        if error_code == pycurl.E_ABORTED_BY_CALLBACK:
-            raise ImageDownloadError(f"Media file `{image_path}` exceeds the maximum allowed size of {max_size} bytes for {modality}.")
-        else:
-            raise ImageDownloadError(f"Marqo encountered an error when downloading the media url {image_path}. "
-                                     f"The original error is: {e}")
+        error_message = str(e)
+        if len(e.args) > 0:
+            error_code = e.args[0]
+            if error_code == pycurl.E_ABORTED_BY_CALLBACK:
+                error_message = f"Media file `{image_path}` exceeds the maximum allowed size for {modality}."
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the media url {image_path}. "
+                                 f"The original error is: {error_message}")
     finally:
         c.close()
         
