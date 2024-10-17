@@ -1,6 +1,5 @@
 import os
 from io import BytesIO
-from platform import architecture
 
 import certifi
 import clip
@@ -29,6 +28,7 @@ from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
+from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
 
@@ -528,7 +528,7 @@ class OPEN_CLIP(AbstractCLIPModel):
             self,
             device: Optional[str] = None,
             model_properties: Optional[Dict] = None,
-            model_auth: Optional[Dict] = None,
+            model_auth: Optional[ModelAuth] = None,
     ) -> None:
 
         super().__init__(device, model_properties, model_auth)
