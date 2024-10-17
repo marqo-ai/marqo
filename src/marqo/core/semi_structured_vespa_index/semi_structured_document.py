@@ -160,12 +160,13 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         return {self._VESPA_DOC_ID: self.id, self._VESPA_DOC_FIELDS: vespa_fields}
 
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
+        """Convert VespaDocumentObject to marqo document document structure."""
         marqo_document = {}
         for string_array in self.fixed_fields.string_arrays:
             key, value = string_array.split("::", 1)
             if key not in marqo_document:
                 marqo_document[key] = []
-            marqo_document[key].append(decode_key(value))
+            marqo_document[key].append(value)
 
         marqo_document.update(self.fixed_fields.int_fields)
         marqo_document.update(self.fixed_fields.float_fields)
@@ -174,7 +175,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         # text fields
         for field_name, field_content in self.text_fields.items():
-            marqo_document[decode_key(field_name)] = field_content
+            marqo_document[field_name] = field_content
 
         # tensor fields
         for field_name, field_content in self.tensor_fields.items():

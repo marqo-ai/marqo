@@ -108,7 +108,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             elif isinstance(value, bool):
                 instance.fields.bool_fields[key] = int(value)
             elif isinstance(value, list) and all(isinstance(elem, str) for elem in value):
-                instance.fields.string_arrays.extend([f"{key}::{custom_encode(element)}" for element in value])
+                instance.fields.string_arrays.extend([f"{key}::{element}" for element in value])
             elif isinstance(value, int):
                 instance.fields.int_fields[key] = value
                 instance.fields.score_modifiers_fields[key] = value
@@ -150,10 +150,10 @@ class UnstructuredVespaDocument(MarqoBaseModel):
 
         # Reconstruct string arrays
         for string_array in self.fields.string_arrays:
-             key, value = string_array.split("::", 1)
-             if key not in marqo_document:
-                 marqo_document[key] = []
-             marqo_document[key].append(value)
+            key, value = string_array.split("::", 1)
+            if key not in marqo_document:
+                marqo_document[key] = []
+            marqo_document[key].append(value)
 
         # Add int and float fields back
         marqo_document.update(self.fields.int_fields)
