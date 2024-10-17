@@ -73,3 +73,7 @@ def generic_models():
 
 def search_api_score_modifiers_parameter():
     return _build_url('reference/api/search/search/#score-modifiers')
+
+def hugging_face_trust_remote_code():
+    # TODO - Update to valid docs URL
+    return _build_url('reference/api/models/hugging-face-models/#trust-remote-code')

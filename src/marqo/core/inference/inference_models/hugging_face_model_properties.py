@@ -7,7 +7,7 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 from pydantic import Field, validator, root_validator
 
-from marqo.base_model import MarqoBaseModel
+from marqo.base_model import MarqoBaseModel, ImmutableBaseModel
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.logger import get_logger
 from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
@@ -20,7 +20,23 @@ class PoolingMethod(str, Enum):
     CLS = "cls"
 
 
-class HuggingFaceModelProperties(MarqoBaseModel):
+class HuggingFaceModelFlags(ImmutableBaseModel):
+    """
+    Flags passed to transformers.AutoModel.from_pretrained()
+    """
+    trust_remote_code: Optional[bool] = None
+    use_memory_efficient_attention: Optional[bool] = None
+    unpad_inputs: Optional[bool] = None
+
+
+class HuggingFaceTokenizerFlags(ImmutableBaseModel):
+    """
+    Flags passed to transformers.AutoTokenizer.from_pretrained()
+    """
+    trust_remote_code: Optional[bool] = None
+
+
+class HuggingFaceModelProperties(ImmutableBaseModel):
     """
     A class to represent the properties of a Hugging Face model.
 
@@ -28,13 +44,15 @@ class HuggingFaceModelProperties(MarqoBaseModel):
         name: The name of the model. This will be used as the repo_id in the Hugging Face model hub.
             This attribute is neglected if 'url' or 'model_location' is provided.
             We are not raising an error right now as that would be a breaking change.
-        token: The token length of the model. It is default to 128.
+        token: The token length of the model. It defaults to 128.
         type: The type of the model. It should be "hf".
         url: The URL of the model checkpoint. It is optional.
         model_location: The location of the model. It is optional.
         model_auth: The authentication information for the model. It is optional.
         note: A note about the model. It is optional.
         pooling_method: The pooling method for the model. It should be one of the values in the PoolingMethod enum.
+        dimensions: The dimensions of the model.
+        trust_remote_code: Allow remote code execution
     """
     name: Optional[str] = None
     token: int = 128
@@ -45,6 +63,7 @@ class HuggingFaceModelProperties(MarqoBaseModel):
     note: Optional[str] = None
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
     dimensions: int
+    trust_remote_code: bool = False
 
     @validator("type")
     def _validate_type(cls, v):
@@ -63,7 +82,7 @@ class HuggingFaceModelProperties(MarqoBaseModel):
             return values
         name = values.get('name')
         if isinstance(name, str) and name:
-            pooling_method =  cls._infer_pooling_method_from_name(name)
+            pooling_method = cls._infer_pooling_method_from_name(name)
         else:
             pooling_method = PoolingMethod.Mean
         values["pooling_method"] = pooling_method
