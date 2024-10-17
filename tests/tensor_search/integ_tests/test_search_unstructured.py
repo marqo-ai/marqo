@@ -104,8 +104,8 @@ class TestSearchUnstructured(MarqoTestCase):
         ]
         for index_name, desc in tests:
             with self.subTest(desc):
-                self.add_documents_and_refresh_index(config=self.config,
-                                                     add_docs_params=AddDocsParams(
+                self.add_documents(config=self.config,
+                                   add_docs_params=AddDocsParams(
                                                 index_name=index_name,
                                                 docs=[
                                                     {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
@@ -115,7 +115,7 @@ class TestSearchUnstructured(MarqoTestCase):
                                                 ],
                                                 tensor_fields=["abc", "other_field", "finally"],
                                             )
-                                                     )
+                                   )
 
                 search_res = tensor_search._vector_text_search(
                     config=self.config, index_name=index_name,
@@ -193,7 +193,7 @@ class TestSearchUnstructured(MarqoTestCase):
                     The editor-in-chief Katharine Viner succeeded Alan Rusbridger in 2015.[10][11] Since 2018, the paper's main newsprint sections have been published in tabloid format. As of July 2021, its print edition had a daily circulation of 105,134.[4] The newspaper has an online edition, TheGuardian.com, as well as two international websites, Guardian Australia (founded in 2013) and Guardian US (founded in 2011). The paper's readership is generally on the mainstream left of British political opinion,[12][13][14][15] and the term "Guardian reader" is used to imply a stereotype of liberal, left-wing or "politically correct" views.[3] Frequent typographical errors during the age of manual typesetting led Private Eye magazine to dub the paper the "Grauniad" in the 1960s, a nickname still used occasionally by the editors for self-mockery.[16]
                     """
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -214,7 +214,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_search_edge_case(self):
         """We ran into bugs with this doc"""
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=[
@@ -244,7 +244,7 @@ class TestSearchUnstructured(MarqoTestCase):
         """Is the result formatted correctly?"""
         q = "Exact match hehehe"
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -297,7 +297,7 @@ class TestSearchUnstructured(MarqoTestCase):
         assert search_res["limit"] > 0
 
     def test_result_count_validation(self):
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -341,7 +341,7 @@ class TestSearchUnstructured(MarqoTestCase):
         assert len(search_res['hits']) >= 1
 
     def test_highlights_tensor(self):
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -366,7 +366,7 @@ class TestSearchUnstructured(MarqoTestCase):
             assert "_highlights" not in hit
 
     def test_highlights_lexical(self):
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index, docs=[
@@ -392,7 +392,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_search_int_field(self):
         """doesn't error out if there is a random int field"""
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -411,7 +411,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 assert len(s_res["hits"]) > 0
 
     def test_filtering_list_case_tensor(self):
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -453,7 +453,7 @@ class TestSearchUnstructured(MarqoTestCase):
         assert len(res_should_only_match_keyword_good["hits"]) == 1
 
     def test_filtering_list_case_lexical(self):
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -486,7 +486,7 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_filtering_list_case_image(self):
 
         hippo_img = TestImageUrls.HIPPO_REALISTIC.value
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -519,7 +519,7 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_filtering(self):
         # TODO-Li Add support for filter on Bool
         # Add documents first (assuming add_docs_caller is a method to add documents)
-        res = self.add_documents_and_refresh_index(
+        res = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -565,7 +565,7 @@ class TestSearchUnstructured(MarqoTestCase):
              "bool_field_1": False, "bool_field_2": True, "text_field_3": "search me"},
         ]
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -604,7 +604,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_filter_spaced_fields(self):
         # Add documents
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -638,7 +638,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_filtering_bad_syntax(self):
         # Adding documents
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -688,7 +688,7 @@ class TestSearchUnstructured(MarqoTestCase):
         assert kwargs["device"] == "cuda:123"
 
     def test_search_other_types_subsearch(self):
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -718,7 +718,7 @@ class TestSearchUnstructured(MarqoTestCase):
             "some_str": "blah"
         }]
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -740,7 +740,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_lexical_filtering(self):
         # Adding documents
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -806,7 +806,7 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_filter_on_id_and_more(self):
         """Test various filtering scenarios including _id and other conditions"""
         # Adding documents
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -865,7 +865,7 @@ class TestSearchUnstructured(MarqoTestCase):
             (None, {"field_1", "field_2", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
         )
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -894,7 +894,7 @@ class TestSearchUnstructured(MarqoTestCase):
         batch_size_list = [50, 50, 28]
         # We add 128 documents to the index wth batch_size 50, 50, 28 to avoid timeout
         for batch_size in batch_size_list:
-            res = self.add_documents_and_refresh_index(
+            res = self.add_documents(
                 config=self.config,
                 add_docs_params=AddDocsParams(
                     index_name=self.default_text_index,
@@ -977,7 +977,7 @@ class TestSearchUnstructured(MarqoTestCase):
             {"_id": "789",
              "image_field": url_2},
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -1002,7 +1002,7 @@ class TestSearchUnstructured(MarqoTestCase):
             {"field_a": "Construction and scaffolding equipment",
              "_id": 'irrelevant_doc'}
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1040,7 +1040,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 "_id": 'artefact_hippo'
             }
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -1086,7 +1086,7 @@ class TestSearchUnstructured(MarqoTestCase):
             }
         ]
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -1096,7 +1096,7 @@ class TestSearchUnstructured(MarqoTestCase):
         )
 
         invalid_queries = [{}, None, {123: 123}, {'123': None},
-                           {"https://marqo_not_real.com/image_1.png": 3}, set()]
+                           {"https://marqo-not-real.com/image_1.png": 3}, set()]
         for q in invalid_queries:
             with self.subTest(f"query={q}"):
                 with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
@@ -1117,7 +1117,7 @@ class TestSearchUnstructured(MarqoTestCase):
                 "_id": 'artefact_hippo'
             }
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -1143,7 +1143,7 @@ class TestSearchUnstructured(MarqoTestCase):
             {"field_a": "Some text about a weird forest",
              "_id": 'artefact_hippo'}
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1178,7 +1178,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
         docs = list(doc_dict.values())
 
-        res = self.add_documents_and_refresh_index(
+        res = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_image_index,
@@ -1207,7 +1207,7 @@ class TestSearchUnstructured(MarqoTestCase):
             {"_id": "2", "text_field_1": "some code", "text_field_2": "match", "int_field_1": 2},
 
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1233,7 +1233,7 @@ class TestSearchUnstructured(MarqoTestCase):
             {"_id": "2", "text_field_1": "some code", "text_field_2": "match", "int_field_1": 2},
 
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1271,7 +1271,7 @@ class TestSearchUnstructured(MarqoTestCase):
             # large negative float
             {'double_field_1': -9999999999.87675, '_id': '7', "search_field": "some text"}
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1303,7 +1303,7 @@ class TestSearchUnstructured(MarqoTestCase):
         docs = [
             {"_id": "1", "text_field": "::my_text"} # This should work properly
         ]
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
@@ -1351,7 +1351,7 @@ class TestSearchUnstructured(MarqoTestCase):
         for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
             with self.subTest(msg):
                 self.clear_index_by_name(self.default_text_index)
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=self.default_text_index,

@@ -213,7 +213,7 @@ class TestHybridSearch(MarqoTestCase):
 
                 if isinstance(index, UnstructuredMarqoIndex):
                     # this is required to create the tensor fields in the semi-structured index
-                    self.add_documents_and_refresh_index(
+                    self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index.name,
@@ -446,7 +446,7 @@ class TestHybridSearch(MarqoTestCase):
         mock_vespa_client_query = unittest.mock.MagicMock()
         mock_vespa_client_query.side_effect = pass_through_query
 
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.semi_structured_index_with_no_model.name,
@@ -579,7 +579,7 @@ class TestHybridSearch(MarqoTestCase):
                       self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                add_docs_res = self.add_documents_and_refresh_index(
+                add_docs_res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -631,7 +631,7 @@ class TestHybridSearch(MarqoTestCase):
                       self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -671,13 +671,12 @@ class TestHybridSearch(MarqoTestCase):
     def test_hybrid_search_searchable_attributes(self):
         """
         Tests that searchable attributes work as expected for all methods
-        TODO: Add unstructured index once searchable attributes are supported
         """
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -742,8 +741,8 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertIn("hits", hybrid_res)
                     self.assertEqual(len(hybrid_res["hits"]), 3)    # Only 3 documents have text field 2. Tensor retrieval will get them all.
                     self.assertEqual(hybrid_res["hits"][0]["_id"], "doc12")
-                    self.assertEqual(hybrid_res["hits"][1]["_id"], "doc11")
-                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc13")
+                    # doc11 and doc13 has score 0, so their order is non-deterministic
+                    self.assertSetEqual({'doc11', 'doc13'}, {hit["_id"] for hit in hybrid_res["hits"][1:]})
 
     def test_hybrid_search_score_modifiers(self):
         """
@@ -754,7 +753,7 @@ class TestHybridSearch(MarqoTestCase):
                       self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -907,7 +906,7 @@ class TestHybridSearch(MarqoTestCase):
                       self.unstructured_default_text_index]:
             with self.subTest(index=type(index)):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -974,7 +973,7 @@ class TestHybridSearch(MarqoTestCase):
                       self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1028,7 +1027,7 @@ class TestHybridSearch(MarqoTestCase):
                       self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1075,7 +1074,7 @@ class TestHybridSearch(MarqoTestCase):
                       self.unstructured_default_image_index]:
             with self.subTest(index=index.name):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1142,7 +1141,7 @@ class TestHybridSearch(MarqoTestCase):
         """
 
         # Add documents
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.structured_text_index_score_modifiers.name,
@@ -1254,7 +1253,7 @@ class TestHybridSearch(MarqoTestCase):
         """
 
         # Add documents
-        self.add_documents_and_refresh_index(
+        self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.semi_structured_default_image_index.name,
@@ -1367,7 +1366,7 @@ class TestHybridSearch(MarqoTestCase):
             with self.subTest(msg=f'{index.type}', index=index):
 
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -1753,8 +1752,8 @@ class TestHybridSearch(MarqoTestCase):
                                                     if isinstance(index, UnstructuredMarqoIndex) else None,
                                                 mappings={"custom_field_1": {"type": "custom_vector"}} \
                                                     if isinstance(index, UnstructuredMarqoIndex) else None)
-                _ = self.add_documents_and_refresh_index(config=self.config,
-                                                         add_docs_params=add_docs_params)
+                _ = self.add_documents(config=self.config,
+                                       add_docs_params=add_docs_params)
 
                 r = tensor_search.search(config=self.config, index_name=index.name, text=None,
                                          search_method="hybrid",
