@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 
+from marqo.core.utils.special_characters_encoding import custom_encode
 from marqo.core import constants
 from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery, MarqoIndex
 from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
@@ -120,7 +121,7 @@ class VespaIndex(ABC):
                 raise InternalError(f'Unknown score modifier type {modifier.type}')
 
         return mult_tensor, add_tensor
-
+    
     def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
         """
         Returns classic score modifiers (from tensor or lexical queries) as a dictionary of dictionaries.
@@ -129,20 +130,24 @@ class VespaIndex(ABC):
         if marqo_query.score_modifiers:
             mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(marqo_query.score_modifiers)
 
+            # Encode field names
+            encoded_mult_tensor = {custom_encode(k): v for k, v in mult_tensor.items()}
+            encoded_add_tensor = {custom_encode(k): v for k, v in add_tensor.items()}
+
             if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
                 return {
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: mult_tensor,
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: add_tensor
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: encoded_mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: encoded_add_tensor
                 }
             elif isinstance(marqo_query, MarqoTensorQuery):
                 return {
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: encoded_mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: encoded_add_tensor
                 }
             elif isinstance(marqo_query, MarqoLexicalQuery):
                 return {
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: mult_tensor,
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: add_tensor
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: encoded_mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: encoded_add_tensor
                 }
             else:
                 raise InternalError(f'Unknown query type {type(marqo_query)}')
