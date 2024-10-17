@@ -6,9 +6,6 @@ from marqo.core.structured_vespa_index import common
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core import exceptions as core_exceptions
 from tests.marqo_test import MarqoTestCase
-from marqo.core.models.marqo_query import MarqoQuery
-from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
-
 
 
 class TestStructuredVespaIndex(MarqoTestCase):
