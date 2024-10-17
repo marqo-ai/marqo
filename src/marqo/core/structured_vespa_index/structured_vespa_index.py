@@ -141,8 +141,7 @@ class StructuredVespaIndex(VespaIndex):
                         encoded_key = f'{index_field.name}.{custom_encode(key)}'
                         target_dict[encoded_key] = value
                 else:
-                    encoded_key = custom_encode(index_field.name)
-                    target_dict[encoded_key] = marqo_value
+                    target_dict[index_field.name] = marqo_value
 
         if len(score_modifiers_double_long) > 0:
             vespa_fields[common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG] = {
