@@ -725,7 +725,7 @@ class OPEN_CLIP(AbstractCLIPModel):
         download_model_params = {"repo_location": model_location}
 
         if model_location.auth_required:
-            download_model_params['auth'] = self.model_properties.model_auth
+            download_model_params['auth'] = self.model_auth
 
         model_file_path = download_model(**download_model_params)
         if model_file_path is None or model_file_path == '':
