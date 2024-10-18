@@ -56,7 +56,8 @@ class HuggingFaceModel(AbstractEmbeddingModel):
                 raise InvalidModelPropertiesError(
                     f"The specified model requires the 'trust_remote_code' attribute to be set to True. "
                     f"Setting this attribute to True may have security implications. "
-                    f"See {marqo_docs.hugging_face_trust_remote_code()} for more information")
+                    f"See {marqo_docs.hugging_face_trust_remote_code()} for more information"
+                )
 
         return parsed_properties
 

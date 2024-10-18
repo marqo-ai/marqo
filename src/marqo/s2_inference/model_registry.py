@@ -492,6 +492,7 @@ def _get_open_clip_properties() -> Dict:
             "note": "Marqo's fashionSigLIP model",
             "type": "open_clip"
         },
+
         # TODO Add these model back when we upgrade the open_clip version
         # "open_clip/MobileCLIP-B/datacompdr_lt":{
         #     "name": "open_clip/MobileCLIP-B/datacompdr_lt",
@@ -616,6 +617,13 @@ def _get_sbert_properties() -> Dict:
 
 def _get_hf_properties() -> Dict:
     HF_MODEL_PROPERTIES = {
+        "Marqo/dunzhang-stella_en_400M_v5": {
+            "name": "Marqo/dunzhang-stella_en_400M_v5",
+            "dimensions": 1024,
+            "tokens": 128,
+            "type": "hf_stella",
+            "trust_remote_code": True
+        },
         "hf/all-MiniLM-L6-v1":
             {"name": "sentence-transformers/all-MiniLM-L6-v1",
              "dimensions": 384,
