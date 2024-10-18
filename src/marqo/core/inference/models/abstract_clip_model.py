@@ -1,13 +1,14 @@
 from abc import abstractmethod
 
+import torch
 from PIL import UnidentifiedImageError
 
-from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.s2_inference.types import *
 from marqo.core.inference.image_download import (_is_image, format_and_load_CLIP_images,
                                                  format_and_load_CLIP_image)
+from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.s2_inference.logger import get_logger
-import torch
+from marqo.s2_inference.types import *
+from marqo.tensor_search.models.private_models import ModelAuth
 
 logger = get_logger(__name__)
 
@@ -25,14 +26,14 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
     """
 
     def __init__(self, device: Optional[str] = None, model_properties: Optional[dict] = None,
-                 model_auth: Optional[dict] = None):
+                 model_auth: Optional[ModelAuth] = None):
         """Instantiate the abstract CLIP model.
 
         Args:
             device (str): The device to load the model on, typically 'cpu' or 'cuda'.
             model_properties (dict): A dictionary containing additional properties or configurations
                 specific to the model. Defaults to an empty dictionary if not provided.
-            model_auth (dict): The authentication information for the model. Defaults to `None` if not provided
+            model_auth (ModelAuth): The authentication information for the model. Defaults to `None` if not provided
         """
 
         super().__init__(model_properties, device, model_auth)
