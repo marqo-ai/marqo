@@ -9,6 +9,7 @@ from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants
 from marqo.core.exceptions import VespaDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
+from marqo.core.utils.special_characters_encoding import custom_encode, decode_key
 
 
 class UnstructuredVespaDocumentFields(MarqoBaseModel):
@@ -87,7 +88,6 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     def from_marqo_document(cls, document: Dict, filter_string_max_length: int) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
-
         if index_constants.MARQO_DOC_ID not in document:
             raise VespaDocumentParsingError(f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
                              f"This should be assigned for a valid document")
@@ -117,12 +117,13 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                 instance.fields.score_modifiers_fields[key] = value
             elif isinstance(value, dict):
                 for k, v in value.items():
+                    encoded_nested_key = f"{key}.{custom_encode(k)}"
                     if isinstance(v, int):
-                        instance.fields.int_fields[f"{key}.{k}"] = v
-                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                        instance.fields.int_fields[encoded_nested_key] = v
+                        instance.fields.score_modifiers_fields[encoded_nested_key] = v
                     elif isinstance(v, float):
-                        instance.fields.float_fields[f"{key}.{k}"] = float(v)
-                        instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
+                        instance.fields.float_fields[encoded_nested_key] = float(v)
+                        instance.fields.score_modifiers_fields[encoded_nested_key] = v
             else:
                 raise VespaDocumentParsingError(f"In document {doc_id}, field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
@@ -146,6 +147,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         # Processing short_string_fields and long_string_fields back into original format
         marqo_document.update(self.fields.short_string_fields)
         marqo_document.update(self.fields.long_string_fields)
+
         # Reconstruct string arrays
         for string_array in self.fields.string_arrays:
             key, value = string_array.split("::", 1)
