@@ -121,7 +121,7 @@ class VespaIndex(ABC):
                 raise InternalError(f'Unknown score modifier type {modifier.type}')
 
         return mult_tensor, add_tensor
-    
+
     def _get_score_modifiers(self, marqo_query: MarqoQuery) -> Optional[Dict[str, Dict[str, float]]]:
         """
         Returns classic score modifiers (from tensor or lexical queries) as a dictionary of dictionaries.

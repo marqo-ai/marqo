@@ -160,7 +160,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         marqo_document.update(self.fields.float_fields)
         marqo_document.update({k: bool(v) for k, v in self.fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fields.marqo__id
-        
+
         # This normally means the document is return with show_vectors=True
         if self.fields.vespa_chunks and self.fields.vespa_embeddings:
             try:

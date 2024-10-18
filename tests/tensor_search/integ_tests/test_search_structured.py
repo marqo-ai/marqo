@@ -23,7 +23,6 @@ from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 
 
-
 class TestSearchStructured(MarqoTestCase):
 
     @classmethod
