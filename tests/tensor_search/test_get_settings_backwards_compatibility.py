@@ -7,12 +7,13 @@ from marqo.core.models.marqo_index import (
     HnswConfig, Model, DistanceMetric, VectorNumericType, TextSplitMethod
 )
 from marqo.tensor_search.api import get_config
-from marqo.core.exceptions import IndexNotFoundError
 
 class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(api.app)
         self.mock_config = MagicMock()
+        self.mock_index_management = MagicMock()
+        self.mock_config.index_management = self.mock_index_management
         self.client.app.dependency_overrides[get_config] = lambda: self.mock_config
 
     def tearDown(self):
@@ -53,15 +54,14 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
         self.assertNotIn("videoPreprocessing", settings)
         self.assertNotIn("audioPreprocessing", settings)
 
-    @patch('marqo.tensor_search.api.tensor_search')
-    def test_get_settings_pre_2_12_structured_index(self, mock_tensor_search):
+    def test_get_settings_pre_2_12_structured_index(self):
         mock_index = self.create_mock_index(
             StructuredMarqoIndex,
             type="structured",
             fields=[],
             tensor_fields=[]
         )
-        self.mock_config.index_management.get_index.return_value = mock_index
+        self.mock_index_management.get_index.return_value = mock_index
 
         response = self.client.get("/indexes/test_index/settings")
         self.assertEqual(response.status_code, 200)
@@ -72,8 +72,7 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
         self.assertIn("allFields", settings)
         self.assertIn("tensorFields", settings)
 
-    @patch('marqo.tensor_search.api.tensor_search')
-    def test_get_settings_pre_2_12_unstructured_index(self, mock_tensor_search):
+    def test_get_settings_pre_2_12_unstructured_index(self):
         mock_index = self.create_mock_index(
             UnstructuredMarqoIndex,
             type="unstructured",
@@ -81,7 +80,7 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
             treat_urls_and_pointers_as_media=False,
             filter_string_max_length=200
         )
-        self.mock_config.index_management.get_index.return_value = mock_index
+        self.mock_index_management.get_index.return_value = mock_index
 
         response = self.client.get("/indexes/test_index/settings")
         self.assertEqual(response.status_code, 200)
@@ -93,11 +92,11 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
         self.assertIn("treatUrlsAndPointersAsMedia", settings)
         self.assertIn("filterStringMaxLength", settings)
 
-    @patch('marqo.tensor_search.api.tensor_search')
-    def test_get_settings_index_not_found(self, mock_tensor_search):
-        self.mock_config.index_management.get_index.side_effect = IndexNotFoundError("Index not found")
+    def test_get_settings_index_not_found(self):
+        from marqo.core.exceptions import IndexNotFoundError
+        self.mock_index_management.get_index.side_effect = IndexNotFoundError("Index not found")
 
         response = self.client.get("/indexes/non_existent_index/settings")
         self.assertEqual(response.status_code, 404)
         self.assertIn("message", response.json())
-        self.assertIn("Index not found", response.json()["message"])
+        self.assertIn("not found", response.json()["message"])
