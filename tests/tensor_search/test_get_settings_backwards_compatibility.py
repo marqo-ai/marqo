@@ -9,14 +9,14 @@ from marqo.core.models.marqo_index import (
 
 class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(api.app)
         self.mock_config = MagicMock()
         self.mock_index_management = MagicMock()
         self.mock_config.index_management = self.mock_index_management
-        self.client.app.dependency_overrides[api.get_config] = lambda: self.mock_config
+        api.app.dependency_overrides[api.get_config] = lambda: self.mock_config
+        self.client = TestClient(api.app)
 
     def tearDown(self):
-        self.client.app.dependency_overrides.clear()
+        api.app.dependency_overrides.clear()
 
     def create_mock_index(self, index_class, **kwargs):
         common_params = {
