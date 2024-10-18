@@ -6,7 +6,6 @@ from marqo.core.models.marqo_index import (
     StructuredMarqoIndex, UnstructuredMarqoIndex, TextPreProcessing, ImagePreProcessing,
     HnswConfig, Model, DistanceMetric, VectorNumericType, TextSplitMethod
 )
-from marqo.tensor_search.api import get_config
 
 class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
     def setUp(self):
@@ -14,7 +13,7 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
         self.mock_config = MagicMock()
         self.mock_index_management = MagicMock()
         self.mock_config.index_management = self.mock_index_management
-        self.client.app.dependency_overrides[get_config] = lambda: self.mock_config
+        self.client.app.dependency_overrides[api.get_config] = lambda: self.mock_config
 
     def tearDown(self):
         self.client.app.dependency_overrides.clear()
