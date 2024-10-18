@@ -18,7 +18,6 @@ def default_env_vars() -> dict:
         EnvVars.VESPA_DELETE_POOL_SIZE: 10,
         EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE: 10,
         EnvVars.VESPA_SEARCH_TIMEOUT_MS: 1000,
-        EnvVars.MARQO_MAX_INDEX_FIELDS: None,
         EnvVars.MARQO_MAX_DOC_BYTES: 100000,
         EnvVars.MARQO_MAX_RETRIEVABLE_DOCS: 10000,
         EnvVars.MARQO_MAX_SEARCH_LIMIT: 1000,
