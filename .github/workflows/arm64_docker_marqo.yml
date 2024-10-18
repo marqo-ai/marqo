@@ -56,7 +56,7 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           ec2-image-id: ${{ vars.MARQO_CPU_ARM64_TESTS_INSTANCE_AMI }}
-          ec2-instance-type: m6i.xlarge
+          ec2-instance-type: r7g.large
           subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
           security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
           aws-resource-tags: > # optional, requires additional permissions
