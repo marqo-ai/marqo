@@ -1,6 +1,7 @@
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
+from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
     get_multilingual_clip_properties
-from marqo.s2_inference.hf_utils import HF_MODEL
+from marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP
+from marqo.core.inference.inference_models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
@@ -2125,9 +2126,8 @@ def _get_model_load_mappings() -> Dict:
             "multilingual_clip" : MULTILINGUAL_CLIP,
             "fp16_clip": FP16_CLIP,
             'random':Random,
-            'hf':HF_MODEL,
-            "no_model": NO_MODEL,
-            }
+            'hf':HuggingFaceModel,
+            "no_model": NO_MODEL}
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already
