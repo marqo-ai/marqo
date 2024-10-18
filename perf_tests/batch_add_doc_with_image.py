@@ -13,7 +13,7 @@ telemetry_file = open('telemetry.jsonl', 'w')
 class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(return_telemetry=True, add_doc_batch_mode='per_batch', *args, **kwargs)
+        super().__init__(return_telemetry=True, add_doc_batch_mode='per_document', *args, **kwargs)
 
     wait_time = between(1, 2)
 
