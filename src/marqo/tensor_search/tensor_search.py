@@ -110,7 +110,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
     """
     try:
         marqo_index = index_meta_cache.get_index(
-            config=config, index_name=add_docs_params.index_name, force_refresh=True
+            index_management=config.index_management, index_name=add_docs_params.index_name, force_refresh=True
         )
 
     # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
@@ -1405,7 +1405,7 @@ def _get_latest_index(config: Config, index_name: str) -> MarqoIndex:
     never change. It also makes sure we always get the latest version of semi-structured index to guarantee the strong
     consistency.
     """
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
     if marqo_index.type == IndexType.SemiStructured:
         return config.index_management.get_index(index_name=index_name)
     return marqo_index
@@ -1677,7 +1677,7 @@ def _lexical_search(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     # SEARCH TIMER-LOGGER (pre-processing)
     RequestMetricsStore.for_request().start("search.lexical.processing_before_vespa")
@@ -2136,7 +2136,7 @@ def _vector_text_search(
 
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     # Determine the text query prefix
     text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
@@ -2699,7 +2699,7 @@ def vectorise_multimodal_combination_field_structured(
 def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
     """Delete documents from the Marqo index with the given doc_ids """
     # Make sure the index exists
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     return delete_docs.delete_documents(
         config=config,

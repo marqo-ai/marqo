@@ -211,7 +211,7 @@ class TestSearch(MarqoTestCase):
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
             with self.subTest(index=index.type):
-                response = self.add_documents_and_refresh_index(
+                response = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -246,7 +246,7 @@ class TestSearch(MarqoTestCase):
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
             with self.subTest(index=index.type):
-                response = self.add_documents_and_refresh_index(
+                response = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -272,7 +272,7 @@ class TestSearch(MarqoTestCase):
     def test_filtering_list_case_tensor(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(type=index.type):
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -320,7 +320,7 @@ class TestSearch(MarqoTestCase):
     def test_filtering_list_case_lexical(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -368,7 +368,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index):
                 hippo_img = TestImageUrls.HIPPO_REALISTIC.value
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -421,7 +421,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents first
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -554,7 +554,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -606,7 +606,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -652,7 +652,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index):
                 # Adding documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -699,7 +699,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Adding documents
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -754,7 +754,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -784,7 +784,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -839,7 +839,7 @@ class TestSearch(MarqoTestCase):
             with self.subTest(msg=index.type):
                 tensor_fields = ["text_field_1", "text_field_2"] \
                     if isinstance(index, UnstructuredMarqoIndex) else None
-                self.add_documents_and_refresh_index(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,

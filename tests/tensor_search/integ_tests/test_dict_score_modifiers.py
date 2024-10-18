@@ -84,7 +84,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -118,7 +118,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -152,7 +152,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -194,7 +194,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -238,7 +238,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -283,7 +283,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -345,7 +345,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -391,7 +391,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -429,7 +429,7 @@ class TestDictScoreModifiers(MarqoTestCase):
         for index in [self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                res = self.add_documents_and_refresh_index(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -496,7 +496,7 @@ class TestDictScoreModifiers(MarqoTestCase):
             with self.subTest(index=index.type):
                 # Add documents
                 with self.assertRaises(ValidationError):
-                    res = self.add_documents_and_refresh_index(
+                    res = self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index.name,
