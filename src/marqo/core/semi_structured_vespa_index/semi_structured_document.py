@@ -167,6 +167,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 marqo_document[key] = []
             marqo_document[key].append(value)
 
+        # marqo_document.update(self.fixed_fields.short_string_fields)
         marqo_document.update(self.fixed_fields.int_fields)
         marqo_document.update(self.fixed_fields.float_fields)
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})

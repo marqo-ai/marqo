@@ -300,7 +300,6 @@ class StructuredVespaIndex(VespaIndex):
                         )
                 else:
                     marqo_document[marqo_name] = value
-
             elif field in self._marqo_index.tensor_subfield_map:
                 tensor_field = self._marqo_index.tensor_subfield_map[field]
 

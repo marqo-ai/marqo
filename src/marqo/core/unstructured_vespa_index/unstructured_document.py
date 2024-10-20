@@ -145,7 +145,6 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         # Processing short_string_fields and long_string_fields back into original format
         marqo_document.update(self.fields.short_string_fields)
         marqo_document.update(self.fields.long_string_fields)
-
         # Reconstruct string arrays
         for string_array in self.fields.string_arrays:
             key, value = string_array.split("::", 1)
