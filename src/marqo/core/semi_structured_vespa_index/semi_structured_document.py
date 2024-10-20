@@ -9,7 +9,6 @@ from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsin
     InvalidTensorFieldError
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index import common
-from marqo.core.utils.special_characters_encoding import custom_encode, decode_key
 
 
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
@@ -92,6 +91,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 continue
             if isinstance(field_content, str):
                 if field_name not in marqo_index.field_map:
+                    # All string fields will be added to the index as lexical fields before this convertion happens
                     raise MarqoDocumentParsingError(f'Field {field_name} is not in index {marqo_index.name}')
                 field = marqo_index.field_map[field_name]
                 instance.text_fields[field.lexical_field_name] = field_content
@@ -109,13 +109,12 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 instance.fixed_fields.score_modifiers_fields[field_name] = field_content
             elif isinstance(field_content, dict):
                 for k, v in field_content.items():
-                    encoded_nested_key = f"{field_name}.{custom_encode(k)}"
                     if isinstance(v, int):
-                        instance.fixed_fields.int_fields[encoded_nested_key] = v
-                        instance.fixed_fields.score_modifiers_fields[encoded_nested_key] = v
+                        instance.fixed_fields.int_fields[f"{field_name}.{k}"] = v
+                        instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
                     elif isinstance(v, float):
-                        instance.fixed_fields.float_fields[encoded_nested_key] = float(v)
-                        instance.fixed_fields.score_modifiers_fields[encoded_nested_key] = v
+                        instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
+                        instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
             else:
                 raise VespaDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "

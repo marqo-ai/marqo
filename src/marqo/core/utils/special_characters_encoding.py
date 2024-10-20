@@ -1,9 +1,7 @@
-import urllib.parse
-
+import re
 
 def custom_encode(s: str) -> str:
-    encoded_string = ''.join(c if c.isascii() and c not in '"\\/' else urllib.parse.quote(c, safe='') for c in s)
-    return encoded_string
+    return re.sub(r'(")|\\u0022', lambda m: r'\u0022' if m.group(1) else r'\\u0022', s)
 
 def decode_key(encoded_key: str) -> str:
-    return urllib.parse.unquote(encoded_key)
+    return re.sub(r'\\u0022', '"', encoded_key)

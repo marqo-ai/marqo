@@ -8,7 +8,6 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
-from marqo.core.utils.special_characters_encoding import custom_encode, decode_key
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -138,8 +137,7 @@ class StructuredVespaIndex(VespaIndex):
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        encoded_key = f'{index_field.name}.{custom_encode(key)}'
-                        target_dict[encoded_key] = value
+                        target_dict[f'{index_field.name}.{key}'] = value
                 else:
                     target_dict[index_field.name] = marqo_value
 
@@ -227,8 +225,7 @@ class StructuredVespaIndex(VespaIndex):
 
                 if isinstance(marqo_value, dict):
                     for key, value in marqo_value.items():
-                        encoded_key = custom_encode(f'{index_field.name}.{key}')
-                        target_dict[encoded_key] = value
+                        target_dict[f'{index_field.name}.{key}'] = value
                 else:
                     target_dict[index_field.name] = marqo_value
 
@@ -302,11 +299,7 @@ class StructuredVespaIndex(VespaIndex):
                             f'{marqo_document[marqo_name]} and {value}'
                         )
                 else:
-                    if isinstance(value, dict) and marqo_field.type in [FieldType.MapFloat, FieldType.MapInt, FieldType.MapLong, FieldType.MapDouble]:
-                        encoded_value = {custom_encode(k): v for k, v in value.items()}
-                        marqo_document[marqo_name] = encoded_value
-                    else:
-                        marqo_document[marqo_name] = value
+                    marqo_document[marqo_name] = value
 
             elif field in self._marqo_index.tensor_subfield_map:
                 tensor_field = self._marqo_index.tensor_subfield_map[field]
