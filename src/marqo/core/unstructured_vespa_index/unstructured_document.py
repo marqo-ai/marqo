@@ -87,6 +87,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
     def from_marqo_document(cls, document: Dict, filter_string_max_length: int) -> "UnstructuredVespaDocument":
         """Instantiate an UnstructuredVespaDocument from a valid Marqo document from
         add_documents"""
+        
         if index_constants.MARQO_DOC_ID not in document:
             raise VespaDocumentParsingError(f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
                              f"This should be assigned for a valid document")
