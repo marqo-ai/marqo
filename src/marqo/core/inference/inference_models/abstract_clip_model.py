@@ -78,25 +78,27 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         # TODO: Implement this method
         pass
 
-
-    def _encode(self, content: Union[str, ImageType, List[str], List[ImageType], Tensor],
-                modality: Modality, normalize: bool = True) -> np.ndarray:
-        """Encode the given content.
-
-        Args:
-            content (): The content to encode.
-            modality (Modality): The modality of the content.
-            normalize (bool): Whether to normalize the output embeddings.
-
-        Returns:
-            np.ndarray: The encoded content.
-        """
-        if modality == Modality.TEXT:
-            return self.encode_text(content, normalize)
-        elif modality == Modality.IMAGE:
-            return self.encode_image(content, normalize)
+    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
+               default: str = 'text', normalize=True, **kwargs) -> np.ndarray:
+        infer = kwargs.pop('infer', True)
+        if infer and _is_image(inputs):
+            is_image = True
         else:
-            raise InternalError(f"Unsupported modality: {modality}")
+            is_image = False
+            if default == 'text':
+                is_image = False
+            elif default == 'image':
+                is_image = True
+            else:
+                raise UnidentifiedImageError(f"expected default='image' or default='text' but received {default}")
+
+        if is_image:
+            logger.debug('image')
+            image_download_headers = kwargs.get("image_download_headers", dict())
+            return self.encode_image(inputs, normalize=normalize, image_download_headers=image_download_headers)
+        else:
+            logger.debug('text')
+            return self.encode_text(inputs, normalize=normalize)
 
     def _convert_output(self, output):
         if self.device == 'cpu':

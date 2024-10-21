@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Any
-from marqo.tensor_search.models.private_models import ModelAuth
+from typing import Optional
 
-from marqo.core.inference.enums import Modality
-import numpy as np
+from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class AbstractEmbeddingModel(ABC):
@@ -51,40 +49,6 @@ class AbstractEmbeddingModel(ABC):
         pass
 
     @abstractmethod
-    def _validate_content_type(self, content: Any, modality: Modality):
-        """Validate if the provided content type is valid for the specific model and if it matches the modality.
-
-        Raise:
-            ValueError: If the content type is not valid.
-        """
+    def encode(self):
+        """Encode the input data."""
         pass
-
-    @abstractmethod
-    def _encode(self, content: Any, modality: Modality, normalize: bool = True) -> np.ndarray:
-        """Encode the given content.
-
-        Args:
-            content (Any): The content to encode.
-            normalize (bool): Whether to normalize the output or not.
-        """
-        pass
-
-    @abstractmethod
-    def _validate_and_set_modality(self, modality) -> Modality:
-        """Validate the modalities for the model.
-
-        We are inferring the modality of the content regardless of the model capabilities. For example, if user provides
-        an image url in the search query, we will infer the modality as image even if the model is a text model.
-
-        Returns:
-            Modality: The modalities for the model content.
-
-        Raises:
-            UnsupportedModalityError: If the model does not support the inferred modality other than text.
-        """
-        pass
-
-    def encode(self, content: Any, normalize: bool = True, modality: Optional[Modality] = None, **kwargs) -> np.ndarray:
-        modality = self._validate_and_set_modality(modality)
-        self._validate_content_type(content, modality)
-        return self._encode(content, modality, normalize)
