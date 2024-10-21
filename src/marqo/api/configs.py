@@ -31,6 +31,7 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_LOG_LEVEL: "info",
         EnvVars.MARQO_MEDIA_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 5,
         EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST: 20,
+        EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE: 370 * 1024 * 1024,  # 370 megabytes in bytes
         # This env variable is set to "info" by default in run_marqo.sh, which overrides this value
         EnvVars.MARQO_MAX_CPU_MODEL_MEMORY: 4,
         EnvVars.MARQO_MAX_CUDA_MODEL_MEMORY: 4,  # For multi-GPU, this is the max memory for each GPU.
