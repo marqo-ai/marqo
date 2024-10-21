@@ -112,10 +112,10 @@ jobs:
         with:
           ref: ${{ github.event.inputs.marqo_ref }}
 
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
-          python-version: "3.8"
+          python-version: "3.9"
 
       - name: Set up Docker Buildx
         if: github.event.inputs.marqo_host == 'http://localhost:8882' && github.event.inputs.image_to_test == 'marqo_docker_0'
