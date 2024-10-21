@@ -47,9 +47,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.LARGEMODELTEST_ACCESSKEY }}
-          aws-secret-access-key: ${{ secrets.LARGEMODELTEST_SECRETACCESSKEY }}
-          aws-region: ${{ secrets.LARGEMODELTEST_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2
@@ -60,17 +60,27 @@ jobs:
           # CUDA AMD64 instance
           ec2-image-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
           ec2-instance-type: g4dn.2xlarge
-          subnet-id: ${{ secrets.LARGEMODELTEST_SUBNET_ID }}
-          security-group-id: ${{ secrets.LARGEMODELTEST_SECURITY_GROUP }}
+          subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+          security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+          aws-resource-tags: > # optional, requires additional permissions
+            [
+              {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
+              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
+              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
+              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
+              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
+              {"Key": "PoloRole", "Value": "testing"}
+            ]
+
   Test-Marqo:
     name: Run CUDA Docker Marqo API Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-                
-    environment: marqo-test-suite 
-    
+
+    environment: marqo-test-suite
+
     steps:
-       
+
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
@@ -81,13 +91,13 @@ jobs:
         with:
           python-version: "3.8"
           cache: "pip"
-          
+
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
           pip install tox==3.26
           pip install flake8
-      
+
       - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
           if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]]; then
@@ -97,21 +107,21 @@ jobs:
           else
             echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
           fi
-  
+
       - name: Checkout marqo-api-tests repo
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-api-tests
           ref: ${{ github.event.inputs.api_tests_branch }}
-          
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-          
+
       - name: Set up Environment
         run: |
           # Set up conf file
           echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-          
+
       - name: Run CUDA Integration Tests - CUDA Docker Marqo
         run: |
           export MQ_API_TEST_BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
@@ -131,9 +141,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.LARGEMODELTEST_ACCESSKEY }}
-          aws-secret-access-key: ${{ secrets.LARGEMODELTEST_SECRETACCESSKEY }}
-          aws-region: ${{ secrets.LARGEMODELTEST_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Stop EC2 runner
         uses: machulav/ec2-github-runner@v2
         with:
