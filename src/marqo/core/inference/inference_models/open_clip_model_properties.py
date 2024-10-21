@@ -50,6 +50,7 @@ class OpenCLIPModelProperties(MarqoBaseModel):
     """
     name: str
     type: str
+    dimensions: int = Field(..., ge=1)
     jit: bool = False
     precision: Precision = Precision.FP32
     url: Optional[str] = None

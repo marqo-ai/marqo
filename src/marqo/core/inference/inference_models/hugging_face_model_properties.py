@@ -31,6 +31,7 @@ class HuggingFaceModelProperties(MarqoBaseModel):
         token: The token length of the model. It is default to 128.
         type: The type of the model. It should be "hf".
         url: The URL of the model checkpoint. It is optional.
+        dimensions: The dimensions of the model.
         model_location: The location of the model. It is optional.
         model_auth: The authentication information for the model. It is optional.
         note: A note about the model. It is optional.
@@ -39,6 +40,7 @@ class HuggingFaceModelProperties(MarqoBaseModel):
     name: Optional[str] = None
     token: int = 128
     type: str
+    dimensions: int = Field(..., ge=1)
     url: Optional[str] = None
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     model_auth: Optional[ModelAuth] = Field(default=None, alias="modelAuth")
