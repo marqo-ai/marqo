@@ -87,7 +87,6 @@ def run_test_vectorize(models, model_type):
                                            f"{embeddings_reference_file}")
 
                     assert np.allclose(output_m, output_v, atol=eps)
-                    # assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
 
                 clear_loaded_models()
                 torch.cuda.empty_cache()
