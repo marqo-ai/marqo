@@ -209,8 +209,12 @@ class IndexManagement:
                 raise InternalError(f'Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} '
                                     f'can not be updated.')
 
-            if (existing_index.tensor_field_map == marqo_index.tensor_field_map and
-                    existing_index.field_map == marqo_index.field_map):
+            def is_subset(dict_a, dict_b):
+                # check if dict_a is a subset of dict_b
+                return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
+
+            if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
+                    is_subset(marqo_index.field_map, existing_index.field_map)):
                 logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
                 return
 
@@ -356,4 +360,5 @@ class IndexManagement:
                     logger.debug(f"Retrieved the distributed lock for index operations. ")
                     yield
             except ZookeeperLockNotAcquiredError:
+                # TODO add a doclink for troubleshooting this issue
                 raise OperationConflictError("Your indexes are being updated. Please try again shortly.")

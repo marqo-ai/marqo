@@ -434,11 +434,12 @@ class TestIndexManagement(MarqoTestCase):
         semi_structured_marqo_index = cast(SemiStructuredMarqoIndex, self.index_management.get_index(request.name))
 
         change1 = semi_structured_marqo_index.copy(deep=True)
-        change1.tensor_fields.extend([self._tensor_field('title'), self._tensor_field('description')])
-        change1.lexical_fields.extend([self._lexical_field('field1'), self._lexical_field('field2')])
+        change1.tensor_fields.extend([self._tensor_field('title'), self._tensor_field('description'), self._tensor_field('tags')])
+        change1.lexical_fields.extend([self._lexical_field('field1'), self._lexical_field('field2'), self._lexical_field('field3')])
 
         change2 = semi_structured_marqo_index.copy(deep=True)
         # Deliberately use a different order to see if the comparison is order-agnostic
+        # Also use a subset to see if it skips the update if all fields needed are already present
         change2.tensor_fields.extend([self._tensor_field('description'), self._tensor_field('title')])
         change2.lexical_fields.extend([self._lexical_field('field2'), self._lexical_field('field1')])
 
