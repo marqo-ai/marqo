@@ -1,6 +1,8 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 from marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
@@ -8,7 +10,7 @@ from marqo.s2_inference.model_registry import _get_open_clip_properties
 
 OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
 
-
+@pytest.mark.unittest
 class TestOpenCLIPModelLoad(TestCase):
     """A test suite for loading OpenCLIP models.
 
@@ -25,7 +27,8 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B-32",
             "url": "https://openclipart.org/download/12345/my_test_model.pt",
-            "type": "open_clip"
+            "type": "open_clip",
+            "dimensions": 512
         }
 
         with patch("marqo.core.inference.inference_models.open_clip_model.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
@@ -44,7 +47,8 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B-108",
             "url": "https://openclipart.org/download/12345/my_test_model.pt",
-            "type": "open_clip"
+            "type": "open_clip",
+            "dimensions": 512
         }
         with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
@@ -75,6 +79,7 @@ class TestOpenCLIPModelLoad(TestCase):
         """Test correct parameters are passed to the OpenCLIP loading from checkpoint method."""
         model_tag = "my_test_model"
         model_properties = {
+            "dimensions": 512,
             "name": "test-siglip",
             "url": "https://openclipart.org/download/12345/my_test_model.pt",
             "type": "open_clip",
@@ -111,6 +116,7 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "hf-hub:my_test_hub",
             "type": "open_clip",
+            "dimensions": 512
         }
         with patch("marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms",
                    return_value=(MagicMock(), MagicMock(), MagicMock())) \
@@ -132,6 +138,7 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "open_clip/ViT-B-32/laion5b_s13b_b90k",
             "type": "open_clip",
+            "dimensions": 512
         }
         with patch("marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms",
                    return_value=(MagicMock(), MagicMock(), MagicMock())) \
@@ -153,7 +160,8 @@ class TestOpenCLIPModelLoad(TestCase):
         """Test loading an OpenCLIP model with missing model properties should raise an error."""
         model_tag = "my_test_model"
         model_properties = {
-            "type": "open_clip"
+            "type": "open_clip",
+            "dimensions": 512
             # Missing 'name' and 'url'
         }
 
@@ -170,7 +178,8 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B-32",
             "type": "open_clip",
-            "image_preprocessor": "UnsupportedPreprocessor"
+            "image_preprocessor": "UnsupportedPreprocessor",
+            "dimensions": 512
         }
 
         with self.assertRaises(InvalidModelPropertiesError) as context:
@@ -185,7 +194,7 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B-32",
             "localpath": "/path/to/my_test_model.pt",
-            "dimension": 512,
+            "dimensions": 512,
             "type": "open_clip"
         }
         with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
@@ -193,13 +202,16 @@ class TestOpenCLIPModelLoad(TestCase):
             with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
-                    model.load()
-                    mock_create_model.assert_called_once_with(
-                        model_name="ViT-B-32",
-                        jit=False,
-                        pretrained="/path/to/my_test_model.pt",
-                        precision="fp32", device="cpu",
-                        cache_dir=ModelCache.clip_cache_path
-                    )
-                    mock_tokenizer.assert_called_once_with("ViT-B-32")
+                    with patch("marqo.core.inference.inference_models.open_clip_model.os.path.exists",
+                               return_value=True) as mock_path_exists:
+                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                        model.load()
+                        mock_create_model.assert_called_once_with(
+                            model_name="ViT-B-32",
+                            jit=False,
+                            pretrained="/path/to/my_test_model.pt",
+                            precision="fp32", device="cpu",
+                            cache_dir=ModelCache.clip_cache_path
+                        )
+                        mock_tokenizer.assert_called_once_with("ViT-B-32")
+                        mock_path_exists.assert_called_once_with("/path/to/my_test_model.pt")

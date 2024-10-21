@@ -111,7 +111,14 @@ class OPEN_CLIP(AbstractCLIPModel):
         """
         # Load the image preprocessor
         if self.model_properties.localpath:
-            self.model_path = self.model_properties.localpath
+            if os.path.exists(self.model_properties.localpath):
+                self.model_path = self.model_properties.localpath
+            else:
+                raise InvalidModelPropertiesError(
+                    f"The localpath '{self.model_properties.localpath}' does not exist. "
+                    f"Please provide a valid localpath to load the model. If you are running Marqo in a container, "
+                    f"make sure the localpath is mounted correctly."
+                )
         elif self.model_properties.model_location:
             self.model_path = self._download_from_repo()
         elif self.model_properties.url:
