@@ -806,12 +806,14 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "poolingMethod": "mean",
                  "notes": ""},
             "hf/bge-base-en-v1.5":
                 {"name": 'BAAI/bge-base-en-v1.5',
                  "dimensions": 768,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-large-en-v1.5":
@@ -819,6 +821,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-small-zh-v1.5":
@@ -826,6 +829,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 512,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             "hf/bge-base-zh-v1.5":
@@ -833,6 +837,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 768,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             "hf/bge-large-zh-v1.5":
@@ -840,6 +845,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             # Uncomment when fix is implemented.
