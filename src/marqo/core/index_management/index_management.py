@@ -31,7 +31,6 @@ class IndexManagement:
     _MINIMUM_VESPA_VERSION_TO_SUPPORT_FAST_FILE_DISTRIBUTION = semver.VersionInfo.parse('8.396.18')
     _MARQO_SETTINGS_SCHEMA_NAME = 'marqo__settings'
     _MARQO_CONFIG_DOC_ID = 'marqo__config'
-    _DEPLOYMENT_LOCK_DEFAULT_WAIT_TIME_SECONDS = 5
 
     def __init__(self,
                  vespa_client: VespaClient,
@@ -39,7 +38,7 @@ class IndexManagement:
                  enable_index_operations: bool = False,
                  deployment_timeout_seconds: int = 60,
                  convergence_timeout_seconds: int = 120,
-                 deployment_lock_timeout_seconds: float = _DEPLOYMENT_LOCK_DEFAULT_WAIT_TIME_SECONDS,
+                 deployment_lock_timeout_seconds: float = 5,
                  ):
         """Instantiate an IndexManagement object.
 
