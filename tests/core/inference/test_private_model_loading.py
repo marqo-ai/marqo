@@ -77,7 +77,8 @@ class TestPrivateModelLoading(MarqoTestCase):
         )
 
         res = self.add_documents(self.config, add_docs_params= add_docs_params)
-        self.assertEqual(res.errors, False)
+        self.assertEqual(False, res.errors)
+        self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
 
     def test_load_private_hf_model_from_a_private_hf_repo(self):
         model = "private-e5-repo-on-hf"
@@ -105,19 +106,19 @@ class TestPrivateModelLoading(MarqoTestCase):
         )
 
         res = self.add_documents(self.config, add_docs_params= add_docs_params)
-        self.assertEqual(res.errors, False)
+        self.assertEqual(False, res.errors)
+        self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
 
     def test_load_private_open_clip_model_from_a_private_ckpt_on_s3(self):
-        model = "private-marqo-fashion-siglip-model-on-s3"
+        model = "private-marqo-fashion-clip-model-ckpt-on-s3"
         model_properties = {
-            "dimensions": 768,
-            "name": "ViT-B-16-SigLIP",
+            "dimensions": 512,
+            "name": "ViT-B-16",
             "type": "open_clip",
-            "imagePreprocessor": "SigLIP",
             "modelLocation": {
                 "s3": {
                     "Bucket": "marqo-opensource-private-model-tests",
-                    "Key": "private-marqo-fashion-siglip-ckpt.bin"
+                    "Key": "private-fashion-clip-ckpt.bin"
                 },
                 "auth_required": True
             }
@@ -128,7 +129,7 @@ class TestPrivateModelLoading(MarqoTestCase):
             docs=[{
                 "id": "1",
                 "text": "This is a test document.",
-                "image": TestImageUrls.IMAGE2
+                "image": str(TestImageUrls.IMAGE2)
             }],
             tensor_fields=["text", "image"],
             model_auth={
@@ -139,13 +140,15 @@ class TestPrivateModelLoading(MarqoTestCase):
             }
         )
         res = self.add_documents(self.config, add_docs_params=add_docs_params)
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(False, res.errors)
+        self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
+        self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_vectors, 2)
 
     def test_load_private_open_clip_model_from_a_private_ckpt_on_hf(self):
         model = "private-marqo-fashion-siglip-model-ckpt-on-hf"
         model_properties = {
             "dimensions": 768,
-            "name": "ViT-B-16",
+            "name": "ViT-B-16-SigLIP",
             "type": "open_clip",
             "modelLocation": {
                 "hf": {
@@ -161,7 +164,7 @@ class TestPrivateModelLoading(MarqoTestCase):
             docs=[{
                 "id": "1",
                 "text": "This is a test document.",
-                "image": TestImageUrls.IMAGE2
+                "image": str(TestImageUrls.IMAGE2)
             }],
             tensor_fields=["text", "image"],
             model_auth={
@@ -169,4 +172,6 @@ class TestPrivateModelLoading(MarqoTestCase):
             }
         )
         res = self.add_documents(self.config, add_docs_params=add_docs_params)
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(False, res.errors)
+        self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_documents, 1)
+        self.assertEqual(self.monitoring.get_index_stats_by_name(self.index_name).number_of_vectors, 2)
