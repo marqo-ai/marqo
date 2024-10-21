@@ -67,7 +67,6 @@ class TestGetSettings(MarqoTestCase):
     def tearDown(self) -> None:
         self.device_patcher.stop()
 
-
     def test_no_index(self):
         self.assertRaises(IndexNotFoundError, self.config.index_management.get_index, "non-existent-index")
 
@@ -140,7 +139,6 @@ class TestGetSettings(MarqoTestCase):
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_structured_default_settings)
         
-
     def test_custom_settings(self):
         """adding custom settings to the index should be reflected in the returned output
         """
@@ -208,4 +206,176 @@ class TestGetSettings(MarqoTestCase):
             retrieved_index = self.config.index_management.get_index(self.structured_custom_index.name)
             retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
             self.assertEqual(retrieved_settings, expected_structured_custom_settings)
-            
+
+    def test_index_settings_should_hide_openclip_model_internal_data_if_model_is_marqtune(self):
+        """Model name, dimensions, and model location should be hidden if model is marqtune
+        """
+        unstructured_marqtune_index = IndexSettings(
+            type=IndexType.Unstructured,
+            model='marqtune/model-id/release-checkpoint',
+            modelProperties= {
+                 "isMarqtuneModel": True,
+                 "name": "ViT-B-32",
+                 "dimensions": 512,
+                 "model_location": {
+                     "s3": {
+                         "Bucket": "marqtune-public-bucket",
+                         "Key": "marqo-test-open-clip-model/epoch_1.pt",
+                     },
+                     "auth_required": False
+                 },
+                 "type": "open_clip",
+            },
+            normalizeEmbeddings=False,
+            textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1)
+        ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
+
+        indexes = self.create_indexes([
+            unstructured_marqtune_index
+        ])
+
+        marqtune_index = indexes[0]
+        expected_unstructured_custom_settings = \
+            {
+                'annParameters': {
+                    'parameters': {'efConstruction': 512, 'm': 16},
+                    'spaceType': DistanceMetric.PrenormalizedAngular
+                },
+                'filterStringMaxLength': 50,
+                'imagePreprocessing': {},
+                'model': 'marqtune/model-id/release-checkpoint',
+                'modelProperties': {
+                    "isMarqtuneModel": True,
+                },
+                'normalizeEmbeddings': False,
+                'textPreprocessing': {'splitLength': 3,
+                                      'splitMethod': TextSplitMethod.Word,
+                                      'splitOverlap': 1},
+                'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
+                'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                'treatUrlsAndPointersAsImages': False,
+                'treatUrlsAndPointersAsMedia': False,
+                'type': IndexType.Unstructured,
+                'vectorNumericType': VectorNumericType.Float
+            }
+
+        retrieved_index = self.config.index_management.get_index(marqtune_index.name)
+        retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
+        self.assertEqual(retrieved_settings, expected_unstructured_custom_settings)
+
+    def test_index_settings_should_hide_hf_model_internal_data_if_model_is_marqtune(self):
+        """Model name, dimensions, and model location should be hidden if model is marqtune
+        """
+        unstructured_marqtune_index = IndexSettings(
+            type=IndexType.Unstructured,
+            model='marqtune/model-id/release-checkpoint',
+            modelProperties= {
+                 "isMarqtuneModel": True,
+                 "dimensions": 384,
+                 "model_location": {
+                     "s3": {
+                         "Bucket": "marqtune-public-bucket",
+                         "Key": "marqo-test-hf-model/epoch_1.zip",
+                     },
+                     "auth_required": False
+                 },
+                 "type": "hf",
+            },
+            normalizeEmbeddings=False,
+            textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1)
+        ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
+
+        indexes = self.create_indexes([
+            unstructured_marqtune_index
+        ])
+
+        marqtune_index = indexes[0]
+        expected_unstructured_custom_settings = \
+            {
+                'annParameters': {
+                    'parameters': {'efConstruction': 512, 'm': 16},
+                    'spaceType': DistanceMetric.PrenormalizedAngular
+                },
+                'filterStringMaxLength': 50,
+                'imagePreprocessing': {},
+                'model': 'marqtune/model-id/release-checkpoint',
+                'modelProperties': {
+                    "isMarqtuneModel": True,
+                },
+                'normalizeEmbeddings': False,
+                'textPreprocessing': {'splitLength': 3,
+                                      'splitMethod': TextSplitMethod.Word,
+                                      'splitOverlap': 1},
+                'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
+                'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                'treatUrlsAndPointersAsImages': False,
+                'treatUrlsAndPointersAsMedia': False,
+                'type': IndexType.Unstructured,
+                'vectorNumericType': VectorNumericType.Float
+            }
+
+        retrieved_index = self.config.index_management.get_index(marqtune_index.name)
+        retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
+        self.assertEqual(retrieved_settings, expected_unstructured_custom_settings)
+
+    def test_index_settings_should_show_model_internal_data_if_model_is_not_marqtune(self):
+        """Model name, dimensions, and model location should be hidden if model is marqtune
+        """
+        unstructured_marqtune_index = IndexSettings(
+            type=IndexType.Unstructured,
+            model='marqtune/model-id/release-checkpoint',
+            modelProperties= {
+                 "dimensions": 384,
+                 "model_location": {
+                     "s3": {
+                         "Bucket": "marqtune-public-bucket",
+                         "Key": "marqo-test-hf-model/epoch_1.zip",
+                     },
+                     "auth_required": False
+                 },
+                 "type": "hf",
+            },
+            normalizeEmbeddings=False,
+            textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1)
+        ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
+
+        indexes = self.create_indexes([
+            unstructured_marqtune_index
+        ])
+        expected_unstructured_custom_settings = \
+            {
+                'annParameters': {
+                    'parameters': {'efConstruction': 512, 'm': 16},
+                    'spaceType': DistanceMetric.PrenormalizedAngular
+                },
+                'filterStringMaxLength': 50,
+                'imagePreprocessing': {},
+                'model': 'marqtune/model-id/release-checkpoint',
+                'modelProperties': {
+                     'dimensions': 384,
+                     'model_location': {
+                         'auth_required': False,
+                         's3': {
+                             'Bucket': 'marqtune-public-bucket',
+                             'Key': 'marqo-test-hf-model/epoch_1.zip'
+                         }
+                     },
+                     'type': 'hf'
+                },
+                'normalizeEmbeddings': False,
+                'textPreprocessing': {'splitLength': 3,
+                                      'splitMethod': TextSplitMethod.Word,
+                                      'splitOverlap': 1},
+                'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
+                'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
+                'treatUrlsAndPointersAsImages': False,
+                'treatUrlsAndPointersAsMedia': False,
+                'type': IndexType.Unstructured,
+                'vectorNumericType': VectorNumericType.Float
+            }
+
+        marqtune_index = indexes[0]
+
+        retrieved_index = self.config.index_management.get_index(marqtune_index.name)
+        retrieved_settings = IndexSettings.from_marqo_index(retrieved_index).dict(exclude_none=True, by_alias=True)
+        self.assertEqual(retrieved_settings, expected_unstructured_custom_settings)

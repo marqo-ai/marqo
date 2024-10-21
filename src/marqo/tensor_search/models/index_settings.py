@@ -210,7 +210,7 @@ class IndexSettings(StrictBaseModel):
                 treatUrlsAndPointersAsMedia=marqo_index.treat_urls_and_pointers_as_media,
                 filterStringMaxLength=marqo_index.filter_string_max_length,
                 model=marqo_index.model.name,
-                modelProperties=marqo_index.model.properties,
+                modelProperties=IndexSettings.get_model_properties(marqo_index),
                 normalizeEmbeddings=marqo_index.normalize_embeddings,
                 textPreprocessing=marqo_index.text_preprocessing,
                 imagePreprocessing=marqo_index.image_preprocessing,
@@ -235,7 +235,7 @@ class IndexSettings(StrictBaseModel):
                 ],
                 tensorFields=[field.name for field in marqo_index.tensor_fields],
                 model=marqo_index.model.name,
-                modelProperties=marqo_index.model.properties,
+                modelProperties=IndexSettings.get_model_properties(marqo_index),
                 normalizeEmbeddings=marqo_index.normalize_embeddings,
                 textPreprocessing=marqo_index.text_preprocessing,
                 imagePreprocessing=marqo_index.image_preprocessing,
@@ -249,6 +249,19 @@ class IndexSettings(StrictBaseModel):
             )
         else:
             raise api_exceptions.InternalError(f"Unknown index type: {type(marqo_index)}")
+
+    @classmethod
+    def get_model_properties(cls, marqo_index):
+        if marqo_index.model.properties is None:
+            return None
+
+        if marqo_index.model.properties.get('isMarqtuneModel', False):
+            # Hide all properties except for isMarqtuneModel
+            marqo_index.model.properties.pop('name', None)
+            marqo_index.model.properties.pop('dimensions')
+            marqo_index.model.properties.pop('model_location')
+            marqo_index.model.properties.pop('type')
+        return marqo_index.model.properties
 
 
 class IndexSettingsWithName(IndexSettings):
