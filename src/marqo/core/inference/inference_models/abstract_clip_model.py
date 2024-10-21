@@ -3,15 +3,12 @@ from abc import abstractmethod
 import numpy as np
 from PIL import UnidentifiedImageError
 
-from marqo.core.exceptions import InternalError
 from marqo.core.inference.inference_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.s2_inference.types import *
 from marqo.core.inference.inference_models.image_download import (_is_image, format_and_load_CLIP_images,
                                                                   format_and_load_CLIP_image)
 from marqo.s2_inference.logger import get_logger
 import torch
-from marqo.core.inference.enums import Modality
-from marqo.s2_inference.errors import UnsupportedModalityError
 
 logger = get_logger(__name__)
 
@@ -51,31 +48,6 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
 
     @abstractmethod
     def encode_image(self, inputs, normalize: bool = True, image_download_headers: dict = None) -> np.ndarray:
-        pass
-
-    def _validate_and_set_modality(self, modality: Optional[Modality] = None) -> Modality:
-        if modality is None:
-            return Modality.TEXT
-        elif modality in [Modality.TEXT, Modality.IMAGE]:
-            return modality
-        else:
-            raise UnidentifiedImageError(
-                f"The model expected modality to be one of {Modality.TEXT} "
-                f"or {Modality.IMAGE} but received {modality}."
-        )
-
-    def _validate_content_type(self, content: Any, modality: Modality) -> None:
-        """Validate if the provided content type is valid for the specific model and if it matches the modality.
-
-        Args:
-            content (Any): The content to validate.
-            modality (Modality): The modality of the content.
-
-        Raises:
-            ValueError: If the content type is not valid.
-        """
-
-        # TODO: Implement this method
         pass
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
