@@ -540,7 +540,8 @@ class TestHuggingFaceModel(unittest.TestCase):
         model_properties = {
             "name": "test-model",
             "type": "hf",
-            "poolingMethod": "mean"
+            "poolingMethod": "mean",
+            "dimensions": 768
         }
         model = HuggingFaceModel(model_properties, "cpu", {})
         self.assertIsInstance(model, HuggingFaceModel)
@@ -548,6 +549,7 @@ class TestHuggingFaceModel(unittest.TestCase):
         self.assertEqual({}, model.model_auth)
         self.assertEqual("test-model", model.model_properties.name)
         self.assertEqual("hf", model.model_properties.type)
+        self.assertEqual(768, model.model_properties.dimensions)
         self.assertEqual(PoolingMethod.Mean, model.model_properties.pooling_method)
 
     def test_initialize_huggingface_model_with_invalid_properties(self):
@@ -656,7 +658,8 @@ class TestHuggingFaceModel(unittest.TestCase):
         model_properties = {
             "name": "test-model",
             "type": "hf",
-            "poolingMethod": "mean"
+            "poolingMethod": "mean",
+            "dimensions": 768
         }
 
         with self.assertRaises(InvalidModelPropertiesError) as excinfo:
@@ -672,7 +675,8 @@ class TestHuggingFaceModel(unittest.TestCase):
         model_properties = {
             "name": "test-model",
             "type": "hf",
-            "poolingMethod": "mean"
+            "poolingMethod": "mean",
+            "dimensions": 768
         }
 
         with self.assertRaises(InvalidModelPropertiesError) as excinfo:
