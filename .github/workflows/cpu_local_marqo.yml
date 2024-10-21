@@ -54,19 +54,28 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2
         with:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id:  ${{ secrets.AMD_EC2_IMAGE_ID }}
-          ec2-instance-type: t3.xlarge
-          subnet-id: ${{ secrets.AMD_SUBNET_ID }}
-          security-group-id: ${{ secrets.AMD_SECURITY_GROUP_ID }}
+          ec2-image-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
+          ec2-instance-type: m6i.xlarge
+          subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+          security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+          aws-resource-tags: > # optional, requires additional permissions
+            [
+              {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
+              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
+              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
+              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
+              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
+              {"Key": "PoloRole", "Value": "testing"}
+            ]
 
   Test-Marqo:
     name: Run CPU Local Marqo API Tests
@@ -137,9 +146,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
       - name: Stop EC2 runner
         uses: machulav/ec2-github-runner@v2
         with:
