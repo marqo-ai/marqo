@@ -21,6 +21,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo.tensor_search.models.api_models import ScoreModifierLists
 
 
 class TestSearchSemiStructured(MarqoTestCase):

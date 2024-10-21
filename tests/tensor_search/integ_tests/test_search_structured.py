@@ -3,6 +3,7 @@ import os
 import random
 import uuid
 from unittest import mock
+import json
 
 import requests
 
@@ -19,6 +20,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo.tensor_search.models.api_models import ScoreModifierLists
 
 
 class TestSearchStructured(MarqoTestCase):
