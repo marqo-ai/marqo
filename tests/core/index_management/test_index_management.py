@@ -366,8 +366,7 @@ class TestIndexManagement(MarqoTestCase):
 
         # update this index
         semi_structured_marqo_index = cast(SemiStructuredMarqoIndex, self.index_management.get_index(request.name))
-        semi_structured_marqo_index.tensor_fields.append(TensorField(
-            name='title', chunk_field_name='marqo__chunks_title', embeddings_field_name='marqo__embeddings_title'))
+        semi_structured_marqo_index.tensor_fields.append(self._tensor_field('title'))
         vespa_schema = cast(SemiStructuredVespaSchema, vespa_schema_factory(request))
         new_schema = vespa_schema.generate_vespa_schema(semi_structured_marqo_index)
         self.index_management.update_index(semi_structured_marqo_index)
@@ -384,13 +383,11 @@ class TestIndexManagement(MarqoTestCase):
         semi_structured_marqo_index = cast(SemiStructuredMarqoIndex, self.index_management.get_index(request.name))
 
         change1 = semi_structured_marqo_index.copy(deep=True)
-        change1.tensor_fields.append(TensorField(
-            name='title', chunk_field_name='marqo__chunks_title', embeddings_field_name='marqo__embeddings_title'))
+        change1.tensor_fields.append(self._tensor_field('title'))
         self.index_management.update_index(change1)
 
         change2 = semi_structured_marqo_index.copy(deep=True)
-        change2.tensor_fields.append(TensorField(
-            name='desc', chunk_field_name='marqo__chunks_desc', embeddings_field_name='marqo__embeddings_desc'))
+        change2.tensor_fields.append(self._tensor_field('description'))
 
         with self.assertRaisesStrict(OperationConflictError) as err:
             self.index_management.update_index(change2)
@@ -420,10 +417,60 @@ class TestIndexManagement(MarqoTestCase):
             )
         ]:
             with self.subTest(f'request_type={type(request)}'):
+                self.index_management.create_index(request)
+
                 _, index = vespa_schema_factory(request).generate_schema()
 
-                with self.assertRaisesStrict(InternalError):
+                with self.assertRaisesStrict(InternalError) as err:
                     self.index_management.update_index(index)
+
+                self.assertIn('can not be update', str(err.exception))
+
+    def test_update_index_should_skip_if_nothing_to_update(self):
+        request = self.unstructured_marqo_index_request(model=Model(name='hf/e5-small'))
+        self.index_management.bootstrap_vespa()
+        self.index_management.create_index(request)
+
+        semi_structured_marqo_index = cast(SemiStructuredMarqoIndex, self.index_management.get_index(request.name))
+
+        change1 = semi_structured_marqo_index.copy(deep=True)
+        change1.tensor_fields.extend([self._tensor_field('title'), self._tensor_field('description')])
+        change1.lexical_fields.extend([self._lexical_field('field1'), self._lexical_field('field2')])
+
+        change2 = semi_structured_marqo_index.copy(deep=True)
+        # Deliberately use a different order to see if the comparison is order-agnostic
+        change2.tensor_fields.extend([self._tensor_field('description'), self._tensor_field('title')])
+        change2.lexical_fields.extend([self._lexical_field('field2'), self._lexical_field('field1')])
+
+        exception_list_1 = []
+        exception_list_2 = []
+        mock_update_index_and_schema = mock.MagicMock()
+
+        def worker1():
+            try:
+                self.index_management.update_index(change1)
+            except Exception as err:
+                exception_list_1.append(err)
+
+        @mock.patch("marqo.core.index_management.vespa_application_package.VespaApplicationPackage.update_index_setting_and_schema", mock_update_index_and_schema)
+        def worker2():
+            try:
+                self.index_management.update_index(change2)
+            except Exception as err:
+                exception_list_2.append(err)
+
+        thread1 = threading.Thread(target=worker1)
+        thread2 = threading.Thread(target=worker2)
+
+        thread1.start()
+        time.sleep(1)
+        thread2.start()
+        thread1.join()
+        thread2.join()
+
+        self.assertEqual(exception_list_1, [])
+        self.assertEqual(exception_list_2, [])
+        mock_update_index_and_schema.assert_not_called()
 
     def test_create_index_should_fail_if_index_already_exists(self):
         request = self.unstructured_marqo_index_request(name="test-index")
@@ -502,15 +549,18 @@ class TestIndexManagement(MarqoTestCase):
         self._assert_index_is_not_present(app, index2.name, index2.schema_name)
 
     def test_concurrent_updates_is_prevented_by_distributed_locking(self):
+        exception_list = []
+
         def worker1():
             request = self.unstructured_marqo_index_request(name="index1")
             self.index_management.create_index(request)
 
         def worker2():
-            with self.assertRaisesStrict(OperationConflictError) as e:
+            try:
                 request = self.unstructured_marqo_index_request(name="index2")
                 self.index_management.create_index(request)
-            self.assertEqual("Another index creation/deletion operation is in progress.", str(e.exception))
+            except Exception as err:
+                exception_list.append(err)
 
         self.index_management.bootstrap_vespa()
         thread1 = threading.Thread(target=worker1)
@@ -522,6 +572,9 @@ class TestIndexManagement(MarqoTestCase):
         thread1.join()
         thread2.join()
 
+        self.assertEqual(1, len(exception_list))
+        self.assertTrue(isinstance(exception_list[0], OperationConflictError))
+        self.assertEqual("Your indexes are being updated. Please try again shortly.", str(exception_list[0]))
 
     @pytest.mark.skip(reason="This test case is just used to verify the optimistic locking mechanism works")
     def test_race_condition(self):
@@ -650,3 +703,13 @@ class TestIndexManagement(MarqoTestCase):
             ),
             schema=self.index_management._MARQO_SETTINGS_SCHEMA_NAME
         )
+
+    def _tensor_field(self, field_name: str):
+        return TensorField(
+            name=field_name, chunk_field_name=f'marqo__chunks_{field_name}',
+            embeddings_field_name=f'marqo__embeddings_{field_name}')
+
+    def _lexical_field(self, field_name: str):
+        return Field(name=field_name, type=FieldType.Text,
+                     features=[FieldFeature.LexicalSearch],
+                     lexical_field_name=f'marqo__lexical_{field_name}')
