@@ -81,7 +81,7 @@ def get_deployment_lock(zookeeper_client: ZookeeperClient, acquire_timeout: floa
 
     Args:
         zookeeper_client: The Zookeeper client.
-        acquire_timeout: The timeout to acquire the lock. Default is 0.
+        acquire_timeout: The timeout to acquire the lock, in seconds. Default is 0.
 
     Returns:
         ZookeeperDistributedLock: The deployment lock.
