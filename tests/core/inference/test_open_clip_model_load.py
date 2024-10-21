@@ -178,3 +178,28 @@ class TestOpenCLIPModelLoad(TestCase):
             model.load()
 
         self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'CLIPA'", str(context.exception))
+
+    def test_load_OpenCLIPModel_from_local_path(self):
+        """Test loading an OpenCLIP model from a local path."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "name": "ViT-B-32",
+            "localpath": "/path/to/my_test_model.pt",
+            "dimension": 512,
+            "type": "open_clip"
+        }
+        with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
+                as mock_create_model:
+            with patch("marqo.core.inference.inference_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
+                    as mock_tokenizer:
+                with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
+                    model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                    model.load()
+                    mock_create_model.assert_called_once_with(
+                        model_name="ViT-B-32",
+                        jit=False,
+                        pretrained="/path/to/my_test_model.pt",
+                        precision="fp32", device="cpu",
+                        cache_dir=ModelCache.clip_cache_path
+                    )
+                    mock_tokenizer.assert_called_once_with("ViT-B-32")

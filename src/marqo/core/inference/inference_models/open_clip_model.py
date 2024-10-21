@@ -12,6 +12,7 @@ from marqo.core.inference.inference_models.abstract_clip_model import AbstractCL
 from marqo.core.inference.inference_models.hf_tokenizer import HFTokenizer
 from marqo.core.inference.inference_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
 from marqo.core.inference.model_download import download_model
+from marqo.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.logger import get_logger
@@ -47,7 +48,8 @@ class OPEN_CLIP(AbstractCLIPModel):
 
     def _load_necessary_components(self) -> None:
         """Load the open_clip model and tokenizer."""
-        if self.model_properties.url is not None or self.model_properties.model_location is not None:
+        if self.model_properties.url is not None or self.model_properties.model_location is not None or \
+                self.model_properties.localpath is not None:
             self.model, self.preprocess = self._load_model_and_image_preprocessor_from_checkpoint()
             self.tokenizer = self._load_tokenizer_from_checkpoint()
         elif self.model_properties.name.startswith(HF_HUB_PREFIX):
@@ -108,17 +110,14 @@ class OPEN_CLIP(AbstractCLIPModel):
         The checkpoint file can be provided through a URL or a model_location object.
         """
         # Load the image preprocessor
-        if self.model_properties.url and self.model_properties.model_location:
-            raise InvalidModelPropertiesError(
-                "Only one of url, model_location can be specified in 'model_properties' "
-            )
+        if self.model_properties.localpath:
+            self.model_path = self.model_properties.localpath
         elif self.model_properties.model_location:
             self.model_path = self._download_from_repo()
         elif self.model_properties.url:
             self.model_path = download_model(url=self.model_properties.url)
         else:
-            raise ValueError("The 'url' or 'model_location' is required in 'model_properties' "
-                             "when loading a custom open_clip model through a URL or a model_location object")
+            raise InternalError("One of 'localpath', 'model_location', or 'url' must be provided to load the model.")
 
         logger.info(f"The name of the custom clip model is {self.model_properties.name}. We use open_clip loader")
 
