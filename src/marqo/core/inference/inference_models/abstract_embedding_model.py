@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
@@ -49,4 +50,5 @@ class AbstractEmbeddingModel(ABC):
 
     @abstractmethod
     def encode(self):
+        """Encode the input data."""
         pass

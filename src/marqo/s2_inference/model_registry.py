@@ -1,4 +1,3 @@
-from marqo.core.inference.inference_models.hugging_face_stella_model import HuggingFaceStellaModel
 from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
     get_multilingual_clip_properties
 from marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP
@@ -15,61 +14,61 @@ from marqo.s2_inference.no_model_utils import NO_MODEL
 # we can use this as a registry
 def _get_clip_properties() -> Dict:
     CLIP_MODEL_PROPERTIES = {
-        'RN50':
-            {"name": "RN50",
-             "dimensions": 1024,
-             "notes": "CLIP resnet50",
-             "type": "clip",
-             },
-        'RN101':
-            {"name": "RN101",
-             "dimensions": 512,
-             "notes": "CLIP resnet101",
-             "type": "clip",
-             },
-        'RN50x4':
-            {"name": "RN50x4",
-             "dimensions": 640,
-             "notes": "CLIP resnet50x4",
-             "type": "clip",
-             },
-        'RN50x16':
-            {"name": "RN50x16",
-             "dimensions": 768,
-             "notes": "CLIP resnet50x16",
-             "type": "clip",
-             },
-        'RN50x64':
-            {"name": "RN50x64",
-             "dimensions": 1024,
-             "notes": "CLIP resnet50x64",
-             "type": "clip",
-             },
-        'ViT-B/32':
-            {"name": "ViT-B/32",
-             "dimensions": 512,
-             "notes": "CLIP ViT-B/32",
-             "type": "clip",
-             },
-        'ViT-B/16':
-            {"name": "ViT-B/16",
-             "dimensions": 512,
-             "notes": "CLIP ViT-B/16",
-             "type": "clip",
-             },
-        'ViT-L/14':
-            {"name": "ViT-L/14",
-             "dimensions": 768,
-             "notes": "CLIP ViT-L/14",
-             "type": "clip",
-             },
-        'ViT-L/14@336px':
-            {"name": "ViT-L/14@336px",
-             "dimensions": 768,
-             "notes": "CLIP ViT-L/14@336px",
-             "type": "clip",
-             },
-    }
+            'RN50':
+                {"name": "RN50",
+                "dimensions": 1024,
+                "notes": "CLIP resnet50",
+                "type": "clip",
+                },
+            'RN101':
+                {"name": "RN101",
+                "dimensions": 512,
+                "notes": "CLIP resnet101",
+                "type": "clip",
+                },
+            'RN50x4':
+                {"name": "RN50x4",
+                "dimensions": 640,
+                "notes": "CLIP resnet50x4",
+                "type": "clip",
+                },
+            'RN50x16':
+                {"name": "RN50x16",
+                "dimensions": 768,
+                "notes": "CLIP resnet50x16",
+                "type": "clip",
+                },
+            'RN50x64':
+                {"name": "RN50x64",
+                "dimensions": 1024,
+                "notes": "CLIP resnet50x64",
+                "type": "clip",
+                },
+            'ViT-B/32':
+                {"name": "ViT-B/32",
+                "dimensions": 512,
+                "notes": "CLIP ViT-B/32",
+                "type": "clip",
+                },
+            'ViT-B/16':
+                {"name": "ViT-B/16",
+                "dimensions": 512,
+                "notes": "CLIP ViT-B/16",
+                "type":"clip",
+                },
+            'ViT-L/14':
+                {"name": "ViT-L/14",
+                "dimensions": 768,
+                "notes": "CLIP ViT-L/14",
+                "type":"clip",
+                },
+            'ViT-L/14@336px':
+                {"name": "ViT-L/14@336px",
+                "dimensions": 768,
+                "notes": "CLIP ViT-L/14@336px",
+                "type":"clip",
+                },
+        }
     return CLIP_MODEL_PROPERTIES
 
 
@@ -492,7 +491,6 @@ def _get_open_clip_properties() -> Dict:
             "note": "Marqo's fashionSigLIP model",
             "type": "open_clip"
         },
-
         # TODO Add these model back when we upgrade the open_clip version
         # "open_clip/MobileCLIP-B/datacompdr_lt":{
         #     "name": "open_clip/MobileCLIP-B/datacompdr_lt",
@@ -538,477 +536,473 @@ def _get_open_clip_properties() -> Dict:
 
 def _get_sbert_properties() -> Dict:
     SBERT_MODEL_PROPERTIES = {
-        "sentence-transformers/all-MiniLM-L6-v1":
-            {"name": "sentence-transformers/all-MiniLM-L6-v1",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        "sentence-transformers/all-MiniLM-L6-v2":
-            {"name": "sentence-transformers/all-MiniLM-L6-v2",
-             "dimensions": 384,
-             "tokens": 256,
-             "type": "sbert",
-             "notes": ""},
-        "sentence-transformers/all-MiniLM-L12-v2":
-            {"name": "sentence-transformers/all-MiniLM-L12-v2",
-             "dimensions": 384,
-             "tokens": 256,
-             "type": "sbert",
-             "notes": ""},
-        "sentence-transformers/all-mpnet-base-v1":
-            {"name": "sentence-transformers/all-mpnet-base-v1",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        "sentence-transformers/all-mpnet-base-v2":
-            {"name": "sentence-transformers/all-mpnet-base-v2",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        'sentence-transformers/stsb-xlm-r-multilingual':
-            {"name": 'sentence-transformers/stsb-xlm-r-multilingual',
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
+            "sentence-transformers/all-MiniLM-L6-v1":
+                {"name": "sentence-transformers/all-MiniLM-L6-v1",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
+            "sentence-transformers/all-MiniLM-L6-v2":
+                {"name": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimensions": 384,
+                "tokens":256,
+                "type":"sbert",
+                "notes": ""},
+            "sentence-transformers/all-MiniLM-L12-v2":
+                {"name": "sentence-transformers/all-MiniLM-L12-v2",
+                "dimensions": 384,
+                "tokens":256,
+                "type":"sbert",
+                "notes": ""},
+            "sentence-transformers/all-mpnet-base-v1":
+                {"name": "sentence-transformers/all-mpnet-base-v1",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
+            "sentence-transformers/all-mpnet-base-v2":
+                {"name": "sentence-transformers/all-mpnet-base-v2",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
+            'sentence-transformers/stsb-xlm-r-multilingual':
+                {"name": 'sentence-transformers/stsb-xlm-r-multilingual',
+                 "dimensions": 768,
+                 "tokens": 128,
+                 "type": "sbert",
+                 "notes": ""},
+            "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
+            "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
+            "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
+            "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
 
-        "flax-sentence-embeddings/all_datasets_v3_mpnet-base":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
-        "flax-sentence-embeddings/all_datasets_v4_mpnet-base":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert",
-             "notes": ""},
+            "flax-sentence-embeddings/all_datasets_v3_mpnet-base":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
+            "flax-sentence-embeddings/all_datasets_v4_mpnet-base":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert",
+                "notes": ""},
     }
     return SBERT_MODEL_PROPERTIES
 
-
 def _get_hf_properties() -> Dict:
     HF_MODEL_PROPERTIES = {
-        "Marqo/dunzhang-stella_en_400M_v5": {
-            "name": "Marqo/dunzhang-stella_en_400M_v5",
-            "dimensions": 1024,
-            "tokens": 128,
-            "type": "hf_stella",
-            "trust_remote_code": True
-        },
-        "hf/all-MiniLM-L6-v1":
-            {"name": "sentence-transformers/all-MiniLM-L6-v1",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
-        "hf/all-MiniLM-L6-v2":
-            {"name": "sentence-transformers/all-MiniLM-L6-v2",
-             "dimensions": 384,
-             "tokens": 256,
-             "type": "hf",
-             "notes": ""},
-        "hf/all-mpnet-base-v1":
-            {"name": "sentence-transformers/all-mpnet-base-v1",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
-        "hf/all-mpnet-base-v2":
-            {"name": "sentence-transformers/all-mpnet-base-v2",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
+            "hf/all-MiniLM-L6-v1":
+                {"name": "sentence-transformers/all-MiniLM-L6-v1",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
+            "hf/all-MiniLM-L6-v2":
+                {"name": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimensions": 384,
+                "tokens":256,
+                "type":"hf",
+                "notes": ""},
+            "hf/all-mpnet-base-v1":
+                {"name": "sentence-transformers/all-mpnet-base-v1",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
+            "hf/all-mpnet-base-v2":
+                {"name": "sentence-transformers/all-mpnet-base-v2",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
 
-        "hf/all_datasets_v3_MiniLM-L12":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
-        "hf/all_datasets_v3_MiniLM-L6":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
-        "hf/all_datasets_v4_MiniLM-L12":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
-        "hf/all_datasets_v4_MiniLM-L6":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
+            "hf/all_datasets_v3_MiniLM-L12":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
+            "hf/all_datasets_v3_MiniLM-L6":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
+            "hf/all_datasets_v4_MiniLM-L12":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
+            "hf/all_datasets_v4_MiniLM-L6":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
 
-        "hf/all_datasets_v3_mpnet-base":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
-        "hf/all_datasets_v4_mpnet-base":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "hf",
-             "notes": ""},
+            "hf/all_datasets_v3_mpnet-base":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
+            "hf/all_datasets_v4_mpnet-base":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"hf",
+                "notes": ""},
 
-        "hf/e5-small":
-            {"name": 'intfloat/e5-small',
-             "dimensions": 384,
-             "tokens": 192,
-             "type": "hf",
-             "model_size": 0.1342,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-base":
-            {"name": 'intfloat/e5-base',
-             "dimensions": 768,
-             "tokens": 192,
-             "type": "hf",
-             "model_size": 0.438,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-large":
-            {"name": 'intfloat/e5-large',
-             "dimensions": 1024,
-             "tokens": 192,
-             "type": "hf",
-             "model_size": 1.3,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-large-unsupervised":
-            {"name": 'intfloat/e5-large-unsupervised',
-             "dimensions": 1024,
-             "tokens": 128,
-             "type": "hf",
-             "model_size": 1.3,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-base-unsupervised":
-            {"name": 'intfloat/e5-base-unsupervised',
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "hf",
-             "model_size": 0.438,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-small-unsupervised":
-            {"name": 'intfloat/e5-small-unsupervised',
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "hf",
-             "model_size": 0.134,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/multilingual-e5-small":
-            {"name": 'intfloat/multilingual-e5-small',
-             "dimensions": 384,
-             "tokens": 512,
-             "type": "hf",
-             "model_size": 0.471,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/multilingual-e5-base":
-            {"name": 'intfloat/multilingual-e5-base',
-             "dimensions": 768,
-             "tokens": 512,
-             "type": "hf",
-             "model_size": 1.11,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/multilingual-e5-large":
-            {"name": 'intfloat/multilingual-e5-large',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "model_size": 2.24,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-small-v2":
-            {"name": 'intfloat/e5-small-v2',
-             "dimensions": 384,
-             "tokens": 512,
-             "type": "hf",
-             "model_size": 0.134,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-base-v2":
-            {"name": 'intfloat/e5-base-v2',
-             "dimensions": 768,
-             "tokens": 512,
-             "type": "hf",
-             "model_size": 0.438,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
-        "hf/e5-large-v2":
-            {"name": 'intfloat/e5-large-v2',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "model_size": 1.34,
-             "text_query_prefix": "query: ",
-             "text_chunk_prefix": "passage: ",
-             "notes": ""},
+            "hf/e5-small":
+                {"name": 'intfloat/e5-small',
+                 "dimensions": 384,
+                 "tokens": 192,
+                 "type": "hf",
+                 "model_size": 0.1342,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-base":
+                {"name": 'intfloat/e5-base',
+                 "dimensions": 768,
+                 "tokens": 192,
+                 "type": "hf",
+                 "model_size": 0.438,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-large":
+                {"name": 'intfloat/e5-large',
+                 "dimensions": 1024,
+                 "tokens": 192,
+                 "type": "hf",
+                 "model_size": 1.3,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-large-unsupervised":
+                {"name": 'intfloat/e5-large-unsupervised',
+                 "dimensions": 1024,
+                 "tokens": 128,
+                 "type": "hf",
+                 "model_size": 1.3,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-base-unsupervised":
+                {"name": 'intfloat/e5-base-unsupervised',
+                 "dimensions": 768,
+                 "tokens": 128,
+                 "type": "hf",
+                 "model_size": 0.438,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-small-unsupervised":
+                {"name": 'intfloat/e5-small-unsupervised',
+                 "dimensions": 384,
+                 "tokens": 128,
+                 "type": "hf",
+                 "model_size": 0.134,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/multilingual-e5-small":
+                {"name": 'intfloat/multilingual-e5-small',
+                 "dimensions": 384,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 0.471,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/multilingual-e5-base":
+                {"name": 'intfloat/multilingual-e5-base',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 1.11,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/multilingual-e5-large":
+                {"name": 'intfloat/multilingual-e5-large',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 2.24,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-small-v2":
+                {"name": 'intfloat/e5-small-v2',
+                 "dimensions": 384,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 0.134,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-base-v2":
+                {"name": 'intfloat/e5-base-v2',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 0.438,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
+            "hf/e5-large-v2":
+                {"name": 'intfloat/e5-large-v2',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "model_size": 1.34,
+                 "text_query_prefix": "query: ",
+                 "text_chunk_prefix": "passage: ",
+                 "notes": ""},
 
-        # New models as of: Marqo 2.7.0
-        "hf/multilingual-e5-large-instruct":
-            {"name": 'intfloat/multilingual-e5-large-instruct',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ",
-             "notes": ""},
-        "hf/GIST-large-Embedding-v0":
-            {"name": 'avsolatorio/GIST-large-Embedding-v0',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "notes": ""},
-        "hf/bge-small-en-v1.5":
-            {"name": 'BAAI/bge-small-en-v1.5',
-             "dimensions": 384,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "Represent this sentence for searching relevant passages: ",
-             "notes": ""},
-        "hf/bge-base-en-v1.5":
-            {"name": 'BAAI/bge-base-en-v1.5',
-             "dimensions": 768,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "Represent this sentence for searching relevant passages: ",
-             "notes": ""},
-        "hf/bge-large-en-v1.5":
-            {"name": 'BAAI/bge-large-en-v1.5',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "Represent this sentence for searching relevant passages: ",
-             "notes": ""},
-        "hf/bge-small-zh-v1.5":
-            {"name": 'BAAI/bge-small-zh-v1.5',
-             "dimensions": 512,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
-             "notes": ""},
-        "hf/bge-base-zh-v1.5":
-            {"name": 'BAAI/bge-base-zh-v1.5',
-             "dimensions": 768,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
-             "notes": ""},
-        "hf/bge-large-zh-v1.5":
-            {"name": 'BAAI/bge-large-zh-v1.5',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
-             "notes": ""},
-        # Uncomment when fix is implemented.
-        # "hf/gte-base-en-v1.5":
-        #    {"name": 'Alibaba-NLP/gte-base-en-v1.5',
-        #     "dimensions": 768,
-        #     "tokens": 8192,
-        #     "type": "hf",
-        #     "notes": ""},
-        # "hf/gte-large-en-v1.5":
-        #    {"name": 'Alibaba-NLP/gte-large-en-v1.5',
-        #     "dimensions": 1024,
-        #     "tokens": 8192,
-        #     "type": "hf",
-        #     "notes": ""},
-        # "hf/snowflake-arctic-embed-m-long":
-        #    {"name": 'Snowflake/snowflake-arctic-embed-m-long',
-        #     "dimensions": 768,
-        #     "tokens": 8192,
-        #     "type": "hf",
-        #     "notes": ""},
-        "hf/snowflake-arctic-embed-m-v1.5":
-            {"name": 'Snowflake/snowflake-arctic-embed-m-v1.5',
-             "dimensions": 768,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "Represent this sentence for searching relevant passages: ",
-             "notes": ""},
-        "hf/snowflake-arctic-embed-m":
-            {"name": 'Snowflake/snowflake-arctic-embed-m',
-             "dimensions": 768,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "Represent this sentence for searching relevant passages: ",
-             "notes": ""},
-        "hf/snowflake-arctic-embed-l":
-            {"name": 'Snowflake/snowflake-arctic-embed-l',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "text_query_prefix": "Represent this sentence for searching relevant passages: ",
-             "notes": ""},
-        "hf/ember-v1":
-            {"name": 'llmrails/ember-v1',
-             "dimensions": 1024,
-             "tokens": 512,
-             "type": "hf",
-             "notes": ""},
+            # New models as of: Marqo 2.7.0
+            "hf/multilingual-e5-large-instruct":
+                {"name": 'intfloat/multilingual-e5-large-instruct',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: ",
+                 "notes": ""},
+            "hf/GIST-large-Embedding-v0":
+                {"name": 'avsolatorio/GIST-large-Embedding-v0',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
+            "hf/bge-small-en-v1.5":
+                {"name": 'BAAI/bge-small-en-v1.5',
+                 "dimensions": 384,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "poolingMethod": "mean",
+                 "notes": ""},
+            "hf/bge-base-en-v1.5":
+                {"name": 'BAAI/bge-base-en-v1.5',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "poolingMethod": "mean",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "notes": ""},
+            "hf/bge-large-en-v1.5":
+                {"name": 'BAAI/bge-large-en-v1.5',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "poolingMethod": "mean",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "notes": ""},
+            "hf/bge-small-zh-v1.5":
+                {"name": 'BAAI/bge-small-zh-v1.5',
+                 "dimensions": 512,
+                 "tokens": 512,
+                 "type": "hf",
+                 "poolingMethod": "mean",
+                 "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
+                 "notes": ""},
+            "hf/bge-base-zh-v1.5":
+                {"name": 'BAAI/bge-base-zh-v1.5',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "poolingMethod": "mean",
+                 "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
+                 "notes": ""},
+            "hf/bge-large-zh-v1.5":
+                {"name": 'BAAI/bge-large-zh-v1.5',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "poolingMethod": "mean",
+                 "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
+                 "notes": ""},
+            # Uncomment when fix is implemented.
+            #"hf/gte-base-en-v1.5":
+            #    {"name": 'Alibaba-NLP/gte-base-en-v1.5',
+            #     "dimensions": 768,
+            #     "tokens": 8192,
+            #     "type": "hf",
+            #     "notes": ""},
+            #"hf/gte-large-en-v1.5":
+            #    {"name": 'Alibaba-NLP/gte-large-en-v1.5',
+            #     "dimensions": 1024,
+            #     "tokens": 8192,
+            #     "type": "hf",
+            #     "notes": ""},
+            #"hf/snowflake-arctic-embed-m-long":
+            #    {"name": 'Snowflake/snowflake-arctic-embed-m-long',
+            #     "dimensions": 768,
+            #     "tokens": 8192,
+            #     "type": "hf",
+            #     "notes": ""},
+            "hf/snowflake-arctic-embed-m-v1.5":
+                {"name": 'Snowflake/snowflake-arctic-embed-m-v1.5',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "notes": ""},
+            "hf/snowflake-arctic-embed-m":
+                {"name": 'Snowflake/snowflake-arctic-embed-m',
+                 "dimensions": 768,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "notes": ""},
+            "hf/snowflake-arctic-embed-l":
+                {"name": 'Snowflake/snowflake-arctic-embed-l',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "notes": ""},
+            "hf/ember-v1":
+                {"name": 'llmrails/ember-v1',
+                 "dimensions": 1024,
+                 "tokens": 512,
+                 "type": "hf",
+                 "notes": ""},
     }
     return HF_MODEL_PROPERTIES
 
-
 def _get_sbert_onnx_properties() -> Dict:
     SBERT_ONNX_MODEL_PROPERTIES = {
-        "onnx/all-MiniLM-L6-v1":
-            {"name": "sentence-transformers/all-MiniLM-L6-v1",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
-        "onnx/all-MiniLM-L6-v2":
-            {"name": "sentence-transformers/all-MiniLM-L6-v2",
-             "dimensions": 384,
-             "tokens": 256,
-             "type": "sbert_onnx",
-             "notes": ""},
-        "onnx/all-mpnet-base-v1":
-            {"name": "sentence-transformers/all-mpnet-base-v1",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
-        "onnx/all-mpnet-base-v2":
-            {"name": "sentence-transformers/all-mpnet-base-v2",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
+            "onnx/all-MiniLM-L6-v1":
+                {"name": "sentence-transformers/all-MiniLM-L6-v1",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all-MiniLM-L6-v2":
+                {"name": "sentence-transformers/all-MiniLM-L6-v2",
+                "dimensions": 384,
+                "tokens":256,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all-mpnet-base-v1":
+                {"name": "sentence-transformers/all-mpnet-base-v1",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all-mpnet-base-v2":
+                {"name": "sentence-transformers/all-mpnet-base-v2",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
 
-        "onnx/all_datasets_v3_MiniLM-L12":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
-        "onnx/all_datasets_v3_MiniLM-L6":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
-        "onnx/all_datasets_v4_MiniLM-L12":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
-        "onnx/all_datasets_v4_MiniLM-L6":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
+            "onnx/all_datasets_v3_MiniLM-L12":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L12",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all_datasets_v3_MiniLM-L6":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_MiniLM-L6",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all_datasets_v4_MiniLM-L12":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L12",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all_datasets_v4_MiniLM-L6":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_MiniLM-L6",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
 
-        "onnx/all_datasets_v3_mpnet-base":
-            {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
-        "onnx/all_datasets_v4_mpnet-base":
-            {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "sbert_onnx",
-             "notes": ""},
+            "onnx/all_datasets_v3_mpnet-base":
+                {"name": "flax-sentence-embeddings/all_datasets_v3_mpnet-base",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
+            "onnx/all_datasets_v4_mpnet-base":
+                {"name": "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"sbert_onnx",
+                "notes": ""},
     }
     return SBERT_ONNX_MODEL_PROPERTIES
 
 
 def _get_sbert_test_properties() -> Dict:
     TEST_MODEL_PROPERTIES = {
-        "sentence-transformers/test":
-            {"name": "sentence-transformers/all-MiniLM-L6-v1",
-             "dimensions": 16,
-             "tokens": 128,
-             "type": "test",
-             "notes": ""},
-        "test":
-            {"name": "sentence-transformers/all-MiniLM-L6-v1",
-             "dimensions": 16,
-             "tokens": 128,
-             "type": "test",
-             "notes": ""},
-        "test_prefix":
-            {"name": "sentence-transformers/all-MiniLM-L6-v1",
-             "dimensions": 16,
-             "tokens": 128,
-             "type": "test",
-             "text_query_prefix": "test query: ",
-             "text_chunk_prefix": "test passage: ",
-             "notes": ""},
+            "sentence-transformers/test":
+                {"name": "sentence-transformers/all-MiniLM-L6-v1",
+                "dimensions": 16,
+                "tokens":128,
+                "type":"test",
+                "notes": ""},
+            "test":
+                {"name": "sentence-transformers/all-MiniLM-L6-v1",
+                "dimensions": 16,
+                "tokens":128,
+                "type":"test",
+                "notes": ""},
+            "test_prefix":
+                {"name": "sentence-transformers/all-MiniLM-L6-v1",
+                "dimensions": 16,
+                "tokens":128,
+                "type":"test",
+                "text_query_prefix": "test query: ",
+                "text_chunk_prefix": "test passage: ",
+                "notes": ""},
     }
     return TEST_MODEL_PROPERTIES
-
 
 def _get_onnx_clip_properties() -> Dict:
     ONNX_CLIP_MODEL_PROPERTIES = {
         "onnx32/openai/ViT-L/14":
             {
-                "name": "onnx32/openai/ViT-L/14",
-                "dimensions": 768,
-                "type": "clip_onnx",
-                "note": "the onnx float32 version of openai ViT-L/14",
+                "name":"onnx32/openai/ViT-L/14",
+                "dimensions" : 768,
+                "type":"clip_onnx",
+                "note":"the onnx float32 version of openai ViT-L/14",
                 "repo_id": "Marqo/onnx-openai-ViT-L-14",
                 "visual_file": "onnx32-openai-ViT-L-14-visual.onnx",
                 "textual_file": "onnx32-openai-ViT-L-14-textual.onnx",
                 "token": None,
-                "resolution": 224,
+                "resolution" : 224,
             },
         "onnx16/openai/ViT-L/14":
             {
@@ -1020,7 +1014,7 @@ def _get_onnx_clip_properties() -> Dict:
                 "visual_file": "onnx16-openai-ViT-L-14-visual.onnx",
                 "textual_file": "onnx16-openai-ViT-L-14-textual.onnx",
                 "token": None,
-                "resolution": 224,
+                "resolution" : 224,
             },
         "onnx32/open_clip/ViT-L-14/openai":
             {
@@ -1050,16 +1044,16 @@ def _get_onnx_clip_properties() -> Dict:
             },
         "onnx32/open_clip/ViT-L-14/laion400m_e32":
             {
-                "name": "onnx32/open_clip/ViT-L-14/laion400m_e32",
-                "dimensions": 768,
-                "type": "clip_onnx",
+                "name" : "onnx32/open_clip/ViT-L-14/laion400m_e32",
+                "dimensions" : 768,
+                "type" : "clip_onnx",
                 "note": "the onnx float32 version of open_clip ViT-L-14/lainon400m_e32",
-                "repo_id": "Marqo/onnx-open_clip-ViT-L-14",
-                "visual_file": "onnx32-open_clip-ViT-L-14-laion400m_e32-visual.onnx",
-                "textual_file": "onnx32-open_clip-ViT-L-14-laion400m_e32-textual.onnx",
-                "token": None,
-                "resolution": 224,
-                "pretrained": "laion400m_e32"
+                "repo_id" : "Marqo/onnx-open_clip-ViT-L-14",
+                "visual_file" : "onnx32-open_clip-ViT-L-14-laion400m_e32-visual.onnx",
+                "textual_file" : "onnx32-open_clip-ViT-L-14-laion400m_e32-textual.onnx",
+                "token" : None,
+                "resolution" : 224,
+                "pretrained" : "laion400m_e32"
             },
         "onnx16/open_clip/ViT-L-14/laion400m_e32":
             {
@@ -1086,8 +1080,8 @@ def _get_onnx_clip_properties() -> Dict:
                 "token": None,
                 "resolution": 224,
                 "pretrained": "laionb_s32b_b82k",
-                "image_mean": (0.5, 0.5, 0.5),
-                "image_std": (0.5, 0.5, 0.5),
+                "image_mean" : (0.5, 0.5, 0.5),
+                "image_std" : (0.5, 0.5, 0.5),
 
             },
         "onnx16/open_clip/ViT-L-14/laion2b_s32b_b82k":
@@ -1266,33 +1260,33 @@ def _get_onnx_clip_properties() -> Dict:
 
         'onnx32/open_clip/ViT-B-32-quickgelu/openai':
             {
-                'name': 'onnx32/open_clip/ViT-B-32-quickgelu/openai',
-                'dimensions': 512,
-                'type': 'clip_onnx',
-                'note': 'the onnx float32 version of open_clip ViT-B-32-quickgelu/openai',
-                'repo_id': 'Marqo/onnx-open_clip-ViT-B-32-quickgelu',
-                'visual_file': 'onnx32-open_clip-ViT-B-32-quickgelu-openai-visual.onnx',
-                'textual_file': 'onnx32-open_clip-ViT-B-32-quickgelu-openai-textual.onnx',
-                'token': None,
-                'resolution': 224, 'pretrained': 'openai',
-                'image_mean': None,
-                'image_std': None
-            },
+              'name': 'onnx32/open_clip/ViT-B-32-quickgelu/openai',
+              'dimensions': 512,
+              'type': 'clip_onnx',
+              'note': 'the onnx float32 version of open_clip ViT-B-32-quickgelu/openai',
+              'repo_id': 'Marqo/onnx-open_clip-ViT-B-32-quickgelu',
+              'visual_file': 'onnx32-open_clip-ViT-B-32-quickgelu-openai-visual.onnx',
+              'textual_file': 'onnx32-open_clip-ViT-B-32-quickgelu-openai-textual.onnx',
+              'token': None,
+              'resolution': 224, 'pretrained': 'openai',
+              'image_mean': None,
+              'image_std': None
+             },
 
         'onnx16/open_clip/ViT-B-32-quickgelu/openai':
             {
-                'name': 'onnx16/open_clip/ViT-B-32-quickgelu/openai',
-                'dimensions': 512,
-                'type': 'clip_onnx',
-                'note': 'the onnx float16 version of open_clip ViT-B-32-quickgelu/openai',
-                'repo_id': 'Marqo/onnx-open_clip-ViT-B-32-quickgelu',
-                'visual_file': 'onnx16-open_clip-ViT-B-32-quickgelu-openai-visual.onnx',
-                'textual_file': 'onnx16-open_clip-ViT-B-32-quickgelu-openai-textual.onnx',
-                'token': None,
-                'resolution': 224,
-                'pretrained': 'openai',
-                'image_mean': None,
-                'image_std': None
+               'name': 'onnx16/open_clip/ViT-B-32-quickgelu/openai',
+               'dimensions': 512,
+               'type': 'clip_onnx',
+               'note': 'the onnx float16 version of open_clip ViT-B-32-quickgelu/openai',
+               'repo_id': 'Marqo/onnx-open_clip-ViT-B-32-quickgelu',
+               'visual_file': 'onnx16-open_clip-ViT-B-32-quickgelu-openai-visual.onnx',
+               'textual_file': 'onnx16-open_clip-ViT-B-32-quickgelu-openai-textual.onnx',
+               'token': None,
+               'resolution': 224,
+               'pretrained': 'openai',
+               'image_mean': None,
+               'image_std': None
             },
 
         'onnx32/open_clip/ViT-B-32-quickgelu/laion400m_e31':
@@ -1373,7 +1367,7 @@ def _get_onnx_clip_properties() -> Dict:
                 'pretrained': 'openai',
                 'image_mean': None,
                 'image_std': None
-            },
+             },
 
         'onnx32/open_clip/ViT-B-16/openai':
             {
@@ -1998,7 +1992,6 @@ def _get_onnx_clip_properties() -> Dict:
     }
     return ONNX_CLIP_MODEL_PROPERTIES
 
-
 def _get_languagebind_properties() -> Dict:
     LANGUAGEBIND_MODEL_PROPERTIES = {
         'LanguageBind/Video_V1.5_FT_Audio_FT_Image': {
@@ -2065,7 +2058,6 @@ def _get_languagebind_properties() -> Dict:
     }
     return LANGUAGEBIND_MODEL_PROPERTIES
 
-
 def _get_fp16_clip_properties() -> Dict:
     FP16_CLIP_MODEL_PROPERTIES = {
         "fp16/ViT-L/14": {
@@ -2093,30 +2085,30 @@ def _get_fp16_clip_properties() -> Dict:
 
 def _get_random_properties() -> Dict:
     RANDOM_MODEL_PROPERTIES = {
-        "random":
-            {"name": "random",
-             "dimensions": 384,
-             "tokens": 128,
-             "type": "random",
-             "notes": ""},
-        "random/large":
-            {"name": "random/large",
-             "dimensions": 768,
-             "tokens": 128,
-             "type": "random",
-             "notes": ""},
-        "random/small":
-            {"name": "random/small",
-             "dimensions": 32,
-             "tokens": 128,
-             "type": "random",
-             "notes": ""},
-        "random/medium":
-            {"name": "random/medium",
-             "dimensions": 128,
-             "tokens": 128,
-             "type": "random",
-             "notes": ""},
+            "random":
+                {"name": "random",
+                "dimensions": 384,
+                "tokens":128,
+                "type":"random",
+                "notes": ""},
+            "random/large":
+                {"name": "random/large",
+                "dimensions": 768,
+                "tokens":128,
+                "type":"random",
+                "notes": ""},
+            "random/small":
+                {"name": "random/small",
+                "dimensions": 32,
+                "tokens":128,
+                "type":"random",
+                "notes": ""},
+            "random/medium":
+                {"name": "random/medium",
+                "dimensions": 128,
+                "tokens":128,
+                "type":"random",
+                "notes": ""},
 
     }
     return RANDOM_MODEL_PROPERTIES
@@ -2130,26 +2122,23 @@ def _get_no_model_properties() -> Dict:
         }
     }
 
-
 def _get_model_load_mappings() -> Dict:
-    return {'clip': CLIP,
+    return {'clip':CLIP,
             'open_clip': OPEN_CLIP,
-            'sbert': SBERT,
-            'test': TEST,
-            'sbert_onnx': SBERT_ONNX,
+            'sbert':SBERT,
+            'test':TEST,
+            'sbert_onnx':SBERT_ONNX,
             'clip_onnx': CLIP_ONNX,
-            "multilingual_clip": MULTILINGUAL_CLIP,
+            "multilingual_clip" : MULTILINGUAL_CLIP,
             "fp16_clip": FP16_CLIP,
-            'random': Random,
-            'hf': HuggingFaceModel,
-            'hf_stella': HuggingFaceStellaModel,
+            'random':Random,
+            'hf':HuggingFaceModel,
             "no_model": NO_MODEL}
-
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already
     sbert_model_properties = _get_sbert_properties()
-    sbert_model_properties.update({k.split('/')[-1]: v for k, v in sbert_model_properties.items()})
+    sbert_model_properties.update({k.split('/')[-1]:v for k,v in sbert_model_properties.items()})
 
     sbert_onnx_model_properties = _get_sbert_onnx_properties()
 
@@ -2178,11 +2167,12 @@ def load_model_properties() -> Dict:
     model_properties.update(no_model_properties)
     model_properties.update(languagebind_model_properties)
 
+
     all_properties = dict()
     all_properties['models'] = model_properties
 
     all_properties['loaders'] = dict()
-    for key, val in _get_model_load_mappings().items():
+    for key,val in _get_model_load_mappings().items():
         all_properties['loaders'][key] = val
 
     return all_properties

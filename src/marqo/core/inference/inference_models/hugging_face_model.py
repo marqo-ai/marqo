@@ -70,30 +70,35 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             raise InternalError("Pooling function is not loaded!")
 
     def _load_necessary_components(self):
+        """Load the necessary components for the hf model.
+
+        Raises:
+            InvalidModelPropertiesError: If the model properties are invalid or incomplete.
+        """
+        if not (self.model_properties.name or self.model_properties.url or self.model_properties.model_location):
+            raise InvalidModelPropertiesError(
+                f"Invalid model properties for the 'hf' model. "
+                f"You do not have the necessary information to load the model. "
+                f"Check {marqo_docs.bring_your_own_model()} for more information."
+            )
+
         if self.model_properties.name:
             self._model, self._tokenizer = self._load_from_hugging_face_repo()
-        elif self.model_properties.url:
+        elif self.model_properties.url or (
+                self.model_properties.model_location and self.model_properties.model_location.s3):
             self._model, self._tokenizer = self._load_from_zip_file()
-        elif self.model_properties.model_location:
-            if self.model_properties.model_location.s3:
+        elif self.model_properties.model_location and self.model_properties.model_location.hf:
+            if self.model_properties.model_location.hf.filename:
                 self._model, self._tokenizer = self._load_from_zip_file()
-            elif self.model_properties.model_location.hf:
-                if self.model_properties.model_location.hf.filename:
-                    self._model, self._tokenizer = self._load_from_zip_file()
-                else:
-                    self._model, self._tokenizer = self._load_from_private_hugging_face_repo()
             else:
-                raise InvalidModelPropertiesError(
-                    f"Invalid model properties for the 'hf' model. "
-                    f"You do not have the necessary information to load the model. "
-                    f"Check {marqo_docs.bring_your_own_model()} for more information."
-                )
+                self._model, self._tokenizer = self._load_from_private_hugging_face_repo()
         else:
             raise InvalidModelPropertiesError(
                 f"Invalid model properties for the 'hf' model. "
                 f"You do not have the necessary information to load the model. "
                 f"Check {marqo_docs.bring_your_own_model()} for more information."
             )
+
         self._model = self._model.to(self.device)
         self._pooling_func = self._load_pooling_method()
         self._model.eval()
@@ -170,7 +175,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         elif self.model_properties.pooling_method == PoolingMethod.CLS:
             return self._cls_pool_func
         else:
-            raise ValueError(f"Invalid pooling method: {self.model_properties.pooling_method}")
+            raise InternalError(f"Invalid pooling method: {self.model_properties.pooling_method}")
 
     def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
         if isinstance(sentence, str):

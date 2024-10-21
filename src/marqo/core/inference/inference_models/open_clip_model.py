@@ -4,19 +4,19 @@ import open_clip
 import torch
 from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
 from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
+from pydantic import ValidationError
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
 from marqo.core.inference.inference_models.abstract_clip_model import AbstractCLIPModel
+from marqo.core.inference.inference_models.hf_tokenizer import HFTokenizer
 from marqo.core.inference.inference_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
+from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.logger import get_logger
-from marqo.core.inference.inference_models.hf_tokenizer import HFTokenizer
-from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.types import *
-from marqo.tensor_search.models.private_models import ModelLocation
-from pydantic import ValidationError
+from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 
 logger = get_logger(__name__)
 
@@ -29,14 +29,12 @@ class OPEN_CLIP(AbstractCLIPModel):
             self,
             device: Optional[str] = None,
             model_properties: Optional[Dict] = None,
-            model_auth: Optional[Dict] = None,
+            model_auth: Optional[ModelAuth] = None,
     ) -> None:
 
         super().__init__(device, model_properties, model_auth)
 
         self.model_properties = self._build_model_properties(model_properties)
-
-        # model_auth gets passed through add_docs and search requests:
         self.preprocess_config = None
 
     def _build_model_properties(self, model_properties: dict) -> OpenCLIPModelProperties:
@@ -233,7 +231,7 @@ class OPEN_CLIP(AbstractCLIPModel):
         download_model_params = {"repo_location": model_location}
 
         if model_location.auth_required:
-            download_model_params['auth'] = self.model_properties.model_auth
+            download_model_params['auth'] = self.model_auth
 
         model_file_path = download_model(**download_model_params)
         if model_file_path is None or model_file_path == '':
