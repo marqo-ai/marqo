@@ -1,49 +1,20 @@
-import regex as re
-from typing import Union, List, Optional
-import ftfy
-import html
 import os
 import urllib
-from tqdm import tqdm
-import torch
+from typing import Union, Optional
 from urllib.error import HTTPError
+
+from tqdm import tqdm
+
+from marqo.core.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import ModelDownloadError, InvalidModelPropertiesError
-from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
-from marqo.s2_inference.model_downloading.from_s3 import (
+from marqo.core.inference.download_model_from_hf import download_model_from_hf
+from marqo.core.inference.download_model_from_s3 import (
     get_presigned_s3_url, get_s3_model_cache_filename, check_s3_model_already_exists,
     get_s3_model_absolute_cache_path
 )
-from marqo.s2_inference.model_downloading.from_hf import download_model_from_hf
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
-
-
-def whitespace_clean(text):
-    text = re.sub(r'\s+', ' ', text)
-    text = text.strip()
-    return text
-
-def basic_clean(text):
-    text = ftfy.fix_text(text)
-    text = html.unescape(html.unescape(text))
-    return text.strip()
-
-
-class HFTokenizer:
-    # HuggingFace tokenizer wrapper
-    # Check https://github.com/mlfoundations/open_clip/blob/16e229c596cafaec46a4defaf27e0e30ffcca12d/src/open_clip/tokenizer.py#L188-L201
-    def __init__(self, tokenizer_name: str):
-        from transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
-
-    def __call__(self, texts: Union[str, List[str]]) -> torch.Tensor:
-        # same cleaning as for default tokenizer, except lowercasing
-        # adding lower (for case-sensitive tokenizers) will make it more robust but less sensitive to nuance
-        if isinstance(texts, str):
-            texts = [texts]
-        texts = [whitespace_clean(basic_clean(text)) for text in texts]
-        input_ids = self.tokenizer(texts, return_tensors='pt', padding='max_length', truncation=True).input_ids
-        return input_ids
+from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 
 
 def download_model(
@@ -51,8 +22,9 @@ def download_model(
         url: Optional[str] = None,
         auth: Optional[ModelAuth] = None,
         download_dir: Optional[str] = None
-    ):
-    """Downloads a custom CLIP model.
+    ) -> str:
+    """
+    Download a model from a given location.
 
     Args:
         repo_location: object that contains information about the location of a
@@ -74,24 +46,26 @@ def download_model(
 
     if url:
         return download_pretrained_from_url(url=url, cache_dir=download_dir)
-
-    if repo_location.s3:
-        download_kwargs = {'location': repo_location.s3, 'download_dir': download_dir}
-        if auth is not None:
-            download_kwargs['auth'] = auth.s3
-        return download_pretrained_from_s3(**download_kwargs)
-    elif repo_location.hf:
-        download_kwargs = {'location': repo_location.hf, 'download_dir': download_dir}
-        if auth is not None:
-            download_kwargs['auth'] = auth.hf
-        return download_model_from_hf(**download_kwargs)
-
+    if isinstance(repo_location, ModelLocation):
+        if repo_location.s3:
+            download_kwargs = {'location': repo_location.s3, 'download_dir': download_dir}
+            if auth is not None:
+                download_kwargs['auth'] = auth.s3
+            return download_pretrained_from_s3(**download_kwargs)
+        elif repo_location.hf:
+            download_kwargs = {'location': repo_location.hf, 'download_dir': download_dir}
+            if auth is not None:
+                download_kwargs['auth'] = auth.hf
+            return download_model_from_hf(**download_kwargs)
+    else:
+        raise InternalError("Invalid model location object provided.")
 
 
 def download_pretrained_from_s3(
         location: S3Location,
         auth: Optional[S3Auth] = None,
-        download_dir: Optional[str] = None):
+        download_dir: Optional[str] = None
+) -> str:
     """Downloads a pretrained model from S3, if it doesn't exist locally. The basename of the object's
     key is used for the filename.
 
@@ -128,7 +102,7 @@ def download_pretrained_from_url(
         url: str,
         cache_dir: Union[str, None] = None,
         cache_file_name: Optional[str] = None,
-):
+) -> str:
     '''
     This function takes a clip model checkpoint url as input, downloads the model if it doesn't exist locally,
     and returns the local path of the downloaded file.
