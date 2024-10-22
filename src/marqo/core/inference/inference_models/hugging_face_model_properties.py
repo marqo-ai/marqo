@@ -28,7 +28,7 @@ class HuggingFaceModelProperties(MarqoBaseModel):
         name: The name of the model. This will be used as the repo_id in the Hugging Face model hub.
             This attribute is neglected if 'url' or 'model_location' is provided.
             We are not raising an error right now as that would be a breaking change.
-        token: The token length of the model. It is default to 128.
+        tokens: The token length of the model. It is default to 128.
         type: The type of the model. It should be "hf".
         url: The URL of the model checkpoint. It is optional.
         dimensions: The dimensions of the model.
@@ -38,7 +38,7 @@ class HuggingFaceModelProperties(MarqoBaseModel):
         pooling_method: The pooling method for the model. It should be one of the values in the PoolingMethod enum.
     """
     name: Optional[str] = None
-    token: int = 128
+    tokens: int = 128
     type: str
     dimensions: int = Field(..., ge=1)
     url: Optional[str] = None

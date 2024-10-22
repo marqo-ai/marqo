@@ -11,11 +11,33 @@ from marqo.tensor_search.models.private_models import ModelLocation
 class TestHuggingFaceModelProperties(unittest.TestCase):
 
     def test_valid_model_with_mandatory_fields(self):
+        """A test for creating a valid HuggingFaceModelProperties object with only mandatory fields."""
         model = HuggingFaceModelProperties(name="test-model", type="hf", dimensions=768)
-        self.assertEqual(model.name, "test-model")
-        self.assertEqual(model.token, 128)
-        self.assertEqual(model.type, "hf")
-        self.assertEqual(model.pooling_method, PoolingMethod.Mean)
+        self.assertEqual("test-model", model.name)
+        self.assertEqual(128, model.tokens)
+        self.assertEqual("hf", model.type)
+        self.assertEqual(PoolingMethod.Mean, model.pooling_method)
+        self.assertEqual(768, model.dimensions)
+        self.assertIsNone(model.url)
+        self.assertIsNone(model.model_location)
+        self.assertIsNone(model.model_auth)
+        self.assertIsNone(model.note)
+
+    def test_valid_model_with_custom_fields(self):
+        """A test for creating a valid HuggingFaceModelProperties object with all fields."""
+        model = HuggingFaceModelProperties(
+            name="test-model", type="hf", dimensions=768,
+            tokens=256, pooling_method=PoolingMethod.CLS
+        )
+        self.assertEqual("test-model", model.name)
+        self.assertEqual(256, model.tokens)
+        self.assertEqual("hf", model.type)
+        self.assertEqual(PoolingMethod.CLS, model.pooling_method)
+        self.assertEqual(model.dimensions, 768)
+        self.assertIsNone(model.url)
+        self.assertIsNone(model.model_location)
+        self.assertIsNone(model.model_auth)
+        self.assertIsNone(model.note)
 
     def test_invalid_type(self):
         with self.assertRaises(ValidationError) as excinfo:

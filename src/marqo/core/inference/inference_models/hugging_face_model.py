@@ -157,7 +157,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             sentence,
             padding=True,
             truncation=True,
-            max_length=self.model_properties.token,
+            max_length=self.model_properties.tokens,
             return_tensors="pt"
         ).to(self.device)
 

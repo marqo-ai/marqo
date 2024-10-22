@@ -712,3 +712,47 @@ class TestHuggingFaceModel(unittest.TestCase):
             f"Text embeddings for two different models are too close. "
             f"There is a problem with the test data or bug in the code."
         )
+
+    @mock.patch("transformers.AutoModel.from_pretrained", side_effect=mock.MagicMock())
+    @mock.patch("transformers.AutoTokenizer.from_pretrained", return_value=mock.MagicMock())
+    def test_instantiate_a_hugging_face_model_with_minimum_model_properties(self, mock_auto_model, mock_auto_tokenizer):
+        """Test that a model can be instantiated with the minimum required model properties."""
+        model_properties = {
+            "name": "test-model",
+            "type": "hf",
+            "dimensions": 512,
+        }
+
+        model = HuggingFaceModel(model_properties, "cpu", None)
+        self.assertIsInstance(model, HuggingFaceModel)
+        self.assertEqual("cpu", model.device)
+        self.assertEqual(None, model.model_auth)
+        self.assertEqual("test-model", model.model_properties.name)
+        self.assertEqual("hf", model.model_properties.type)
+        self.assertEqual(512, model.model_properties.dimensions)
+        self.assertEqual(128, model.model_properties.tokens)
+        self.assertEqual(PoolingMethod.Mean, model.model_properties.pooling_method)
+
+    @mock.patch("transformers.AutoModel.from_pretrained", side_effect=mock.MagicMock())
+    @mock.patch("transformers.AutoTokenizer.from_pretrained", return_value=mock.MagicMock())
+    def test_instantiate_a_hugging_face_model_with_custom_model_properties(self, mock_auto_model, mock_auto_tokenizer):
+        """Test that a model can be instantiated with custom model properties."""
+        model_properties = {
+            "name": "test-model",
+            "type": "hf",
+            "dimensions": 123,
+            "tokens": 456,
+            "poolingMethod": "cls",
+        }
+
+        model = HuggingFaceModel(model_properties, "cpu", None)
+        self.assertIsInstance(model, HuggingFaceModel)
+        self.assertEqual("cpu", model.device)
+        self.assertEqual(None, model.model_auth)
+        self.assertEqual("test-model", model.model_properties.name)
+        self.assertEqual("hf", model.model_properties.type)
+        self.assertEqual(123, model.model_properties.dimensions)
+        self.assertEqual(456, model.model_properties.tokens)
+        self.assertEqual(PoolingMethod.CLS, model.model_properties.pooling_method)
+
+
