@@ -5,7 +5,7 @@ from typing import Optional, List
 from pydantic import Field, root_validator
 
 from marqo.base_model import MarqoBaseModel
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
+from marqo.tensor_search.models.private_models import ModelLocation
 
 
 class ImagePreprocessor(str, Enum):
@@ -36,7 +36,6 @@ class OpenCLIPModelProperties(MarqoBaseModel):
         localpath: The local path of the model checkpoint. It is optional.
         model_location: The location of the model. It is optional.
         tokenizer: The name of the _tokenizer. It is optional.
-        model_auth: The authentication information for the model. It is optional.
         image_preprocessor: The image preprocessor used by the model. It should be one of the values in the
             ImagePreprocessor enum.
         mean: The mean values for the image preprocessor. It is optional. It provided, it will override the
@@ -46,7 +45,6 @@ class OpenCLIPModelProperties(MarqoBaseModel):
         size: The size of the image. It is optional. If provided, it will override the default size of the image.
         note: A note about the model. It is optional.
         pretrained: The name of the pretrained model. It is optional.
-
     """
     name: str
     type: str
@@ -57,7 +55,6 @@ class OpenCLIPModelProperties(MarqoBaseModel):
     localpath: Optional[str] = None
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     tokenizer: Optional[str] = None
-    model_auth: Optional[ModelAuth] = Field(default=None, alias="modelAuth")
     image_preprocessor: ImagePreprocessor = Field(default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor")
     mean: Optional[List[float]] = None
     std: Optional[List[float]] = None

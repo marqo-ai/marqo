@@ -1,13 +1,16 @@
 import unittest
 from unittest import mock
 
+import pytest
 from pydantic import ValidationError
 
-from marqo.core.inference.inference_models.hugging_face_model_properties import HuggingFaceModelProperties, PoolingMethod
+from marqo.core.inference.inference_models.hugging_face_model_properties import HuggingFaceModelProperties, \
+    PoolingMethod
 from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.private_models import ModelLocation
 
 
+@pytest.mark.unittest
 class TestHuggingFaceModelProperties(unittest.TestCase):
 
     def test_valid_model_with_mandatory_fields(self):
@@ -20,7 +23,6 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
         self.assertEqual(768, model.dimensions)
         self.assertIsNone(model.url)
         self.assertIsNone(model.model_location)
-        self.assertIsNone(model.model_auth)
         self.assertIsNone(model.note)
 
     def test_valid_model_with_custom_fields(self):
@@ -36,8 +38,48 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
         self.assertEqual(model.dimensions, 768)
         self.assertIsNone(model.url)
         self.assertIsNone(model.model_location)
-        self.assertIsNone(model.model_auth)
         self.assertIsNone(model.note)
+
+    def test_both_original_and_alias_fields_work(self):
+        test_cases = (({
+                           "name": "test-model",
+                           "type": "hf",
+                           "dimensions": 768,
+                           "tokens": 256,
+                           "poolingMethod": "cls",
+                           "modelLocation": {
+                               "hf": {
+                                   "repoId": "test-repo-id",
+                                   "filename": "test-filename"
+                               },
+                           },
+                       }, "alias fields/camelCase"),
+                      ({
+                           "name": "test-model",
+                           "type": "hf",
+                           "dimensions": 768,
+                           "tokens": 256,
+                           "pooling_method": "cls",
+                           "model_location": {
+                               "hf": {
+                                   "repo_id": "test-repo-id",
+                                   "filename": "test-filename"
+                               },
+                           }
+                       }, "standard fields/snake_case"))
+
+        for model_properties, msg in test_cases:
+            with self.subTest(msg):
+                model = HuggingFaceModelProperties(**model_properties)
+                self.assertEqual("test-model", model.name)
+                self.assertEqual(256, model.tokens)
+                self.assertEqual("hf", model.type)
+                self.assertEqual(PoolingMethod.CLS, model.pooling_method)
+                self.assertEqual(model.dimensions, 768)
+                self.assertIsNone(model.url)
+                self.assertEqual(model.model_location,
+                                 ModelLocation(hf=HfModelLocation(repo_id="test-repo-id", filename="test-filename")))
+                self.assertIsNone(model.note)
 
     def test_invalid_type(self):
         with self.assertRaises(ValidationError) as excinfo:
@@ -70,7 +112,7 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
             with self.subTest(f"Pooling method inferred from name with {pooling_method}"):
                 with mock.patch("marqo.core.inference.inference_models.hugging_face_model_properties."
                                 "HuggingFaceModelProperties._infer_pooling_method_from_name",
-                                return_value = pooling_method) as mock_infer:
+                                return_value=pooling_method) as mock_infer:
                     model = HuggingFaceModelProperties(name="model-with-cls", type="hf", dimensions=768)
                 mock_infer.assert_called_once()
                 self.assertEqual(pooling_method, model.pooling_method)
@@ -93,7 +135,6 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
         model = HuggingFaceModelProperties(name="test-model", type="hf", dimensions=768)
         self.assertIsNone(model.url)
         self.assertIsNone(model.model_location)
-        self.assertIsNone(model.model_auth)
         self.assertIsNone(model.note)
         self.assertEqual(model.pooling_method, PoolingMethod.Mean)
 
@@ -105,7 +146,8 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
     def test_invalid_model_with_both_url_and_model_location(self):
         model_location = ModelLocation(hf=HfModelLocation(repo_id="test-repo-id", filename="test-filename"))
         with self.assertRaises(ValidationError) as excinfo:
-            HuggingFaceModelProperties(url="http://example.com", model_location=model_location, type="hf", dimensions=768)
+            HuggingFaceModelProperties(url="http://example.com", model_location=model_location, type="hf",
+                                       dimensions=768)
         self.assertIn("Only one of 'url' and 'model_location' should be provided.", str(excinfo.exception))
 
     def test_valid_model_with_custom_url_and_inferred_pooling(self):

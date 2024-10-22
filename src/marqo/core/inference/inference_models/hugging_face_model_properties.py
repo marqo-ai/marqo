@@ -33,7 +33,6 @@ class HuggingFaceModelProperties(MarqoBaseModel):
         url: The URL of the model checkpoint. It is optional.
         dimensions: The dimensions of the model.
         model_location: The location of the model. It is optional.
-        model_auth: The authentication information for the model. It is optional.
         note: A note about the model. It is optional.
         pooling_method: The pooling method for the model. It should be one of the values in the PoolingMethod enum.
     """
@@ -43,7 +42,6 @@ class HuggingFaceModelProperties(MarqoBaseModel):
     dimensions: int = Field(..., ge=1)
     url: Optional[str] = None
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
-    model_auth: Optional[ModelAuth] = Field(default=None, alias="modelAuth")
     note: Optional[str] = None
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
 
