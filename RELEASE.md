@@ -1,3 +1,24 @@
+# Release 2.12.5
+
+## Bug fixes and minor changes
+- Fix a bug where authentication is not correctly passed when loading a private model. Marqo can now load custom models from private repositories correctly ([#1010](https://github.com/marqo-ai/marqo/pull/1010)).
+
+# Release 2.12.4
+
+## Bug fixes and minor changes
+- Fix inference time regression from 2.11 to 2.12 where inference time increased unexpectedly ([#1005](https://github.com/marqo-ai/marqo/pull/1005)).
+
+# Release 2.12.3
+
+## Bug fixes and minor changes
+- Fix bug where users upgrading from indexes created with Marqo 2.11 to 2.12 would encounter an error when using the `get_settings` API endpoint ([#1003](https://github.com/marqo-ai/marqo/pull/1003)).
+
+# Release 2.12.2
+
+## Bug fixes and minor changes
+- Upgrade the `Pillow` and `nltk` packages ([#989](https://github.com/marqo-ai/marqo/pull/989)).
+- Fix a bug where `normalizeEmbeddings=False` is not honored for some indexes ([#994](https://github.com/marqo-ai/marqo/pull/994)).
+
 # Release 2.12.1
 
 ## Bug fixes and minor changes
