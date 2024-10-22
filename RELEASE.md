@@ -1,3 +1,18 @@
+# Release 2.12.5
+
+## Bug fixes and minor changes
+- Fix a bug where authentication is not correctly passed when loading a private model. Marqo can now load custom models from private repositories correctly ([#1010](https://github.com/marqo-ai/marqo/pull/1010)).
+
+# Release 2.12.4
+
+## Bug fixes and minor changes
+- Fix inference time regression from 2.11 to 2.12 where inference time increased unexpectedly ([#1005](https://github.com/marqo-ai/marqo/pull/1005)).
+
+# Release 2.12.3
+
+## Bug fixes and minor changes
+- Fix bug where users upgrading from indexes created with Marqo 2.11 to 2.12 would encounter an error when using the `get_settings` API endpoint ([#1003](https://github.com/marqo-ai/marqo/pull/1003)).
+
 # Release 2.12.2
 
 ## Bug fixes and minor changes
@@ -10,14 +25,12 @@
 - Fix a bug where when `treatUrlsAndPointersAsImages` is unset and `treatUrlsAndPointersAsMedia` is set, Marqo returns an error where `treatUrlsAndPointersAsImages` cannot be `False` when `treatUrlsAndPointersAsMedia` is `True` ([#971](https://github.com/marqo-ai/marqo/commit/a0084a86d5cf797616a1f8e185eba87417edbc15)) 
 - Add new video-audio model `LanguageBind/Video_V1.5_FT_Audio_FT` to the model registry ([#971](https://github.com/marqo-ai/marqo/commit/a0084a86d5cf797616a1f8e185eba87417edbc15)).
 
-
 # Release 2.12.0
 
 ## New features
 - Add support for video and audio modalities using LanguageBind models ([#931](https://github.com/marqo-ai/marqo/pull/931)). You can now index, embed, and search with video and audio files using Marqo, extending your search capabilities beyond text and images. 
 - Load OpenCLIP models from HuggingFace Hub ([#939](https://github.com/marqo-ai/marqo/pull/939)). Support loading OpenCLIP models directly from HuggingFace by providing a model name with the hf-hub: prefix. This simplifies model integration and expands your options.
 - Load custom OpenCLIP checkpoints with different image preprocessors ([#939](https://github.com/marqo-ai/marqo/pull/939)). Allow loading a custom OpenCLIP checkpoint with a different image preprocessor by providing imagePreprocessor in the model properties. This offers greater flexibility in model selection and customization.
-
 
 ## Bug fixes and minor changes
 - Fix tokenizer loading for custom OpenCLIP checkpoints ([#939](https://github.com/marqo-ai/marqo/pull/939)). The correct tokenizer is now applied when custom OpenCLIP model checkpoints are loaded.
