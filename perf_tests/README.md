@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
 ### Add new dependencies
 We use pip-tools to generate `requirements.txt` file from `requirements.in`. Please do not edit
-`requirements.txt` file directly. Instead, add the direct dependency to `requirements.in`, and run
+`requirements.txt` file directly. Instead, add the direct dependency to requirements.in, and run
 
 ```shell
 pip install pip-tools

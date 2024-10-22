@@ -1,23 +1,17 @@
 import abc
-import argparse
-import pytest
-import subprocess
+import os
+import sys
+from marqo_test import MarqoTestCase
 
-from tests.marqo_test import MarqoTestCase
-
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 class BaseTestCase(MarqoTestCase):
-    @abc.abstractmethod
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # cls().prepare()
+
     def prepare(self):
-
         pass
 
-@pytest.mark.marqo_from_version('2.5')
-class TestPartialUpdateExistingIndex(BaseTestCase):
-    def prepare(self):
-        # Create structured and unstructured indexes and add some documents
-        pass
-
-    def test_partialUpdate_scoreModifiers_success(self):
-        # This runs on to_version
-        pass

@@ -44,8 +44,6 @@ jobs:
         run: |
           pip install semver
 
-      - name: Validate input parameters # this will need to check whether the versions passed in are valid. So to_version should be greater than from_version and both should be versions only
-
       - name: Generate version list #this code block just generates the from versions and stores it in a versions variable as a list
         id: versions
         run: |

@@ -136,7 +136,7 @@ jobs:
 #          python -m pip install --upgrade pip
 #          pip install pytest docker
 #
-##      Uncomment this step & put test_runner.py in marqo-api-tests. For now they are in marqo repo
+##      Uncomment this step & put compatibility_test_runnercompatibility_test_runner.py in marqo-api-tests. For now they are in marqo repo
 ##      - name: Checkout marqo-api-tests repo
 ##        uses: actions/checkout@v3
 ##        with:
@@ -150,7 +150,7 @@ jobs:
 #
 #      - name: Run rollback test
 #        run: |
-#          python tests/backwards_compatibility_tests/test_runner.py \
+#          python tests/backwards_compatibility_tests/scripts/compatibility_test_runner.py \
 #            --mode=rollback \
 #            --from_version ${{ github.event.inputs.from_version }} \
 #            --to_version ${{ github.event.inputs.to_version }} \
