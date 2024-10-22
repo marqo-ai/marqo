@@ -99,7 +99,7 @@ class MultimodalModel:
                 'video': 'LanguageBind_Video_V1.5_FT',
             }
         else:
-            raise ValueError(f"Unsupported LanguageBind _model: {self.model_name}")
+            raise ValueError(f"Unsupported LanguageBind model: {self.model_name}")
         model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path).to(self.device)
         model.eval()
         return model
