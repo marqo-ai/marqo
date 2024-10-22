@@ -28,8 +28,7 @@ from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
-from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.private_models import ModelLocation
+from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
 
 logger = get_logger(__name__)
