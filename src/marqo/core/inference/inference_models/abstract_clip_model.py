@@ -4,6 +4,8 @@ import numpy as np
 import torch
 from PIL import UnidentifiedImageError
 
+from marqo.core.inference.image_download import (_is_image, format_and_load_CLIP_images,
+                                                 format_and_load_CLIP_image)
 from marqo.core.inference.inference_models.abstract_embedding_model import AbstractEmbeddingModel
 from marqo.core.inference.inference_models.image_download import (_is_image, format_and_load_CLIP_images,
                                                                   format_and_load_CLIP_image)
@@ -57,7 +59,6 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         if infer and _is_image(inputs):
             is_image = True
         else:
-            is_image = False
             if default == 'text':
                 is_image = False
             elif default == 'image':

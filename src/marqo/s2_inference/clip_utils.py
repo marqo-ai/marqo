@@ -1,6 +1,5 @@
 import os
 from io import BytesIO
-from platform import architecture
 
 import certifi
 import clip
@@ -30,7 +29,7 @@ from marqo.core.inference.inference_models.hf_tokenizer import HFTokenizer
 from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
-from marqo.tensor_search.models.private_models import ModelLocation
+from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
 
 logger = get_logger(__name__)
