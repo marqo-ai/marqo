@@ -35,7 +35,6 @@ class OpenCLIPModelProperties(MarqoBaseModel):
         url: The URL of the model checkpoint. It is optional.
         model_location: The location of the model. It is optional.
         tokenizer: The name of the tokenizer. It is optional.
-        model_auth: The authentication information for the model. It is optional.
         image_preprocessor: The image preprocessor used by the model. It should be one of the values in the
             ImagePreprocessor enum.
         mean: The mean values for the image preprocessor. It is optional. It provided, it will override the
@@ -53,7 +52,6 @@ class OpenCLIPModelProperties(MarqoBaseModel):
     url: Optional[str] = None
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     tokenizer: Optional[str] = None
-    model_auth: Optional[ModelAuth] = Field(default=None, alias="modelAuth")
     image_preprocessor: ImagePreprocessor = Field(default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor")
     mean: Optional[List[float]] = None
     std: Optional[List[float]] = None
