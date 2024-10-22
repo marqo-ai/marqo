@@ -30,8 +30,6 @@ class TestGetSettingsBackwardsCompatibility(unittest.TestCase):
                 split_method=TextSplitMethod.Word
             ),
             "image_preprocessing": ImagePreProcessing(),
-            "video_preprocessing": None,
-            "audio_preprocessing": None,
             "distance_metric": DistanceMetric.PrenormalizedAngular,
             "vector_numeric_type": VectorNumericType.Float,
             "hnsw_config": HnswConfig(ef_construction=128, m=16),
