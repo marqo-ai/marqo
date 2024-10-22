@@ -38,7 +38,7 @@ class IndexManagement:
                  enable_index_operations: bool = False,
                  deployment_timeout_seconds: int = 60,
                  convergence_timeout_seconds: int = 120,
-                 deployment_lock_timeout: int = 0,
+                 deployment_lock_timeout_seconds: float = 5,
                  ):
         """Instantiate an IndexManagement object.
 
@@ -47,9 +47,12 @@ class IndexManagement:
             zookeeper_client: ZookeeperClient object
             enable_index_operations: A flag to enable index operations. If set to True,
                 the object can create/delete indexes, otherwise, it raises an InternalError during index operations.
+            deployment_timeout_seconds: Vespa deployment timeout in seconds
+            convergence_timeout_seconds: Vespa convergence timeout in seconds
+            deployment_lock_timeout_seconds: Vespa deployment lock timeout in seconds
         """
         self.vespa_client = vespa_client
-        self._zookeeper_deployment_lock = get_deployment_lock(zookeeper_client, deployment_lock_timeout) \
+        self._zookeeper_deployment_lock = get_deployment_lock(zookeeper_client, deployment_lock_timeout_seconds) \
             if zookeeper_client else None
         self._enable_index_operations = enable_index_operations
         self._deployment_timeout_seconds = deployment_timeout_seconds
@@ -198,11 +201,22 @@ class IndexManagement:
             OperationConflictError: If another index creation/deletion operation is
                 in progress and the lock cannot be acquired
         """
-        if not isinstance(marqo_index, SemiStructuredMarqoIndex):
-            # This is just a sanity check, it should not happen since we do not expose this method to end user.
-            raise InternalError(f'Index {marqo_index.name} can not be updated.')
-
         with self._vespa_deployment_lock():
+            existing_index = self.get_index(marqo_index.name)
+            if not isinstance(existing_index, SemiStructuredMarqoIndex):
+                # This is just a sanity check, it should not happen since we do not expose this method to end user.
+                raise InternalError(f'Index {marqo_index.name} created by Marqo version {marqo_index.marqo_version} '
+                                    f'can not be updated.')
+
+            def is_subset(dict_a, dict_b):
+                # check if dict_a is a subset of dict_b
+                return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
+
+            if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
+                    is_subset(marqo_index.field_map, existing_index.field_map)):
+                logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
+                return
+
             schema = SemiStructuredVespaSchema.generate_vespa_schema(marqo_index)
             self._get_vespa_application().update_index_setting_and_schema(marqo_index, schema)
 
@@ -342,8 +356,8 @@ class IndexManagement:
         else:
             try:
                 with self._zookeeper_deployment_lock:
-                    logger.info(f"Retrieved the distributed lock for index operations. ")
+                    logger.debug(f"Retrieved the distributed lock for index operations. ")
                     yield
             except ZookeeperLockNotAcquiredError:
-                raise OperationConflictError("Another index creation/deletion operation is in progress. "
-                                             "Your request is rejected. Please try again later")
+                # TODO add a doclink for troubleshooting this issue
+                raise OperationConflictError("Your indexes are being updated. Please try again shortly.")
