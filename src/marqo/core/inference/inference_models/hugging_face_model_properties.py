@@ -63,7 +63,7 @@ class HuggingFaceModelProperties(ImmutableBaseModel):
     note: Optional[str] = None
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
     dimensions: int
-    trust_remote_code: bool = False
+    trust_remote_code: bool = Field(False, alias="trustRemoteCode")
 
     @validator("type")
     def _validate_type(cls, v):
