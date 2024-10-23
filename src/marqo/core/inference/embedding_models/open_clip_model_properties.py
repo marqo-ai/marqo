@@ -2,10 +2,10 @@
 from enum import Enum
 from typing import Optional, List
 
-from pydantic import Field
+from pydantic import Field, root_validator
 
-from marqo.base_model import MarqoBaseModel
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
+from marqo.core.inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
+from marqo.tensor_search.models.private_models import ModelLocation
 
 
 class ImagePreprocessor(str, Enum):
@@ -21,7 +21,7 @@ class Precision(str, Enum):
     FP16 = "fp16"
 
 
-class OpenCLIPModelProperties(MarqoBaseModel):
+class OpenCLIPModelProperties(MarqoBaseModelProperties):
     """
     A class to represent the properties of an OpenCLIP model.
 
@@ -33,6 +33,7 @@ class OpenCLIPModelProperties(MarqoBaseModel):
         jit: A boolean indicating whether the model is JIT compiled.
         precision: The precision of the model. It should be either 'fp32' or 'fp16'.
         url: The URL of the model checkpoint. It is optional.
+        localpath: The local path of the model checkpoint. It is optional.
         model_location: The location of the model. It is optional.
         tokenizer: The name of the tokenizer. It is optional.
         image_preprocessor: The image preprocessor used by the model. It should be one of the values in the
@@ -47,10 +48,10 @@ class OpenCLIPModelProperties(MarqoBaseModel):
 
     """
     name: str
-    type: str
     jit: bool = False
     precision: Precision = Precision.FP32
     url: Optional[str] = None
+    localpath: Optional[str] = None
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     tokenizer: Optional[str] = None
     image_preprocessor: ImagePreprocessor = Field(default=ImagePreprocessor.OpenCLIP, alias="imagePreprocessor")
@@ -59,3 +60,15 @@ class OpenCLIPModelProperties(MarqoBaseModel):
     size: Optional[int] = None
     note: Optional[str] = None
     pretrained: Optional[str] = None
+
+    @root_validator(pre=False, skip_on_failure=True)
+    def _validate_custom_loading_fields(cls, values):
+        url = values.get("url")
+        localpath = values.get("localpath")
+        model_location = values.get("model_location")
+
+        provided_fields = sum(1 for field in [url, localpath, model_location] if field is not None)
+        if provided_fields > 1:
+            raise ValueError("Only one of 'url', 'localpath', or 'model_location' should be provided.")
+
+        return values

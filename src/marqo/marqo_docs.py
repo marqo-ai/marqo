@@ -50,7 +50,7 @@ def configuring_preloaded_models():
 
 
 def bring_your_own_model():
-    return _build_url('Guides/Models-Reference/bring_your_own_model/')
+    return _build_url('models/marqo/bring-your-own-model')
 
 
 def query_reference():
@@ -67,6 +67,7 @@ def api_reference_document_body():
 
 def troubleshooting():
     return _build_url('other-resources/troubleshooting/troubleshooting/')
+
 
 def generic_models():
     return _build_url('models/marqo/list-of-models/#generic-clip-models')
