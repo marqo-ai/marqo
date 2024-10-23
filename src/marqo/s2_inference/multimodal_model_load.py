@@ -11,10 +11,11 @@ import io
 from pydantic import BaseModel
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 from PIL.Image import Image
 import torch
 from urllib.parse import quote
+from marqo.core.inference.image_download import DEFAULT_HEADERS
 
 
 from marqo.s2_inference.multimodal_model_load import *
@@ -130,8 +131,9 @@ class DefaultEncoder(ModelEncoder):
 
 
 @contextmanager
-def fetch_content_sample(url, sample_size=10240):  # 10 KB
-    response = requests.get(url, stream=True)
+def fetch_content_sample(url, media_download_headers: Optional[dict] = None, sample_size=10240):  # 10 KB
+    # It's ok to pass None to requests.get() for headers and it won't change the default headers
+    response = requests.get(url, stream=True, headers=media_download_headers)
     buffer = io.BytesIO()
     try:
         for chunk in response.iter_content(chunk_size=min(sample_size, 8192)):
@@ -145,7 +147,7 @@ def fetch_content_sample(url, sample_size=10240):  # 10 KB
         response.close()
 
 
-def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
+def infer_modality(content: Union[str, List[str], bytes], media_download_headers: Optional[dict] = None) -> Modality:
     """
     Infer the modality of the content. Video, audio, image or text.
     """
@@ -167,7 +169,7 @@ def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
         if validate_url(encoded_url):
             # Use context manager to handle content sample
             try:
-                with fetch_content_sample(encoded_url) as sample:
+                with fetch_content_sample(encoded_url, media_download_headers) as sample:
                     mime = magic.from_buffer(sample.read(), mime=True)
                     if mime.startswith('image/'):
                         return Modality.IMAGE
