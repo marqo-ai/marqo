@@ -276,7 +276,7 @@ def load_sbert_cross_encoder_model(model_name: str, device: str, max_length: int
 def load_hf_cross_encoder_model(model_name: str, device: str) -> Dict:
     """    
     
-    features = _tokenizer(['How many people live in Berlin?', 'How many people live in Berlin?'], ['Berlin has a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers.', 'New York City is famous for the Metropolitan Museum of Art.'],  padding=True, truncation=True, return_tensors="pt")
+    features = tokenizer(['How many people live in Berlin?', 'How many people live in Berlin?'], ['Berlin has a population of 3,520,031 registered inhabitants in an area of 891.82 square kilometers.', 'New York City is famous for the Metropolitan Museum of Art.'],  padding=True, truncation=True, return_tensors="pt")
     with torch.no_grad():
         scores = model(**features).logits
 
