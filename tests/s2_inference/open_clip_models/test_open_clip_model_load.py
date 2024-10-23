@@ -5,6 +5,8 @@ from marqo.core.inference.inference_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.model_registry import _get_open_clip_properties
+from marqo.tensor_search.models.external_apis.s3 import S3Auth
+from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 
 OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
 
@@ -178,3 +180,65 @@ class TestOpenCLIPModelLoad(TestCase):
             model.load()
 
         self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'CLIPA'", str(context.exception))
+
+    def test_load_OpenCLIPModel_with_auth_s3(self):
+        """Ensure that the model/checkpoint is downloaded with the correct S3 authentication."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "name": "ViT-B-16",
+            "model_location": {
+                "s3": {
+                    "Bucket": "my-bucket",
+                    "Key": "my-key",
+                },
+                "authRequired": True,
+            },
+            "type": "open_clip",
+            "dimensions": 768,
+        }
+
+        model_auth = ModelAuth(s3 = S3Auth(
+            aws_access_key_id="my_access_key",
+            aws_secret_access_key="my_secret_key",
+        ))
+
+        with patch("marqo.s2_inference.clip_utils.download_model") as mock_download_model:
+            # It's ok to return a RuntimeError as we are testing the download_model function
+            with self.assertRaises(RuntimeError):
+                model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
+                model.load()
+
+            mock_download_model.assert_called_once_with(
+                repo_location=ModelLocation(**model_properties["model_location"]),
+                auth=model_auth,
+            )
+
+    def test_load_OpenCLIPModel_with_auth_hf(self):
+        """Ensure that the model/checkpoint is downloaded with the correct S3 authentication."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "name": "ViT-B-16",
+            "model_location": {
+                "hf": {
+                    "repo_id": "my-hf-repo",
+                    "filename": "my-hf-filename.pt"
+                },
+                "authRequired": True,
+            },
+            "type": "open_clip",
+            "dimensions": 768
+        }
+
+        model_auth = ModelAuth(**{"hf": {"token":"my_hf_token"}})
+
+        with patch("marqo.s2_inference.clip_utils.download_model") as mock_download_model:
+            # It's ok to return a RuntimeError as we are testing the download_model function
+            with self.assertRaises(RuntimeError):
+                model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
+                model.load()
+
+            mock_download_model.assert_called_once_with(
+                repo_location=ModelLocation(**model_properties["model_location"]),
+                auth=model_auth,
+            )
+
