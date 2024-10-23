@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 
-from marqo.core.utils.special_characters_encoding import custom_encode
 from marqo.core import constants
 from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery, MarqoIndex
 from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
-
+import re
 
 class VespaIndex(ABC):
     """
@@ -103,6 +102,36 @@ class VespaIndex(ABC):
         """
         Get the name of the id field in Vespa documents, inside the 'fields' dictionary."""
         pass
+    
+    def _custom_encode(self, s: str) -> str:
+        """
+        Encode double quotes in a string by replacing them with their Unicode escape sequence.
+
+        This function replaces all occurrences of double quotes (") in the input string
+        with the Unicode escape sequence '\u0022'.
+
+        Args:
+            s (str): The input string to be encoded.
+
+        Returns:
+            str: The encoded string with double quotes replaced by '\u0022'.
+        """
+        return re.sub(r'(")', lambda m: r'\u0022', s)
+
+    def _decode_key(self, encoded_key: str) -> str:
+        """
+        Decode a string by replacing Unicode escape sequences for double quotes with actual double quotes.
+
+        This function replaces all occurrences of the Unicode escape sequence '\u0022'
+        in the input string with double quotes (").
+
+        Args:
+            encoded_key (str): The input string to be decoded.
+
+        Returns:
+            str: The decoded string with '\u0022' replaced by double quotes.
+        """
+        return re.sub(r'\\u0022', '"', encoded_key)
 
     def _convert_score_modifiers_to_tensors(self, score_modifiers: List[ScoreModifier]) -> Dict[
         str, Dict[str, float]]:
@@ -114,9 +143,9 @@ class VespaIndex(ABC):
         add_tensor = {}
         for modifier in score_modifiers:
             if modifier.type == ScoreModifierType.Multiply:
-                mult_tensor[modifier.field] = modifier.weight
+                mult_tensor[self._custom_encode(modifier.field)] = modifier.weight
             elif modifier.type == ScoreModifierType.Add:
-                add_tensor[modifier.field] = modifier.weight
+                add_tensor[self._custom_encode(modifier.field)] = modifier.weight
             else:
                 raise InternalError(f'Unknown score modifier type {modifier.type}')
 
@@ -130,24 +159,20 @@ class VespaIndex(ABC):
         if marqo_query.score_modifiers:
             mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(marqo_query.score_modifiers)
 
-            # Encode field names
-            encoded_mult_tensor = {custom_encode(k): v for k, v in mult_tensor.items()}
-            encoded_add_tensor = {custom_encode(k): v for k, v in add_tensor.items()}
-
             if self._marqo_index_version < self._HYBRID_SEARCH_MINIMUM_VERSION:
                 return {
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: encoded_mult_tensor,
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: encoded_add_tensor
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_2_9: mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_2_9: add_tensor
                 }
             elif isinstance(marqo_query, MarqoTensorQuery):
                 return {
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: encoded_mult_tensor,
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: encoded_add_tensor
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
                 }
             elif isinstance(marqo_query, MarqoLexicalQuery):
                 return {
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: encoded_mult_tensor,
-                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: encoded_add_tensor
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_LEXICAL: mult_tensor,
+                    constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL: add_tensor
                 }
             else:
                 raise InternalError(f'Unknown query type {type(marqo_query)}')
