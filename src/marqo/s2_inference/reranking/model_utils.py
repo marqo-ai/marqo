@@ -229,7 +229,7 @@ class HFClassificationOnnx:
             List[Dict]: _description_
         """
         self.inputs = self._prepare_inputs(inputs)
-        # couldn't find aaaaany documentation on passing _tokenizer arguments through the pipeline
+        # couldn't find any documentation on passing tokenizer arguments through the pipeline
         # leaving these here for reference
         # https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/__init__.py#L750
         # https://stackoverflow.com/questions/67849833/how-to-truncate-input-in-the-huggingface-pipeline
@@ -300,7 +300,7 @@ def load_hf_cross_encoder_model(model_name: str, device: str) -> Dict:
 
     model.eval()
     
-    return {'model':model, '_tokenizer':tokenizer}
+    return {'model':model, 'tokenizer':tokenizer}
 
 def load_owl_vit(model_name: str, device: str) -> Dict:
     """loader for owl vit for image reranking
