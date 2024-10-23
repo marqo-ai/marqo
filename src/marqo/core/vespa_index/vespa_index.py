@@ -8,6 +8,7 @@ from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
 
+
 class VespaIndex(ABC):
     """
     An abstract class for classes that facilitate data and query transformation to and from a Vespa index.
