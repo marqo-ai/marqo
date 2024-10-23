@@ -1186,3 +1186,115 @@ class TestSearchStructured(MarqoTestCase):
         )
         self.assertIn("hits", res)
         self.assertEqual(5, len(res["hits"]))
+
+    def test_special_characters_in_map_score_modifiers(self):
+         special_characters = [
+             # Basic punctuation
+             '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '+', '=', '{', '}', '[', ']', ':', ';', "'", '"',
+             '<', '>', ',', '.', '?', '/', '\\', '|', '~', '`',
+
+             # Math symbols
+             '+', '-', '*', '/', '=', '%', '<', '>', '±', '≠', '≈', '√', '∞', '∑', '∫', '∂', '∇', '∏', '⊕', '∪', '∩',
+
+             # Currency symbols
+             '$', '€', '£', '¥', '₹', '₽', '₿', '¢', '₩', '₦', '₫',
+
+             # Accented and diacritic letters
+             'á', 'é', 'í', 'ó', 'ú', 'ü', 'ñ', 'ç', 'ø', 'å', 'œ', 'æ', 'ÿ', 'ä', 'ö', 'ß', 'ø',
+
+             # Greek letters
+             'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'λ', 'μ', 'π', 'φ', 'ψ', 'ω',
+
+             # Arrows and other symbols
+             '←', '↑', '→', '↓', '↔', '↕', '⇐', '⇒', '⇔', '∞', '∴', '≈', '≠', '≥', '≤', '√',
+
+             # Box drawing characters
+             '─', '│', '┌', '┐', '└', '┘', '┼', '╳', '█', '░', '▒', '▓',
+
+             # Emoji
+             '🙂', '😁', '😂', '🤔', '🙄', '😎', '😢', '😡', '😍', '🤯', '🐱', '🐶', '🌟', '🌍', '🚀', '🍕', '🎉', '❤️',
+
+             # Superscripts and subscripts
+             '¹', '²', '³', '⁴', '⁵', '₁', '₂', '₃', '₄', '₅',
+
+             # Other symbols
+             '☂', '⚡', '☯', '✈', '✉', '⚽', '♠', '♣', '♥', '♦', '☢', '⚠', '☮',
+         ]
+
+         failed_characters = []
+         soft_failed_characters = []
+         supported_characters = []
+
+         for special_character in special_characters:
+             try:
+                 docs = [
+                     {
+                         "_id": "1_map",
+                         "text_field_1": "a photo of a cat",
+                         "map_score_mods_float": {f"a{special_character}subsubfield": 0.5},
+                     }
+                 ]
+
+                 add_result = self.add_documents(
+                     config=self.config,
+                     add_docs_params=AddDocsParams(
+                         index_name=self.default_text_index,
+                         docs=docs,
+                     )
+                 )
+
+                 score_modifiers = ScoreModifierLists(**{
+                     "add_to_score": [{"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
+                 })
+
+                 res = tensor_search.search(
+                     config=self.config,
+                     index_name=self.default_text_index,
+                     text="",
+                     score_modifiers=score_modifiers,
+                 )
+
+                 expected_score = 1.4165449318484857
+                 actual_score = res['hits'][0]['_score']
+
+                 if abs(actual_score - expected_score) > 0.01:
+                     #print(f"Soft fail for special character '{special_character}': Score mismatch")
+                     #print(f"Expected: {expected_score}, Actual: {actual_score}")
+                     soft_failed_characters.append(special_character)
+                 else:
+                     supported_characters.append(special_character)
+
+             except (errors.InvalidArgError, errors.InternalError) as e:
+                 #print(f"Failed for special character '{special_character}': {e}")
+                 #print(f"Exception type: {type(e)}")
+                 #print(f"Exception args: {e.args}")
+                 failed_characters.append(special_character)
+             except Exception as e:
+                 #print(f"Unexpected error for special character '{special_character}': {e}")
+                 #print(f"Exception type: {type(e)}")
+                 #print(f"Exception args: {e.args}")
+                 failed_characters.append(special_character)
+                 raise  # Unexpected exceptions for further investigation
+
+             finally:
+                 # Clear the index after each test
+                 delete_result = tensor_search.delete_documents(
+                     config=self.config,
+                     index_name=self.default_text_index,
+                     doc_ids=["1_map"]
+                 )
+
+         # Print summary
+         print(f"\nSupported characters: {len(supported_characters)}")
+         print(f"Soft failed characters: {len(soft_failed_characters)}")
+         print(f"Failed characters: {len(failed_characters)}")
+
+         if soft_failed_characters:
+             print(f"\nSoft failed characters (score mismatch): {soft_failed_characters}")
+
+         if failed_characters:
+             print(f"\nFailed characters (4XX or 500 errors): {failed_characters}")
+
+         # Assert that no characters resulted in 4XX or 500 errors
+         self.assertEqual(len(failed_characters), 0, 
+                          f"The following characters failed with 4XX or 500 errors: {failed_characters}")
