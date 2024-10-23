@@ -334,7 +334,7 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
         return marqo_config.embed.embed_content(
             content=embedding_request.content,
             index_name=index_name, device=device,
-            image_download_headers=embedding_request.image_download_headers,
+            media_download_headers=embedding_request.mediaDownloadHeaders,
             model_auth=embedding_request.modelAuth,
             content_type=embedding_request.content_type
         )

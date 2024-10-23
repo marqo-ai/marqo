@@ -110,15 +110,15 @@ class MultimodalModel:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
         return self.encoder.preprocessor(modality)
 
-    def encode(self, content, modality, **kwargs):
+    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, **kwargs):
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
-        return self.encoder.encode(content, modality, **kwargs)
+        return self.encoder.encode(content, modality, media_download_headers, **kwargs)
 
 
 class ModelEncoder(ABC):
     @abstractmethod
-    def encode(self, content, modality, **kwargs):
+    def encode(self, content, modality, media_download_headers, **kwargs):
         pass
 
 
@@ -126,8 +126,8 @@ class DefaultEncoder(ModelEncoder):
     def __init__(self, model):
         self.model = model
 
-    def encode(self, content, modality, **kwargs):
-        return self.model.encode(content, **kwargs)
+    def encode(self, content, modality, media_download_headers, **kwargs):
+        return self.model.encode(content, media_download_headers, **kwargs)
 
 
 @contextmanager
@@ -251,7 +251,7 @@ class LanguageBindEncoder(ModelEncoder):
 
         return self._preprocessors.get(modality)
 
-    def encode(self, content, modality, normalize=True, **kwargs):
+    def encode(self, content, modality, normalize=True, media_download_headers: Optional[Dict]=None, **kwargs):
         inputs = {}
 
         if modality == Modality.TEXT:
@@ -269,7 +269,7 @@ class LanguageBindEncoder(ModelEncoder):
                     with open(temp_filename, 'wb') as f:
                         f.write(content)
                 elif isinstance(content, str) and "http" in content:
-                    self._download_content(content, temp_filename)
+                    self._download_content(content, temp_filename, media_download_headers)
                 else:
                     return self.encode([content], modality=Modality.TEXT)
 
@@ -280,7 +280,7 @@ class LanguageBindEncoder(ModelEncoder):
             if isinstance(content, str) and "http" in content:
                 suffix = ".mp4" if modality == Modality.VIDEO else ".wav"
                 with self._temp_file(suffix) as temp_filename:
-                    self._download_content(content, temp_filename)
+                    self._download_content(content, temp_filename, media_download_headers)
                     preprocessed_content = self.preprocessor(modality)([temp_filename], return_tensors='pt')
                     inputs[modality.value] = to_device(preprocessed_content, self.model.device)['pixel_values']
 
@@ -302,11 +302,11 @@ class LanguageBindEncoder(ModelEncoder):
 
         return embeddings.cpu().numpy()
 
-    def _download_content(self, url, filename):
+    def _download_content(self, url, filename, media_download_headers: Optional[Dict]=None):
         # 3 seconds for images, 20 seconds for audio and video
         timeout_ms = 3000 if filename.endswith(('.png', '.jpg', '.jpeg')) else 20000
 
-        buffer = download_image_from_url(url, {}, timeout_ms)
+        buffer = download_image_from_url(url, media_download_headers, timeout_ms)
 
         with open(filename, 'wb') as f:
             f.write(buffer.getvalue())

@@ -485,7 +485,7 @@ class CLIP:
 
         if is_image:
             logger.debug('image')
-            image_download_headers = kwargs.get("image_download_headers", dict())
+            image_download_headers = kwargs.get("media_download_headers", dict())
             return self.encode_image(inputs, normalize=normalize, image_download_headers=image_download_headers)
         else:
             logger.debug('text')

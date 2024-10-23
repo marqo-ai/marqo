@@ -167,7 +167,7 @@ class CLIP_ONNX(object):
                 raise ValueError(f"expected default='image' or default='text' but received {default}")
 
         if is_image:
-            logger.debug('image')
+            logger.debug('image'),
             return self.encode_image(inputs, normalize=True)
         else:
             logger.debug('text')
