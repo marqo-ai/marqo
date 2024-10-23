@@ -4,7 +4,9 @@ from pydantic import BaseModel, validator, ValidationError
 from typing import Any, Union, List, Dict, Optional, NewType, Literal
 
 from marqo.api.exceptions import InvalidArgError
+from marqo.core.models import MarqoQuery
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.s2_inference.multimodal_model_load import Modality
 
 Qidx = NewType('Qidx', int) # Indicates the position of a search query in a bulk search request
 JHash = NewType('JHash', int) # hash of a VectoriseJob. Used for quick access of VectorisedJobs
@@ -26,25 +28,25 @@ class VectorisedJobs(BaseModel):
     content: List[Union[str, List[str]]]
     device: str
     normalize_embeddings: bool
-    image_download_headers: Optional[Dict]
-    content_type: Literal['text', 'media']
+    media_download_headers: Optional[Dict]
     model_auth: Optional[ModelAuth]
+    modality: Modality
 
     def __hash__(self):
         return self.groupby_key() + hash(json.dumps(self.content, sort_keys=True))
 
     def groupby_key(self) -> JHash:
         return VectorisedJobs.get_groupby_key(self.model_name, self.model_properties, self.device,
-                                              self.normalize_embeddings, self.content_type,
-                                              self.image_download_headers)
+                                              self.normalize_embeddings, self.modality,
+                                              self.media_download_headers)
 
     @staticmethod
     def get_groupby_key(model_name: str, model_properties: Dict[str, Any], device: str,
-                        normalize_embeddings: bool, content_type: str, image_download_headers: Optional[Dict]) -> JHash:
+                        normalize_embeddings: bool, modality: str, media_download_headers: Optional[Dict]) -> JHash:
         return JHash(hash(model_name) + hash(json.dumps(model_properties, sort_keys=True))
                      + hash(device) + hash(normalize_embeddings)
-                     + hash(content_type)
-                     + hash(json.dumps(image_download_headers, sort_keys=True))
+                     + hash(modality)
+                     + hash(json.dumps(media_download_headers, sort_keys=True))
                      )
 
     def add_content(self, content: List[Union[str, List[str]]]) -> VectorisedJobPointer:
@@ -76,3 +78,28 @@ class SearchContext(BaseModel):
         if not (1 <= len(v) <= 64):
             raise InvalidArgError('The number of tensors must be between 1 and 64')
         return v
+
+
+class QueryContent(BaseModel):
+    content: str
+    modality: Modality
+
+
+class QueryContentCollector(BaseModel):
+    queries: List[QueryContent]
+    @property
+    def text_queries(self) -> List[QueryContent]:
+        return [q for q in self.queries if q.modality == Modality.TEXT]
+    
+    @property
+    def image_queries(self) -> List[QueryContent]:
+        return [q for q in self.queries if q.modality == Modality.IMAGE]
+    
+    @property
+    def video_queries(self) -> List[QueryContent]:
+        return [q for q in self.queries if q.modality == Modality.VIDEO]
+    
+    @property
+    def audio_queries(self) -> List[QueryContent]:
+        return [q for q in self.queries if q.modality == Modality.AUDIO]
+    

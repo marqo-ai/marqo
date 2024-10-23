@@ -277,7 +277,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             reranker=search_query.reRanker,
             filter=search_query.filter, device=device,
             attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
-            image_download_headers=search_query.image_download_headers,
+            media_download_headers = search_query.mediaDownloadHeaders,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth,

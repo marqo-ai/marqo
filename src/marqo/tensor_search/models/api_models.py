@@ -7,7 +7,7 @@ https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 from typing import Union, List, Dict, Optional
 
 import pydantic
-from pydantic import BaseModel, root_validator, validator
+from pydantic import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
 from marqo.core.models.hybrid_parameters import HybridParameters
@@ -47,7 +47,8 @@ class SearchQuery(BaseMarqoModel):
     filter: str = None
     attributesToRetrieve: Union[None, List[str]] = None
     boost: Optional[Dict] = None
-    image_download_headers: Optional[Dict] = None
+    imageDownloadHeaders: Optional[Dict] = Field(default_factory=None, alias="image_download_headers")
+    mediaDownloadHeaders: Optional[Dict] = None
     context: Optional[SearchContext] = None
     scoreModifiers: Optional[ScoreModifierLists] = None
     modelAuth: Optional[ModelAuth] = None
@@ -67,6 +68,26 @@ class SearchQuery(BaseMarqoModel):
             return value.upper()
         else:
             return value
+
+    @root_validator(skip_on_failure=True)
+    def _validate_image_download_headers_and_media_download_headers(cls, values):
+        """Validate imageDownloadHeaders and mediaDownloadHeaders. Raise an error if both are set.
+
+        If imageDownloadHeaders is set, set mediaDownloadHeaders to it and use mediaDownloadHeaders in the
+        rest of the code.
+
+        imageDownloadHeaders is deprecated and will be removed in the future.
+        """
+        image_download_headers = values.get('imageDownloadHeaders')
+        media_download_headers = values.get('mediaDownloadHeaders')
+        if image_download_headers and media_download_headers:
+            raise ValueError("Cannot set both imageDownloadHeaders(image_download_headers) and mediaDownloadHeaders. "
+                             "The imageDownloadHeaders(image_download_headers) is deprecated and will be removed in the future. "
+                             "Use mediaDownloadHeaders instead.")
+        if image_download_headers:
+            values['mediaDownloadHeaders'] = image_download_headers
+        return values
+
 
     @root_validator(pre=False, skip_on_failure=True)
     def validate_query_and_context(cls, values):
