@@ -210,7 +210,7 @@ class Model(StrictBaseModel):
             return request_level_prefix
 
         # For backwards compatibility. Since older versions of Marqo did not have a text_query_prefix field,
-        # we need to return an empty string if the model does not have a text_query_prefix. 
+        # we need to return an empty string if the model does not have a text_query_prefix.
         # We know that the value of text_query_prefix is None in old indexes since the model was not populated
         # from the registry.
         if self.text_query_prefix is None:
@@ -224,7 +224,7 @@ class Model(StrictBaseModel):
             return request_level_prefix
 
         # For backwards compatibility. Since older versions of Marqo did not have a text_chunk_prefix field,
-        # we need to return an empty string if the model does not have a text_chunk_prefix. 
+        # we need to return an empty string if the model does not have a text_chunk_prefix.
         # We know that the value of text_chunk_prefix is None in old indexes since the model was not populated
         # from the registry.
         if self.text_chunk_prefix is None:
