@@ -1321,7 +1321,7 @@ class TestModelAuthlLoadForHFModelBasic(MarqoTestCase):
         assert len(mock_automodel_from_pretrained.call_args_list) == 1
         assert mock_automodel_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
 
-        # is the hf _tokenizer being loaded with the expected args?
+        # is the hf tokenizer being loaded with the expected args?
         assert len(mock_autotokenizer_from_pretrained.call_args_list) == 1
         assert mock_autotokenizer_from_pretrained.call_args_list[0][0][0] == 'cache/path/to/model/', "Expected call not found"
 

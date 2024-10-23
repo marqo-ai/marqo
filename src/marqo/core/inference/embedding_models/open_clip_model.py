@@ -68,15 +68,15 @@ class OPEN_CLIP(AbstractCLIPModel):
         self.model.eval()
 
     def _check_loaded_components(self):
-        """Check if the open_clip model, _tokenizer, and image preprocessor are loaded.
+        """Check if the open_clip model, tokenizer, and image preprocessor are loaded.
 
         Raises:
-            RuntimeError: If the open_clip model, _tokenizer, or image preprocessor is not loaded.
+            RuntimeError: If the open_clip model, tokenizer, or image preprocessor is not loaded.
         """
         if self.model is None:
             raise RuntimeError("The open_clip model is not loaded. Please load the model before inference.")
         if self.tokenizer is None:
-            raise RuntimeError("The open_clip _tokenizer is not loaded. Please load the _tokenizer before inference.")
+            raise RuntimeError("The open_clip tokenizer is not loaded. Please load the tokenizer before inference.")
         if self.preprocess is None:
             raise RuntimeError("The open_clip image preprocessor is not loaded. "
                                "Please load the image preprocessor before inference.")
