@@ -372,8 +372,10 @@ class TestMultilingualE5Models(unittest.TestCase):
                                                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
                                                  "hf/all_datasets_v4_MiniLM-L6"])
 
+
 @pytest.mark.largemodel
-@pytest.mark.skipif(torch.cuda.is_available() is False)
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
 class TestStellaModels(unittest.TestCase):
     def setUp(self):
         self.models = ["Marqo/dunzhang-stella_en_400M_v5"]
