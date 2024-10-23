@@ -7,7 +7,7 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 from pydantic import Field, validator, root_validator
 
-from marqo.core.inference.inference_models.marqo_base_model_properties import MarqoBaseModelProperties
+from marqo.core.inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.logger import get_logger
 from marqo.tensor_search.models.private_models import ModelLocation

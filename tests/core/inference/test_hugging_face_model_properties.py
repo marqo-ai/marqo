@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 from pydantic import ValidationError
 
-from marqo.core.inference.inference_models.hugging_face_model_properties import HuggingFaceModelProperties, \
+from marqo.core.inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
     PoolingMethod
 from marqo.tensor_search.models.external_apis.hf import HfModelLocation
 from marqo.tensor_search.models.private_models import ModelLocation
@@ -110,7 +110,7 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
     def test_infer_pooling_method(self):
         for pooling_method in (PoolingMethod.Mean, PoolingMethod.CLS):
             with self.subTest(f"Pooling method inferred from name with {pooling_method}"):
-                with mock.patch("marqo.core.inference.inference_models.hugging_face_model_properties."
+                with mock.patch("marqo.core.inference.embedding_models.hugging_face_model_properties."
                                 "HuggingFaceModelProperties._infer_pooling_method_from_name",
                                 return_value=pooling_method) as mock_infer:
                     model = HuggingFaceModelProperties(name="model-with-cls", type="hf", dimensions=768)
@@ -118,7 +118,7 @@ class TestHuggingFaceModelProperties(unittest.TestCase):
                 self.assertEqual(pooling_method, model.pooling_method)
 
     def test_explicit_valid_pooling_method(self):
-        with mock.patch("marqo.core.inference.inference_models.hugging_face_model_properties."
+        with mock.patch("marqo.core.inference.embedding_models.hugging_face_model_properties."
                         "HuggingFaceModelProperties._infer_pooling_method_from_name") as mock_infer:
             model = HuggingFaceModelProperties(name="test-model", type="hf", pooling_method=PoolingMethod.CLS,
                                                dimensions=768)

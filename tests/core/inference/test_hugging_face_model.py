@@ -3,8 +3,8 @@ from unittest import mock
 
 import numpy as np
 
-from marqo.core.inference.inference_models.hugging_face_model import HuggingFaceModel
-from marqo.core.inference.inference_models.hugging_face_model_properties import PoolingMethod
+from marqo.core.inference.embedding_models.hugging_face_model import HuggingFaceModel
+from marqo.core.inference.embedding_models.hugging_face_model_properties import PoolingMethod
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 
 
