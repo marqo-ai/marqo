@@ -4,9 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from marqo.s2_inference.configs import ModelCache
+from marqo.core.inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.s2_inference.hf_utils import extract_huggingface_archive
 from marqo.s2_inference.s2_inference import _load_model
 
 
@@ -60,17 +59,18 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
     @patch('open_clip.create_model', autospec=True)
     @patch('os.remove', autospec=True)
     def test_corrupted_file_handling(self, mock_os_remove, mock_create_model_and_transforms):
-        # Setup
+        """Ensure that a proper error is raised when a corrupted file is encountered. The file should be removed."""
         mock_create_model_and_transforms.side_effect = RuntimeError("The file might be corrupted")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
-            for model_properties in self.dummpy_model_properties:
+        for model_properties in self.dummpy_model_properties:
+            with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                       return_value = self.dummpy_corrupted_file):
                 with self.assertRaises(InvalidModelPropertiesError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 # Verify
                 self.assertIn("Marqo encountered a corrupted file when loading open_clip file", str(context.exception))
                 mock_os_remove.assert_called_once_with(self.dummpy_corrupted_file)
 
-                # Reset necessary mock
+                # Reset the mock
                 mock_os_remove.reset_mock()
 
     @patch('open_clip.create_model', autospec=True)
@@ -79,7 +79,8 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         # Setup
         mock_create_model_and_transforms.side_effect = RuntimeError("The file might be corrupted")
         mock_os_remove.side_effect = OSError("Permission denied")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
+        with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                   return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(RuntimeError) as context:
@@ -97,7 +98,8 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
     def test_other_errors_handling(self, mock_os_remove, mock_create_model_and_transforms):
         # Setup
         mock_create_model_and_transforms.side_effect = Exception("An error occurred")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
+        with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                   return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(RuntimeError) as context:
@@ -111,7 +113,8 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
         # Setup
         mock_create_model_and_transforms.side_effect = Exception(
             "This could be because the operator doesn't exist for this backend")
-        with patch("marqo.s2_inference.clip_utils.download_model", return_value = self.dummpy_corrupted_file):
+        with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                   return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
                 with self.assertRaises(InvalidModelPropertiesError) as context:
@@ -204,7 +207,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
         with patch('os.path.isfile', return_value=True), \
              patch('os.path.splitext', return_value=('/path/to/file', '.txt')), \
              patch('os.makedirs'), \
-             patch("marqo.s2_inference.hf_utils.download_model", return_value = "/path/to/file.txt"):
+             patch("marqo.core.inference.embedding_models.hugging_face_model.download_model", return_value = "/path/to/file.txt"):
             for model_properties in self.dummy_model_properties:
                 with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
@@ -215,7 +218,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
              patch('os.path.splitext', return_value=('/path/to/file', '.zip')), \
              patch('os.makedirs') as mock_makedirs, \
              patch('zipfile.ZipFile') as mock_zipfile, \
-             patch("marqo.s2_inference.hf_utils.download_model", return_value="/path/to/file.zip"),\
+             patch("marqo.core.inference.embedding_models.hugging_face_model.download_model", return_value="/path/to/file.zip"),\
              patch("transformers.AutoModel.from_pretrained") as mock_model,\
              patch("transformers.AutoTokenizer.from_pretrained") as mock_tokenizer:
 
@@ -224,7 +227,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
 
                 mock_makedirs.assert_called_once_with('/path/to/file', exist_ok=True)
                 mock_zipfile.assert_called_once_with('/path/to/file.zip', 'r')
-                mock_model.assert_called_once_with('/path/to/file', use_auth_token=None, cache_dir = ModelCache.hf_cache_path)
+                mock_model.assert_called_once_with('/path/to/file')
                 mock_tokenizer.assert_called_once_with('/path/to/file')
 
                 mock_makedirs.reset_mock()
@@ -237,7 +240,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
             patch('os.path.splitext', return_value=('/path/to/file', '.tar')), \
             patch('os.makedirs') as mock_makedirs, \
             patch('tarfile.open') as mock_tarfile,\
-            patch("marqo.s2_inference.hf_utils.download_model", return_value="/path/to/file.tar"), \
+            patch("marqo.core.inference.embedding_models.hugging_face_model.download_model", return_value="/path/to/file.tar"), \
             patch("transformers.AutoModel.from_pretrained") as mock_model, \
             patch("transformers.AutoTokenizer.from_pretrained") as mock_tokenizer:
 
@@ -246,7 +249,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
 
                 mock_makedirs.assert_called_once_with('/path/to/file', exist_ok=True)
                 mock_tarfile.assert_called_once_with('/path/to/file.tar', 'r')
-                mock_model.assert_called_once_with('/path/to/file', use_auth_token=None, cache_dir=ModelCache.hf_cache_path)
+                mock_model.assert_called_once_with('/path/to/file')
                 mock_tokenizer.assert_called_once_with('/path/to/file')
 
                 mock_makedirs.reset_mock()
@@ -256,14 +259,15 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
 
     def test_directory(self):
         with patch('os.path.isfile', return_value=False),\
-            patch("marqo.s2_inference.hf_utils.download_model", return_value="/path/to/file.tar"), \
+            patch("marqo.core.inference.embedding_models.hugging_face_model.download_model", return_value="/path/to/file.tar"), \
             patch("transformers.AutoModel.from_pretrained") as mock_model, \
             patch("transformers.AutoTokenizer.from_pretrained") as mock_tokenizer:
-            self.assertEqual(extract_huggingface_archive('/path/to/directory'), '/path/to/directory')
+            self.assertEqual(HuggingFaceModel.extract_huggingface_archive('/path/to/directory'), '/path/to/directory')
 
     def test_hf_repo_id(self):
         with patch('os.path.isfile', return_value=False):
-            self.assertEqual(extract_huggingface_archive('sentence-transformers/all-MiniLM-L6-v2'), 'sentence-transformers/all-MiniLM-L6-v2')
+            self.assertEqual(HuggingFaceModel.extract_huggingface_archive('sentence-transformers/all-MiniLM-L6-v2'),
+            'sentence-transformers/all-MiniLM-L6-v2')
 
     def test_extraction_failure(self):
         with patch('os.path.isfile', return_value=True), \
@@ -272,5 +276,5 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
              patch('zipfile.ZipFile', side_effect=zipfile.BadZipfile), \
              patch('os.remove') as mock_remove:
             with self.assertRaises(InvalidModelPropertiesError):
-                extract_huggingface_archive('/path/to/file.zip')
+                HuggingFaceModel.extract_huggingface_archive('/path/to/file.zip')
             mock_remove.assert_called_once_with('/path/to/file.zip')

@@ -15,7 +15,8 @@ from typing import List, Dict, Any, Optional
 from marqo import marqo_docs
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
 from marqo.s2_inference import constants
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP
+from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.s2_inference.clip_utils import CLIP
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
@@ -30,7 +31,7 @@ from marqo.api.configs import EnvVars
 from marqo.tensor_search.enums import AvailableModelsKey
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
-    
+
 logger = get_logger(__name__)
 
 # The avaiable has the structure:
@@ -126,7 +127,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
         else:
             vector_batches = []
             batch_size = _get_max_vectorise_batch_size()
-            
+
             for batch in generate_batches(content, batch_size=batch_size):
                 if modality is None:
                     modality = infer_modality(batch[0] if isinstance(batch[0], (str, bytes)) else batch)
@@ -283,9 +284,8 @@ def _update_available_models(model_cache_key: str, model_name: str, validated_mo
         model_size = get_model_size(model_name, validated_model_properties)
         if lock.locked():
             raise ModelCacheManagementError("Request rejected, as this request attempted to update the model cache, while "
-                                            "another request was updating the model cache at the same time.\n "
-                                            "Please wait for 10 seconds and send the request again.\n "
-                                            "Marqo's documentation can be found here: `https://docs.marqo.ai/latest/`")
+                                            "another request was updating the model cache at the same time. "
+                                            "Please wait for 10 seconds and send the request again ")
         with lock:
             _validate_model_into_device(model_name, validated_model_properties, device,
                                        calling_func=_update_available_models.__name__)
@@ -481,7 +481,7 @@ def _check_memory_threshold_for_model(device: str, model_size: Union[float, int]
             f"You are trying to load a model with size = `{model_size}` into device = `{device}`, which is larger than the device threshold = `{threshold}`. "
             f"Marqo CANNOT find enough space for the model. Please change the threshold by adjusting the environment variables.\n"
             f"Please modify the threshold by setting the environment variable `MARQO_MAX_CUDA_MODEL_MEMORY` or `MARQO_MAX_CPU_MODEL_MEMORY`."
-            f"You can find more detailed information at `https://docs.marqo.ai/latest/other-resources/guides/advanced-usage/configuration/`.")
+            f"You can find more detailed information at {marqo_docs.configuring_marqo()}.")
     return (used_memory + model_size) < threshold
 
 
@@ -533,7 +533,7 @@ def _load_model(
 
     # TODO For each refactored model class, add a new elif block here and remove the if block
     #  once we have all models refactored
-    if model_type == ModelType.OpenCLIP:
+    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL):
         model = loader(
             device = device,
             model_properties = model_properties,

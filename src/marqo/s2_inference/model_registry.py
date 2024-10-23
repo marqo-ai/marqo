@@ -1,6 +1,7 @@
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
+from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
     get_multilingual_clip_properties
-from marqo.s2_inference.hf_utils import HF_MODEL
+from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
+from marqo.core.inference.embedding_models.hugging_face_model import HuggingFaceModel
 from marqo.s2_inference.onnx_clip_utils import CLIP_ONNX
 from marqo.s2_inference.random_utils import Random
 from marqo.s2_inference.sbert_onnx_utils import SBERT_ONNX
@@ -805,12 +806,14 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "text_query_prefix": "Represent this sentence for searching relevant passages: ",
+                 "poolingMethod": "mean",
                  "notes": ""},
             "hf/bge-base-en-v1.5":
                 {"name": 'BAAI/bge-base-en-v1.5',
                  "dimensions": 768,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-large-en-v1.5":
@@ -818,6 +821,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "Represent this sentence for searching relevant passages: ",
                  "notes": ""},
             "hf/bge-small-zh-v1.5":
@@ -825,6 +829,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 512,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             "hf/bge-base-zh-v1.5":
@@ -832,6 +837,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 768,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             "hf/bge-large-zh-v1.5":
@@ -839,6 +845,7 @@ def _get_hf_properties() -> Dict:
                  "dimensions": 1024,
                  "tokens": 512,
                  "type": "hf",
+                 "poolingMethod": "mean",
                  "text_query_prefix": "为这个句子生成表示以用于检索相关文章：",
                  "notes": ""},
             # Uncomment when fix is implemented.
@@ -2125,9 +2132,8 @@ def _get_model_load_mappings() -> Dict:
             "multilingual_clip" : MULTILINGUAL_CLIP,
             "fp16_clip": FP16_CLIP,
             'random':Random,
-            'hf':HF_MODEL,
-            "no_model": NO_MODEL,
-            }
+            'hf':HuggingFaceModel,
+            "no_model": NO_MODEL}
 
 def load_model_properties() -> Dict:
     # also truncate the name if not already

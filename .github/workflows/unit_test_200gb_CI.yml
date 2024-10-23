@@ -155,6 +155,10 @@ jobs:
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
           
+          export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
+          export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
+          export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
+          
           cd marqo
           export PYTHONPATH="./tests:./src:."
           pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests

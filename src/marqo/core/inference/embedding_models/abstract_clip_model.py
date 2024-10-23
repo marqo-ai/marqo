@@ -1,11 +1,14 @@
 from abc import abstractmethod
 
+import numpy as np
 import torch
 from PIL import UnidentifiedImageError
 
 from marqo.core.inference.image_download import (_is_image, format_and_load_CLIP_images,
                                                  format_and_load_CLIP_image)
-from marqo.core.inference.models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.core.inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.core.inference.embedding_models.image_download import (_is_image, format_and_load_CLIP_images,
+                                                                  format_and_load_CLIP_image)
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -43,17 +46,16 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         self.preprocess = None
 
     @abstractmethod
-    def encode_text(self, inputs: Union[str, List[str]], normalize: bool = True) -> FloatTensor:
+    def encode_text(self, inputs: Union[str, List[str]], normalize: bool = True) -> np.ndarray:
         pass
 
     @abstractmethod
-    def encode_image(self, inputs, normalize: bool = True, image_download_headers: dict = None) -> FloatTensor:
+    def encode_image(self, inputs, normalize: bool = True, image_download_headers: dict = None) -> np.ndarray:
         pass
 
     def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
-               default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
+               default: str = 'text', normalize=True, **kwargs) -> np.ndarray:
         infer = kwargs.pop('infer', True)
-
         if infer and _is_image(inputs):
             is_image = True
         else:
