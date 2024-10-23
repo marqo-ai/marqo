@@ -238,7 +238,7 @@ class TestOpenCLIPModelLoad(TestCase):
             aws_secret_access_key="my_secret_key",
         ))
 
-        with patch("marqo.s2_inference.clip_utils.download_model") as mock_download_model:
+        with patch("marqo.core.inference.inference_models.open_clip_model.download_model") as mock_download_model:
             # It's ok to return a RuntimeError as we are testing the download_model function
             with self.assertRaises(RuntimeError):
                 model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
@@ -267,9 +267,9 @@ class TestOpenCLIPModelLoad(TestCase):
 
         model_auth = ModelAuth(**{"hf": {"token":"my_hf_token"}})
 
-        with patch("marqo.s2_inference.clip_utils.download_model") as mock_download_model:
+        with patch("marqo.core.inference.inference_models.open_clip_model.download_model") as mock_download_model:
             # It's ok to return a RuntimeError as we are testing the download_model function
-            with self.assertRaises(RuntimeError):
+            with self.assertRaises(RuntimeError) as e:
                 model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
                 model.load()
 
@@ -277,4 +277,3 @@ class TestOpenCLIPModelLoad(TestCase):
                 repo_location=ModelLocation(**model_properties["model_location"]),
                 auth=model_auth,
             )
-
