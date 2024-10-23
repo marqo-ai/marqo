@@ -8,9 +8,9 @@ from pydantic import ValidationError
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
-from marqo.core.inference.inference_models.abstract_clip_model import AbstractCLIPModel
-from marqo.core.inference.inference_models.hf_tokenizer import HFTokenizer
-from marqo.core.inference.inference_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
+from marqo.core.inference.embedding_models.abstract_clip_model import AbstractCLIPModel
+from marqo.core.inference.embedding_models.hf_tokenizer import HFTokenizer
+from marqo.core.inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
 from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
