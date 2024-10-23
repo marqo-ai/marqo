@@ -988,6 +988,9 @@ class TestSearch(MarqoTestCase):
             ('"exact match"', ['doc2']),                # Match off of 'exact match'
             ('\\"escaped\\"', ['doc4', 'red_herring_2']),        # Match off of 'escaped' or '"escaped"'
             ('"exacto" wrong"', ['doc3']),       # Match properly off of 'wrong'
+            ('""', []),                          # Single quote should return no results (treated as whitespace)
+            ('"', []),                           # Double quote should return no results (treated as whitespace)
+            ('', [])                            # Empty string should return no results
         ]
 
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:

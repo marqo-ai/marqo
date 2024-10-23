@@ -223,7 +223,7 @@ class TestUtils(unittest.TestCase):
             ('just "a long long " string', (["a long long "], ['just', 'string'])),
             ('"required 1 " not required " required2" again',
              (["required 1 ", " required2"], ['not', 'required', 'again'])),
-            ('"just" "just" "" a string', (["just", "just", ""], ['a', 'string'])),
+            ('"just" "just" "" a string', (["just", "just"], ['a', 'string'])),
 
             ('朋友你好', ([], ['朋友你好'])),
             ('朋友 "你好"', (["你好"], ['朋友'])),
@@ -240,13 +240,13 @@ class TestUtils(unittest.TestCase):
             ('"', ([], [])),
             ('"""hello', ([], ['hello'])),
             ('""" python docstring appeared"""', ([], ['python', 'docstring', 'appeared'])),
-            ('""', ([''], [])),
+            ('""', ([], [])),
             ('what about backticks `?', ([], ['what', 'about', 'backticks', '`?'])),
             (
                 '\\" escaped quotes\\"  what happens here?',
-                ([], ['"', 'escaped', 'quotes"', 'what', 'happens', 'here?'])
+                ([], ['\\"', 'escaped', 'quotes\\"', 'what', 'happens', 'here?'])
             ),
-            ('\\"朋友\\"', ([], ['"朋友"'])),
+            ('\\"朋友\\"', ([], ['\\"朋友\\"'])),
             ('double  spaces  get  removed', ([], ['double', 'spaces', 'get', 'removed'])),
             ('"go"od"', ([], ['go', 'od'])),
             ('"ter"m1" term2', ([], ['ter','m1', 'term2'])),
@@ -257,7 +257,7 @@ class TestUtils(unittest.TestCase):
             ('"朋友', ([], ['朋友'])),
             # Combination: good terms, bad terms (opening and closing), escaped quotes, spaces.
             ('hello "term1" " term 2 " space b"adterm" "badte"rm "term \\"3" "unfinished',
-             (['term1', ' term 2 ', 'term "3'], ['hello', 'space', 'b', 'adterm', 'badte', 'rm', 'unfinished'])),
+             (['term1', ' term 2 ', 'term \\"3'], ['hello', 'space', 'b', 'adterm', 'badte', 'rm', 'unfinished'])),
 
             # on Lucene, these unusual structures seem to get passed straight through as well.
             # The quotes seem to be completely ignored (with and without quotes yields identical results,

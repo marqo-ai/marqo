@@ -234,7 +234,7 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
         if text[i] == '"':
             # Check if ESCAPED
             if i > 0 and text[i - 1] == '\\':
-                # Read quote literally. Backslash should be ignored (both blob and required)
+                # Read quote literally. Backslash should be passed directly to Vespa.
                 pass
 
             # OPENING QUOTE
@@ -252,7 +252,8 @@ def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
                 if (i == len(text) - 1 or text[i + 1] == " ") and not current_quote_pair_is_faulty:
                     # Add everything in between the quotes as a required term
                     new_required_term = text[opening_quote_idx + 1:i]
-                    required_terms.append(new_required_term)
+                    if new_required_term:                           # Do not add empty strings as required terms
+                        required_terms.append(new_required_term)
 
                     # Remove this required term from the blob
                     blob = blob[:-(len(new_required_term) + 2)]
