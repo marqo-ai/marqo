@@ -7,10 +7,10 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 from pydantic import Field, validator, root_validator
 
-from marqo.base_model import MarqoBaseModel
+from marqo.core.inference.inference_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.logger import get_logger
-from marqo.tensor_search.models.private_models import ModelLocation, ModelAuth
+from marqo.tensor_search.models.private_models import ModelLocation
 
 logger = get_logger(__name__)
 
@@ -20,7 +20,7 @@ class PoolingMethod(str, Enum):
     CLS = "cls"
 
 
-class HuggingFaceModelProperties(MarqoBaseModel):
+class HuggingFaceModelProperties(MarqoBaseModelProperties):
     """
     A class to represent the properties of a Hugging Face model.
 
@@ -38,8 +38,6 @@ class HuggingFaceModelProperties(MarqoBaseModel):
     """
     name: Optional[str] = None
     tokens: int = 128
-    type: str
-    dimensions: int = Field(..., ge=1)
     url: Optional[str] = None
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     note: Optional[str] = None
@@ -80,30 +78,31 @@ class HuggingFaceModelProperties(MarqoBaseModel):
         """
         repo_id = name
         file_name = "1_Pooling/config.json"
+
+        def log_warning_and_return_default():
+            logger.warning(f"Could not infer pooling method from the model {name}. Defaulting to mean pooling.")
+            return PoolingMethod.Mean
+
         try:
             file_path = hf_hub_download(repo_id, file_name, cache_dir=ModelCache.hf_cache_path)
         except HfHubHTTPError:
-            logger.warn(f"Could not infer pooling method from the model {name}. Defaulting to mean pooling.")
-            return PoolingMethod.Mean
+            return log_warning_and_return_default()
 
         try:
             with open(file_path, 'r') as file:
                 content = json.loads(file.read())
         except JSONDecodeError:
-            logger.warn(f"Could not infer pooling method from the model {name}. Defaulting to mean pooling.")
-            return PoolingMethod.Mean
+            return log_warning_and_return_default()
 
         if not isinstance(content, dict):
-            logger.warn(f"Could not infer pooling method from the model {name}. Defaulting to mean pooling.")
-            return PoolingMethod.Mean
+            return log_warning_and_return_default()
 
         if content.get("pooling_mode_cls_token") is True:
             return PoolingMethod.CLS
         elif content.get("pooling_mode_mean_tokens") is True:
             return PoolingMethod.Mean
         else:
-            logger.warn(f"Could not infer pooling method from the model {name}. Defaulting to mean pooling.")
-            return PoolingMethod.Mean
+            return log_warning_and_return_default()
 
     @root_validator(skip_on_failure=True)
     def _validate_minimum_required_fields_to_load(cls, values):

@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from pydantic import Field, root_validator
 
-from marqo.base_model import MarqoBaseModel
+from marqo.core.inference.inference_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.tensor_search.models.private_models import ModelLocation
 
 
@@ -21,7 +21,7 @@ class Precision(str, Enum):
     FP16 = "fp16"
 
 
-class OpenCLIPModelProperties(MarqoBaseModel):
+class OpenCLIPModelProperties(MarqoBaseModelProperties):
     """
     A class to represent the properties of an OpenCLIP model.
 
@@ -47,8 +47,6 @@ class OpenCLIPModelProperties(MarqoBaseModel):
         pretrained: The name of the pretrained model. It is optional.
     """
     name: str
-    type: str
-    dimensions: int = Field(..., ge=1)
     jit: bool = False
     precision: Precision = Precision.FP32
     url: Optional[str] = None

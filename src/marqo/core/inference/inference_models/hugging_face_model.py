@@ -54,12 +54,6 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         Raises:
             InvalidModelPropertiesError: If the model properties are invalid or incomplete.
         """
-        if not (self.model_properties.name or self.model_properties.url or self.model_properties.model_location):
-            raise InvalidModelPropertiesError(
-                f"Invalid model properties for the 'hf' model. "
-                f"You do not have the necessary information to load the model. "
-                f"Check {marqo_docs.bring_your_own_model()} for more information."
-            )
 
         if self.model_properties.name:
             self._model, self._tokenizer = self._load_from_hugging_face_repo()
@@ -72,11 +66,8 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             else:
                 self._model, self._tokenizer = self._load_from_private_hugging_face_repo()
         else:
-            raise InvalidModelPropertiesError(
-                f"Invalid model properties for the 'hf' model. "
-                f"You do not have the necessary information to load the model. "
-                f"Check {marqo_docs.bring_your_own_model()} for more information."
-            )
+            raise InternalError(f"Invalid model properties: {self.model_properties}. Marqo can not load the model via "
+                                f"a specified method. Please check the model properties and try again.")
 
         self._model = self._model.to(self.device)
         self._pooling_func = self._load_pooling_method()
@@ -193,7 +184,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     @staticmethod
     def extract_huggingface_archive(path: str) -> str:
         '''
-            This function takes the path as input. The path can must be a string that can be:
+            This function takes the path as input. The path is a string that can be one of the followings:
             1. A downloaded archive file. This function will extract the model from the archive return the directory path.
             2. A repo_id in huggingface. This function will return the input string directly.
 
