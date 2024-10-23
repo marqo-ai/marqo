@@ -984,7 +984,7 @@ class TestSearch(MarqoTestCase):
             {"_id": "red_herring_3", "text_field_1": 'wrong"'}
         ]
         test_cases = [
-            ('1\\"2', ['doc1']),                        # Match off of '12"'
+            ('1\\"2', ['doc1']),                        # Match off of '1"2'
             ('"exact match"', ['doc2']),                # Match off of 'exact match'
             ('\\"escaped\\"', ['doc4', 'red_herring_2']),        # Match off of 'escaped' or '"escaped"'
             ('"exacto" wrong"', ['doc3']),       # Match properly off of 'wrong'
