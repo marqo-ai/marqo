@@ -111,8 +111,6 @@ class VespaIndex(ABC):
         mult_tensor = {}
         add_tensor = {}
         for modifier in score_modifiers:
-            if '"' in modifier.field:
-                continue # Skip this modifier if it contains double quotes. Vespa Errors out on this.
             if modifier.type == ScoreModifierType.Multiply:
                 mult_tensor[modifier.field] = modifier.weight
             elif modifier.type == ScoreModifierType.Add:
