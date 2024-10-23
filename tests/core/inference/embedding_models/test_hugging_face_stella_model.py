@@ -1,7 +1,5 @@
 import unittest
 
-from marqo.core.inference.embedding_models.hugging_face_model_properties import HuggingFaceModelFlags, \
-    HuggingFaceTokenizerFlags
 from marqo.core.inference.embedding_models.hugging_face_stella_model import HuggingFaceStellaModel
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 

@@ -28,9 +28,9 @@ PRETRAINED_INIT_CONFIGURATION = {
 
 class LanguageBindVideoTokenizer(CLIPTokenizer):
     """
-    Construct a CLIP _tokenizer. Based on byte-level Byte-Pair-Encoding.
+    Construct a CLIP tokenizer. Based on byte-level Byte-Pair-Encoding.
 
-    This _tokenizer inherits from [`PreTrainedTokenizer`] which contains most of the main methods. Users should refer to
+    This tokenizer inherits from [`PreTrainedTokenizer`] which contains most of the main methods. Users should refer to
     this superclass for more information regarding those methods.
 
     Args:

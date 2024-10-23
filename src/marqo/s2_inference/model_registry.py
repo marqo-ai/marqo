@@ -894,13 +894,6 @@ def _get_hf_properties() -> Dict:
                  "tokens": 512,
                  "type": "hf",
                  "notes": ""},
-            "Marqo/dunzhang-stella_en_400M_v5":
-                {"name": "Marqo/dunzhang-stella_en_400M_v5",
-                "dimensions": 1024,
-                "tokens": 512,
-                "type": "hf_stella",
-                "trust_remote_code": True
-            },
     }
     return HF_MODEL_PROPERTIES
 

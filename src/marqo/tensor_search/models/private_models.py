@@ -39,7 +39,7 @@ class ModelLocation(MarqoBaseModel):
 
     s3: Optional[S3Location] = None
     hf: Optional[HfModelLocation] = None
-    auth_required: bool = Field(default=False, aliase="authRequired")
+    auth_required: bool = Field(default=False, alias="authRequired")
 
 
     @root_validator(skip_on_failure=True)

@@ -59,7 +59,6 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
         if infer and _is_image(inputs):
             is_image = True
         else:
-            is_image = False
             if default == 'text':
                 is_image = False
             elif default == 'image':
