@@ -165,9 +165,12 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
 
                         try:
-                            processed_chunks = download_and_chunk_media(doc[field], device, media_download_headers, inferred_modality,
-                                                                    marqo_index_type, marqo_index_model, preprocessors,
-                                                                    audio_preprocessing, video_preprocessing)
+                            processed_chunks = download_and_chunk_media(
+                                url=doc[field], device=device, modality=inferred_modality,
+                                marqo_index_type=marqo_index_type, marqo_index_model=marqo_index_model,
+                                preprocessors=preprocessors, audio_preprocessing=audio_preprocessing,
+                                video_preprocessing=video_preprocessing, media_download_headers=media_download_headers
+                            )
                             media_repo[doc[field]] = processed_chunks
                         except (ffmpeg.Error, S2InferenceError) as e:
                             logger.error(f"Error processing {inferred_modality} file: {str(e)}")
@@ -197,13 +200,17 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
 
 
-def download_and_chunk_media(url: str, device: str, headers: dict, modality: Modality, marqo_index_type: IndexType, marqo_index_model: Model,
+def download_and_chunk_media(url: str, device: str, modality: Modality, marqo_index_type: IndexType, marqo_index_model: Model,
                              preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
-                             video_preprocessing: VideoPreProcessing = None) -> List[Dict[str, torch.Tensor]]:
+                             video_preprocessing: VideoPreProcessing = None,
+                             media_download_headers: Optional[Dict] = None) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
-    processor = StreamingMediaProcessor(url, device, headers, modality, marqo_index_type, marqo_index_model, preprocessors,
-                                        audio_preprocessing, video_preprocessing)
+    processor = StreamingMediaProcessor(
+        url=url, device=device, modality=modality, marqo_index_type=marqo_index_type, marqo_index_model=marqo_index_model,
+        preprocessors=preprocessors, audio_preprocessing=audio_preprocessing, video_preprocessing=video_preprocessing,
+        media_download_headers=media_download_headers
+    )
 
     if processor.total_size > MAX_FILE_SIZE:
         raise ValueError(

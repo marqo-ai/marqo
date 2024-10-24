@@ -18,12 +18,11 @@ from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 class StreamingMediaProcessor:
-    def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index_type: IndexType,
+    def __init__(self, url: str, device: str, modality: Modality, marqo_index_type: IndexType,
                  marqo_index_model: Model, preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
-                 video_preprocessing: VideoPreProcessing = None):
+                 video_preprocessing: VideoPreProcessing = None, media_download_headers: Optional[Dict[str, str] ]= None):
         self.url = url
         self.device = device
-        self.headers = headers
         self.modality = modality
         self.marqo_index_type = marqo_index_type
         self.marqo_index_model = marqo_index_model
@@ -32,6 +31,10 @@ class StreamingMediaProcessor:
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
         self.total_size, self.duration = self._fetch_file_metadata()
+
+        if media_download_headers is None:
+            media_download_headers = {}
+        self.media_download_headers = media_download_headers
 
         self._set_split_parameters(modality)
         self._log_initialization_details()
@@ -66,6 +69,8 @@ class StreamingMediaProcessor:
                 'of': 'json',
                 'probesize': '256K'  # Probe only the first 256KB
             }
+
+            probe_options.update(self.media_download_headers)
 
             probe = ffmpeg.probe(self.url, **probe_options)
 
@@ -105,7 +110,10 @@ class StreamingMediaProcessor:
 
                 try:
                     # Use ffmpeg-python to process the chunk
-                    stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
+                    stream = ffmpeg.input(
+                        self.url, ss=chunk_start, t=chunk_end - chunk_start,
+                        headers=self.media_download_headers
+                    )
 
                     if self.modality == Modality.VIDEO:
                         stream = ffmpeg.output(stream, output_file, vcodec='libx264', acodec='aac', **{'f': 'mp4'})
