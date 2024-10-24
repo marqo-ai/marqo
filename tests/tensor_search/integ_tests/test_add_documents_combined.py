@@ -1101,22 +1101,33 @@ class TestAddDocumentsCombined(MarqoTestCase):
         documents = [
             {
                 "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
+                "text_field_1": "A private image with a png extension",
                 "_id": "1"
             },
             {
                 "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
+                "text_field_1": "A private image without an extension",
                 "_id": "2"
             }
         ]
         for index_name in test_indexes:
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name else None
+            tensor_fields = ["multimodal_field", "my_combination_field"] if (
+                    index_name == self.unstructured_marqo_index_name) else None
+            mappings = {
+                "multimodal_field":
+                    {
+                        "type": "multimodal_combination",
+                        "weights": {"image_field_1": 1.0, "text_field_1": 1.0}
+                    }
+            }
             with self.subTest(index_name):
                 res = tensor_search.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
                         index_name=index_name,
-                        tensor_fields=tensor_fields
+                        tensor_fields=tensor_fields,
+                        mappings=mappings
                     )
                 )
                 self.assertTrue(res.errors)
@@ -1133,15 +1144,25 @@ class TestAddDocumentsCombined(MarqoTestCase):
         documents = [
             {
                 "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
+                "text_field_1": "A private image with a png extension",
                 "_id": "1"
             },
             {
                 "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
+                "text_field_1": "A private image without an extension",
                 "_id": "2"
             }
         ]
         for index_name in test_indexes:
-            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name else None
+            tensor_fields = ["image_field_1", "multimodal_field"] if (
+                    index_name == self.unstructured_marqo_index_name) else None
+            mappings = {
+                "multimodal_field":
+                    {
+                        "type": "multimodal_combination",
+                        "weights": {"image_field_1": 1.0, "text_field_1": 1.0}
+                    }
+            }
             with self.subTest(index_name):
                 res = tensor_search.add_documents(
                     self.config,
@@ -1149,7 +1170,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         docs=documents,
                         index_name=index_name,
                         tensor_fields=tensor_fields,
-                        media_download_headers={"marqo_media_header": "media_header_test_key"}
+                        media_download_headers={"marqo_media_header": "media_header_test_key"},
+                        mappings=mappings
                     )
                 )
                 self.assertFalse(res.errors)
