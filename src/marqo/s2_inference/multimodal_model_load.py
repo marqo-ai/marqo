@@ -133,7 +133,14 @@ class DefaultEncoder(ModelEncoder):
 @contextmanager
 def fetch_content_sample(url, media_download_headers: Optional[dict] = None, sample_size=10240):  # 10 KB
     # It's ok to pass None to requests.get() for headers and it won't change the default headers
+    """Fetch a sample of the content from the URL.
+
+    Raises:
+        HTTPError: If the response status code is not 200
+    """
     response = requests.get(url, stream=True, headers=media_download_headers)
+    if response.status_code != 200:
+        response.raise_for_status()
     buffer = io.BytesIO()
     try:
         for chunk in response.iter_content(chunk_size=min(sample_size, 8192)):
@@ -157,7 +164,6 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
         
         # Encode the URL
         encoded_url = encode_url(content)
-
         extension = encoded_url.split('.')[-1].lower()
         if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
             return Modality.IMAGE

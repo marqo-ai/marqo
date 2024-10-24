@@ -15,6 +15,7 @@ import PIL
 import requests
 import torch
 from more_itertools import flatten
+from numpy.ma.core import subtract
 from torch import Tensor
 
 import unittest.mock
@@ -1093,3 +1094,61 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 embeddings = get_res['results'][0]['_tensor_facets'][0]['_embedding']
                 norm = np.linalg.norm(np.array(embeddings))
                 self.assertTrue(norm - 1.0 > 1e-5, f"Embedding norm is {norm}")
+
+    def test_add_private_images_proper_error_returned(self):
+        """Test to ensure that private images can not be downloaded and an appropriate error is returned"""
+        test_indexes = [self.structured_marqo_index_name, self.unstructured_marqo_index_name]
+        documents = [
+            {
+                "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
+                "_id": "1"
+            },
+            {
+                "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
+                "_id": "2"
+            }
+        ]
+        for index_name in test_indexes:
+            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=tensor_fields
+                    )
+                )
+                self.assertTrue(res.errors)
+                items = res.items
+                self.assertEqual(2, len(items))
+                for item in items:
+                    self.assertEqual(400, item.status)
+                    self.assertIn("403", item.message)
+
+    def test_add_private_images_success(self):
+        """Test to ensure that private images can be downloaded with proper headers"""
+        test_indexes = [self.structured_marqo_index_name, self.unstructured_marqo_index_name]
+        documents = [
+            {
+                "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
+                "_id": "1"
+            },
+            {
+                "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
+                "_id": "2"
+            }
+        ]
+        for index_name in test_indexes:
+            tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=tensor_fields,
+                        media_download_headers={"marqo_media_header": "media_header_test_key"}
+                    )
+                )
+                self.assertFalse(res.errors)

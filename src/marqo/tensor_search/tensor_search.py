@@ -2036,7 +2036,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
                 # Apply prefix if key is not an image or if index does not treat URLs and pointers as images
                 modality = infer_modality(key, q.mediaDownloadHeaders)
                 if modality == Modality.TEXT:
-                    prefixed_q[key] = f"{text_query_prefix}{value}"
+                    prefixed_q[f"{text_query_prefix}{key}"] = value
                 else:
                     prefixed_q[key] = value
         new_query_object = BulkSearchQueryEntity(
