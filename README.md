@@ -492,7 +492,7 @@ Marqo is a community project with the goal of making tensor search accessible to
 
 1. Run the full test suite (by using the command `tox` in this dir).
 
-2. Create a pull request with an attached github issue.
+2. Create a pull request with an attached GitHub issue.
 
 ## Support
 
