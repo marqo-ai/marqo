@@ -18,7 +18,7 @@ from marqo.s2_inference.errors import MediaDownloadError
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery
-from tests.marqo_test import MarqoTestCase, TestImageUrls
+from tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
 
 
 class TestSearch(MarqoTestCase):
@@ -1057,3 +1057,103 @@ class TestSearch(MarqoTestCase):
                         )
                         self.assertEqual(len(expected_ids), len(res['hits']))
                         self.assertEqual(set(expected_ids), {hit['_id'] for hit in res['hits']})
+
+
+@pytest.mark.largemodel
+class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
+    """A class to test the search with the LanguageBind model."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        structured_language_bind_index = cls.structured_marqo_index_request(
+            name="structured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
+                FieldRequest(name="audio_field_1", type=FieldType.AudioPointer),
+                FieldRequest(name="video_field_1", type=FieldType.VideoPointer),
+                FieldRequest(
+                    name="multimodal_field",
+                    type=FieldType.MultimodalCombination,
+                    dependent_fields={
+                        "image_field_1": 1.0,
+                        "text_field_1": 1.0,
+                        "audio_field_1": 1.0,
+                        "video_field_1": 1.0,
+                    }
+                )
+            ],
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
+            tensor_fields=["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"],
+        )
+
+        unstructured_language_bind_index = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True
+        )
+
+        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index])
+
+        cls.structured_language_bind_index_name = structured_language_bind_index.name
+        cls.unstructured_language_bind_index_name = unstructured_language_bind_index.name
+
+        s2_inference.clear_loaded_models()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        s2_inference.clear_loaded_models()
+
+    def test_language_bind_model_can_search_all_media_modalities(self):
+        """Test to ensure that the LanguageBind model can search all media types to the index"""
+        queries = [
+            "This is a test text",
+            TestImageUrls.IMAGE1.value,
+            TestAudioUrls.AUDIO1.value,
+            TestVideoUrls.VIDEO1.value,
+            {
+                "This is a test text": 1,
+                TestImageUrls.IMAGE1.value: 1,
+                TestAudioUrls.AUDIO1.value: 1,
+                TestVideoUrls.VIDEO1.value: 1
+            }
+        ]
+        for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+            for query in queries:
+                with self.subTest(index_name):
+                    _ = tensor_search.search(
+                        config = self.config,
+                        index_name=index_name,
+                        text=query,
+                        search_method=SearchMethod.LEXICAL
+                    )
+
+    def test_language_bind_model_can_search_all_private_media_modalities(self):
+        """A test to ensure that the LanguageBind model can search all private media types to the index"""
+        queries = [
+            "This is a test text",
+            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
+            "https://d2k91vq0avo7lq.cloudfront.net/bark.wav",
+            "https://d2k91vq0avo7lq.cloudfront.net/congress.mp4",
+            {
+                "This is a test text": 1,
+                "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png": 1,
+                "https://d2k91vq0avo7lq.cloudfront.net/bark.wav": 1,
+                "https://d2k91vq0avo7lq.cloudfront.net/congress.mp4": 1
+            }
+        ]
+        for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+            for query in queries:
+                with self.subTest(index_name):
+                    _ = tensor_search.search(
+                        config = self.config,
+                        index_name=index_name,
+                        text=query,
+                        search_method=SearchMethod.LEXICAL,
+                        media_download_headers={"marqo_media_header": "media_header_test_key"}
+                    )

@@ -1,25 +1,18 @@
 import os
 import unittest.mock
+import unittest.mock
 import uuid
 from unittest import mock
 from unittest.mock import patch
 
 import PIL
 import numpy as np
-
-import numpy as np
 import pytest
-
-
-import PIL
 import requests
 import torch
-from more_itertools import flatten
-from numpy.ma.core import subtract
 from torch import Tensor
 
-import unittest.mock
-
+from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.models.marqo_get_documents_by_id_response import MarqoGetDocumentsByIdsResponse
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
@@ -28,10 +21,7 @@ from marqo.s2_inference.multimodal_model_load import infer_modality
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
-from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
-from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.s2_inference.multimodal_model_load import infer_modality
-from marqo.tensor_search import streaming_media_processor
+from tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -1172,6 +1162,117 @@ class TestAddDocumentsCombined(MarqoTestCase):
                         tensor_fields=tensor_fields,
                         media_download_headers={"marqo_media_header": "media_header_test_key"},
                         mappings=mappings
+                    )
+                )
+                self.assertFalse(res.errors)
+
+
+
+
+@pytest.mark.largemodel
+class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
+    """A class to test the add_documents with the LanguageBind model."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+
+        structured_language_bind_index = cls.structured_marqo_index_request(
+            name="structured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            fields=[
+                FieldRequest(name="text_field_1", type=FieldType.Text,
+                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
+                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
+                FieldRequest(name="audio_field_1", type=FieldType.AudioPointer),
+                FieldRequest(name="video_field_1", type=FieldType.VideoPointer),
+                FieldRequest(
+                    name="multimodal_field",
+                    type=FieldType.MultimodalCombination,
+                    dependent_fields={
+                        "image_field_1": 1.0,
+                        "text_field_1": 1.0,
+                        "audio_field_1": 1.0,
+                        "video_field_1": 1.0,
+                    }
+                )
+            ],
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
+            tensor_fields=["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"],
+        )
+
+        unstructured_language_bind_index = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
+            treat_urls_and_pointers_as_images=True,
+            treat_urls_and_pointers_as_media=True
+        )
+
+        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index])
+
+        cls.structured_language_bind_index_name = structured_language_bind_index.name
+        cls.unstructured_language_bind_index_name = unstructured_language_bind_index.name
+
+        s2_inference.clear_loaded_models()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        s2_inference.clear_loaded_models()
+
+    def test_language_bind_model_can_add_all_media_modalities(self):
+        """Test to ensure that the LanguageBind model can add all media types to the index"""
+        documents = [
+            {
+                "text_field_1": "This is a test text",
+                "image_field_1": TestImageUrls.IMAGE1.value,
+                "audio_field_1": TestAudioUrls.AUDIO1.value,
+                "video_field_1": TestVideoUrls.VIDEO1.value,
+                "_id": "1"
+            }
+        ]
+        for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+            tensor_fields = ["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"] \
+                if index_name == self.unstructured_language_bind_index_name else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=tensor_fields
+                    )
+                )
+                self.assertFalse(res.errors)
+
+    def test_language_bind_model_can_add_all_private_media_modalities(self):
+        documents = [
+            {   # With extensions
+                "text_field_1": "This is a test text",
+                "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
+                "audio_field_1": "https://d2k91vq0avo7lq.cloudfront.net/bark.wav",
+                "video_field_1": "https://d2k91vq0avo7lq.cloudfront.net/congress.mp4",
+                "_id": "1"
+            },
+            {
+                # No extensions
+                "text_field_1": "This is a test text",
+                "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
+                "audio_field_1": "https://d2k91vq0avo7lq.cloudfront.net/bark",
+                "video_field_1": "https://d2k91vq0avo7lq.cloudfront.net/congress",
+                "_id": "1"
+            }
+        ]
+        for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+            tensor_fields = ["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"] \
+                if index_name == self.unstructured_language_bind_index_name else None
+            with self.subTest(index_name):
+                res = tensor_search.add_documents(
+                    self.config,
+                    add_docs_params=AddDocsParams(
+                        docs=documents,
+                        index_name=index_name,
+                        tensor_fields=tensor_fields,
+                        media_download_headers={"marqo_media_header": "media_header_test_key"}
                     )
                 )
                 self.assertFalse(res.errors)

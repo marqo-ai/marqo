@@ -36,6 +36,21 @@ class TestImageUrls(str, Enum):
     HIPPO_STATUE = 'https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_statue_small.png'
 
 
+class TestAudioUrls(str, Enum):
+    __test__ = False
+    AUDIO1 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-100032-A-0.wav"
+    AUDIO2 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115545-C-48.wav"
+    AUDIO3 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-119125-A-45.wav"
+
+
+class TestVideoUrls(str, Enum):
+    __test__ = False
+    VIDEO1 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
+    VIDEO2 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4"
+    VIDEO3 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--mI_-gaZLk_000018_000028.mp4"
+
+
+
 class MarqoTestCase(unittest.TestCase):
     indexes = []
 
