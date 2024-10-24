@@ -146,8 +146,9 @@ class HuggingFaceModel(AbstractEmbeddingModel):
 
         model_dir = self.extract_huggingface_archive(zip_file_path)
         try:
-            model = AutoModel.from_pretrained(model_dir).to(
-                self.device, **self._model_flags.dict(exclude_none=True)
+            model = AutoModel.from_pretrained(
+                model_dir,
+                **self._model_flags.dict(exclude_none=True)
             )
             tokenizer = AutoTokenizer.from_pretrained(
                 model_dir, **self._tokenizer_flags.dict(exclude_none=True)
