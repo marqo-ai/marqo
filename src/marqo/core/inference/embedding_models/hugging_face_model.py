@@ -54,7 +54,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         if self._model_flags.trust_remote_code or self._tokenizer_flags.trust_remote_code:
             if not parsed_properties.trust_remote_code:
                 raise InvalidModelPropertiesError(
-                    f"The specified model requires the 'trust_remote_code' attribute to be set to True. "
+                    f"The specified model requires the 'trustRemoteCode' attribute to be set to True. "
                     f"Setting this attribute to True may have security implications. "
                     f"See {marqo_docs.hugging_face_trust_remote_code()} for more information"
                 )
