@@ -379,6 +379,8 @@ class StartTorchCudaSummary:
         self.log_file = log_file
         self.interval = interval  # time in seconds between summaries
         self.stop_thread = threading.Event()
+        if not os.path.exists(os.path.dirname(self.log_file)):
+            os.makedirs(os.path.dirname(self.log_file))
 
     def _log_memory_summary(self):
         while not self.stop_thread.is_set():
