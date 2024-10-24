@@ -2,10 +2,10 @@ from abc import ABC
 
 from pydantic import Field
 
-from marqo.base_model import MarqoBaseModel
+from marqo.base_model import MarqoBaseModel, ImmutableBaseModel
 
 
-class MarqoBaseModelProperties(MarqoBaseModel, ABC):
+class MarqoBaseModelProperties(ImmutableBaseModel, ABC):
     """
     The base class for all model properties classes in Marqo.
 

@@ -6,13 +6,14 @@ from typing import Tuple, Callable, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
+from marqo.core.inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
+from marqo.core.inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
+    PoolingMethod, HuggingFaceModelFlags, HuggingFaceTokenizerFlags
 from pydantic import ValidationError
 from transformers import (AutoModel, AutoTokenizer)
 
+from marqo import marqo_docs
 from marqo.core.exceptions import InternalError
-from marqo.core.inference.embedding_models.abstract_embedding_model import AbstractEmbeddingModel
-from marqo.core.inference.embedding_models.hugging_face_model_properties import HuggingFaceModelProperties, \
-    PoolingMethod
 from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
@@ -23,8 +24,18 @@ from marqo.tensor_search.models.private_models import ModelAuth
 class HuggingFaceModel(AbstractEmbeddingModel):
     """The concrete class for all sentence transformers models loaded from Hugging Face."""
 
-    def __init__(self, model_properties: dict, device: str, model_auth: Optional[ModelAuth] = None):
+    def __init__(
+            self,
+            model_properties: dict,
+            device: str,
+            model_auth: Optional[ModelAuth] = None,
+            model_flags: Optional[HuggingFaceModelFlags] = None,
+            tokenizer_flags: Optional[HuggingFaceTokenizerFlags] = None
+    ):
         super().__init__(model_properties, device, model_auth)
+
+        self._model_flags = model_flags or HuggingFaceModelFlags()
+        self._tokenizer_flags = tokenizer_flags or HuggingFaceTokenizerFlags()
 
         self.model_properties = self._build_model_properties(model_properties)
 
@@ -35,10 +46,20 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     def _build_model_properties(self, model_properties: dict) -> HuggingFaceModelProperties:
         """Convert the user input model_properties to HuggingFaceModelProperties."""
         try:
-            return HuggingFaceModelProperties(**model_properties)
+            parsed_properties = HuggingFaceModelProperties(**model_properties)
         except ValidationError as e:
             raise InvalidModelPropertiesError(f"Invalid model properties: {model_properties}. Original error {e}") \
                 from e
+
+        if self._model_flags.trust_remote_code or self._tokenizer_flags.trust_remote_code:
+            if not parsed_properties.trust_remote_code:
+                raise InvalidModelPropertiesError(
+                    f"The specified model requires the 'trustRemoteCode' attribute to be set to True. "
+                    f"Setting this attribute to True may have security implications. "
+                    f"See {marqo_docs.hugging_face_trust_remote_code()} for more information"
+                )
+
+        return parsed_properties
 
     def _check_loaded_components(self):
         if self._model is None:
@@ -83,11 +104,13 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         try:
             model = AutoModel.from_pretrained(
                 self.model_properties.model_location.hf.repo_id,
-                token=hf_repo_token
+                token=hf_repo_token,
+                **self._model_flags.dict(exclude_none=True)
             )
             tokenizer = AutoTokenizer.from_pretrained(
                 self.model_properties.model_location.hf.repo_id,
-                token=hf_repo_token
+                token=hf_repo_token,
+                **self._tokenizer_flags.dict(exclude_none=True)
             )
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
@@ -99,8 +122,12 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     def _load_from_hugging_face_repo(self) -> Tuple:
         """Load the model from the Hugging Face model hub based on the repo_id."""
         try:
-            model = AutoModel.from_pretrained(self.model_properties.name)
-            tokenizer = AutoTokenizer.from_pretrained(self.model_properties.name)
+            model = AutoModel.from_pretrained(
+                self.model_properties.name, **self._model_flags.dict(exclude_none=True)
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                self.model_properties.name, **self._tokenizer_flags.dict(exclude_none=True)
+            )
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encountered an error loading the Hugging Face model, modelProperties={self.model_properties}. "
@@ -119,8 +146,13 @@ class HuggingFaceModel(AbstractEmbeddingModel):
 
         model_dir = self.extract_huggingface_archive(zip_file_path)
         try:
-            model = AutoModel.from_pretrained(model_dir).to(self.device)
-            tokenizer = AutoTokenizer.from_pretrained(model_dir)
+            model = AutoModel.from_pretrained(
+                model_dir,
+                **self._model_flags.dict(exclude_none=True)
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_dir, **self._tokenizer_flags.dict(exclude_none=True)
+            )
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encountered an error loading the Hugging Face model, modelProperties={self.model_properties}. "
@@ -184,7 +216,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
     @staticmethod
     def extract_huggingface_archive(path: str) -> str:
         '''
-            This function takes the path as input. The path is a string that can be one of the followings:
+            This function takes the path as input. The path is a string that can be one of the following:
             1. A downloaded archive file. This function will extract the model from the archive return the directory path.
             2. A repo_id in huggingface. This function will return the input string directly.
 
@@ -196,8 +228,10 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             # if it's a file, check if it's a compressed file
             base, ext = os.path.splitext(path)
             if ext in ['.bin', '.pt']:
-                raise InvalidModelPropertiesError(f"Marqo does not support loading Hugging Face SBERT models from the provided single `{ext}` file. "
-                                                  "Please try to wrap the model in a Hugging Face archive file and try again. ")
+                raise InvalidModelPropertiesError(
+                    f"Marqo does not support loading Hugging Face SBERT models from the provided single `{ext}` file. "
+                    "Please try to wrap the model in a Hugging Face archive file and try again. ")
+
             try:
                 # create a new directory with the same name as the file
                 new_dir = base
@@ -223,18 +257,24 @@ class HuggingFaceModel(AbstractEmbeddingModel):
                         f"a new one. \n "
                         f"Error message: `{str(remove_e)}`"
                     )
-                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`.\n '
-                                                  f'This is probably because the file is corrupted or the extension `{ext}` is not supported. '
-                                                  f'Marqo has removed the corrupted file from the disk.'
-                                                  f'Please ensure that the file is a valid compressed file and try again.')
+                raise InvalidModelPropertiesError(
+                    f'Marqo encountered an error while extracting the compressed model archive from `{path}`.\n '
+                    f'This is probably because the file is corrupted or the extension `{ext}` is not supported. '
+                    f'Marqo has removed the corrupted file from the disk.'
+                    f'Please ensure that the file is a valid compressed file and try again.')
+
             # will this error really happen?
             except PermissionError:
-                raise InvalidModelPropertiesError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
-                                                  f'This is probably because the Marqo does not have the permission to write to the directory. '
-                                                  f'Please check the access permission of Marqo and try again.')
+                raise InvalidModelPropertiesError(
+                    f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
+                    f'This is probably because the Marqo does not have the permission to write to the directory. '
+                    f'Please check the access permission of Marqo and try again.')
+
             except Exception as e:
-                raise RuntimeError(f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
-                                                  f'The original error message is `{str(e)}`')
+                raise RuntimeError(
+                    f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
+                    f'The original error message is `{str(e)}`')
+
         else:
             # return the directory path or repo_id directory
             return path
