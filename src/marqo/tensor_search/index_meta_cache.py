@@ -102,7 +102,7 @@ def _check_refresh_thread(config: Config):
 
                         if time.time() - cache_refresh_last_logged_time > cache_refresh_log_interval:
                             cache_refresh_last_logged_time = time.time()
-                            logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
+                            # logger.info(f'Last index cache refresh at {cache_refresh_last_logged_time}')
                     except VespaError as e:
                         if isinstance(e, VespaStatusError) and e.status_code == 400:
                             # This can happen when settings schema doesn't exist
