@@ -20,7 +20,7 @@ from marqo.tensor_search.models.preprocessors_model import Preprocessors
 class StreamingMediaProcessor:
     def __init__(self, url: str, device: str, modality: Modality, marqo_index_type: IndexType,
                  marqo_index_model: Model, preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
-                 video_preprocessing: VideoPreProcessing = None, media_download_headers: Optional[Dict[str, str] ]= None):
+                 video_preprocessing: VideoPreProcessing = None, media_download_headers: Optional[Dict[str, str]]= None):
         self.url = url
         self.device = device
         self.modality = modality
@@ -67,10 +67,9 @@ class StreamingMediaProcessor:
                 'v': 'error',
                 'show_entries': 'format=size,duration',
                 'of': 'json',
-                'probesize': '256K'  # Probe only the first 256KB
+                'probesize': '256K',  # Probe only the first 256KB
+                'headers': self.media_download_headers
             }
-
-            probe_options.update(self.media_download_headers)
 
             probe = ffmpeg.probe(self.url, **probe_options)
 
