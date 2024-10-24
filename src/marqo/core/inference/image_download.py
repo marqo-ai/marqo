@@ -71,7 +71,7 @@ def _is_image(inputs: Union[str, List[Union[str, ImageType, ndarray]]]) -> bool:
         raise UnidentifiedImageError(f"expected type Image or str for inputs but received type {type(thing)}")
 
 
-def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], image_download_headers: dict) -> List[
+def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], media_download_headers: dict) -> List[
     ImageType]:
     """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
         for the clip model
@@ -90,13 +90,13 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
 
     results = []
     for image in images:
-        results.append(format_and_load_CLIP_image(image, image_download_headers))
+        results.append(format_and_load_CLIP_image(image, media_download_headers))
 
     return results
 
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
-                               image_download_headers: dict) -> Union[ImageType, Tensor]:
+                               media_download_headers: dict) -> Union[ImageType, Tensor]:
     """standardizes the input to be a PIL image
 
     Args:
@@ -113,7 +113,7 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
     """
     # check for the input type
     if isinstance(image, str):
-        img = load_image_from_path(image, image_download_headers)
+        img = load_image_from_path(image, media_download_headers)
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
     elif isinstance(image, torch.Tensor):
@@ -127,13 +127,13 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
     return img
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout_ms=3000,
+def load_image_from_path(image_path: str, media_download_headers: dict, timeout_ms=3000,
                          metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
         image_path (str): Local or remote path to image.
-        image_download_headers (dict): header for the image download
+        media_download_headers (dict): header for the image download
         timeout_ms (int): timeout (in milliseconds), for the whole request
     Raises:
         ValueError: If the local path is invalid, and is not a url
@@ -148,7 +148,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
         if metrics_obj is not None:
             metrics_obj.start(f"image_download.{image_path}")
         try:
-            img_io: BytesIO = download_image_from_url(image_path, image_download_headers, timeout_ms)
+            img_io: BytesIO = download_image_from_url(image_path, media_download_headers, timeout_ms)
             img = Image.open(img_io)
         except ImageDownloadError as e:
             raise UnidentifiedImageError(str(e)) from e
@@ -167,12 +167,12 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
     return img
 
 
-def download_image_from_url(image_path: str, image_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
+def download_image_from_url(image_path: str, media_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
     """Download an image from a URL and return a PIL image using pycurl.
 
     Args:
         image_path (str): URL to the image.
-        image_download_headers (dict): Headers for the image download.
+        media_download_headers (dict): Headers for the image download.
         timeout_ms (int): Timeout in milliseconds, for the whole request.
 
     Returns:
@@ -199,7 +199,7 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     c.setopt(pycurl.FOLLOWLOCATION, 1)
 
     headers = DEFAULT_HEADERS.copy()
-    headers.update(image_download_headers)
+    headers.update(media_download_headers)
     c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
 
     try:
