@@ -13,6 +13,7 @@ import marqo.core.exceptions as core_exceptions
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
+from marqo.vespa.exceptions import VespaStatusError
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
 from marqo.tensor_search import tensor_search
@@ -21,6 +22,8 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo.tensor_search.models.api_models import ScoreModifierLists
+from tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 
 class TestSearchSemiStructured(MarqoTestCase):
@@ -1378,3 +1381,77 @@ class TestSearchSemiStructured(MarqoTestCase):
                 with self.assertRaises(InvalidArgError):
                     res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
                                                search_method=SearchMethod.LEXICAL)
+                    
+    def test_special_characters_in_map_score_modifiers(self):
+        special_characters = SPECIAL_CHARACTERS
+
+        failed_characters = []
+        soft_failed_characters = []
+        supported_characters = []
+
+        for special_character in special_characters:
+            try:
+                docs = [
+                    {
+                        "_id": "1_map",
+                        "text_field_1": "a photo of a cat",
+                        "map_score_mods_float": {f"a{special_character}subsubfield": 0.5},
+                    }
+                ]
+
+                add_result = self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=self.default_text_index,
+                        docs=docs,
+                        tensor_fields=["text_field_1"]
+                    )
+                )
+
+                score_modifiers = ScoreModifierLists(**{
+                    "add_to_score": [{"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
+                })
+
+                res = tensor_search.search(
+                    config=self.config,
+                    index_name=self.default_text_index,
+                    text="",
+                    score_modifiers=score_modifiers,
+                )
+
+                expected_score = 1.4165449318484857
+                actual_score = res['hits'][0]['_score']
+
+                if abs(actual_score - expected_score) > 0.01:
+                    soft_failed_characters.append(special_character)
+                else:
+                    supported_characters.append(special_character)
+
+            except (errors.InvalidArgError, errors.InternalError, VespaStatusError) as e:
+                failed_characters.append(special_character)
+            except Exception as e:
+                failed_characters.append(special_character)
+                raise
+
+            finally:
+                # Clear the index after each test
+                delete_result = tensor_search.delete_documents(
+                    config=self.config,
+                    index_name=self.default_text_index,
+                    doc_ids=["1_map"]
+                )
+
+        # Print summary
+        print(f"\nSupported characters: {len(supported_characters)}")
+        print(f"Soft failed characters: {len(soft_failed_characters)}")
+        print(f"Failed characters: {len(failed_characters)}")
+
+        if soft_failed_characters:
+            print(f"\nSoft failed characters (score mismatch): {soft_failed_characters}")
+
+        if failed_characters:
+            print(f"\nFailed characters (4XX or 500 errors): {failed_characters}")
+
+        # Assert that " is the only failed character
+        self.assertEqual(failed_characters, ['"'], 
+                         f"Expected only double quote to fail, but got: {failed_characters}")
