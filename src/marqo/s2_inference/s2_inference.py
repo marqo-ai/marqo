@@ -45,10 +45,12 @@ _marqo_inference_cache = MarqoInferenceCache(cache_size=read_env_vars_and_defaul
 
 
 
-def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
-              model_properties: dict = None,
-              device: str = None, normalize_embeddings: bool = get_default_normalization(),
-              model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT, **kwargs,) -> List[List[float]]:
+def vectorise(
+        model_name: str, content: Union[str, List[str], List[Image], List[bytes]],
+        model_properties: dict = None,
+        device: str = None, normalize_embeddings: bool = get_default_normalization(),
+        model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT,
+        media_download_headers: Optional[Dict] = None, **kwargs) -> List[List[float]]:
     if not device:
         raise InternalError(message=f"vectorise (internal function) cannot be called without setting device!")
 
@@ -63,25 +65,36 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[
     model = _available_models[model_cache_key][AvailableModelsKey.model]
 
     if _marqo_inference_cache.is_enabled() and enable_cache:
-        return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs)
+        return _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality,
+                                     media_download_headers, **kwargs)
     else:
-        return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
+        return _vectorise_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers,
+                                        **kwargs)
 
-def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs):
+def _vectorise_with_cache(model, model_cache_key, content, normalize_embeddings, modality, media_download_headers,
+                          **kwargs):
     if isinstance(content, str):
         vectorised = _marqo_inference_cache.get(model_cache_key, content)
         if vectorised is None:
-            vectorised = _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
+            vectorised = _encode_without_cache(
+                model_cache_key, content, normalize_embeddings, modality, media_download_headers,
+                **kwargs
+            )
             _marqo_inference_cache.set(model_cache_key, content, vectorised[0])
         else:
             vectorised = _convert_cached_embeddings_to_output(vectorised)
         return vectorised
     elif isinstance(content, list):
-        return _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs)
+        return _vectorise_list_with_cache(
+            model, model_cache_key, content, normalize_embeddings, modality,
+            media_download_headers,
+            **kwargs
+        )
     else:
         raise TypeError(f"Unsupported content type: {type(content).__name__}")
 
-def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality, **kwargs):
+def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embeddings, modality,  media_download_headers,
+                               **kwargs):
     contents_to_vectorise = []
     cached_output = []
 
@@ -97,7 +110,10 @@ def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embedd
             contents_to_vectorise.append(content_item)
 
     if contents_to_vectorise:
-        vectorised_outputs = _encode_without_cache(model_cache_key, contents_to_vectorise, normalize_embeddings, modality, **kwargs)
+        vectorised_outputs = _encode_without_cache(
+            model_cache_key, contents_to_vectorise, normalize_embeddings, modality,
+            media_download_headers, **kwargs
+        )
         # Cache the vectorised outputs
         for content_item, vectorised_output in zip(contents_to_vectorise, vectorised_outputs):
             if isinstance(content_item, str):
@@ -110,18 +126,25 @@ def _vectorise_list_with_cache(model, model_cache_key, content, normalize_embedd
 
     return vectorised_outputs
 
-def _vectorise_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
-                             normalize_embeddings: bool, modality: Modality, **kwargs) -> List[List[float]]:
+
+def _vectorise_without_cache(
+        model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
+        normalize_embeddings: bool, modality: Modality, media_download_headers,
+        **kwargs) -> List[List[float]]:
     return _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
 
 def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
-                          normalize_embeddings: bool, modality: Modality, **kwargs) -> List[List[float]]:
+                          normalize_embeddings: bool, modality: Modality, media_download_headers: Optional[Dict]=None,
+                          **kwargs) -> List[List[float]]:
     try:
         model = _available_models[model_cache_key][AvailableModelsKey.model]
         encoder = get_encoder(model)
 
         if isinstance(content, str):
-            vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
+            vectorised = model.encode(
+                content, normalize=normalize_embeddings, modality=modality,
+                media_download_headers=media_download_headers, **kwargs
+            )
         elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         else:
@@ -134,8 +157,9 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
 
                 # TODO maybe the infer parameter can be replaced by modality
                 infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
-                encoded_batch = encoder.encode(batch, modality=modality, normalize=normalize_embeddings,
-                                               infer=infer, **kwargs)
+                encoded_batch = encoder.encode(
+                    batch, modality=modality, normalize=normalize_embeddings,
+                    media_download_headers=media_download_headers, infer = infer, **kwargs)
                 
                 vector_batches.append(_convert_tensor_to_numpy(encoded_batch))
             
