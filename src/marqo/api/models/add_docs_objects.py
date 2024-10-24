@@ -53,7 +53,7 @@ class AddDocsBodyParams(BaseModel):
         media_download_headers = values.get('mediaDownloadHeaders')
         if image_download_headers and media_download_headers:
             raise ValueError("Cannot set both imageDownloadHeaders and mediaDownloadHeaders. "
-                             "The imageDownloadHeaders is deprecated and will be removed in the future. "
+                             "'imageDownloadHeaders' is deprecated and will be removed in the future. "
                              "Use mediaDownloadHeaders instead.")
         if image_download_headers:
             values['mediaDownloadHeaders'] = image_download_headers

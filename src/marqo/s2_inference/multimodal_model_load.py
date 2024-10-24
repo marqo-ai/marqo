@@ -139,8 +139,7 @@ def fetch_content_sample(url, media_download_headers: Optional[dict] = None, sam
         HTTPError: If the response status code is not 200
     """
     response = requests.get(url, stream=True, headers=media_download_headers)
-    if response.status_code != 200:
-        response.raise_for_status()
+    response.raise_for_status()
     buffer = io.BytesIO()
     try:
         for chunk in response.iter_content(chunk_size=min(sample_size, 8192)):

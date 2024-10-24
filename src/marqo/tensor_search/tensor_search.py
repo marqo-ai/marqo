@@ -2596,7 +2596,7 @@ def vectorise_multimodal_combination_field_structured(
                     content=prefixed_text_content,
                     device=device,
                     normalize_embeddings=normalize_embeddings,
-                    infer=True,
+                    infer=False,
                     model_auth=model_auth,
                     modality=Modality.TEXT
                 )

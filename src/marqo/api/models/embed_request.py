@@ -22,11 +22,6 @@ class EmbedRequest(MarqoBaseModel):
     modelAuth: Optional[ModelAuth] = None
     content_type: Optional[EmbedContentType] = Field(default=EmbedContentType.Query, alias="contentType")
 
-    @root_validator(pre=True)
-    def _test(cls, values):
-        print(values)
-        return values
-
     @pydantic.validator('content')
     def validate_content(cls, value):
         # Iterate through content list items
@@ -70,7 +65,7 @@ class EmbedRequest(MarqoBaseModel):
         media_download_headers = values.get('mediaDownloadHeaders')
         if image_download_headers and media_download_headers:
             raise ValueError("Cannot set both imageDownloadHeaders and mediaDownloadHeaders. "
-                             "The imageDownloadHeaders is deprecated and will be removed in the future. "
+                             "'imageDownloadHeaders' is deprecated and will be removed in the future. "
                              "Use mediaDownloadHeaders instead.")
         if image_download_headers:
             values['mediaDownloadHeaders'] = image_download_headers
