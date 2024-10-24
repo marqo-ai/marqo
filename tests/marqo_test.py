@@ -23,7 +23,7 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 
 
-class TestImageUrls(Enum):
+class TestImageUrls(str, Enum):
     __test__ = False  # Prevent pytest from collecting this class as a test
     IMAGE0 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg'
     IMAGE1 = 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg'
@@ -67,7 +67,8 @@ class MarqoTestCase(unittest.TestCase):
         cls.configure_request_metrics()
         cls.vespa_client = vespa_client
         cls.zookeeper_client = zookeeper_client
-        cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client, enable_index_operations=True)
+        cls.index_management = IndexManagement(cls.vespa_client, cls.zookeeper_client, enable_index_operations=True,
+                                               deployment_lock_timeout_seconds=2)
         cls.monitoring = Monitoring(cls.vespa_client, cls.index_management)
         cls.config = config.Config(vespa_client=vespa_client, default_device="cpu",
                                    zookeeper_client=cls.zookeeper_client)

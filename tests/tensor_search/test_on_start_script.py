@@ -60,7 +60,7 @@ class TestOnStartScript(MarqoTestCase):
         }
 
         clip_model_expected = (
-            "generic-clip-test-model-2", 
+            "generic-clip-test-model-2",
             "ViT-B/32", 
             512, 
             "clip", 

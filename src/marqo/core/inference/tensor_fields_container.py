@@ -127,7 +127,7 @@ class ModelConfig(BaseModel):
 
 class Vectoriser(ABC):
     @abstractmethod
-    def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
+    def vectorise(self, content_chunks: List[ContentChunkType], key_prefix: str = None) -> List[List[float]]:
         """
         Generate embeddings from a list of content chunks.
 
@@ -159,6 +159,7 @@ class Vectoriser(ABC):
             # Fail the whole batch due to a malfunctioning embedding model
             raise ModelError(f'Problem vectorising query. Reason: {str(model_error)}')
         except s2_inference_errors.S2InferenceError as e:
+            # TODO find a better error code, the existing one is 'invalid_argument'
             raise AddDocumentsError(e.message) from e
 
     @classmethod
@@ -168,7 +169,7 @@ class Vectoriser(ABC):
 
     @classmethod
     def batch_vectorisers_by_modality(cls, model_config: ModelConfig,
-                                      chunks_to_vectorise: Dict[FieldType, List[ContentChunkType]]
+                                      chunks_to_vectorise: Dict[FieldType, List[Tuple[str, ContentChunkType]]]
                                       ) -> Dict[FieldType, 'Vectoriser']:
         return {field_type: BatchCachingVectoriser(modality, chunks_to_vectorise[field_type], model_config)
                 for modality, field_type in MODALITY_FIELD_TYPE_MAP.items()
@@ -183,7 +184,7 @@ class SingleVectoriser(Vectoriser):
         self.modality = modality
         self.model_config = model_config
 
-    def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
+    def vectorise(self, content_chunks: List[ContentChunkType], key_prefix: str = None) -> List[List[float]]:
         with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
             if self.modality in [Modality.AUDIO, Modality.VIDEO]:
                 # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
@@ -197,27 +198,12 @@ class BatchCachingVectoriser(Vectoriser):
     Generate embeddings when the class is initialised and cache them. When vectorise method is called, just return
     the cached embeddings.
     """
-    def __init__(self, modality: Modality, chunks_to_vectorise: List[ContentChunkType], model_config: ModelConfig):
+    def __init__(self, modality: Modality, chunks_to_vectorise: List[Tuple[str, ContentChunkType]], model_config: ModelConfig):
         self.modality = modality
         self.model_config = model_config
         self.embedding_cache = self._vectorise_and_cache(chunks_to_vectorise)
 
-    def _dict_key(self, chunk: ContentChunkType):
-        if isinstance(chunk, Image):
-            chunk = chunk.convert('RGB')
-            pixel_bytes = chunk.tobytes()
-            # Use md5 hash for faster hashing.
-            return hashlib.md5(pixel_bytes).hexdigest()
-        elif isinstance(chunk, dict):
-            # Generate a sorted key-value pairs to ensure consistency.
-            return frozenset((k, self._dict_key(v)) for k, v in chunk.items())
-        elif isinstance(chunk, Tensor):
-            # Convert to a tuple to be hashable  # TODO find a more memory efficient way, maybe hashlib.md5?
-            return tuple(chunk.flatten().tolist())
-        else:
-            return chunk
-
-    def _vectorise_and_cache(self, chunks_to_vectorise: List[ContentChunkType]) -> dict:
+    def _vectorise_and_cache(self, chunks_to_vectorise: List[Tuple[str, ContentChunkType]]) -> dict:
         if not chunks_to_vectorise:
             return dict()
 
@@ -226,14 +212,15 @@ class BatchCachingVectoriser(Vectoriser):
         with RequestMetricsStore.for_request().time(f"add_documents.create_vectors"):
             if self.modality in [Modality.AUDIO, Modality.VIDEO]:
                 # audio and video fields has to be vectorised chunk by chunk due to a limitation of languagebind
-                embeddings = [vector for content_chunk in chunks_to_vectorise for vector in
+                embeddings = [vector for _, content_chunk in chunks_to_vectorise for vector in
                               self._s2inference_vectorise([content_chunk], self.modality, self.model_config)]
             else:
-                embeddings = self._s2inference_vectorise(chunks_to_vectorise, self.modality, self.model_config)
-            return {self._dict_key(chunk): embeddings[i] for i, chunk in enumerate(chunks_to_vectorise)}
+                embeddings = self._s2inference_vectorise([content_chunk for _, content_chunk in chunks_to_vectorise],
+                                                         self.modality, self.model_config)
+            return {f'{key}': embeddings[i] for i, (key, _) in enumerate(chunks_to_vectorise)}
 
-    def vectorise(self, content_chunks: List[ContentChunkType]) -> List[List[float]]:
-        return [self.embedding_cache[self._dict_key(chunk)] for chunk in content_chunks]
+    def vectorise(self, content_chunks: List[ContentChunkType], key_prefix: str = None) -> List[List[float]]:
+        return [self.embedding_cache[f'{key_prefix}_{i}'] for i, _ in enumerate(content_chunks)]
 
 
 class TensorFieldContent(BaseModel):
@@ -299,14 +286,14 @@ class TensorFieldContent(BaseModel):
                 self.chunks.extend(chunks)
                 self.content_chunks.extend(content_chunks)
 
-    def vectorise(self, vectorisers: Dict[FieldType, Vectoriser]) -> None:
+    def vectorise(self, vectorisers: Dict[FieldType, Vectoriser], key_prefix: str = None) -> None:
         if self.field_type not in vectorisers:
             raise AddDocumentsError(f'Vectorisation is not supported for field type: {self.field_type.name}')
 
         if not self.content_chunks:
             return
 
-        embeddings = vectorisers[self.field_type].vectorise(self.content_chunks)
+        embeddings = vectorisers[self.field_type].vectorise(self.content_chunks, key_prefix)
         self.embeddings.extend(embeddings)
         self.content_chunks = []  # drop it after vectorisation so memory can be freed
         self.is_resolved = True

@@ -8,7 +8,7 @@ from marqo.api import exceptions as api_errors
 from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
 from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.inference.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
-    TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser
+    TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser, ContentChunkType
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \
     UnsupportedFeatureError
 from marqo.core.models import MarqoIndex
@@ -308,17 +308,20 @@ class AddDocumentsHandler(ABC):
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
-
-            doc_chunks_map: Dict[str, Dict[FieldType, List[str]]] = dict()
-            doc_field_map: Dict[str, List[TensorFieldContent]] = dict()
+            # sample doc_chunks_map: {'doc_id1': {'image_pointer': [('field_a_0': content_chunk)]}}
+            doc_chunks_map: Dict[str, Dict[FieldType, List[Tuple[str, ContentChunkType]]]] = dict()
+            # sample doc_field_map: {'doc_id1': {'field_name_1': tensor_field_content}}
+            doc_field_map: Dict[str, Dict[str, TensorFieldContent]] = dict()
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
                     tensor_field_content.chunk(chunkers)
+                    content_chunks_with_key = [(f'{field_name}_{index}', chunk) for index, chunk in
+                                               enumerate(tensor_field_content.content_chunks)]
                     doc_chunks_map.setdefault(doc_id, {}).setdefault(
-                        tensor_field_content.field_type, []).extend(tensor_field_content.content_chunks)
-                    doc_field_map.setdefault(doc_id, []).append(tensor_field_content)
+                        tensor_field_content.field_type, []).extend(content_chunks_with_key)
+                    doc_field_map.setdefault(doc_id, {})[field_name] = tensor_field_content
 
                 except AddDocumentsError as err:
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
@@ -331,8 +334,8 @@ class AddDocumentsHandler(ABC):
                 try:
                     vectorisers = Vectoriser.batch_vectorisers_by_modality(model_config, chunks_to_vectorise)
 
-                    for tensor_field_content in doc_field_map[doc_id]:
-                        tensor_field_content.vectorise(vectorisers)
+                    for field_name, tensor_field_content in doc_field_map[doc_id].items():
+                        tensor_field_content.vectorise(vectorisers, key_prefix=field_name)
 
                 except AddDocumentsError as err:
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
@@ -342,14 +345,17 @@ class AddDocumentsHandler(ABC):
         with ExitStack() as exit_stack:
             media_repo = self._download_media_contents(exit_stack)
             chunkers = self._field_type_chunker_map(media_repo)
-            chunks_map = dict()
+            # sample chunks_map: {'image_pointer': [('doc_id_1_field_a_0': content_chunk)]}
+            chunks_map: Dict[FieldType, List[Tuple[str, ContentChunkType]]] = dict()
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
                 try:
                     tensor_field_content.chunk(chunkers)
                     field_type = tensor_field_content.field_type
-                    chunks_map.setdefault(field_type, []).extend(tensor_field_content.content_chunks)
+                    content_chunks_with_key = [(f'{doc_id}_{field_name}_{index}', chunk) for index, chunk in
+                                               enumerate(tensor_field_content.content_chunks)]
+                    chunks_map.setdefault(field_type, []).extend(content_chunks_with_key)
                 except AddDocumentsError as err:
                     self.add_docs_response_collector.collect_error_response(doc_id, err)
                     self.tensor_fields_container.remove_doc(doc_id)
@@ -359,12 +365,12 @@ class AddDocumentsHandler(ABC):
             except AddDocumentsError as err:
                 logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err)
                 raise InternalError(
-                    message=f'Encountered problem when vectorising batch of documents. Reason: {str(err)}'
+                    message=f'Encountered problem when vectorising batch of documents. Reason: {err.error_message}'
                 )
 
             for doc_id, field_name, tensor_field_content in (
                     self.tensor_fields_container.tensor_fields_to_vectorise(*chunkers.keys())):
-                tensor_field_content.vectorise(vectorisers)
+                tensor_field_content.vectorise(vectorisers, key_prefix=f'{doc_id}_{field_name}')
 
     def _download_media_contents(self, exit_stack):
         url_doc_id_map = dict()

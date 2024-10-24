@@ -102,6 +102,9 @@ class AddDocumentsError(Exception):
         self.error_message = error_message
         self.status_code = int(status_code)
 
+    def __str__(self) -> str:
+        return f'{self.error_code}: {self.error_message}'
+
 
 class DuplicateDocumentError(AddDocumentsError):
     pass
