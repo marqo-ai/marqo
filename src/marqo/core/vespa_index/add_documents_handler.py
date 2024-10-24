@@ -365,7 +365,7 @@ class AddDocumentsHandler(ABC):
             except AddDocumentsError as err:
                 logger.error('Encountered problem when vectorising batch of documents. Reason: %s', err)
                 raise InternalError(
-                    message=f'Encountered problem when vectorising batch of documents. Reason: {str(err)}'
+                    message=f'Encountered problem when vectorising batch of documents. Reason: {err.error_message}'
                 )
 
             for doc_id, field_name, tensor_field_content in (
