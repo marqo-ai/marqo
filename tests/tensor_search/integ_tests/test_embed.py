@@ -549,7 +549,7 @@ class TestEmbed(MarqoTestCase):
                         marqo_config=self.config, index_name=index.name,
                         embedding_request=EmbedRequest(
                             content=[image_url],
-                            media_download_headers={"Authorization": "my secret key"},
+                            mediaDownloadHeaders={"Authorization": "my secret key"},
                             modelAuth=ModelAuth(s3=S3Auth(
                                 aws_access_key_id='12345',
                                 aws_secret_access_key='this-is-a-secret'))

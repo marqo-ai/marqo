@@ -65,7 +65,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
-        text_field_type = self._infer_field_type(field_content)
+        text_field_type = self._infer_field_type(field_content, self.add_docs_params.media_download_headers)
         content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name,
                                                        field_content, text_field_type)
         marqo_doc[field_name] = content

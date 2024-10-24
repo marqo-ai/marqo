@@ -170,7 +170,6 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
             return Modality.VIDEO
         elif extension in ['mp3', 'wav', 'ogg']:
             return Modality.AUDIO
-
         if validate_url(encoded_url):
             # Use context manager to handle content sample
             try:

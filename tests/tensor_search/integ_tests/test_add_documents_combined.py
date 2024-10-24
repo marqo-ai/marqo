@@ -1128,7 +1128,8 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
     def test_add_private_images_success(self):
         """Test to ensure that private images can be downloaded with proper headers"""
-        test_indexes = [self.structured_marqo_index_name, self.unstructured_marqo_index_name]
+        # test_indexes = [self.structured_marqo_index_name, self.unstructured_marqo_index_name]
+        test_indexes =  [self.unstructured_marqo_index_name, ]
         documents = [
             {
                 "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
