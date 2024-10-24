@@ -11,11 +11,10 @@ import io
 from pydantic import BaseModel
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Union, Optional
+from typing import List, Dict, Any, Union
 from PIL.Image import Image
 import torch
 from urllib.parse import quote
-from marqo.core.inference.image_download import DEFAULT_HEADERS
 
 
 from marqo.s2_inference.multimodal_model_load import *
@@ -110,15 +109,15 @@ class MultimodalModel:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
         return self.encoder.preprocessor(modality)
 
-    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, **kwargs):
+    def encode(self, content, modality, **kwargs):
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
-        return self.encoder.encode(content, modality, media_download_headers, **kwargs)
+        return self.encoder.encode(content, modality, **kwargs)
 
 
 class ModelEncoder(ABC):
     @abstractmethod
-    def encode(self, content, modality, media_download_headers, **kwargs):
+    def encode(self, content, modality, **kwargs):
         pass
 
 
@@ -126,14 +125,13 @@ class DefaultEncoder(ModelEncoder):
     def __init__(self, model):
         self.model = model
 
-    def encode(self, content, modality, media_download_headers, **kwargs):
-        return self.model.encode(content, modality=modality, media_download_headers=media_download_headers, **kwargs)
+    def encode(self, content, modality, **kwargs):
+        return self.model.encode(content, **kwargs)
 
 
 @contextmanager
-def fetch_content_sample(url, media_download_headers: Optional[dict] = None, sample_size=10240):  # 10 KB
-    # It's ok to pass None to requests.get() for headers and it won't change the default headers
-    response = requests.get(url, stream=True, headers=media_download_headers)
+def fetch_content_sample(url, sample_size=10240):  # 10 KB
+    response = requests.get(url, stream=True)
     buffer = io.BytesIO()
     try:
         for chunk in response.iter_content(chunk_size=min(sample_size, 8192)):
@@ -147,7 +145,7 @@ def fetch_content_sample(url, media_download_headers: Optional[dict] = None, sam
         response.close()
 
 
-def infer_modality(content: Union[str, List[str], bytes], media_download_headers: Optional[dict] = None) -> Modality:
+def infer_modality(content: Union[str, List[str], bytes]) -> Modality:
     """
     Infer the modality of the content. Video, audio, image or text.
     """
@@ -169,7 +167,7 @@ def infer_modality(content: Union[str, List[str], bytes], media_download_headers
         if validate_url(encoded_url):
             # Use context manager to handle content sample
             try:
-                with fetch_content_sample(encoded_url, media_download_headers) as sample:
+                with fetch_content_sample(encoded_url) as sample:
                     mime = magic.from_buffer(sample.read(), mime=True)
                     if mime.startswith('image/'):
                         return Modality.IMAGE
@@ -251,7 +249,7 @@ class LanguageBindEncoder(ModelEncoder):
 
         return self._preprocessors.get(modality)
 
-    def encode(self, content, modality, normalize=True, media_download_headers: Optional[Dict]=None, **kwargs):
+    def encode(self, content, modality, normalize=True, **kwargs):
         inputs = {}
 
         if modality == Modality.TEXT:
@@ -269,7 +267,7 @@ class LanguageBindEncoder(ModelEncoder):
                     with open(temp_filename, 'wb') as f:
                         f.write(content)
                 elif isinstance(content, str) and "http" in content:
-                    self._download_content(content, temp_filename, media_download_headers)
+                    self._download_content(content, temp_filename)
                 else:
                     return self.encode([content], modality=Modality.TEXT)
 
@@ -280,7 +278,7 @@ class LanguageBindEncoder(ModelEncoder):
             if isinstance(content, str) and "http" in content:
                 suffix = ".mp4" if modality == Modality.VIDEO else ".wav"
                 with self._temp_file(suffix) as temp_filename:
-                    self._download_content(content, temp_filename, media_download_headers)
+                    self._download_content(content, temp_filename)
                     preprocessed_content = self.preprocessor(modality)([temp_filename], return_tensors='pt')
                     inputs[modality.value] = to_device(preprocessed_content, self.model.device)['pixel_values']
 
@@ -302,11 +300,11 @@ class LanguageBindEncoder(ModelEncoder):
 
         return embeddings.cpu().numpy()
 
-    def _download_content(self, url, filename, media_download_headers: Optional[Dict]=None):
+    def _download_content(self, url, filename):
         # 3 seconds for images, 20 seconds for audio and video
         timeout_ms = 3000 if filename.endswith(('.png', '.jpg', '.jpeg')) else 20000
 
-        buffer = download_image_from_url(url, media_download_headers, timeout_ms)
+        buffer = download_image_from_url(url, {}, timeout_ms)
 
         with open(filename, 'wb') as f:
             f.write(buffer.getvalue())
