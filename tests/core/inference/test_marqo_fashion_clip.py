@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from marqo.s2_inference.clip_utils import OPEN_CLIP
+from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.model_registry import _get_open_clip_properties
 from marqo.s2_inference.s2_inference import clear_loaded_models
 

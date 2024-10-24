@@ -14,56 +14,63 @@ def _build_url(path):
 
 
 def configuring_marqo():
-    return _build_url('Guides/Advanced-Usage/configuration/')
+    return _build_url('other-resources/guides/advanced-usage/configuration/')
 
 
 def create_index():
-    return _build_url('API-Reference/Indexes/create_index/')
+    return _build_url('reference/api/indexes/create-index/')
 
 
 def multimodal_combination_object():
-    return _build_url('Guides/Advanced-Usage/document_fields/#multimodal-combination-object/')
+    return _build_url('other-resources/guides/advanced-usage/document-fields/#multimodal-combination-object')
 
 
 def custom_vector_object():
-    return _build_url('Guides/Advanced-Usage/document_fields/#custom-vectors/')
+    return _build_url('other-resources/guides/advanced-usage/document-fields/#custom-vector-object')
 
 
 def mappings():
-    return _build_url('API-Reference/Documents/mappings/')
+    return _build_url('reference/api/documents/mappings/')
 
 
 def map_fields():
-    return _build_url('API-Reference/Documents/add_or_replace_documents/#map-fields/')
+    return _build_url('reference/api/documents/add-or-replace-documents/#map-fields')
 
 
 def list_of_models():
-    return _build_url('Guides/Models-Reference/list_of_models/')
+    return _build_url('models/marqo/list-of-models/')
 
 
 def search_context():
-    return _build_url('API-Reference/Search/search/#context')
+    return _build_url('reference/api/search/search/#context')
 
 
 def configuring_preloaded_models():
-    return _build_url('Guides/Advanced-Usage/configuration/#configuring-preloaded-models')
+    return _build_url('other-resources/guides/advanced-usage/configuration/#configuring-preloaded-models')
 
 
 def bring_your_own_model():
-    return _build_url('Guides/Models-Reference/bring_your_own_model/')
+    return _build_url('models/marqo/bring-your-own-model')
 
 
 def query_reference():
-    return _build_url('API-Reference/Search/search/#query-q')
+    return _build_url('reference/api/search/search/#query-q')
 
 
 def indexing_images():
-    return _build_url('Guides/Advanced-Usage/images/')
+    return _build_url('other-resources/guides/advanced-usage/images/')
 
 
 def api_reference_document_body():
-    return _build_url('API-Reference/Documents/add_or_replace_documents/#body')
+    return _build_url('reference/api/documents/add-or-replace-documents/#body')
 
 
 def troubleshooting():
     return _build_url('other-resources/troubleshooting/troubleshooting/')
+
+
+def generic_models():
+    return _build_url('models/marqo/list-of-models/#generic-clip-models')
+
+def search_api_score_modifiers_parameter():
+    return _build_url('reference/api/search/search/#score-modifiers')
