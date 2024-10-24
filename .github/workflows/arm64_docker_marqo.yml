@@ -83,7 +83,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.9   # TODO: Check if 3.9 is okay instead of 3.8. So far, so good
+      - name: Set up Python 3.9
         run:  |
           apt-get -y update
           apt-get -y install python3.9

@@ -91,10 +91,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
-          python-version: "3.8"
+          python-version: "3.9"
           cache: "pip"
           
       - name: Install Dependencies
