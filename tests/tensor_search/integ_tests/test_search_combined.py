@@ -1060,7 +1060,7 @@ class TestSearch(MarqoTestCase):
 
 
 @pytest.mark.largemodel
-class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
+class TestLanguageBindModelSearchCombined(MarqoTestCase):
     """A class to test the search with the LanguageBind model."""
 
     @classmethod
@@ -1130,7 +1130,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                         config = self.config,
                         index_name=index_name,
                         text=query,
-                        search_method=SearchMethod.LEXICAL
+                        search_method=SearchMethod.TENSOR
                     )
 
     def test_language_bind_model_can_search_all_private_media_modalities(self):
@@ -1154,6 +1154,6 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                         config = self.config,
                         index_name=index_name,
                         text=query,
-                        search_method=SearchMethod.LEXICAL,
+                        search_method=SearchMethod.TENSOR,
                         media_download_headers={"marqo_media_header": "media_header_test_key"}
                     )
