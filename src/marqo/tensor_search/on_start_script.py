@@ -19,6 +19,10 @@ from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
+import threading
+import time
+import torch
+import logging
 
 
 
@@ -39,6 +43,7 @@ def on_start(config: config.Config):
         PrintVersion(),
         MarqoWelcome(),
         MarqoPhrase(),
+        StartTorchCudaSummary()
     )
 
     for thing_to_start in to_run_on_start:
@@ -366,3 +371,38 @@ class MarqoWelcome:
                                                                                                                         
         """
         print(message, flush=True)
+
+
+class StartTorchCudaSummary:
+
+    def __init__(self, log_file='./cuda_memory_summary.log', interval=60):
+        self.log_file = log_file
+        self.interval = interval  # time in seconds between summaries
+        self.stop_thread = threading.Event()
+
+    def _log_memory_summary(self):
+        while not self.stop_thread.is_set():
+            # Get CUDA memory summary
+            summary = torch.cuda.memory_summary()
+
+            # Log the memory summary to the log file
+            with open(self.log_file, 'a') as log:
+                log.write(f"Memory Summary at {time.strftime('%Y-%m-%d %H:%M:%S')}:\n")
+                log.write(summary)
+                log.write("\n\n")
+
+            # Print the summary to the console
+            print(summary)
+
+            # Sleep for the specified interval before logging the next summary
+            time.sleep(self.interval)
+
+    def run(self):
+        # Start a background thread that logs memory summaries at regular intervals
+        self.thread = threading.Thread(target=self._log_memory_summary, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        # Stop the background thread
+        self.stop_thread.set()
+        self.thread.join()
