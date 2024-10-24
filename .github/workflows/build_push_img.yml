@@ -1,0 +1,132 @@
+name: Build and Push Marqo Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      marqo_ref:
+        description: 'Marqo branch-name, commit SHA or tag'
+        required: false
+        default: 'mainline'
+      push_to:
+        description: 'image destination. Options: "ECR", "DockerHub"'
+        required: true
+      image_repo:
+        description: 'Image repository'
+        required: true
+        default: 'marqo'
+      image_tag:
+        description: 'Image tag'
+        required: true
+      dockerhub_username:
+        description: 'DockerHub username'
+        required: false
+      dockerhub_password:
+        description: 'DockerHub password'
+        required: false
+
+jobs:
+  Start-Runner:
+    # on US-WEST-2, open source account
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_EC2_GH_RUNNER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_EC2_GH_RUNNER_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          # 200 GB amd64 image
+          ec2-image-id:  ami-01accacd51bdde263
+          ec2-instance-type: t3.xlarge
+          subnet-id: subnet-038b1447ac3c97e7a
+          security-group-id: sg-094be521399e0d5ba
+
+  Docker-Build:
+    name: Build docker image
+    needs: Start-Runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+
+    environment: marqo-build-environment
+
+    steps:
+      - name: Checkout Marqo
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo
+          ref: ${{ github.event.inputs.marqo_ref }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        if: github.event.inputs.push_to == 'DockerHub'
+        with:
+          username: ${{ github.event.inputs.dockerhub_username }}
+          password: ${{ github.event.inputs.dockerhub_password }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        if: github.event.inputs.push_to == 'ECR'
+        with:
+          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: docker/login-action@v2
+        if: github.event.inputs.push_to == 'ECR'
+        with:
+          registry: 424082663841.dkr.ecr.us-east-1.amazonaws.com/${{ github.event.inputs.image_repo }}
+
+      - name: Set registry and image repo
+        id: prepare
+        run: |
+          if [[ "${{ github.event.inputs.push_to }}" == "ECR" ]]; then
+            echo "::set-output name=registry::424082663841.dkr.ecr.us-east-1.amazonaws.com"
+          else
+            echo "::set-output name=registry::marqoai"
+          fi
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.prepare.outputs.registry }}/${{ github.event.inputs.image_repo }}:${{ github.event.inputs.image_tag }}
+
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Docker-Build # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_EC2_GH_RUNNER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_EC2_GH_RUNNER_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
