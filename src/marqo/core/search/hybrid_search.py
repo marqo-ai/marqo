@@ -152,7 +152,7 @@ class HybridSearch:
             q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,
             limit=result_count,
             offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
-            boost=boost, media_download_headers=media_download_headers, context=context, scoreModifiers=score_modifiers,
+            boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
             index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix,
             hybridParameters=hybrid_parameters
         )]
