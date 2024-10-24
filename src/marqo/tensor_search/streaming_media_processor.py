@@ -30,11 +30,11 @@ class StreamingMediaProcessor:
         self.video_preprocessing = video_preprocessing
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
-        self.total_size, self.duration = self._fetch_file_metadata()
-
         if media_download_headers is None:
             media_download_headers = {}
         self.media_download_headers = media_download_headers
+
+        self.total_size, self.duration = self._fetch_file_metadata()
 
         self._set_split_parameters(modality)
         self._log_initialization_details()
