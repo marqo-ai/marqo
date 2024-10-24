@@ -706,7 +706,7 @@ class TestHuggingFaceModel(unittest.TestCase):
                         HuggingFaceModel(model_properties, device, model_flags=model_flags,
                                          tokenizer_flags=tokenizer_flags)
 
-                    self.assertIn("trust_remote_code", str(context.exception))
+                    self.assertIn("trustRemoteCode", str(context.exception))
 
         for trust_remote_code in [None, False]:
             with self.subTest(trust_remote_code=trust_remote_code):

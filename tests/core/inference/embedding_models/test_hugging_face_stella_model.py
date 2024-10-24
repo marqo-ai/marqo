@@ -19,7 +19,7 @@ class TestHuggingFaceStellaModel(unittest.TestCase):
                 with self.assertRaises(InvalidModelPropertiesError) as context:
                     HuggingFaceStellaModel(model_properties, device)
 
-                self.assertIn("trust_remote_code", str(context.exception))
+                self.assertIn("trustRemoteCode", str(context.exception))
 
         with self.subTest(trust_remote_code=True):
             model_properties = {'name': 'my_model', 'type': 'hf', 'dimensions': 512,
