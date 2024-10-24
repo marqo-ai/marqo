@@ -2372,7 +2372,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=False, model_auth=model_auth, modality=Modality.TEXT
+                    infer=True, model_auth=model_auth, modality=Modality.TEXT
                 )
 
                 vectors_list.extend(text_vectors)
@@ -2596,7 +2596,7 @@ def vectorise_multimodal_combination_field_structured(
                     content=prefixed_text_content,
                     device=device,
                     normalize_embeddings=normalize_embeddings,
-                    infer=False,
+                    infer=True,
                     model_auth=model_auth,
                     modality=Modality.TEXT
                 )

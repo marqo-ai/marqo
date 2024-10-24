@@ -39,7 +39,6 @@ logger = logging.getLogger(__name__)
 def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                              media_repo: dict,
                                              tensor_fields: List[str],
-                                             image_download_headers: dict,
                                              device: str = None,
                                              media_field_types_mapping: Optional[Dict[str, FieldType]] = None,
                                              media_download_headers: Optional[Dict] = None,
@@ -118,7 +117,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             continue
 
                         try:
-                            media_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], image_download_headers,
+                            media_repo[doc[field]] = clip_utils.load_image_from_path(doc[field], media_download_headers,
                                                                                      timeout_ms=int(
                                                                                          TIMEOUT_SECONDS * 1000),
                                                                                      metrics_obj=metric_obj)
@@ -166,7 +165,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 continue
 
                         try:
-                            processed_chunks = download_and_chunk_media(doc[field], device, download_headers, inferred_modality,
+                            processed_chunks = download_and_chunk_media(doc[field], device, media_download_headers, inferred_modality,
                                                                     marqo_index_type, marqo_index_model, preprocessors,
                                                                     audio_preprocessing, video_preprocessing)
                             media_repo[doc[field]] = processed_chunks
@@ -188,7 +187,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             try:
                                 media_repo[sub_field] = clip_utils.load_image_from_path(
                                     sub_field,
-                                    image_download_headers,
+                                    media_download_headers,
                                     timeout=TIMEOUT_SECONDS,
                                     metrics_obj=metric_obj
                                 )
@@ -289,11 +288,10 @@ def _determine_thread_count(marqo_index: MarqoIndex, add_docs_params: AddDocsPar
 
 @contextmanager
 def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                                    image_download_headers: dict,
                                     model_name: str,
                                     normalize_embeddings: bool,
                                     media_field_types_mapping: Optional[Dict[str, FieldType]],
-                                    media_download_headers: Optional[Dict] = None,  # Optional for now
+                                    media_download_headers: Optional[Dict] = None,
                                     model_properties: Optional[Dict] = None,
                                     model_auth: Optional[ModelAuth] = None,
                                     device: Optional[str] = None,
@@ -309,7 +307,6 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
         docs = docs,
         thread_count = thread_count,
         tensor_fields = tensor_fields,
-        image_download_headers = image_download_headers,
         model_name = model_name,
         normalize_embeddings = normalize_embeddings,
         force_download = force_download,
@@ -336,15 +333,17 @@ def download_and_preprocess_content(docs: List[dict], thread_count: int, tensor_
                 pass
 
 
-def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
-                  image_download_headers: dict, model_name: str, normalize_embeddings: bool,
-                  force_download: bool, media_field_types_mapping: Optional[Dict[str, FieldType]],
-                  model_properties: Optional[Dict],
-                  model_auth: Optional[ModelAuth], device: Optional[str],
-                  patch_method_exists: bool, marqo_index_type: Optional[IndexType], marqo_index_model: Optional[Model],
-                  media_download_headers: Optional[Dict] = None,
-                  audio_preprocessing: Optional[AudioPreProcessing] = None,
-                  video_preprocessing: Optional[VideoPreProcessing] = None) -> dict:
+def process_batch(
+        docs: List[dict], thread_count: int, tensor_fields: List[str],
+        model_name: str, normalize_embeddings: bool,
+        force_download: bool, media_field_types_mapping: Optional[Dict[str, FieldType]],
+        model_properties: Optional[Dict],
+        model_auth: Optional[ModelAuth], device: Optional[str],
+        patch_method_exists: bool, marqo_index_type: Optional[IndexType], marqo_index_model: Optional[Model],
+        media_download_headers: Optional[Dict] = None,
+        audio_preprocessing: Optional[AudioPreProcessing] = None,
+        video_preprocessing: Optional[VideoPreProcessing] = None
+) -> dict:
 
     docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
@@ -373,7 +372,6 @@ def process_batch(docs: List[dict], thread_count: int, tensor_fields: List[str],
                 allocation,
                 media_repo,
                 tensor_fields,
-                image_download_headers,
                 device,
                 media_field_types_mapping,
                 media_download_headers,

@@ -53,7 +53,7 @@ def vectorise(model_name: str, content: Union[str, List[str], List[Image], List[
               enable_cache: bool = False,
               modality: Modality = Modality.TEXT,
               media_download_headers: Optional[Dict] = None,
-              infer: bool = False
+              infer: bool = True
               ) -> List[List[float]]:
     """Vectorise the given content using the given model.
 

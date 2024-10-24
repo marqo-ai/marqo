@@ -127,7 +127,7 @@ class DefaultEncoder(ModelEncoder):
         self.model = model
 
     def encode(self, content, modality, media_download_headers, **kwargs):
-        return self.model.encode(content, media_download_headers, **kwargs)
+        return self.model.encode(content, modality=modality, media_download_headers=media_download_headers, **kwargs)
 
 
 @contextmanager

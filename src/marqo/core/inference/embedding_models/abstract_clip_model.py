@@ -53,8 +53,8 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
     def encode_image(self, inputs, normalize: bool = True, image_download_headers: dict = None) -> np.ndarray:
         pass
 
-    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
-               default: str = 'text', normalize=True, **kwargs) -> np.ndarray:
+    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], normalize=True, **kwargs) -> np.ndarray:
+        default = "text"
         infer = kwargs.pop('infer', True)
         if infer and _is_image(inputs):
             is_image = True

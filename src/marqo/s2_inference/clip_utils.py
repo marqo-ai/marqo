@@ -177,6 +177,8 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     c.setopt(pycurl.FOLLOWLOCATION, 1)
 
     headers = DEFAULT_HEADERS.copy()
+    if image_download_headers is None:
+        image_download_headers = dict()
     headers.update(image_download_headers)
     c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
 
@@ -467,9 +469,8 @@ class CLIP:
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]],
-               default: str = 'text', normalize=True, **kwargs) -> FloatTensor:
-
+    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], normalize=True, **kwargs) -> FloatTensor:
+        default = "text"
         infer = kwargs.pop('infer', True)
 
         if infer and _is_image(inputs):
