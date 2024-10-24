@@ -1,3 +1,4 @@
+from marqo.core.inference.embedding_models.hugging_face_stella_model import HuggingFaceStellaModel
 from marqo.s2_inference.clip_utils import CLIP, MULTILINGUAL_CLIP, FP16_CLIP, \
     get_multilingual_clip_properties
 from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
@@ -2140,6 +2141,7 @@ def _get_model_load_mappings() -> Dict:
             "fp16_clip": FP16_CLIP,
             'random':Random,
             'hf':HuggingFaceModel,
+            'hf_stella': HuggingFaceStellaModel,
             "no_model": NO_MODEL}
 
 def load_model_properties() -> Dict:

@@ -64,8 +64,8 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
 
     @validator("type")
     def _validate_type(cls, v):
-        if v != "hf":
-            raise ValueError("The type of the model should be 'hf'.")
+        if v not in ["hf", "hf_stella"]:
+            raise ValueError("The type of the model should be 'hf' or 'hf_stella'.")
         return v
 
     @root_validator(pre=True, skip_on_failure=True)
