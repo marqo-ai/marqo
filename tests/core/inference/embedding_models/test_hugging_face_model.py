@@ -4,7 +4,8 @@ from unittest import mock
 import numpy as np
 
 from marqo.core.inference.embedding_models.hugging_face_model import HuggingFaceModel
-from marqo.core.inference.embedding_models.hugging_face_model_properties import PoolingMethod
+from marqo.core.inference.embedding_models.hugging_face_model_properties import PoolingMethod, HuggingFaceModelFlags, \
+  HuggingFaceTokenizerFlags
 from marqo.s2_inference.errors import InvalidModelPropertiesError
 
 
@@ -681,6 +682,62 @@ class TestHuggingFaceModel(unittest.TestCase):
             model.load()
 
         self.assertIn("Model load failed", str(excinfo.exception))
+
+    def test_trust_remote_code_validation_false(self):
+        """
+        Test that an error is raised when trust_remote_code is set to True for model or tokenizer,
+        but is not set in the model_properties or is set to false
+        """
+        for trust_remote_code in [None, False]:
+            for model_trust_remote_code, tokenizer_trust_remote_code in [(True, False), (False, True), (True, True)]:
+                with self.subTest(trust_remote_code=trust_remote_code,
+                                  model_trust_remote_code=model_trust_remote_code,
+                                  tokenizer_trust_remote_code=tokenizer_trust_remote_code):
+                    model_properties = {k: v for k, v in {'name': 'my_model', 'type': 'hf', 'dimensions': 512,
+                                                          'trustRemoteCode': trust_remote_code}.items() if
+                                        v is not None}
+                    device = 'cpu'
+
+                    # Case 1: trust_remote_code flag not set in model_properties, should raise InvalidModelPropertiesError
+                    model_flags = HuggingFaceModelFlags(trust_remote_code=model_trust_remote_code)
+                    tokenizer_flags = HuggingFaceTokenizerFlags(trust_remote_code=tokenizer_trust_remote_code)
+
+                    with self.assertRaises(InvalidModelPropertiesError) as context:
+                        HuggingFaceModel(model_properties, device, model_flags=model_flags,
+                                         tokenizer_flags=tokenizer_flags)
+
+                    self.assertIn("trustRemoteCode", str(context.exception))
+
+        for trust_remote_code in [None, False]:
+            with self.subTest(trust_remote_code=trust_remote_code):
+                model_properties = {k: v for k, v in {'name': 'my_model', 'type': 'hf', 'dimensions': 512,
+                                                      'trustRemoteCode': trust_remote_code}.items() if
+                                    v is not None}
+                device = 'cpu'
+
+                # Case 1: trust_remote_code flag not set in model_properties, should raise InvalidModelPropertiesError
+                model_flags = HuggingFaceModelFlags(trust_remote_code=False)
+                tokenizer_flags = HuggingFaceTokenizerFlags(trust_remote_code=False)
+
+                self.assertIsNotNone(HuggingFaceModel(model_properties, device, model_flags=model_flags,
+                                                      tokenizer_flags=tokenizer_flags))
+
+    def test_trust_remote_code_validation_true(self):
+        """
+        Test that no error is raised when trust_remote_code is set to True.
+        """
+        for model_trust_remote_code, tokenizer_trust_remote_code in [(True, False), (False, True), (True, True)]:
+            with self.subTest(model_trust_remote_code=model_trust_remote_code,
+                              tokenizer_trust_remote_code=tokenizer_trust_remote_code):
+                model_properties = {'name': 'my_model', 'type': 'hf', 'dimensions': 512, 'trustRemoteCode': True}
+                device = 'cpu'
+
+                # Case 1: trust_remote_code flag not set in model_properties, should raise InvalidModelPropertiesError
+                model_flags = HuggingFaceModelFlags(trust_remote_code=model_trust_remote_code)
+                tokenizer_flags = HuggingFaceTokenizerFlags(trust_remote_code=tokenizer_trust_remote_code)
+
+                self.assertIsNotNone(HuggingFaceModel(model_properties, device, model_flags=model_flags,
+                                                      tokenizer_flags=tokenizer_flags))
 
     def test_sentence_transformers_nli_bert_base_cls_pooling_embeddings(self):
         """A test to ensure the embeddings are generated correctly for the default text model, loading from hf.

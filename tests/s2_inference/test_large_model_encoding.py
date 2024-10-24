@@ -3,7 +3,8 @@ import torch
 import pytest
 import json
 from marqo.s2_inference.types import FloatTensor
-from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, _convert_tensor_to_numpy
+from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, \
+    _convert_tensor_to_numpy
 from unittest.mock import patch
 import numpy as np
 import unittest
@@ -15,7 +16,7 @@ import functools
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
 from tests.marqo_test import TestImageUrls
 
-_load_model = functools.partial(og_load_model, calling_func = "unit_test")
+_load_model = functools.partial(og_load_model, calling_func="unit_test")
 from marqo.s2_inference.configs import ModelCache
 import shutil
 
@@ -43,7 +44,6 @@ def get_absolute_file_path(filename: str) -> str:
 
 
 def run_test_vectorize(models, model_type):
-    
     # model_type determines the filename with which the embeddings are saved/loaded
     # Ensure that vectorised output from vectorise function matches both the model.encode output and
     # hardcoded embeddings from Python 3.8
@@ -89,7 +89,7 @@ def run_test_vectorize(models, model_type):
                     assert np.allclose(output_m, output_v, atol=eps)
 
                 clear_loaded_models()
-                torch.cuda.empty_cache()
+
                 # delete the model to free up memory,
                 # it is hacked loading from _load_model, so we need to delete it manually
                 del model
@@ -113,7 +113,7 @@ def run_test_model_outputs(models):
 
         del model
         clear_loaded_models()
-        torch.cuda.empty_cache()
+
 
 def run_test_model_normalization(models):
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -135,7 +135,7 @@ def run_test_model_normalization(models):
 
         del model
         clear_loaded_models()
-        torch.cuda.empty_cache()
+
 
 def run_test_cuda_encode_type(models):
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -151,11 +151,11 @@ def run_test_cuda_encode_type(models):
 
         del model
         clear_loaded_models()
-        torch.cuda.empty_cache()
 
 
 @pytest.mark.largemodel
-@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
 class TestLargeClipModels(unittest.TestCase):
     def setUp(self):
         self.models = [
@@ -175,7 +175,6 @@ class TestLargeClipModels(unittest.TestCase):
 
     def tearDown(self):
         clear_loaded_models()
-        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -188,7 +187,7 @@ class TestLargeClipModels(unittest.TestCase):
     def test_vectorize(self):
         # For GPU Memory Optimization, we shouldn't load all models at once
         run_test_vectorize(models=self.models, model_type="large_open_clip")
-        
+
     def test_load_clip_text_model(self):
         device = "cuda"
         eps = 1e-9
@@ -234,16 +233,15 @@ class TestLargeClipModels(unittest.TestCase):
                     mock_autocast.reset_mock()
 
 
-
 @pytest.mark.largemodel
-@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
 class TestE5Models(unittest.TestCase):
     def setUp(self):
         self.models = ["hf/e5-large", "hf/e5-large-unsupervised"]
 
     def tearDown(self):
         clear_loaded_models()
-        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -269,6 +267,7 @@ class TestE5Models(unittest.TestCase):
         for model_name in self.models:
             run_test_cuda_encode_type([model_name])
 
+
 @pytest.mark.largemodel
 @pytest.mark.skip(reason="Needs further investigation")
 class TestBGEModels(unittest.TestCase):
@@ -277,7 +276,6 @@ class TestBGEModels(unittest.TestCase):
 
     def tearDown(self):
         clear_loaded_models()
-        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -294,7 +292,7 @@ class TestBGEModels(unittest.TestCase):
     def test_model_outputs(self):
         for model_name in self.models:
             run_test_model_outputs([model_name])
-    
+
     def test_model_normalization(self):
         for model_name in self.models:
             run_test_model_normalization([model_name])
@@ -303,15 +301,15 @@ class TestBGEModels(unittest.TestCase):
         for model_name in self.models:
             run_test_cuda_encode_type([model_name])
 
+
 @pytest.mark.largemodel
 @pytest.mark.skip(reason="Needs further investigation")
 class TestSnowflakeModels(unittest.TestCase):
     def setUp(self):
         self.models = ["hf/snowflake-arctic-embed-l"]
-    
+
     def tearDown(self):
         clear_loaded_models()
-        torch.cuda.empty_cache()
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -339,7 +337,8 @@ class TestSnowflakeModels(unittest.TestCase):
 
 
 @pytest.mark.largemodel
-@pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
 class TestMultilingualE5Models(unittest.TestCase):
     def setUp(self):
         self.models = [
@@ -390,9 +389,45 @@ class TestMultilingualE5Models(unittest.TestCase):
                     other_language_feature = np.array(vectorise(model_name=model_name, content=other_language_text,
                                                                 normalize_embeddings=True, device=device))
                     assert np.allclose(english_feature, other_language_feature, atol=e)
-    
+
     def test_cuda_encode_type(self):
-            run_test_cuda_encode_type(self.models + ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
-                                                    "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
-                                                    "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
-                                                    "hf/all_datasets_v4_MiniLM-L6"])
+        run_test_cuda_encode_type(self.models + ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
+                                                 "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
+                                                 "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
+                                                 "hf/all_datasets_v4_MiniLM-L6"])
+
+
+@pytest.mark.largemodel
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
+class TestStellaModels(unittest.TestCase):
+    def setUp(self):
+        self.models = ["Marqo/dunzhang-stella_en_400M_v5"]
+
+    def tearDown(self):
+        clear_loaded_models()
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_model_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        remove_cached_model_files()
+
+    def test_vectorize(self):
+        # For GPU Memory Optimization, we shouldn't load all models at once
+        for model_name in self.models:
+            run_test_vectorize(models=[model_name])
+
+    def test_model_outputs(self):
+        for model_name in self.models:
+            run_test_model_outputs([model_name])
+
+    def test_model_normalization(self):
+        for model_name in self.models:
+            run_test_model_normalization([model_name])
+
+    def test_cuda_encode_type(self):
+        for model_name in self.models:
+            run_test_cuda_encode_type([model_name])

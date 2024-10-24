@@ -7,6 +7,7 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 from pydantic import Field, validator, root_validator
 
+from marqo.base_model import ImmutableBaseModel
 from marqo.core.inference.embedding_models.marqo_base_model_properties import MarqoBaseModelProperties
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.logger import get_logger
@@ -18,6 +19,22 @@ logger = get_logger(__name__)
 class PoolingMethod(str, Enum):
     Mean = "mean"
     CLS = "cls"
+
+
+class HuggingFaceModelFlags(ImmutableBaseModel):
+    """
+    Flags passed to transformers.AutoModel.from_pretrained()
+    """
+    trust_remote_code: Optional[bool] = None
+    use_memory_efficient_attention: Optional[bool] = None
+    unpad_inputs: Optional[bool] = None
+
+
+class HuggingFaceTokenizerFlags(ImmutableBaseModel):
+    """
+    Flags passed to transformers.AutoTokenizer.from_pretrained()
+    """
+    trust_remote_code: Optional[bool] = None
 
 
 class HuggingFaceModelProperties(MarqoBaseModelProperties):
@@ -35,6 +52,7 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
         model_location: The location of the model. It is optional.
         note: A note about the model. It is optional.
         pooling_method: The pooling method for the model. It should be one of the values in the PoolingMethod enum.
+        trust_remote_code: Allow remote code execution.
     """
     name: Optional[str] = None
     tokens: int = 128
@@ -42,11 +60,12 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
     model_location: Optional[ModelLocation] = Field(default=None, alias="modelLocation")
     note: Optional[str] = None
     pooling_method: PoolingMethod = Field(..., alias="poolingMethod")
+    trust_remote_code: bool = Field(False, alias="trustRemoteCode")
 
     @validator("type")
     def _validate_type(cls, v):
-        if v != "hf":
-            raise ValueError("The type of the model should be 'hf'.")
+        if v not in ["hf", "hf_stella"]:
+            raise ValueError("The type of the model should be 'hf' or 'hf_stella'.")
         return v
 
     @root_validator(pre=True, skip_on_failure=True)
@@ -60,7 +79,7 @@ class HuggingFaceModelProperties(MarqoBaseModelProperties):
             return values
         name = values.get('name')
         if isinstance(name, str) and name:
-            pooling_method =  cls._infer_pooling_method_from_name(name)
+            pooling_method = cls._infer_pooling_method_from_name(name)
         else:
             pooling_method = PoolingMethod.Mean
         values["pooling_method"] = pooling_method
