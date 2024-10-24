@@ -375,7 +375,7 @@ class MarqoWelcome:
 
 class StartTorchCudaSummary:
 
-    def __init__(self, log_file='./cuda_memory_summary.log', interval=60):
+    def __init__(self, log_file='/logs/cuda_memory_summary.log', interval=60):
         self.log_file = log_file
         self.interval = interval  # time in seconds between summaries
         self.stop_thread = threading.Event()
