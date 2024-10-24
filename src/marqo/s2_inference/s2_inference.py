@@ -131,7 +131,7 @@ def _vectorise_without_cache(
         model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
         normalize_embeddings: bool, modality: Modality, media_download_headers,
         **kwargs) -> List[List[float]]:
-    return _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, **kwargs)
+    return _encode_without_cache(model_cache_key, content, normalize_embeddings, modality, media_download_headers, **kwargs)
 
 def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], List[Image], List[bytes]],
                           normalize_embeddings: bool, modality: Modality, media_download_headers: Optional[Dict]=None,

@@ -1,23 +1,25 @@
 import os
 import uuid
 from unittest import mock
-import torch
+
 import pytest
+import torch
+from pydantic import ValidationError
 
 import marqo.core.exceptions as core_exceptions
+from marqo import exceptions as base_exceptions
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.add_docs_params import AddDocsParams
-from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo import exceptions as base_exceptions
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+from marqo.s2_inference.errors import MediaDownloadError
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery
-from pydantic import ValidationError
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestSearch(MarqoTestCase):
@@ -966,3 +968,47 @@ class TestSearch(MarqoTestCase):
         # A special case for no search method provided
         search_query = SearchQuery(q="test")
         self.assertEqual(SearchMethod.TENSOR, search_query.searchMethod)
+
+    def test_search_private_images_proper_error_raised(self):
+        """Test that search raises a MediaDownloadError when trying to access private images"""
+        test_indexes = [
+            self.unstructured_default_image_index,
+            self.structured_default_image_index
+        ]
+
+        test_queries = [({
+            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png": 1,
+            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small": 1 }, "dictionary queries"),
+            ("https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small", "str queries")]
+        for index_name in test_indexes:
+            for query, msg in test_queries:
+                with self.subTest(msg=f"index: {index_name}, query: {msg}"):
+                    with self.assertRaises(MediaDownloadError):
+                        _ = tensor_search.search(
+                            config=self.config,
+                            index_name=index_name.name,
+                            text=query,
+                            search_method=SearchMethod.TENSOR,
+                        )
+
+    def test_search_over_private_images_with_media_download_headers(self):
+        """Test that search can use private images with media download headers"""
+        test_indexes = [
+            self.unstructured_default_image_index,
+            self.structured_default_image_index
+        ]
+
+        test_queries = [({
+            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png": 1,
+            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small": 1 }, "dictionary queries"),
+            ("https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small", "str queries")]
+        for index_name in test_indexes:
+            for query, msg in test_queries:
+                with self.subTest(msg=f"index: {index_name}, query: {msg}"):
+                    _ = tensor_search.search(
+                        config=self.config,
+                        index_name=index_name.name,
+                        text=query,
+                        search_method=SearchMethod.TENSOR,
+                        media_download_headers={"marqo_media_header": "media_header_test_key"}
+                    )
