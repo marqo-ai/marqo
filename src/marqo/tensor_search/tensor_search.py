@@ -1888,8 +1888,10 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         # TODO: Handle exception for single job, and allow others to run.
         try:
             if v.content:
-                modality = infer_modality(v.content[0] if isinstance(v.content, list) else v.content,
-                                          media_download_headers=v.media_download_headers)
+                modality = infer_modality(
+                    v.content[0] if isinstance(v.content, list) else v.content,
+                    media_download_headers=v.media_download_headers
+                )
                 vectors = s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
@@ -1950,7 +1952,6 @@ def get_query_vectors_from_jobs(
                     (
                         get_content_vector(
                         possible_jobs=qidx_to_job[qidx],
-                        jobs=jobs,
                         job_to_vectors=job_to_vectors,
                         content=content
                         ),
@@ -1984,7 +1985,6 @@ def get_query_vectors_from_jobs(
             # result[qidx] = vectors[0]
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
-                jobs=jobs,
                 job_to_vectors=job_to_vectors,
                 content=q.q
             )
@@ -1993,14 +1993,16 @@ def get_query_vectors_from_jobs(
     return result
 
 
-def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors: Dict[JHash, Dict[str, List[float]]],
-                       jobs: Dict[JHash, VectorisedJobs], content: str) -> List[float]:
+def get_content_vector(
+        possible_jobs: List[VectorisedJobPointer],
+        job_to_vectors: Dict[JHash, Dict[str, List[float]]],
+        content: str
+) -> List[float]:
     """finds the vector associated with a piece of content
 
     Args:
         possible_jobs: The jobs where the target vector may reside
-        treat_urls_as_media: an index_parameter that indicates whether content should be treated as image, audio, video
-            if it has a URL structure
+        job_to_vectors: The mapping of job to vectors
         content: The content to search
 
     Returns:
@@ -2010,10 +2012,8 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
     """
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
-        try:
+        if content in job_to_vectors[vec_job_pointer.job_hash]:
             return job_to_vectors[vec_job_pointer.job_hash][content]
-        except KeyError:
-            raise not_found_error
     raise not_found_error
 
 
