@@ -36,11 +36,11 @@ class IndexSettings(StrictBaseModel):
     imagePreprocessing: core.ImagePreProcessing = core.ImagePreProcessing(
         patchMethod=None
     )
-    videoPreprocessing: core.VideoPreProcessing = core.VideoPreProcessing(
+    videoPreprocessing: Optional[core.VideoPreProcessing] = core.VideoPreProcessing(
         splitLength=20,
         splitOverlap=3,
     )
-    audioPreprocessing: core.AudioPreProcessing = core.AudioPreProcessing(
+    audioPreprocessing: Optional[core.AudioPreProcessing] = core.AudioPreProcessing(
         splitLength=10,
         splitOverlap=3,
     )

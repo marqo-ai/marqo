@@ -1,13 +1,18 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock
 
-from marqo.s2_inference.clip_utils import OPEN_CLIP
+import pytest
+
+from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.model_registry import _get_open_clip_properties
+from marqo.tensor_search.models.external_apis.s3 import S3Auth
+from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 
 OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
 
-
+@pytest.mark.unittest
 class TestOpenCLIPModelLoad(TestCase):
     """A test suite for loading OpenCLIP models.
 
@@ -24,12 +29,13 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B-32",
             "url": "https://openclipart.org/download/12345/my_test_model.pt",
-            "type": "open_clip"
+            "type": "open_clip",
+            "dimensions": 512
         }
 
-        with patch("marqo.s2_inference.clip_utils.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
+        with patch("marqo.core.inference.embedding_models.open_clip_model.OPEN_CLIP._load_model_and_image_preprocessor_from_checkpoint", \
                    return_value=(MagicMock(), MagicMock())) as mock_load_method:
-            with patch("marqo.s2_inference.clip_utils.OPEN_CLIP._load_tokenizer_from_checkpoint",
+            with patch("marqo.core.inference.embedding_models.open_clip_model.OPEN_CLIP._load_tokenizer_from_checkpoint",
                        return_value=MagicMock()) as mock_load_tokenizer:
                 with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                     model = OPEN_CLIP(model_properties=model_properties, device="cpu")
@@ -43,13 +49,14 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B-108",
             "url": "https://openclipart.org/download/12345/my_test_model.pt",
-            "type": "open_clip"
+            "type": "open_clip",
+            "dimensions": 512
         }
-        with patch("marqo.s2_inference.clip_utils.open_clip.create_model", return_value=MagicMock()) \
+        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
-            with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
+            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
-                with patch("marqo.s2_inference.clip_utils.download_model", return_value="my_test_model.pt"):
+                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
@@ -74,17 +81,18 @@ class TestOpenCLIPModelLoad(TestCase):
         """Test correct parameters are passed to the OpenCLIP loading from checkpoint method."""
         model_tag = "my_test_model"
         model_properties = {
+            "dimensions": 512,
             "name": "test-siglip",
             "url": "https://openclipart.org/download/12345/my_test_model.pt",
             "type": "open_clip",
             "image_preprocessor": "SigLIP",
             "size": 322  # Override the default size 224
         }
-        with patch("marqo.s2_inference.clip_utils.open_clip.create_model", return_value=MagicMock()) \
+        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
                 as mock_create_model:
-            with patch("marqo.s2_inference.clip_utils.open_clip.get_tokenizer", return_value=MagicMock()) \
+            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
                     as mock_tokenizer:
-                with patch("marqo.s2_inference.clip_utils.download_model", return_value="my_test_model.pt"):
+                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model", return_value="my_test_model.pt"):
                     with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
                         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
                         model.load()
@@ -110,6 +118,7 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "hf-hub:my_test_hub",
             "type": "open_clip",
+            "dimensions": 512
         }
         with patch("marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms",
                    return_value=(MagicMock(), MagicMock(), MagicMock())) \
@@ -131,6 +140,7 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "open_clip/ViT-B-32/laion5b_s13b_b90k",
             "type": "open_clip",
+            "dimensions": 512
         }
         with patch("marqo.s2_inference.clip_utils.open_clip.create_model_and_transforms",
                    return_value=(MagicMock(), MagicMock(), MagicMock())) \
@@ -152,11 +162,12 @@ class TestOpenCLIPModelLoad(TestCase):
         """Test loading an OpenCLIP model with missing model properties should raise an error."""
         model_tag = "my_test_model"
         model_properties = {
-            "type": "open_clip"
+            "type": "open_clip",
+            "dimensions": 512
             # Missing 'name' and 'url'
         }
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(InvalidModelPropertiesError) as context:
             model = OPEN_CLIP(model_properties=model_properties, device="cpu")
             model.load()
 
@@ -169,11 +180,100 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B-32",
             "type": "open_clip",
-            "image_preprocessor": "UnsupportedPreprocessor"
+            "image_preprocessor": "UnsupportedPreprocessor",
+            "dimensions": 512
         }
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(InvalidModelPropertiesError) as context:
             model = OPEN_CLIP(model_properties=model_properties, device="cpu")
             model.load()
 
         self.assertIn("permitted: 'SigLIP', 'OpenAI', 'OpenCLIP', 'CLIPA'", str(context.exception))
+
+    def test_load_OpenCLIPModel_from_local_path(self):
+        """Test loading an OpenCLIP model from a local path."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "name": "ViT-B-32",
+            "localpath": "/path/to/my_test_model.pt",
+            "dimensions": 512,
+            "type": "open_clip"
+        }
+        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
+                as mock_create_model:
+            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
+                    as mock_tokenizer:
+                with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
+                    with patch("marqo.core.inference.embedding_models.open_clip_model.os.path.exists",
+                               return_value=True) as mock_path_exists:
+                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                        model.load()
+                        mock_create_model.assert_called_once_with(
+                            model_name="ViT-B-32",
+                            jit=False,
+                            pretrained="/path/to/my_test_model.pt",
+                            precision="fp32", device="cpu",
+                            cache_dir=ModelCache.clip_cache_path
+                        )
+                        mock_tokenizer.assert_called_once_with("ViT-B-32")
+                        mock_path_exists.assert_called_once_with("/path/to/my_test_model.pt")
+    def test_load_OpenCLIPModel_with_auth_s3(self):
+        """Ensure that the model/checkpoint is downloaded with the correct S3 authentication."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "name": "ViT-B-16",
+            "model_location": {
+                "s3": {
+                    "Bucket": "my-bucket",
+                    "Key": "my-key",
+                },
+                "authRequired": True,
+            },
+            "type": "open_clip",
+            "dimensions": 768,
+        }
+
+        model_auth = ModelAuth(s3 = S3Auth(
+            aws_access_key_id="my_access_key",
+            aws_secret_access_key="my_secret_key",
+        ))
+
+        with patch("marqo.core.inference.embedding_models.open_clip_model.download_model") as mock_download_model:
+            # It's ok to return a RuntimeError as we are testing the download_model function
+            with self.assertRaises(RuntimeError):
+                model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
+                model.load()
+
+            mock_download_model.assert_called_once_with(
+                repo_location=ModelLocation(**model_properties["model_location"]),
+                auth=model_auth,
+            )
+
+    def test_load_OpenCLIPModel_with_auth_hf(self):
+        """Ensure that the model/checkpoint is downloaded with the correct S3 authentication."""
+        model_tag = "my_test_model"
+        model_properties = {
+            "name": "ViT-B-16",
+            "model_location": {
+                "hf": {
+                    "repo_id": "my-hf-repo",
+                    "filename": "my-hf-filename.pt"
+                },
+                "authRequired": True,
+            },
+            "type": "open_clip",
+            "dimensions": 768
+        }
+
+        model_auth = ModelAuth(**{"hf": {"token":"my_hf_token"}})
+
+        with patch("marqo.core.inference.embedding_models.open_clip_model.download_model") as mock_download_model:
+            # It's ok to return a RuntimeError as we are testing the download_model function
+            with self.assertRaises(RuntimeError) as e:
+                model = OPEN_CLIP(model_properties=model_properties, device="cpu", model_auth=model_auth)
+                model.load()
+
+            mock_download_model.assert_called_once_with(
+                repo_location=ModelLocation(**model_properties["model_location"]),
+                auth=model_auth,
+            )

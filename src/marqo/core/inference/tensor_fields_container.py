@@ -159,6 +159,7 @@ class Vectoriser(ABC):
             # Fail the whole batch due to a malfunctioning embedding model
             raise ModelError(f'Problem vectorising query. Reason: {str(model_error)}')
         except s2_inference_errors.S2InferenceError as e:
+            # TODO find a better error code, the existing one is 'invalid_argument'
             raise AddDocumentsError(e.message) from e
 
     @classmethod
