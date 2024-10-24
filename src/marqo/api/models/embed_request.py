@@ -9,18 +9,23 @@ from typing import Union, List, Dict, Optional, Any
 from pydantic import Field, root_validator
 
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.api_models import BaseMarqoModel
+from marqo.base_model import MarqoBaseModel
 from marqo.core.embed.embed import EmbedContentType
 
 
 
-class EmbedRequest(BaseMarqoModel):
+class EmbedRequest(MarqoBaseModel):
     # content can be a single query or list of queries. Queries can be a string or a dictionary.
     content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
     image_download_headers: Optional[Dict] = Field(default=None, alias="imageDownloadHeaders")
-    mediaDownloadHeaders: Optional[Dict] = Field(default=None, alias="mediaDownloadHeaders")
+    mediaDownloadHeaders: Optional[Dict] = None
     modelAuth: Optional[ModelAuth] = None
-    content_type: Optional[EmbedContentType] = Field(EmbedContentType.Query, alias=("contentType"))
+    content_type: Optional[EmbedContentType] = Field(default=EmbedContentType.Query, alias="contentType")
+
+    @root_validator(pre=True)
+    def _test(cls, values):
+        print(values)
+        return values
 
     @pydantic.validator('content')
     def validate_content(cls, value):
