@@ -50,27 +50,27 @@ def translate_api_device(device: Optional[str]) -> Optional[str]:
                               f"Acceptable device types: {acceptable_devices}")
 
 
-def decode_image_download_headers(image_download_headers: Optional[str] = None) -> dict:
+def decode_media_download_headers(media_download_headers: Optional[str] = None) -> dict:
     """Decodes an image download header string into a Python dict
 
     Args:
-        image_download_headers: JSON-serialised, URL encoded header dictionary
+        media_download_headers: JSON-serialised, URL encoded header dictionary
 
     Returns:
-        image_download_headers as a dict
+        media_download_headers as a dict
 
     Raises:
         InvalidArgError if there is trouble parsing the dictionary
     """
-    if not image_download_headers:
+    if not media_download_headers:
         return dict()
     else:
         try:
-            as_str = urllib.parse.unquote_plus(image_download_headers)
+            as_str = urllib.parse.unquote_plus(media_download_headers)
             as_dict = json.loads(as_str)
             return as_dict
         except json.JSONDecodeError as e:
-            raise InvalidArgError(f"Error parsing image_download_headers. Message: {e}")
+            raise InvalidArgError(f"Error parsing media_download_headers. Message: {e}")
 
 
 def decode_query_string_model_auth(model_auth: Optional[str] = None) -> Optional[ModelAuth]:
@@ -130,14 +130,14 @@ def add_docs_params_orchestrator(index_name: str, body: Union[AddDocsBodyParams,
     tensor_fields = body.tensorFields
     use_existing_tensors = body.useExistingTensors
     model_auth = body.modelAuth
-    image_download_headers = body.imageDownloadHeaders
+    media_download_headers = body.mediaDownloadHeaders
     image_download_thread_count = body.imageDownloadThreadCount
     text_chunk_prefix = body.textChunkPrefix
 
     return AddDocsParams(
         index_name=index_name, docs=docs,
         device=device, tensor_fields=tensor_fields,
-        use_existing_tensors=use_existing_tensors, image_download_headers=image_download_headers,
+        use_existing_tensors=use_existing_tensors, media_download_headers=media_download_headers,
         image_download_thread_count=image_download_thread_count,
         mappings=mappings, model_auth=model_auth, text_chunk_prefix=text_chunk_prefix,
         batch_vectorisation_mode=body.batchVectorisationMode,

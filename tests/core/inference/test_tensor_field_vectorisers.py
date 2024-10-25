@@ -1,3 +1,4 @@
+import unittest
 from typing import Dict
 from unittest.mock import patch
 
@@ -10,17 +11,20 @@ from marqo.core.exceptions import AddDocumentsError, ModelError
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.errors import ModelDownloadError
 from marqo.s2_inference.multimodal_model_load import Modality
-from tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo.tensor_search.telemetry import RequestMetricsStore
+from tests.marqo_test import TestImageUrls
 from marqo.s2_inference import errors as s2_inference_errors
 
 
 @pytest.mark.unittest
-class TestTensorFieldVectorisers(MarqoTestCase):
+class TestTensorFieldVectorisers(unittest.TestCase):
     def setUp(self):
         self.model_config = ModelConfig(
             model_name='random',
             normalize_embeddings=True
         )
+        RequestMetricsStore._set_request('request')
+        RequestMetricsStore.set_in_request()
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_single_vectoriser_should_vectorise_chunks_passed_in_in_one_go(self, mock_vectorise):
@@ -56,26 +60,26 @@ class TestTensorFieldVectorisers(MarqoTestCase):
     def test_batch_vectoriser_should_vectorise_chunks_in_one_batch(self, mock_vectorise):
         for modality in [Modality.TEXT, Modality.IMAGE]:
             with self.subTest(modality=modality):
-                all_chunks = ['chunk1', 'chunk2']
+                all_chunks = [('key_0', 'chunk1'), ('key_1', 'chunk2')]
                 mock_vectorise.reset_mock()
                 mock_vectorise.side_effect = [[[1.0, 2.0], [3.0, 4.0]]]
 
                 batch_vectoriser = BatchCachingVectoriser(modality, all_chunks, self.model_config)
 
                 self.assertEquals(1, mock_vectorise.call_count)
-                self.assertEquals(all_chunks, mock_vectorise.call_args_list[0].kwargs['content'])
+                self.assertEquals(['chunk1', 'chunk2'], mock_vectorise.call_args_list[0].kwargs['content'])
 
                 # verify if the embeddings are cached
                 mock_vectorise.reset_mock()
-                embeddings = batch_vectoriser.vectorise(['chunk2', 'chunk1'])
-                self.assertEquals([[3.0, 4.0], [1.0, 2.0]], embeddings)
+                embeddings = batch_vectoriser.vectorise(['chunk1', 'chunk2'], key_prefix='key')
+                self.assertEquals([[1.0, 2.0], [3.0, 4.0]], embeddings)
                 self.assertEquals(0, mock_vectorise.call_count)
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_batch_vectoriser_should_vectorise_audio_and_video_chunks_one_at_a_time(self, mock_vectorise):
         for modality in [Modality.AUDIO, Modality.VIDEO]:
             with self.subTest(modality=modality):
-                all_chunks = ['chunk1', 'chunk2']
+                all_chunks = [('key_0_0', 'chunk1'), ('key_1_0', 'chunk2')]
                 mock_vectorise.reset_mock()
                 mock_vectorise.side_effect = [[[1.0, 2.0]], [[3.0, 4.0]]]
 
@@ -87,7 +91,7 @@ class TestTensorFieldVectorisers(MarqoTestCase):
 
                 # verify if the embeddings are cached
                 mock_vectorise.reset_mock()
-                embeddings = batch_vectoriser.vectorise(['chunk2'])
+                embeddings = batch_vectoriser.vectorise(['chunk2'], key_prefix='key_1')
                 self.assertEquals([[3.0, 4.0]], embeddings)
                 self.assertEquals(0, mock_vectorise.call_count)
 
@@ -97,20 +101,20 @@ class TestTensorFieldVectorisers(MarqoTestCase):
         image1 = load_image_from_path(TestImageUrls.IMAGE1.value, {})
 
         for modality, chunk_type, content_chunks, side_effect in [
-            (Modality.TEXT, str, ['chunk1', 'chunk2'], [[[1.0, 2.0], [3.0, 4.0]]]),
-            (Modality.IMAGE, Image, [image0, image1], [[[1.0, 2.0], [3.0, 4.0]]]),
-            (Modality.IMAGE, torch.Tensor, [torch.tensor([1., 2.]), torch.tensor([2., 3.])], [[[1.0, 2.0], [3.0, 4.0]]]),
-            (Modality.AUDIO, Dict[str, torch.Tensor], [{'audio_chunk1': torch.tensor([1., 2.])},
-                                                       {'audio_chunk2': torch.tensor([2., 3.])}], [[[1.0, 2.0]], [[3.0, 4.0]]]),
-            (Modality.VIDEO, Dict[str, torch.Tensor], [{'video_chunk1': torch.tensor([1., 2.])},
-                                                       {'video_chunk2': torch.tensor([2., 3.])}], [[[1.0, 2.0]], [[3.0, 4.0]]]),
+            (Modality.TEXT, str, [('key_0_0', 'chunk1'), ('key_1_0', 'chunk2')], [[[1.0, 2.0], [3.0, 4.0]]]),
+            (Modality.IMAGE, Image, [('key_0_0', image0), ('key_1_0', image1)], [[[1.0, 2.0], [3.0, 4.0]]]),
+            (Modality.IMAGE, torch.Tensor, [('key_0_0', torch.tensor([1., 2.])), ('key_1_0', torch.tensor([2., 3.]))], [[[1.0, 2.0], [3.0, 4.0]]]),
+            (Modality.AUDIO, Dict[str, torch.Tensor], [('key_0_0', {'audio_chunk1': torch.tensor([1., 2.])}),
+                                                       ('key_1_0', {'audio_chunk2': torch.tensor([2., 3.])})], [[[1.0, 2.0]], [[3.0, 4.0]]]),
+            (Modality.VIDEO, Dict[str, torch.Tensor], [('key_0_0', {'video_chunk1': torch.tensor([1., 2.])}),
+                                                       ('key_1_0', {'video_chunk2': torch.tensor([2., 3.])})], [[[1.0, 2.0]], [[3.0, 4.0]]]),
         ]:
             with self.subTest(modality=modality, chunk_type=chunk_type):
                 mock_vectorise.reset_mock()
                 mock_vectorise.side_effect = side_effect
                 batch_vectoriser = BatchCachingVectoriser(modality, content_chunks, self.model_config)
 
-                embeddings = batch_vectoriser.vectorise([content_chunks[1]])
+                embeddings = batch_vectoriser.vectorise([content_chunks[1]], key_prefix='key_1')
                 self.assertEquals([[3.0, 4.0]], embeddings)
 
     @patch('marqo.s2_inference.s2_inference.vectorise')

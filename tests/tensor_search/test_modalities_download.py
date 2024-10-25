@@ -1,17 +1,21 @@
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-from PIL import UnidentifiedImageError
-import torch
-from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError
-from marqo.tensor_search.add_docs import threaded_download_and_preprocess_content
-from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
-from marqo.s2_inference.s2_inference import Modality
-from marqo.s2_inference.models.model_type import ModelType
-from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
-from marqo.s2_inference.errors import MediaDownloadError
+
 import ffmpeg
+import pytest
+import torch
+from PIL import UnidentifiedImageError
+
+from marqo.core.models.marqo_index import IndexType, MarqoIndex, FieldType
+from marqo.s2_inference.errors import MediaDownloadError
+from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError
+from marqo.s2_inference.models.model_type import ModelType
+from marqo.s2_inference.s2_inference import Modality
+from marqo.tensor_search.add_docs import threaded_download_and_preprocess_content
+from marqo.tensor_search.telemetry import RequestMetrics
 
 
+@pytest.mark.unittest
 class TestThreadedDownloadAndPreprocess(unittest.TestCase):
 
     def setUp(self):
@@ -62,7 +66,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         tensor_fields = ["field1"]
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
@@ -83,7 +87,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         media_field_types_mapping = {"field1": FieldType.ImagePointer}
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
             media_field_types_mapping=media_field_types_mapping
@@ -106,7 +110,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         tensor_fields = ["field1"]
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
@@ -130,7 +134,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         media_field_types_mapping = {"field1": FieldType.AudioPointer}
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
             media_field_types_mapping=media_field_types_mapping
@@ -148,7 +152,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         tensor_fields = ["field1"]
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
@@ -167,7 +171,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         tensor_fields = ["field1"]
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
@@ -189,7 +193,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         tensor_fields = ["field1"]
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
@@ -217,7 +221,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
 
         # Call the function
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
@@ -230,13 +234,30 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
 
         # Verify that download_and_chunk_media was called twice
         self.assertEqual(mock_download_and_chunk.call_count, 2)
+        print(mock_download_and_chunk.call_args_list)
 
         # Verify the calls to download_and_chunk_media
         mock_download_and_chunk.assert_any_call(
-            self.mock_video_url, "cpu", None, Modality.VIDEO, self.mock_marqo_index.type, self.mock_marqo_index.model, None, None, None
+            url=self.mock_video_url,
+            device='cpu',
+            modality= Modality.VIDEO,
+            marqo_index_type = self.mock_marqo_index.type,
+            marqo_index_model = self.mock_marqo_index.model,
+            preprocessors = None,
+            audio_preprocessing = None,
+            video_preprocessing = None,
+            media_download_headers = {}
         )
         mock_download_and_chunk.assert_any_call(
-            self.mock_audio_url, "cpu", None, Modality.AUDIO, self.mock_marqo_index.type, self.mock_marqo_index.model, None, None, None
+            url=self.mock_video_url,
+            device='cpu',
+            modality= Modality.VIDEO,
+            marqo_index_type = self.mock_marqo_index.type,
+            marqo_index_model = self.mock_marqo_index.model,
+            preprocessors = None,
+            audio_preprocessing = None,
+            video_preprocessing = None,
+            media_download_headers = {}
         )
 
     @patch("marqo.tensor_search.add_docs.download_and_chunk_media")
@@ -261,7 +282,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         ]
 
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
             media_field_types_mapping=media_field_types_mapping
@@ -291,7 +312,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         mock_infer_modality.side_effect = [Modality.TEXT, Modality.TEXT]
 
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
             media_field_types_mapping=media_field_types_mapping
@@ -321,7 +342,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         mock_download_and_chunk.side_effect = ffmpeg.Error("FFmpeg processing error", stdout=b"", stderr=b"")
 
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
             media_field_types_mapping=media_field_types_mapping
@@ -347,7 +368,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         media_field_types_mapping = {"image_field": FieldType.ImagePointer}
 
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
             media_field_types_mapping=media_field_types_mapping
@@ -365,7 +386,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
         tensor_fields = ["field1"]
         
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
@@ -392,7 +413,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
 
         # Call the function
         threaded_download_and_preprocess_content(
-            docs, media_repo, tensor_fields, {}, device="cpu",
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
             marqo_index_type=self.mock_marqo_index.type,
             marqo_index_model=self.mock_marqo_index.model,
         )
