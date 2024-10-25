@@ -213,7 +213,6 @@ class PatchifyModel:
                 "Request rejected, as this request attempted to load and cache the model, "
                 "but the lock is already held by another operation. "
                 "Please wait for a few seconds and send the request again.\n"
-                "Marqo's documentation can be found here: `https://docs.marqo.ai/latest/`"
             )
 
         with _load_model_lock:

@@ -8,7 +8,8 @@ import pytest
 
 from marqo.api.exceptions import InternalError
 from marqo.s2_inference import clip_utils, types
-from marqo.s2_inference.clip_utils import CLIP, OPEN_CLIP, FP16_CLIP, MULTILINGUAL_CLIP
+from marqo.s2_inference.clip_utils import CLIP, FP16_CLIP, MULTILINGUAL_CLIP
+from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import ImageDownloadError
 from marqo.tensor_search.enums import ModelProperties
@@ -106,7 +107,9 @@ class TestDownloadFromRepo(unittest.TestCase):
     def test__download_from_repo_with_auth(self, mock_download_model, ):
         mock_download_model.return_value = 'model.pth'
         location = ModelLocation(
-            s3=S3Location(Bucket='some_bucket', Key='some_key'), auth_required=True)
+            s3=S3Location(Bucket='some_bucket', Key='some_key'),
+            auth_required=True
+        )
         s3_auth = S3Auth(aws_access_key_id='some_key_id', aws_secret_access_key='some_secret')
 
         model_props = {

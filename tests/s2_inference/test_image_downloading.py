@@ -53,12 +53,12 @@ class TestImageDownloading(TestCase):
         for url, expected, msg in self.test_cases:
             with self.subTest(url=url, expected=expected, msg=msg):
                 with self.assertRaises(ImageDownloadError) as cm:
-                    download_image_from_url(image_path=url + ".jpg", image_download_headers={})
+                    download_image_from_url(image_path=url + ".jpg", media_download_headers={})
 
     def test_download_image_from_url_handlesUrlRequiringUserAgentHeader(self):
         url_requiring_user_agent_header = "https://docs.marqo.ai/2.0.0/Examples/marqo.jpg"
         try:
-            download_image_from_url(image_path=url_requiring_user_agent_header, image_download_headers={})
+            download_image_from_url(image_path=url_requiring_user_agent_header, media_download_headers={})
         except Exception as e:
             self.fail(f"Exception was raised when downloading {url_requiring_user_agent_header}: {e}")
 
@@ -77,7 +77,7 @@ class TestImageDownloading(TestCase):
 
         for (headers, expected_headers, msg) in test_cases:
             with self.subTest(headers=headers, expected_headers=expected_headers, msg=msg):
-                download_image_from_url('http://example.com/image.jpg', image_download_headers=headers)
+                download_image_from_url('http://example.com/image.jpg', media_download_headers=headers)
                 mock_curl_instance.setopt.assert_called_with(pycurl.HTTPHEADER, expected_headers)
 
     def test_download_image_from_url_handlesRedirection(self):
@@ -88,5 +88,5 @@ class TestImageDownloading(TestCase):
         ])
 
         with MockHttpServer(app).run_in_thread() as base_url:
-            result = download_image_from_url(f'{base_url}/missing_image.jpg', image_download_headers={})
+            result = download_image_from_url(f'{base_url}/missing_image.jpg', media_download_headers={})
             self.assertEqual(result.getvalue(), image_content)
