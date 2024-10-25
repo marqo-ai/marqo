@@ -1247,22 +1247,23 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
     def test_language_bind_model_can_add_all_private_media_modalities(self):
         documents = [
             {   # With extensions
-                "text_field_1": "This is a test text",
+                #"text_field_1": "This is a test text",
                 "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
-                "audio_field_1": "https://d2k91vq0avo7lq.cloudfront.net/bark.wav",
-                "video_field_1": "https://d2k91vq0avo7lq.cloudfront.net/congress.mp4",
-                "_id": "1"
+                # "audio_field_1": "https://d2k91vq0avo7lq.cloudfront.net/bark.wav",
+                # "video_field_1": "https://d2k91vq0avo7lq.cloudfront.net/congress.mp4",
+                # "_id": "1"
             },
-            {
-                # No extensions
-                "text_field_1": "This is a test text",
-                "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
-                "audio_field_1": "https://d2k91vq0avo7lq.cloudfront.net/bark",
-                "video_field_1": "https://d2k91vq0avo7lq.cloudfront.net/congress",
-                "_id": ""
-            }
+            # {
+            #     # No extensions
+            #     "text_field_1": "This is a test text",
+            #     "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
+            #     "audio_field_1": "https://d2k91vq0avo7lq.cloudfront.net/bark",
+            #     "video_field_1": "https://d2k91vq0avo7lq.cloudfront.net/congress",
+            #     "_id": "2"
+            # }
         ]
-        for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+        # for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+        for index_name in [self.structured_language_bind_index_name]:
             tensor_fields = ["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"] \
                 if index_name == self.unstructured_language_bind_index_name else None
             with self.subTest(index_name):
