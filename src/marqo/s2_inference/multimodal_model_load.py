@@ -292,7 +292,7 @@ class LanguageBindEncoder(ModelEncoder):
                 # If media has already been preprocessed
                 inputs[modality.value] = to_device(content[0], self.model.device)['pixel_values']
             elif isinstance(content[0], str) and 'http' in content[0]:
-                return self.encode(content[0], modality=modality)
+                return self.encode(content[0], modality=modality, media_download_headers=media_download_headers)
             else:
                 raise ValueError(f"Unsupported {modality.value} content type: {type(content)}, content: {content}")
 
