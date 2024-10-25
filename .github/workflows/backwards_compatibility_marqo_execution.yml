@@ -85,7 +85,7 @@ jobs:
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
-          pip install tox==3.26
+#          pip install tox==3.26
           pip install flake8
 
       - name: Set up Environment
@@ -103,22 +103,23 @@ jobs:
             echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
           fi
 
-      - name: Check current directory
-        run: pwd
-      - name: List all contents of directory
-        run: ls -la
-      - name: list all tox environments
-        run: tox -l --verbose
+#      - name: Check current directory
+#        run: pwd
+#      - name: List all contents of directory
+#        run: ls -la
+#      - name: list all tox environments
+#        run: tox -l --verbose
 
-      - name: Run backwards compatibility test #run_container is defined in marqo-api-tests
+
+      - name: Run backwards_compatibility test
         run: |
-         export MARQO_FROM_VERSION="${{github.event.inputs.from_version}}"
-         echo "$MARQO_FROM_VERSION"
-         export MARQO_TO_VERSION="${{github.event.inputs.to_version}}"
-         echo "$MARQO_TO_VERSION"
-         export MARQO_TO_VERSION_IMAGE_TAG="${{github.event.inputs.to_version_tag}}"
-         echo "$MARQO_TO_VERSION_IMAGE_TAG"
-         tox -e py3-compatibility_tests  
+          python tests/backwards_compatibility_tests/scripts/compatibility_test_runner.py \
+            --mode=backwards_compatibility \
+            --from_version ${{ github.event.inputs.from_version }} \
+            --to_version ${{ github.event.inputs.to_version }} \
+            --from_image ${{ github.event.inputs.from_image }} \
+            --to_image ${{ github.event.inputs.to_image }}
+
 
 #  rollback: #yet to write this
 #    runs-on: ubuntu-latest
