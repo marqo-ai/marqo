@@ -53,6 +53,15 @@ jobs:
           ec2-instance-type: t3.xlarge
           subnet-id: subnet-038b1447ac3c97e7a
           security-group-id: sg-094be521399e0d5ba
+          aws-resource-tags: > # optional, requires additional permissions
+            [
+              {"Key": "Name", "Value": "marqo-build-push-img-runner-${{ github.run_id }}"},
+              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
+              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
+              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
+              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
+              {"Key": "PoloRole", "Value": "testing"}
+            ]
 
   Docker-Build:
     name: Build docker image
