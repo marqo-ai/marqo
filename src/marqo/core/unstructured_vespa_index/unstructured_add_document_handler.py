@@ -65,17 +65,18 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
-        text_field_type = self._infer_field_type(field_content)
+        text_field_type = self._infer_field_type(field_content, self.add_docs_params.media_download_headers)
         content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name,
                                                        field_content, text_field_type)
         marqo_doc[field_name] = content
 
-    def _infer_field_type(self, field_content: Any) -> Optional[FieldType]:
+    def _infer_field_type(self, field_content: Any, media_download_headers: Optional[Dict] = None) \
+            -> Optional[FieldType]:
         if not isinstance(field_content, str):
             return None
 
         try:
-            modality = infer_modality(field_content)
+            modality = infer_modality(field_content, media_download_headers)
 
             if not self.marqo_index.treat_urls_and_pointers_as_media and modality in [Modality.AUDIO, Modality.VIDEO]:
                 modality = Modality.TEXT

@@ -421,4 +421,3 @@ class AddDocumentsHandler(ABC):
             FieldType.VideoPointer: AudioVideoChunker(media_repo=media_repo),
         }
         return chunkers
-

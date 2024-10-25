@@ -204,7 +204,7 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"}, # png image with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
@@ -239,7 +239,7 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"},  # png file with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
@@ -262,7 +262,7 @@ class TestSearch(MarqoTestCase):
                     index_name=index.name,
                     text="https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3"
                 )
-                
+
                 # Assertions
                 self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
                 self.assertEqual(results['hits'][0]['_id'], "2")  # The audio document should be the top result

@@ -523,9 +523,9 @@ class TestEmbed(MarqoTestCase):
                 self.assertEqual(embed_res["content"], [image_url])
                 self.assertTrue(np.allclose(embed_res["embeddings"][0], search_query_embedding))
 
-    def test_embed_with_image_download_headers_and_model_auth(self):
+    def test_embed_with_media_download_headers_and_model_auth(self):
         """
-        Ensure that vectorise is called with the correct image_download_headers and model_auth
+        Ensure that vectorise is called with the correct media_download_headers and model_auth
         when using the embed endpoint.
         """
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
@@ -537,7 +537,7 @@ class TestEmbed(MarqoTestCase):
                     via mock
                     Set image download headers and model auth to None so there's no error out.
                     """
-                    kwargs["image_download_headers"] = None
+                    kwargs["media_download_headers"] = None
                     kwargs["model_auth"] = None
                     return vectorise(*arg, **kwargs)
 
@@ -549,7 +549,7 @@ class TestEmbed(MarqoTestCase):
                         marqo_config=self.config, index_name=index.name,
                         embedding_request=EmbedRequest(
                             content=[image_url],
-                            image_download_headers={"Authorization": "my secret key"},
+                            mediaDownloadHeaders={"Authorization": "my secret key"},
                             modelAuth=ModelAuth(s3=S3Auth(
                                 aws_access_key_id='12345',
                                 aws_secret_access_key='this-is-a-secret'))
@@ -564,7 +564,7 @@ class TestEmbed(MarqoTestCase):
                 self.assertEqual(len(call_args), 1)
 
                 vectorise_kwargs = call_args[0].kwargs
-                self.assertEqual(vectorise_kwargs["image_download_headers"], {"Authorization": "my secret key"})
+                self.assertEqual(vectorise_kwargs["media_download_headers"], {"Authorization": "my secret key"})
                 self.assertEqual(vectorise_kwargs["model_auth"], ModelAuth(s3=S3Auth(
                                 aws_access_key_id='12345',
                                 aws_secret_access_key='this-is-a-secret')))

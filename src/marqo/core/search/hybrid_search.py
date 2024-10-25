@@ -33,7 +33,7 @@ class HybridSearch:
             offset: int = 0, ef_search: Optional[int] = None, approximate: bool = True,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
             attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-            image_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
+            media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
             hybrid_parameters: HybridParameters = None) -> Dict:
@@ -51,7 +51,8 @@ class HybridSearch:
                 verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
                     objects are printed out
                 attributes_to_retrieve: if set, only returns these fields
-                image_download_headers: headers for downloading images
+                media_download_headers: headers for downloading media
+
                 context: a dictionary to allow custom vectors in search
                 score_modifiers: a dictionary to modify the score based on field values, should be None for hybrid search
                 model_auth: Authorisation details for downloading a model (if required)
@@ -151,7 +152,7 @@ class HybridSearch:
             q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,
             limit=result_count,
             offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
-            boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
+            boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
             index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix,
             hybridParameters=hybrid_parameters
         )]

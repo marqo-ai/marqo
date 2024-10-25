@@ -1136,7 +1136,7 @@ class TestVectorSearch(MarqoTestCase):
             weighted_vectors = []
             for q, weight in multi_query.items():
                 vec = vectorise(model_name="ViT-B/16", content=[q, ],
-                                image_download_headers=None, normalize_embeddings=True,
+                                media_download_headers=None, normalize_embeddings=True,
                                 device="cpu")[0]
                 weighted_vectors.append(np.asarray(vec) * weight)
 

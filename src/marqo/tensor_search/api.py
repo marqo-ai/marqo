@@ -277,7 +277,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             reranker=search_query.reRanker,
             filter=search_query.filter, device=device,
             attributes_to_retrieve=search_query.attributesToRetrieve, boost=search_query.boost,
-            image_download_headers=search_query.image_download_headers,
+            media_download_headers = search_query.mediaDownloadHeaders,
             context=search_query.context,
             score_modifiers=search_query.scoreModifiers,
             model_auth=search_query.modelAuth,
@@ -334,7 +334,7 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
         return marqo_config.embed.embed_content(
             content=embedding_request.content,
             index_name=index_name, device=device,
-            image_download_headers=embedding_request.image_download_headers,
+            media_download_headers=embedding_request.mediaDownloadHeaders,
             model_auth=embedding_request.modelAuth,
             content_type=embedding_request.content_type
         )
