@@ -1,24 +1,23 @@
 import os
 import uuid
 from unittest import mock
-
-import pytest
 import torch
+import pytest
 
 import marqo.core.exceptions as core_exceptions
-from marqo import exceptions as base_exceptions
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.enums import SearchMethod
+from marqo.core.models.add_docs_params import AddDocsParams
+from tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo import exceptions as base_exceptions
 from marqo.core.models.marqo_query import MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.s2_inference.errors import MediaDownloadError
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery
-from tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from pydantic import ValidationError
 
 
 class TestSearch(MarqoTestCase):
@@ -205,7 +204,7 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"}, # png image with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
@@ -240,7 +239,7 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"},  # png file with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
@@ -263,7 +262,7 @@ class TestSearch(MarqoTestCase):
                     index_name=index.name,
                     text="https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3"
                 )
-                
+
                 # Assertions
                 self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
                 self.assertEqual(results['hits'][0]['_id'], "2")  # The audio document should be the top result
@@ -968,146 +967,48 @@ class TestSearch(MarqoTestCase):
         search_query = SearchQuery(q="test")
         self.assertEqual(SearchMethod.TENSOR, search_query.searchMethod)
 
-    def test_search_private_images_proper_error_raised(self):
-        """Test that search raises a MediaDownloadError when trying to access private images"""
-        test_indexes = [
-            self.unstructured_default_image_index,
-            self.structured_default_image_index
+    def test_lexical_search_DoesNotErrorWithEscapedQuotes(self):
+        """
+        Ensure that lexical search handles double quotes properly, both escaped and wrong quotes.
+        Expected behavior: escaped quotes are passed to vespa. Incorrect quotes are treated like whitespace.
+        """
+
+        docs_list = [
+            {"_id": "doc1", "text_field_1": '1"2'},
+            {"_id": "doc2", "text_field_1": 'exact match'},
+            {"_id": "doc3", "text_field_1": 'exacto wrong syntax'},
+            {"_id": "doc4", "text_field_1": '"escaped"'},
+
+            {"_id": "red_herring_1", "text_field_1": '12'},
+            {"_id": "red_herring_2", "text_field_1": 'escaped'},
+            {"_id": "red_herring_3", "text_field_1": 'wrong"'}
+        ]
+        test_cases = [
+            ('1\\"2', ['doc1']),                        # Match off of '1"2'
+            ('"exact match"', ['doc2']),                # Match off of 'exact match'
+            ('\\"escaped\\"', ['doc4', 'red_herring_2']),        # Match off of 'escaped' or '"escaped"'
+            ('"exacto" wrong"', ['doc3']),       # Match properly off of 'wrong'
+            ('""', []),                          # Single quote should return no results (treated as whitespace)
+            ('"', []),                           # Double quote should return no results (treated as whitespace)
+            ('', [])                            # Empty string should return no results
         ]
 
-        test_queries = [({
-            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png": 1,
-            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small": 1 }, "dictionary queries"),
-            ("https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small", "str queries")]
-        for index_name in test_indexes:
-            for query, msg in test_queries:
-                with self.subTest(msg=f"index: {index_name}, query: {msg}"):
-                    with self.assertRaises(MediaDownloadError):
-                        _ = tensor_search.search(
-                            config=self.config,
-                            index_name=index_name.name,
-                            text=query,
-                            search_method=SearchMethod.TENSOR,
-                        )
-
-    def test_search_over_private_images_with_media_download_headers(self):
-        """Test that search can use private images with media download headers"""
-        test_indexes = [
-            self.unstructured_default_image_index,
-            self.structured_default_image_index
-        ]
-
-        test_queries = [({
-            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png": 1,
-            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small": 1 }, "dictionary queries"),
-            ("https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small", "str queries")]
-        for index_name in test_indexes:
-            for query, msg in test_queries:
-                with self.subTest(msg=f"index: {index_name}, query: {msg}"):
-                    _ = tensor_search.search(
-                        config=self.config,
-                        index_name=index_name.name,
-                        text=query,
-                        search_method=SearchMethod.TENSOR,
-                        media_download_headers={"marqo_media_header": "media_header_test_key"}
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
                     )
-
-
-@pytest.mark.largemodel
-class TestLanguageBindModelSearchCombined(MarqoTestCase):
-    """A class to test the search with the LanguageBind model."""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        super().setUpClass()
-
-        structured_language_bind_index = cls.structured_marqo_index_request(
-            name="structured_image_index" + str(uuid.uuid4()).replace('-', ''),
-            fields=[
-                FieldRequest(name="text_field_1", type=FieldType.Text,
-                             features=[FieldFeature.Filter, FieldFeature.LexicalSearch]),
-                FieldRequest(name="image_field_1", type=FieldType.ImagePointer),
-                FieldRequest(name="audio_field_1", type=FieldType.AudioPointer),
-                FieldRequest(name="video_field_1", type=FieldType.VideoPointer),
-                FieldRequest(
-                    name="multimodal_field",
-                    type=FieldType.MultimodalCombination,
-                    dependent_fields={
-                        "image_field_1": 1.0,
-                        "text_field_1": 1.0,
-                        "audio_field_1": 1.0,
-                        "video_field_1": 1.0,
-                    }
                 )
-            ],
-            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
-            tensor_fields=["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"],
-        )
 
-        unstructured_language_bind_index = cls.unstructured_marqo_index_request(
-            name="unstructured_image_index" + str(uuid.uuid4()).replace('-', ''),
-            model=Model(name="LanguageBind/Video_V1.5_FT_Audio_FT_Image"),
-            treat_urls_and_pointers_as_images=True,
-            treat_urls_and_pointers_as_media=True
-        )
-
-        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index])
-
-        cls.structured_language_bind_index_name = structured_language_bind_index.name
-        cls.unstructured_language_bind_index_name = unstructured_language_bind_index.name
-
-        s2_inference.clear_loaded_models()
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        super().tearDownClass()
-        s2_inference.clear_loaded_models()
-
-    def test_language_bind_model_can_search_all_media_modalities(self):
-        """Test to ensure that the LanguageBind model can search all media types to the index"""
-        queries = [
-            "This is a test text",
-            TestImageUrls.IMAGE1.value,
-            TestAudioUrls.AUDIO1.value,
-            TestVideoUrls.VIDEO1.value,
-            {
-                "This is a test text": 1,
-                TestImageUrls.IMAGE1.value: 1,
-                TestAudioUrls.AUDIO1.value: 1,
-                TestVideoUrls.VIDEO1.value: 1
-            }
-        ]
-        for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
-            for query in queries:
-                with self.subTest(index_name):
-                    _ = tensor_search.search(
-                        config = self.config,
-                        index_name=index_name,
-                        text=query,
-                        search_method=SearchMethod.TENSOR
-                    )
-
-    def test_language_bind_model_can_search_all_private_media_modalities(self):
-        """A test to ensure that the LanguageBind model can search all private media types to the index"""
-        queries = [
-            "This is a test text",
-            "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png",
-            "https://d2k91vq0avo7lq.cloudfront.net/bark.wav",
-            "https://d2k91vq0avo7lq.cloudfront.net/congress.mp4",
-            {
-                "This is a test text": 1,
-                "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small.png": 1,
-                "https://d2k91vq0avo7lq.cloudfront.net/bark.wav": 1,
-                "https://d2k91vq0avo7lq.cloudfront.net/congress.mp4": 1
-            }
-        ]
-        for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
-            for query in queries:
-                with self.subTest(index_name):
-                    _ = tensor_search.search(
-                        config = self.config,
-                        index_name=index_name,
-                        text=query,
-                        search_method=SearchMethod.TENSOR,
-                        media_download_headers={"marqo_media_header": "media_header_test_key"}
-                    )
+                for query, expected_ids in test_cases:
+                    with self.subTest(query=query):
+                        res = tensor_search.search(
+                            text=query, config=self.config, index_name=index.name,
+                            search_method=SearchMethod.LEXICAL
+                        )
+                        self.assertEqual(len(expected_ids), len(res['hits']))
+                        self.assertEqual(set(expected_ids), {hit['_id'] for hit in res['hits']})
