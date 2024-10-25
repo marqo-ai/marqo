@@ -833,13 +833,13 @@ class TestAddDocumentsCombined(MarqoTestCase):
         processor = streaming_media_processor.StreamingMediaProcessor(
             url='http://example.com/video.mp4',
             device='cpu',
-            headers={},
             modality=streaming_media_processor.Modality.VIDEO,
             marqo_index_type=IndexType.Unstructured,
             marqo_index_model=Model(name="test", properties={}),
             audio_preprocessing=unittest.mock.Mock(),
             video_preprocessing=unittest.mock.Mock(),
-            preprocessors={'video': unittest.mock.Mock()}
+            preprocessors={'video': unittest.mock.Mock()},
+            media_download_headers={},
         )
 
         # Set arbitrary values
@@ -1165,8 +1165,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     )
                 )
                 self.assertFalse(res.errors)
-
-
 
 
 @pytest.mark.largemodel
