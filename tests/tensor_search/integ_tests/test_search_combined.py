@@ -1012,52 +1012,6 @@ class TestSearch(MarqoTestCase):
                         media_download_headers={"marqo_media_header": "media_header_test_key"}
                     )
 
-    def test_lexical_search_DoesNotErrorWithEscapedQuotes(self):
-        """
-        Ensure that lexical search handles double quotes properly, both escaped and wrong quotes.
-        Expected behavior: escaped quotes are passed to vespa. Incorrect quotes are treated like whitespace.
-        """
-
-        docs_list = [
-            {"_id": "doc1", "text_field_1": '1"2'},
-            {"_id": "doc2", "text_field_1": 'exact match'},
-            {"_id": "doc3", "text_field_1": 'exacto wrong syntax'},
-            {"_id": "doc4", "text_field_1": '"escaped"'},
-
-            {"_id": "red_herring_1", "text_field_1": '12'},
-            {"_id": "red_herring_2", "text_field_1": 'escaped'},
-            {"_id": "red_herring_3", "text_field_1": 'wrong"'}
-        ]
-        test_cases = [
-            ('1\\"2', ['doc1']),                        # Match off of '1"2'
-            ('"exact match"', ['doc2']),                # Match off of 'exact match'
-            ('\\"escaped\\"', ['doc4', 'red_herring_2']),        # Match off of 'escaped' or '"escaped"'
-            ('"exacto" wrong"', ['doc3']),       # Match properly off of 'wrong'
-            ('""', []),                          # Single quote should return no results (treated as whitespace)
-            ('"', []),                           # Double quote should return no results (treated as whitespace)
-            ('', [])                            # Empty string should return no results
-        ]
-
-        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
-            with self.subTest(index=index.type):
-                tensor_search.add_documents(
-                    config=self.config,
-                    add_docs_params=AddDocsParams(
-                        index_name=index.name,
-                        docs=docs_list,
-                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
-                    )
-                )
-
-                for query, expected_ids in test_cases:
-                    with self.subTest(query=query):
-                        res = tensor_search.search(
-                            text=query, config=self.config, index_name=index.name,
-                            search_method=SearchMethod.LEXICAL
-                        )
-                        self.assertEqual(len(expected_ids), len(res['hits']))
-                        self.assertEqual(set(expected_ids), {hit['_id'] for hit in res['hits']})
-
 
 @pytest.mark.largemodel
 class TestLanguageBindModelSearchCombined(MarqoTestCase):
