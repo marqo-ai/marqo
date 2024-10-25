@@ -15,6 +15,7 @@ import ffmpeg
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from marqo.core.exceptions import InternalError
 
 
 class StreamingMediaProcessor:
@@ -30,9 +31,7 @@ class StreamingMediaProcessor:
         self.video_preprocessing = video_preprocessing
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
-        if media_download_headers is None:
-            media_download_headers = {}
-        self.media_download_headers = media_download_headers
+        self.media_download_headers = self._convert_headers_to_cli_format(media_download_headers)
 
         self.total_size, self.duration = self._fetch_file_metadata()
 
@@ -59,6 +58,25 @@ class StreamingMediaProcessor:
         # print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
         pass
 
+    def _convert_headers_to_cli_format(self, raw_media_download_headers: Optional[Dict] = None) -> str:
+        """
+        A helper function to convert the media download headers into a format that can be passed to ffmpeg in
+        subprocess calls.
+
+        Examples:
+            If the headers are {"key1": "value1", "key2": "value2"}, the function will return a string
+            "key1: value1\r\nkey2: value2"
+
+        Returns:
+            str: The headers in the required format. An empty string if no headers or None are provided.
+        """
+        if raw_media_download_headers is None or raw_media_download_headers == {}:
+            return ""
+        elif not isinstance(raw_media_download_headers, dict):
+            raise InternalError("media_download_headers should be a dictionary")
+        return "\r\n".join([f"{key}: {value}" for key, value in raw_media_download_headers.items()])
+
+
     def _fetch_file_metadata(self):
         start_time = time.time()
 
@@ -68,8 +86,10 @@ class StreamingMediaProcessor:
                 'show_entries': 'format=size,duration',
                 'of': 'json',
                 'probesize': '256K',  # Probe only the first 256KB
-                'headers': self.media_download_headers
             }
+
+            if self.media_download_headers:
+                probe_options['headers'] = self.media_download_headers
 
             probe = ffmpeg.probe(self.url, **probe_options)
 
@@ -109,10 +129,13 @@ class StreamingMediaProcessor:
 
                 try:
                     # Use ffmpeg-python to process the chunk
-                    stream = ffmpeg.input(
-                        self.url, ss=chunk_start, t=chunk_end - chunk_start,
-                        headers=self.media_download_headers
-                    )
+                    if self.media_download_headers:
+                        stream = ffmpeg.input(
+                            self.url, ss=chunk_start, t=chunk_end - chunk_start,
+                            headers=self.media_download_headers
+                        )
+                    else:
+                        stream = ffmpeg.input(self.url, ss=chunk_start, t=chunk_end - chunk_start)
 
                     if self.modality == Modality.VIDEO:
                         stream = ffmpeg.output(stream, output_file, vcodec='libx264', acodec='aac', **{'f': 'mp4'})
