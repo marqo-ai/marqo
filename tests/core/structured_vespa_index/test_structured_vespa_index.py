@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from marqo.core.models.marqo_index import *
 from marqo.core.structured_vespa_index import common
@@ -250,4 +251,55 @@ class TestStructuredVespaIndex(MarqoTestCase):
                     'nonexistent field': 'fail'
                 }
             )
+
+    def test_score_modifier_with_dot_in_subfield(self):
+        """
+        Test case where the score modifier field contains a period ('.') in the subfield name.
+        Ensures that only the first occurrence of '.' is split, and the rest is retained as part of the subfield.
+        """
+        marqo_doc = {
+            '_id': 'my_id',
+            'title': 'my title',
+            'price': 100.0,
+            "map_float_field": {"sub.field": 1.23},
+            constants.MARQO_DOC_TENSORS: {
+                'title': {
+                    constants.MARQO_DOC_CHUNKS: ['my', 'title'],
+                    constants.MARQO_DOC_EMBEDDINGS: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+                }
+            }
+        }
+
+        actual_vespa_doc = self.vespa_index.to_vespa_document(marqo_doc)
         
+        self.assertEqual(actual_vespa_doc['id'], 'my_id')
+        self.assertEqual(
+            actual_vespa_doc['fields'][common.FIELD_SCORE_MODIFIERS_FLOAT],
+            {'price': 100.0, 'map_float_field.sub.field': 1.23}
+        )
+
+    def test_score_modifier_with_multiple_dots_in_subfield(self):
+        """
+        Test case where the score modifier field contains multiple periods ('.') in the subfield name.
+        Ensures that only the first occurrence of '.' is split, and the rest are retained as part of the subfield.
+        """
+        marqo_doc = {
+            '_id': 'complex_id',
+            'title': 'complex title',
+            'price': 200.0,
+            "map_float_field": {"complex.sub.field.name": 4.56},
+            constants.MARQO_DOC_TENSORS: {
+                'title': {
+                    constants.MARQO_DOC_CHUNKS: ['complex', 'title'],
+                    constants.MARQO_DOC_EMBEDDINGS: [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+                }
+            }
+        }
+
+        actual_vespa_doc = self.vespa_index.to_vespa_document(marqo_doc)
+        
+        self.assertEqual(actual_vespa_doc['id'], 'complex_id')
+        self.assertEqual(
+            actual_vespa_doc['fields'][common.FIELD_SCORE_MODIFIERS_FLOAT],
+            {'price': 200.0, 'map_float_field.complex.sub.field.name': 4.56}
+        )

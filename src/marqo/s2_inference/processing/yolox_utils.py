@@ -89,7 +89,7 @@ def demo_postprocess(outputs: ndarray, img_size: Tuple[int, int], p6: bool = Fal
     Args:
         outputs (ndarray): the outputs from the yolox model inference
         img_size (Tuple[int, int]): the size of the input image
-        p6 (bool, optional): model architecture parameter. marqo-yolo v1 and v2 should be False. 
+        p6 (bool, optional): model architecture parameter. marqo-yolo v1 and v2 should be False.
                             check the model architecture for anything else. Defaults to False.
 
     Returns:

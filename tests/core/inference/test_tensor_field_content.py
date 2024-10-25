@@ -26,7 +26,7 @@ class DummyVectoriser(Vectoriser):
     def __init__(self):
         self.vectorise_call_count = 0
 
-    def vectorise(self, content_chunks: Union[List[str], List[Image]]) -> List[List[float]]:
+    def vectorise(self, content_chunks: Union[List[str], List[Image]], key_prefix: str = None) -> List[List[float]]:
         self.vectorise_call_count += 1
         return [[1.0 * (i + 1), 2.0 * (i + 1)] for i in range(len(content_chunks))]
 

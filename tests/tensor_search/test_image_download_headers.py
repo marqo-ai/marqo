@@ -62,11 +62,11 @@ class TestImageDownloadHeaders(MarqoTestCase):
         tensor_search.create_vector_index(
             config=self.config, index_name=self.index_name_1, index_settings=self.image_index_settings()
         )
-        image_download_headers = {"Authorization": "some secret key blah"}
+        media_download_headers = {"Authorization": "some secret key blah"}
         self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, docs=[
                 {"_id": "1", "image": self.real_img_url}],
-            auto_refresh=True, image_download_headers=image_download_headers, device="cpu"))
+            auto_refresh=True, media_download_headers=media_download_headers, device="cpu"))
 
         def pass_through_requests_get(url, *args, **kwargs):
             return requests_get(url, *args, **kwargs)
@@ -80,11 +80,11 @@ class TestImageDownloadHeaders(MarqoTestCase):
                 # Perform a vector search
                 search_res = tensor_search._vector_text_search(
                     config=self.config, index_name=self.index_name_1,
-                    result_count=1, query=self.real_img_url, image_download_headers=image_download_headers, device="cpu"
+                    result_count=1, query=self.real_img_url, media_download_headers=media_download_headers, device="cpu"
                 )
                 # Check if the image URL was called at least once with the correct headers
                 image_url_called = any(
-                    call_args[0] == self.real_img_url and call_kwargs.get('headers', None) == image_download_headers
+                    call_args[0] == self.real_img_url and call_kwargs.get('headers', None) == media_download_headers
                     for call_args, call_kwargs in mock_get.call_args_list
                 )
                 assert image_url_called, "Image URL not called with the correct headers"
@@ -102,18 +102,18 @@ class TestImageDownloadHeaders(MarqoTestCase):
 
         @unittest.mock.patch("marqo.s2_inference.clip_utils.load_image_from_path", mock_load_image_from_path)
         def run():
-            image_download_headers = {"Authorization": "some secret key blah"}
+            media_download_headers = {"Authorization": "some secret key blah"}
 
             # Add a document with an image URL
             self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, docs=[
                     {"_id": "1", "image": self.real_img_url}
-                ], auto_refresh=True, image_download_headers=image_download_headers, device="cpu"
+                ], auto_refresh=True, media_download_headers=media_download_headers, device="cpu"
             ))
             # Check if load_image_from_path was called with the correct headers
             assert len(mock_load_image_from_path.call_args_list) == 1
             call_args, call_kwargs = mock_load_image_from_path.call_args_list[0]
-            assert image_download_headers in call_args
+            assert media_download_headers in call_args
             return True
 
         assert run() is True
@@ -123,14 +123,14 @@ class TestImageDownloadHeaders(MarqoTestCase):
         tensor_search.create_vector_index(config=self.config, index_name=self.index_name_1,
                                           index_settings=self.image_index_settings())
         test_image_url = self.real_img_url
-        image_download_headers = {"Authorization": "some secret key blah"}
+        media_download_headers = {"Authorization": "some secret key blah"}
 
         def pass_through_load_image_from_path(*args, **kwargs):
             return load_image_from_path(*args, **kwargs)
 
         def pass_through_requests_get(url, *args, **kwargs):
             if url == test_image_url:
-                assert kwargs.get('headers', None) == image_download_headers
+                assert kwargs.get('headers', None) == media_download_headers
             return requests_get(url, *args, **kwargs)
 
         # Mock the load_image_from_path function
@@ -144,7 +144,7 @@ class TestImageDownloadHeaders(MarqoTestCase):
                         "_id": "1",
                         "image": test_image_url,
                     }],
-                auto_refresh=True, image_download_headers=image_download_headers, device="cpu"))
+                auto_refresh=True, media_download_headers=media_download_headers, device="cpu"))
 
         # Set up the mock GET
         mock_get = unittest.mock.MagicMock()
@@ -155,13 +155,13 @@ class TestImageDownloadHeaders(MarqoTestCase):
                 bulk_search_query = BulkSearchQuery(queries=[{
                     "index": self.index_name_1,
                     "q": self.real_img_url,
-                    "image_download_headers": image_download_headers
+                    "media_download_headers": media_download_headers
                 }])
                 resp = tensor_search.bulk_search(marqo_config=self.config, query=bulk_search_query)
 
         # Check if the image URL was called at least once with the correct headers
         image_url_called = any(
-            call_args[0] == test_image_url and call_kwargs.get('headers', None) == image_download_headers
+            call_args[0] == test_image_url and call_kwargs.get('headers', None) == media_download_headers
             for call_args, call_kwargs in mock_get.call_args_list
         )
         assert image_url_called, "Image URL not called with the correct headers"
