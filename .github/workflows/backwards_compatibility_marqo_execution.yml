@@ -156,3 +156,24 @@ jobs:
 #            --to_version ${{ github.event.inputs.to_version }} \
 #            --from_image ${{ github.event.inputs.from_image }} \
 #            --to_image ${{ github.event.inputs.to_image }}
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - Test-Marqo # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
