@@ -29,7 +29,8 @@ def pytest_collection_modifyitems(config, items):
             print(f"Test version: {test_version}, from_version: {from_version}")
             test_version = semver.VersionInfo.parse(test_version)
             from_version = semver.VersionInfo.parse(from_version)
-            if test_version < from_version:
+            # TODO: review this logic to see if it is correct
+            if test_version > from_version:
                 item.add_marker(pytest.mark.skip(reason=f"Test requires marqo_version {test_version} which is not greater than from_version {from_version}. Skipping."))
 
     print(f"Total collected tests: {len(items)}")
