@@ -247,10 +247,10 @@ class OPEN_CLIP(AbstractCLIPModel):
         return model_file_path
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                     image_download_headers: Optional[Dict] = None,
+                     media_download_headers: Optional[Dict] = None,
                      normalize=True) -> FloatTensor:
 
-        self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
+        self.image_input_processed: Tensor = self._preprocess_images(images, media_download_headers)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):

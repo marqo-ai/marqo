@@ -13,10 +13,15 @@ def make_list_of_images(x):
     return x
 
 
+def _convert_to_rgb(image):
+    return image.convert("RGB")
+
+
 def get_image_transform(config):
     config = config.vision_config
     transform = transforms.Compose(
         [
+            _convert_to_rgb,
             transforms.ToTensor(),
             transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.CenterCrop(224),
