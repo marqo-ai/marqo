@@ -58,7 +58,7 @@ jobs:
           security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
           aws-resource-tags: > # optional, requires additional permissions
             [
-              {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
+              {"Key": "Name", "Value": "marqo-compatibility-test-runner-${{ github.run_id }}"},
               {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
               {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
               {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
