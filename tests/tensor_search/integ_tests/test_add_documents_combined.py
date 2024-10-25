@@ -1259,7 +1259,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                 "image_field_1": "https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small",
                 "audio_field_1": "https://d2k91vq0avo7lq.cloudfront.net/bark",
                 "video_field_1": "https://d2k91vq0avo7lq.cloudfront.net/congress",
-                "_id": "1"
+                "_id": ""
             }
         ]
         for index_name in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
