@@ -78,5 +78,4 @@ def search_api_score_modifiers_parameter():
 
 
 def hugging_face_trust_remote_code():
-    # TODO - Update to valid docs URL
-    return _build_url('reference/api/models/hugging-face-models/#trust-remote-code')
+    return _build_url('models/marqo/bring-your-own-model/#bring-your-own-hugging-face-sentence-transformers-models')
