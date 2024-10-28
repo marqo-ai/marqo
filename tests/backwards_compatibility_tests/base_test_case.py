@@ -10,7 +10,6 @@ class BaseTestCase(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        # cls().prepare()
 
     def prepare(self):
         pass

@@ -15,12 +15,9 @@ def to_version(request):
 
 def pytest_collection_modifyitems(config, items):
     from_version = config.getoption("--from_version")
-    print(f"Running pytest_collection_modifyitems with from_version: {from_version}")
 
     for item in items:
         version_marker = item.get_closest_marker("marqo_version")
-        print(f"Checking test: {item.name}")
-        print(f"Checking version_marker: {version_marker}")
 
         if version_marker:
             test_version = version_marker.args[0]

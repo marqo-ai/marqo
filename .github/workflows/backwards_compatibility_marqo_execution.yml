@@ -87,7 +87,6 @@ jobs:
       - name: Install Dependencies
         run: |
           #pip install -r requirements.txt
-#          pip install tox==3.26
           pip install flake8
 
       - name: Set up Environment
@@ -105,12 +104,6 @@ jobs:
             echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
           fi
 
-#      - name: Check current directory
-#        run: pwd
-#      - name: List all contents of directory
-#        run: ls -la
-#      - name: list all tox environments
-#        run: tox -l --verbose
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -133,7 +126,7 @@ jobs:
             --to_image ${{ github.event.inputs.to_image }}
 
 
-#  rollback: #yet to write this
+#  rollback: #TODO: implement this
 #    runs-on: ubuntu-latest
 #    needs: Start-Runner
 #    steps:
