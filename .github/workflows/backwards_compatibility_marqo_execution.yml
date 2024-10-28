@@ -75,7 +75,7 @@ jobs:
       - name: checkout marqo repo
         uses: actions/checkout@v3
         with:
-          repository: adityabharadwaj198/marqo
+          repository: marqo-ai/marqo
           fetch-depth: 0
 
       - name: Set up Python 3.8
