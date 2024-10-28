@@ -43,7 +43,6 @@ jobs:
         run: |
           # Build and push image to ECR
           echo "Building and pushing marqo image to ECR"
-          echo "printing the branch name" + ${{ github.ref_name }}
           echo "printing the commit sha" + ${{ github.sha }}
           workflow_data="{\"ref\": \"mainline\",\"inputs\": {\"marqo_ref\": \"${{ github.sha }}\", \"push_to\": \"ECR\",\"image_repo\": \"marqo-compatibility-tests\",\"image_tag\":\"${{ github.sha }}\"}}"
           echo "printing the workflow_data" + $workflow_data
