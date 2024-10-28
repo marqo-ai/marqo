@@ -1,5 +1,5 @@
 # Execution workflow
-name: Marqo Test Execution
+name: [Compatibility Tests] Marqo Test Execution
 
 on:
   workflow_dispatch:
@@ -7,7 +7,9 @@ on:
       from_version:
         description: 'Source Marqo version'
         required: true
-      to_version:
+      to_version: #TODO: decide if this should be made optional - reasoning:
+        # 1. when a commit is pushed to mainline - you will need to have context of what version this commit is for. Without that you can't tell what is the to_version.
+        # In the same sense - how will you know what previous versions to test?
         description: 'Target Marqo version'
         required: true
       to_version_tag:
@@ -109,7 +111,16 @@ jobs:
 #        run: ls -la
 #      - name: list all tox environments
 #        run: tox -l --verbose
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Run backwards_compatibility test
         run: |
@@ -117,6 +128,7 @@ jobs:
             --mode=backwards_compatibility \
             --from_version ${{ github.event.inputs.from_version }} \
             --to_version ${{ github.event.inputs.to_version }} \
+            --to_version_tag ${{ github.event.inputs.to_version_tag }} \
             --from_image ${{ github.event.inputs.from_image }} \
             --to_image ${{ github.event.inputs.to_image }}
 

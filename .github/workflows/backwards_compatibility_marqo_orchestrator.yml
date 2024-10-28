@@ -1,9 +1,9 @@
 # Orchestrator workflow
-name: Marqo Test Orchestrator
+name: [Compatibility Tests] Marqo Test Orchestrator
 
 on:
-  push:
-    branches: [ main ]
+  push: #TODO: Decide if this workflow should run on push. Doesn't make sense to run on push.
+    branches: [ mainline ]
 #  pull_request:
 #    branches: [ main ]
   workflow_dispatch:
@@ -23,9 +23,74 @@ env:
   MAX_VERSIONS_TO_TEST: ${{ github.event.inputs.max_versions_to_test || 3 }}
 
 jobs:
+  invoke-build-push-img-github-workflow:
+    # Responsible for invoking build_push_img.yml GitHub actions workflow in the same repo
+    # that builds a marqo commit using the latest commit and uploads it to a private ECR Registry.
+    # More in /marqo/.github/workflows/build_push_img.yml
+    name: Invoke build_push_img.yml github actions workflow
+    runs-on: ubuntu-latest
+    environment: marqo-test-suite
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Build and push marqo image to ECR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          to_version: ${{ github.event.inputs.to_version }}
+        run: |
+          # Build and push image to ECR
+          echo "Building and pushing marqo image to ECR"
+          echo "printing the branch name" + ${{ github.ref_name }}
+          echo "printing the commit sha" + ${{ github.sha }}
+          workflow_data="{\"ref\": \"mainline\",\"inputs\": {\"marqo_ref\": \"${{ github.sha }}\", \"push_to\": \"ECR\",\"image_repo\": \"marqo-compatibility-tests\",\"image_tag\":\"${{ github.sha }}\"}}"
+          echo "printing the workflow_data" + $workflow_data
+          curl -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/adityabharadwaj198/marqo/actions/workflows/build_push_img.yml/dispatches \
+            -d "$workflow_data"
+
+  poll-for-image-existence:
+    # Responsible for polling the ECR registry for the image to be available
+    # More in /marqo/.github/workflows/build_push_img.yml
+    name: Poll for image existence
+    runs-on: ubuntu-latest
+    environment: marqo-test-suite
+    needs: invoke-build-push-img-github-workflow
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Poll for image existence
+        run: |
+          echo "Polling for image existence"
+          MAX_RETRIES=10  # Adjust retries as needed
+          SLEEP_TIME=15   # Adjust polling interval as needed
+          for ((i=1; i<=MAX_RETRIES; i++)); do
+            if aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }}; then
+              echo "Image found in ECR"
+              exit 0
+            else
+              echo "Image not found in ECR, retrying in $SLEEP_TIME seconds..."
+              sleep $SLEEP_TIME
+            fi
+          done
+          echo "Image not found after $MAX_RETRIES attempts. Exiting."
+          exit 1
+
   orchestrate:
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
+    needs: poll-for-image-existence
 
     environment: marqo-test-suite
     steps:
@@ -65,25 +130,6 @@ jobs:
           print(' '.join(versions))
           ")
           echo "::set-output name=list::$versions"
-
-      - name: Build and push marqo image to ECR
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          to_version: ${{ github.event.inputs.to_version }}
-        run: |
-          # Build and push image to ECR
-          echo "Building and pushing marqo image to ECR"
-          echo "printing the branch name" + ${{ github.ref_name }}
-          echo "printing the commit sha" + ${{ github.sha }}
-          workflow_data="{\"ref\": \"mainline\",\"inputs\": {\"marqo_ref\": \"${{ github.sha }}\", \"push_to\": \"ECR\",\"image_repo\": \"marqo-compatibility-tests\",\"image_tag\":\"${{ github.sha }}\"}}"
-          echo "printing the workflow_data" + $workflow_data
-          curl -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/adityabharadwaj198/marqo/actions/workflows/build_push_img.yml/dispatches \
-            -d "$workflow_data"
 
       - name: Trigger execution workflows #this code block is then actually responsible for running the the execution yaml file with from_version / to_version combinations
         env:

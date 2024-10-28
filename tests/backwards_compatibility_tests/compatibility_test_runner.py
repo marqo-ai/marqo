@@ -22,7 +22,7 @@ volumes_to_cleanup: Set[str] = set()
 
 def pull_remote_image_from_ecr(image_tag: str):
     ecr_registry = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
-    image_repo = "marqo"
+    image_repo = "marqo-compatibility-tests"
 
     # Log in to ECR
     print(" aditya "
@@ -45,32 +45,34 @@ def pull_remote_image_from_ecr(image_tag: str):
     subprocess.run(["docker", "pull", image_full_name], check=True)
 
     # Optionally retag the image locally to marqo-ai/marqo
-    local_tag = f"marqo-ai/marqo:{image_tag}"
+    local_tag = f"marqo-ai/marqo:{image_tag}" #it should now be called marqo-ai/marqo:sha-token
     print(f" aditya Retagging image to: {local_tag}")
     subprocess.run(["docker", "tag", image_full_name, local_tag], check=True)
+    return local_tag
 
     # Now you can use the image as "marqo-ai/marqo:{image_tag}"
 
-def pull_marqo_image(image: str, source):
+def pull_marqo_image(image: str, source: str):
     """Pull the specified Marqo Docker image."""
     try:
         if source == "docker":
             print(" aditya "
                   "Inside pull_marqo_image pulling this image" + image);
-            # subprocess.run(["docker", "pull", image], check=True)
+            subprocess.run(["docker", "pull", image], check=True)
             print(" aditya "
                   "didn't actually pull the image")
-        else:
+            return image
+        elif source == "ECR":
             print(" aditya "
                   "Reached here so I can be sure that this runs for ECR ");
-            # pull_remote_image_from_ecr(image)
+            return pull_remote_image_from_ecr(image_tag=image)
     except subprocess.CalledProcessError as e:
         raise Exception(f"Failed to pull Docker image {image}: {e}")
 
 
 def start_marqo_from_version_container(version: str, from_version_volume, from_version_image: Optional[str] = None,
-                                       transfer_state: Optional[str] = None, source="docker",
-                                       env_vars: Optional[list] = None):
+                                       transfer_state: Optional[str] = None, env_vars: Optional[list] = None):
+    source = "docker"
     """Start a Marqo container after pulling the required image and apply all provided environment variables."""
     print(f" aditya Starting Marqo container with version {version}, from_version_image {from_version_image}, from_version_volume {from_version_image}, transfer_state {transfer_state}, source {source}")
     from_version_image = from_version_image or f"marqoai/marqo:{version}"
@@ -167,21 +169,21 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
         raise
 
 def start_marqo_to_version_container(to_version: str, from_version: str, from_version_volume: str,
-                                     to_version_image: Optional[str] = None, source="docker",
-                                     env_vars: Optional[list] = None):
+                                     to_version_tag: str, env_vars: Optional[list] = None):
+    source = "ECR"
     print(
         f"Starting Marqo container with to_version {to_version}, "
-        f"from_version: {from_version}, from_image {to_version_image}, "
-        f"from_version_volume {from_version_volume}, to_version_image, {to_version_image}, source {source}")
-    to_version_image = to_version_image or f"marqoai/marqo:{to_version}"
+        f"from_version: {from_version} "
+        f"from_version_volume {from_version_volume}, to_version_tag, {to_version_tag}, source {source}")
     container_name = f"marqo-{to_version}"
     to_version = semver.VersionInfo.parse(to_version)
     from_version = semver.VersionInfo.parse(from_version)
 
-    print(f" aditya Using image: {to_version_image} with container name: {container_name}")
+    print(f" aditya Using image: {to_version_tag} with container name: {container_name}")
 
     # Pull the image before starting the container
-    pull_marqo_image(to_version_image, source)
+    to_version_image_name = pull_marqo_image(to_version_tag, source)
+    print(f" Printing image name {to_version_image_name}")
     try:
         subprocess.run(["docker", "rm", "-f", container_name], check=True)
     except subprocess.CalledProcessError:
@@ -204,16 +206,15 @@ def start_marqo_to_version_container(to_version: str, from_version: str, from_ve
     if from_version >= marqo_transfer_state_version and to_version >= marqo_transfer_state_version:
         # Use the provided volume for state transfer
         cmd.extend(["-v", f"{from_version_volume}:/opt/vespa/var"]) #setting volume to be mounted at /opt/vespa/var because starting from 2.9, the state is stored in /opt/vespa/var
-    elif from_version < marqo_transfer_state_version and to_version <= marqo_transfer_state_version:
+    elif from_version < marqo_transfer_state_version and to_version < marqo_transfer_state_version:
         cmd.extend(["-v", f"{from_version_volume}:/opt/vespa"]) #setting volume to be mounted at /opt/vespa because before 2.9, the state was stored in /opt/vespa
-    # Case when from_version is <2.9 and to_version is >=2.9
+    elif from_version < marqo_transfer_state_version <= to_version:     # Case when from_version is <2.9 and to_version is >=2.9
     # Here you need to explicitly copy
-    elif from_version < marqo_transfer_state_version <= to_version:
         to_version_volume = create_volume_for_marqo_version(str(to_version), None)
-        copy_state_from_container(from_version_volume, to_version_volume, to_version_image)
+        copy_state_from_container(from_version_volume, to_version_volume, to_version_image_name)
         cmd.extend(["-v", f"{to_version_volume}:/opt/vespa/var"])
 
-    cmd.append(to_version_image)
+    cmd.append(to_version_image_name)
 
     print(f" aditya Running command: {' '.join(cmd)}")
 
@@ -294,7 +295,7 @@ def cleanup_volumes():
             print(f" aditya Warning: Failed to remove volume {volume_name}: {e}")
     volumes_to_cleanup.clear()
 
-def backwards_compatibility_test(from_version: str, to_version: str, from_image: Optional[str] = None,
+def backwards_compatibility_test(from_version: str, to_version: str, to_version_tag: str, from_image: Optional[str] = None,
                                  to_image: Optional[str] = None):
     try:
         # Step 1: Start from_version container and prepare
@@ -326,7 +327,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, from_image:
               "stopped marqo container" + str(from_version))
 
         # Step 3: Start to_version container, transferring state
-        start_marqo_to_version_container(to_version, from_version, from_version_volume, to_image, source="docker")
+        start_marqo_to_version_container(to_version, from_version, from_version_volume, to_image)
         print(" aditya started marqo container in to_version by transferring state")
         # Step 4: Run tests
         run_tests("test", from_version, to_version, "http://localhost:8882")
@@ -346,10 +347,11 @@ def backwards_compatibility_test(from_version: str, to_version: str, from_image:
 
 
 
-def rollback_test(from_version: str, to_version: str, from_image: Optional[str] = None, to_image: Optional[str] = None):
+def rollback_test(to_version: str, from_version: str, to_version_tag, from_image: Optional[str] = None,
+                  to_image: Optional[str] = None):
     try:
         # Steps 1-3: Same as backwards_compatibility_test
-        backwards_compatibility_test(from_version, to_version, from_image, to_image)
+        backwards_compatibility_test(from_version, to_version, None, from_image, to_image)
 
         # Step 4: Stop to_version container (but don't remove it)
         stop_marqo_container(to_version)
@@ -432,6 +434,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["backwards_compatibility", "rollback"], required=True)
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
+    parser.add_argument("--to_version_tag", required=True)
     parser.add_argument("--from_image", default=None)
     parser.add_argument("--to_image", default=None)
     args = parser.parse_args()
@@ -444,6 +447,6 @@ if __name__ == "__main__":
         sys.exit(0) # TODO: figure out if this is the right way to quit.
 
     if args.mode == "backwards_compatibility":
-        backwards_compatibility_test(args.from_version, args.to_version, args.from_image, args.to_image)
+        backwards_compatibility_test(args.from_version, args.to_version, args.to_version_tag, args.from_image, args.to_image)
     elif args.mode == "rollback":
-        rollback_test(args.from_version, args.to_version, args.from_image, args.to_image)
+        rollback_test(args.to_version, args.from_version, args.to_version_tag, args.from_image, args.to_image)
