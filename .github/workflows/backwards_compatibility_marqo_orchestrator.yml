@@ -73,8 +73,8 @@ jobs:
       - name: Poll for image existence
         run: |
           echo "Polling for image existence"
-          MAX_RETRIES=10  # Adjust retries as needed
-          SLEEP_TIME=15   # Adjust polling interval as needed
+          MAX_RETRIES=20  # Adjust retries as needed
+          SLEEP_TIME=60   # Adjust polling interval as needed
           for ((i=1; i<=MAX_RETRIES; i++)); do
             if aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }}; then
               echo "Image found in ECR"
