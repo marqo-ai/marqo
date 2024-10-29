@@ -52,7 +52,7 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/marqo-ai/marqo/actions/workflows/build_push_img.yml/dispatches \
+            https://api.github.com/repos/adityabharadwaj198/marqo/actions/workflows/build_push_img.yml/dispatches \
             -d "$workflow_data"
 
   poll-for-image-existence:
@@ -90,7 +90,7 @@ jobs:
   orchestrate:
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
-    needs: poll-for-image-existence
+#    needs: poll-for-image-existence
 
     environment: marqo-test-suite
     steps:
@@ -138,6 +138,6 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/marqo-ai/marqo/actions/workflows/backwards_compatibility_marqo_execution.yml/dispatches \
+              https://api.github.com/repos/adityabharadwaj198/marqo/actions/workflows/backwards_compatibility_marqo_execution.yml/dispatches \
               -d "$workflow_data"
           done
