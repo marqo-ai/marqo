@@ -117,7 +117,7 @@ jobs:
 
       - name: Run backwards_compatibility test
         run: |
-          python tests/backwards_compatibility_tests/scripts/compatibility_test_runner.py \
+          python tests/backwards_compatibility_tests/compatibility_test_runner.py \
             --mode=backwards_compatibility \
             --from_version ${{ github.event.inputs.from_version }} \
             --to_version ${{ github.event.inputs.to_version }} \
