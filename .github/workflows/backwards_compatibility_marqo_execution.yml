@@ -115,6 +115,9 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: List contents of directory
+        run: ls
+
       - name: Run backwards_compatibility test
         run: |
           python tests/backwards_compatibility_tests/compatibility_test_runner.py \
