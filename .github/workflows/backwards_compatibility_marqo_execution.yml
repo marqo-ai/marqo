@@ -84,6 +84,10 @@ jobs:
           python-version: "3.8"
           cache: "pip"
 
+      - name: Install pip-tools
+        run: |
+          python -m pip install pip-tools
+
       - name: Compile requirements
         run: | 
           pip-compile tests/backwards_compatibility_tests/requirements.in
