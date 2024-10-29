@@ -113,7 +113,7 @@ jobs:
         id: versions
         run: |
           # Run the Python script and capture its output
-          VERSION_LIST=$(python generate_versions.py ${{ github.event.inputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
+          VERSION_LIST=$(python tests/backwards_compatibility_tests/generate_versions.py ${{ github.event.inputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
           echo "::set-output name=list::$VERSION_LIST" # setting the output variable
 
       - name: display versions
