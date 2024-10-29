@@ -75,7 +75,7 @@ jobs:
       - name: checkout marqo repo
         uses: actions/checkout@v3
         with:
-          repository: marqo-ai/marqo
+          repository: adityabharadwaj198/marqo #rename to marqo-ai/marqo for mainline branch
           fetch-depth: 0
 
       - name: Set up Python 3.8
@@ -159,7 +159,7 @@ jobs:
 #
 #      - name: Run rollback test
 #        run: |
-#          python tests/backwards_compatibility_tests/scripts/compatibility_test_runner.py \
+#          python tests/compatibility_tests/scripts/compatibility_test_runner.py \
 #            --mode=rollback \
 #            --from_version ${{ github.event.inputs.from_version }} \
 #            --to_version ${{ github.event.inputs.to_version }} \
