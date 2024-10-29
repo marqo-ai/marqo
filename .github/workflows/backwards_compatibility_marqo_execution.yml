@@ -84,10 +84,14 @@ jobs:
           python-version: "3.8"
           cache: "pip"
 
+      - name: Compile requirements
+        run: | 
+          pip-compile tests/backwards_compatibility_tests/requirements.in
+
       - name: Install Dependencies
         run: |
-          #pip install -r requirements.txt
-          pip install flake8
+          pip install -r tests/backwards_compatibility_tests/requirements.txt
+#          pip install flake8
 
       - name: Set up Environment
         run: |
