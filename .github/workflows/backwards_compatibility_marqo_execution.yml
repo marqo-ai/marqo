@@ -116,7 +116,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: List contents of directory
-        run: ls -la
+        run: ls -lR
 
       - name: Run backwards_compatibility test
         run: |
