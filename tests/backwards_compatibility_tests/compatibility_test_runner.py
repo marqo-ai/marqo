@@ -393,8 +393,8 @@ if __name__ == "__main__":
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
     parser.add_argument("--to_version_tag", required=True)
-    parser.add_argument("--from_image", default=None)
-    parser.add_argument("--to_image", default=None)
+    parser.add_argument("--from_image", required=False, default=None, help='Specify the source image')
+    parser.add_argument("--to_image", required=False, default=None, help='Specify the target image')
     args = parser.parse_args()
 
     from_version = semver.VersionInfo.parse(args.from_version)
