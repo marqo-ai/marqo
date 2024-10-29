@@ -1,5 +1,5 @@
 # Orchestrator workflow
-name: [Compatibility Tests] Marqo Test Orchestrator
+name: Marqo Compatibility Tests Orchestrator
 
 on:
   push: #TODO: Decide if this workflow should run on push. Doesn't make sense to run on push, since we'll need to somehow have context of what is the to_version and then derive from_versions from those.
@@ -112,24 +112,13 @@ jobs:
       - name: Generate version list #this code block just generates the from versions and stores it in a versions variable as a list
         id: versions
         run: |
-          to_version="${{ github.event.inputs.to_version}}"
-          MAX_PATCH=9  # Assuming patch versions go up to x.13.9 or similar
-          versions=$(python -c "
-          import semver
-          v = semver.VersionInfo.parse('$to_version')
-          versions = []
-          current_minor = v.minor - 1  # Decrease to previous minor version
-          patch = $MAX_PATCH
-          
-          for i in range($MAX_VERSIONS_TO_TEST):
-              version_str = f'{v.major}.{current_minor}.{patch}'
-              versions.append(version_str)
-              patch -= 1
-              if patch < 0:  # Move to the next minor version if we run out of patches
-                  break
-          print(' '.join(versions))
-          ")
-          echo "::set-output name=list::$versions"
+          # Run the Python script and capture its output
+          VERSION_LIST=$(python generate_versions.py ${{ github.event.inputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
+          echo "::set-output name=list::$VERSION_LIST" # setting the output variable
+
+      - name: display versions
+        run: | 
+          echo "Versions to test: ${{ steps.versions.outputs.list }}"
 
       - name: Trigger execution workflows #this code block is then actually responsible for running the the execution yaml file with from_version / to_version combinations
         env:

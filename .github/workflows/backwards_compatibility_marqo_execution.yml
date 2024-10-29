@@ -1,5 +1,5 @@
 # Execution workflow
-name: [Compatibility Tests] Marqo Test Execution
+name: Marqo Test Compatibility Execution
 
 on:
   workflow_dispatch:
