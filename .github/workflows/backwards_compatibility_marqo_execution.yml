@@ -126,16 +126,29 @@ jobs:
       - name: List contents of directory
         run: ls -lR
 
+#      - name: Run backwards_compatibility test
+#        run: |
+#          python tests/backwards_compatibility_tests/compatibility_test_runner.py \
+#            --mode=backwards_compatibility \
+#            --from_version ${{ github.event.inputs.from_version }} \
+#            --to_version ${{ github.event.inputs.to_version }} \
+#            --to_version_tag ${{ github.event.inputs.to_version_tag }} \
+#            --from_image ${{ github.event.inputs.from_image }} \
+#            --to_image ${{ github.event.inputs.to_image }}
       - name: Run backwards_compatibility test
         run: |
-          python tests/backwards_compatibility_tests/compatibility_test_runner.py \
+          cmd="python tests/backwards_compatibility_tests/compatibility_test_runner.py \
             --mode=backwards_compatibility \
             --from_version ${{ github.event.inputs.from_version }} \
             --to_version ${{ github.event.inputs.to_version }} \
-            --to_version_tag ${{ github.event.inputs.to_version_tag }} \
-            --from_image ${{ github.event.inputs.from_image }} \
-            --to_image ${{ github.event.inputs.to_image }}
-
+            --to_version_tag ${{ github.event.inputs.to_version_tag }}"
+          if [ -n "${{ github.event.inputs.from_image }}" ]; then
+            cmd="$cmd --from_image ${{ github.event.inputs.from_image }}"
+          fi
+          if [ -n "${{ github.event.inputs.to_image }}" ]; then
+            cmd="$cmd --to_image ${{ github.event.inputs.to_image }}"
+          fi
+          eval $cmd
 
 #  rollback: #TODO: implement this
 #    runs-on: ubuntu-latest
