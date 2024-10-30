@@ -1,3 +1,20 @@
+# Release 2.13.0
+
+## New features
+- Searchable attributes for unstructured indexes ([#968](https://github.com/marqo-ai/marqo/pull/968)). This new feature allows you to specify which lexical or tensor fields to include in your search queries, providing greater control over the search process. By customizing your search parameters, you can enhance the precision of your results across all search types: tensor, lexical, and hybrid. This feature is available for unstructured indexes created with Marqo 2.13 or later. For detailed guidance, please refer to [the API reference](https://docs.marqo.ai/latest/reference/api/search/search/#searchable-attributes) and [comparison of unstructured and structured indexes](https://docs.marqo.ai/latest/other-resources/cookbook/indexes/unstructured-vs-structured-indexes/)
+- Support for `stella_en_400M_v5` embedding models ([#1021](https://github.com/marqo-ai/marqo/pull/1021)). This feature adds compatibility for the Stella 400M text embedding models, enhancing the versatility of Marqo in handling diverse model types. Users can now use the `hf_stella` model type in their custom models. Please refer to [stella model guide](https://docs.marqo.ai/2.13/models/marqo/bring-your-own-model/#stella-models) for details.
+- Allow specifying pooling method for Hugging Face models ([#954](https://github.com/marqo-ai/marqo/pull/954)). Marqo can now infer the pooling method and accept user provided pooling method in model properties. For detailed examples, please refer to [this document about bringing your own Hugging Face model](https://docs.marqo.ai/2.13/models/marqo/bring-your-own-model/#bring-your-own-hugging-face-sentence-transformers-models).
+
+## Bug fixes and minor changes
+- Normalize custom vectors during indexing when `normalizeEmbeddings` is set to True for indexes created with Marqo 2.13 or later ([#970](https://github.com/marqo-ai/marqo/pull/970)). This fix ensures that custom vector fields align with other tensor fields in terms of normalization, resulting in more accurate search results and improved overall performance.
+- Enhanced query parser for double quotes ([#979](https://github.com/marqo-ai/marqo/pull/979)). This feature introduces improved parsing logic for handling double quotes in search queries, allowing for greater flexibility and resilience against syntax errors. Badly formatted and escaped quotes no longer lead to 500 status errors. Please refer to the [lexical search guide](https://docs.marqo.ai/latest/reference/api/search/search/#lexical-search-exact-matches) for more details and examples.
+- Bug fix for score modifiers handling ([#1008](https://github.com/marqo-ai/marqo/pull/1008)). This update resolves an issue related to the handling of score modifiers in queries, specifically those involving the period `.` character. Users will now experience smoother query operations without encountering internal errors, ensuring that score modifiers are correctly applied. 
+- Bug fixes for media download and query handling ([#1022](https://github.com/marqo-ai/marqo/pull/1022)). Users can now successfully download private media files by using the new `mediaDownloadHeaders` parameter, which will replace the deprecated `imageDownloadHeaders`. Additionally, the fix resolves issues preventing the inclusion of more than two modalities in weighted queries, along with support for indexing `.png` images in Languagebind models.
+
+## Contributor shout-outs
+- Shoutouts to our valuable 4.6k stargazers!
+- Thanks a lot for the discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+
 # Release 2.12.5
 
 ## Bug fixes and minor changes
