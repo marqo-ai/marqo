@@ -101,8 +101,7 @@ class MarqoTestCase(unittest.TestCase):
 
     @classmethod
     def add_documents(cls, *args, **kwargs):
-        # TODO change to use config.document.add_documents when tensor_search.add_documents is removed
-        return tensor_search.add_documents(*args, **kwargs)
+        return cls.config.document.add_documents(add_docs_params=kwargs.get('add_docs_params'))
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
