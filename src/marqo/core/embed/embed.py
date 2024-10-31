@@ -117,12 +117,9 @@ class Embed:
 
         # Vectorise the queries
         with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
-            try:
-                qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(
-                    temp_config, queries, device
-                )
-            except s2_inference_errors.MediaDownloadError as e:
-                raise api_exceptions.InvalidArgError(message=str(e)) from e
+            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(
+                temp_config, queries, device
+            )
 
         embeddings: List[List[float]] = list(qidx_to_vectors.values())
 

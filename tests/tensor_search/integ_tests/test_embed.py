@@ -764,7 +764,29 @@ class TestEmbed(MarqoTestCase):
                             marqo_config=self.config, index_name=index_name,
                             embedding_request=EmbedRequest(
                                 content=test_content
-                            )
+                            ),
+                            device="cpu"
                         )
                         self.assertIn("Error downloading media file", str(e.exception))
                         self.assertIn("403 Client Error", str(e.exception))
+
+    def test_embed_invalid_image_proper_error_raised(self):
+        """Test that a proper 400 error is raised when trying to embed an invalid image url."""
+        test_content_lists = [
+            ("https://a-dummy-image-url.jpg", "a single invalid image url"),
+            (["https://a-dummy-image-url.jpg", "test"],
+             "a list of content with an invalid image url")
+        ]
+
+        for index_name in [self.unstructured_default_image_index.name, self.structured_default_image_index.name]:
+            for test_content, msg in test_content_lists:
+                with self.subTest(f"{index_name} - {msg}"):
+                    with self.assertRaises(InvalidArgError) as e:
+                        embed_res = embed(
+                            marqo_config=self.config, index_name=index_name,
+                            embedding_request=EmbedRequest(
+                                content=test_content
+                            ),
+                            device="cpu"
+                        )
+                        self.assertIn("Error vectorising content", str(e.exception))

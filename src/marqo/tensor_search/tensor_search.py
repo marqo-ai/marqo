@@ -2073,12 +2073,14 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
     """Run the query vectorisation process
 
     Raise:
-        MediaDownloadError: If the media cannot be downloaded. This error is raised before the vectorisation process.
-        api_exceptions.InvalidArgError: If the vectorisation process fails.
+        api_exceptions.InvalidArgError: If the vectorisation process fails or if the media cannot be downloaded.
     """
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
-    prefixed_queries = add_prefix_to_queries(queries)
+    try:
+        prefixed_queries = add_prefix_to_queries(queries)
+    except s2_inference_errors.MediaDownloadError as e:
+        raise api_exceptions.InvalidArgError(message=str(e)) from e
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
@@ -2176,10 +2178,7 @@ def _vector_text_search(
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
-        try:
-            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
-        except s2_inference_errors.MediaDownloadError as e:
-            raise api_exceptions.InvalidArgError(message=str(e)) from e
+        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
     vectorised_text = list(qidx_to_vectors.values())[0]
 
     marqo_query = MarqoTensorQuery(

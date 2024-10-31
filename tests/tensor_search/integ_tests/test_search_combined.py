@@ -1014,7 +1014,7 @@ class TestSearch(MarqoTestCase):
                         self.assertEqual(set(expected_ids), {hit['_id'] for hit in res['hits']})
 
     def test_search_private_image_return_proper_error(self):
-        """A test to ensure that InvalidArgumentError is raised when searching for an image in a private index."""
+        """A test to ensure that InvalidArgumentError is raised when searching for a private image."""
         test_queries_list = [
             ("https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small", "A private image"),
             ({"https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small": 1, "test": 1},
@@ -1030,3 +1030,20 @@ class TestSearch(MarqoTestCase):
                         )
                     self.assertIn("Error downloading media file", str(e.exception))
                     self.assertIn("403 Client Error", str(e.exception))
+
+    def test_search_invalid_image_url_image_return_proper_error(self):
+        """A test to ensure that InvalidArgumentError is raised when searching for an invalid image url."""
+        test_queries_list = [
+            ("https://a-dummy-image-url.jpg", "A invalid image"),
+            ({"https://a-dummy-image-url.jpg": 1, "test": 1},
+             "A invalid image in the dictionary")
+        ]
+
+        for index_name in [self.structured_default_image_index, self.unstructured_default_image_index]:
+            for query, msg in test_queries_list:
+                with self.subTest(f"{index_name} - {query}"):
+                    with self.assertRaises(api_exceptions.InvalidArgError) as e:
+                        tensor_search.search(
+                            text=query, config=self.config, index_name=index_name.name,
+                        )
+                    self.assertIn("Error vectorising content", str(e.exception))
