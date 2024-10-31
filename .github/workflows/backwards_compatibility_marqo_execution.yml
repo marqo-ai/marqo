@@ -135,6 +135,11 @@ jobs:
 #            --to_version_tag ${{ github.event.inputs.to_version_tag }} \
 #            --from_image ${{ github.event.inputs.from_image }} \
 #            --to_image ${{ github.event.inputs.to_image }}
+      - name: check marqo disk usage
+        run: |
+          df -h /
+          du -sh /* | sort -hr
+
       - name: Run backwards_compatibility test
         run: |
           cmd="python tests/backwards_compatibility_tests/compatibility_test_runner.py \
@@ -149,6 +154,13 @@ jobs:
             cmd="$cmd --to_image ${{ github.event.inputs.to_image }}"
           fi
           eval $cmd
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          df -h /
+          du -sh /* | sort -hr
+          docker system df -v
 
 #  rollback: #TODO: implement this
 #    runs-on: ubuntu-latest
