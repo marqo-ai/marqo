@@ -900,7 +900,8 @@ def _get_hf_properties() -> Dict:
                 "dimensions": 1024,
                 "tokens": 512,
                 "type": "hf_stella",
-                "trustRemoteCode": True
+                "trustRemoteCode": True,
+                "text_query_prefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query.\nQuery: "
             },
     }
     return HF_MODEL_PROPERTIES
