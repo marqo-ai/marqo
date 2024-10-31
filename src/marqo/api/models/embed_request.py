@@ -3,21 +3,20 @@
 Choices (enum-type structure) in fastAPI:
 https://pydantic-docs.helpmanual.io/usage/types/#enums-and-choices
 """
-import pydantic
-from typing import Union, List, Dict, Optional, Any
+from typing import Union, List, Dict, Optional
 
+import pydantic
 from pydantic import Field, root_validator
 
-from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.base_model import MarqoBaseModel
 from marqo.core.embed.embed import EmbedContentType
-
+from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class EmbedRequest(MarqoBaseModel):
     # content can be a single query or list of queries. Queries can be a string or a dictionary.
     content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]]
-    image_download_headers: Optional[Dict] = Field(default=None, alias="imageDownloadHeaders")
+    imageDownloadHeaders: Optional[Dict] = Field(default=None, alias="image_download_headers")
     mediaDownloadHeaders: Optional[Dict] = None
     modelAuth: Optional[ModelAuth] = None
     content_type: Optional[EmbedContentType] = Field(default=EmbedContentType.Query, alias="contentType")

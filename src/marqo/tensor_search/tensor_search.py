@@ -2018,6 +2018,12 @@ def get_content_vector(
 
 
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
+    """
+    Add prefix to the queries if it is a text query.
+
+    Raises:
+        MediaDownloadError: If the media cannot be downloaded
+    """
     prefixed_queries = []
     for q in queries:
         text_query_prefix = q.index.model.get_text_query_prefix(q.text_query_prefix)
@@ -2165,7 +2171,10 @@ def _vector_text_search(
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
-        qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+        try:
+            qidx_to_vectors: Dict[Qidx, List[float]] = run_vectorise_pipeline(config, queries, device)
+        except s2_inference_errors.MediaDownloadError as e:
+            raise api_exceptions.InvalidArgError(message=str(e)) from e
     vectorised_text = list(qidx_to_vectors.values())[0]
 
     marqo_query = MarqoTensorQuery(
