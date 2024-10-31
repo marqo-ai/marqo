@@ -2070,7 +2070,12 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
 
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
     Qidx, List[float]]:
-    """Run the query vectorisation process"""
+    """Run the query vectorisation process
+
+    Raise:
+        MediaDownloadError: If the media cannot be downloaded. This error is raised before the vectorisation process.
+        api_exceptions.InvalidArgError: If the vectorisation process fails.
+    """
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
     prefixed_queries = add_prefix_to_queries(queries)
