@@ -32,18 +32,17 @@ on:
       - mainline
     paths-ignore:
       - '**.md'
-  pull_request:
-    branches:
-      - mainline
   pull_request_target:
     branches:
       - mainline
+    paths-ignore:
+      - '**.md'
 
 permissions:
   contents: read
 
 concurrency:
-  group: cpu-local-api-tests-${{ github.ref }}
+  group: cpu-local-api-tests-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:

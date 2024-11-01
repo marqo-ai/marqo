@@ -9,15 +9,14 @@ on:
       - mainline
     paths-ignore:
       - '**.md'
-  pull_request:
-    branches:
-      - mainline
   pull_request_target:
     branches:
       - mainline
+    paths-ignore:
+      - '**.md'
 
 concurrency:
-  group: large-model-unit-tests-${{ github.ref }}
+  group: large-model-unit-tests-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
