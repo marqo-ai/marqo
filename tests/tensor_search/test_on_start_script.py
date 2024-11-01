@@ -7,6 +7,7 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import on_start_script
 from marqo.tensor_search.enums import EnvVars
 from tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase
 
 
 class TestOnStartScript(MarqoTestCase):
@@ -61,7 +62,7 @@ class TestOnStartScript(MarqoTestCase):
         }
 
         clip_model_expected = (
-            "generic-clip-test-model-2", 
+            "generic-clip-test-model-2",
             "ViT-B/32", 
             512, 
             "clip", 
@@ -254,7 +255,6 @@ class TestOnStartScript(MarqoTestCase):
 
         assert run_empty()
 
-
     def test_concurrent_model_loading(self):
         valid_patch_models = ['dino-v1', 'dino-v2']
         mock_chunk_image = mock.MagicMock()
@@ -269,6 +269,16 @@ class TestOnStartScript(MarqoTestCase):
             return True
 
         assert run()
+
+    @mock.patch("marqo.config.Config")
+    def test_boostrap_failure_should_raise_error(self, mock_config):
+        mock_config.index_management.bootstrap_vespa.side_effect = Exception('some error')
+
+        with self.assertRaises(Exception) as context:
+            on_start_script.on_start(mock_config)
+
+        self.assertTrue('some error' in str(context.exception))
+
 
     def test_SetEnableVideoGPUAcceleration_none_input_check_fails(self):
         """Test when the env variable is None(not set by the users) and the check fails, the env var is set to 'FALSE'."""

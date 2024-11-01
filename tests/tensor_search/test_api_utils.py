@@ -1,5 +1,7 @@
 import pydantic
-from marqo.tensor_search.models.add_docs_objects import ModelAuth, AddDocsParams, AddDocsBodyParams
+
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.api.models.add_docs_objects import ModelAuth, AddDocsBodyParams
 from marqo.tensor_search.web.api_utils import add_docs_params_orchestrator
 from marqo.tensor_search.models.private_models import S3Auth
 import urllib.parse
@@ -96,13 +98,13 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         # Query parameters should be parsed as default values
         non_tensor_fields = []
         use_existing_tensors = False
-        image_download_headers = dict()
+        media_download_headers = dict()
         model_auth = None
         mappings = dict()
 
         # Call the function with the arguments
         result = add_docs_params_orchestrator(index_name, body, device, non_tensor_fields, mappings,
-                                              model_auth, image_download_headers, use_existing_tensors)
+                                              model_auth, media_download_headers, use_existing_tensors)
 
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
@@ -112,7 +114,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         assert result.non_tensor_fields == ["field1"]
         assert result.use_existing_tensors == True
         assert result.docs == [{"test": "doc"}]
-        assert result.image_download_headers == {"header1": "value1"}
+        assert result.media_download_headers == {"header1": "value1"}
 
     def test_add_docs_params_orchestrator_deprecated_query_parameters(self):
         # Set up the arguments for the function
@@ -124,14 +126,14 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         device = "test-device"
         non_tensor_fields = ["field1"]
         use_existing_tensors = True
-        image_download_headers = {"header1": "value1"}
+        media_download_headers = {"header1": "value1"}
         model_auth = model_auth
         mappings = {"map1": "value1"}
         auto_refresh = True
 
         # Call the function with the arguments
         result = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
-                                              model_auth, image_download_headers, use_existing_tensors)
+                                              model_auth, media_download_headers, use_existing_tensors)
 
         # Assert that the result is as expected
         assert isinstance(result, AddDocsParams)
@@ -141,7 +143,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         assert result.non_tensor_fields == ["field1"]
         assert result.use_existing_tensors == True
         assert result.docs == [{"test": "doc"}]
-        assert result.image_download_headers == {"header1": "value1"}
+        assert result.media_download_headers == {"header1": "value1"}
 
     def test_add_docs_params_orchestrator_error(self):
         # Test the case where the function should raise an error due to invalid input
@@ -153,7 +155,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         device = "test-device"
         non_tensor_fields = ["field1"]
         use_existing_tensors = True
-        image_download_headers = {"header1": "value1"}
+        media_download_headers = {"header1": "value1"}
         model_auth = model_auth
         mappings = {"map1": "value1"}
         auto_refresh = True
@@ -161,7 +163,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
         # Use pytest.raises to check for the error
         try:
            _ = add_docs_params_orchestrator(index_name, body, device, auto_refresh, non_tensor_fields, mappings,
-                                            model_auth, image_download_headers, use_existing_tensors)
+                                            model_auth, media_download_headers, use_existing_tensors)
         except InternalError as e:
             self.assertIn("Unexpected request body type", str(e))
 
@@ -179,7 +181,7 @@ class TestAddDocsParamsOrchestrator(unittest.TestCase):
                                     mappings={"map1": "value1"})
 
         params = {"non_tensor_fields": ["what"], "use_existing_tensors": True,
-                  "image_download_headers": {"header2": "value2"}, "model_auth": model_auth,
+                  "media_download_headers": {"header2": "value2"}, "model_auth": model_auth,
                   "mappings": {"map2": "value2"}}
 
         for param, value in params.items():

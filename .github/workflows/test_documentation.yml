@@ -1,7 +1,10 @@
 name: test_documentation
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - mainline
+      - releases/*
 
 permissions:
   contents: read

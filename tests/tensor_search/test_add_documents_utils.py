@@ -5,7 +5,7 @@ from unittest import mock
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase
 from marqo.tensor_search import add_docs
 from marqo.core.models.marqo_index import *

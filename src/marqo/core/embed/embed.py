@@ -34,11 +34,12 @@ class Embed:
         return value
 
     def embed_content(
-                    self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
-                    index_name: str, device: str = None, image_download_headers: Optional[Dict] = None,
-                    model_auth: Optional[ModelAuth] = None,
-                    content_type: Optional[EmbedContentType] = EmbedContentType.Query
-                    ) -> Dict:
+            self, content: Union[str, Dict[str, float], List[Union[str, Dict[str, float]]]],
+            index_name: str, device: str = None,
+            media_download_headers: Optional[Dict] = None,
+            model_auth: Optional[ModelAuth] = None,
+            content_type: Optional[EmbedContentType] = EmbedContentType.Query
+    ) -> Dict:
         """
         Use the index's model to embed the content
 
@@ -72,7 +73,7 @@ class Embed:
 
         # Generate input for the vectorise pipeline (Preprocessing)
         RequestMetricsStore.for_request().start("embed.query_preprocessing")
-        marqo_index = index_meta_cache.get_index(config=temp_config, index_name=index_name)
+        marqo_index = index_meta_cache.get_index(index_management=temp_config.index_management, index_name=index_name)
 
         # Transform content to list if it is not already
         if isinstance(content, List):
@@ -105,7 +106,7 @@ class Embed:
                 BulkSearchQueryEntity(
                     q=content_entry,
                     index=marqo_index,
-                    image_download_headers=image_download_headers,
+                    mediaDownloadHeaders=media_download_headers,
                     modelAuth=model_auth,
                     text_query_prefix=prefix
                     # TODO: Check if it's fine that we leave out the other parameters

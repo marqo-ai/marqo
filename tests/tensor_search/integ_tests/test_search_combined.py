@@ -9,7 +9,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo import exceptions as base_exceptions
 from marqo.core.models.marqo_query import MarqoLexicalQuery
@@ -204,14 +204,14 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"}, # png image with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
             with self.subTest(index=index.type):
-                response = tensor_search.add_documents(
+                response = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -239,14 +239,14 @@ class TestSearch(MarqoTestCase):
         documents = [
             {"video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4", "_id": "1"},
             # Replace the audio link with something marqo-hosted
-            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"}, 
+            {"audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3", "_id": "2"},
             {"image_field_1": TestImageUrls.HIPPO_REALISTIC_LARGE.value, "_id": "3"},
             # {"image_field_1": TestImageUrls.HIPPO_REALISTIC.value, "_id": "5"},  # png file with palette is not supported
             {"text_field_1": "hello there padawan. Today you will begin your training to be a Jedi", "_id": "4"},
         ]
         for index in [self.unstructured_languagebind_index, self.structured_languagebind_index]:
             with self.subTest(index=index.type):
-                response = tensor_search.add_documents(
+                response = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -262,7 +262,7 @@ class TestSearch(MarqoTestCase):
                     index_name=index.name,
                     text="https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3"
                 )
-                
+
                 # Assertions
                 self.assertEqual(len(results['hits']), 3)  # 3 documents should be returned (limit=3)
                 self.assertEqual(results['hits'][0]['_id'], "2")  # The audio document should be the top result
@@ -272,7 +272,7 @@ class TestSearch(MarqoTestCase):
     def test_filtering_list_case_tensor(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(type=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -320,7 +320,7 @@ class TestSearch(MarqoTestCase):
     def test_filtering_list_case_lexical(self):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -368,7 +368,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_image_index, self.structured_default_image_index]:
             with self.subTest(index=index):
                 hippo_img = TestImageUrls.HIPPO_REALISTIC.value
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -421,7 +421,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents first
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -554,7 +554,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -606,7 +606,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Add documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -652,7 +652,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
             with self.subTest(index=index):
                 # Adding documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -699,7 +699,7 @@ class TestSearch(MarqoTestCase):
         for index in [self.structured_default_text_index]:
             with self.subTest(index=index.type):
                 # Adding documents
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -754,7 +754,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -784,7 +784,7 @@ class TestSearch(MarqoTestCase):
         """
         for index in [self.structured_default_text_index, self.unstructured_default_text_index]:
             with self.subTest(index=index.type):
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -839,7 +839,7 @@ class TestSearch(MarqoTestCase):
             with self.subTest(msg=index.type):
                 tensor_fields = ["text_field_1", "text_field_2"] \
                     if isinstance(index, UnstructuredMarqoIndex) else None
-                tensor_search.add_documents(
+                self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name,
@@ -966,3 +966,49 @@ class TestSearch(MarqoTestCase):
         # A special case for no search method provided
         search_query = SearchQuery(q="test")
         self.assertEqual(SearchMethod.TENSOR, search_query.searchMethod)
+
+    def test_lexical_search_DoesNotErrorWithEscapedQuotes(self):
+        """
+        Ensure that lexical search handles double quotes properly, both escaped and wrong quotes.
+        Expected behavior: escaped quotes are passed to vespa. Incorrect quotes are treated like whitespace.
+        """
+
+        docs_list = [
+            {"_id": "doc1", "text_field_1": '1"2'},
+            {"_id": "doc2", "text_field_1": 'exact match'},
+            {"_id": "doc3", "text_field_1": 'exacto wrong syntax'},
+            {"_id": "doc4", "text_field_1": '"escaped"'},
+
+            {"_id": "red_herring_1", "text_field_1": '12'},
+            {"_id": "red_herring_2", "text_field_1": 'escaped'},
+            {"_id": "red_herring_3", "text_field_1": 'wrong"'}
+        ]
+        test_cases = [
+            ('1\\"2', ['doc1']),                        # Match off of '1"2'
+            ('"exact match"', ['doc2']),                # Match off of 'exact match'
+            ('\\"escaped\\"', ['doc4', 'red_herring_2']),        # Match off of 'escaped' or '"escaped"'
+            ('"exacto" wrong"', ['doc3']),       # Match properly off of 'wrong'
+            ('""', []),                          # Single quote should return no results (treated as whitespace)
+            ('"', []),                           # Double quote should return no results (treated as whitespace)
+            ('', [])                            # Empty string should return no results
+        ]
+
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+                tensor_search.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=docs_list,
+                        tensor_fields=["text_field_1"] if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                for query, expected_ids in test_cases:
+                    with self.subTest(query=query):
+                        res = tensor_search.search(
+                            text=query, config=self.config, index_name=index.name,
+                            search_method=SearchMethod.LEXICAL
+                        )
+                        self.assertEqual(len(expected_ids), len(res['hits']))
+                        self.assertEqual(set(expected_ids), {hit['_id'] for hit in res['hits']})

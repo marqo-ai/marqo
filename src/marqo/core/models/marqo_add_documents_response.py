@@ -52,6 +52,16 @@ class MarqoAddDocumentsItem(MarqoBaseModel):
     error: Optional[str] = None
     code: Optional[str] = None
 
+    @classmethod
+    def from_error(cls, doc_id: Optional[str], error: Any) -> 'MarqoAddDocumentsItem':
+        return MarqoAddDocumentsItem(
+            id=doc_id if doc_id is not None else '',
+            error=error.message,
+            message=error.message,
+            status=int(error.status_code or 400),
+            code=error.code
+        )
+
 
 class MarqoAddDocumentsResponse(MarqoBaseDocumentsResponse):
     errors: bool

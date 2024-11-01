@@ -8,9 +8,9 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
-from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex
+from marqo.core.models.marqo_index import UnstructuredMarqoIndex, StructuredMarqoIndex, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoHybridQuery
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_HYBRID_CUSTOM_SEARCHER
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils
@@ -33,7 +33,7 @@ class HybridSearch:
             offset: int = 0, ef_search: Optional[int] = None, approximate: bool = True,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
             attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-            image_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
+            media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
             hybrid_parameters: HybridParameters = None) -> Dict:
@@ -51,7 +51,8 @@ class HybridSearch:
                 verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
                     objects are printed out
                 attributes_to_retrieve: if set, only returns these fields
-                image_download_headers: headers for downloading images
+                media_download_headers: headers for downloading media
+
                 context: a dictionary to allow custom vectors in search
                 score_modifiers: a dictionary to modify the score based on field values, should be None for hybrid search
                 model_auth: Authorisation details for downloading a model (if required)
@@ -82,7 +83,7 @@ class HybridSearch:
 
         RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
 
-        marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+        marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
         # Version checks (different for structured and unstructured)
         marqo_index_version = marqo_index.parsed_marqo_version()
@@ -106,9 +107,10 @@ class HybridSearch:
             hybrid_parameters = HybridParameters()
 
         # TODO: Remove when unstructured searchable attributes are supported
-        if isinstance(marqo_index, UnstructuredMarqoIndex) and \
-                (hybrid_parameters.searchableAttributesTensor is not None or \
-                hybrid_parameters.searchableAttributesLexical is not None):
+        if (isinstance(marqo_index, UnstructuredMarqoIndex) and
+                not isinstance(marqo_index, SemiStructuredMarqoIndex) and
+                (hybrid_parameters.searchableAttributesTensor is not None or
+                 hybrid_parameters.searchableAttributesLexical is not None)):
             raise core_exceptions.UnsupportedFeatureError(
                 f"Hybrid search for unstructured indexes currently does not support `searchableAttributesTensor` or "
                 f"`searchableAttributesLexical`. Please set these attributes to None."
@@ -150,7 +152,7 @@ class HybridSearch:
             q=query_text_vectorise, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.HYBRID,
             limit=result_count,
             offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
-            boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
+            boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
             index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix,
             hybridParameters=hybrid_parameters
         )]

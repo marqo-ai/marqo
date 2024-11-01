@@ -16,15 +16,15 @@ from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from marqo.core.exceptions import InternalError
 
 
 class StreamingMediaProcessor:
-    def __init__(self, url: str, device: str, headers: Dict[str, str], modality: Modality, marqo_index_type: IndexType,
+    def __init__(self, url: str, device: str, modality: Modality, marqo_index_type: IndexType,
                  marqo_index_model: Model, preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
-                 video_preprocessing: VideoPreProcessing = None):
+                 video_preprocessing: VideoPreProcessing = None, media_download_headers: Optional[Dict[str, str]]= None):
         self.url = url
         self.device = device
-        self.headers = headers
         self.modality = modality
         self.marqo_index_type = marqo_index_type
         self.marqo_index_model = marqo_index_model
@@ -32,12 +32,15 @@ class StreamingMediaProcessor:
         self.video_preprocessing = video_preprocessing
         self.preprocessors = preprocessors
         self.preprocessor = self.preprocessors[modality]
+        self.media_download_headers = self._convert_headers_to_cli_format(media_download_headers)
+
         self.total_size, self.duration = self._fetch_file_metadata()
         self.enable_video_gpu_acceleration = (
                 utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'TRUE'
         )
 
         self._set_split_parameters(modality)
+        self._log_initialization_details()
 
     def _set_split_parameters(self, modality):
         preprocessing = self.video_preprocessing if modality == Modality.VIDEO else self.audio_preprocessing
@@ -52,6 +55,32 @@ class StreamingMediaProcessor:
         if modality not in [Modality.VIDEO, Modality.AUDIO]:
             raise ValueError(f"Unsupported modality: {modality}")
 
+    def _log_initialization_details(self):
+        # print(f"from StreamingMediaProcessor, self.split_length: {self.split_length}")
+        # print(f"from StreamingMediaProcessor, self.split_overlap: {self.split_overlap}")
+        # print(f"from StreamingMediaProcessor, self.total_size: {self.total_size}")
+        # print(f"from StreamingMediaProcessor, self.duration: {self.duration}")
+        pass
+
+    def _convert_headers_to_cli_format(self, raw_media_download_headers: Optional[Dict] = None) -> str:
+        """
+        A helper function to convert the media download headers into a format that can be passed to ffmpeg in
+        subprocess calls.
+
+        Examples:
+            If the headers are {"key1": "value1", "key2": "value2"}, the function will return a string
+            "key1: value1\r\nkey2: value2"
+
+        Returns:
+            str: The headers in the required format. An empty string if no headers or None are provided.
+        """
+        if raw_media_download_headers is None or raw_media_download_headers == {}:
+            return ""
+        elif not isinstance(raw_media_download_headers, dict):
+            raise InternalError("media_download_headers should be a dictionary")
+        return "\r\n".join([f"{key}: {value}" for key, value in raw_media_download_headers.items()])
+
+
     def _fetch_file_metadata(self):
         start_time = time.time()
 
@@ -60,8 +89,11 @@ class StreamingMediaProcessor:
                 'v': 'error',
                 'show_entries': 'format=size,duration',
                 'of': 'json',
-                'probesize': '256K'  # Probe only the first 256KB
+                'probesize': '256K',  # Probe only the first 256KB
             }
+
+            if self.media_download_headers:
+                probe_options['headers'] = self.media_download_headers
 
             probe = ffmpeg.probe(self.url, **probe_options)
 

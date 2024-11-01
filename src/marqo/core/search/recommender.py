@@ -80,7 +80,7 @@ class Recommender:
         if len(documents) == 0:
             raise InvalidArgumentError('No documents with non-zero weight provided')
 
-        marqo_index = index_meta_cache.get_index(config.Config(self.vespa_client), index_name=index_name)
+        marqo_index = index_meta_cache.get_index(index_management=self.index_management, index_name=index_name)
 
         if interpolation_method is None:
             interpolation_method = self._get_default_interpolation_method(marqo_index)

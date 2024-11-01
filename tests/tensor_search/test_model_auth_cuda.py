@@ -3,11 +3,11 @@
 multiprocessing should be tested manually -problem with mocking (deadlock esque)
 """
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
-from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.tensor_search.models.private_models import S3Auth, ModelAuth
 from marqo.api.exceptions import InvalidArgError, IndexNotFoundError, BadRequestError
 from tests.marqo_test import MarqoTestCase
-from marqo.s2_inference.model_downloading.from_s3 import get_s3_model_absolute_cache_path
+from marqo.core.inference.download_model_from_s3 import get_s3_model_absolute_cache_path
 from marqo.tensor_search.models.external_apis.s3 import S3Location
 from unittest import mock
 from tests.tensor_search.test_model_auth import _delete_file, _get_base_index_settings
@@ -15,7 +15,6 @@ import unittest
 import os
 import torch
 import pytest
-from marqo.api.exceptions import BadRequestError
 
 
 @pytest.mark.largemodel
@@ -85,7 +84,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
 
         with unittest.mock.patch('boto3.client', return_value=mock_s3_client) as mock_boto3_client:
             # Call the function that uses the generate_presigned_url method
-            res = tensor_search.add_documents(config=cls.config, add_docs_params=AddDocsParams(
+            res = self.add_documents(config=cls.config, add_docs_params=AddDocsParams(
                 index_name=cls.index_name_1, docs=[{'a': 'b'}],
                 device=cls.device,
                 model_auth=ModelAuth(
@@ -113,7 +112,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
 
     def test_after_downloading_auth_doesnt_matter(self):
         """on this instance, at least"""
-        res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+        res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
             index_name=self.index_name_1, auto_refresh=True, docs=[{'c': 'd'}], device=self.device
         ))
         assert not res['errors']
@@ -123,7 +122,7 @@ class TestModelAuthLoadedS3(MarqoTestCase):
         tensor_search.eject_model(model_name=self.custom_model_name, device=self.device)
         mock_req = mock.MagicMock()
         with mock.patch('urllib.request.urlopen', mock_req):
-            res = tensor_search.add_documents(config=self.config, add_docs_params=AddDocsParams(
+            res = self.add_documents(config=self.config, add_docs_params=AddDocsParams(
                 index_name=self.index_name_1, auto_refresh=True, docs=[{'c': 'd'}],
                 device=self.device
             ))

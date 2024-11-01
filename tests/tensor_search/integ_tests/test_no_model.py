@@ -119,7 +119,7 @@ class TestNoModel(MarqoTestCase):
                     index_name == self.unstructured_index_with_no_model else None
                 mappings = {"custom_field_1": {"type": "custom_vector"}} if \
                     index_name == self.unstructured_index_with_no_model else None
-                r = tensor_search.add_documents(
+                r = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index_name,
@@ -183,8 +183,8 @@ class TestNoModel(MarqoTestCase):
                                                 docs=docs,
                                                 tensor_fields=tensor_fields,
                                                 mappings=mappings)
-                _ = tensor_search.add_documents(config=self.config,
-                                                add_docs_params=add_docs_params)
+                _ = self.add_documents(config=self.config,
+                                       add_docs_params=add_docs_params)
 
                 r = tensor_search.search(config=self.config, index_name=index_name, text=None,
                                          search_method="tensor",

@@ -3,12 +3,18 @@ from typing import Dict, List, Tuple, Optional
 
 import marqo.api.exceptions as api_exceptions
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import UnsupportedFeatureError, ParsingError
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
-from marqo.core.models.marqo_index import IndexType
+from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
+    UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
+    SemiStructuredAddDocumentsHandler, SemiStructuredFieldCountConfig
+from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
+from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.logging import get_logger
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
@@ -24,6 +30,23 @@ class Document:
     def __init__(self, vespa_client: VespaClient, index_management: IndexManagement):
         self.vespa_client = vespa_client
         self.index_management = index_management
+
+    def add_documents(self, add_docs_params: AddDocsParams,
+                      field_count_config=SemiStructuredFieldCountConfig()) -> MarqoAddDocumentsResponse:
+        marqo_index = self.index_management.get_index(add_docs_params.index_name)
+
+        if isinstance(marqo_index, StructuredMarqoIndex):
+            add_docs_handler = StructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
+        elif isinstance(marqo_index, SemiStructuredMarqoIndex):
+            add_docs_handler = SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params,
+                                                                 self.vespa_client, self.index_management,
+                                                                 field_count_config)
+        elif isinstance(marqo_index, UnstructuredMarqoIndex):
+            add_docs_handler = UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, self.vespa_client)
+        else:
+            raise InternalError(f"Unknown index type {type(marqo_index)}")
+
+        return add_docs_handler.add_documents()
 
     def delete_all_docs_by_index_name(self, index_name: str) -> int:
         """Delete all documents in the given index by index name.
@@ -81,7 +104,7 @@ class Document:
         Return:
             MarqoUpdateDocumentsResponse containing the response of the partial update operation
         """
-        if marqo_index.type == IndexType.Unstructured:
+        if marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured]:
             raise UnsupportedFeatureError("Partial document update is not supported for unstructured indexes. "
                                           "Please use add_documents with use_existing_tensor=True instead")
         elif marqo_index.type == IndexType.Structured:
@@ -136,7 +159,7 @@ class Document:
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
-                status, message = self.translate_vespa_document_response(resp.status)
+                status, message = self.vespa_client.translate_vespa_document_response(resp.status, None)
                 new_item = MarqoUpdateDocumentsItem(id=doc_id, status=status, message=message, error=message)
                 items.append(new_item)
 
@@ -200,7 +223,7 @@ class Document:
         if responses is not None:
             for resp in responses.responses:
                 doc_id = resp.id.split('::')[-1] if resp.id else None
-                status, message = self.translate_vespa_document_response(resp.status, message=resp.message)
+                status, message = self.vespa_client.translate_vespa_document_response(resp.status, resp.message)
                 new_item = MarqoAddDocumentsItem(id=doc_id, status=status, message=message)
                 new_items.append(new_item)
 
@@ -210,32 +233,3 @@ class Document:
 
         return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
                                          processingTimeMs=add_docs_processing_time_ms)
-
-    def translate_vespa_document_response(self, status: int, message: Optional[str]=None) -> Tuple[int, Optional[str]]:
-        """A helper function to translate Vespa document response into the expected status, message that
-        is used in Marqo document API responses.
-
-        Args:
-            status: The status code from Vespa document response
-
-        Return:
-            A tuple of status code and the message in the response
-        """
-        if status == 200:
-            return 200, None
-        elif status == 404:
-            return 404, "Document does not exist in the index"
-        # Update documents get 412 from Vespa for document not found as we use condition
-        elif status == 412:
-            return 404, "Document does not exist in the index"
-        elif status == 429:
-            return 429, "Marqo vector store receives too many requests. Please try again later"
-        elif status == 507:
-            return 400, "Marqo vector store is out of memory or disk space"
-        # TODO Block the invalid special characters before sending to Vespa
-        elif status == 400 and isinstance(message, str) and "could not parse field" in message.lower():
-            return 400, f"The document contains invalid characters in the fields. Original error: {message} "
-        else:
-            logger.error(f"An unexpected error occurred from the Vespa document response. "
-                         f"status: {status}, message: {message}")
-            return 500, f"Marqo vector store returns an unexpected error with this document. Original error: {message}"

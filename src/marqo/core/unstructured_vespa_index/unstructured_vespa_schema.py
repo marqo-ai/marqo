@@ -1,11 +1,10 @@
 import textwrap
-import semver
 
 from marqo.core import constants
 from marqo.core.models import UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.unstructured_vespa_index import common as unstructured_common
-from marqo.core.vespa_schema import VespaSchema
+from marqo.core.vespa_index.vespa_schema import VespaSchema
 
 
 class UnstructuredVespaSchema(VespaSchema):

@@ -50,6 +50,10 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_exceptions
 from marqo.api import exceptions as errors
 from marqo.core.constants import MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
+from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
+    SemiStructuredAddDocumentsHandler
+from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
+from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 # We depend on _httprequests.py for now, but this may be replaced in the future, as
 # _httprequests.py is designed for the client
@@ -57,20 +61,18 @@ from marqo.config import Config
 from marqo.core import constants
 from marqo.core import exceptions as core_exceptions
 from marqo.core.models.hybrid_parameters import HybridParameters
-from marqo.core.models.marqo_index import IndexType
-from marqo.s2_inference.models.model_type import ModelType
+from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex
 from marqo.core.models.marqo_index import MarqoIndex, FieldType, UnstructuredMarqoIndex, StructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.structured_vespa_index.common import RANK_PROFILE_BM25, RANK_PROFILE_EMBEDDING_SIMILARITY
 from marqo.core.unstructured_vespa_index import unstructured_validation as unstructured_index_add_doc_validation
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
-from marqo.core.vespa_index import for_marqo_index as vespa_index_factory
+from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.s2_inference import infer_modality, Modality
 from marqo.s2_inference.clip_utils import _is_image, validate_url
-from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
@@ -79,21 +81,20 @@ from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
 from marqo.tensor_search.enums import (
-    Device, TensorField, SearchMethod, EnvVars
+    Device, TensorField, SearchMethod
 )
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search.index_meta_cache import get_cache
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity, ScoreModifierLists
 from marqo.tensor_search.models.delete_docs_objects import MqDeleteDocsRequest
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, VectorisedJobs, VectorisedJobPointer, \
-    SearchContextTensor
+    SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo.vespa.exceptions import VespaStatusError
-from marqo.vespa.models import VespaDocument, FeedBatchResponse, QueryResult
+from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_get_documents_by_id_response import (MarqoGetDocumentsByIdsResponse,
                                                                   MarqoGetDocumentsByIdsItem)
@@ -109,7 +110,7 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
     """
     try:
         marqo_index = index_meta_cache.get_index(
-            config=config, index_name=add_docs_params.index_name, force_refresh=True
+            index_management=config.index_management, index_name=add_docs_params.index_name, force_refresh=True
         )
 
     # TODO: raise core_exceptions.IndexNotFoundError instead (fix associated tests)
@@ -117,10 +118,15 @@ def add_documents(config: Config, add_docs_params: AddDocsParams) -> MarqoAddDoc
         raise api_exceptions.IndexNotFoundError(
             f"Cannot add documents to non-existent index {add_docs_params.index_name}")
 
+    if isinstance(marqo_index, SemiStructuredMarqoIndex):
+        return SemiStructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client,
+                                                 config.index_management).add_documents()
     if isinstance(marqo_index, UnstructuredMarqoIndex):
-        return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        # return _add_documents_unstructured(config, add_docs_params, marqo_index)
+        return UnstructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client).add_documents()
     elif isinstance(marqo_index, StructuredMarqoIndex):
-        return _add_documents_structured(config, add_docs_params, marqo_index)
+        # return _add_documents_structured(config, add_docs_params, marqo_index)
+        return StructuredAddDocumentsHandler(marqo_index, add_docs_params, config.vespa_client).add_documents()
     else:
         raise api_exceptions.InternalError(f"Unknown index type {type(marqo_index)}")
 
@@ -180,7 +186,7 @@ def _add_documents_unstructured(config: Config, add_docs_params: AddDocsParams, 
                         docs=docs,
                         thread_count=media_download_thread_count,
                         tensor_fields=tensor_fields_and_multimodal_subfields,
-                        image_download_headers=add_docs_params.image_download_headers,
+                        media_download_headers=add_docs_params.media_download_headers,
                         model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
                         media_field_types_mapping=None,
@@ -703,7 +709,7 @@ def _add_documents_structured(config: Config, add_docs_params: AddDocsParams, ma
                         docs=docs,
                         thread_count=media_download_thread_count,
                         tensor_fields=media_fields,
-                        image_download_headers=add_docs_params.image_download_headers,
+                        media_download_headers=add_docs_params.media_download_headers,
                         # add non image download headers in the future
                         model_name=marqo_index.model.name,
                         normalize_embeddings=marqo_index.normalize_embeddings,
@@ -1236,7 +1242,7 @@ def _determine_thread_count(marqo_index, add_docs_params):
 
 
 def _get_marqo_document_by_id(config: Config, index_name: str, document_id: str):
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = _get_latest_index(config, index_name)
 
     try:
         res = config.vespa_client.get_document(document_id, marqo_index.schema_name)
@@ -1291,7 +1297,7 @@ def _get_marqo_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return []
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = _get_latest_index(config, index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -1345,7 +1351,7 @@ def get_documents_by_ids(
     if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
         return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = _get_latest_index(config, index_name)
     batch_get = config.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
     vespa_index = vespa_index_factory(marqo_index)
 
@@ -1376,7 +1382,8 @@ def get_documents_by_ids(
                 }
             )
         else:
-            status, message = config.document.translate_vespa_document_response(response.status)
+            document = config.document
+            status, message = document.vespa_client.translate_vespa_document_response(response.status, None)
             results.append(
                 MarqoGetDocumentsByIdsItem(
                     id=_get_id_from_vespa_id(response.id), status=status,
@@ -1389,6 +1396,19 @@ def get_documents_by_ids(
         errors = True
 
     return MarqoGetDocumentsByIdsResponse(errors=errors, results=results)
+
+
+def _get_latest_index(config: Config, index_name: str) -> MarqoIndex:
+    """
+    Get index from the cache first. If index is semi-structured, get the latest setting bypassing the cache
+    This approach makes sure we don't add extra latency to structured indexes or legacy unstructured indexes since they
+    never change. It also makes sure we always get the latest version of semi-structured index to guarantee the strong
+    consistency.
+    """
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
+    if marqo_index.type == IndexType.SemiStructured:
+        return config.index_management.get_index(index_name=index_name)
+    return marqo_index
 
 
 def _get_id_from_vespa_id(vespa_id: str) -> str:
@@ -1445,7 +1465,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            reranker: Union[str, Dict] = None, filter: Optional[str] = None,
            attributes_to_retrieve: Optional[List[str]] = None,
            device: str = None, boost: Optional[Dict] = None,
-           image_download_headers: Optional[Dict] = None,
+           media_download_headers: Optional[Dict] = None,
            context: Optional[SearchContext] = None,
            score_modifiers: Optional[ScoreModifierLists] = None,
            model_auth: Optional[ModelAuth] = None,
@@ -1473,7 +1493,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         device: May be none, we calculate default device here
         num_highlights: number of highlights to return for each doc
         boost: boosters to re-weight the scores of individual fields
-        image_download_headers: headers for downloading images
+        media_download_headers: headers to use when downloading media
         context: a dictionary to allow custom vectors in search, for tensor search only
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
@@ -1563,7 +1583,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
-                image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+                media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
             )
         elif search_method.upper() == SearchMethod.HYBRID:
@@ -1574,7 +1594,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
-                image_download_headers=image_download_headers, context=context, score_modifiers=score_modifiers,
+                media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
                 hybrid_parameters=hybrid_parameters
             )
@@ -1657,7 +1677,7 @@ def _lexical_search(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     # SEARCH TIMER-LOGGER (pre-processing)
     RequestMetricsStore.for_request().start("search.lexical.processing_before_vespa")
@@ -1715,37 +1735,39 @@ def _lexical_search(
     return gathered_docs
 
 
-def construct_vector_input_batches(query: Optional[Union[str, Dict]], index_info: MarqoIndex) \
-        -> Tuple[List[str], List[str]]:
+def construct_vector_input_batches(query: Optional[Union[str, Dict]], media_download_headers: Optional[Dict] = None) \
+        -> QueryContentCollector:
     """Splits images from text in a single query (either a query string, or dict of weighted strings).
 
     Args:
         query: a string query, or a dict of weighted strings.
-        index_info: used to determine whether URLs should be treated as images
+        media_download_headers: headers to use when downloading media
 
     Returns:
-        A tuple of string batches. The first is text content the second is image content.
+        A SearchQueryCollector object with the text and media content separated.
     """
     # TODO - infer this from model
-    treat_urls_as_media = True
-
+    query_content_list = []
     if isinstance(query, str):
-        if treat_urls_as_media and validate_url(query):
-            return [], [query, ]
-        else:
-            return [query, ], []
+        query_content_list.append(
+            QueryContent(
+                content=query,
+                modality=infer_modality(query, media_download_headers=media_download_headers)
+            )
+        )
     elif isinstance(query, dict):  # is dict:
-        ordered_queries = list(query.items())
-        if treat_urls_as_media:
-            text_queries = [k for k, _ in ordered_queries if not _is_image(k)]
-            image_queries = [k for k, _ in ordered_queries if _is_image(k)]
-            return text_queries, image_queries
-        else:
-            return [k for k, _ in ordered_queries], []
+        for query, weights in query.items():
+            query_content_list.append(
+                QueryContent(
+                    content=query,
+                    modality=infer_modality(query, media_download_headers=media_download_headers)
+                )
+            )
     elif query is None:
-        return [], []
+        pass
     else:
         raise ValueError(f"Incorrect type for query: {type(query).__name__}")
+    return QueryContentCollector(queries = query_content_list)
 
 
 def gather_documents_from_response(response: QueryResult, marqo_index: MarqoIndex, highlights: bool,
@@ -1780,7 +1802,7 @@ def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attribu
 
 def assign_query_to_vector_job(
         q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs],
-        grouped_content: Tuple[List[str], List[str], List[str], List[str]],
+        grouped_content: QueryContentCollector,
         index_info: MarqoIndex, device: str) -> List[VectorisedJobPointer]:
     """
     For a individual query, assign its content (to be vectorised) to a vector job. If none exist with the correct
@@ -1799,34 +1821,39 @@ def assign_query_to_vector_job(
     Returns:
         A list of pointers to the location in a vector job that will have its vectorised content.
     """
-    if len(grouped_content) != 2:
-        raise RuntimeError(
-            "assign_query_to_vector_job() expects param `grouped_content` with 2 elems. Instead received"
-            f" `grouped_content` with {len(grouped_content)} elems")
     ptrs = []
-    for i, content in enumerate(grouped_content):
-        content_type = ['text', 'media'][i]
-        vector_job = VectorisedJobs(
-            model_name=index_info.model.name,
-            model_properties=index_info.model.get_properties(),
-            content=content,
-            device=device,
-            normalize_embeddings=index_info.normalize_embeddings,
-            image_download_headers=q.image_download_headers,
-            content_type=content_type,
-            model_auth=q.modelAuth
-        )
-        # If exists, add content to vector job. Otherwise create new
-        if jobs.get(vector_job.groupby_key()) is not None:
-            j = jobs.get(vector_job.groupby_key())
-            ptrs.append(j.add_content(content))
-        else:
-            jobs[vector_job.groupby_key()] = vector_job
-            ptrs.append(VectorisedJobPointer(
-                job_hash=vector_job.groupby_key(),
-                start_idx=0,
-                end_idx=len(vector_job.content)
-            ))
+    content_lists_by_modality = [
+        grouped_content.text_queries,
+        grouped_content.image_queries,
+        grouped_content.audio_queries,
+        grouped_content.video_queries,
+    ]
+
+    for i, list_of_queries_by_modalities in enumerate(content_lists_by_modality):
+        if len(list_of_queries_by_modalities) > 0:
+            content: List[str] = [query.content for query in list_of_queries_by_modalities]
+            modality: Modality = list_of_queries_by_modalities[0].modality
+            vector_job = VectorisedJobs(
+                model_name=index_info.model.name,
+                model_properties=index_info.model.get_properties(),
+                content=content,
+                device=device,
+                normalize_embeddings=index_info.normalize_embeddings,
+                media_download_headers=q.mediaDownloadHeaders,
+                model_auth=q.modelAuth,
+                modality = modality
+            )
+            # If exists, add content to vector job. Otherwise create new
+            if jobs.get(vector_job.groupby_key()) is not None:
+                j = jobs.get(vector_job.groupby_key())
+                ptrs.append(j.add_content(content))
+            else:
+                jobs[vector_job.groupby_key()] = vector_job
+                ptrs.append(VectorisedJobPointer(
+                    job_hash=vector_job.groupby_key(),
+                    start_idx=0,
+                    end_idx=len(vector_job.content)
+                ))
     return ptrs
 
 
@@ -1845,9 +1872,8 @@ def create_vector_jobs(queries: List[BulkSearchQueryEntity], config: Config, dev
     qidx_to_job: Dict[Qidx, List[VectorisedJobPointer]] = dict()
     jobs: Dict[JHash, VectorisedJobs] = {}
     for i, q in enumerate(queries):
-        q = queries[i]
         # split images, from text:
-        to_be_vectorised: Tuple[List[str], List[str]] = construct_vector_input_batches(q.q, q.index)
+        to_be_vectorised: QueryContentCollector = construct_vector_input_batches(q.q, q.mediaDownloadHeaders)
         qidx_to_job[i] = assign_query_to_vector_job(q, jobs, to_be_vectorised, q.index, device)
 
     return qidx_to_job, jobs
@@ -1862,12 +1888,15 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
         # TODO: Handle exception for single job, and allow others to run.
         try:
             if v.content:
-                modality = infer_modality(v.content[0] if isinstance(v.content, list) else v.content)
+                modality = infer_modality(
+                    v.content[0] if isinstance(v.content, list) else v.content,
+                    media_download_headers=v.media_download_headers
+                )
                 vectors = s2_inference.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
-                    image_download_headers=v.image_download_headers,
+                    media_download_headers=v.media_download_headers,
                     model_auth=v.model_auth,
                     enable_cache=True,
                     modality=modality
@@ -1920,11 +1949,12 @@ def get_query_vectors_from_jobs(
             if ordered_queries:
                 # multiple queries. We have to weight and combine them:
                 vectorised_ordered_queries = [
-                    (get_content_vector(
+                    (
+                        get_content_vector(
                         possible_jobs=qidx_to_job[qidx],
-                        jobs=jobs,
                         job_to_vectors=job_to_vectors,
-                        content=content),
+                        content=content
+                        ),
                      weight,
                      content
                     ) for content, weight in ordered_queries
@@ -1955,7 +1985,6 @@ def get_query_vectors_from_jobs(
             # result[qidx] = vectors[0]
             result[qidx] = get_content_vector(
                 possible_jobs=qidx_to_job.get(qidx, []),
-                jobs=jobs,
                 job_to_vectors=job_to_vectors,
                 content=q.q
             )
@@ -1964,14 +1993,16 @@ def get_query_vectors_from_jobs(
     return result
 
 
-def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors: Dict[JHash, Dict[str, List[float]]],
-                       jobs: Dict[JHash, VectorisedJobs], content: str) -> List[float]:
+def get_content_vector(
+        possible_jobs: List[VectorisedJobPointer],
+        job_to_vectors: Dict[JHash, Dict[str, List[float]]],
+        content: str
+) -> List[float]:
     """finds the vector associated with a piece of content
 
     Args:
         possible_jobs: The jobs where the target vector may reside
-        treat_urls_as_media: an index_parameter that indicates whether content should be treated as image, audio, video
-            if it has a URL structure
+        job_to_vectors: The mapping of job to vectors
         content: The content to search
 
     Returns:
@@ -1979,15 +2010,10 @@ def get_content_vector(possible_jobs: List[VectorisedJobPointer], job_to_vectors
 
     Raises runtime error if is not found
     """
-    content_type = 'text' if infer_modality(content) == Modality.TEXT else 'media'
-
     not_found_error = RuntimeError(f"get_content_vector(): could not find corresponding vector for content `{content}`")
     for vec_job_pointer in possible_jobs:
-        if jobs[vec_job_pointer.job_hash].content_type == content_type:
-            try:
-                return job_to_vectors[vec_job_pointer.job_hash][content]
-            except KeyError:
-                raise not_found_error
+        if content in job_to_vectors[vec_job_pointer.job_hash]:
+            return job_to_vectors[vec_job_pointer.job_hash][content]
     raise not_found_error
 
 
@@ -1999,19 +2025,20 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
         if q.q is None:
             prefixed_q = q.q
         elif isinstance(q.q, str):
-            if _is_image(q.q):
-                prefixed_q = q.q
-            else:
+            modality = infer_modality(q.q, q.mediaDownloadHeaders)
+            if modality == Modality.TEXT:
                 prefixed_q = f"{text_query_prefix}{q.q}"
+            else:
+                prefixed_q = q.q
         else:  # q.q is dict
             prefixed_q = {}
             for key, value in q.q.items():
                 # Apply prefix if key is not an image or if index does not treat URLs and pointers as images
-                if _is_image(key):
-                    prefixed_q[key] = value
-                else:
+                modality = infer_modality(key, q.mediaDownloadHeaders)
+                if modality == Modality.TEXT:
                     prefixed_q[f"{text_query_prefix}{key}"] = value
-
+                else:
+                    prefixed_q[key] = value
         new_query_object = BulkSearchQueryEntity(
             q=prefixed_q,
             searchableAttributes=q.searchableAttributes,
@@ -2022,7 +2049,7 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
             filter=q.filter,
             attributesToRetrieve=q.attributesToRetrieve,
             boost=q.boost,
-            image_download_headers=q.image_download_headers,
+            mediaDownloadHeaders=q.mediaDownloadHeaders,
             context=q.context,
             scoreModifiers=q.scoreModifiers,
             index=q.index,
@@ -2067,7 +2094,7 @@ def _vector_text_search(
         ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
-        image_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
+        media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
         highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
     """
@@ -2084,7 +2111,7 @@ def _vector_text_search(
         verbose: if 0 - nothing is printed. if 1 - data is printed without vectors, if 2 - full
             objects are printed out
         attributes_to_retrieve: if set, only returns these fields
-        image_download_headers: headers for downloading images
+        media_download_headers: headers for downloading media
         context: a dictionary to allow custom vectors in search
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
@@ -2116,7 +2143,7 @@ def _vector_text_search(
 
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     # Determine the text query prefix
     text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)
@@ -2133,7 +2160,7 @@ def _vector_text_search(
     queries = [BulkSearchQueryEntity(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
-        boost=boost, image_download_headers=image_download_headers, context=context, scoreModifiers=score_modifiers,
+        boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
         index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
     )]
 
@@ -2345,7 +2372,7 @@ def vectorise_multimodal_combination_field_unstructured(field: str,
                     model_name=marqo_index.model.name,
                     model_properties=marqo_index.model.properties, content=prefixed_text_content_to_vectorise,
                     device=device, normalize_embeddings=normalize_embeddings,
-                    infer=False, model_auth=model_auth, modality=Modality.TEXT
+                    infer=True, model_auth=model_auth, modality=Modality.TEXT
                 )
 
                 vectors_list.extend(text_vectors)
@@ -2679,7 +2706,7 @@ def vectorise_multimodal_combination_field_structured(
 def delete_documents(config: Config, index_name: str, doc_ids: List[str]):
     """Delete documents from the Marqo index with the given doc_ids """
     # Make sure the index exists
-    marqo_index = index_meta_cache.get_index(config=config, index_name=index_name)
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
 
     return delete_docs.delete_documents(
         config=config,

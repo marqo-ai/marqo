@@ -3,14 +3,14 @@ from unittest import mock
 
 from marqo.core.exceptions import InvalidFieldNameError
 from marqo.core.models.interpolation_method import InterpolationMethod
-from marqo.core.models.marqo_index import Model, FieldFeature, FieldType, MarqoIndex, IndexType, TextPreProcessing, \
-    TextSplitMethod
+from marqo.core.models.marqo_index import Model, FieldFeature, FieldType, MarqoIndex, TextPreProcessing, \
+    TextSplitMethod, UnstructuredMarqoIndex
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.core.search.recommender import Recommender
 from marqo.core.utils.vector_interpolation import Slerp, Nlerp, Lerp
 from marqo.exceptions import InvalidArgumentError
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.models.score_modifiers_object import ScoreModifierLists, ScoreModifierOperator
 from tests.marqo_test import MarqoTestCase
 
@@ -154,12 +154,12 @@ class TestRecommender(MarqoTestCase):
             }
         ]
 
-        if index.type == IndexType.Unstructured:
+        if isinstance(index, UnstructuredMarqoIndex):
             tensor_fields = ["title", "description", "content", "multimodal_field"]
         else:
             tensor_fields = None
 
-        tensor_search.add_documents(
+        self.add_documents(
             self.config,
             add_docs_params=AddDocsParams(
                 index_name=index.name,
@@ -354,7 +354,7 @@ class TestRecommender(MarqoTestCase):
             }
         ]
         index = self.unstructured_text_index
-        tensor_search.add_documents(
+        self.add_documents(
             self.config,
             add_docs_params=AddDocsParams(
                 index_name=index.name,

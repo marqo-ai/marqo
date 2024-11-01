@@ -1,15 +1,12 @@
-import unittest
+import os
+import uuid
+from unittest.mock import patch
 
 from marqo.core.exceptions import IndexNotFoundError
-from marqo.tensor_search import tensor_search
-from tests.marqo_test import MarqoTestCase
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from unittest.mock import patch
-import os
-from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
-import pprint
-import uuid
+from marqo.tensor_search.models.index_settings import IndexSettings
+from tests.marqo_test import MarqoTestCase
 
 
 class TestGetSettings(MarqoTestCase):
@@ -18,12 +15,9 @@ class TestGetSettings(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        # Default indexes
-        cls.unstructured_default_index = cls.config.index_management.create_index(
-            IndexSettings().to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
-        )
-        cls.structured_default_index = cls.config.index_management.create_index(
-            IndexSettings(
+        unstructured_default_index = IndexSettings().to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
+
+        structured_default_index = IndexSettings(
                 type=IndexType.Structured,
                 allFields=[
                     FieldRequest(name='field1', type=FieldType.Text),
@@ -31,19 +25,15 @@ class TestGetSettings(MarqoTestCase):
                 ],
                 tensorFields=[]
             ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
-        )
 
-        # Custom settings indexes
-        cls.unstructured_custom_index = cls.config.index_management.create_index(
-            IndexSettings(
+        unstructured_custom_index = IndexSettings(
                 type=IndexType.Unstructured,
                 model='ViT-B/32',
                 normalizeEmbeddings=False,
                 textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
             ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
-        )
-        cls.structured_custom_index = cls.config.index_management.create_index(
-            IndexSettings(
+
+        structured_custom_index = IndexSettings(
                 type=IndexType.Structured,
                 allFields=[
                     FieldRequest(name='field1', type=FieldType.Text),
@@ -54,14 +44,18 @@ class TestGetSettings(MarqoTestCase):
                 normalizeEmbeddings=False,
                 textPreprocessing=TextPreProcessing(splitLength=3, splitMethod=TextSplitMethod.Word, splitOverlap=1),
             ).to_marqo_index_request('a' + str(uuid.uuid4()).replace('-', ''))
-        )
 
-        cls.indexes = [
-            cls.unstructured_default_index,
-            cls.structured_default_index,
-            cls.unstructured_custom_index,
-            cls.structured_custom_index
-        ]
+        cls.indexes = cls.create_indexes([
+            unstructured_default_index,
+            structured_default_index,
+            unstructured_custom_index,
+            structured_custom_index
+        ])
+
+        cls.unstructured_default_index = cls.indexes[0]
+        cls.structured_default_index = cls.indexes[1]
+        cls.unstructured_custom_index = cls.indexes[2]
+        cls.structured_custom_index = cls.indexes[3]
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)

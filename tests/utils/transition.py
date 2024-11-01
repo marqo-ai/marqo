@@ -6,7 +6,7 @@ from copy import deepcopy
 
 from marqo.config import Config
 from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.models.add_docs_objects import AddDocsParams
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search.tensor_search import add_documents
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 

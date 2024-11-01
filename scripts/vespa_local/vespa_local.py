@@ -2,7 +2,7 @@ import argparse
 
 import os
 
-VESPA_SERVER_VERSION='8.396.18'  # version baked into marqo-base:29
+VESPA_VERSION=os.getenv('VESPA_VERSION', '8.396.18')  # default version baked into marqo-base:30
 
 
 def start(args):
@@ -12,7 +12,7 @@ def start(args):
               "--name vespa "
               "--hostname vespa-container "
               "--publish 8080:8080 --publish 19071:19071 --publish 2181:2181 --publish 127.0.0.1:5005:5005 "
-              f"vespaengine/vespa:{VESPA_SERVER_VERSION}")
+              f"vespaengine/vespa:{VESPA_VERSION}")
 
 
 def restart(args):
