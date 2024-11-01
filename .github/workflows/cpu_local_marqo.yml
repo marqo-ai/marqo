@@ -32,11 +32,11 @@ on:
       - mainline
     paths-ignore:
       - '**.md'
-  pull_request_target:
-    branches:
-      - mainline
-    paths-ignore:
-      - '**.md'
+#  pull_request_target:
+#    branches:
+#      - mainline
+#    paths-ignore:
+#      - '**.md'
 
 permissions:
   contents: read
