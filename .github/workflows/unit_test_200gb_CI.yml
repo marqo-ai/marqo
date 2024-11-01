@@ -12,6 +12,10 @@ on:
     branches:
       - mainline
       - releases/*
+  pull_request_target:
+    branches:
+      - mainline
+      - releases/*
 
 concurrency:
   group: unit-tests-${{ github.ref }}
