@@ -101,6 +101,7 @@ class TestGetSettings(MarqoTestCase):
                         },
                         "auth_required": False
                     },
+                    "trustRemoteCode": True,
                     "type": "hf",
                 },
                 normalizeEmbeddings=False,

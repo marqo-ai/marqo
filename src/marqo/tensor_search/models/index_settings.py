@@ -261,6 +261,7 @@ class IndexSettings(StrictBaseModel):
             marqo_index.model.properties.pop('dimensions')
             marqo_index.model.properties.pop('model_location')
             marqo_index.model.properties.pop('type')
+            marqo_index.model.properties.pop('trustRemoteCode', None)
         return marqo_index.model.properties
 
 
