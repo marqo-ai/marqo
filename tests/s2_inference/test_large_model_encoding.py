@@ -402,7 +402,7 @@ class TestLanguageBindModels(unittest.TestCase):
                 self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 < 1e-6)
 
             unnormalized_embeddings_list = vectorise(model_name=model_name,
-                                                   content=content, device="cuda", normalize_embeddings=True)
+                                                   content=content, device="cuda", normalize_embeddings=False)
             for embeddings in unnormalized_embeddings_list:
                 self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
 
