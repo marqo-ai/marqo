@@ -114,7 +114,8 @@ class MultimodalModel:
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
         return self.encoder.encode(
-            content=content, modality=modality, media_download_headers=media_download_headers, normalize=True, **kwargs
+            content=content, modality=modality, media_download_headers=media_download_headers,
+            normalize=normalize, **kwargs
         )
 
 
