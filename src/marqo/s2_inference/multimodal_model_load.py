@@ -113,6 +113,7 @@ class MultimodalModel:
     def encode(self, content, modality, media_download_headers: Optional[Dict]=None, **kwargs):
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
+        print(**kwargs)
         return self.encoder.encode(content, modality, media_download_headers, **kwargs)
 
 
