@@ -1,19 +1,20 @@
+from enum import Enum
 from timeit import default_timer as timer
 from typing import List, Optional, Union, Dict
-from enum import Enum
 
 import pydantic
 
+import marqo.api.exceptions as api_exceptions
+import marqo.s2_inference.errors as s2_inference_errors
 from marqo import exceptions as base_exceptions
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.tensor_search import utils
 from marqo.tensor_search.models.api_models import BulkSearchQueryEntity
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.search import Qidx
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
-from marqo.core.utils.prefix import determine_text_prefix, DeterminePrefixContentType
 from marqo.vespa.vespa_client import VespaClient
-from marqo.tensor_search import utils
 
 logger = get_logger(__name__)
 
@@ -116,7 +117,9 @@ class Embed:
 
         # Vectorise the queries
         with RequestMetricsStore.for_request().time(f"embed.vector_inference_full_pipeline"):
-            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(temp_config, queries, device)
+            qidx_to_vectors: Dict[Qidx, List[float]] = tensor_search.run_vectorise_pipeline(
+                temp_config, queries, device
+            )
 
         embeddings: List[List[float]] = list(qidx_to_vectors.values())
 
