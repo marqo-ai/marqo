@@ -8,10 +8,6 @@ on:
     branches:
       - mainline
       - releases/*
-  pull_request:
-    branches:
-      - mainline
-      - releases/*
   pull_request_target:
     branches:
       - mainline

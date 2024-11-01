@@ -9,12 +9,11 @@ on:
       - mainline
     paths-ignore:
       - '**.md'
-  pull_request:
-    branches:
-      - mainline
   pull_request_target:
     branches:
       - mainline
+    paths-ignore:
+      - '**.md'
 
 concurrency:
   group: large-model-unit-tests-${{ github.ref }}
