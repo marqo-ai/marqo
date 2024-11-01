@@ -12,6 +12,10 @@ on:
     branches:
       - mainline
       - releases/*
+  pull_request_target:
+    branches:
+      - mainline
+      - releases/*
 
 concurrency:
   group: unit-tests-${{ github.ref }}
@@ -154,6 +158,10 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
+          
+          export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
+          export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
+          export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
           cd marqo
           export PYTHONPATH="./tests:./src:."

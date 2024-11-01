@@ -315,7 +315,7 @@ class TestAddDocumentHandler(MarqoTestCase):
                 ])
         )
 
-        with self.assertRaises(InternalError) as context:
+        with self.assertRaisesStrict(InternalError) as context:
             handler.add_documents()
 
         self.assertEquals('Encountered problem when vectorising batch of documents. Reason: vectorise error',
