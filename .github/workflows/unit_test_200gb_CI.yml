@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Show concurrency group
         run: |
-          echo "Concurrency group: unit-tests-${{ github.ref }}"
+          echo "github.ref: ${{ github.ref }}; github.head_ref: ${{github.head_ref}}"
 
 #  Start-Runner:
 #    name: Start self-hosted EC2 runner
