@@ -110,11 +110,12 @@ class MultimodalModel:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
         return self.encoder.preprocessor(modality)
 
-    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, **kwargs):
+    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, normalize=True, **kwargs):
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
-        print(**kwargs)
-        return self.encoder.encode(content, modality, media_download_headers, **kwargs)
+        return self.encoder.encode(
+            content=content, modality=modality, media_download_headers=media_download_headers, normalize=True, **kwargs
+        )
 
 
 class ModelEncoder(ABC):
@@ -256,7 +257,7 @@ class LanguageBindEncoder(ModelEncoder):
 
         return self._preprocessors.get(modality)
 
-    def encode(self, content, modality, normalize=True, media_download_headers: Optional[Dict]=None, **kwargs):
+    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, normalize=True, **kwargs):
         inputs = {}
 
         if modality == Modality.TEXT:

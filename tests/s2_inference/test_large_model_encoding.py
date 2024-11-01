@@ -1,4 +1,6 @@
 import os
+from locale import normalize
+
 import torch
 import pytest
 from marqo.s2_inference.types import FloatTensor
@@ -367,10 +369,46 @@ class TestMultilingualE5Models(unittest.TestCase):
                     assert np.allclose(english_feature, other_language_feature, atol=e)
 
     def test_cuda_encode_type(self):
-        run_test_cuda_encode_type(self.models + ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
-                                                 "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
-                                                 "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
-                                                 "hf/all_datasets_v4_MiniLM-L6"])
+        run_test_cuda_encode_type(
+            self.models + ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
+                           "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
+                           "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
+                           "hf/all_datasets_v4_MiniLM-L6",]
+        )
+
+
+@pytest.mark.largemodel
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
+class TestLanguageBindModels(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        remove_cached_model_files()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        clear_loaded_models()
+        remove_cached_model_files()
+
+    def setUp(self):
+        self.models = ["LanguageBind/Video_V1.5_FT_Audio_FT_Image"]
+
+    def help_test_vectorise(self, model_name):
+        for content in ["test", ["test2", "test3"]]:
+            normalized_embeddings_list = vectorise(model_name=model_name,
+                                                   content=content, device="cuda", normalize_embeddings=True)
+            for embeddings in normalized_embeddings_list:
+                self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 < 1e-6)
+
+            unnormalized_embeddings_list = vectorise(model_name=model_name,
+                                                   content=content, device="cuda", normalize_embeddings=True)
+            for embeddings in unnormalized_embeddings_list:
+                self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
+
+    def test_models(self):
+        for model_name in self.models:
+            self.help_test_vectorise(model_name)
 
 
 @pytest.mark.largemodel
