@@ -1,20 +1,20 @@
+import functools
 import os
-from locale import normalize
-
-import torch
-import pytest
-from marqo.s2_inference.types import FloatTensor
-from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, \
-    _convert_tensor_to_numpy
-from unittest.mock import patch
-import numpy as np
 import unittest
+from unittest.mock import patch
+
+import numpy as np
+import pytest
+import torch
+
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
     _convert_vectorized_output,
 )
-import functools
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
+from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, \
+    _convert_tensor_to_numpy
+from marqo.s2_inference.types import FloatTensor
 from tests.marqo_test import TestImageUrls
 
 _load_model = functools.partial(og_load_model, calling_func="unit_test")

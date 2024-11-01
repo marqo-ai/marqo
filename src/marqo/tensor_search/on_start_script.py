@@ -270,11 +270,6 @@ def _preload_model(model, content, device):
     """
     if isinstance(model, str):
         # For models IN REGISTRY
-        print(
-            f"model_name: {model}, "
-            f"content: {content}, "
-            f"device: {device}"
-        )
         _ = vectorise(
             model_name=model,
             content=content,
