@@ -69,7 +69,7 @@ jobs:
             ]
             
   backwards_compatibility:
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     needs: Start-Runner
     steps:
       - name: checkout marqo repo
@@ -84,10 +84,17 @@ jobs:
           python-version: "3.8"
           cache: "pip"
 
+      - name: Install pip-tools
+        run: |
+          python -m pip install pip-tools
+
+      - name: Compile requirements
+        run: | 
+          pip-compile tests/backwards_compatibility_tests/requirements.in
+
       - name: Install Dependencies
         run: |
-          #pip install -r requirements.txt
-          pip install flake8
+          pip install -r tests/backwards_compatibility_tests/requirements.txt
 
       - name: Set up Environment
         run: |
@@ -115,16 +122,25 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Login to Amazon ECR registry
+        run: |
+          aws ecr get-login-password --region us-east-1 | \
+          docker login --username AWS --password-stdin 424082663841.dkr.ecr.us-east-1.amazonaws.com
+
       - name: Run backwards_compatibility test
         run: |
-          python tests/backwards_compatibility_tests/compatibility_test_runner.py \
+          cmd="python tests/backwards_compatibility_tests/compatibility_test_runner.py \
             --mode=backwards_compatibility \
             --from_version ${{ github.event.inputs.from_version }} \
             --to_version ${{ github.event.inputs.to_version }} \
-            --to_version_tag ${{ github.event.inputs.to_version_tag }} \
-            --from_image ${{ github.event.inputs.from_image }} \
-            --to_image ${{ github.event.inputs.to_image }}
-
+            --to_version_tag ${{ github.event.inputs.to_version_tag }}"
+          if [ -n "${{ github.event.inputs.from_image }}" ]; then
+            cmd="$cmd --from_image ${{ github.event.inputs.from_image }}"
+          fi
+          if [ -n "${{ github.event.inputs.to_image }}" ]; then
+            cmd="$cmd --to_image ${{ github.event.inputs.to_image }}"
+          fi
+          eval $cmd
 
 #  rollback: #TODO: implement this
 #    runs-on: ubuntu-latest
@@ -156,7 +172,7 @@ jobs:
 #
 #      - name: Run rollback test
 #        run: |
-#          python tests/backwards_compatibility_tests/scripts/compatibility_test_runner.py \
+#          python tests/compatibility_tests/scripts/compatibility_test_runner.py \
 #            --mode=rollback \
 #            --from_version ${{ github.event.inputs.from_version }} \
 #            --to_version ${{ github.event.inputs.to_version }} \
@@ -166,7 +182,7 @@ jobs:
     name: Stop self-hosted EC2 runner
     needs:
       - Start-Runner # required to get output from the start-runner job
-      - Test-Marqo # required to wait when the main job is done
+      - backwards_compatibility # required to wait when the main job is done
     runs-on: ubuntu-latest
     if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
     steps:

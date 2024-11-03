@@ -4,7 +4,6 @@ Pass its settings to local_marqo_settings.
 """
 from typing import List, Dict
 import json
-import time
 
 import unittest
 from marqo.utils import construct_authorized_url

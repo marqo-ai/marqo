@@ -8,6 +8,7 @@ import sys
 import os
 import requests
 import semver
+import traceback
 
 marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 
@@ -24,26 +25,37 @@ def pull_remote_image_from_ecr(image_tag: str):
     ecr_registry = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
     image_repo = "marqo-compatibility-tests"
 
-    # Log in to ECR
-    subprocess.run(
-        ["aws", "ecr", "get-login-password", "--region", "us-east-1"],
-        check=True,
-        stdout=subprocess.PIPE
-    ).stdout.decode('utf-8')
-    subprocess.run(
-        ["docker", "login", "--username", "AWS", "--password-stdin", ecr_registry],
-        check=True
-    )
-    # Pull the Docker image from ECR
-    image_full_name = f"{ecr_registry}/{image_repo}:{image_tag}"
-    print(f"Pulling image: {image_full_name}")
-    subprocess.run(["docker", "pull", image_full_name], check=True)
+    try:
+        # Log in to ECR
+        login_password = subprocess.run(
+            ["aws", "ecr", "get-login-password", "--region", "us-east-1"],
+            check=True,
+            stdout=subprocess.PIPE
+        ).stdout.decode('utf-8')
+        subprocess.run(
+            ["docker", "login", "--username", "AWS", "--password-stdin", ecr_registry],
+            input=login_password.encode('utf-8'),
+            check=True
+        )
+        # Pull the Docker image from ECR
+        image_full_name = f"{ecr_registry}/{image_repo}:{image_tag}"
+        print(f"Pulling image: {image_full_name}")
+        subprocess.run(["docker", "pull", image_full_name], check=True)
 
-    # Optionally retag the image locally to marqo-ai/marqo
-    local_tag = f"marqo-ai/marqo:{image_tag}" #it should now be called marqo-ai/marqo:sha-token
-    print(f"Retagging image to: {local_tag}")
-    subprocess.run(["docker", "tag", image_full_name, local_tag], check=True)
-    return local_tag
+        # Optionally retag the image locally to marqo-ai/marqo
+        local_tag = f"marqo-ai/marqo:{image_tag}" #it should now be called marqo-ai/marqo:sha-token
+        print(f"Retagging image to: {local_tag}")
+        subprocess.run(["docker", "tag", image_full_name, local_tag], check=True)
+        return local_tag
+    except subprocess.CalledProcessError as e:
+        print(f"Command '{e.cmd}' failed with return code {e.returncode}")
+        print("Error output:", e.output.decode() if e.output else "No output")
+        traceback.print_exc()  # Print the full stack trace for debugging
+        raise Exception(f"Failed to pull Docker image {image_tag}: {e}")
+    except Exception as e:
+        print("An unexpected error occurred while pulling the Docker image.")
+        traceback.print_exc()  # Print full stack trace for debugging
+        raise e
 
     # Now you can use the image as "marqo-ai/marqo:{image_tag}"
 
@@ -277,7 +289,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
                                  to_image: Optional[str] = None):
     try:
         # Step 1: Start from_version container and run tests in prepare mode
-        print("In here with from_version:" + from_version + " to_version: " + to_version + " ");
+        print("In here with from_version:" + from_version + " to_version: " + to_version + " ")
             # Check for version compatibility
         from_major_version = int(from_version.split('.')[0])
         print(f"from major version = {from_major_version}")
@@ -291,12 +303,16 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         start_marqo_from_version_container(from_version, from_version_volume, from_image)
         print("Started marqo container" + from_version)
 
-        run_tests("prepare", from_version, to_version, "http://localhost:8882")
+        try:
+            run_tests("prepare", from_version, to_version, "http://localhost:8882")
+        except Exception as e:
+            print(f"Error running tests in prepare mode: {e}")
+            raise
         # Step 2: Stop from_version container (but don't remove it)
         stop_marqo_container(from_version)
 
         # Step 3: Start to_version container, transferring state
-        start_marqo_to_version_container(to_version, from_version, from_version_volume, to_image)
+        start_marqo_to_version_container(to_version, from_version, from_version_volume, to_version_tag)
         print(f"Started marqo container in to_version {to_version} by transferring state")
         # Step 4: Run tests
         run_tests("test", from_version, to_version, "http://localhost:8882")
@@ -335,6 +351,7 @@ def rollback_test(to_version: str, from_version: str, to_version_tag, from_image
         cleanup_containers()
 
 def run_tests(mode: str, from_version: str, to_version: str, marqo_api: str):
+    print(f"Inside run_tests with arguments mode: {mode}, from_version: {from_version}, to_version: {to_version}")
     if mode == "prepare":
         tests = []
         for test in BaseTestCase.__subclasses__():
@@ -349,7 +366,8 @@ def run_tests(mode: str, from_version: str, to_version: str, marqo_api: str):
         pytest_args = [
             f"--from_version={from_version}",
             f"--to_version={to_version}",
-            "-m", f"marqo_version"
+            "-m", f"marqo_version",
+            "tests/backwards_compatibility_tests"
         ]
         pytest.main(pytest_args)
 
@@ -393,8 +411,8 @@ if __name__ == "__main__":
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
     parser.add_argument("--to_version_tag", required=True)
-    parser.add_argument("--from_image", default=None)
-    parser.add_argument("--to_image", default=None)
+    parser.add_argument("--from_image", required=False, default=None, help='Specify the source image')
+    parser.add_argument("--to_image", required=False, default=None, help='Specify the target image')
     args = parser.parse_args()
 
     from_version = semver.VersionInfo.parse(args.from_version)

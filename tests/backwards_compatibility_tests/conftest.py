@@ -4,6 +4,7 @@ import semver
 def pytest_addoption(parser):
     parser.addoption("--from_version", action="store", default="2.7", help="version to start from")
     parser.addoption("--to_version", action="store", default="2.8", help="version to migrate to")
+    print("Added pytest options for from_version and to_version")
 
 @pytest.fixture
 def from_version(request):
