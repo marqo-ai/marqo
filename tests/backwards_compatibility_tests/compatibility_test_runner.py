@@ -289,7 +289,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
                                  to_image: Optional[str] = None):
     try:
         # Step 1: Start from_version container and run tests in prepare mode
-        print("In here with from_version:" + from_version + " to_version: " + to_version + " ");
+        print("In here with from_version:" + from_version + " to_version: " + to_version + " ")
             # Check for version compatibility
         from_major_version = int(from_version.split('.')[0])
         print(f"from major version = {from_major_version}")
@@ -351,6 +351,7 @@ def rollback_test(to_version: str, from_version: str, to_version_tag, from_image
         cleanup_containers()
 
 def run_tests(mode: str, from_version: str, to_version: str, marqo_api: str):
+    print(f"Inside run_tests with arguments mode: {mode}, from_version: {from_version}, to_version: {to_version}")
     if mode == "prepare":
         tests = []
         for test in BaseTestCase.__subclasses__():
@@ -365,7 +366,8 @@ def run_tests(mode: str, from_version: str, to_version: str, marqo_api: str):
         pytest_args = [
             f"--from_version={from_version}",
             f"--to_version={to_version}",
-            "-m", f"marqo_version"
+            "-m", f"marqo_version",
+            "tests/backwards_compatibility_tests"
         ]
         pytest.main(pytest_args)
 
