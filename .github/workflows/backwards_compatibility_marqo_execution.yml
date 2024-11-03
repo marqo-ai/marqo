@@ -69,7 +69,7 @@ jobs:
             ]
             
   backwards_compatibility:
-    runs-on: ubuntu-latest
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     needs: Start-Runner
     steps:
       - name: checkout marqo repo
@@ -139,6 +139,9 @@ jobs:
         run: |
           df -h /
           du -sh /* | sort -hr
+      - name: Resize marqo disk space
+        run: |
+          sudo resize2fs /dev/nvme0n1
 
       - name: Run backwards_compatibility test
         run: |
