@@ -297,13 +297,13 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
             print(f"Error running tests in prepare mode: {e}")
             raise
         # Step 2: Stop from_version container (but don't remove it)
-        # stop_marqo_container(from_version)
+        stop_marqo_container(from_version)
 
         # Step 3: Start to_version container, transferring state
-        # start_marqo_to_version_container(to_version, from_version, from_version_volume, to_version_tag)
+        start_marqo_to_version_container(to_version, from_version, from_version_volume, to_version_tag)
         print(f"Started marqo container in to_version {to_version} by transferring state")
         # Step 4: Run tests
-        # run_tests("test", from_version, to_version, "http://localhost:8882")
+        run_tests("test", from_version, to_version, "http://localhost:8882")
         print("Ran tests in test mode")
     except Exception as e:
         print(f"Error: {e}, {e.__class__.__name__}, {e.__traceback__}, {e.__traceback__.__class__}, {e.__traceback__.tb_lineno}")
