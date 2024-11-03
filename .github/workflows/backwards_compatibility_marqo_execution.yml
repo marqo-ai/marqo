@@ -123,8 +123,10 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: List contents of directory
-        run: ls -lR
+      - name: Login to Amazon ECR registry
+        run: |
+          aws ecr get-login-password --region us-east-1 | \
+          docker login --username AWS --password-stdin 424082663841.dkr.ecr.us-east-1.amazonaws.com
 
       - name: Run backwards_compatibility test
         run: |
