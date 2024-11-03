@@ -8,17 +8,13 @@ on:
     branches:
       - mainline
       - releases/*
-  pull_request:
-    branches:
-      - mainline
-      - releases/*
   pull_request_target:
     branches:
       - mainline
       - releases/*
 
 concurrency:
-  group: unit-tests-${{ github.ref }}
+  group: unit-tests-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -75,7 +71,7 @@ jobs:
         with:
           python-version: "3.8"
           cache: "pip"
-          
+
       - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
         with:
@@ -85,14 +81,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r marqo-base/requirements.txt
-          # override base requirements with marqo requirements, if needed: 
+          # override base requirements with marqo requirements, if needed:
           pip install -r marqo/requirements.dev.txt
 
       - name: Build Vespa
         run: |
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
-          
+
           # Function to wait for the dpkg lock to be released
           function wait_for_dpkg_lock() {
             while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
@@ -100,13 +96,13 @@ jobs:
               sleep 5
             done
           }
-      
+
           # Wait for the dpkg lock before updating and installing
           wait_for_dpkg_lock
-          
+
           echo "Updating package list"
           apt-get update -y
-          
+
           # Build Vespa components
           echo "Installing jdk 17"
           sudo apt-get install openjdk-17-jdk -y
@@ -122,7 +118,7 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          
+
           cd marqo/scripts/vespa_local
           set -x
           python vespa_local.py start
@@ -134,7 +130,7 @@ jobs:
               sleep 1
           done
           echo -e "\nDone waiting."
-          
+
           # Zip up schemas and services
           sudo apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
@@ -145,24 +141,24 @@ jobs:
           # wait for vespa to start (document url):
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
             (echo "Vespa (Document URL) did not start in time" && exit 1)
-          
+
           echo "Vespa document API is available. Local Vespa setup complete."
 
           # Delete the zip file
           rm vespa_tester_app.zip
           echo "Deleted vespa_tester_app.zip"
-          
+
       - name: Run Unit Tests
         run: |
           # Define these for use by marqo
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          
+
           export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
-          
+
           cd marqo
           export PYTHONPATH="./tests:./src:."
           pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
@@ -172,7 +168,7 @@ jobs:
         with:
           name: marqo-test-report
           path: marqo/cov_html/
-  
+
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:
