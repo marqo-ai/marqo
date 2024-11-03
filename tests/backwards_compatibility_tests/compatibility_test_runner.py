@@ -8,6 +8,7 @@ import sys
 import os
 import requests
 import semver
+import traceback
 
 marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 
@@ -24,26 +25,37 @@ def pull_remote_image_from_ecr(image_tag: str):
     ecr_registry = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
     image_repo = "marqo-compatibility-tests"
 
-    # Log in to ECR
-    subprocess.run(
-        ["aws", "ecr", "get-login-password", "--region", "us-east-1"],
-        check=True,
-        stdout=subprocess.PIPE
-    ).stdout.decode('utf-8')
-    subprocess.run(
-        ["docker", "login", "--username", "AWS", "--password-stdin", ecr_registry],
-        check=True
-    )
-    # Pull the Docker image from ECR
-    image_full_name = f"{ecr_registry}/{image_repo}:{image_tag}"
-    print(f"Pulling image: {image_full_name}")
-    subprocess.run(["docker", "pull", image_full_name], check=True)
+    try:
+        # Log in to ECR
+        login_password = subprocess.run(
+            ["aws", "ecr", "get-login-password", "--region", "us-east-1"],
+            check=True,
+            stdout=subprocess.PIPE
+        ).stdout.decode('utf-8')
+        subprocess.run(
+            ["docker", "login", "--username", "AWS", "--password-stdin", ecr_registry],
+            input=login_password.encode('utf-8'),
+            check=True
+        )
+        # Pull the Docker image from ECR
+        image_full_name = f"{ecr_registry}/{image_repo}:{image_tag}"
+        print(f"Pulling image: {image_full_name}")
+        subprocess.run(["docker", "pull", image_full_name], check=True)
 
-    # Optionally retag the image locally to marqo-ai/marqo
-    local_tag = f"marqo-ai/marqo:{image_tag}" #it should now be called marqo-ai/marqo:sha-token
-    print(f"Retagging image to: {local_tag}")
-    subprocess.run(["docker", "tag", image_full_name, local_tag], check=True)
-    return local_tag
+        # Optionally retag the image locally to marqo-ai/marqo
+        local_tag = f"marqo-ai/marqo:{image_tag}" #it should now be called marqo-ai/marqo:sha-token
+        print(f"Retagging image to: {local_tag}")
+        subprocess.run(["docker", "tag", image_full_name, local_tag], check=True)
+        return local_tag
+    except subprocess.CalledProcessError as e:
+        print(f"Command '{e.cmd}' failed with return code {e.returncode}")
+        print("Error output:", e.output.decode() if e.output else "No output")
+        traceback.print_exc()  # Print the full stack trace for debugging
+        raise Exception(f"Failed to pull Docker image {image_tag}: {e}")
+    except Exception as e:
+        print("An unexpected error occurred while pulling the Docker image.")
+        traceback.print_exc()  # Print full stack trace for debugging
+        raise e
 
     # Now you can use the image as "marqo-ai/marqo:{image_tag}"
 
