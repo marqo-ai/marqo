@@ -1,34 +1,25 @@
-from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.tensor_search import tensor_search
-from marqo.tensor_search import enums
-from marqo.tensor_search.models.api_models import BulkSearchQuery, BulkSearchQueryEntity, ScoreModifierLists
-from tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.tensor_search.tensor_search import add_documents
-from marqo.tensor_search.models.search import SearchContext
-from marqo.tensor_search.api import embed
-import numpy as np
-import torch
-import pytest
-
-import requests
-import json
+import os
+import unittest
+import uuid
 from unittest import mock
 from unittest.mock import patch
-from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.api.exceptions import MarqoWebError, IndexNotFoundError, InvalidArgError, DocumentNotFoundError
-import marqo.exceptions as base_exceptions
-from marqo.core.models.marqo_index import *
-from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
-    FeedDocumentResponse
-from marqo.vespa.models.query_result import Root, Child, RootFields
-from marqo.tensor_search.models.private_models import S3Auth, ModelAuth, HfAuth
+
+import numpy as np
+import pytest
+import torch
+
 from marqo.api.models.embed_request import EmbedRequest
-from marqo.tensor_search import utils
-import os
-import pprint
-import unittest
-import httpx
-import uuid
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.marqo_index import *
+from marqo.core.models.marqo_index_request import FieldRequest
+from marqo.tensor_search import enums
+from marqo.tensor_search import tensor_search
+from marqo.tensor_search.api import embed
+from marqo.tensor_search.models.private_models import S3Auth, ModelAuth
+from marqo.vespa.models import QueryResult
+from marqo.vespa.models.query_result import Root, Child, RootFields
+from tests.marqo_test import MarqoTestCase, TestImageUrls
+from marqo.api.exceptions import InvalidArgError
 
 
 class TestEmbed(MarqoTestCase):
@@ -756,3 +747,46 @@ class TestEmbed(MarqoTestCase):
                 # Assert vectors are equal
                 self.assertEqual(embed_res_hardcoded["content"], ["test passage: I am the GOAT."])
                 self.assertTrue(np.allclose(embed_res_hardcoded["embeddings"][0], embed_res_prefix_query["embeddings"][0]))
+
+    def test_embed_private_image_proper_error_raised(self):
+        """Test that a proper 400 error is raised when trying to embed a private image and have no access."""
+        test_content_lists = [
+            ("https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small", "a single private image url"),
+            (["https://d2k91vq0avo7lq.cloudfront.net/ai_hippo_realistic_small", "test"],
+             "a list of content with a private image url")
+        ]
+
+        for index_name in [self.unstructured_default_image_index.name, self.structured_default_image_index.name]:
+            for test_content, msg in test_content_lists:
+                with self.subTest(f"{index_name} - {msg}"):
+                    with self.assertRaises(InvalidArgError) as e:
+                        embed_res = embed(
+                            marqo_config=self.config, index_name=index_name,
+                            embedding_request=EmbedRequest(
+                                content=test_content
+                            ),
+                            device="cpu"
+                        )
+                        self.assertIn("Error downloading media file", str(e.exception))
+                        self.assertIn("403 Client Error", str(e.exception))
+
+    def test_embed_invalid_image_proper_error_raised(self):
+        """Test that a proper 400 error is raised when trying to embed an invalid image url."""
+        test_content_lists = [
+            ("https://a-dummy-image-url.jpg", "a single invalid image url"),
+            (["https://a-dummy-image-url.jpg", "test"],
+             "a list of content with an invalid image url")
+        ]
+
+        for index_name in [self.unstructured_default_image_index.name, self.structured_default_image_index.name]:
+            for test_content, msg in test_content_lists:
+                with self.subTest(f"{index_name} - {msg}"):
+                    with self.assertRaises(InvalidArgError) as e:
+                        embed_res = embed(
+                            marqo_config=self.config, index_name=index_name,
+                            embedding_request=EmbedRequest(
+                                content=test_content
+                            ),
+                            device="cpu"
+                        )
+                        self.assertIn("Error vectorising content", str(e.exception))

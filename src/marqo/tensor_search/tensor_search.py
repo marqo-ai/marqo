@@ -2018,6 +2018,12 @@ def get_content_vector(
 
 
 def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSearchQueryEntity]:
+    """
+    Add prefix to the queries if it is a text query.
+
+    Raises:
+        MediaDownloadError: If the media cannot be downloaded
+    """
     prefixed_queries = []
     for q in queries:
         text_query_prefix = q.index.model.get_text_query_prefix(q.text_query_prefix)
@@ -2064,10 +2070,17 @@ def add_prefix_to_queries(queries: List[BulkSearchQueryEntity]) -> List[BulkSear
 
 def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity], device: Union[Device, str]) -> Dict[
     Qidx, List[float]]:
-    """Run the query vectorisation process"""
+    """Run the query vectorisation process
+
+    Raise:
+        api_exceptions.InvalidArgError: If the vectorisation process fails or if the media cannot be downloaded.
+    """
 
     # Prepend the prefixes to the queries if it exists (output should be of type List[BulkSearchQueryEntity])
-    prefixed_queries = add_prefix_to_queries(queries)
+    try:
+        prefixed_queries = add_prefix_to_queries(queries)
+    except s2_inference_errors.MediaDownloadError as e:
+        raise api_exceptions.InvalidArgError(message=str(e)) from e
 
     # 1. Pre-process inputs ready for s2_inference.vectorise
     # we can still use qidx_to_job. But the jobs structure may need to be different
