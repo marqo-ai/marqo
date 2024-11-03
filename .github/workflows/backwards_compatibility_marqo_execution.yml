@@ -139,9 +139,6 @@ jobs:
         run: |
           df -h /
           du -sh /* | sort -hr
-      - name: Resize marqo disk space
-        run: |
-          sudo resize2fs /dev/nvme0n1
 
       - name: Run backwards_compatibility test
         run: |
