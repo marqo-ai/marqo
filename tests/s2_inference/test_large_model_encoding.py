@@ -16,10 +16,11 @@ from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_prope
     _convert_tensor_to_numpy
 from marqo.s2_inference.types import FloatTensor
 from tests.marqo_test import TestImageUrls
-
-_load_model = functools.partial(og_load_model, calling_func="unit_test")
+from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.s2_inference.configs import ModelCache
 import shutil
+
+_load_model = functools.partial(og_load_model, calling_func="unit_test")
 
 
 def remove_cached_model_files():
@@ -394,21 +395,56 @@ class TestLanguageBindModels(unittest.TestCase):
     def setUp(self):
         self.models = ["LanguageBind/Video_V1.5_FT_Audio_FT_Image"]
 
-    def help_test_vectorise(self, model_name):
-        for content in ["test", ["test2", "test3"]]:
-            normalized_embeddings_list = vectorise(model_name=model_name,
-                                                   content=content, device="cuda", normalize_embeddings=True)
-            for embeddings in normalized_embeddings_list:
-                self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 < 1e-6)
+    def _help_test_vectorise(self, model_name, modality, test_content_list):
+        for content in test_content_list:
+            with self.subTest(model=model_name, content=content, normalized=True):
+                normalized_embeddings_list = vectorise(
+                    model_name=model_name,
+                    content=content, device="cuda", normalize_embeddings=True,
+                    modality=modality
+                )
+                for embeddings in normalized_embeddings_list:
+                    self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 < 1e-6)
 
-            unnormalized_embeddings_list = vectorise(model_name=model_name,
-                                                   content=content, device="cuda", normalize_embeddings=False)
-            for embeddings in unnormalized_embeddings_list:
-                self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
+            with self.subTest(model=model_name, content=content, normalized=False):
+                unnormalized_embeddings_list = vectorise(
+                    model_name=model_name,
+                    content=content, device="cuda", normalize_embeddings=False,
+                    modality=modality
+                )
+                for embeddings in unnormalized_embeddings_list:
+                    self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
 
     def test_models(self):
+        test_cases = {
+            Modality.TEXT: ["test", ["test2", "test3"]],
+            Modality.AUDIO: [
+                "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/4-145081-A-9.wav",
+                [
+                    "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115920-A-22.wav",
+                    "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115920-A-22.wav"
+                ]
+            ],
+            Modality.IMAGE: [
+                'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg',
+                [
+                    'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
+                    'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
+                ]
+            ],
+            Modality.VIDEO: [
+                'https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--bO6XwZ9HI_000041_000051.mp4',
+                [
+                    'https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/-0MVWb7nJLY_000008_000018.mp4',
+                    'https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/-0oMsq-9b6c_000095_000105.mp4'
+                ]
+            ]
+        }
+
         for model_name in self.models:
-            self.help_test_vectorise(model_name)
+            for modality, test_content_list in test_cases.items():
+                with self.subTest(model=model_name, modality=modality):
+                    self._help_test_vectorise(model_name, modality, test_content_list)
 
 
 @pytest.mark.largemodel
