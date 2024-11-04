@@ -275,7 +275,36 @@ class HybridSearcherTest {
             assertThat(actualMessage).contains(expectedOuterMessage);
         }
 
-        // TODO: Tensor error
+        @Test
+        void shouldRaiseTensorError() {
+            // If the tensor query has an error, the whole function should raise an error.
+            // Create tensor hits
+            HitGroup hitsTensor = new HitGroup();
+            hitsTensor.addError(new ErrorMessage(500, "Sample error in tensor query"));
+
+            // Create lexical hits
+            HitGroup hitsLexical = new HitGroup();
+            hitsLexical.add(new Hit("index:test/5/lexical1", 1.0));
+
+            // Set parameters
+            int k = 60;
+            double alpha = 0.5;
+            boolean verbose = false;
+
+            // RRF function must throw a runtime error
+            RuntimeException exception = assertThrows(
+                    RuntimeException.class,
+                    () -> {
+                        HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+                    });
+
+            // Assert that the error message is correct
+            String expectedInternalMessage = "Sample error in tensor query";
+            String expectedOuterMessage = "Error in hybrid RRF search - tensor portion: ";
+            String actualMessage = exception.getMessage();
+            assertThat(actualMessage).contains(expectedInternalMessage);
+            assertThat(actualMessage).contains(expectedOuterMessage);
+        }
     }
 
     @Nested
