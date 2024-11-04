@@ -278,7 +278,7 @@ class LanguageBindEncoder(ModelEncoder):
                 elif isinstance(content, str) and "http" in content:
                     self._download_content(content, temp_filename, media_download_headers)
                 else:
-                    return self.encode([content], normalize=normalize, media_download_headers=media_download_headers, modality=Modality.TEXT)
+                    return self.encode([content], normalize=normalize, modality=Modality.TEXT)
 
                 preprocessed_image = self.preprocessor(Modality.IMAGE)([temp_filename], return_tensors='pt')
                 inputs['image'] = to_device(preprocessed_image, self.model.device)['pixel_values']
