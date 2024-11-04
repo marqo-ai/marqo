@@ -393,7 +393,7 @@ class TestLanguageBindModels(unittest.TestCase):
 
     def setUp(self):
         self.models = ["LanguageBind/Video_V1.5_FT_Audio_FT_Image"]
-        self.device="cpu"
+        self.device="cuda"
 
     def _help_test_vectorise(self, model_name, modality, test_content_list):
         for content in test_content_list:
