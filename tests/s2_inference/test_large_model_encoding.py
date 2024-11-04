@@ -385,22 +385,24 @@ class TestLanguageBindModels(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        remove_cached_model_files()
+        import os
+        os.environ["MARQO_MAX_CPU_MODEL_MEMORY"] = "10"
+        clear_loaded_models()
 
     @classmethod
     def tearDownClass(cls) -> None:
         clear_loaded_models()
-        remove_cached_model_files()
 
     def setUp(self):
         self.models = ["LanguageBind/Video_V1.5_FT_Audio_FT_Image"]
+        self.device="cpu"
 
     def _help_test_vectorise(self, model_name, modality, test_content_list):
         for content in test_content_list:
             with self.subTest(model=model_name, content=content, normalized=True):
                 normalized_embeddings_list = vectorise(
                     model_name=model_name,
-                    content=content, device="cuda", normalize_embeddings=True,
+                    content=content, device=self.device, normalize_embeddings=True,
                     modality=modality
                 )
                 for embeddings in normalized_embeddings_list:
@@ -409,7 +411,7 @@ class TestLanguageBindModels(unittest.TestCase):
             with self.subTest(model=model_name, content=content, normalized=False):
                 unnormalized_embeddings_list = vectorise(
                     model_name=model_name,
-                    content=content, device="cuda", normalize_embeddings=False,
+                    content=content, device=self.device, normalize_embeddings=False,
                     modality=modality
                 )
                 for embeddings in unnormalized_embeddings_list:
