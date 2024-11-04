@@ -10,6 +10,7 @@ import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.Chain;
 import com.yahoo.search.*;
 import com.yahoo.search.query.ranking.RankFeatures;
+import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.*;
@@ -242,6 +243,39 @@ class HybridSearcherTest {
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
         }
+
+        @Test
+        void shouldRaiseLexicalError() {
+            // If the lexical query has an error, the whole function should raise an error.
+            // Create tensor hits
+            HitGroup hitsTensor = new HitGroup();
+            hitsTensor.add(new Hit("index:test/5/tensor1", 1.0));
+
+            // Create lexical hits
+            HitGroup hitsLexical = new HitGroup();
+            hitsLexical.addError(new ErrorMessage(500, "Sample error in lexical query"));
+
+            // Set parameters
+            int k = 60;
+            double alpha = 0.5;
+            boolean verbose = false;
+
+            // RRF function must throw a runtime error
+            RuntimeException exception = assertThrows(
+                    RuntimeException.class,
+                    () -> {
+                        HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+                    });
+
+            // Assert that the error message is correct
+            String expectedInternalMessage = "Sample error in lexical query";
+            String expectedOuterMessage = "Error in hybrid RRF search - lexical portion: ";
+            String actualMessage = exception.getMessage();
+            assertThat(actualMessage).contains(expectedInternalMessage);
+            assertThat(actualMessage).contains(expectedOuterMessage);
+        }
+
+        // TODO: Tensor error
     }
 
     @Nested

@@ -2,7 +2,7 @@ import argparse
 
 import os
 
-VESPA_VERSION=os.getenv('VESPA_VERSION', '8.396.18')  # default version baked into marqo-base:30
+VESPA_VERSION=os.getenv('VESPA_VERSION', '8.431.32')  # default version baked into marqo-base:???
 
 
 def start(args):

@@ -1644,6 +1644,21 @@ class TestHybridSearch(MarqoTestCase):
                 # Make sure results are retrieved
                 self.assertIn("hits", res)
 
+    def test_hybrid_search_error_in_subsearch_raises_correct_error(self):
+        """
+        If a sub-search in hybrid search has an error, the correct error should be raised in Marqo
+        """
+        tensor_search.search(
+            config=self.config,
+            index_name=self.unstructured_default_text_index.name,
+            text='\\\\"test\\\\"',
+            search_method="HYBRID",
+            hybrid_parameters=HybridParameters(
+                verbose=True
+            ),
+        )
+
+
     def test_hybrid_search_structured_index_has_no_hybrid_rank_profile_fails(self):
         """
         If an index does not have both lexical and tensor fields, it will have no hybrid rank profile.

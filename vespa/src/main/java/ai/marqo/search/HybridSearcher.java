@@ -167,8 +167,17 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("alpha is %.2f", alpha), verbose);
         logIfVerbose(String.format("k is %d", k), verbose);
 
-        // Iterate through tensor hits list
+        // Check for errors in results, raise if necessary
+        if (hitsLexical.getError() != null) {
+            throw new RuntimeException(
+                    "Error in hybrid RRF search - lexical portion: " + hitsLexical.getError().toString());
+        }
+        if (hitsTensor.getError() != null) {
+            throw new RuntimeException(
+                    "Error in hybrid RRF search - tensor portion: " + hitsTensor.getError().toString());
+        }
 
+        // Iterate through tensor hits list
         int rank = 1;
         if (alpha > 0.0) {
             logIfVerbose(
