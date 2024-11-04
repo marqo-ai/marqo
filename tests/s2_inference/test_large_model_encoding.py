@@ -385,8 +385,6 @@ class TestLanguageBindModels(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        import os
-        os.environ["MARQO_MAX_CPU_MODEL_MEMORY"] = "10"
         clear_loaded_models()
 
     @classmethod
@@ -408,14 +406,15 @@ class TestLanguageBindModels(unittest.TestCase):
                 for embeddings in normalized_embeddings_list:
                     self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 < 1e-6)
 
-            with self.subTest(model=model_name, content=content, normalized=False):
-                unnormalized_embeddings_list = vectorise(
-                    model_name=model_name,
-                    content=content, device=self.device, normalize_embeddings=False,
-                    modality=modality
-                )
-                for embeddings in unnormalized_embeddings_list:
-                    self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
+            if modality != Modality.TEXT: # Text embeddings are always normalized
+                with self.subTest(model=model_name, content=content, normalized=False):
+                    unnormalized_embeddings_list = vectorise(
+                        model_name=model_name,
+                        content=content, device=self.device, normalize_embeddings=False,
+                        modality=modality
+                    )
+                    for embeddings in unnormalized_embeddings_list:
+                        self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
 
     def test_models(self):
         test_cases = {
