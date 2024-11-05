@@ -13,8 +13,8 @@ import traceback
 marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from base_test_case import BaseTestCase
-from test_vector_normalisation import TestVectorNormalisation
+from base_test_case import BaseCompatibilityTestCase
+from test_vector_normalisation import CompatibilityTestVectorNormalisation #Required so that the line #255 still works
 
 
 # Keep track of containers that need cleanup
@@ -352,16 +352,18 @@ def rollback_test(to_version: str, from_version: str, to_version_tag, from_image
 
 def run_tests(mode: str, from_version: str, to_version: str, marqo_api: str):
     print(f"Inside run_tests with arguments mode: {mode}, from_version: {from_version}, to_version: {to_version}")
+
     if mode == "prepare":
-        tests = []
-        for test in BaseTestCase.__subclasses__():
-            if getattr(test, 'marqo_from_version', '0') <= from_version:
-                tests.append(test)
-        for test in tests:
-            test.setUpClass()
-            test_instance = test()
+        # Get all subclasses of `BaseCompatibilityTestCase` that match the `from_version` criterion
+        tests = [test_class for test_class in BaseCompatibilityTestCase.__subclasses__()
+                 if getattr(test_class, 'marqo_from_version', '0') <= from_version]
+
+        for test_class in tests:
+            test_class.setUpClass()
+            test_instance = test_class()
             test_instance.prepare()
-            test.tearDownClass()
+            test_class.tearDownClass()
+
     elif mode == "test":
         pytest_args = [
             f"--from_version={from_version}",

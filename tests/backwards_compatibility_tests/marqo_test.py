@@ -1,4 +1,4 @@
-"""Please have a running Marqo instance to test against!
+"""This test class requires you to have a running Marqo instance to test against!
 
 Pass its settings to local_marqo_settings.
 """

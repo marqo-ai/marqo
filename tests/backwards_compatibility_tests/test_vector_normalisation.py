@@ -1,17 +1,12 @@
-import uuid
-from abc import abstractmethod
-
 import pytest
 
-from base_test_case import BaseTestCase
+from base_test_case import BaseCompatibilityTestCase
 from marqo_test import MarqoTestCase
-# from marqo.client import Client
-# from marqo.errors import MarqoWebError
 import marqo
 
 
 @pytest.mark.marqo_version('2.13.0')
-class TestVectorNormalisation(BaseTestCase):
+class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     text_index_with_normalize_embeddings_true = "add_doc_api_test_structured_index_with_normalize_embeddings_true"
 
     DEFAULT_DIMENSIONS = 384
