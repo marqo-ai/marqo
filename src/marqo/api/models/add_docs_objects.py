@@ -1,7 +1,6 @@
-from typing import List
-from typing import Optional, Union, Any, Sequence
+from typing import List, Dict
+from typing import Optional, Any, Sequence
 
-import numpy as np
 from pydantic import BaseModel, root_validator
 from pydantic import Field
 
@@ -25,7 +24,7 @@ class AddDocsBodyParams(BaseModel):
     mediaDownloadHeaders: Optional[dict] = None
     modelAuth: Optional[ModelAuth] = None
     mappings: Optional[dict] = None
-    documents: Union[Sequence[Union[dict, Any]], np.ndarray]
+    documents: Sequence[Dict[str, Any]]
     imageDownloadThreadCount: int = Field(default_factory=lambda: read_env_vars_and_defaults_ints(EnvVars.MARQO_IMAGE_DOWNLOAD_THREAD_COUNT_PER_REQUEST))
     mediaDownloadThreadCount: Optional[int]
     textChunkPrefix: Optional[str] = None
