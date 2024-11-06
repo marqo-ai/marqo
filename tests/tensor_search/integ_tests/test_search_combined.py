@@ -1013,6 +1013,13 @@ class TestSearch(MarqoTestCase):
                         self.assertEqual(len(expected_ids), len(res['hits']))
                         self.assertEqual(set(expected_ids), {hit['_id'] for hit in res['hits']})
 
+    def test_broken_lexical_on_structured(self):
+        # TODO: Remove this test
+        res = tensor_search.search(
+            text='\\\\"test\\\\"', config=self.config, index_name=self.structured_default_text_index.name,
+            search_method=SearchMethod.LEXICAL
+        )
+
     def test_search_private_image_return_proper_error(self):
         """A test to ensure that InvalidArgumentError is raised when searching for a private image."""
         test_queries_list = [
