@@ -3,6 +3,20 @@ import subprocess
 import sys
 
 def generate_versions(to_version: str, num_versions: int = 4) -> list:
+    """
+    Generate a list of previous versions based on the target version.
+
+    This function generates a list of previous versions for a given target version.
+    It includes the previous patch version of the same minor version if applicable,
+    and the latest patch versions for preceding minor versions.
+
+    Args:
+        to_version (str): The target version to generate previous versions for.
+        num_versions (int): The number of previous versions to generate. Defaults to 4.
+
+    Returns:
+        list: A list of previous versions as strings.
+    """
     target_version = semver.VersionInfo.parse(to_version)
     versions = []
 

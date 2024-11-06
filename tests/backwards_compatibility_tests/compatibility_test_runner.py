@@ -22,6 +22,18 @@ containers_to_cleanup: Set[str] = set()
 volumes_to_cleanup: Set[str] = set()
 
 def pull_remote_image_from_ecr(image_tag: str):
+    """
+    Pulls a Docker image from Amazon ECR and optionally retags it locally.
+
+    Args:
+        image_tag (str): The tag of the image to pull from ECR.
+
+    Returns:
+        str: The local tag of the pulled and retagged Docker image.
+
+    Raises:
+        Exception: If there is an error during the Docker image pull or retagging process.
+    """
     ecr_registry = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
     image_repo = "marqo-compatibility-tests"
 
@@ -60,7 +72,20 @@ def pull_remote_image_from_ecr(image_tag: str):
     # Now you can use the image as "marqo-ai/marqo:{image_tag}"
 
 def pull_marqo_image(image: str, source: str):
-    """Pull the specified Marqo Docker image."""
+    """
+    Pull the specified Marqo Docker image.
+
+    Args:
+        image (str): The name of the Docker image to pull.
+        source (str): The source from which to pull the image.
+                      It can be either 'docker' for Docker Hub or 'ECR' for Amazon ECR.
+
+    Returns:
+        str: The name of the pulled Docker image.
+
+    Raises:
+        Exception: If there is an error during the Docker image pull process.
+    """
     try:
         if source == "docker":
             print(f"pulling this image from dockerhub {image}")
@@ -74,7 +99,18 @@ def pull_marqo_image(image: str, source: str):
 
 def start_marqo_from_version_container(version: str, from_version_volume, from_version_image: Optional[str] = None,
                                        env_vars: Optional[list] = None):
-    source = "docker" #The from_version image would always be available on docker because it's supposed to be an already released docker image
+    """
+    Start a Marqo container after pulling the required image from docker and creating a volume.
+    The volume is mounted to a specific point such that it can be later used to transfer state to a different version of Marqo.
+
+    Args:
+        version (str): The version of the Marqo container to start.
+        from_version_volume: The volume to use for the container.
+        from_version_image (Optional[str]): The specific image to use for the container. Defaults to None.
+        env_vars (Optional[list]): A list of environment variables to set in the container. Defaults to None.
+    """
+
+    source = "docker" #The source for from_version image would always be docker because it's supposed to be an already released docker image
     """Start a Marqo container after pulling the required image and apply all provided environment variables."""
     print(f"Starting Marqo container with version {version}, from_version_image {from_version_image}, from_version_volume {from_version_image}, source {source}")
     from_version_image = from_version_image or f"marqoai/marqo:{version}"
@@ -113,8 +149,6 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
     if version >= marqo_transfer_state_version:
         # setting volume to be mounted at /opt/vespa/var because starting from 2.9, the state is stored in /opt/vespa/var
         cmd.extend(["-v", f"{from_version_volume}:/opt/vespa/var"])
-        # subprocess.run(["mkdir", "/logs"]) #TODO: Check if this is required or not
-        # cmd.extend(["-v", "$(pwd)/logs:/opt/vespa/logs"])  # Optional logs for debugging
     else:
         # setting volume to be mounted at /opt/vespa because before 2.9, the state was stored in /opt/vespa
         cmd.extend(["-v", f"{from_version_volume}:/opt/vespa"])  # volume name will be marqo_2_12_0_volume
@@ -166,6 +200,17 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
 
 def start_marqo_to_version_container(to_version: str, from_version: str, from_version_volume: str,
                                      to_version_tag: str, env_vars: Optional[list] = None):
+    """
+    Start a Marqo container for the specified to_version, transferring state from the from_version container.
+    The state is transferred by copying the state from the from_version container to the to_version container, by re-using the
+    from_version_volume created when starting from_version container.
+    Args:
+        to_version (str): The target version of the Marqo container to start.
+        from_version (str): The source version of the Marqo container.
+        from_version_volume (str): The volume to use for the container.
+        to_version_tag (str): The specific image tag to use for the container.
+        env_vars (Optional[list]): A list of environment variables to set in the container. Defaults to None.
+    """
     source = "ECR" #Source of a to_version image will always be ECR because,
     print(
         f"Starting Marqo container with to_version {to_version}, "
@@ -257,8 +302,12 @@ def start_marqo_to_version_container(to_version: str, from_version: str, from_ve
 
 
 def stop_marqo_container(version: str):
-    """Stop a Marqo container but don't remove it yet."""
-    print("in here with version " + version)
+    """
+    Stop a Marqo container but don't remove it yet.
+
+    Args:
+        version (str): The version of the Marqo container to stop.
+    """
     container_name = f"marqo-{version}"
     print(f"Stopping container with container name {container_name}")
     try:
@@ -269,7 +318,15 @@ def stop_marqo_container(version: str):
 
 
 def cleanup_containers():
-    """Remove all containers that were created during the test."""
+    """
+    Remove all containers that were created during the test.
+
+    This function iterates over the set of containers to clean up and attempts to remove each one using the Docker CLI.
+    If a container cannot be removed, a warning message is printed.
+
+    Raises:
+        subprocess.CalledProcessError: If there is an error during the container removal process.
+    """
     for container_name in containers_to_cleanup:
         try:
             subprocess.run(["docker", "rm", "-f", container_name], check=True)
@@ -278,6 +335,15 @@ def cleanup_containers():
     containers_to_cleanup.clear()
 
 def cleanup_volumes():
+    """
+    Remove all Docker volumes that were created during the test.
+
+    This function iterates over the set of volumes to clean up and attempts to remove each one using the Docker CLI.
+    If a volume cannot be removed, a warning message is printed.
+
+    Raises:
+        subprocess.CalledProcessError: If there is an error during the volume removal process.
+    """
     for volume_name in volumes_to_cleanup:
         try:
             subprocess.run(["docker", "volume", "rm", volume_name], check=True)
@@ -287,10 +353,27 @@ def cleanup_volumes():
 
 def backwards_compatibility_test(from_version: str, to_version: str, to_version_tag: str, from_image: Optional[str] = None,
                                  to_image: Optional[str] = None):
+    """
+    Perform a backwards compatibility test between two versions of Marqo.
+
+    This function starts a container with the from_version, runs tests in prepare mode, stops the container,
+    starts a container with the to_version by transferring state from from_version container, and runs tests in test mode.
+
+    Args:
+        from_version (str): The source version of the Marqo container.
+        to_version (str): The target version of the Marqo container.
+        to_version_tag (str): The specific image tag to use for the to_version container.
+        from_image (Optional[str]): The specific image to use for the from_version container. Defaults to None.
+        to_image (Optional[str]): The specific image to use for the to_version container. Defaults to None.
+
+    Raises:
+        ValueError: If the major versions of from_version and to_version are incompatible.
+        Exception: If there is an error during the test process.
+    """
     try:
         # Step 1: Start from_version container and run tests in prepare mode
-        print("In here with from_version:" + from_version + " to_version: " + to_version + " ")
-            # Check for version compatibility
+        print(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_tag: {to_version_tag}, from_image: {from_image}, to_image: {to_image}")
+        # Check for version compatibility
         from_major_version = int(from_version.split('.')[0])
         print(f"from major version = {from_major_version}")
         to_major_version = int(to_version.split('.')[0])
@@ -332,17 +415,26 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
 
 def rollback_test(to_version: str, from_version: str, to_version_tag, from_image: Optional[str] = None,
                   to_image: Optional[str] = None):
+    """
+    Perform a rollback test between two versions of Marqo.
+
+    This function first performs a backwards compatibility test from the from_version to the to_version.
+    Then, it stops the to_version container, starts the from_version container again, and runs tests in test mode.
+
+    Args:
+        to_version (str): The target version of the Marqo container.
+        from_version (str): The source version of the Marqo container.
+        to_version_tag: The specific image tag to use for the to_version container.
+        from_image (Optional[str]): The specific image to use for the from_version container. Defaults to None.
+        to_image (Optional[str]): The specific image to use for the to_version container. Defaults to None.
+    """
     try:
-        # Steps 1-3: Same as backwards_compatibility_test
         backwards_compatibility_test(from_version, to_version, None, from_image, to_image)
 
-        # Step 4: Stop to_version container (but don't remove it)
         stop_marqo_container(to_version)
 
-        # Step 5: Start from_version container, transferring state back
         start_marqo_from_version_container(from_version, None, from_image)
 
-        # Step 6: Run tests
         run_tests("test", from_version, to_version, "http://localhost:8882")
     finally:
         # Stop the final container (but don't remove it yet)
@@ -374,6 +466,22 @@ def run_tests(mode: str, from_version: str, to_version: str, marqo_api: str):
         pytest.main(pytest_args)
 
 def create_volume_for_marqo_version(version: str, volume_name: str):
+    """
+    Create a Docker volume for the specified Marqo version.
+
+    This function replaces dots with underscores in the version string to format the volume name.
+    If no volume name is provided, it generates one based on the version.
+
+    Args:
+        version (str): The version of the Marqo container.
+        volume_name (str): The name of the Docker volume to create. If None, a name is generated based on the version.
+
+    Returns:
+        str: The name of the created Docker volume.
+
+    Raises:
+        subprocess.CalledProcessError: If there is an error during the Docker volume creation process.
+    """
     # Replace dots with underscores to format the volume name
     if volume_name is None:
         volume_name = get_volume_name_from_marqo_version(version)
@@ -390,12 +498,39 @@ def create_volume_for_marqo_version(version: str, volume_name: str):
 
     #TODO: Make it compatible for when you directly pass and image and no version is passed.
 def get_volume_name_from_marqo_version(version):
+    """
+    Generate a Docker volume name based on the Marqo version.
+
+    This function replaces dots with underscores in the version string to format the volume name.
+
+    Args:
+        version (str): The version of the Marqo container.
+
+    Returns:
+        str: The formatted Docker volume name.
+    """
     volume_name = f"marqo_{version.replace('.', '_')}_volume"
     return volume_name
 
 
 def copy_state_from_container(
         from_version_volume: str, to_version_volume: str, image: str):
+    """
+    Copy the state from one Docker volume to another using a specified Docker image.
+
+    This function runs a Docker container with the specified image, mounts the source and target volumes,
+    and copies the contents from the source volume to the target volume. It is specifically used
+    in case when from_version is <2.9 and to_version is >=2.9.
+
+    Args:
+        from_version_volume (str): The name of the source Docker volume.
+        to_version_volume (str): The name of the target Docker volume.
+        image (str): The Docker image to use for the container.
+
+    Raises:
+        subprocess.CalledProcessError: If there is an error during the Docker run or copy process.
+    """
+
     cmd = ["docker", "run", "--rm", "-it", "--entrypoint=''",
            "-v", f"{from_version_volume}:/opt/vespa_old",
            "-v", f"{to_version_volume}:/opt/vespa/var",

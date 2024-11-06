@@ -8,7 +8,11 @@ from marqo_test import MarqoTestCase
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 class BaseCompatibilityTestCase(MarqoTestCase):
-
+    """
+    Base class for backwards compatibility tests. Contains a prepare method that should be implemented by subclasses to
+    add documents / prepare marqo state. Also contains methods to save and load results to/from a file so that
+    test results can be compared across versions.
+    """
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -36,5 +40,5 @@ class BaseCompatibilityTestCase(MarqoTestCase):
         return results
 
     def prepare(self):
+        """Prepare marqo state like adding documents"""
         pass
-

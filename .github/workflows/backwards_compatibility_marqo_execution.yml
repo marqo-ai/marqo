@@ -56,29 +56,35 @@ jobs:
             ]
             
   backwards_compatibility:
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    # This job runs on the newly created runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
     needs: Start-Runner
     steps:
+      # Step to check out the Marqo repository
       - name: checkout marqo repo
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo
           fetch-depth: 0
 
+      # Step to set up Python 3.9
       - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
           python-version: "3.9"
           cache: "pip"
 
+      # Step to install pip-tools
       - name: Install pip-tools
         run: |
           python -m pip install pip-tools
 
+      # Step to install dependencies from requirements.txt
       - name: Install Dependencies
         run: |
           pip install -r tests/backwards_compatibility_tests/requirements.txt
 
+      # Step to configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -86,15 +92,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      # Step to login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # Step to login to Amazon ECR registry
       - name: Login to Amazon ECR registry
         run: |
           aws ecr get-login-password --region us-east-1 | \
           docker login --username AWS --password-stdin 424082663841.dkr.ecr.us-east-1.amazonaws.com
 
+      # Step to run the backwards compatibility test
       - name: Run backwards_compatibility test
         run: |
           cmd="python tests/backwards_compatibility_tests/compatibility_test_runner.py \

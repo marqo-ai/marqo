@@ -37,6 +37,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      # step to check for image existence - it uses aws cli to check if the image exists in the ECR registry "marqo-compatibility-tests"
       - name: check for image existence
         id: check-image
         run: |
@@ -47,6 +48,7 @@ jobs:
             echo "::set-output name=image_exists::false"
           fi
 
+      # Step to build and push marqo image to ECR, only executes if the image does not exist signified by image_exists == false.
       - name: Build and push marqo image to ECR
         if: steps.check-image.outputs.image_exists == 'false'
         env:
@@ -79,6 +81,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      # Step to poll for image existence, polls the ECR registry (marqo-compatibility-tests) for the image to be available.
+      # It retries 20 times with a sleep interval of 60 seconds. The step exits with a status code of 0 if the image is found, else exits with a status code of 1.
+      # In the context of a github action if a step exits with a status code of 1, the entire workflow is marked as failed.
       - name: Poll for image existence
         run: |
           echo "Polling for image existence"
@@ -97,34 +102,42 @@ jobs:
           exit 1
 
   orchestrate:
+    # Job to orchestrate backwards compatibility test execution
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
     needs: poll-for-image-existence
 
     environment: marqo-test-suite
     steps:
+      # Step to check out the Marqo repository
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
+      # Step to set up Python 3.9
       - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
           python-version: '3.9'
           cache: "pip"
 
+      # Step to install the semver package
       - name: Install semver
         run: |
           pip install semver
 
+
+      # Step to determine the target version
       - name: Determine to_version
-        if: $${{ github.event_name != 'workflow_dispatch' && !github.event.inputs.to_version }}
+        if: $${{ github.event_name != 'workflow_dispatch' && !github.event.inputs.to_version }} # If this condition is met it signifies
+        # that the run was triggered due to mainline push and was not manual. In that case we need to calculate to_version below. This is skipped otherwise.
         id: get-version
         run: |
           VERSION=$(python tests/backwards_compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
           echo "::set-output name=to_version::$VERSION"
 
+      # Step to generate the list of versions to test
       - name: Generate version list #this code block just generates the from_version list and stores it in a versions variable as a list
         id: versions
         run: |
@@ -132,13 +145,15 @@ jobs:
           VERSION_LIST=$(python tests/backwards_compatibility_tests/scripts/generate_versions.py ${{ steps.get-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
           echo "::set-output name=list::$VERSION_LIST" # setting the output variable
 
+      # Step to display the versions to test
       - name: display versions
         run: | 
           echo "Versions to test: ${{ steps.versions.outputs.list }} against to_version: ${{ steps.get-version.outputs.to_version }}"
 
-      - name: Trigger execution workflows #this code block is then actually responsible for running the the backwards_compatibility_marqo_execution.yml file with from_version / to_version combinations
+      # Step to trigger execution workflows for each version combination
+      - name: Trigger execution workflows #this code block is then actually responsible for running the backwards_compatibility_marqo_execution.yml file with from_version / to_version combinations
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} #check if this is required
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           for from_version in ${{ steps.versions.outputs.list }}
           do
