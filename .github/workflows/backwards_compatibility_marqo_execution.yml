@@ -31,17 +31,6 @@ jobs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
       ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
     steps:
-      - name: print values
-        run: |
-          echo "${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}" | sed 's/./& /g'
-          echo "${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}" | sed 's/./& /g'
-          echo "${{ secrets.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}" | sed 's/./& /g'
-          echo "${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}" | sed 's/./& /g'
-          echo "${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}" | sed 's/./& /g'      
-          echo "${{ github.event.inputs.from_version }}" | sed 's/./& /g'
-          echo "${{ github.event.inputs.to_version }}" | sed 's/./& /g'
-          echo "${{ github.event.inputs.to_version_tag }}" | sed 's/./& /g'
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -78,10 +67,10 @@ jobs:
           repository: marqo-ai/marqo
           fetch-depth: 0
 
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
-          python-version: "3.8"
+          python-version: "3.9"
           cache: "pip"
 
       - name: Install pip-tools
@@ -142,42 +131,6 @@ jobs:
           fi
           eval $cmd
 
-#  rollback: #TODO: implement this
-#    runs-on: ubuntu-latest
-#    needs: Start-Runner
-#    steps:
-#      - uses: actions/checkout@v2
-#
-#      - name: Set up Python
-#        uses: actions/setup-python@v2
-#        with:
-#          python-version: '3.x'
-#
-#      - name: Install dependencies
-#        run: |
-#          python -m pip install --upgrade pip
-#          pip install pytest docker
-#
-##      Uncomment this step & put compatibility_test_runnercompatibility_test_runner.py in marqo-api-tests. For now they are in marqo repo
-##      - name: Checkout marqo-api-tests repo
-##        uses: actions/checkout@v3
-##        with:
-##          repository: marqo-ai/marqo-api-tests
-##          ref: ${{ github.event.inputs.api_tests_branch }}
-#
-#      - name: Set up Environment
-#        run: |
-#          # Set up conf file
-#          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-#
-#      - name: Run rollback test
-#        run: |
-#          python tests/compatibility_tests/scripts/compatibility_test_runner.py \
-#            --mode=rollback \
-#            --from_version ${{ github.event.inputs.from_version }} \
-#            --to_version ${{ github.event.inputs.to_version }} \
-#            --from_image ${{ github.event.inputs.from_image }} \
-#            --to_image ${{ github.event.inputs.to_image }}
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:

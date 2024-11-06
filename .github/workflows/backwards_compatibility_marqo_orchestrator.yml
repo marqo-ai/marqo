@@ -37,6 +37,7 @@ jobs:
         with:
           fetch-depth: 0
 
+
       - name: Build and push marqo image to ECR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,21 +100,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
-          python-version: '3.8'
+          python-version: '3.9'
           cache: "pip"
 
       - name: Install semver
         run: |
           pip install semver
 
+      - name: Determine to_version
+        id: get-version
+        run: |
+          VERSION=$(python tests/backwards_compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
+          echo "::set-output name=to_version::$VERSION"
+
       - name: Generate version list #this code block just generates the from versions and stores it in a versions variable as a list
         id: versions
         run: |
           # Run the Python script and capture its output
-          VERSION_LIST=$(python tests/backwards_compatibility_tests/generate_versions.py ${{ github.event.inputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
+          VERSION_LIST=$(python tests/backwards_compatibility_tests/scripts/generate_versions.py ${{ steps.get-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
           echo "::set-output name=list::$VERSION_LIST" # setting the output variable
 
       - name: display versions
