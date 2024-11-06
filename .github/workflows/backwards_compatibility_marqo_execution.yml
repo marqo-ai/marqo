@@ -83,11 +83,6 @@ jobs:
         run: |
           pip install -r tests/backwards_compatibility_tests/requirements.txt
 
-      - name: Set up Environment
-        run: |
-          # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-
       - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
           if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]]; then
