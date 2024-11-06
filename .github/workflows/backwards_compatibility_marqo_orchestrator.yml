@@ -2,7 +2,7 @@
 name: Marqo Compatibility Tests Orchestrator
 
 on:
-  push: #TODO: Decide if this workflow should run on push. Doesn't make sense to run on push, since we'll need to somehow have context of what is the to_version and then derive from_versions from those.
+  push:
     branches:
       - mainline
     paths-ignore:

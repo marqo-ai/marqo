@@ -7,13 +7,11 @@ on:
       from_version:
         description: 'Source Marqo version'
         required: true
-      to_version: #TODO: decide if this should be made optional - reasoning:
-        # 1. when a commit is pushed to mainline - you will need to have context of what version this commit is for. Without that you can't tell what is the to_version.
-        # In the same sense - how will you know what previous versions to test?
+      to_version:
         description: 'Target Marqo version'
         required: true
       to_version_tag:
-        description: 'Target Marqo version tag' #Used for pulling the to_version docker image from ECR
+        description: 'Target Marqo version tag'
         required: true
       from_image:
         description: 'Source Marqo image (optional)'
