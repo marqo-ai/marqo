@@ -73,10 +73,10 @@ def pull_marqo_image(image: str, source: str):
 
 
 def start_marqo_from_version_container(version: str, from_version_volume, from_version_image: Optional[str] = None,
-                                       transfer_state: Optional[str] = None, env_vars: Optional[list] = None):
-    source = "docker"
+                                       env_vars: Optional[list] = None):
+    source = "docker" #The from_version image would always be available on docker because it's supposed to be an already released docker image
     """Start a Marqo container after pulling the required image and apply all provided environment variables."""
-    print(f"Starting Marqo container with version {version}, from_version_image {from_version_image}, from_version_volume {from_version_image}, transfer_state {transfer_state}, source {source}")
+    print(f"Starting Marqo container with version {version}, from_version_image {from_version_image}, from_version_volume {from_version_image}, source {source}")
     from_version_image = from_version_image or f"marqoai/marqo:{version}"
     container_name = f"marqo-{version}"
 
@@ -106,7 +106,7 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
             cmd.extend(["-e", var])
 
     # Handle version-specific volume mounting
-    # Mounting volumes for Marqo >= 2.9")
+    # Mounting volumes for Marqo >= 2.9
     # Use the provided volume for state transfer
     from_version_volume = create_volume_for_marqo_version(version, from_version_volume)
     print(f"from version volume = {from_version_volume}")
@@ -166,7 +166,7 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
 
 def start_marqo_to_version_container(to_version: str, from_version: str, from_version_volume: str,
                                      to_version_tag: str, env_vars: Optional[list] = None):
-    source = "ECR"
+    source = "ECR" #Source of a to_version image will always be ECR because,
     print(
         f"Starting Marqo container with to_version {to_version}, "
         f"from_version: {from_version} "
@@ -340,7 +340,7 @@ def rollback_test(to_version: str, from_version: str, to_version_tag, from_image
         stop_marqo_container(to_version)
 
         # Step 5: Start from_version container, transferring state back
-        start_marqo_from_version_container(from_version, None, from_image, transfer_state=f"marqo-{to_version}")
+        start_marqo_from_version_container(from_version, None, from_image)
 
         # Step 6: Run tests
         run_tests("test", from_version, to_version, "http://localhost:8882")

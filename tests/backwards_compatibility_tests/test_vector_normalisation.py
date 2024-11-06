@@ -18,7 +18,6 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
         super().setUpClass()
 
         cls.client = marqo.Client(**cls.client_settings)
-        print("Client has been initialized:", cls.client)
 
         cls.create_indexes([
             {

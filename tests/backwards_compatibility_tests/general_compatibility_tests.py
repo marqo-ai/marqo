@@ -127,7 +127,6 @@ class GeneralCompatibilityCompatibilityTest(BaseCompatibilityTestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.client = marqo.Client(**cls.client_settings)
-        print("Client has been initialized:", cls.client)
         print(f"Creating indexes {cls.indexes_to_test_on}")
         cls.create_indexes(cls.indexes_to_test_on)
         cls.indexes_to_delete = [cls.structured_index_metadata['indexName'],

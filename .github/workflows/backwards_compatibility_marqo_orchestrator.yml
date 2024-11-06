@@ -51,7 +51,6 @@ jobs:
         if: steps.check-image.outputs.image_exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          to_version: ${{ github.event.inputs.to_version }}
         run: |
           # Build and push image to ECR
           echo "Building and pushing marqo image to ECR"
@@ -120,12 +119,13 @@ jobs:
           pip install semver
 
       - name: Determine to_version
+        if: $${{ github.event_name != 'workflow_dispatch' && !github.event.inputs.to_version }}
         id: get-version
         run: |
           VERSION=$(python tests/backwards_compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
           echo "::set-output name=to_version::$VERSION"
 
-      - name: Generate version list #this code block just generates the from versions and stores it in a versions variable as a list
+      - name: Generate version list #this code block just generates the from_version list and stores it in a versions variable as a list
         id: versions
         run: |
           # Run the Python script and capture its output
@@ -134,15 +134,15 @@ jobs:
 
       - name: display versions
         run: | 
-          echo "Versions to test: ${{ steps.versions.outputs.list }}"
+          echo "Versions to test: ${{ steps.versions.outputs.list }} against to_version: ${{ steps.get-version.outputs.to_version }}"
 
-      - name: Trigger execution workflows #this code block is then actually responsible for running the the execution yaml file with from_version / to_version combinations
+      - name: Trigger execution workflows #this code block is then actually responsible for running the the backwards_compatibility_marqo_execution.yml file with from_version / to_version combinations
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} #check if this is required
         run: |
           for from_version in ${{ steps.versions.outputs.list }}
           do
-            workflow_data="{\"ref\":\"${{ github.ref }}\",\"inputs\":{\"from_version\":\"$from_version\",\"to_version\":\"${{ github.event.inputs.to_version }}\",\"to_version_tag\":\"${{ github.sha }}\""
+            workflow_data="{\"ref\":\"${{ github.ref }}\",\"inputs\":{\"from_version\":\"$from_version\",\"to_version\":\"${{ steps.get-version.outputs.to_version }}\",\"to_version_tag\":\"${{ github.sha }}\""
             
             if [ -n "${{ github.event.inputs.to_image }}" ]; then
               workflow_data="$workflow_data,\"to_image\":\"${{ github.event.inputs.to_image }}\""
