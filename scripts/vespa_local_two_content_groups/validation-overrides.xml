@@ -1,0 +1,3 @@
+<validation-overrides>
+     <allow until='2024-08-14'>schema-removal</allow>
+</validation-overrides>

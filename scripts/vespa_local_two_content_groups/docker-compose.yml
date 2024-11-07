@@ -1,0 +1,44 @@
+services:
+  node0:
+    image: "vespaengine/vespa:${VESPA_VERSION:-latest}"
+    container_name: node0
+    hostname: node0.vespanet
+    environment:
+      - VESPA_CONFIGSERVERS=node0.vespanet
+    networks:
+      - vespanet
+    ports:
+      - "19071:19071"
+      - "8080:8080"
+      - "5005:5005"
+    command: configserver,services
+
+  node1:
+    image: "vespaengine/vespa:${VESPA_VERSION:-latest}"
+    container_name: node1
+    hostname: node1.vespanet
+    environment:
+      - VESPA_CONFIGSERVERS=node0.vespanet
+    networks:
+      - vespanet
+    ports:
+      - "19107:19107"
+      - "20100:19092"
+    command: services
+
+  node2:
+    image: "vespaengine/vespa:${VESPA_VERSION:-latest}"
+    container_name: node2
+    hostname: node2.vespanet
+    environment:
+      - VESPA_CONFIGSERVERS=node0.vespanet
+    networks:
+      - vespanet
+    ports:
+      - "19108:19107"
+      - "20101:19092"
+    command: services
+
+networks:
+  vespanet:
+    driver: bridge
