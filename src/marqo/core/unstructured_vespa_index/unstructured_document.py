@@ -1,13 +1,11 @@
 import json
-from copy import deepcopy
 from typing import List, Dict, Any
-import semver
 
-from pydantic import Field, BaseModel
+from pydantic import Field
+
 from marqo.base_model import MarqoBaseModel
-
 from marqo.core import constants as index_constants
-from marqo.core.exceptions import VespaDocumentParsingError
+from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError
 from marqo.core.unstructured_vespa_index import common as unstructured_common
 
 
@@ -89,7 +87,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
         add_documents"""
 
         if index_constants.MARQO_DOC_ID not in document:
-            raise VespaDocumentParsingError(f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
+            raise MarqoDocumentParsingError(f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
                              f"This should be assigned for a valid document")
 
         doc_id = document[index_constants.MARQO_DOC_ID]
@@ -124,7 +122,7 @@ class UnstructuredVespaDocument(MarqoBaseModel):
                         instance.fields.float_fields[f"{key}.{k}"] = float(v)
                         instance.fields.score_modifiers_fields[f"{key}.{k}"] = v
             else:
-                raise VespaDocumentParsingError(f"In document {doc_id}, field {key} has an "
+                raise MarqoDocumentParsingError(f"In document {doc_id}, field {key} has an "
                                  f"unsupported type {type(value)} which has not been validated in advance.")
 
         instance.fields.vespa_multimodal_params = document.get(unstructured_common.MARQO_DOC_MULTIMODAL_PARAMS, {})
