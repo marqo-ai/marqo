@@ -110,10 +110,13 @@ class MultimodalModel:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
         return self.encoder.preprocessor(modality)
 
-    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, **kwargs):
+    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, normalize=True, **kwargs):
         if self.encoder is None:
             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
-        return self.encoder.encode(content, modality, media_download_headers, **kwargs)
+        return self.encoder.encode(
+            content=content, modality=modality, media_download_headers=media_download_headers,
+            normalize=normalize, **kwargs
+        )
 
 
 class ModelEncoder(ABC):
@@ -255,7 +258,7 @@ class LanguageBindEncoder(ModelEncoder):
 
         return self._preprocessors.get(modality)
 
-    def encode(self, content, modality, normalize=True, media_download_headers: Optional[Dict]=None, **kwargs):
+    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, normalize=True, **kwargs):
         inputs = {}
 
         if modality == Modality.TEXT:
@@ -275,7 +278,7 @@ class LanguageBindEncoder(ModelEncoder):
                 elif isinstance(content, str) and "http" in content:
                     self._download_content(content, temp_filename, media_download_headers)
                 else:
-                    return self.encode([content], modality=Modality.TEXT)
+                    return self.encode([content], normalize=normalize, modality=Modality.TEXT)
 
                 preprocessed_image = self.preprocessor(Modality.IMAGE)([temp_filename], return_tensors='pt')
                 inputs['image'] = to_device(preprocessed_image, self.model.device)['pixel_values']
@@ -292,7 +295,7 @@ class LanguageBindEncoder(ModelEncoder):
                 # If media has already been preprocessed
                 inputs[modality.value] = to_device(content[0], self.model.device)['pixel_values']
             elif isinstance(content[0], str) and 'http' in content[0]:
-                return self.encode(content[0], modality=modality, media_download_headers=media_download_headers)
+                return self.encode(content[0], modality=modality, normalize=normalize, media_download_headers=media_download_headers)
             else:
                 raise ValueError(f"Unsupported {modality.value} content type: {type(content)}, content: {content}")
 
