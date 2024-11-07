@@ -22,7 +22,7 @@ def determine_to_version(run_commit_hash: str, current_marqo_version: str):
     """
     tag = subprocess.check_output(["git", "tag", "--list", f"{current_marqo_version}"],
                                    text=True).splitlines() #Determine if tags exist for current_marqo_version picked from version.py file
-    if tag: #If tag already exists for the current_marqo_version, it means that this version is already released and we possibly have not bumped up the version yet, thus we need to treat this commit as commit of the next version.
+    if tag: #If tag already exists for the current_marqo_version, it means that this version is already released and we are working towards the next version release, thus we need to treat this commit as commit of the next version release.
         try:
             tag_commit_hash = subprocess.check_output( #Determining commit hash of the tag
                 ["git", "rev-list", "-n", "1", tag[0]],
