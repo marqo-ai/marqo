@@ -127,7 +127,7 @@ class GeneralCompatibilityCompatibilityTest(BaseCompatibilityTestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.client = marqo.Client(**cls.client_settings)
-        print(f"Creating indexes {cls.indexes_to_test_on}")
+        cls.logger.debug(f"Creating indexes {cls.indexes_to_test_on}")
         cls.create_indexes(cls.indexes_to_test_on)
         cls.indexes_to_delete = [cls.structured_index_metadata['indexName'],
                                  cls.unstructured_index_metadata['indexName']]
@@ -137,23 +137,25 @@ class GeneralCompatibilityCompatibilityTest(BaseCompatibilityTestCase):
         Prepare the indexes and add documents for the test.
         Also store the search results for later comparison.
         """
-        try:
-            print(f'Feeding documents to {self.indexes_to_test_on}')
-            for index in self.indexes_to_test_on:
-                if index['type'] == 'structured':
-                    self.client.index(index_name=index['indexName']).add_documents(documents=self.docs,
-                                                                                   mappings=self.mappings,
-                                                                                   tensor_fields=self.tensor_fields)
-                else:
-                    self.client.index(index_name=index['indexName']).add_documents(documents=self.docs)
-        except Exception as e:
-            print(f"Exception occurred while adding documents {e}")
+        with self.subTest("Adding documents to structured and unstructured indexes"):
+            try:
+                self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
+                for index in self.indexes_to_test_on:
+                    if index['type'] == 'structured':
+                        self.client.index(index_name=index['indexName']).add_documents(documents=self.docs,
+                                                                                       mappings=self.mappings,
+                                                                                       tensor_fields=self.tensor_fields)
+                    else:
+                        self.client.index(index_name=index['indexName']).add_documents(documents=self.docs)
+            except Exception as e:
+                self.logger.error(f"Exception occurred while adding documents {e}")
 
         unstructured_results = {}
         # Loop through queries, search methods, and result keys to populate unstructured_results
-        for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
-            result = self.client.index(self.unstructured_index_metadata['indexName']).search(q=query, search_method=search_method)
-            unstructured_results[result_key] = result
+        with self.subTest("Storing search results to be compared later"):
+            for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
+                result = self.client.index(self.unstructured_index_metadata['indexName']).search(q=query, search_method=search_method)
+                unstructured_results[result_key] = result
 
         # store the result of search across all structured & unstructured indexes
         self.save_results_to_file(unstructured_results)
@@ -167,8 +169,8 @@ class GeneralCompatibilityCompatibilityTest(BaseCompatibilityTestCase):
             # Run the search again with the same parameters
             current_result = self.client.index(index_name=self.unstructured_index_metadata['indexName']).search(q=query, search_method=search_method)
             # Compare the current result with the stored result
-            self.compare_results(stored_results[result_key], current_result)
+            self._compare_results(stored_results[result_key], current_result)
 
-    def compare_results(self, expected_result, actual_result):
+    def _compare_results(self, expected_result, actual_result):
         """Compare two search results and assert if they match."""
-        assert expected_result == actual_result, f"Results do not match. Expected: {expected_result}, Got: {actual_result}"
+        self.assertEqual(expected_result, actual_result, f"Results do not match. Expected: {expected_result}, Got: {actual_result}")

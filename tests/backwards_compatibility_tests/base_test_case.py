@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -16,6 +17,12 @@ class BaseCompatibilityTestCase(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
+        cls.logger = logging.getLogger(cls.__name__)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        cls.logger.addHandler(handler)
+        cls.logger.setLevel(logging.INFO)
 
     @classmethod
     def get_results_file_path(cls):
