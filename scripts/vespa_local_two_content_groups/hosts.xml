@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright Vespa.ai. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root. -->
+<hosts>
+    <!-- config servers -->
+    <host name="node0.vespanet">
+        <alias>node0</alias>
+    </host>
+    <host name="node1.vespanet">
+        <alias>node1</alias>
+    </host>
+    <host name="node2.vespanet">
+        <alias>node2</alias>
+    </host>
+</hosts>
