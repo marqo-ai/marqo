@@ -1,4 +1,4 @@
-# implements a 'model' that returns a random vector, irrespective of 
+# implements a 'model' that returns a random vector, irrespective of
 # input. does not require a model and is completely random
 # used for testing purposes
 import functools

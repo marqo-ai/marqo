@@ -1,6 +1,5 @@
 import os
 from io import BytesIO
-from platform import architecture
 
 import certifi
 import clip
@@ -13,8 +12,6 @@ import transformers
 import validators
 from PIL import Image, UnidentifiedImageError
 from multilingual_clip import pt_multilingual_clip
-from open_clip.pretrained import _pcfg, _slpcfg, _apcfg
-from open_clip.transform import image_transform_v2, PreprocessCfg, merge_preprocess_dict
 from requests.utils import requote_uri
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 from torchvision.transforms import InterpolationMode
@@ -24,10 +21,10 @@ from marqo.api.exceptions import InternalError
 from marqo.tensor_search.enums import EnvVars
 from marqo.core.inference.models.abstract_clip_model import AbstractCLIPModel
 from marqo.core.inference.models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
+from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
 from marqo.s2_inference.logger import get_logger
-from marqo.s2_inference.processing.custom_clip_utils import HFTokenizer, download_model
 from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation
@@ -73,7 +70,7 @@ def _get_transform(n_px: int, image_mean: List[float] = None, image_std: List[fl
     ])
 
 
-def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], image_download_headers: dict) -> List[
+def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], media_download_headers: dict) -> List[
     ImageType]:
     """takes in a list of strings, arrays or urls and either loads and/or converts to PIL
         for the clip model
@@ -92,18 +89,18 @@ def format_and_load_CLIP_images(images: List[Union[str, ndarray, ImageType]], im
 
     results = []
     for image in images:
-        results.append(format_and_load_CLIP_image(image, image_download_headers))
+        results.append(format_and_load_CLIP_image(image, media_download_headers))
 
     return results
 
 
-def load_image_from_path(image_path: str, image_download_headers: dict, timeout_ms=3000,
+def load_image_from_path(image_path: str, media_download_headers: dict, timeout_ms=3000,
                          metrics_obj: Optional[RequestMetrics] = None) -> ImageType:
     """Loads an image into PIL from a string path that is either local or a url
 
     Args:
         image_path (str): Local or remote path to image.
-        image_download_headers (dict): header for the image download
+        media_download_headers (dict): header for the image download
         timeout_ms (int): timeout (in milliseconds), for the whole request
     Raises:
         ValueError: If the local path is invalid, and is not a url
@@ -118,7 +115,7 @@ def load_image_from_path(image_path: str, image_download_headers: dict, timeout_
         if metrics_obj is not None:
             metrics_obj.start(f"image_download.{image_path}")
         try:
-            img_io: BytesIO = download_image_from_url(image_path, image_download_headers, timeout_ms)
+            img_io: BytesIO = download_image_from_url(image_path, media_download_headers, timeout_ms)
             img = Image.open(img_io)
         except ImageDownloadError as e:
             raise UnidentifiedImageError(str(e)) from e
@@ -151,12 +148,13 @@ def validate_url(url: str) -> bool:
 
 
 
-def download_image_from_url(image_path: str, image_download_headers: dict, timeout_ms: int = 3000, modality: Optional[str] = None) -> BytesIO:
+
+def download_image_from_url(image_path: str, media_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
     """Download an image from a URL and return a PIL image using pycurl.
 
     Args:
         image_path (str): URL to the image.
-        image_download_headers (dict): Headers for the image download.
+        media_download_headers (dict): Headers for the image download.
         timeout_ms (int): Timeout in milliseconds, for the whole request.
 
     Returns:
@@ -183,7 +181,9 @@ def download_image_from_url(image_path: str, image_download_headers: dict, timeo
     c.setopt(pycurl.FOLLOWLOCATION, 1)
 
     headers = DEFAULT_HEADERS.copy()
-    headers.update(image_download_headers)
+    if media_download_headers is None:
+        media_download_headers = dict()
+    headers.update(media_download_headers)
     c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
 
     # callback to check file size for video and audio
@@ -236,7 +236,7 @@ def encode_url(url: str) -> str:
 
 
 def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
-                               image_download_headers: dict) -> Union[ImageType, Tensor]:
+                               media_download_headers: dict) -> Union[ImageType, Tensor]:
     """standardizes the input to be a PIL image
 
     Args:
@@ -253,7 +253,7 @@ def format_and_load_CLIP_image(image: Union[str, ndarray, ImageType, Tensor],
     """
     # check for the input type
     if isinstance(image, str):
-        img = load_image_from_path(image, image_download_headers)
+        img = load_image_from_path(image, media_download_headers)
     elif isinstance(image, np.ndarray):
         img = Image.fromarray(image.astype('uint8'), 'RGB')
     elif isinstance(image, torch.Tensor):
@@ -393,7 +393,7 @@ class CLIP:
                 raise InvalidModelPropertiesError(f"Marqo can not load the custom clip model."
                                                   f"The provided model path `{path}` is neither a local file nor a valid url."
                                                   f"Please check your provided model url and retry"
-                                                  f"Check `https://docs.marqo.ai/0.0.12/Models-Reference/dense_retrieval/` for more info.")
+                                                  f"Check {marqo_docs.bring_your_own_model()} for more info.")
 
             self.jit = self.model_properties.get("jit", False)
             self.model, self.preprocess = self.custom_clip_load()
@@ -439,27 +439,27 @@ class CLIP:
         return self._convert_output(outputs)
 
     def _preprocess_images(self, images: Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor],
-                           image_download_headers: Optional[Dict] = None) -> Tensor:
+                           media_download_headers: Optional[Dict] = None) -> Tensor:
         """Preprocess the input image to be ready for the model.
 
         Args:
             images (Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor]): input image,
             can be a str(url), a PIL image, or a tensor, or a list of them
-            image_download_headers (Optional[Dict]): headers for the image download
+            media_download_headers (Optional[Dict]): headers for the image download
         Return:
             Tensor: the processed image tensor with shape (batch_size, channel, n_px, n_px)
         """
         if self.model is None:
             self.load()
-        if image_download_headers is None:
-            image_download_headers = dict()
+        if media_download_headers is None:
+            media_download_headers = dict()
 
         # default to batch encoding
         if isinstance(images, list):
             image_input: List[Union[ImageType, Tensor]] \
-                = format_and_load_CLIP_images(images, image_download_headers)
+                = format_and_load_CLIP_images(images, media_download_headers)
         else:
-            image_input: List[Union[ImageType, Tensor]] = [format_and_load_CLIP_image(images, image_download_headers)]
+            image_input: List[Union[ImageType, Tensor]] = [format_and_load_CLIP_image(images, media_download_headers)]
 
         image_input_processed: Tensor = torch.stack([self.preprocess(_img).to(self.device) \
                                                          if not isinstance(_img, torch.Tensor) else _img \
@@ -467,18 +467,18 @@ class CLIP:
         return image_input_processed
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor],
-                     normalize=True, image_download_headers: Optional[Dict] = None) -> FloatTensor:
+                     normalize=True, media_download_headers: Optional[Dict] = None) -> FloatTensor:
         """Encode the input image to a tensor representation.
 
         Args:
             images (Union[str, ImageType, List[Union[str, ImageType, Tensor]], Tensor]): input image,
             can be a str(url), a PIL image, or a tensor, or a list of them
             normalize (bool): whether to normalize the output tensor
-            image_download_headers (Optional[Dict]): headers for the image download
+            media_download_headers (Optional[Dict]): headers for the image download
         Return:
             FloatTensor: the encoded image tensor with shape (batch_size, embedding_dim)
         """
-        self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
+        self.image_input_processed: Tensor = self._preprocess_images(images, media_download_headers)
         with torch.no_grad():
             outputs = self.model.encode_image(self.image_input_processed)
 
@@ -506,8 +506,8 @@ class CLIP:
 
         if is_image:
             logger.debug('image')
-            image_download_headers = kwargs.get("image_download_headers", dict())
-            return self.encode_image(inputs, normalize=normalize, image_download_headers=image_download_headers)
+            media_download_headers = kwargs.get("media_download_headers", dict())
+            return self.encode_image(inputs, normalize=normalize, media_download_headers=media_download_headers)
         else:
             logger.debug('text')
             return self.encode_text(inputs, normalize=normalize)
@@ -526,7 +526,7 @@ class FP16_CLIP(CLIP):
                            f"FP16 clip model `{self.model_type}` is only available with device `cuda`.\n"
                            f"With current device `{self.device}`, the model will be loaded in `float32` mode. \n"
                            f"Please check you cuda availability or try the fp32 version `{self.model_type.replace('fp16/', '')}`"
-                           f"Check `https://docs.marqo.ai/0.0.13/Models-Reference/dense_retrieval/#generic-clip-models` for more info.")
+                           f"Check {marqo_docs.generic_models()} for more info.")
 
         self.model_name = self.model_type.replace("fp16/", "")
 
@@ -537,257 +537,6 @@ class FP16_CLIP(CLIP):
         self.model = self.model.to(self.device)
         self.tokenizer = clip.tokenize
         self.model.eval()
-
-
-class OPEN_CLIP(AbstractCLIPModel):
-    def __init__(
-            self,
-            device: Optional[str] = None,
-            model_properties: Optional[Dict] = None,
-            model_auth: Optional[Dict] = None,
-    ) -> None:
-
-        super().__init__(device, model_properties, model_auth)
-
-        # model_auth gets passed through add_docs and search requests:
-        self.preprocess_config = None
-
-    def _build_model_properties(self, model_properties: dict):
-        return OpenCLIPModelProperties(**model_properties)
-
-    def _load_necessary_components(self) -> None:
-        """Load the open_clip model and tokenizer."""
-        if self.model_properties.url is not None or self.model_properties.model_location is not None:
-            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_checkpoint()
-            self.tokenizer = self._load_tokenizer_from_checkpoint()
-        elif self.model_properties.name.startswith(HF_HUB_PREFIX):
-            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_hf_repo()
-            self.tokenizer = self._load_tokenizer_from_hf_repo()
-        elif self.model_properties.name.startswith(MARQO_OPEN_CLIP_REGISTRY_PREFIX):
-            self.model, self.preprocess = self._load_model_and_image_preprocessor_from_open_clip_repo()
-            self.tokenizer = self._load_tokenizer_from_open_clip_repo()
-        else:
-            raise InvalidModelPropertiesError(
-                f"Marqo cannot load the provided open_clip model. "
-                f"Check {marqo_docs.bring_your_own_model()} "
-                f"for more details on the supported methods to open_clip model "
-            )
-        self.model = self.model.to(self.device)
-        self.model.eval()
-
-    def _check_loaded_components(self):
-        """Check if the open_clip model, tokenizer, and image preprocessor are loaded.
-
-        Raises:
-            RuntimeError: If the open_clip model, tokenizer, or image preprocessor is not loaded.
-        """
-        if self.model is None:
-            raise RuntimeError("The open_clip model is not loaded. Please load the model before inference.")
-        if self.tokenizer is None:
-            raise RuntimeError("The open_clip tokenizer is not loaded. Please load the tokenizer before inference.")
-        if self.preprocess is None:
-            raise RuntimeError("The open_clip image preprocessor is not loaded. "
-                               "Please load the image preprocessor before inference.")
-
-    def _load_image_preprocessor(self) -> Callable:
-        return image_transform_v2(self.preprocess_config)
-
-    def _aggregate_image_preprocessor_config(self) -> PreprocessCfg:
-        """Aggregate the image preprocessor configuration for the open_clip model."""
-
-        if self.model_properties.image_preprocessor in [ImagePreprocessor.OpenCLIP, ImagePreprocessor.OpenAI]:
-            base_image_preprocess_config = _pcfg()
-        elif self.model_properties.image_preprocessor in [ImagePreprocessor.SigLIP]:
-            base_image_preprocess_config = _slpcfg()
-        elif self.model_properties.image_preprocessor in [ImagePreprocessor.CLIPA]:
-            base_image_preprocess_config = _apcfg()
-        else:
-            raise ValueError(f"Invalid image preprocessor {self.model_properties.image_preprocessor}")
-
-        aggregated_image_preprocess_config = PreprocessCfg(
-            **merge_preprocess_dict(
-                base_image_preprocess_config, self.model_properties.dict(exclude_none=True)
-            )
-        )
-
-        return aggregated_image_preprocess_config
-
-    def _load_model_and_image_preprocessor_from_checkpoint(self) -> Tuple[torch.nn.Module, Compose]:
-        """Load the model and image preprocessor from a checkpoint file.
-
-        The checkpoint file can be provided through a URL or a model_location object.
-        """
-        # Load the image preprocessor
-        if self.model_properties.url and self.model_properties.model_location:
-            raise InvalidModelPropertiesError(
-                "Only one of url, model_location can be specified in 'model_properties' "
-            )
-        elif self.model_properties.model_location:
-            self.model_path = self._download_from_repo()
-        elif self.model_properties.url:
-            self.model_path = download_model(url=self.model_properties.url)
-        else:
-            raise ValueError("The 'url' or 'model_location' is required in 'model_properties' "
-                             "when loading a custom open_clip model through a URL or a model_location object")
-
-        logger.info(f"The name of the custom clip model is {self.model_properties.name}. We use open_clip loader")
-
-        try:
-            self.preprocess_config = self._aggregate_image_preprocessor_config()
-            preprocess = image_transform_v2(self.preprocess_config, is_train=False)
-            model = open_clip.create_model(
-                model_name=self.model_properties.name,
-                jit=self.model_properties.jit,
-                pretrained=self.model_path,
-                precision=self.model_properties.precision,
-                device=self.device,
-                cache_dir=ModelCache.clip_cache_path
-            )
-            return model, preprocess
-        except Exception as e:
-            if (isinstance(e, RuntimeError) and "The file might be corrupted" in str(e)):
-                try:
-                    os.remove(self.model_path)
-                except Exception as remove_e:
-                    raise RuntimeError(
-                        f"Marqo encountered an error while attempting to delete a corrupted file '{self.model_path}'. "
-                        f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance "
-                        f"with a new one. \n "
-                        f"Error message: `{str(remove_e)}`"
-                    )
-                raise InvalidModelPropertiesError(
-                    f"Marqo encountered a corrupted file when loading open_clip file '{self.model_path}'. "
-                    f"Marqo has removed this file from the disk. "
-                    f"Some possible causes are: "
-                    f"1. the file was not a valid open_clip checkpoint, "
-                    f"2. the file was corrupted during download or incompletely downloaded, "
-                    f"3. you may have tried to load a clip model even though model_properties['type'] is set to 'open_clip' "
-                    f"Please check and update your model properties and retry. "
-                    f"You can find more details at {marqo_docs.bring_your_own_model()}")
-            # It is tricky to cacth the error when loading clip model using type = open_clip. Different pytorch version will raise different error.
-            elif isinstance(e, (AttributeError, RuntimeError)) or (
-                    "This could be because the operator doesn't exist for this backend" in str(e)):
-                raise InvalidModelPropertiesError(
-                    f"Marqo encountered an error when loading custom open_clip model '{self.model_properties.name}' with "
-                    f"model properties = '{self.model_properties.dict()}'. "
-                    f"The error message is {str(e)}. "
-                    f"You may have tried to load a clip model even though model_properties['type'] is set to 'open_clip' "
-                    f"Please check and update your model properties and retry. "
-                    f"You can find more details at {marqo_docs.bring_your_own_model()}"
-                )
-            else:
-                raise RuntimeError(
-                    f"Marqo encountered an error when loading custom open_clip model {self.model_properties.name} with "
-                    f"model properties = {self.model_properties.dict()}. "
-                    f"The error message is {str(e)}. "
-                    f"Please check and update your model properties and retry. "
-                    f"You can find more details at {marqo_docs.bring_your_own_model()}"
-                )
-
-    def _load_model_and_image_preprocessor_from_hf_repo(self) -> Tuple[torch.nn.Module, Compose]:
-        """Load the model and image preprocessor from a hf_repo.
-
-        The hf_repo should be provided in the model properties, and it is a string starting with `hf-hub:`.
-        """
-        model, _, preprocess = open_clip.create_model_and_transforms(
-            model_name=self.model_properties.name,
-            device=self.device,
-            cache_dir=ModelCache.clip_cache_path,
-        )
-        return model, preprocess
-
-    def _load_model_and_image_preprocessor_from_open_clip_repo(self) -> Tuple[torch.nn.Module, Compose]:
-        """Load the model and image preprocessor from the marqo model registry.
-
-        The model name should be provided in the model properties, and it is a string starting with `open_clip/`.
-        """
-        architecture = self.model_properties.name.split("/", 3)[1]
-        pretrained = self.model_properties.name.split("/", 3)[2]
-
-        model, _, preprocess = open_clip.create_model_and_transforms(
-            model_name=architecture,
-            pretrained=pretrained,
-            device=self.device,
-            cache_dir=ModelCache.clip_cache_path
-        )
-        return model, preprocess
-
-    def _load_tokenizer_from_checkpoint(self) -> Callable:
-        if not self.model_properties.tokenizer:
-            return open_clip.get_tokenizer(self.model_properties.name)
-        else:
-            logger.info(f"Custom HFTokenizer is provided. Loading...")
-            return HFTokenizer(self.model_properties.tokenizer)
-
-    def _load_tokenizer_from_hf_repo(self) -> Callable:
-        return open_clip.get_tokenizer(self.model_properties.name)
-
-    def _load_tokenizer_from_open_clip_repo(self) -> Callable:
-        return open_clip.get_tokenizer(self.model_properties.name.split("/", 3)[1])
-
-    def _download_from_repo(self):
-        """Downloads model from an external repo like s3 and returns the filepath
-
-        Returns:
-            The model's filepath
-
-        Raises:
-            RunTimeError if an empty filepath is detected. This is important
-                because OpenCLIP will instantiate a model with random weights, if
-                a filepath isn't specified, and the model isn't a publicly
-                available HF or OpenAI one.
-        """
-        model_location: ModelLocation = self.model_properties.model_location
-        download_model_params = {"repo_location": model_location}
-
-        if model_location.auth_required:
-            download_model_params['auth'] = self.model_properties.model_auth
-
-        model_file_path = download_model(**download_model_params)
-        if model_file_path is None or model_file_path == '':
-            raise RuntimeError(
-                'download_model() needs to return a valid filepath to the model! Instead, received '
-                f' filepath `{model_file_path}`')
-        return model_file_path
-
-    def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                     image_download_headers: Optional[Dict] = None,
-                     normalize=True) -> FloatTensor:
-
-        self.image_input_processed: Tensor = self._preprocess_images(images, image_download_headers)
-
-        with torch.no_grad():
-            if self.device.startswith("cuda"):
-                with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
-            else:
-                outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
-
-        if normalize:
-            _shape_before = outputs.shape
-            outputs /= self.normalize(outputs)
-            assert outputs.shape == _shape_before
-        return self._convert_output(outputs)
-
-    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
-        if self.model is None:
-            self.load()
-
-        text = self.tokenizer(sentence).to(self.device)
-
-        with torch.no_grad():
-            if self.device.startswith("cuda"):
-                with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_text(text).to(torch.float32)
-            else:
-                outputs = self.model.encode_text(text).to(torch.float32)
-
-        if normalize:
-            _shape_before = outputs.shape
-            outputs /= self.normalize(outputs)
-            assert outputs.shape == _shape_before
-
-        return self._convert_output(outputs)
 
 
 class MULTILINGUAL_CLIP(CLIP):
@@ -843,16 +592,16 @@ class MULTILINGUAL_CLIP(CLIP):
         return self._convert_output(outputs)
 
     def encode_image(self, images: Union[str, ImageType, List[Union[str, ImageType]]],
-                     normalize=True, image_download_headers: Optional[dict] = None) -> FloatTensor:
+                     normalize=True, media_download_headers: Optional[dict] = None) -> FloatTensor:
 
         if self.visual_model is None:
             self.load()
-        if image_download_headers is None:
-            image_download_headers = dict()
+        if media_download_headers is None:
+            media_download_headers = dict()
 
         # default to batch encoding
         if isinstance(images, list):
-            image_input = format_and_load_CLIP_images(images, image_download_headers)
+            image_input = format_and_load_CLIP_images(images, media_download_headers)
         else:
             image_input = [format_and_load_CLIP_image(images, {})]
 
