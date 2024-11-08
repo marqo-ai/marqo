@@ -240,7 +240,8 @@ class TestVectoriseBatching(unittest.TestCase):
         result = s2_inference.vectorise(model_name='mock_model', content=single_content,
                                         model_properties=self.mock_model_props, device="cpu")
 
-        self.mock_model.encode.assert_called_once_with(single_content, normalize=True, modality=Modality.TEXT)
+        self.mock_model.encode.assert_called_once_with(single_content, normalize=True, modality=Modality.TEXT,
+                                                       media_download_headers=None)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 

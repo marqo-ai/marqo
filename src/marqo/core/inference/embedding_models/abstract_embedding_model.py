@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from marqo.tensor_search.models.private_models import ModelAuth
+
 
 class AbstractEmbeddingModel(ABC):
     """This is the abstract base class for all models in Marqo."""
 
     def __init__(self, model_properties: Optional[dict] = None, device: Optional[str] = None,
-                 model_auth: Optional[dict] = None):
+                 model_auth: Optional[ModelAuth] = None):
         """Load the model with the given properties.
 
         Args:
@@ -20,7 +22,6 @@ class AbstractEmbeddingModel(ABC):
         if model_properties is None:
             model_properties = dict()
 
-        self.model_properties = self._build_model_properties(model_properties)
         self.device = device
         self.model_auth = model_auth
 
@@ -32,11 +33,6 @@ class AbstractEmbeddingModel(ABC):
         """
         self._load_necessary_components()
         self._check_loaded_components()
-
-    @abstractmethod
-    def _build_model_properties(self, model_properties: dict):
-        """Parse the model properties from the user input and convert it to a pydantic model."""
-        pass
 
     @abstractmethod
     def _load_necessary_components(self):
@@ -54,4 +50,5 @@ class AbstractEmbeddingModel(ABC):
 
     @abstractmethod
     def encode(self):
+        """Encode the input data."""
         pass

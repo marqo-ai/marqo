@@ -2,6 +2,7 @@ from typing import Dict, Any, Optional
 
 import marqo.core.constants as index_constants
 import marqo.core.search.search_filter as search_filter
+from marqo import marqo_docs
 from marqo.api import exceptions as errors
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_query import (MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery)
@@ -40,10 +41,10 @@ class UnstructuredVespaIndex(VespaIndex):
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         if marqo_query.searchable_attributes is not None:
-            # TODO Add a marqo doc link here on how to create a structured index
-            raise errors.InvalidArgError('searchable_attributes is not supported for an unstructured index. '
-                                         'You can create a structured index '
-                                         'by `mq.create_index("your_index_name", type="structured")`')
+            raise errors.InvalidArgError('Searchable attributes are not supported for unstructured indexes created '
+                                         'with Marqo versions prior to 2.13.0. To take advantage of this feature, '
+                                         'please create a new Marqo index. For more information, refer to the Create '
+                                         f'Index API reference: {marqo_docs.create_index()}.')
 
         if isinstance(marqo_query, MarqoHybridQuery):       # TODO: Rethink structure so order of checking doesn't matter
             return self._to_vespa_hybrid_query(marqo_query)
@@ -298,7 +299,7 @@ class UnstructuredVespaIndex(VespaIndex):
         return query
 
     def _to_vespa_hybrid_query(self, marqo_query: MarqoHybridQuery) -> Dict[str, Any]:
-        # TODO: Add "fields to search" when searchable attributes get implemented
+        # This is for legacy unstructured index only. Searchable attributes is not supported
         # Tensor term
         tensor_term = self._get_tensor_search_term(marqo_query)
         # Lexical term
@@ -320,7 +321,7 @@ class UnstructuredVespaIndex(VespaIndex):
         else:
             filter_term = ''
 
-        select_attributes = "*"     # TODO: Fix when searchable attributes are implemented
+        select_attributes = "*"
 
         summary = unstructured_common.SUMMARY_ALL_VECTOR if marqo_query.expose_facets \
             else unstructured_common.SUMMARY_ALL_NON_VECTOR
@@ -331,17 +332,6 @@ class UnstructuredVespaIndex(VespaIndex):
             unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {},
             unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {}
         }
-
-        # TODO: add this back when searchable attributes are implemented
-        # Separate fields to rank (lexical and tensor)
-        #query_inputs.update({
-        #    unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_LEXICAL: {
-        #        f: 1 for f in fields_to_search_lexical
-        #    },
-        #    unstructured_common.QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR: {
-        #        f: 1 for f in fields_to_search_tensor
-        #    }
-        #})
 
         # Extract score modifiers
         hybrid_score_modifiers = self._get_hybrid_score_modifiers(marqo_query)
