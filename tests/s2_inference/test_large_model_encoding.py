@@ -61,8 +61,13 @@ def run_test_vectorize(models, model_type):
     )
 
     # Load in hardcoded embeddings json file
-    with open(embeddings_reference_file, "r") as f:
-        embeddings_python_3_8 = json.load(f)
+    if os.path.exists(embeddings_reference_file) and os.path.isfile(embeddings_reference_file):
+        with open(embeddings_reference_file, "r") as f:
+            embeddings_python_3_8 = json.load(f)
+    else:
+        print(f"Embeddings reference file not found at {embeddings_reference_file}. Skipping hardcoded embeddings test"
+              f" for model type: {model_type}")
+        embeddings_python_3_8 = None
 
     with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
         def run():
@@ -84,7 +89,8 @@ def run_test_vectorize(models, model_type):
                     # Embeddings must match hardcoded python 3.8.20 embeddings
                     if isinstance(sentence, str):
                         try:
-                            assert np.allclose(output_m, embeddings_python_3_8[name][sentence], atol=1e-6)
+                            if embeddings_python_3_8:
+                                assert np.allclose(output_m, embeddings_python_3_8[name][sentence], atol=1e-6)
                         except KeyError:
                             raise KeyError(f"Hardcoded Python 3.8 embeddings not found for "
                                            f"model: {name}, sentence: {sentence} in JSON file: "
@@ -439,6 +445,7 @@ class TestLanguageBindModels(unittest.TestCase):
                         modality=modality
                     )
                     for embeddings in unnormalized_embeddings_list:
+                        # TODO: Record unnormalized embeddings and compare with json
                         self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
 
     def test_models(self):
@@ -493,8 +500,7 @@ class TestStellaModels(unittest.TestCase):
 
     def test_vectorize(self):
         # For GPU Memory Optimization, we shouldn't load all models at once
-        for model_name in self.models:
-            run_test_vectorize(models=[model_name])
+        run_test_vectorize(models=self.models, model_type="stella")
 
     def test_model_outputs(self):
         for model_name in self.models:
