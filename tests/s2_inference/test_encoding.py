@@ -57,7 +57,7 @@ class TestEncoding(unittest.TestCase):
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
         eps = 1e-9
-        embeddings_file_name = get_absolute_file_path("embeddings_reference/embeddings_python_3_8.json")
+        embeddings_file_name = get_absolute_file_path("embeddings_reference/embeddings_all_models_python_3_8.json")
 
         # Load in hardcoded embeddings json file
         with open(embeddings_file_name, "r") as f:
