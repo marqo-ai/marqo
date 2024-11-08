@@ -53,7 +53,6 @@ def run_test_vectorize(models, model_type):
     # Ensure that vectorised output from vectorise function matches both the model.encode output and
     # hardcoded embeddings from Python 3.8
     
-
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
     device = "cuda"
     eps = 1e-9
