@@ -108,56 +108,6 @@ def run_test_vectorize(models, model_type):
 
         assert run()
 
-def run_test_vectorize_record_embeddings(models, model_type):
-    """
-    model_type determines the filename with which the embeddings are saved/loaded
-    """
-    sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
-    device = "cuda"
-    eps = 1e-9
-    with patch.dict(os.environ, {"MARQO_MAX_CUDA_MODEL_MEMORY": "10"}):
-        def run():
-
-            # Create embeddings dict
-            embeddings_large_model_python_3_8 = dict()
-
-            for name in models:
-                # Create embeddings sub-dict
-                embeddings_large_model_python_3_8[name] = dict()
-                model_properties = get_model_properties_from_registry(name)
-                model = _load_model(model_properties['name'], model_properties=model_properties, device=device, )
-
-                for sentence in sentences:
-                    output_v = vectorise(name, sentence, model_properties, device, normalize_embeddings=True)
-
-                    assert _check_output_type(output_v)
-
-                    output_m = model.encode(sentence, normalize=True)
-
-                    # Converting output_m to numpy if it is cuda.
-                    if type(output_m) == torch.Tensor:
-                        output_m = output_m.cpu().numpy()
-
-                    # Embeddings must match hardcoded python 3.8 embeddings
-                    if isinstance(sentence, str):
-                        embeddings_large_model_python_3_8[name][sentence] = output_v
-
-                    assert abs(torch.FloatTensor(output_m) - torch.FloatTensor(output_v)).sum() < eps
-
-                clear_loaded_models()
-                torch.cuda.empty_cache()
-                # delete the model to free up memory,
-                # it is hacked loading from _load_model, so we need to delete it manually
-                del model
-
-            # Write everything to JSON
-            with open(f"embeddings_reference/embeddings_{model_type}_python_3_8.json", "w") as f:
-                json.dump(embeddings_large_model_python_3_8, f)
-
-            return True
-
-        assert run()
-
 
 def run_test_model_outputs(models):
     sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -551,10 +501,6 @@ class TestStellaModels(unittest.TestCase):
     def test_vectorize(self):
         # For GPU Memory Optimization, we shouldn't load all models at once
         run_test_vectorize(models=self.models, model_type="stella")
-
-    def test_vectorize_record_embeddings(self):
-        # Just used to generate the embeddings json file
-        run_test_vectorize_record_embeddings(models=self.models, model_type="stella")
 
     def test_model_outputs(self):
         for model_name in self.models:
