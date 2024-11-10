@@ -19,8 +19,8 @@ from torchvision.transforms import InterpolationMode
 from marqo import marqo_docs
 from marqo.api.exceptions import InternalError
 from marqo.tensor_search.enums import EnvVars
-from marqo.core.inference.models.abstract_clip_model import AbstractCLIPModel
-from marqo.core.inference.models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
+from marqo.core.inference.embedding_models.abstract_clip_model import AbstractCLIPModel
+from marqo.core.inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
 from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
@@ -149,7 +149,7 @@ def validate_url(url: str) -> bool:
 
 
 
-def download_image_from_url(image_path: str, media_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
+def download_image_from_url(image_path: str, media_download_headers: dict, timeout_ms: int = 3000, modality: Optional[str] = None) -> BytesIO:
     """Download an image from a URL and return a PIL image using pycurl.
 
     Args:

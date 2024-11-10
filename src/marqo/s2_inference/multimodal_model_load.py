@@ -276,7 +276,7 @@ class LanguageBindEncoder(ModelEncoder):
                     with open(temp_filename, 'wb') as f:
                         f.write(content)
                 elif isinstance(content, str) and "http" in content:
-                    self._download_content(content, temp_filename, media_download_headers)
+                    self._download_content(content, temp_filename, media_download_headers, modality)
                 else:
                     return self.encode([content], normalize=normalize, modality=Modality.TEXT)
 
@@ -287,7 +287,7 @@ class LanguageBindEncoder(ModelEncoder):
             if isinstance(content, str) and "http" in content:
                 suffix = ".mp4" if modality == Modality.VIDEO else ".wav"
                 with self._temp_file(suffix) as temp_filename:
-                    self._download_content(content, temp_filename, media_download_headers)
+                    self._download_content(content, temp_filename, media_download_headers, modality)
                     preprocessed_content = self.preprocessor(modality)([temp_filename], return_tensors='pt')
                     inputs[modality.value] = to_device(preprocessed_content, self.model.device)['pixel_values']
 
@@ -310,7 +310,7 @@ class LanguageBindEncoder(ModelEncoder):
         return embeddings.cpu().numpy()
 
 
-    def _download_content(self, url, filename, media_download_headers: Optional[Dict]=None):
+    def _download_content(self, url, filename, media_download_headers: Optional[Dict]=None, modality: Optional[str]=None):
         # 3 seconds for images, 20 seconds for audio and video
         timeout_ms = 3000 if filename.endswith(('.png', '.jpg', '.jpeg')) else 20000
 
