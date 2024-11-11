@@ -2,7 +2,35 @@ name: Build and Push Marqo Docker Image
 
 on:
   workflow_call:
-  workflow_dispatch:
+    inputs:
+      marqo_ref:
+        description: 'Marqo branch-name, commit SHA or tag'
+        required: false
+        type: string
+        default: 'mainline'
+      push_to:
+        description: 'image destination. Options: "ECR", "DockerHub"'
+        required: true
+        type: string
+        default: 'ECR'
+      image_repo:
+        description: 'Image repository'
+        required: true
+        type: string
+        default: 'marqo'
+      image_tag:
+        description: 'Image tag'
+        required: true
+        type: string
+      dockerhub_username:
+        description: 'DockerHub username'
+        required: false
+        type: string
+      dockerhub_password:
+        description: 'DockerHub password'
+        required: false
+        type: string
+  workflow_dispatch: #for manual triggers
     inputs:
       marqo_ref:
         description: 'Marqo branch-name, commit SHA or tag'

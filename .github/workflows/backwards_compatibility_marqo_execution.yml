@@ -3,6 +3,27 @@ name: Marqo Compatibility Tests Execution
 
 on:
   workflow_call:
+    inputs:
+        from_version:
+            description: 'Source Marqo version'
+            required: true
+            type: string
+        to_version:
+            description: 'Target Marqo version'
+            required: true
+            type: string
+        to_version_tag:
+            description: 'Target Marqo version tag'
+            required: true
+            type: string
+        from_image:
+            description: 'Source Marqo image (optional)'
+            required: false
+            type: string
+        to_image:
+            description: 'Target Marqo image (optional)'
+            required: false
+            type: string
   workflow_dispatch:
     inputs:
       from_version:
