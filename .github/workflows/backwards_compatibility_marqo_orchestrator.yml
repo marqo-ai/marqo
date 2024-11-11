@@ -85,7 +85,6 @@ jobs:
         run: |
           pip install semver
 
-
       # Step to determine the target version
       - name: Determine to_version
         if: $${{ github.event_name != 'workflow_dispatch' && !github.event.inputs.to_version }} # If this condition is met it signifies
@@ -108,17 +107,19 @@ jobs:
         run: | 
           echo "Versions to test: ${{ steps.versions.outputs.list }} against to_version: ${{ steps.get-version.outputs.to_version }}"
 
-      # Step to trigger execution workflows for each version combination
+  # Job to trigger execution workflows for each version combination
   run-execution-workflow:
-    name: Backwards Compatibility Tests
+    name: Run all execution workflows
     runs-on: ubuntu-latest
     needs: orchestrate
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
-    uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
-    with:
-      from_version: ${{ matrix.from_version }}
-      to_version: ${{ needs.orchestrate.outputs.to_version }}
-      to_version_tag: ${{ github.sha }}
-      to_image: ${{ github.event.inputs.to_image || '' }}
+    steps:
+        - name: Run individual execution workflows with from_version ${{ matrix.from_version }}
+          uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
+          with:
+            from_version: ${{ matrix.from_version }}
+            to_version: ${{ needs.orchestrate.outputs.to_version }}
+            to_version_tag: ${{ github.sha }}
+            to_image: ${{ github.event.inputs.to_image || '' }}
