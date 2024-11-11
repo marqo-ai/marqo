@@ -1,7 +1,8 @@
 # Execution workflow
-name: Marqo Test Compatibility Execution
+name: Marqo Compatibility Tests Execution
 
 on:
+  workflow_call:
   workflow_dispatch:
     inputs:
       from_version:
