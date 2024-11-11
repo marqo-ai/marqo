@@ -64,7 +64,7 @@ jobs:
     # Job to orchestrate backwards compatibility test execution
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
-    needs: invoke-build-push-img-github-workflow
+    needs: build-and-push-image
 
     environment: marqo-test-suite
     steps:
