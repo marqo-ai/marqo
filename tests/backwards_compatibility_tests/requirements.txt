@@ -1,0 +1,6 @@
+pytest
+pillow
+numpy
+marqo
+semver
+uvicorn[STANDARD]

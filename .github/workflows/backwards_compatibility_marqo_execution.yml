@@ -12,8 +12,8 @@ on:
             description: 'Target Marqo version'
             required: true
             type: string
-        to_version_tag:
-            description: 'Target Marqo version tag'
+        to_version_digest:
+            description: 'Target Marqo version digest'
             required: true
             type: string
         from_image:
@@ -32,8 +32,8 @@ on:
       to_version:
         description: 'Target Marqo version'
         required: true
-      to_version_tag:
-        description: 'Target Marqo version tag'
+      to_version_digest:
+        description: 'Target Marqo version digest'
         required: true
       from_image:
         description: 'Source Marqo image (optional)'
@@ -86,7 +86,7 @@ jobs:
       - name: checkout marqo repo
         uses: actions/checkout@v3
         with:
-          repository: marqo-ai/marqo
+          repository: ${{ github.repository }} #Check out the repository that contains this action since the tests exist in the same repository
           fetch-depth: 0
 
       # Step to set up Python 3.9
@@ -101,6 +101,9 @@ jobs:
         run: |
           python -m pip install pip-tools
 
+      - name: Debug
+        run: |
+          pwd && ls -laR && echo $GITHUB_WORKSPACE
       # Step to install dependencies from requirements.txt
       - name: Install Dependencies
         run: |
@@ -121,17 +124,23 @@ jobs:
 
       # Step to run the backwards compatibility test
       - name: Run backwards_compatibility test
+        env:
+          FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
+          TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}
+          TO_VERSION_DIGEST: ${{ inputs.to_version_digest || github.event.inputs.to_version_digest }}
+          FROM_IMAGE: ${{ inputs.from_image || github.event.inputs.from_image }}
+          TO_IMAGE: ${{ inputs.to_image || github.event.inputs.to_image }}
         run: |
           cmd="python tests/backwards_compatibility_tests/compatibility_test_runner.py \
             --mode=backwards_compatibility \
-            --from_version ${{ github.event.inputs.from_version }} \
-            --to_version ${{ github.event.inputs.to_version }} \
-            --to_version_tag ${{ github.event.inputs.to_version_tag }}"
-          if [ -n "${{ github.event.inputs.from_image }}" ]; then
-            cmd="$cmd --from_image ${{ github.event.inputs.from_image }}"
+            --from_version $FROM_VERSION \
+            --to_version $TO_VERSION \
+            --to_version_digest $TO_VERSION_DIGEST"
+          if [ -n "$FROM_IMAGE" ]; then
+            cmd="$cmd --from_image $FROM_IMAGE"
           fi
-          if [ -n "${{ github.event.inputs.to_image }}" ]; then
-            cmd="$cmd --to_image ${{ github.event.inputs.to_image }}"
+          if [ -n "$TO_IMAGE" ]; then
+            cmd="$cmd --to_image $TO_IMAGE"
           fi
           eval $cmd
 

@@ -100,11 +100,21 @@ jobs:
     environment: marqo-build-environment
 
     steps:
+      - name: Set input variables
+        id: set-inputs
+        run: |
+          echo "MARQO_REF=${{ inputs.marqo_ref || github.event.inputs.marqo_ref }}" >> $GITHUB_ENV
+          echo "PUSH_TO=${{ inputs.push_to || github.event.inputs.push_to }}" >> $GITHUB_ENV
+          echo "IMAGE_REPO=${{ inputs.image_repo || github.event.inputs.image_repo }}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${{ inputs.image_tag || github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          echo "DOCKERHUB_USERNAME=${{ inputs.dockerhub_username || github.event.inputs.dockerhub_username }}" >> $GITHUB_ENV
+          echo "DOCKERHUB_PASSWORD=${{ inputs.dockerhub_password || github.event.inputs.dockerhub_password }}" >> $GITHUB_ENV
+
       - name: Checkout Marqo
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo
-          ref: ${{ github.event.inputs.marqo_ref }}
+          ref: ${{ env.MARQO_REF }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -114,14 +124,14 @@ jobs:
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
-        if: github.event.inputs.push_to == 'DockerHub'
+        if: env.PUSH_TO == 'DockerHub'
         with:
-          username: ${{ github.event.inputs.dockerhub_username }}
-          password: ${{ github.event.inputs.dockerhub_password }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_PASSWORD }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
-        if: github.event.inputs.push_to == 'ECR'
+        if: env.PUSH_TO == 'ECR'
         with:
           aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
@@ -129,17 +139,17 @@ jobs:
 
       - name: Login to ECR
         uses: docker/login-action@v2
-        if: github.event.inputs.push_to == 'ECR'
+        if: env.PUSH_TO == 'ECR'
         with:
-          registry: 424082663841.dkr.ecr.us-east-1.amazonaws.com/${{ github.event.inputs.image_repo }}
+          registry: 424082663841.dkr.ecr.us-east-1.amazonaws.com/${{ env.IMAGE_REPO }}
 
       - name: Set registry and image repo
         id: prepare
         run: |
-          if [[ "${{ github.event.inputs.push_to }}" == "ECR" ]]; then
-            echo "::set-output name=registry::424082663841.dkr.ecr.us-east-1.amazonaws.com"
+          if [[ "${{ env.PUSH_TO }}" == "ECR" ]]; then
+            echo "registry=424082663841.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=registry::marqoai"
+            echo "registry=marqoai" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push
@@ -148,7 +158,7 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.prepare.outputs.registry }}/${{ github.event.inputs.image_repo }}:${{ github.event.inputs.image_tag }}
+          tags: ${{ steps.prepare.outputs.registry }}/${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
