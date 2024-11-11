@@ -9,7 +9,6 @@ import magic
 import io
 
 from pydantic import BaseModel
-from enum import Enum
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union, Optional
 from PIL.Image import Image
@@ -31,13 +30,7 @@ from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBin
 from marqo.s2_inference.languagebind.video.tokenization_video import LanguageBindVideoTokenizer
 from marqo.s2_inference.languagebind.audio.tokenization_audio import LanguageBindAudioTokenizer
 from marqo.s2_inference.configs import ModelCache
-
-
-class Modality(str, Enum):
-    TEXT = "language"
-    IMAGE = "image"
-    VIDEO = "video"
-    AUDIO = "audio"
+from marqo.s2_inference.types import Modality
 
 
 class MultimodalModelProperties(BaseModel):

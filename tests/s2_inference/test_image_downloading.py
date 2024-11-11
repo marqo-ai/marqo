@@ -94,7 +94,7 @@ class TestImageDownloading(TestCase):
             self.assertEqual(result.getvalue(), image_content)
     
     @patch('marqo.s2_inference.clip_utils.pycurl.Curl')
-    @patch('marqo.s2_inference.clip_utils.EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE', 5_000_000)  # 5MB limit
+    @patch.dict('os.environ', {'MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE': '5000000'})  # 5MB limit
     def test_video_audio_file_size_check_over_limit(self, mock_curl):
         # Setup
         test_url = "http://ipv4.download.thinkbroadband.com:8080/5GB.zip"
@@ -132,7 +132,7 @@ class TestImageDownloading(TestCase):
         mock_curl_instance.setopt.assert_any_call(pycurl.XFERINFOFUNCTION, ANY)
 
     @patch('marqo.s2_inference.clip_utils.pycurl.Curl')
-    @patch('marqo.s2_inference.clip_utils.EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE', 5_000_000)  # 5MB limit
+    @patch.dict('os.environ', {'MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE': '5000000'}) # 5MB limit
     def test_video_audio_file_size_check_under_limit(self, mock_curl):
         # Setup
         test_url = "http://example.com/small_video.mp4"
