@@ -1,6 +1,7 @@
 name: Build and Push Marqo Docker Image
 
 on:
+  workflow_call:
   workflow_dispatch:
     inputs:
       marqo_ref:

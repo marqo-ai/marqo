@@ -49,63 +49,21 @@ jobs:
           fi
 
       # Step to build and push marqo image to ECR, only executes if the image does not exist signified by image_exists == false.
-      - name: Build and push marqo image to ECR
+      - name: Build and Push Image
+        id: build-and-push-image
         if: steps.check-image.outputs.image_exists == 'false'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Build and push image to ECR
-          echo "Building and pushing marqo image to ECR"
-          workflow_data="{\"ref\": \"mainline\",\"inputs\": {\"marqo_ref\": \"${{ github.sha }}\", \"push_to\": \"ECR\",\"image_repo\": \"marqo-compatibility-tests\",\"image_tag\":\"${{ github.sha }}\"}}"
-          echo "printing the workflow_data" + $workflow_data
-          curl -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/adityabharadwaj198/marqo/actions/workflows/build_push_img.yml/dispatches \
-            -d "$workflow_data"
-
-  poll-for-image-existence:
-    # Responsible for polling the ECR registry for the image to be available
-    # More in /marqo/.github/workflows/build_push_img.yml
-    name: Poll for image existence
-    runs-on: ubuntu-latest
-    environment: marqo-test-suite
-    needs: invoke-build-push-img-github-workflow
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: ./.github/workflows/build_push_img.yml
         with:
-          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      # Step to poll for image existence, polls the ECR registry (marqo-compatibility-tests) for the image to be available.
-      # It retries 20 times with a sleep interval of 60 seconds. The step exits with a status code of 0 if the image is found, else exits with a status code of 1.
-      # In the context of a github action if a step exits with a status code of 1, the entire workflow is marked as failed.
-      - name: Poll for image existence
-        run: |
-          echo "Polling for image existence"
-          MAX_RETRIES=20  # Adjust retries as needed
-          SLEEP_TIME=60   # Adjust polling interval as needed
-          for ((i=1; i<=MAX_RETRIES; i++)); do
-            if aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }}; then
-              echo "Image found in ECR"
-              exit 0
-            else
-              echo "Image not found in ECR, retrying in $SLEEP_TIME seconds..."
-              sleep $SLEEP_TIME
-            fi
-          done
-          echo "Image not found after $MAX_RETRIES attempts. Exiting."
-          exit 1
+          marqo_ref: "${{ github.sha }}"
+          push_to: "ECR"
+          image_repo: "marqo-compatibility-tests"
+          image_tag: "${{ github.sha }}"
 
   orchestrate:
     # Job to orchestrate backwards compatibility test execution
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
-    needs: poll-for-image-existence
+    needs: invoke-build-push-img-github-workflow
 
     environment: marqo-test-suite
     steps:
@@ -143,7 +101,7 @@ jobs:
         run: |
           # Run the Python script and capture its output
           VERSION_LIST=$(python tests/backwards_compatibility_tests/scripts/generate_versions.py ${{ steps.get-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
-          echo "::set-output name=list::$VERSION_LIST" # setting the output variable
+          echo "::set-output name=list::$VERSION_LIST" 
 
       # Step to display the versions to test
       - name: display versions
@@ -151,24 +109,16 @@ jobs:
           echo "Versions to test: ${{ steps.versions.outputs.list }} against to_version: ${{ steps.get-version.outputs.to_version }}"
 
       # Step to trigger execution workflows for each version combination
-      - name: Trigger execution workflows #this code block is then actually responsible for running the backwards_compatibility_marqo_execution.yml file with from_version / to_version combinations
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          for from_version in ${{ steps.versions.outputs.list }}
-          do
-            workflow_data="{\"ref\":\"${{ github.ref }}\",\"inputs\":{\"from_version\":\"$from_version\",\"to_version\":\"${{ steps.get-version.outputs.to_version }}\",\"to_version_tag\":\"${{ github.sha }}\""
-            
-            if [ -n "${{ github.event.inputs.to_image }}" ]; then
-              workflow_data="$workflow_data,\"to_image\":\"${{ github.event.inputs.to_image }}\""
-            fi
-            workflow_data="$workflow_data}}"
-            echo "printing workflow_data + " $workflow_data
-            curl -L \
-              -X POST \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/adityabharadwaj198/marqo/actions/workflows/backwards_compatibility_marqo_execution.yml/dispatches \
-              -d "$workflow_data"
-          done
+  run-execution-workflow:
+    name: Backwards Compatibility Tests
+    runs-on: ubuntu-latest
+    needs: orchestrate
+    strategy:
+      matrix:
+        from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
+    uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
+    with:
+      from_version: ${{ matrix.from_version }}
+      to_version: ${{ needs.orchestrate.outputs.to_version }}
+      to_version_tag: ${{ github.sha }}
+      to_image: ${{ github.event.inputs.to_image || '' }}
