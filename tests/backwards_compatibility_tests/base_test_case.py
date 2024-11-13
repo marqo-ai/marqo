@@ -35,7 +35,7 @@ class BaseCompatibilityTestCase(MarqoTestCase):
         filepath = cls.get_results_file_path()
         with filepath.open('w') as f:
             json.dump(results, f, indent=4)
-        print(f"Results saved to {filepath}")
+        cls.logger.debug(f"Results saved to {filepath}")
 
     @classmethod
     def load_results_from_file(cls):
@@ -43,8 +43,15 @@ class BaseCompatibilityTestCase(MarqoTestCase):
         filepath = cls.get_results_file_path()
         with filepath.open('r') as f:
             results = json.load(f)
-        print(f"Results loaded from {filepath}")
+        cls.logger.debug(f"Results loaded from {filepath}")
         return results
+
+    @classmethod
+    def delete_file(cls):
+        """Delete the results file."""
+        filepath = cls.get_results_file_path()
+        filepath.unlink()
+        cls.logger.debug(f"Results file deleted: {filepath}")
 
     def prepare(self):
         """Prepare marqo state like adding documents"""
