@@ -87,7 +87,11 @@ class IndexManagement:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
         with self._vespa_deployment_lock():
-            vespa_app = self._get_vespa_application(check_configured=False, need_binary_file_support=True)
+            # We skip the Vespa convergence check here so that Marqo instance can be bootstrapped even when Vespa is
+            # not converged. This will reduce the risk of having downtime when the Marqo instance crashes while waiting
+            # for Vespa app to converge.
+            vespa_app = self._get_vespa_application(check_configured=False, need_binary_file_support=True,
+                                                    check_for_application_convergence=False)
 
             to_version = version.get_version()
             from_version = vespa_app.get_marqo_config().version if vespa_app.is_configured else None
@@ -105,8 +109,15 @@ class IndexManagement:
             return True
 
     def rollback_vespa(self) -> None:
+        """
+        Roll back Vespa application package to the previous version backed up in the current app package.
+        """
         with self._vespa_deployment_lock():
-            self._get_vespa_application(need_binary_file_support=True).rollback(version.get_version())
+            # We skip the Vespa convergence check so that the rollback can be done even when Vespa is not converged.
+            # This allows us to rollback Vespa app when Vespa is in a weird state and fails to converge.
+            vespa_app = self._get_vespa_application(need_binary_file_support=True,
+                                                    check_for_application_convergence=False)
+            vespa_app.rollback(version.get_version())
 
     def create_index(self, marqo_index_request: MarqoIndexRequest) -> MarqoIndex:
         """
@@ -274,8 +285,8 @@ class IndexManagement:
         """
         return self._get_vespa_application().get_marqo_config().version
 
-    def _get_vespa_application(self, check_configured: bool = True, need_binary_file_support: bool = False) \
-            -> VespaApplicationPackage:
+    def _get_vespa_application(self, check_configured: bool = True, need_binary_file_support: bool = False,
+                               check_for_application_convergence: bool = True) -> VespaApplicationPackage:
         """
         Retrieve a Vespa application package. Depending on whether we need to handle binary files and the Vespa version,
         it uses different implementation of VespaApplicationStore.
@@ -283,6 +294,8 @@ class IndexManagement:
         Args:
             check_configured: if set to True, it checks whether the application package is configured or not.
             need_binary_file_support: indicates whether the support for binary file is needed.
+            check_for_application_convergence: whether we check convergence of the Vespa app package. If set to true and
+              Vespa is not converged, this process will fail with a VespaError raised.
 
         Returns:
             The VespaApplicationPackage instance we can use to do bootstrapping/rollback and any index operations.
@@ -311,6 +324,10 @@ class IndexManagement:
 
         if need_binary_file_support and vespa_version < self._MINIMUM_VESPA_VERSION_TO_SUPPORT_UPLOAD_BINARY_FILES:
             # Binary files are only supported using VespaApplicationFileStore prior to Vespa version 8.382.22
+
+            # Please note that we don't pass in `check_for_application_convergence` parameter because we will always
+            # wait for convergence in this case. This will reduce the risk of overriding a newer version of the Vespa
+            # application package.
             application_package_store = VespaApplicationFileStore(
                 vespa_client=self.vespa_client,
                 deploy_timeout=self._deployment_timeout_seconds,
@@ -320,7 +337,8 @@ class IndexManagement:
             application_package_store = ApplicationPackageDeploymentSessionStore(
                 vespa_client=self.vespa_client,
                 deploy_timeout=self._deployment_timeout_seconds,
-                wait_for_convergence_timeout=self._convergence_timeout_seconds
+                wait_for_convergence_timeout=self._convergence_timeout_seconds,
+                check_for_application_convergence=check_for_application_convergence
             )
 
         application = VespaApplicationPackage(application_package_store)
