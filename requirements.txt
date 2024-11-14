@@ -1,4 +1,6 @@
 # Package in this file will overwrite the default requirements in the base-image
 # Only put the package that are updating frequently
-# Currently, all the packages are included in the base-image
 
+# Currently, all the packages are included in the base-image
+# Check https://github.com/marqo-ai/marqo-base/tree/main/requirements for the
+# list of packages in the base-image
