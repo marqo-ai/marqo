@@ -30,11 +30,9 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
             ('multiple_lexical_tensor_fields', ['text_field1', 'text_field2'], ['tensor_field1', 'tensor_field2'], 'semi_structured_vespa_index_schema_mutliple_lexical_tensor_fields.sd'),
         ]
 
-        for test_case in test_cases:
-            with (self.subTest(msg=test_case[0])):
-                lexical_fields = test_case[1]
-                tensor_fields = test_case[2]
-                expected_schema = self._read_schema_from_file(f'test_schemas/{test_case[3]}')
+        for test_case, lexical_fields, tensor_fields, expected_schema_file in test_cases:
+            with self.subTest(msg=test_case):
+                expected_schema = self._read_schema_from_file(f'test_schemas/{expected_schema_file}')
 
                 test_marqo_index_request = self.unstructured_marqo_index_request(
                     name="test_semi_structured_schema",

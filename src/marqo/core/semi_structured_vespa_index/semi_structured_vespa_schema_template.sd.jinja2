@@ -132,30 +132,34 @@ schema {{ index.schema_name }} {
             {%- endif -%}
         {% endmacro -%}
 
+        {% macro sum_score(score_macro, fields) -%}
+            {%- set length = fields|length -%}
+            {%- if length == 0 -%}
+                0
+            {%- else -%}
+                {%- set add = joiner(" + ") -%}
+                {%- for field in fields -%}{{ add() }}{{ score_macro(field) }}{%- endfor -%}
+            {%- endif -%}
+        {% endmacro -%}
+
         {% macro lexical_score(field) -%}
             if (query({{ field.lexical_field_name }}) > 0, bm25({{ field.lexical_field_name }}), 0)
+        {%- endmacro -%}
+
+        {% macro lexical_field_count(field) -%}
+            if (query({{ field.lexical_field_name }}) > 0, 1, 0)
         {%- endmacro -%}
 
         {% macro embedding_score(field) -%}
             if (query({{ field.embeddings_field_name }}) > 0, closeness(field, {{ field.embeddings_field_name }}), 0)
         {%- endmacro -%}
 
-        {% macro sum_score(score_macro, fields) -%}
-            {%- set add = joiner(" + ") -%}
-            {%- for field in fields -%}{{ add() }}{{ score_macro(field) }}{%- endfor -%}
-        {% endmacro -%}
-
-        {% if index.lexical_fields -%}
         function lexical_score_sum() {
             expression: {{ sum_score(lexical_score, index.lexical_fields) }}
         }
 
-        {% macro count_lexical_fields() -%}
-            {%- set add = joiner(" + ") -%}
-            {%- for field in index.lexical_fields -%}{{ add() }}if (query({{ field.lexical_field_name }}) > 0, 1, 0){%- endfor -%}
-        {% endmacro -%}
         function lexical_score_avg() {
-            expression: ({{ sum_score(lexical_score, index.lexical_fields) }}) / max(1, {{ count_lexical_fields() }})
+            expression: ({{ sum_score(lexical_score, index.lexical_fields) }}) / max(1, {{ sum_score(lexical_field_count, index.lexical_fields) }})
         }
 
         function lexical_score_max() {
@@ -165,7 +169,6 @@ schema {{ index.schema_name }} {
         function lexical_score() {
             expression: if (query(marqo__bm25_aggregator) == 0, lexical_score_sum(), if (query(marqo__bm25_aggregator) == 1, lexical_score_avg(), lexical_score_max()))
         }
-        {% endif -%}
 
         {# We provide this function even without the tensor field to support embed requests -#}
         function embedding_score() {
@@ -173,13 +176,11 @@ schema {{ index.schema_name }} {
         }
     }
 
-    {% if index.lexical_fields -%}
     rank-profile bm25 inherits base_rank_profile {
         first-phase {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
-    {% endif -%}
 
     {# We provide this rank profile even without the tensor field to support embed requests -#}
     rank-profile embedding_similarity inherits base_rank_profile {
@@ -193,7 +194,6 @@ schema {{ index.schema_name }} {
         {%- endif %}
     }
 
-    {% if index.lexical_fields and index.tensor_fields -%}
     rank-profile hybrid_custom_searcher inherits default {
         inputs {
             query(marqo__fields_to_rank_lexical) tensor<int8>(p{})
@@ -213,9 +213,11 @@ schema {{ index.schema_name }} {
         second-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
+        {% if index.tensor_fields -%}
         match-features:
         {%- for field in index.tensor_fields %} closest({{ field.embeddings_field_name }}){% endfor -%}
         {%- for field in index.tensor_fields %} distance(field, {{ field.embeddings_field_name }}){% endfor -%}
+        {%- endif %}
     }
 
     rank-profile hybrid_embedding_similarity_then_bm25 inherits base_rank_profile {
@@ -223,7 +225,6 @@ schema {{ index.schema_name }} {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
         }
     }
-    {%- endif %}
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
