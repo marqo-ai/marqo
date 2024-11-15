@@ -1,7 +1,5 @@
 import pytest
 
-from tests.marqo_test import MarqoTestCase
-
 
 def pytest_addoption(parser):
     parser.addoption("--largemodel", action="store_true", default=False)
