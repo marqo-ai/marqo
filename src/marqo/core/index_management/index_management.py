@@ -86,19 +86,24 @@ class IndexManagement:
         Returns:
             True if Vespa was bootstrapped, False if it was already up-to-date
         """
+
+        # We skip the Vespa convergence check here so that Marqo instance can be bootstrapped even when Vespa is
+        # not converged. This will reduce the risk of having downtime when the Marqo instance crashes while waiting
+        # for Vespa app to converge.
+        to_version = version.get_version()
+        vespa_app_for_version_check = self._get_vespa_application(check_configured=False, need_binary_file_support=True,
+                                                                  check_for_application_convergence=False)
+        from_version = vespa_app_for_version_check.get_marqo_config().version \
+            if vespa_app_for_version_check.is_configured else None
+
+        if from_version and semver.VersionInfo.parse(from_version) >= semver.VersionInfo.parse(to_version):
+            # skip bootstrapping if already bootstrapped to this version or later
+            return False
+
         with self._vespa_deployment_lock():
-            # We skip the Vespa convergence check here so that Marqo instance can be bootstrapped even when Vespa is
-            # not converged. This will reduce the risk of having downtime when the Marqo instance crashes while waiting
-            # for Vespa app to converge.
+            # Initialise another session based on the current active session
             vespa_app = self._get_vespa_application(check_configured=False, need_binary_file_support=True,
                                                     check_for_application_convergence=False)
-
-            to_version = version.get_version()
-            from_version = vespa_app.get_marqo_config().version if vespa_app.is_configured else None
-
-            if from_version and semver.VersionInfo.parse(from_version) >= semver.VersionInfo.parse(to_version):
-                # skip bootstrapping if already bootstrapped to this version or later
-                return False
 
             # Only retrieving existing index when the vespa app is not configured and the index settings schema exists
             existing_indexes = self._get_existing_indexes() if not vespa_app.is_configured and \
