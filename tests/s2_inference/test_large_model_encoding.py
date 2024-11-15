@@ -1,23 +1,26 @@
+import functools
 import os
-import torch
-import pytest
-from marqo.s2_inference.types import FloatTensor
-from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, \
-    _convert_tensor_to_numpy
-from unittest.mock import patch
-import numpy as np
 import unittest
+from unittest.mock import patch
+
+import numpy as np
+import pytest
+import torch
+
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
     _convert_vectorized_output,
 )
-import functools
 from marqo.s2_inference.s2_inference import _load_model as og_load_model
+from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, \
+    _convert_tensor_to_numpy
+from marqo.s2_inference.types import FloatTensor
 from tests.marqo_test import TestImageUrls
-
-_load_model = functools.partial(og_load_model, calling_func="unit_test")
+from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.s2_inference.configs import ModelCache
 import shutil
+
+_load_model = functools.partial(og_load_model, calling_func="unit_test")
 
 
 def remove_cached_model_files():
@@ -367,10 +370,82 @@ class TestMultilingualE5Models(unittest.TestCase):
                     assert np.allclose(english_feature, other_language_feature, atol=e)
 
     def test_cuda_encode_type(self):
-        run_test_cuda_encode_type(self.models + ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
-                                                 "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
-                                                 "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
-                                                 "hf/all_datasets_v4_MiniLM-L6"])
+        run_test_cuda_encode_type(
+            self.models + ["fp16/ViT-B/32", "open_clip/convnext_base_w/laion2b_s13b_b82k",
+                           "open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k_augreg",
+                           "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1",
+                           "hf/all_datasets_v4_MiniLM-L6",]
+        )
+
+
+@pytest.mark.largemodel
+@pytest.mark.skipif(torch.cuda.is_available() is False,
+                    reason="We skip the large model test if we don't have cuda support")
+class TestLanguageBindModels(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        clear_loaded_models()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        clear_loaded_models()
+
+    def setUp(self):
+        self.models = ["LanguageBind/Video_V1.5_FT_Audio_FT_Image"]
+        self.device="cuda"
+
+    def _help_test_vectorise(self, model_name, modality, test_content_list):
+        for content in test_content_list:
+            with self.subTest(model=model_name, content=content, normalized=True):
+                normalized_embeddings_list = vectorise(
+                    model_name=model_name,
+                    content=content, device=self.device, normalize_embeddings=True,
+                    modality=modality
+                )
+                for embeddings in normalized_embeddings_list:
+                    self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 < 1e-6)
+
+            if modality != Modality.TEXT: # Text embeddings are always normalized
+                with self.subTest(model=model_name, content=content, normalized=False):
+                    unnormalized_embeddings_list = vectorise(
+                        model_name=model_name,
+                        content=content, device=self.device, normalize_embeddings=False,
+                        modality=modality
+                    )
+                    for embeddings in unnormalized_embeddings_list:
+                        self.assertTrue(np.linalg.norm(np.array(embeddings)) - 1 > 1e-2)
+
+    def test_models(self):
+        test_cases = {
+            Modality.TEXT: ["test", ["test2", "test3"]],
+            Modality.AUDIO: [
+                "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/4-145081-A-9.wav",
+                [
+                    "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115920-A-22.wav",
+                    "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115920-A-22.wav"
+                ]
+            ],
+            Modality.IMAGE: [
+                'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg',
+                [
+                    'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
+                    'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg'
+                ]
+            ],
+            Modality.VIDEO: [
+                'https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--bO6XwZ9HI_000041_000051.mp4',
+                [
+                    'https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/-0MVWb7nJLY_000008_000018.mp4',
+                    'https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/-0oMsq-9b6c_000095_000105.mp4'
+                ]
+            ]
+        }
+
+        for model_name in self.models:
+            for modality, test_content_list in test_cases.items():
+                with self.subTest(model=model_name, modality=modality):
+                    self._help_test_vectorise(model_name, modality, test_content_list)
 
 
 @pytest.mark.largemodel
