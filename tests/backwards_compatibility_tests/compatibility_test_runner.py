@@ -16,8 +16,7 @@ from compatibility_test_logger import get_logger
 
 marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from base_test_case import BaseCompatibilityTestCase
+from base_compatibility_test_case import BaseCompatibilityTestCase
 
 # Keep track of containers that need cleanup
 containers_to_cleanup: Set[str] = set()
@@ -486,6 +485,8 @@ def run_prepare_mode(version_to_test_against: str):
     # Get all subclasses of `BaseCompatibilityTestCase` that match the `version_to_test_against` criterion
     tests = [test_class for test_class in BaseCompatibilityTestCase.__subclasses__()
              if getattr(test_class, 'marqo_version', '0') <= version_to_test_against]
+    for test_class in BaseCompatibilityTestCase.__subclasses__():
+        logger.debug(f"See the test_class: {test_class}")
     for test_class in tests:
         test_class.setUpClass()
         test_instance = test_class()

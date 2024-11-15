@@ -95,15 +95,6 @@ jobs:
         with:
           python-version: "3.9"
           cache: "pip"
-
-      # Step to install pip-tools
-      - name: Install pip-tools
-        run: |
-          python -m pip install pip-tools
-
-      - name: Debug
-        run: |
-          pwd && ls -laR && echo $GITHUB_WORKSPACE
       # Step to install dependencies from requirements.txt
       - name: Install Dependencies
         run: |
@@ -131,18 +122,14 @@ jobs:
           FROM_IMAGE: ${{ inputs.from_image || github.event.inputs.from_image }}
           TO_IMAGE: ${{ inputs.to_image || github.event.inputs.to_image }}
         run: |
-          cmd="python tests/backwards_compatibility_tests/compatibility_test_runner.py \
-            --mode=backwards_compatibility \
-            --from_version $FROM_VERSION \
-            --to_version $TO_VERSION \
-            --to_version_digest $TO_VERSION_DIGEST"
-          if [ -n "$FROM_IMAGE" ]; then
-            cmd="$cmd --from_image $FROM_IMAGE"
-          fi
-          if [ -n "$TO_IMAGE" ]; then
-            cmd="$cmd --to_image $TO_IMAGE"
-          fi
-          eval $cmd
+              export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
+              python tests/backwards_compatibility_tests/compatibility_test_runner.py \
+              --mode=backwards_compatibility \
+              --from_version "$FROM_VERSION" \
+              --to_version "$TO_VERSION" \
+              --to_version_digest "$TO_VERSION_DIGEST" \
+              ${FROM_IMAGE:+--from_image "$FROM_IMAGE"} \
+              ${TO_IMAGE:+--to_image "$TO_IMAGE"}
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner

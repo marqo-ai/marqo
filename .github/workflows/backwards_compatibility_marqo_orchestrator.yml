@@ -51,10 +51,10 @@ jobs:
         run: |
           echo "Checking for image existence"
           if aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }}; then
-            echo "::set-output name=image_exists::true"
+            echo "image_exists=true" >> $GITHUB_OUTPUT
             echo "Image already exists in ECR"
           else
-            echo "::set-output name=image_exists::false"
+            echo "image_exists=false" >> $GITHUB_OUTPUT
             echo "Image doesn't exist" 
           fi
 
@@ -80,7 +80,7 @@ jobs:
     outputs:
       list: ${{ steps.generate-versions.outputs.list }}
       to_version: ${{ steps.get-to-version.outputs.to_version }}
-      image_digest: ${{ steps.image-digest.outputs.digest }}
+#      image_digest: ${{ needs.build-and-push-image.outputs.image_digest }}
     environment: marqo-test-suite
     steps:
       # Step to check out the Marqo repository
@@ -110,16 +110,14 @@ jobs:
           else
             VERSION=$(python tests/backwards_compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
           fi
-          echo "::set-output name=to_version::$VERSION"
-
+          echo "to_version=${VERSION}" >> $GITHUB_OUTPUT
       # Step to generate the list of versions to test
       - name: Generate version list #this code block just generates the from_version list and stores it in a versions variable as a list
         id: generate-versions
         run: |
           # Run the Python script and capture its output
           VERSION_LIST=$(python tests/backwards_compatibility_tests/scripts/generate_versions.py ${{ steps.get-to-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
-          echo "::set-output name=list::$VERSION_LIST" 
-
+          echo "list=${VERSION_LIST}" >> $GITHUB_OUTPUT
       # Step to display the versions to test
       - name: display versions
         run: |
@@ -131,39 +129,10 @@ jobs:
           aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-
-      - name: Retrieve image digest
-        id: image-digest
-        run: |
-          echo "Fetching image digest from ECR"
-
-          REPO_NAME="marqo-compatibility-tests"
-          IMAGE_TAG="${{ github.sha }}"
-
-          # Get the image digest
-          echo "Attempting to retrieve image digest for the specific tag: ${{ github.sha }}"
-          DIGEST=$(aws ecr describe-images \
-            --repository-name "$REPO_NAME" \
-            --image-ids imageTag="$IMAGE_TAG" \
-            --query 'imageDetails[0].imageDigest' \
-            --output text) || true
-
-          echo "DIGEST result: $DIGEST"
-          if [ "$DIGEST" == "None" ] || [ -z "$DIGEST" ]; then
-            echo "Image not found in ECR or command failed."
-            exit 1
-          fi
-          
-          echo "Successfully retrieved image Image Digest: $DIGEST"
-
-          # Set the digest as a global environment variable
-          echo "::set-output name=digest::$DIGEST"
-
-
   run-execution-workflow:
     # Job to trigger execution workflows for each version combination
     name: Run all execution workflows
-    needs: orchestrate
+    needs: [orchestrate, build-and-push-image]
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
@@ -172,5 +141,5 @@ jobs:
     with:
       from_version: ${{ matrix.from_version }}
       to_version: ${{ needs.orchestrate.outputs.to_version }}
-      to_version_digest: ${{ needs.orchestrate.outputs.image_digest }} # Pass the image digest to the execution workflow
+      to_version_digest: ${{ needs.build-and-push-image.outputs.image_digest }} # Pass the image digest to the execution workflow
       to_image: ${{ github.event.inputs.to_image || '' }}

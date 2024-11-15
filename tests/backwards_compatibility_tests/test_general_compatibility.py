@@ -1,6 +1,6 @@
 import pytest
 
-from base_test_case import BaseCompatibilityTestCase
+from base_compatibility_test_case import BaseCompatibilityTestCase
 from marqo_test import MarqoTestCase
 import marqo
 
@@ -138,36 +138,35 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
         Prepare the indexes and add documents for the test.
         Also store the search results for later comparison.
         """
-        with self.subTest("Adding documents to structured and unstructured indexes"):
-            try:
-                self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
-                for index in self.indexes_to_test_on:
-                    if index.get("type") is not None and index.get('type') == 'structured':
-                        self.client.index(index_name=index['indexName']).add_documents(documents=self.docs)
-                    else:
-                        self.client.index(index_name=index['indexName']).add_documents(documents=self.docs,
-                                                                                       mappings=self.mappings,
-                                                                                       tensor_fields=self.tensor_fields)
-            except Exception as e:
-                self.logger.error(f"Exception occurred while adding documents {e}")
+        try:
+            self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
+            for index in self.indexes_to_test_on:
+                if index.get("type") is not None and index.get('type') == 'structured':
+                    self.client.index(index_name=index['indexName']).add_documents(documents=self.docs)
+                else:
+                    self.client.index(index_name=index['indexName']).add_documents(documents=self.docs,
+                                                                                   mappings=self.mappings,
+                                                                                   tensor_fields=self.tensor_fields)
+        except Exception as e:
+            self.logger.error(f"Exception occurred while adding documents {e}")
+            raise e
 
         all_results = {}
         # Loop through queries, search methods, and result keys to populate unstructured_results
-        with self.subTest("Storing search results to be compared later"):
-            for index in self.indexes_to_test_on:
-                index_name = index['indexName']
-                all_results[index_name] = {}
+        for index in self.indexes_to_test_on:
+            index_name = index['indexName']
+            all_results[index_name] = {}
 
-                # For each index, store results for different search methods
-                for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
-                    if index.get("type") is not None and index.get("type") == 'structured':
-                        if search_method == 'HYBRID':
-                            result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
-                        else:
-                            result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
+            # For each index, store results for different search methods
+            for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
+                if index.get("type") is not None and index.get("type") == 'structured':
+                    if search_method == 'HYBRID':
+                        result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
                     else:
-                        result = self.client.index(index_name).search(q=query, search_method=search_method)
-                    all_results[index_name][result_key] = result
+                        result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
+                else:
+                    result = self.client.index(index_name).search(q=query, search_method=search_method)
+                all_results[index_name][result_key] = result
 
         # store the result of search across all structured & unstructured indexes
         self.save_results_to_file(all_results)
@@ -176,21 +175,20 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
         """Run search queries and compare the results with the stored results."""
 
         stored_results = self.load_results_from_file()
-        with self.subTest("Storing search results to be compared later"):
-            for index in self.indexes_to_test_on:
-                index_name = index['indexName']
+        for index in self.indexes_to_test_on:
+            index_name = index['indexName']
 
-                # For each index, search for different queries and compare results
-                for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
-                    if index.get("type") is not None and index.get("type") == 'structured':
-                        if search_method == 'HYBRID':
-                            result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
-                        else:
-                            result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
+            # For each index, search for different queries and compare results
+            for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
+                if index.get("type") is not None and index.get("type") == 'structured':
+                    if search_method == 'HYBRID':
+                        result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
                     else:
-                        result = self.client.index(index_name).search(q=query, search_method=search_method)
+                        result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
+                else:
+                    result = self.client.index(index_name).search(q=query, search_method=search_method)
 
-                    self._compare_results(stored_results[index_name][result_key], result)
+                self._compare_results(stored_results[index_name][result_key], result)
 
 
     def _compare_results(self, expected_result, actual_result):

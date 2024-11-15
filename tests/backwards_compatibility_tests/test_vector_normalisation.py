@@ -1,6 +1,6 @@
 import pytest
 
-from base_test_case import BaseCompatibilityTestCase
+from base_compatibility_test_case import BaseCompatibilityTestCase
 from marqo_test import MarqoTestCase
 import marqo
 
@@ -68,23 +68,22 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
             self.logger.debug(f"Added documents to index: {add_docs_res_normalized}")
         except Exception as e:
             self.logger.error(f"Exception occurred while adding documents {e}")
+            raise e
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
         # This runs on to_version
-        with self.subTest("Calling get_indexes API"):
-            get_indexes = self.client.get_indexes()
-            self.logger.debug(f"Got these indexes {get_indexes}")
+        get_indexes = self.client.get_indexes()
+        self.logger.debug(f"Got these indexes {get_indexes}")
 
-        with self.subTest("Querying specific index"):
-            for result in get_indexes['results']:
-                index_name = result['indexName']
-                self.logger.debug(f"Processing index: {index_name}")
-                try:
-                    doc_res_normalized = self.client.index(index_name).get_document(
-                    document_id="doc1",
-                    expose_facets=True)
-                    self.assertEqual(doc_res_normalized["custom_vector_field_1"], "custom vector text")
-                    self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
-                    self.assertEqual(doc_res_normalized['_tensor_facets'][0]['_embedding'], self.expected_custom_vector_after_normalization)
-                except Exception as e:
-                    self.logger.error(f"Got an exception while trying to query index: {e}")
+        for result in get_indexes['results']:
+            index_name = result['indexName']
+            self.logger.debug(f"Processing index: {index_name}")
+            try:
+                doc_res_normalized = self.client.index(index_name).get_document(
+                document_id="doc1",
+                expose_facets=True)
+                self.assertEqual(doc_res_normalized["custom_vector_field_1"], "custom vector text")
+                self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
+                self.assertEqual(doc_res_normalized['_tensor_facets'][0]['_embedding'], self.expected_custom_vector_after_normalization)
+            except Exception as e:
+                self.logger.error(f"Got an exception while trying to query index: {e}")

@@ -14,7 +14,7 @@ def generate_versions(to_version: str, num_versions: int = 3) -> list:
 
     Args:
         to_version (str): The target version to generate previous versions for.
-        num_versions (int): The number of previous versions to generate. Defaults to 4.
+        num_versions (int): The number of previous versions to generate. Defaults to 3.
 
     Returns:
         list: A list of previous versions as strings.
@@ -26,8 +26,6 @@ def generate_versions(to_version: str, num_versions: int = 3) -> list:
     if target_version.patch > 0:
         prev_patch_version = f"{target_version.major}.{target_version.minor}.{target_version.patch - 1}"
         versions.append(prev_patch_version)
-        print(versions)
-        print(num_versions)
 
     # Gather the latest patch version for each preceding minor version
     minor = target_version.minor - 1

@@ -27,6 +27,6 @@ def pytest_collection_modifyitems(config, items):
             logger.debug(f"Test version: {test_case_version}, v/s version supplied in pytest arguments: {version}")
             test_case_version = semver.VersionInfo.parse(test_case_version)
             if test_case_version > version:
-                item.add_marker(pytest.mark.skip(reason=f"Test requires marqo_version {test_case_version} which is not greater than version {version}. Skipping."))
+                item.add_marker(pytest.mark.skip(reason=f"Test requires marqo_version {test_case_version} which is not greater than version supplied {version}. Skipping."))
 
     logger.debug(f"Total collected tests: {len(items)}")

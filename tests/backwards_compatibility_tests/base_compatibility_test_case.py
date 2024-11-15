@@ -1,14 +1,11 @@
 import json
 import logging
-import os
-import sys
+from abc import abstractmethod, ABC
 from pathlib import Path
-
 from marqo_test import MarqoTestCase
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-class BaseCompatibilityTestCase(MarqoTestCase):
+class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     """
     Base class for backwards compatibility tests. Contains a prepare method that should be implemented by subclasses to
     add documents / prepare marqo state. Also contains methods to save and load results to/from a file so that
@@ -17,12 +14,14 @@ class BaseCompatibilityTestCase(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
-        cls.logger = logging.getLogger(cls.__name__)
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        cls.logger.addHandler(handler)
-        cls.logger.setLevel(logging.INFO)
+        if not hasattr(cls, 'logger'):
+            cls.logger = logging.getLogger(cls.__name__)
+            if not cls.logger.hasHandlers():
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(filename)s:%(lineno)d | %(message)s')
+                handler.setFormatter(formatter)
+                cls.logger.addHandler(handler)
+            cls.logger.setLevel(logging.INFO)
 
     @classmethod
     def get_results_file_path(cls):
@@ -53,6 +52,17 @@ class BaseCompatibilityTestCase(MarqoTestCase):
         filepath.unlink()
         cls.logger.debug(f"Results file deleted: {filepath}")
 
+    @abstractmethod
     def prepare(self):
         """Prepare marqo state like adding documents"""
         pass
+
+    @classmethod
+    def set_logging_level(cls, level: str):
+        log_level = getattr(logging, level.upper(), None)
+        if log_level is None:
+            raise ValueError(f"Invalid log level: {level}. Using current log level: {logging.getLevelName(cls.logger.level)}.")
+        cls.logger.setLevel(log_level)
+        for handler in cls.logger.handlers:
+            handler.setLevel(log_level)
+        cls.logger.info(f"Logging level changed to. {level.upper()}")
