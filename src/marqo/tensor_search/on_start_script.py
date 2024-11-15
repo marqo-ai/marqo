@@ -279,7 +279,7 @@ class CheckNLTKTokenizers:
             nltk.download("punkt_tab")
 
         try:
-            nltk.data.find("tokenizers/wordnet")
+            nltk.data.find("tokenizers/punkt")
             nltk.data.find("tokenizers/punkt_tab")
         except LookupError as e:
             raise exceptions.StartupSanityCheckError(

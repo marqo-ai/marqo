@@ -6,6 +6,7 @@ from marqo.api import exceptions, configs
 from marqo.tensor_search import enums
 from marqo.tensor_search import on_start_script
 from tests.marqo_test import MarqoTestCase
+from marqo.api.exceptions import StartupSanityCheckError
 
 
 class TestOnStartScript(MarqoTestCase):
@@ -277,10 +278,17 @@ class TestOnStartScript(MarqoTestCase):
 
         self.assertTrue('some error' in str(context.exception))
 
+    def test_missing_punkt_downloaded(self):
+        """A test to ensure that the script will attempt to download the punkt and punkt_tab
+        tokenizer if it is not found"""
+        with mock.patch("marqo.tensor_search.on_start_script.nltk.data.find") as mock_find, \
+            mock.patch("marqo.tensor_search.on_start_script.nltk.download") as mock_nltk_download:
+                # Mock find to always succeed
+                mock_find.side_effect = LookupError()
 
+                checker = on_start_script.CheckNLTKTokenizers()
+                with self.assertRaises(StartupSanityCheckError):
+                    checker.run()
 
-
-
-
-
-
+                mock_nltk_download.assert_any_call('punkt')
+                mock_nltk_download.assert_any_call("punkt_tab")
