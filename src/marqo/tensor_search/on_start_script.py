@@ -20,6 +20,7 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
 import subprocess
+import nltk
 
 
 
@@ -34,6 +35,7 @@ def on_start(config: config.Config):
         CUDAAvailable(),
         SetBestAvailableDevice(),
         SetEnableVideoGPUAcceleration(),
+        CheckNLTKTokenizers(),
         CacheModels(),
         InitializeRedis("localhost", 6379),
         CachePatchModels(),
@@ -314,6 +316,20 @@ class SetEnableVideoGPUAcceleration:
                 f"Check {marqo_docs.configuring_marqo()} for more information. "
                 f"Original error message: {result.stderr.decode()}"
             )
+
+
+class CheckNLTKTokenizers:
+    """Checks if NLTK tokenizers are available."""
+    logger = get_logger('CheckNLTKTokenizers')
+
+    def run(self):
+        try:
+            nltk.data.find('tokenizers/punkt')
+            nltk.data.find("tokenizers/punkt_tab")
+        except LookupError as e:
+            raise exceptions.StartupSanityCheckError(
+                f"NLTK tokenizers not found. Original error message: {e}. "
+            ) from e
 
 
 def _preload_model(model, content, device):
