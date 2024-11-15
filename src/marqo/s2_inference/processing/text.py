@@ -22,20 +22,6 @@ def _splitting_functions(split_by: str, language: str='english') -> FunctionType
     Returns:
         _type_: function for splitting text based on the method provided 
     """
-    if not isinstance(split_by, str):
-        raise TypeError(f"expected str received {type(split_by)}")
-
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        nltk.download("punkt")
-
-    # Punkt_tab needs to be downloaded after NLTK 3.8 and later
-    try:
-        nltk.data.find("tokenizers/punkt_tab")
-    except LookupError:
-        nltk.download("punkt_tab")
-
     MAPPING = {
         'character':list,
         'word': partial(word_tokenize, language=language),
