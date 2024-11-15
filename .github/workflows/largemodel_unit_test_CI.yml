@@ -95,7 +95,7 @@ jobs:
       - name: Download nltk data
         run: |
             python -m nltk.downloader punkt
-            python -m ntk.downloader punkt_tab
+            python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
         run: |
