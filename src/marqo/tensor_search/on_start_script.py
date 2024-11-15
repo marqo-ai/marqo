@@ -298,7 +298,7 @@ class SetEnableVideoGPUAcceleration:
             '-v', 'error',  # Suppress output
             '-hwaccel', 'cuda',  # Use CUDA for hardware acceleration
             '-f', 'lavfi',  # Input format is a lavfi (FFmpeg's built-in filter)
-            '-i', 'nullsrc=s=1280x720',  # Generate a blank video source of 1280x720 resolution
+            '-i', 'nullsrc=s=600x400',  # Generate a blank video source of 1280x720 resolution
             '-vframes', '1',  # Process only 1 frame
             '-c:v', 'h264_nvenc',  # Use NVENC encoder
             '-f', 'null',  # Output to null (discard the output)
