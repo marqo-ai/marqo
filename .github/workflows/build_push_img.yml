@@ -1,5 +1,6 @@
 name: Build and Push Marqo Docker Image
 
+# TODO: Add concurrency for these tasks (https://s2search.atlassian.net/browse/MQ-274) (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841652402)
 on:
   workflow_call:
     inputs:
