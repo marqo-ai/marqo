@@ -60,6 +60,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          #TODO: create a runner in us-east-1 and use it for the build https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841644166
           aws-region: us-west-2
       - name: Start EC2 runner
         id: start-ec2-runner
@@ -110,14 +111,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@v1
-#        if: env.PUSH_TO == 'ECR'
-#        with:
-#          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
-#          aws-region: us-east-1
 
       - name: Login to ECR
         uses: docker/login-action@v2

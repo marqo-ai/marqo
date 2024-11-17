@@ -18,6 +18,7 @@ on:
       max_versions_to_test:
         description: 'Max versions to test'
         required: false
+      #TODO: Add input for specifying py_marqo branch (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841556872)
 
 # Setting MAX_VERSIONS_TO_TEST, this can be a configurable value or if no input is provided, it can be a default value.
 env:

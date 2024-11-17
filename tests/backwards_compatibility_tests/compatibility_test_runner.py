@@ -33,6 +33,7 @@ def load_all_subclasses(package_name):
         importlib.import_module(f"{package_name}.{module_name}")
 
 
+#TODO: Explore using docker python SDK docker-py to replace the subprocess call, https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841689970
 def pull_remote_image_from_ecr(image_digest: str):
     """
     Pulls a Docker image from Amazon ECR and optionally retags it locally.
@@ -144,7 +145,7 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
-        "-it", "-p", "8882:8882",
+        "-p", "8882:8882",
         "-e", "MARQO_ENABLE_BATCH_APIS=TRUE",
         "-e", "MARQO_MAX_CPU_MODEL_MEMORY=1.6"
     ]
@@ -247,7 +248,7 @@ def start_marqo_to_version_container(to_version: str, from_version: str, from_ve
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
-        "-it", "-p", "8882:8882",
+        "-p", "8882:8882",
         "-e", "MARQO_ENABLE_BATCH_APIS=TRUE",
         "-e", "MARQO_MAX_CPU_MODEL_MEMORY=1.6"
     ]

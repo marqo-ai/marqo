@@ -20,6 +20,7 @@ on:
             description: 'Source Marqo image (optional)'
             required: false
             type: string
+        #TODO: Currently to_image is just a input parameter, it's passed but not being used in the compatibility_test_runner.py script. We need to add support for this in the script. https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841574339
         to_image:
             description: 'Target Marqo image (optional)'
             required: false
