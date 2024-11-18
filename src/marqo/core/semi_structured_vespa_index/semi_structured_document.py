@@ -46,7 +46,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     @classmethod
     def from_vespa_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
         """
-        Instantiate an UnstructuredVespaDocument from a Vespa document.
+        Instantiate an SemiStructuredVespaDocument from a Vespa document.
         Used in get_document_by_id or get_documents_by_ids
         """
         fields = document.get(cls._VESPA_DOC_FIELDS, {})
@@ -76,10 +76,11 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
     @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
-        """Instantiate an UnstructuredVespaDocument from a valid Marqo document for feeding to Vespa"""
+        """Instantiate an SemiStructuredVespaDocument from a valid Marqo document for feeding to Vespa"""
 
         if index_constants.MARQO_DOC_ID not in document:
-            raise VespaDocumentParsingError(
+            # Please note we still use unstructured in the error message since it will be exposed to user
+            raise MarqoDocumentParsingError(
                 f"Unstructured Marqo document does not have a {index_constants.MARQO_DOC_ID} field. "
                 f"This should be assigned for a valid document")
 
@@ -116,7 +117,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                         instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
             else:
-                raise VespaDocumentParsingError(
+                raise MarqoDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "
                     f"unsupported type {type(field_content)} which has not been validated in advance.")
 
