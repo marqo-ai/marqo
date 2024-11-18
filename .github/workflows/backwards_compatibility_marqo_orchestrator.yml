@@ -71,7 +71,7 @@ jobs:
 
 
   orchestrate:
-    # Job to orchestrate backwards compatibility test execution. Majorly responsible for determining to_version and for generating the list of for_version to test against.
+    # Job to orchestrate backwards compatibility test execution. Majorly responsible for determining to_version and for generating the list of from_version(s) to test against.
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
     needs: build-and-push-image
