@@ -7,29 +7,31 @@ from marqo import marqo_docs
 from marqo.api import exceptions as api_errors
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
-from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, MODALITY_FIELD_TYPE_MAP
 from marqo.core.models import UnstructuredMarqoIndex
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_tensor_fields, validate_field_name, \
     validate_mappings_object_format, validate_coupling_of_mappings_and_doc
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
+from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
 from marqo.s2_inference.errors import MediaDownloadError
 from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
 
 from marqo.vespa.models import VespaDocument
 from marqo.vespa.models.get_document_response import Document
+from marqo.vespa.vespa_client import VespaClient
 
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search.constants import ALLOWED_UNSTRUCTURED_FIELD_TYPES
-from marqo.tensor_search.validation import list_types_valid, validate_custom_vector, \
-    validate_multimodal_combination, validate_map_numeric_field
-from marqo.vespa.vespa_client import VespaClient
+from marqo.tensor_search.validation import validate_custom_vector, \
+    validate_map_numeric_field
 
 
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
+    _MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS = semver.VersionInfo.parse("2.9.0")
+
     def __init__(self, marqo_index: UnstructuredMarqoIndex, add_docs_params: AddDocsParams, vespa_client: VespaClient):
         self._validate_add_docs_params(add_docs_params)
         super().__init__(marqo_index, add_docs_params, vespa_client)
@@ -100,27 +102,29 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
                     f"Allowed content types: {[ty.__name__ for ty in ALLOWED_UNSTRUCTURED_FIELD_TYPES]}"
                 )
 
-            if isinstance(field_content, list) and not list_types_valid(field_content):
-                raise AddDocumentsError(
-                    f"Field content '{field_content}' "
-                    f"of type {type(field_content).__name__} is not of valid content type! "
-                    f"All list elements must be of the same type and that type must be int, float or string"
-                )
+            if isinstance(field_content, list):
+                for element in field_content:
+                    if not isinstance(element, str):
+                        # if the field content is a list, it should only contain strings.
+                        raise AddDocumentsError(
+                            f"Field content {field_content} includes an element of type {type(element).__name__} "
+                            f"which is not a string. Unstructured Marqo index only supports string lists."
+                        )
+
+            is_tensor_field = field_name in self.add_docs_params.tensor_fields
 
             if isinstance(field_content, dict):
                 if self.tensor_fields_container.is_custom_tensor_field(field_name):
-                    # TODO is_non_tensor_field check can be move out to AddDocsParams level
-                    validate_custom_vector(field_content, False, self.marqo_index.model.get_dimension())
-                elif self.tensor_fields_container.is_multimodal_field(field_name):
-                    # FIXME, multimodal field should not be present in the doc
-                    # TODO This validation should be done at AddDocsParams level
-                    validate_multimodal_combination(field_content, False,
-                                                    self.tensor_fields_container.get_multimodal_field_mapping(field_name))
-                elif self.marqo_index.parsed_marqo_version() < semver.VersionInfo.parse("2.9.0"):
-                    # TODO This check should not happen at root level
+                    # TODO should is_non_tensor_field check be moved out to AddDocsParams validation?
+                    # Please note that if one of the documents in the batch has a custom field which does not exist
+                    # in the tensor field, the whole batch will fail and user will get a 400 pydantic.ValidationError.
+                    # We keep this behaviour unchanged to be compatible with the legacy unstructured index.
+                    validate_custom_vector(field_content, not is_tensor_field, self.marqo_index.model.get_dimension())
+                elif self.marqo_index.parsed_marqo_version() < self._MINIMUM_MARQO_VERSION_SUPPORTS_MAP_NUMERIC_FIELDS:
+                    # We do not support map of numeric fields prior to 2.9.0
                     raise AddDocumentsError(
-                        f"The field {field_name} is a map field and only supported for indexes created with Marqo 2.9.0 "
-                        f"or later. See {marqo_docs.map_fields()} and {marqo_docs.mappings()}."
+                        f"The field {field_name} is a map field and only supported for indexes created with Marqo 2.9.0"
+                        f" or later. See {marqo_docs.map_fields()} and {marqo_docs.mappings()}."
                     )
                 else:
                     validate_map_numeric_field(field_content)

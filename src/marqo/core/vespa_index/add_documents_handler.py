@@ -10,7 +10,7 @@ from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationM
 from marqo.core.inference.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
     TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser, ContentChunkType
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \
-    UnsupportedFeatureError
+    UnsupportedFeatureError, VespaDocumentParsingError
 from marqo.core.models import MarqoIndex
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
