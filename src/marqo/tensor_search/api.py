@@ -231,13 +231,13 @@ def root():
             "version": version.get_version()}
 
 
-@app.get('/memory')
+@app.get('/memory', include_in_schema=False)
 @utils.enable_debug_apis()
 def memory():
     return memory_profiler.get_memory_profile()
 
 
-@app.post('/validate/index/{index_name}')
+@app.post('/validate/index/{index_name}', include_in_schema=False)
 @utils.enable_ops_api()
 def schema_validation(index_name: str, settings_object: dict):
     IndexManagement.validate_index_settings(index_name, settings_object)
@@ -451,7 +451,7 @@ def get_cuda_info(marqo_config: config.Config = Depends(get_config)):
     return marqo_config.monitoring.get_cuda_info()
 
 
-@app.post("/batch/indexes/delete")
+@app.post("/batch/indexes/delete", include_in_schema=False)
 @utils.enable_batch_apis()
 def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
@@ -460,7 +460,7 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
                                  "index_names": index_names}, status_code=200)
 
 
-@app.post("/batch/indexes/create")
+@app.post("/batch/indexes/create", include_in_schema=False)
 @utils.enable_batch_apis()
 def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName],
                          marqo_config: config.Config = Depends(get_config)):
@@ -480,7 +480,7 @@ def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithNa
     )
 
 
-@app.delete("/indexes/{index_name}/documents/delete-all")
+@app.delete("/indexes/{index_name}/documents/delete-all", include_in_schema=False)
 @utils.enable_batch_apis()
 def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.
@@ -490,7 +490,7 @@ def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(
     return {"documentCount": document_count}
 
 
-@app.post("/upgrade")
+@app.post("/upgrade", include_in_schema=False)
 @utils.enable_upgrade_api()
 def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
@@ -498,7 +498,7 @@ def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
     upgrade_runner.upgrade()
 
 
-@app.post("/rollback")
+@app.post("/rollback", include_in_schema=False)
 @utils.enable_upgrade_api()
 def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
@@ -506,7 +506,7 @@ def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(g
     rollback_runner.rollback(from_version=req.from_version, to_version=req.to_version)
 
 
-@app.post("/rollback-vespa")
+@app.post("/rollback-vespa", include_in_schema=False)
 def rollback_vespa_app_to_current_version(marqo_config: config.Config = Depends(get_config)):
     marqo_config.index_management.rollback_vespa()
     return JSONResponse(
