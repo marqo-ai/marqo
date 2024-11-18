@@ -41,7 +41,7 @@ def pull_remote_image_from_ecr(image_identifier: str):
         image_identifier (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag
                                 (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
                                 or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
-                                This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for a automatically triggered workflow.
+                                This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for an automatically triggered workflow.
 
     Returns:
         str: The local tag of the pulled and retagged Docker image.
@@ -225,7 +225,7 @@ def start_marqo_to_version_container(to_version: str, from_version: str, from_ve
         from_version_volume (str): The volume to use for the container.
         to_version_identifier (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
                                         or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
-                                        This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for a automatically triggered workflow.
+                                        This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for an automatically triggered workflow.
         env_vars (Optional[list]): A list of environment variables to set in the container. Defaults to None.
     """
     source = "ECR" #Source of a to_version image will always be ECR because we build and push unpublished & to be tested images to ECR
@@ -367,7 +367,7 @@ def cleanup_volumes():
             logger.debug(f"Warning: Failed to remove volume {volume_name}: {e}")
     volumes_to_cleanup.clear()
 
-def backwards_compatibility_test(from_version: str, to_version: str, to_version_digest: str):
+def backwards_compatibility_test(from_version: str, to_version: str, to_version_image_idenfitifer: str):
     """
     Perform a backwards compatibility test between two versions of Marqo.
 
@@ -377,9 +377,10 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
     Args:
         from_version (str): The source version of the Marqo container.
         to_version (str): The target version of the Marqo container.
-        to_version_digest (str): The specific image digest to use for the to_version container.
-        from_image (Optional[str]): The specific image to use for the from_version container. Defaults to None.
-        to_image (Optional[str]): The specific image to use for the to_version container. Defaults to None.
+        to_version_image_idenfitifer (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag
+                                (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
+                                or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
+                                This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for an automatically triggered workflow.
 
     Raises:
         ValueError: If the major versions of from_version and to_version are incompatible.
@@ -387,7 +388,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
     """
     try:
         # Step 1: Start from_version container and run tests in prepare mode
-        logger.debug(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_digest: {to_version_digest}, from_image: {from_image}, to_image: {to_image}")
+        logger.debug(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_image_idenfitifer: {to_version_image_idenfitifer}")
         # Check for version compatibility
         from_major_version = int(from_version.split('.')[0])
         logger.debug(f"from major version = {from_major_version}")
@@ -410,7 +411,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         stop_marqo_container(from_version)
 
         # Step 3: Start to_version container, transferring state
-        start_marqo_to_version_container(to_version, from_version, from_version_volume, to_version_digest)
+        start_marqo_to_version_container(to_version, from_version, from_version_volume, to_version_image_idenfitifer)
         logger.debug(f"Started marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
         run_tests_across_versions("test", from_version, to_version)
@@ -602,4 +603,4 @@ if __name__ == "__main__":
     if args.mode == "backwards_compatibility":
         backwards_compatibility_test(args.from_version, args.to_version, args.to_version_image_identifier)
     elif args.mode == "rollback":
-        rollback_test(args.to_version, args.from_version, args.to_version_digest)
+        rollback_test(args.to_version, args.from_version, args.to_version_image_identifier)
