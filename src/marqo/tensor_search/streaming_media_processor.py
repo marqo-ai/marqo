@@ -135,7 +135,6 @@ class StreamingMediaProcessor:
                             start_time=chunk_start,
                             duration=chunk_end - chunk_start,
                             output_file=output_file,
-                            enable_gpu_acceleration=self.enable_video_gpu_acceleration,
                         )
                     elif self.modality == Modality.AUDIO:  # AUDIO
                         output_file = self.fetch_audio_chunk(
@@ -166,8 +165,7 @@ class StreamingMediaProcessor:
         if download_total > 0:
             progress = downloaded / download_total * 100
 
-    def fetch_video_chunk(self, url: str, start_time: float, duration: float, output_file: str,
-                          enable_gpu_acceleration: bool = False) -> str:
+    def fetch_video_chunk(self, url: str, start_time: float, duration: float, output_file: str) -> str:
         """
         Fetch a video chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
         downloaded video chunk.
@@ -176,7 +174,6 @@ class StreamingMediaProcessor:
             start_time: The start time of the video chunk
             duration: The duration of the video chunk
             output_file: The path to save the video chunk
-            enable_gpu_acceleration: Whether to use GPU acceleration for downloading the video chunk
 
         Returns:
             THe path to the downloaded video chunk
@@ -184,7 +181,7 @@ class StreamingMediaProcessor:
         Raises:
             MediaDownloadError: If there is an error downloading the video chunk
         """
-        if enable_gpu_acceleration is True:
+        if self.enable_gpu_acceleration is True:
             ffmpeg_command = [
                 'ffmpeg',
                 '-y',  # Enable overwrite
