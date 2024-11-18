@@ -425,11 +425,11 @@ class VespaApplicationFileStore(VespaApplicationStore):
     more details. This is the only viable option to deploy changes of binary files before Vespa version 8.382.22.
     We implement this approach to support bootstrapping and rollback for Vespa version prior to 8.382.22.
     """
-    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int):
+    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int,
+                 check_for_application_convergence: bool = True):
         super().__init__(vespa_client, deploy_timeout, wait_for_convergence_timeout)
-        # We always check convergence before downloading the application package to reduce the risk of overriding
-        # a newer version of application package when activate this change.
-        self._app_root_path = vespa_client.download_application(check_for_application_convergence=True)
+        self._app_root_path = vespa_client.download_application(
+            check_for_application_convergence=check_for_application_convergence)
 
     def _full_path(self, *paths: str) -> str:
         return os.path.join(self._app_root_path, *paths)

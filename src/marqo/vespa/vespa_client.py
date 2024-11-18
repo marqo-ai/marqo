@@ -198,9 +198,8 @@ class VespaClient:
             except (httpx.TimeoutException, httpcore.TimeoutException):
                 logger.error("Marqo timed out waiting for Vespa application to converge. Will retry.")
 
-        logger.debug(f"Vespa application did not converge within {timeout} seconds, the convergence status is {self._get_convergence_status()}")
-
-        raise VespaError(f"Vespa application did not converge within {timeout} seconds")
+        raise VespaError(f"Vespa application did not converge within {timeout} seconds. "
+                         f"The convergence status is {self._get_convergence_status()}")
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
