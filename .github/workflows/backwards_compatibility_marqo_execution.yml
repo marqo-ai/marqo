@@ -122,7 +122,7 @@ jobs:
               --mode=backwards_compatibility \
               --from_version "$FROM_VERSION" \
               --to_version "$TO_VERSION" \
-              --to_version_image_identifier "TO_VERSION_IMAGE_IDENTIFIER" \
+              --to_version_image_identifier "$TO_VERSION_IMAGE_IDENTIFIER" \
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
