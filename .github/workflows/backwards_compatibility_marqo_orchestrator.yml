@@ -12,9 +12,6 @@ on:
       to_version:
         description: 'Target Marqo version'
         required: true
-      to_image:
-        description: 'Target Marqo image (optional)'
-        required: false
       max_versions_to_test:
         description: 'Max versions to test'
         required: false
@@ -130,6 +127,7 @@ jobs:
           aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+
   run-execution-workflow:
     # Job to trigger execution workflows for each version combination
     name: Run all execution workflows
@@ -142,5 +140,6 @@ jobs:
     with:
       from_version: ${{ matrix.from_version }}
       to_version: ${{ needs.orchestrate.outputs.to_version }}
-      to_version_digest: ${{ needs.build-and-push-image.outputs.image_digest }} # Pass the image digest to the execution workflow
-      to_image: ${{ github.event.inputs.to_image || '' }}
+      # Pass the image_identifier to the execution workflow. By image_identifier, we refer to the
+      # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
+      to_version_image_identifier: ${{ needs.build-and-push-image.outputs.image_identifier }}

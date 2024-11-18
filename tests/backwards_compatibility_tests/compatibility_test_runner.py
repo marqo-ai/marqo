@@ -7,7 +7,6 @@ import pytest
 from typing import Optional, Set
 import subprocess
 import sys
-import os
 import requests
 import semver
 import traceback
@@ -34,12 +33,15 @@ def load_all_subclasses(package_name):
 
 
 #TODO: Explore using docker python SDK docker-py to replace the subprocess call, https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841689970
-def pull_remote_image_from_ecr(image_digest: str):
+def pull_remote_image_from_ecr(image_identifier: str):
     """
-    Pulls a Docker image from Amazon ECR and optionally retags it locally.
+    Pulls a Docker image from Amazon ECR using the image_identifier and optionally retags it locally.
 
     Args:
-        image_digest (str): The digest of the image to pull from ECR.
+        image_identifier (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag
+                                (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
+                                or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
+                                This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for a automatically triggered workflow.
 
     Returns:
         str: The local tag of the pulled and retagged Docker image.
@@ -63,13 +65,13 @@ def pull_remote_image_from_ecr(image_digest: str):
             check=True
         )
         # Pull the Docker image from ECR
-        image_full_name = f"{ecr_registry}/{image_repo}@{image_digest}"
+        image_full_name = image_identifier
         logger.debug(f"Pulling image: {image_full_name}")
         subprocess.run(["docker", "pull", image_full_name], check=True)
 
         # Optionally retag the image locally to marqo-ai/marqo
-        hash_part = image_digest.split(":")[1] if ":" in image_digest else image_digest
-        local_tag = f"marqo-ai/marqo:{hash_part}" #it should now be called marqo-ai/marqo:sha-token
+        hash_part = image_identifier.split(":")[1] if ":" in image_identifier else image_identifier
+        local_tag = f"marqo-ai/marqo:{hash_part}" #it should now be called marqo-ai/marqo:sha-token for image with image digest or marqo-ai/marqo:github.sha for an image with image tag
         logger.debug(f"Retagging image to: {local_tag}")
         subprocess.run(["docker", "tag", image_full_name, local_tag], check=True)
         return local_tag
@@ -77,7 +79,7 @@ def pull_remote_image_from_ecr(image_digest: str):
         logger.debug(f"Command '{e.cmd}' failed with return code {e.returncode}")
         logger.debug("Error output:", e.output.decode() if e.output else "No output")
         traceback.print_exc()  # Print the full stack trace for debugging
-        raise Exception(f"Failed to pull Docker image {image_digest}: {e}")
+        raise Exception(f"Failed to pull Docker image {image_identifier}: {e}")
     except Exception as e:
         logger.debug("An unexpected error occurred while pulling the Docker image.")
         traceback.print_exc()  # Print full stack trace for debugging
@@ -106,19 +108,18 @@ def pull_marqo_image(image_identifier: str, source: str):
             subprocess.run(["docker", "pull", image_identifier], check=True)
             return image_identifier
         elif source == "ECR":
-            return pull_remote_image_from_ecr(image_digest=image_identifier)
+            return pull_remote_image_from_ecr(image_identifier)
     except subprocess.CalledProcessError as e:
         raise Exception(f"Failed to pull Docker image {image_identifier}: {e}")
 
 
-def start_marqo_from_version_container(version: str, from_version_volume, from_version_image: Optional[str] = None,
-                                       env_vars: Optional[list] = None):
+def start_marqo_from_version_container(from_version: str, from_version_volume, env_vars: Optional[list] = None):
     """
     Start a Marqo container after pulling the required image from docker and creating a volume.
     The volume is mounted to a specific point such that it can be later used to transfer state to a different version of Marqo.
 
     Args:
-        version (str): The version of the Marqo container to start.
+        from_version (str): The version of the Marqo container to start.
         from_version_volume: The volume to use for the container.
         from_version_image (Optional[str]): The specific image to use for the container. Defaults to None.
         env_vars (Optional[list]): A list of environment variables to set in the container. Defaults to None.
@@ -126,9 +127,9 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
 
     source = "docker" #The source for from_version image would always be docker because it's supposed to be an already released docker image
 
-    logger.debug(f"Starting Marqo container with version {version}, from_version_image {from_version_image}, from_version_volume {from_version_image}, source {source}")
-    from_version_image = from_version_image or f"marqoai/marqo:{version}"
-    container_name = f"marqo-{version}"
+    logger.debug(f"Starting Marqo container with from_version: {from_version}, from_version_volume: {from_version_volume}, source: {source}")
+    from_version_image = f"marqoai/marqo:{from_version}"
+    container_name = f"marqo-{from_version}"
 
     logger.debug(f"Using image: {from_version_image} with container name: {container_name}")
 
@@ -159,9 +160,9 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
 
     # Mounting volumes for Marqo >= 2.9
     # Use the provided volume for state transfer
-    from_version_volume = create_volume_for_marqo_version(version, from_version_volume)
+    from_version_volume = create_volume_for_marqo_version(from_version, from_version_volume)
     logger.debug(f"from_version volume = {from_version_volume}")
-    if version >= marqo_transfer_state_version:
+    if from_version >= marqo_transfer_state_version:
         # setting volume to be mounted at /opt/vespa/var because starting from 2.9, the state is stored in /opt/vespa/var
         cmd.extend(["-v", f"{from_version_volume}:/opt/vespa/var"])
     else:
@@ -213,31 +214,33 @@ def start_marqo_from_version_container(version: str, from_version_volume, from_v
         raise
 
 def start_marqo_to_version_container(to_version: str, from_version: str, from_version_volume: str,
-                                     to_version_digest: str, env_vars: Optional[list] = None):
+                                     to_version_identifier: str, env_vars: Optional[list] = None):
     """
     Start a Marqo container for the specified to_version, transferring state from the from_version container.
     The state is transferred by copying the state from the from_version container to the to_version container, by re-using the
     from_version_volume created when starting from_version container.
     Args:
         to_version (str): The target version of the Marqo container to start.
-        from_version (str): The source version of the Marqo container.
+        from_version (str): The source version of the Marqo container. The from_version parameter is later used to determine how we transfer state.
         from_version_volume (str): The volume to use for the container.
-        to_version_digest (str): The specific image digest to use for the container.
+        to_version_identifier (str): The unique identifier for a to_version image. It can be either be the fully qualified image name with the tag (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests:abcdefgh1234)
+                                        or the fully qualified image name with the digest (ex: 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
+                                        This is constructed in build_push_image.yml workflow and will be the qualified image name with digest for a automatically triggered workflow.
         env_vars (Optional[list]): A list of environment variables to set in the container. Defaults to None.
     """
     source = "ECR" #Source of a to_version image will always be ECR because we build and push unpublished & to be tested images to ECR
     logger.debug(
-        f"Starting Marqo container with to_version {to_version}, "
+        f"Starting Marqo container with to_version: {to_version}, "
         f"from_version: {from_version} "
-        f"from_version_volume {from_version_volume}, to_version_digest, {to_version_digest}, source {source}")
+        f"from_version_volume: {from_version_volume}, to_version_identifier: {to_version_identifier}, source: {source}")
     container_name = f"marqo-{to_version}"
     to_version = semver.VersionInfo.parse(to_version)
     from_version = semver.VersionInfo.parse(from_version)
 
-    logger.debug(f"Using image: {to_version_digest} with container name: {container_name}")
+    logger.debug(f"Using image: {to_version_identifier} with container name: {container_name}")
 
     # Pull the image before starting the container
-    to_version_image_name = pull_marqo_image(to_version_digest, source)
+    to_version_image_name = pull_marqo_image(to_version_identifier, source)
     logger.debug(f" Printing image name {to_version_image_name}")
     try:
         subprocess.run(["docker", "rm", "-f", container_name], check=True)
@@ -364,8 +367,7 @@ def cleanup_volumes():
             logger.debug(f"Warning: Failed to remove volume {volume_name}: {e}")
     volumes_to_cleanup.clear()
 
-def backwards_compatibility_test(from_version: str, to_version: str, to_version_digest: str, from_image: Optional[str] = None,
-                                 to_image: Optional[str] = None):
+def backwards_compatibility_test(from_version: str, to_version: str, to_version_digest: str):
     """
     Perform a backwards compatibility test between two versions of Marqo.
 
@@ -396,7 +398,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.debug(f"Transferring state from version {from_version} to {to_version}")
 
         from_version_volume = get_volume_name_from_marqo_version(from_version)
-        start_marqo_from_version_container(from_version, from_version_volume, from_image)
+        start_marqo_from_version_container(from_version, from_version_volume)
         logger.debug(f"Started marqo container {from_version}")
 
         try:
@@ -444,11 +446,11 @@ def rollback_test(to_version: str, from_version: str, to_version_digest, from_im
         to_image (Optional[str]): The specific image to use for the to_version container. Defaults to None.
     """
     try:
-        backwards_compatibility_test(from_version, to_version, None, from_image, to_image)
+        backwards_compatibility_test(from_version, to_version, None)
 
         stop_marqo_container(to_version)
 
-        start_marqo_from_version_container(from_version, None, from_image)
+        start_marqo_from_version_container(from_version, None)
 
         run_tests_across_versions("test", from_version, to_version)
     finally:
@@ -588,9 +590,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["backwards_compatibility", "rollback"], required=True)
     parser.add_argument("--from_version", required=True)
     parser.add_argument("--to_version", required=True)
-    parser.add_argument("--to_version_digest", required=True)
-    parser.add_argument("--from_image", required=False, default=None, help='Specify the source image')
-    parser.add_argument("--to_image", required=False, default=None, help='Specify the target image')
+    parser.add_argument("--to_version_image_identifier", required=True)
     args = parser.parse_args()
 
     from_version = semver.VersionInfo.parse(args.from_version)
@@ -600,6 +600,6 @@ if __name__ == "__main__":
         sys.exit(0) # TODO: figure out if we should just quit.
 
     if args.mode == "backwards_compatibility":
-        backwards_compatibility_test(args.from_version, args.to_version, args.to_version_digest, args.from_image, args.to_image)
+        backwards_compatibility_test(args.from_version, args.to_version, args.to_version_image_identifier)
     elif args.mode == "rollback":
-        rollback_test(args.to_version, args.from_version, args.to_version_digest, args.from_image, args.to_image)
+        rollback_test(args.to_version, args.from_version, args.to_version_digest)
