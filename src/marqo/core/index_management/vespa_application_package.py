@@ -425,9 +425,11 @@ class VespaApplicationFileStore(VespaApplicationStore):
     more details. This is the only viable option to deploy changes of binary files before Vespa version 8.382.22.
     We implement this approach to support bootstrapping and rollback for Vespa version prior to 8.382.22.
     """
-    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int):
+    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int,
+                 check_for_application_convergence: bool = True):
         super().__init__(vespa_client, deploy_timeout, wait_for_convergence_timeout)
-        self._app_root_path = vespa_client.download_application(check_for_application_convergence=True)
+        self._app_root_path = vespa_client.download_application(
+            check_for_application_convergence=check_for_application_convergence)
 
     def _full_path(self, *paths: str) -> str:
         return os.path.join(self._app_root_path, *paths)
@@ -483,9 +485,11 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
     See https://docs.vespa.ai/en/reference/deploy-rest-api-v2.html#create-session for more details.
     However, this approach does not support binary files for Vespa version prior to 8.382.22.
     """
-    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int):
+    def __init__(self, vespa_client: VespaClient, deploy_timeout: int, wait_for_convergence_timeout: int,
+                 check_for_application_convergence: bool = True):
         super().__init__(vespa_client, deploy_timeout, wait_for_convergence_timeout)
-        self._content_base_url, self._prepare_url = vespa_client.create_deployment_session()
+        self._content_base_url, self._prepare_url = vespa_client.create_deployment_session(
+            check_for_application_convergence)
         self._all_contents = vespa_client.list_contents(self._content_base_url)
 
     def file_exists(self, *paths: str) -> bool:
