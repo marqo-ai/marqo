@@ -209,6 +209,7 @@ jobs:
           
           echo "# Coverage Summary, Slow Tests and Failed Tests" >> $GITHUB_STEP_SUMMARY
           echo "```text" >> $GITHUB_STEP_SUMMARY
+          cat marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
           awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
           echo "```" >> $GITHUB_STEP_SUMMARY
           
