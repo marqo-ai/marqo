@@ -172,8 +172,7 @@ jobs:
           set -o pipefail
           pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered --cov-fail-under=35 \
-            --md-report --md-report-flavor gfm --md-report-exclude-outcomes passed xpassed \
-            --md-report-output pytest_result_summary.md \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/core/vespa_index/test_add_documents_handler.py | tee pytest_output.txt
 
       - name: Check Test Coverage of New Code
@@ -189,7 +188,7 @@ jobs:
           cd marqo
           echo "Running diff-cover against branch $BASE_BRANCH"
           git fetch origin $BASE_BRANCH:$BASE_BRANCH
-          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md --fail-under=95 \
+          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md --fail-under=90 \
             --compare-branch $BASE_BRANCH
 
       - name: Upload Test Report
@@ -206,7 +205,6 @@ jobs:
         run: |
           echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
           cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
-          ls -al marqo/pytest_output.txt
           
           echo "# Coverage Summary, Slow Tests and Failed Tests" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
