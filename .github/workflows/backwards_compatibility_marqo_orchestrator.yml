@@ -30,6 +30,7 @@ jobs:
     environment: marqo-test-suite
     outputs:
       image_exists: ${{ steps.check-image.outputs.image_exists }}
+      image_identifier: ${{ steps.check-image.outputs.image_identifier }}
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
@@ -44,13 +45,18 @@ jobs:
           aws-region: us-east-1
 
       # step to check for image existence - it uses aws cli to check if the image exists in the ECR registry "marqo-compatibility-tests"
-      - name: check for image existence
+      - name: Check image existence and get identifier
         id: check-image
         run: |
           echo "Checking for image existence"
-          if aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }}; then
+          if IMAGE_DETAILS=$(aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }} 2>/dev/null); then
             echo "image_exists=true" >> $GITHUB_OUTPUT
-            echo "Image already exists in ECR"
+            echo "Image already exists in ECR, will not build and push again. Will be using the image digest from existing image"
+            
+            IMAGE_IDENTIFIER=$(echo "$IMAGE_DETAILS" | jq -r '.imageDetails[0].imageDigest')
+            REGISTRY_ID = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
+            FULL_IDENTIFIER="${REGISTRY_ID}/marqo-compatibility-tests@${IMAGE_IDENTIFIER}"
+            echo "image_identifier=${FULL_IDENTIFIER}" >> $GITHUB_OUTPUT
           else
             echo "image_exists=false" >> $GITHUB_OUTPUT
             echo "Image doesn't exist" 
@@ -74,11 +80,11 @@ jobs:
     # Job to orchestrate backwards compatibility test execution. Majorly responsible for determining to_version and for generating the list of from_version(s) to test against.
     name: Orchestrate backwards compatibility test execution
     runs-on: ubuntu-latest
-    needs: build-and-push-image
+    needs: [check-if-image-exists, build-and-push-image]
+    if: always () && (needs.check-if-image-exists.result == 'success')
     outputs:
       list: ${{ steps.generate-versions.outputs.list }}
       to_version: ${{ steps.get-to-version.outputs.to_version }}
-#      image_digest: ${{ needs.build-and-push-image.outputs.image_digest }}
     environment: marqo-test-suite
     steps:
       # Step to check out the Marqo repository
@@ -131,7 +137,8 @@ jobs:
   run-execution-workflow:
     # Job to trigger execution workflows for each version combination
     name: Run all execution workflows
-    needs: [orchestrate, build-and-push-image]
+    needs: [orchestrate, check-if-image-exists, build-and-push-image]
+    if: always() && (needs.orchestrate.result == 'success')
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
@@ -141,5 +148,7 @@ jobs:
       from_version: ${{ matrix.from_version }}
       to_version: ${{ needs.orchestrate.outputs.to_version }}
       # Pass the image_identifier to the execution workflow. By image_identifier, we refer to the
-      # complete qualified image name with the image digest (i.e  424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
-      to_version_image_identifier: ${{ needs.build-and-push-image.outputs.image_identifier }}
+      # complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
+      # The image_identifier can either come from the check-if-image-exists (i.e in case the image already exists in ECR) job or the build-and-push-image (i.e in case the image was built and pushed to ECR) job.
+      to_version_image_identifier: ${{ needs.check-if-image-exists.outputs.image_exists == 'true' && needs.check-if-image-exists.outputs.image_identifier 
+                                  || needs.build-and-push-image.outputs.image_identifier }}
