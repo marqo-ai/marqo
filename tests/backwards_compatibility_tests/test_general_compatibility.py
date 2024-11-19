@@ -123,21 +123,26 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
     result_keys = search_methods # Set the result keys to be the same as search methods for easy comparison
     searchable_attributes = {"TENSOR": ['image_field', 'multimodal_field'], "LEXICAL": ['text_field']}
 
+    # We need to set indexes_to_delete variable in an overriden tearDownClass() method
+    # So that when the test method has finished running, pytest is able to delete the indexes added in
+    # prepare method of this class
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
+        super().tearDownClass()
 
     @classmethod
-    def setUpClass(cls):
+    def setUpClass(cls) -> None:
+        cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
         super().setUpClass()
-        cls.client = marqo.Client(**cls.client_settings)
-        cls.logger.debug(f"Creating indexes {cls.indexes_to_test_on}")
-        cls.create_indexes(cls.indexes_to_test_on)
-        cls.indexes_to_delete = [cls.structured_index_metadata['indexName'],
-                                 cls.unstructured_index_metadata['indexName']]
 
     def prepare(self):
         """
         Prepare the indexes and add documents for the test.
         Also store the search results for later comparison.
         """
+        self.logger.debug(f"Creating indexes {self.indexes_to_test_on}")
+        self.create_indexes(self.indexes_to_test_on)
         try:
             self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
             for index in self.indexes_to_test_on:
@@ -147,6 +152,7 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
                     self.client.index(index_name=index['indexName']).add_documents(documents=self.docs,
                                                                                    mappings=self.mappings,
                                                                                    tensor_fields=self.tensor_fields)
+            self.logger.debug(f'Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}')
         except Exception as e:
             self.logger.error(f"Exception occurred while adding documents {e}")
             raise e
@@ -188,9 +194,10 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
                 else:
                     result = self.client.index(index_name).search(q=query, search_method=search_method)
 
-                self._compare_results(stored_results[index_name][result_key], result)
+                self._compare_search_results(stored_results[index_name][result_key], result)
 
 
-    def _compare_results(self, expected_result, actual_result):
+    def _compare_search_results(self, expected_result, actual_result):
         """Compare two search results and assert if they match."""
-        self.assertEqual(expected_result, actual_result, f"Results do not match. Expected: {expected_result}, Got: {actual_result}")
+        # We compare just the hits because the result contains other fields like processingTime which changes in every search API call.
+        self.assertEqual(expected_result.get("hits"), actual_result.get("hits"), f"Results do not match. Expected: {expected_result}, Got: {actual_result}")

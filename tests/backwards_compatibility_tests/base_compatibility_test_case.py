@@ -11,6 +11,8 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     add documents / prepare marqo state. Also contains methods to save and load results to/from a file so that
     test results can be compared across versions.
     """
+    indexes_to_delete = []
+
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -27,6 +29,16 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     def get_results_file_path(cls):
         """Dynamically generate a unique file path based on the class name."""
         return Path(f"{cls.__qualname__}_stored_results.json")
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        # A function that will be automatically called after each test call
+        # This removes all the loaded models. It will also remove all the indexes inside a marqo instance.
+        # Be sure to set the indexes_to_delete list with the indexes you want to delete, in the test class.
+        cls.removeAllModels()
+        if cls.indexes_to_delete:
+            cls.delete_indexes(cls.indexes_to_delete)
+            cls.logger.debug(f"Deleting indexes {cls.indexes_to_delete}")
 
     @classmethod
     def save_results_to_file(cls, results):

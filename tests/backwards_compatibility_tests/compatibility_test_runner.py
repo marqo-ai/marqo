@@ -404,7 +404,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         try:
             run_tests_across_versions("prepare", from_version, to_version)
         except Exception as e:
-            logger.debug(f"Error running tests in prepare mode: {e}")
+            logger.error(f"Error running tests across versions in 'prepare' mode: {e}")
             raise e
         # Step 2: Stop from_version container (but don't remove it)
         stop_marqo_container(from_version)
@@ -413,10 +413,18 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         start_marqo_to_version_container(to_version, from_version, from_version_volume, to_version_image_idenfitifer)
         logger.debug(f"Started marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
-        run_tests_across_versions("test", from_version, to_version)
-        logger.debug("Ran tests in test mode")
+        try:
+            run_tests_across_versions("test", from_version, to_version)
+        except Exception as e:
+            logger.error(f"Error running tests across versions in 'test' mode: {e}")
+            raise e
+        logger.debug("Finished running tests in Test mode")
         # Step 5: Do a full test run which includes running tests in prepare and test mode on the same container
-        full_test_run(to_version)
+        try:
+            full_test_run(to_version)
+        except Exception as e:
+            logger.error(f"Error running tests in full test run mode: {e}")
+            raise e
     except Exception as e:
         logger.debug(f"An error occurred while executing backwards compatibility tests: {e}")
         raise e
@@ -477,7 +485,7 @@ def full_test_run(to_version: str):
     to_version Marqo container. Note that to_version Marqo container has been created by transferring instance from a
     previous from_version Marqo container.
     """
-    logger.debug(f"Inside full_test_run with to_version: {to_version}")
+    logger.debug(f"Running full_test_run with to_version: {to_version}")
     #Step 1: Run tests in prepare mode
     run_prepare_mode(to_version)
     #Step 2: Run tests in test mode
@@ -486,13 +494,13 @@ def full_test_run(to_version: str):
 def run_prepare_mode(version_to_test_against: str):
     load_all_subclasses("tests.backwards_compatibility_tests")
     # Get all subclasses of `BaseCompatibilityTestCase` that match the `version_to_test_against` criterion
+    # The below condition also checks if the test class is not marked to be skipped
     tests = [test_class for test_class in BaseCompatibilityTestCase.__subclasses__()
-             if getattr(test_class, 'marqo_version', '0') <= version_to_test_against]
+             if (getattr(test_class, 'marqo_version', '0') <= version_to_test_against and getattr(test_class, 'skip', False) == False)]
     for test_class in tests:
-        test_class.setUpClass()
+        test_class.setUpClass() #setUpClass will be used to create Marqo client
         test_instance = test_class()
-        test_instance.prepare() #Run prepare method of the test class
-        test_class.tearDownClass()
+        test_instance.prepare() #Prepare method will be used to create index and add documents
 
 def construct_pytest_arguments(version_to_test_against):
     pytest_args = [

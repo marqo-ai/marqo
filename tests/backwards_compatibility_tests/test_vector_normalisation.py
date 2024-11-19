@@ -12,16 +12,8 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     DEFAULT_DIMENSIONS = 384
     custom_vector = [1.0 for _ in range(DEFAULT_DIMENSIONS)]
     expected_custom_vector_after_normalization = [0.05103103816509247 for _ in range(DEFAULT_DIMENSIONS)]
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-
-        cls.client = marqo.Client(**cls.client_settings)
-
-        cls.create_indexes([
-            {
-                "indexName": cls.text_index_with_normalize_embeddings_true,
+    index_metadata = {
+                "indexName": text_index_with_normalize_embeddings_true,
                 "type": "structured",
                 "model": "sentence-transformers/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": True,
@@ -40,15 +32,24 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                      "features": ["lexical_search", "filter"]},
                 ],
                 "tensorFields": ["title", "content", "custom_vector_field_1"],
-            },
-        ]
-        )
+            }
 
+    indexes_to_test_on = [text_index_with_normalize_embeddings_true]
+
+    # We need to set indexes_to_delete variable in an overriden tearDownClass() method
+    # So that when the test method has finished running, pytest is able to delete the indexes added in
+    # prepare method of this class
+    @classmethod
+    def tearDownClass(cls) -> None:
         cls.indexes_to_delete = [cls.text_index_with_normalize_embeddings_true]
+        super().tearDownClass()
 
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
         # Add documents
+        self.logger.debug(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
+        self.create_indexes([self.index_metadata])
+
         try:
             add_docs_res_normalized = self.client.index(index_name=self.text_index_with_normalize_embeddings_true).add_documents(
                 documents=[
@@ -66,6 +67,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                     }
                 ])
             self.logger.debug(f"Added documents to index: {add_docs_res_normalized}")
+            self.logger.debug(f'Ran prepare mode test for {self.text_index_with_normalize_embeddings_true} inside test class {self.__class__.__name__}')
         except Exception as e:
             self.logger.error(f"Exception occurred while adding documents {e}")
             raise e
@@ -75,8 +77,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
         get_indexes = self.client.get_indexes()
         self.logger.debug(f"Got these indexes {get_indexes}")
 
-        for result in get_indexes['results']:
-            index_name = result['indexName']
+        for index_name in self.indexes_to_test_on:
             self.logger.debug(f"Processing index: {index_name}")
             try:
                 doc_res_normalized = self.client.index(index_name).get_document(
