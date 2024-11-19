@@ -171,7 +171,7 @@ jobs:
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
           pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test \
-            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered --cov-fail-under=35 \
+            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered --cov-fail-under=80 \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/core/vespa_index/test_add_documents_handler.py | tee pytest_output.txt
 

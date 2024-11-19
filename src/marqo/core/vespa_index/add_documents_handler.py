@@ -94,11 +94,6 @@ class AddDocumentsResponseCollector:
             status=200,
         )))
 
-        if False:
-            "a"
-        else:
-            "b"
-
     def to_add_doc_responses(self, index_name: str) -> MarqoAddDocumentsResponse:
         processing_time = (timer() - self.start_time) * 1000
         # since we reversed the doc list to skip duplicate docs, we now need to reverse the response
