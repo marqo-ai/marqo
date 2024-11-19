@@ -30,11 +30,13 @@ on:
   push:
     branches:
       - mainline
+      - releases/*
     paths-ignore:
       - '**.md'
   pull_request_target:
     branches:
       - mainline
+      - releases/*
     paths-ignore:
       - '**.md'
 
