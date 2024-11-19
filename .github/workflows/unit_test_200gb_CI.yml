@@ -206,10 +206,13 @@ jobs:
         run: |
           echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
           cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
+          
           echo "# Coverage Summary, Slow Tests and Failed Tests" >> $GITHUB_STEP_SUMMARY
           echo "```text" >> $GITHUB_STEP_SUMMARY
-          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
+          cat marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
+#          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
           echo "```" >> $GITHUB_STEP_SUMMARY
+          
           cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
       - name: Fail Job If Tests or Coverage Failed
