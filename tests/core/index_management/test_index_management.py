@@ -100,9 +100,10 @@ class TestIndexManagement(MarqoTestCase):
 
         self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
 
+    @patch('marqo.vespa.vespa_client.VespaClient.check_for_application_convergence')
     @patch('marqo.vespa.vespa_client.VespaClient.get_vespa_version')
     def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped_for_older_vespa_version(
-            self, mock_vespa_version):
+            self, mock_vespa_version, mock_check_convergence):
         mock_vespa_version.return_value = '8.382.21'
 
         def modified_post(*args, **kwargs):
@@ -111,16 +112,31 @@ class TestIndexManagement(MarqoTestCase):
         # verify the first boostrap call deploys the app to vespa
         with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
             self.assertTrue(self.index_management.bootstrap_vespa())
-            self.assertEqual(mock_post.call_count, 2)
-            self.assertTrue('prepareandactivate' in mock_post.call_args_list[1].args[0])
+            self.assertEqual(mock_post.call_count, 3)
+            # First call creates a session to download the app for app version check
+            self.assertTrue('session?from=' in mock_post.call_args_list[0].args[0])
+            # Second call creates a session to download the app to do bootstrapping
+            self.assertTrue('session?from=' in mock_post.call_args_list[1].args[0])
+            # Third call deploys the app by uploading the zip file
+            self.assertTrue('prepareandactivate' in mock_post.call_args_list[2].args[0])
+
+            # The first bootstrapping will deploy a new Vespa app, so it will check convergence
+            mock_check_convergence.assert_called_once()
+
+        mock_check_convergence.reset_mock()
 
         # verify the second boostrap call skips the deployment
         with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
             self.assertFalse(self.index_management.bootstrap_vespa())
             self.assertEqual(mock_post.call_count, 1)
-            self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
+            # First call creates a session to download the app for app version check
+            self.assertTrue('session?from=' in mock_post.call_args_list[0].args[0])
 
-    def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped(self):
+            # The second bootstrapping only need to check version, so it will skip convergence check
+            mock_check_convergence.assert_not_called()
+
+    @patch('marqo.vespa.vespa_client.VespaClient.check_for_application_convergence')
+    def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped(self, mock_check_convergence):
         def modified_put(*args, **kwargs):
             return httpx.put(*args, **kwargs)
 
@@ -129,11 +145,17 @@ class TestIndexManagement(MarqoTestCase):
             self.assertTrue(self.index_management.bootstrap_vespa())
             self.assertTrue('prepare' in mock_post.call_args_list[-2].args[0])
             self.assertTrue('active' in mock_post.call_args_list[-1].args[0])
+            # The first bootstrapping will deploy a new Vespa app, so it will check convergence
+            mock_check_convergence.assert_called_once()
+
+        mock_check_convergence.reset_mock()
 
         # verify the second boostrap call skips the deployment
         with mock.patch.object(httpx.Client, 'put', side_effect=modified_put) as mock_post:
             self.assertFalse(self.index_management.bootstrap_vespa())
             self.assertEqual(mock_post.call_count, 0)
+            # The second bootstrapping only need to check version, so it will skip convergence check
+            mock_check_convergence.assert_not_called()
 
     def test_boostrap_vespa_should_migrate_index_settings_from_existing_vespa_app(self):
         """
@@ -242,36 +264,6 @@ class TestIndexManagement(MarqoTestCase):
                 os.path.join(backup_dir, *file),
                 os.path.join(latest_version, *file)
             )
-
-    @patch('marqo.vespa.vespa_client.VespaClient.check_for_application_convergence')
-    def test_bootstrap_and_rollback_should_skip_convergence_check(self, mock_check_convergence):
-        self.index_management.bootstrap_vespa()
-        mock_check_convergence.assert_not_called()
-
-        mock_check_convergence.reset_mock()
-
-        try:
-            self.index_management.rollback_vespa()
-        except ApplicationRollbackError:
-            pass
-        mock_check_convergence.assert_not_called()
-
-    @patch('marqo.vespa.vespa_client.VespaClient.check_for_application_convergence')
-    @patch('marqo.vespa.vespa_client.VespaClient.get_vespa_version')
-    def test_bootstrap_and_rollback_should_not_skip_convergence_check_for_older_vespa_version(self, mock_vespa_version,
-                                                                                              mock_check_convergence):
-        mock_vespa_version.return_value = '8.382.21'
-
-        self.index_management.bootstrap_vespa()
-        mock_check_convergence.assert_called_once()
-
-        mock_check_convergence.reset_mock()
-
-        try:
-            self.index_management.rollback_vespa()
-        except ApplicationRollbackError:
-            pass
-        mock_check_convergence.assert_called_once()
 
     def test_rollback_should_fail_when_target_version_is_current_version(self):
         self.index_management.bootstrap_vespa()
