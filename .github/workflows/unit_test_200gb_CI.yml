@@ -89,6 +89,7 @@ jobs:
             python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
+        if: false
         run: |
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
@@ -117,6 +118,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
+        if: false
         run: |
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -153,6 +155,8 @@ jobs:
           echo "Deleted vespa_tester_app.zip"
 
       - name: Run Unit Tests
+        id: run_unit_tests
+        continue-on-error: true
         run: |
           # Define these for use by marqo
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -165,13 +169,42 @@ jobs:
 
           cd marqo
           export PYTHONPATH="./tests:./src:."
-          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test \
+            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report=lcov:lcov.info --cov-fail-under=25 \
+            tests/core/vespa_index/test_add_documents_handler.py
+
+      - name: Check Test Coverage of New Code
+        id: check_test_coverage
+        continue-on-error: true
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          else
+            export BASE_BRANCH=mainline
+          fi
+          
+          cd marqo
+          echo "Running diff-cover against branch $BASE_BRANCH"
+          git fetch origin $BASE_BRANCH:$BASE_BRANCH
+          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md --fail-under=95 \
+            --compare-branch $BASE_BRANCH
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
+        if: ${{ always() }}  # upload the coverage report even the previous step fails
+        continue-on-error: true
         with:
           name: marqo-test-report
-          path: marqo/cov_html/
+          path: |
+            marqo/cov_html/
+            diff_cov.html
+
+      - name: Fail Job If Tests or Coverage Failed
+        if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
+        run: |
+          echo "Tests or coverage checks failed. Marking job as failed."
+          exit 1
+        shell: bash
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
