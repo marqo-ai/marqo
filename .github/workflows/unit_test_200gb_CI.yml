@@ -89,7 +89,6 @@ jobs:
             python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
-        if: false
         run: |
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
@@ -118,7 +117,6 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        if: false
         run: |
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -173,7 +171,7 @@ jobs:
           pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered --cov-fail-under=80 \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/core/vespa_index/test_add_documents_handler.py | tee pytest_output.txt
+            tests | tee pytest_output.txt
 
       - name: Check Test Coverage of New Code
         id: check_test_coverage
