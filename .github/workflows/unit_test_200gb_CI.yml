@@ -186,7 +186,7 @@ jobs:
           cd marqo
           echo "Running diff-cover against branch $BASE_BRANCH"
           git fetch origin $BASE_BRANCH:$BASE_BRANCH
-          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md --fail-under=95 \
+          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md --fail-under=101 \
             --compare-branch $BASE_BRANCH
 
       - name: Upload Test Report
@@ -197,7 +197,7 @@ jobs:
           name: marqo-test-report
           path: |
             marqo/cov_html/
-            diff_cov.html
+            marqo/diff_cov.html
 
       - name: Fail Job If Tests or Coverage Failed
         if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
