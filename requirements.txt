@@ -1,3 +1,11 @@
+# Package in this file will overwrite the default requirements in the base-image
+# Only put the package that are updating frequently
+
+# Currently, all the packages are included in the base-image
+# Check https://github.com/marqo-ai/marqo-base/tree/main/requirements for the
+# list of packages in the base-image
+
+# TODO Remove these packages when the base image is upgaraded to 38
 pydantic==1.10.11
 httpx==0.25.0
 semver==3.0.2
