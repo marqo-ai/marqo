@@ -191,13 +191,17 @@ jobs:
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
-        if: ${{ always() }}  # upload the coverage report even the previous step fails
         continue-on-error: true
         with:
           name: marqo-test-report
           path: |
             marqo/cov_html/
             marqo/diff_cov.html
+
+      - name: Test and coverage report summary
+        continue-on-error: true
+        run: |
+          cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
       - name: Fail Job If Tests or Coverage Failed
         if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
