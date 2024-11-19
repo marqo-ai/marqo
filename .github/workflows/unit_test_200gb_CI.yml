@@ -171,6 +171,7 @@ jobs:
           export PYTHONPATH="./tests:./src:."
           pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report=lcov:lcov.info --cov-fail-under=35 \
+            --md-report --md-report-flavor gfm --md-report-exclude-outcomes passed skipped xpassed --md-report-output pytest_result.md \
             tests/core/vespa_index/test_add_documents_handler.py
 
       - name: Check Test Coverage of New Code
@@ -202,6 +203,7 @@ jobs:
       - name: Test and coverage report summary
         continue-on-error: true
         run: |
+          cat marqo/pytest_result.md >> $GITHUB_STEP_SUMMARY
           cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
 
       - name: Fail Job If Tests or Coverage Failed

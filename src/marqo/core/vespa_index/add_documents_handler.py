@@ -91,7 +91,7 @@ class AddDocumentsResponseCollector:
 
         self.responses.append((loc, MarqoAddDocumentsItem(
             id=doc_id if doc_id is not None else '',
-            status=200,
+            status=400,
         )))
 
         if loc is not None:
