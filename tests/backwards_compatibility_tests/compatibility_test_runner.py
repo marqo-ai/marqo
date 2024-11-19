@@ -24,7 +24,6 @@ volumes_to_cleanup: Set[str] = set()
 logger = get_logger(__name__)
 
 def load_all_subclasses(package_name):
-    logger.debug(f"Inside load_all_subclasses with package_name: {package_name}")
     package = importlib.import_module(package_name)
     package_path = package.__path__
 
@@ -465,7 +464,7 @@ def run_tests_across_versions(mode: str, from_version: str, to_version: str):
     This method will run tests across two Marqo versions, meaning it will run prepare on a Marqo from_version instance,
     and run tests on a Marqo to_version instance.
     """
-    print(f"Running tests across versions with mode: {mode}, from_version: {from_version}, to_version: {to_version}")
+    logger.debug(f"Running tests across versions with mode: {mode}, from_version: {from_version}, to_version: {to_version}")
 
     if mode == "prepare":
         run_prepare_mode(from_version)
@@ -489,8 +488,6 @@ def run_prepare_mode(version_to_test_against: str):
     # Get all subclasses of `BaseCompatibilityTestCase` that match the `version_to_test_against` criterion
     tests = [test_class for test_class in BaseCompatibilityTestCase.__subclasses__()
              if getattr(test_class, 'marqo_version', '0') <= version_to_test_against]
-    for test_class in BaseCompatibilityTestCase.__subclasses__():
-        logger.debug(f"See the test_class: {test_class}")
     for test_class in tests:
         test_class.setUpClass()
         test_instance = test_class()
