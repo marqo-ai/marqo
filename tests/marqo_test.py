@@ -12,15 +12,15 @@ import vespa.application as pyvespa
 from starlette.applications import Starlette
 
 from marqo import config, version, tensor_search
-from marqo.tensor_search import index_meta_cache, tensor_search
-from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 from marqo.core.monitoring.monitoring import Monitoring
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
+from marqo.vespa.zookeeper_client import ZookeeperClient
 
 
 class TestImageUrls(str, Enum):
