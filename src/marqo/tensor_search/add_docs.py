@@ -1,19 +1,17 @@
 """Functions used to fulfill the add_documents endpoint"""
 import concurrent
 import copy
+import logging
 import math
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import ContextManager
-import threading
-import torch
-import ffmpeg
 
-import logging
-
-import numpy as np
 import PIL
+import numpy as np
+import torch
 from PIL.ImageFile import ImageFile
 from torchvision.transforms import Compose
 
@@ -22,17 +20,16 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
 from marqo.s2_inference import clip_utils
+from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
+from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
-from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
-from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-
-from marqo.s2_inference.models.model_type import ModelType
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +75,9 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
     # Determine index type
     is_structured_index = marqo_index_type == IndexType.Structured
     is_unstructured_index = marqo_index_type in [IndexType.Unstructured, IndexType.SemiStructured]
+
+    if preprocessors is None:
+        preprocessors = {}
 
     # Generate pseudo-unique ID for thread metrics.
     _id = f'image_download.{threading.get_ident()}'
@@ -172,7 +172,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 video_preprocessing=video_preprocessing, media_download_headers=media_download_headers
                             )
                             media_repo[doc[field]] = processed_chunks
-                        except (ffmpeg.Error, S2InferenceError) as e:
+                        except Exception as e:
                             logger.error(f"Error processing {inferred_modality} file: {str(e)}")
                             media_repo[doc[field]] = S2InferenceError(f"Error processing {inferred_modality} file: {str(e)}")
                     
