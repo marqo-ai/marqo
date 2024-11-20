@@ -24,7 +24,7 @@ class TestVideoFFmpegDecode(unittest.TestCase):
         enable_gpu_acceleration = False
 
         StreamingMediaProcessor.fetch_video_chunk(
-            valid_url, start_time, duration, self.output_file, enable_gpu_acceleration
+            valid_url, start_time, duration, self.output_file, enable_gpu_acceleration=enable_gpu_acceleration
         )
         self.assertTrue(os.path.exists(self.output_file))
 
@@ -36,7 +36,7 @@ class TestVideoFFmpegDecode(unittest.TestCase):
 
         with self.assertRaises(MediaDownloadError) as e:
             StreamingMediaProcessor.fetch_video_chunk(
-                invalid_url, start_time, duration, self.output_file, enable_gpu_acceleration
+                invalid_url, start_time, duration, self.output_file, enable_gpu_acceleration=enable_gpu_acceleration
             )
         self.assertFalse(os.path.exists(self.output_file))
         self.assertIn("404", str(e.exception))
@@ -50,7 +50,7 @@ class TestVideoFFmpegDecode(unittest.TestCase):
 
         with self.assertRaises(MediaDownloadError):
             StreamingMediaProcessor.fetch_video_chunk(
-                valid_url, start_time, duration, self.output_file, enable_gpu_acceleration
+                valid_url, start_time, duration, self.output_file, enable_gpu_acceleration=enable_gpu_acceleration
             )
         self.assertFalse(os.path.exists(self.output_file))
 
@@ -62,7 +62,7 @@ class TestVideoFFmpegDecode(unittest.TestCase):
 
         for enable_gpu_acceleration in (True, False):
             StreamingMediaProcessor.fetch_video_chunk(
-                valid_url, start_time, duration, self.output_file, enable_gpu_acceleration
+                valid_url, start_time, duration, self.output_file, enable_gpu_acceleration=enable_gpu_acceleration
             )
             self.assertTrue(os.path.exists(self.output_file))
             os.remove(self.output_file)

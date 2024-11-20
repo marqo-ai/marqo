@@ -5,7 +5,6 @@ import os
 import subprocess
 # for multimodal processing
 import tempfile
-from typing import Tuple
 
 import ffmpeg
 import torch
@@ -81,7 +80,7 @@ class StreamingMediaProcessor:
         return "\r\n".join([f"{key}: {value}" for key, value in raw_media_download_headers.items()])
 
 
-    def _fetch_file_metadata(self) -> Tuple[float, float]:
+    def _fetch_file_metadata(self):
         try:
             probe_options = {
                 'v': 'error',
@@ -97,7 +96,6 @@ class StreamingMediaProcessor:
 
             size = int(probe['format'].get('size', 0))
             duration = float(probe['format'].get('duration', 0))
-
             return size, duration
 
         except ffmpeg.Error as e:
@@ -135,6 +133,8 @@ class StreamingMediaProcessor:
                             start_time=chunk_start,
                             duration=chunk_end - chunk_start,
                             output_file=output_file,
+                            media_download_headers=self.media_download_headers,
+                            enable_gpu_acceleration=self.enable_video_gpu_acceleration
                         )
                     elif self.modality == Modality.AUDIO:  # AUDIO
                         output_file = self.fetch_audio_chunk(
@@ -142,6 +142,7 @@ class StreamingMediaProcessor:
                             start_time=chunk_start,
                             duration=chunk_end - chunk_start,
                             output_file=output_file,
+                            media_download_headers=self.media_download_headers
                         )
                     else:
                         raise ValueError(f"Unsupported modality: {self.modality}")
@@ -165,7 +166,10 @@ class StreamingMediaProcessor:
         if download_total > 0:
             progress = downloaded / download_total * 100
 
-    def fetch_video_chunk(self, url: str, start_time: float, duration: float, output_file: str) -> str:
+    @staticmethod
+    def fetch_video_chunk(url: str, start_time: float, duration: float, output_file: str,
+                          media_download_headers: str = "",
+                          enable_gpu_acceleration: bool = False,) -> str:
         """
         Fetch a video chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
         downloaded video chunk.
@@ -174,6 +178,7 @@ class StreamingMediaProcessor:
             start_time: The start time of the video chunk
             duration: The duration of the video chunk
             output_file: The path to save the video chunk
+            enable_gpu_acceleration: Whether to use GPU acceleration for downloading the video chunk
 
         Returns:
             THe path to the downloaded video chunk
@@ -181,7 +186,7 @@ class StreamingMediaProcessor:
         Raises:
             MediaDownloadError: If there is an error downloading the video chunk
         """
-        if self.enable_gpu_acceleration is True:
+        if enable_gpu_acceleration is True:
             ffmpeg_command = [
                 'ffmpeg',
                 '-y',  # Enable overwrite
@@ -210,9 +215,8 @@ class StreamingMediaProcessor:
                 output_file
             ]
 
-        if self.media_download_headers:
-            ffmpeg_command.extend(['-headers', self.media_download_headers])
-
+        if media_download_headers:
+            ffmpeg_command.extend(['-headers', media_download_headers])
         result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
             # Even if there is an error, the output file may still be created. Remove it if it exists.
@@ -223,7 +227,10 @@ class StreamingMediaProcessor:
                                      f"Original error message: {result.stderr.decode()}")
         return output_file
 
-    def fetch_audio_chunk(self, url: str, start_time: float, duration: float, output_file: str) -> str:
+    @staticmethod
+    def fetch_audio_chunk(
+            url: str, start_time: float, duration: float, output_file: str, media_download_headers: str = ""
+    ) -> str:
         """
         Fetch an audio chunk from the url, starting at start_time and lasting duration seconds. Return the path to the
         downloaded audio chunk.
@@ -249,8 +256,8 @@ class StreamingMediaProcessor:
             output_file  # Output file
         ]
 
-        if self.media_download_headers:
-            ffmpeg_command.extend(['-headers', self.media_download_headers])
+        if media_download_headers:
+            ffmpeg_command.extend(['-headers', media_download_headers])
 
         result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
