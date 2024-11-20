@@ -279,7 +279,7 @@ class TestOnStartScript(MarqoTestCase):
         self.assertTrue('some error' in str(context.exception))
 
     def test_missing_punkt_downloaded(self):
-        """A test to ensure that the script will attempt to download the punkt and punkt_tab
+        """A test to ensure that the script will attempt to download the punkt_tab
         tokenizer if it is not found"""
         with mock.patch("marqo.tensor_search.on_start_script.nltk.data.find") as mock_find, \
             mock.patch("marqo.tensor_search.on_start_script.nltk.download") as mock_nltk_download:
