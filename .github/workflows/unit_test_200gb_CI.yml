@@ -87,6 +87,10 @@ jobs:
           # override base requirements with marqo requirements, if needed:
           pip install -r marqo/requirements.dev.txt
 
+      - name: Download nltk data
+        run: |
+            python -m nltk.downloader punkt_tab
+
       - name: Build Vespa
         run: |
           systemctl stop unattended-upgrades
@@ -164,7 +168,7 @@ jobs:
 
           cd marqo
           export PYTHONPATH="./tests:./src:."
-          pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4

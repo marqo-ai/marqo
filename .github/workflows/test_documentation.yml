@@ -37,7 +37,6 @@ jobs:
         run: |
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           pip install -r marqo/requirements.dev.txt
-          pip install pytest==7.4.0
 
       - name: Run Documentation Tests
         run: |

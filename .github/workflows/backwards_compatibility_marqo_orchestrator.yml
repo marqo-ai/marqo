@@ -1,0 +1,154 @@
+# Orchestrator workflow
+name: Marqo Compatibility Tests Orchestrator
+
+on:
+  push:
+    branches:
+      - mainline
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+    inputs:
+      to_version:
+        description: 'Target Marqo version'
+        required: true
+      max_versions_to_test:
+        description: 'Max versions to test'
+        required: false
+      #TODO: Add input for specifying py_marqo branch (https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841556872)
+
+# Setting MAX_VERSIONS_TO_TEST, this can be a configurable value or if no input is provided, it can be a default value.
+env:
+  MAX_VERSIONS_TO_TEST: ${{ github.event.inputs.max_versions_to_test || 3 }}
+
+jobs:
+  check-if-image-exists:
+    # Responsible for deciding if we should invoke build_push_img.yml GitHub actions workflow in the same repo.
+    # We do not want to build and push the image if it already exists in the ECR registry, which will be the case if this is a manual developer initiated re-run using the same commit.
+    name: Check if image already exists in ECR
+    runs-on: ubuntu-latest
+    environment: marqo-test-suite
+    outputs:
+      image_exists: ${{ steps.check-image.outputs.image_exists }}
+      image_identifier: ${{ steps.check-image.outputs.image_identifier }}
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # step to check for image existence - it uses aws cli to check if the image exists in the ECR registry "marqo-compatibility-tests"
+      - name: Check image existence and get identifier
+        id: check-image
+        run: |
+          echo "Checking for image existence"
+          if IMAGE_DETAILS=$(aws ecr describe-images --repository-name marqo-compatibility-tests --image-ids imageTag=${{ github.sha }} 2>/dev/null); then
+            echo "image_exists=true" >> $GITHUB_OUTPUT
+            echo "Image already exists in ECR, will not build and push again. Will be using the image digest from existing image"
+            
+            IMAGE_IDENTIFIER=$(echo "$IMAGE_DETAILS" | jq -r '.imageDetails[0].imageDigest')
+            REGISTRY_ID = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
+            FULL_IDENTIFIER="${REGISTRY_ID}/marqo-compatibility-tests@${IMAGE_IDENTIFIER}"
+            echo "image_identifier=${FULL_IDENTIFIER}" >> $GITHUB_OUTPUT
+          else
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+            echo "Image doesn't exist" 
+          fi
+
+  build-and-push-image:
+    # Job to actually build and push image to ECR registry. This job is only triggered if the image does not already exist in the ECR registry.
+    name: Build and Push Image
+    needs: check-if-image-exists
+    if: needs.check-if-image-exists.outputs.image_exists == 'false'
+    uses: ./.github/workflows/build_push_img.yml
+    secrets: inherit
+    with:
+      marqo_ref: "${{ github.sha }}"
+      push_to: "ECR"
+      image_repo: "marqo-compatibility-tests"
+      image_tag: "${{ github.sha }}"
+
+
+  orchestrate:
+    # Job to orchestrate backwards compatibility test execution. Majorly responsible for determining to_version and for generating the list of from_version(s) to test against.
+    name: Orchestrate backwards compatibility test execution
+    runs-on: ubuntu-latest
+    needs: [check-if-image-exists, build-and-push-image]
+    if: always () && (needs.check-if-image-exists.result == 'success')
+    outputs:
+      list: ${{ steps.generate-versions.outputs.list }}
+      to_version: ${{ steps.get-to-version.outputs.to_version }}
+    environment: marqo-test-suite
+    steps:
+      # Step to check out the Marqo repository
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Step to set up Python 3.9
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.9'
+          cache: "pip"
+
+      # Step to install the semver package
+      - name: Install semver
+        run: |
+          pip install semver
+
+      # Step to determine the target version
+      - name: Determine to_version
+        id: get-to-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.to_version }}" ]; then
+            VERSION="${{ github.event.inputs.to_version }}"
+          else
+            VERSION=$(python tests/backwards_compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
+          fi
+          echo "to_version=${VERSION}" >> $GITHUB_OUTPUT
+      # Step to generate the list of versions to test
+      - name: Generate version list #this code block just generates the from_version list and stores it in a versions variable as a list
+        id: generate-versions
+        run: |
+          # Run the Python script and capture its output
+          VERSION_LIST=$(python tests/backwards_compatibility_tests/scripts/generate_versions.py ${{ steps.get-to-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
+          echo "list=${VERSION_LIST}" >> $GITHUB_OUTPUT
+      # Step to display the versions to test
+      - name: display versions
+        run: |
+          echo "Versions to test: ${{ steps.generate-versions.outputs.list }} against to_version: ${{ steps.get-to-version.outputs.to_version }}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+  run-execution-workflow:
+    # Job to trigger execution workflows for each version combination
+    name: Run all execution workflows
+    needs: [orchestrate, check-if-image-exists, build-and-push-image]
+    if: always() && (needs.orchestrate.result == 'success')
+    strategy:
+      matrix:
+        from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
+    uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
+    secrets: inherit
+    with:
+      from_version: ${{ matrix.from_version }}
+      to_version: ${{ needs.orchestrate.outputs.to_version }}
+      # Pass the image_identifier to the execution workflow. By image_identifier, we refer to the
+      # complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
+      # The image_identifier can either come from the check-if-image-exists (i.e in case the image already exists in ECR) job or the build-and-push-image (i.e in case the image was built and pushed to ECR) job.
+      to_version_image_identifier: ${{ needs.check-if-image-exists.outputs.image_exists == 'true' && needs.check-if-image-exists.outputs.image_identifier 
+                                  || needs.build-and-push-image.outputs.image_identifier }}

@@ -1,18 +1,19 @@
 import json
 import os
 import time
-
-import torch
-
 from threading import Lock
+
+import nltk
+import torch
 from PIL import Image
 
-from marqo import config, marqo_docs, version
+from marqo import config, version
+from marqo import marqo_docs
 from marqo.api import exceptions
 from marqo.connections import redis_driver
-from marqo.s2_inference.s2_inference import vectorise
-from marqo.s2_inference.processing.image import chunk_image
 from marqo.s2_inference.constants import PATCH_MODELS
+from marqo.s2_inference.processing.image import chunk_image
+from marqo.s2_inference.s2_inference import vectorise
 # we need to import backend before index_meta_cache to prevent circular import error:
 from marqo.tensor_search import constants
 from marqo.tensor_search import index_meta_cache, utils
@@ -319,16 +320,22 @@ class SetEnableVideoGPUAcceleration:
 
 
 class CheckNLTKTokenizers:
-    """Checks if NLTK tokenizers are available."""
-    logger = get_logger('CheckNLTKTokenizers')
+    """Check if NLTK tokenizers are available, if not, download them.
 
+    NLTK tokenizers are included in the base-image, we do a sanity check to ensure they are available.
+    """
     def run(self):
         try:
-            nltk.data.find('tokenizers/punkt')
+            nltk.data.find("tokenizers/punkt_tab")
+        except LookupError:
+            logger.info("NLTK punkt_tab tokenizer not found. Downloading...")
+            nltk.download("punkt_tab")
+
+        try:
             nltk.data.find("tokenizers/punkt_tab")
         except LookupError as e:
             raise exceptions.StartupSanityCheckError(
-                f"NLTK tokenizers not found. Original error message: {e}. "
+                f"Marqo failed to download and download NLTK tokenizers. Original error: {e}"
             ) from e
 
 

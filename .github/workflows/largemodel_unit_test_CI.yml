@@ -92,6 +92,10 @@ jobs:
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 
+      - name: Download nltk data
+        run: |
+            python -m nltk.downloader punkt_tab
+
       - name: Build Vespa
         run: |
           systemctl stop unattended-upgrades
@@ -162,7 +166,7 @@ jobs:
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests --largemodel --ignore=marqo/tests/test_documentation.py
+          pytest marqo/tests --largemodel --ignore=marqo/tests/test_documentation.py --ignore=marqo/tests/backwards_compatibility_tests 
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
