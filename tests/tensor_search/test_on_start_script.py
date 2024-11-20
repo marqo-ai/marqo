@@ -3,10 +3,10 @@ import os
 from unittest import mock
 
 from marqo.api import exceptions, configs
+from marqo.api.exceptions import StartupSanityCheckError
 from marqo.tensor_search import enums
 from marqo.tensor_search import on_start_script
 from tests.marqo_test import MarqoTestCase
-from marqo.api.exceptions import StartupSanityCheckError
 
 
 class TestOnStartScript(MarqoTestCase):
@@ -289,6 +289,4 @@ class TestOnStartScript(MarqoTestCase):
                 checker = on_start_script.CheckNLTKTokenizers()
                 with self.assertRaises(StartupSanityCheckError):
                     checker.run()
-
-                mock_nltk_download.assert_any_call('punkt')
                 mock_nltk_download.assert_any_call("punkt_tab")

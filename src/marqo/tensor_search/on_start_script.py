@@ -267,19 +267,12 @@ class CheckNLTKTokenizers:
     """
     def run(self):
         try:
-            nltk.data.find("tokenizers/punkt")
-        except LookupError:
-            logger.info("NLTK punkt tokenizer not found. Downloading...")
-            nltk.download("punkt")
-
-        try:
             nltk.data.find("tokenizers/punkt_tab")
         except LookupError:
             logger.info("NLTK punkt_tab tokenizer not found. Downloading...")
             nltk.download("punkt_tab")
 
         try:
-            nltk.data.find("tokenizers/punkt")
             nltk.data.find("tokenizers/punkt_tab")
         except LookupError as e:
             raise exceptions.StartupSanityCheckError(

@@ -1,11 +1,10 @@
-from typing import Any, Dict, List, Optional, Union
-from types import FunctionType
-
 from functools import partial
-from more_itertools import windowed
+from types import FunctionType
+from typing import List
 
+from more_itertools import windowed
+# sent_tokenize and word_tokenize requires the punkt_tab dataset
 from nltk.tokenize import sent_tokenize, word_tokenize
-import nltk
 
 
 def _splitting_functions(split_by: str, language: str='english') -> FunctionType:
