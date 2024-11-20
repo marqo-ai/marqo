@@ -20,6 +20,7 @@ from torchvision.transforms import Compose
 import marqo.exceptions as base_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
+from marqo.exceptions import InternalError
 from marqo.s2_inference import clip_utils
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
@@ -167,8 +168,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         try:
                             processed_chunks = download_and_chunk_media(
                                 url=doc[field], device=device, modality=inferred_modality,
-                                marqo_index_type=marqo_index_type, marqo_index_model=marqo_index_model,
-                                preprocessors=preprocessors, audio_preprocessing=audio_preprocessing,
+                                preprocessors=Preprocessors(**preprocessors), audio_preprocessing=audio_preprocessing,
                                 video_preprocessing=video_preprocessing, media_download_headers=media_download_headers
                             )
                             media_repo[doc[field]] = processed_chunks
@@ -180,35 +180,20 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         media_repo[doc[field]] = S2InferenceError(f"Error processing media file {doc}, detected as text, expected a {media_field_types_mapping[field]} pointer")
                     else:
                         pass
-
-                # For multimodal tensor combination
-                elif isinstance(doc[field], dict):
-                    for sub_field in list(doc[field].values()):
-                        if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
-                            if sub_field in media_repo:
-                                continue
-                            try:
-                                media_repo[sub_field] = clip_utils.load_image_from_path(
-                                    sub_field,
-                                    media_download_headers,
-                                    timeout=TIMEOUT_SECONDS,
-                                    metrics_obj=metric_obj
-                                )
-                            except PIL.UnidentifiedImageError as e:
-                                media_repo[sub_field] = e
-                                metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
-                                continue
+                else:
+                    raise InternalError(f"Invalid field type for {field} to be added in media repo. Must be a string "
+                                        f"but {type(field)}.")
 
 
-def download_and_chunk_media(url: str, device: str, modality: Modality, marqo_index_type: IndexType, marqo_index_model: Model,
+def download_and_chunk_media(url: str, device: str, modality: Modality,
                              preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
                              video_preprocessing: VideoPreProcessing = None,
                              media_download_headers: Optional[Dict] = None) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
     processor = StreamingMediaProcessor(
-        url=url, device=device, modality=modality, marqo_index_type=marqo_index_type, marqo_index_model=marqo_index_model,
-        preprocessors=preprocessors, audio_preprocessing=audio_preprocessing, video_preprocessing=video_preprocessing,
+        url=url, device=device, modality=modality, preprocessors=preprocessors,
+        audio_preprocessing=audio_preprocessing, video_preprocessing=video_preprocessing,
         media_download_headers=media_download_headers
     )
 
