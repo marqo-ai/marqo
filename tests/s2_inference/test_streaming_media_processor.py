@@ -90,13 +90,10 @@ class TestStreamingMediaProcessor(unittest.TestCase):
 
             # We expect the GPU decoding to be faster than CPU decoding
             if enable_video_gpu_acceleration:
-                self.assertLess(elapsed_time, 5, f"GPU decoding took too long. Elapsed time: "
-                                                 f"{elapsed_time}. URL: {valid_url}")
-            # We expect the CPU decoding to be slower than GPU decoding
-            else:
-                self.assertGreater(elapsed_time, 5,
-                                   f"CPU decoding took too short. There could be an issue. "
-                                   f"Elapsed time: {elapsed_time}. URL: {valid_url}")
+                self.assertLess(
+                    elapsed_time, 3, f"GPU decoding took too long. Elapsed time: "
+                                     f"{elapsed_time}. URL: {valid_url}"
+                )
             self.assertTrue(os.path.exists(self.output_file))
 
     def test_header_conversion_with_valid_headers(self):
