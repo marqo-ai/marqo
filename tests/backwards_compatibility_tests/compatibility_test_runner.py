@@ -492,15 +492,39 @@ def full_test_run(to_version: str):
     run_test_mode(to_version)
 
 def run_prepare_mode(version_to_test_against: str):
+    version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     load_all_subclasses("tests.backwards_compatibility_tests")
     # Get all subclasses of `BaseCompatibilityTestCase` that match the `version_to_test_against` criterion
     # The below condition also checks if the test class is not marked to be skipped
-    tests = [test_class for test_class in BaseCompatibilityTestCase.__subclasses__()
-             if (getattr(test_class, 'marqo_version', '0') <= version_to_test_against and getattr(test_class, 'skip', False) == False)]
-    for test_class in tests:
-        test_class.setUpClass() #setUpClass will be used to create Marqo client
-        test_instance = test_class()
-        test_instance.prepare() #Prepare method will be used to create index and add documents
+    for test_class in BaseCompatibilityTestCase.__subclasses__():
+        markers = getattr(test_class, "pytestmark", [])
+        # Check for specific markers
+        marqo_version_marker = next( # Checks what version a compatibility test is marked with (ex: @pytest.mark.marqo_version('2.11.0')). If no version is marked, it will skip the test
+            (marker for marker in markers if marker.name == "marqo_version"),
+            None
+        )
+        skip_marker = next( # Checks if a compatibility test is marked with @pytest.mark.skip
+            (marker for marker in markers if marker.name == "skip"),
+            None
+        )
+        # To check for cases if a test case is not marked with marqo_version OR if it is marked with skip. In that case we skip running prepare mode on that test case.
+        if not marqo_version_marker or skip_marker:
+            if not marqo_version_marker:
+                logger.error(f"No marqo_version marker detected for class {test_class.__name__}, skipping prepare mode for this test class")
+            elif skip_marker:
+                logger.error(f"Detected 'skip' marker for class {test_class.__name__}, skipping prepare mode for this test class")
+            continue
+
+        marqo_version = marqo_version_marker.args[0]
+        logger.debug(f"Detected marqo_version '{marqo_version}' for class {test_class.__name__}")
+
+        if semver.VersionInfo.parse(marqo_version).compare(version_to_test_against) <= 0:
+            logger.debug(f"Running prepare mode on test: {test_class.__name__} with version: {marqo_version}")
+            test_class.setUpClass() #setUpClass will be used to create Marqo client
+            test_instance = test_class()
+            test_instance.prepare() #Prepare method will be used to create index and add documents
+        else: # Skip the test if the version_to_test_against is greater than the version the test is marked
+            logger.debug(f"Skipping testcase {test_class.__name__} with version {marqo_version} as it is greater than {version_to_test_against}")
 
 def construct_pytest_arguments(version_to_test_against):
     pytest_args = [
