@@ -71,7 +71,8 @@ jobs:
         run: |
           # Get the list of changed files in the current PR
           changed_files=$(git diff --name-only $GITHUB_SHA $GITHUB_BASE_REF)
-          echo $changed_files
+          echo "github_sha: $GITHUB_SHA, github_base_ref: $GITHUB_BASE_REF"
+          echo "changed files: $changed_files"
           
           # Check if the changed files are only .md files
           if [[ ! "$changed_files" =~ \.md$ ]]; then
