@@ -18,7 +18,7 @@ from marqo.tensor_search import tensor_search, utils
 from marqo.tensor_search.enums import SearchMethod, EnvVars
 from marqo.core.models.add_docs_params import AddDocsParams
 from integ_tests.marqo_test import MarqoTestCase
-from tests.utils.transition import add_docs_caller
+from integ_tests.utils.transition import add_docs_caller
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 
 

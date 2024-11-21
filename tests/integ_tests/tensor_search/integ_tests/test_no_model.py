@@ -11,7 +11,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.models.search import SearchContext
 from integ_tests.marqo_test import MarqoTestCase
-from tests.utils.transition import *
+from integ_tests.utils.transition import *
 
 
 class TestNoModel(MarqoTestCase):

@@ -19,7 +19,7 @@ from marqo.tensor_search.models.search import SearchContext
 from marqo.tensor_search import api
 import numpy as np
 from marqo.tensor_search.models.api_models import CustomVectorQuery
-from tests.tensor_search.backwards_compat.resources import results_2_9
+from integ_tests.tensor_search.backwards_compat.resources import results_2_9
 
 
 class TestSearchRegression(MarqoTestCase):

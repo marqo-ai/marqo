@@ -10,7 +10,7 @@ from integ_tests.marqo_test import MarqoTestCase
 from marqo.core.inference.download_model_from_s3 import get_s3_model_absolute_cache_path
 from marqo.tensor_search.models.external_apis.s3 import S3Location
 from unittest import mock
-from tests.tensor_search.test_model_auth import _delete_file, _get_base_index_settings
+from integ_tests.tensor_search.test_model_auth import _delete_file, _get_base_index_settings
 import unittest
 import os
 import torch

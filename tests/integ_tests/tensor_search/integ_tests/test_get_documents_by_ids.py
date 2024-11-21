@@ -19,7 +19,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from unittest.mock import patch
 import os
 import pprint
-from tests.utils.transition import *
+from integ_tests.utils.transition import *
 
 
 class TestGetDocuments(MarqoTestCase):

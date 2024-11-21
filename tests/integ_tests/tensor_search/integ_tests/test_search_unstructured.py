@@ -24,7 +24,7 @@ from marqo.tensor_search.models.search import SearchContext
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.vespa.models import QueryResult
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
+from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 
 class TestSearchUnstructured(MarqoTestCase):

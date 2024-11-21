@@ -11,7 +11,7 @@ from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.api import exceptions as api_exceptions
 from marqo.tensor_search import enums
-from tests.utils.transition import add_docs_batched
+from integ_tests.utils.transition import add_docs_batched
 import os
 from marqo.vespa.models.delete_document_response import DeleteBatchDocumentResponse, DeleteBatchResponse
 

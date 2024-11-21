@@ -165,8 +165,8 @@ jobs:
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
-          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src:./marqo"
-          pytest marqo/tests --largemodel 
+          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
+          pytest marqo/tests/integ_tests --largemodel 
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
