@@ -1,8 +1,9 @@
 import argparse
 
 import os
+import time
 
-VESPA_VERSION=os.getenv('VESPA_VERSION', '8.396.18')  # default version baked into marqo-base:30
+VESPA_VERSION = os.getenv('VESPA_VERSION', '8.396.18')  # default version baked into marqo-base:30
 
 
 def start(args):
@@ -22,7 +23,20 @@ def restart(args):
 def deploy_config(args):
     os.system('vespa config set target local')
     here = os.path.dirname(os.path.abspath(__file__))
-    os.system(f'vespa deploy "{here}"')
+
+    max_retries = 10
+    for attempt in range(1, max_retries + 1):
+        print(f"Attempt {attempt}/{max_retries}: Deploying application package...")
+        result = os.system(f'vespa deploy "{here}"')
+
+        if result == 0:
+            print("Deployment successful.")
+            break
+        else:
+            print(f"Deployment failed. Retrying in 1 second...")
+            time.sleep(1)
+    else:
+        print("Deployment failed after 10 attempts.")
 
 
 def stop(args):
@@ -39,14 +53,14 @@ def main():
     prepare_parser = subparsers.add_parser("start", help="Start local Vespa")
     prepare_parser.set_defaults(func=start)
 
-    prepare_parser = subparsers.add_parser("restart", help="Restart existing local Vespa")
-    prepare_parser.set_defaults(func=restart)
+    restart_parser = subparsers.add_parser("restart", help="Restart existing local Vespa")
+    restart_parser.set_defaults(func=restart)
 
-    eks_parser = subparsers.add_parser("deploy-config", help="Deploy config")
-    eks_parser.set_defaults(func=deploy_config)
+    deploy_parser = subparsers.add_parser("deploy-config", help="Deploy config")
+    deploy_parser.set_defaults(func=deploy_config)
 
-    clean_parser = subparsers.add_parser("stop", help="Stop local Vespa")
-    clean_parser.set_defaults(func=stop)
+    stop_parser = subparsers.add_parser("stop", help="Stop local Vespa")
+    stop_parser.set_defaults(func=stop)
 
     # Parse the command-line arguments and execute the corresponding function
     args = parser.parse_args()
