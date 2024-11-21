@@ -10,7 +10,7 @@ on:
       - releases/*
     paths-ignore:
       - '**.md'
-  pull_request_target:
+  pull_request:
     branches:
       - mainline
       - releases/*
@@ -18,7 +18,7 @@ on:
       - '**.md'
 
 concurrency:
-  group: large-model-unit-tests-${{ github.head_ref || github.ref }}
+  group: large-model-unit-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -69,9 +69,6 @@ jobs:
         with:
           fetch-depth: 0
           path: marqo
-          # if triggered by a pull_request_target event, we should use the merge ref of the PR
-          # if triggered by a push event, github.ref points to the head of the source branch
-          ref: ${{ github.event_name == 'pull_request_target' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
 
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
