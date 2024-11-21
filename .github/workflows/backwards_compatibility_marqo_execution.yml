@@ -45,7 +45,6 @@ jobs:
       contents: read
       actions: write
       id-token: write
-      ec2-actions: write
       checks: write
       deployments: write
       packages: write
@@ -138,7 +137,6 @@ jobs:
       contents: read
       actions: write
       id-token: write
-      ec2-actions: write
       checks: write
       deployments: write
       packages: write
