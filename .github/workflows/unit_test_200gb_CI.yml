@@ -69,6 +69,7 @@ jobs:
       - name: Check if only md files changed
         id: check_changes
         run: |
+          cd marqo
           # Get the list of changed files in the current PR
           changed_files=$(git diff --name-only $GITHUB_SHA $GITHUB_BASE_REF)
           echo "github_sha: $GITHUB_SHA, github_base_ref: $GITHUB_BASE_REF"
