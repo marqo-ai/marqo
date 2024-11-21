@@ -73,7 +73,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         """Both CPU and GPU decoding should work on a GPU-enabled machine."""
         valid_url = "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
         start_time = 0
-        duration = 1
+        duration = 10
 
         for enable_video_gpu_acceleration in (True, False):
             streaming_media_processor_object = StreamingMediaProcessor(
@@ -81,31 +81,41 @@ class TestStreamingMediaProcessor(unittest.TestCase):
                 enable_video_gpu_acceleration=enable_video_gpu_acceleration
             )
 
-            start_time = time.time()
+            decode_start_time = time.time()
 
             streaming_media_processor_object.fetch_video_chunk(
                 start_time, duration, self.output_file
             )
+            elapsed_time = time.time() - decode_start_time
 
-            elapsed_time = time.time() - start_time
-            self.assertLess(elapsed_time, 5, f"GPU decoding took too long. Elapsed time: "
-                                             f"{elapsed_time}. URL: {valid_url}")
+            # We expect the GPU decoding to be faster than CPU decoding
+            if enable_video_gpu_acceleration:
+                self.assertLess(elapsed_time, 5, f"GPU decoding took too long. Elapsed time: "
+                                                 f"{elapsed_time}. URL: {valid_url}")
+            # We expect the CPU decoding to be slower than GPU decoding
+            else:
+                self.assertGreater(elapsed_time, 5,
+                                   f"CPU decoding took too short. There could be an issue. "
+                                   f"Elapsed time: {elapsed_time}. URL: {valid_url}")
             self.assertTrue(os.path.exists(self.output_file))
 
     def test_header_conversion_with_valid_headers(self):
         """Headers should be correctly converted to CLI format."""
         headers = {"Authorization": "Bearer token", "User-Agent": "Test"}
-        streaming_media_processor_object = StreamingMediaProcessor(
-            url="https://example.com", device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors(),
-            media_download_headers=headers
-        )
+        # We need to mock the metadata fetching to avoid MediaDownloadError due to the headers
+        with patch("marqo.tensor_search.streaming_media_processor.StreamingMediaProcessor._fetch_file_metadata") \
+              as mock_fetch_file_metadata:
+            mock_fetch_file_metadata.return_value = (2971504, 10.01)
+            streaming_media_processor_object = StreamingMediaProcessor(
+                url=TestAudioUrls.AUDIO1.value, device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors(),
+                media_download_headers=headers)
         expected = "Authorization: Bearer token\r\nUser-Agent: Test"
         self.assertEqual(streaming_media_processor_object.media_download_headers, expected)
 
     def test_header_conversion_with_empty_headers(self):
         """Empty headers should result in an empty string."""
         streaming_media_processor_object = StreamingMediaProcessor(
-            url="https://example.com", device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors(),
+            url=TestAudioUrls.AUDIO1.value, device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors(),
             media_download_headers={}
         )
         self.assertEqual(streaming_media_processor_object.media_download_headers, "")
