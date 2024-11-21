@@ -54,7 +54,7 @@ jobs:
             echo "Image already exists in ECR, will not build and push again. Will be using the image digest from existing image"
             
             IMAGE_IDENTIFIER=$(echo "$IMAGE_DETAILS" | jq -r '.imageDetails[0].imageDigest')
-            REGISTRY_ID = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
+            REGISTRY_ID="424082663841.dkr.ecr.us-east-1.amazonaws.com"
             FULL_IDENTIFIER="${REGISTRY_ID}/marqo-compatibility-tests@${IMAGE_IDENTIFIER}"
             echo "image_identifier=${FULL_IDENTIFIER}" >> $GITHUB_OUTPUT
           else
