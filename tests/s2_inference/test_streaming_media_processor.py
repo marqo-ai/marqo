@@ -7,9 +7,11 @@ from marqo.s2_inference.errors import MediaDownloadError
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.s2_inference.multimodal_model_load import Modality
+from marqo.core.exceptions import InternalError
+from tests.marqo_test import TestVideoUrls, TestAudioUrls
 
 
-class TestVideoFFmpegDecode(unittest.TestCase):
+class TestStreamingMediaProcessor(unittest.TestCase):
     def setUp(self):
         self.output_file = "./test.mp4"
         if os.path.exists(self.output_file):
@@ -19,7 +21,6 @@ class TestVideoFFmpegDecode(unittest.TestCase):
         if os.path.exists(self.output_file):
             os.remove(self.output_file)
 
-    @mark.cpu_only
     def test_video_decode_cpu_works(self):
         """Video decoding should work on a CPU-only machine."""
         valid_url = "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
@@ -49,7 +50,6 @@ class TestVideoFFmpegDecode(unittest.TestCase):
         self.assertFalse(os.path.exists(self.output_file))
         self.assertIn("404", str(e.exception))
 
-    @mark.cpu_only
     def test_video_decode_gpu_does_not_work(self):
         """A proper error is raised when trying to decode a video with GPU acceleration enabled on a CPU-only machine."""
         valid_url = "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
@@ -83,3 +83,65 @@ class TestVideoFFmpegDecode(unittest.TestCase):
             )
             self.assertTrue(os.path.exists(self.output_file))
             os.remove(self.output_file)
+
+    def test_header_conversion_with_valid_headers(self):
+        """Headers should be correctly converted to CLI format."""
+        headers = {"Authorization": "Bearer token", "User-Agent": "Test"}
+        streaming_media_processor_object = StreamingMediaProcessor(
+            url="https://example.com", device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors(),
+            media_download_headers=headers
+        )
+        expected = "Authorization: Bearer token\r\nUser-Agent: Test"
+        self.assertEqual(streaming_media_processor_object.media_download_headers, expected)
+
+    def test_header_conversion_with_empty_headers(self):
+        """Empty headers should result in an empty string."""
+        streaming_media_processor_object = StreamingMediaProcessor(
+            url="https://example.com", device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors(),
+            media_download_headers={}
+        )
+        self.assertEqual(streaming_media_processor_object.media_download_headers, "")
+
+    def test_header_conversion_with_invalid_headers(self):
+        """Invalid header type should raise an InternalError."""
+        with self.assertRaises(InternalError):
+            _ = StreamingMediaProcessor(
+                url="https://example.com", device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors(),
+                media_download_headers=["Invalid", "List"]
+            )
+
+    def test_audio_decode_cpu_works(self):
+        """Audio decoding should work on a CPU-only machine."""
+        valid_url = TestAudioUrls.AUDIO1.value
+        start_time = 0
+        duration = 1
+
+        streaming_media_processor_object = StreamingMediaProcessor(
+            url=valid_url, device="cpu", modality=Modality.AUDIO, preprocessors=Preprocessors()
+        )
+        output_file = "./test.wav"
+        streaming_media_processor_object.fetch_audio_chunk(start_time, duration, output_file)
+        self.assertTrue(os.path.exists(output_file))
+        os.remove(output_file)
+
+    def test_metadata_fetching_success(self):
+        """Metadata fetching should return correct size and duration."""
+        valid_url = TestVideoUrls.VIDEO1.value
+
+        streaming_media_processor_object = StreamingMediaProcessor(
+            url=valid_url, device="cpu", modality=Modality.VIDEO, preprocessors=Preprocessors()
+        )
+        size, duration = streaming_media_processor_object._fetch_file_metadata()
+
+        self.assertEqual(2971504, size) # Hardcoded value
+        self.assertGreater(10.01, duration) # Hardcoded value
+
+    def test_metadata_fetching_invalid_url(self):
+        """Invalid URL should raise MediaDownloadError when fetching metadata."""
+        invalid_url = "https://invalid-url.com/video.mp4"
+
+        with self.assertRaises(MediaDownloadError):
+            streaming_media_processor_object = StreamingMediaProcessor(
+                url=invalid_url, device="cpu", modality=Modality.VIDEO, preprocessors=Preprocessors()
+            )
+            streaming_media_processor_object._fetch_file_metadata()
