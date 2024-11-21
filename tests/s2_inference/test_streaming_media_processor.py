@@ -152,7 +152,7 @@ class TestStreamingMediaProcessor(unittest.TestCase):
         size, duration = streaming_media_processor_object._fetch_file_metadata()
 
         self.assertEqual(2971504, size) # Hardcoded value
-        self.assertGreater(10.01, duration) # Hardcoded value
+        self.assertEqual(10.01, duration) # Hardcoded value
 
     def test_metadata_fetching_invalid_url(self):
         """Invalid URL should raise MediaDownloadError when fetching metadata."""
