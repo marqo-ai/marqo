@@ -167,8 +167,8 @@ jobs:
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
 
           cd marqo
-          export PYTHONPATH="./tests:./src:."
-          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          export PYTHONPATH="./tests/integ_tests:./src:."
+          pytest --ignore=tests/integ_tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
