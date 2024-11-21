@@ -1,0 +1,147 @@
+# Execution workflow
+name: Marqo Compatibility Tests Execution
+
+on:
+  workflow_call:
+    # from_version: Used as: the identifier for a workflow call, for logging purposes and for pulling image from DockerHub. We need to pass a version here: ex: 2.11.1
+    # to_version: Used as: the identifier for a workflow call and for logging purposes. We cannot use this to pull images from ECR or DockerHub (as opposed to from_version) since the to_version image has not been released yet. We need to pass a version here: ex: 2.11.5
+    # to_version_image_identifier: A unique identifier of the to_version image uploaded to ECR. Can either be the tag or the digest of the "To be released" image. This is specifically used to pull images from ECR.  We need to pass a full qualified docker image name with tag or digest here, example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef resp.
+    inputs:
+      from_version:
+        description: 'Source Marqo version. This is calculated in backwards_compatibility_marqo_orchestrator.yml and passed to this workflow'
+        required: true
+        type: string
+      to_version:
+        description: 'Target Marqo version. This is used for logging purposes, to identify the target version of Marqo being tested and to calculate the from_versions in the backwards_compatibility_marqo_orchestrator.yml. It is NOT used to pull images from ECR.'
+        required: true
+        type: string
+      to_version_image_identifier:
+        description: 'To version image identifier is a unique identifier for the target Marqo image, which can either be a tag or a digest. It should contain complete qualified image name with tag or digest. For example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef. This is used to pull images from ECR.'
+        required: true
+        type: string
+  workflow_dispatch:
+    # from_version: Used as: the identifier for a workflow call, for logging purposes and for pulling image from DockerHub. We need to pass a version here: ex: 2.11.1
+    # to_version: Used as: the identifier for a workflow call and for logging purposes. We cannot use this to pull images from ECR or DockerHub (as opposed to from_version) since the to_version image has not been released yet. We need to pass a version here: ex: 2.11.5
+    # to_version_image_identifier: A unique identifier of the to_version image uploaded to ECR. Can either be the tag or the digest of the "To be released" image. This is specifically used to pull images from ECR.  We need to pass a full qualified docker image name with tag or digest here, example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef resp.
+
+    # If running manually, just specify the from_version, to_version and the fully qualified marqo image name with tag or digest in same format of the examples given above
+    inputs:
+      from_version:
+        description: 'Source Marqo version. This is used to pull the image from DockerHub and for logging purposes.'
+        required: true
+        type: string
+      to_version:
+        description: 'Target Marqo version. This is used for logging purposes and to identify the target version of Marqo being tested.'
+        required: true
+        type: string
+      to_version_image_identifier:
+        description: 'To version image identifier is a unique identifier for the target Marqo image, which can either be a tag or a digest. It should contain complete qualified image name with tag or digest. For example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef. This is used to pull images from ECR.'
+        required: true
+        type: string
+
+jobs:
+  Start-Runner:
+    permissions: write-all
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          ec2-image-id: ${{ secrets.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
+          ec2-instance-type: m6i.xlarge
+          subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+          security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+          aws-resource-tags: > # optional, requires additional permissions
+            [
+              {"Key": "Name", "Value": "marqo-compatibility-test-runner-${{ github.run_id }}"},
+              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
+              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
+              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
+              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
+              {"Key": "PoloRole", "Value": "testing"}
+            ]
+            
+  backwards_compatibility:
+    # This job runs on the newly created runner
+    runs-on: ${{ needs.start-runner.outputs.label }}
+    needs: Start-Runner
+    steps:
+      # Step to check out the Marqo repository
+      - name: checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }} #Check out the repository that contains this action since the tests exist in the same repository
+          fetch-depth: 0
+
+      # Step to set up Python 3.9
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.9"
+          cache: "pip"
+      # Step to install dependencies from requirements.txt
+      - name: Install Dependencies
+        run: |
+          pip install -r tests/backwards_compatibility_tests/requirements.txt
+
+      # Step to configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.ECR_PUSHER_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Step to login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Step to run the backwards compatibility test
+      - name: Run backwards_compatibility test
+        env:
+          FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
+          TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}
+          TO_VERSION_IMAGE_IDENTIFIER: ${{ inputs.to_version_image_identifier || github.event.inputs.to_version_image_identifier }}
+        run: |
+              export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
+              python tests/backwards_compatibility_tests/compatibility_test_runner.py \
+              --mode=backwards_compatibility \
+              --from_version "$FROM_VERSION" \
+              --to_version "$TO_VERSION" \
+              --to_version_image_identifier "$TO_VERSION_IMAGE_IDENTIFIER" \
+
+  Stop-Runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - Start-Runner # required to get output from the start-runner job
+      - backwards_compatibility # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
