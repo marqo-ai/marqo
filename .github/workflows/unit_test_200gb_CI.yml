@@ -66,24 +66,6 @@ jobs:
           fetch-depth: 0
           path: marqo
 
-      - name: Check if only md files changed
-        id: check_changes
-        run: |
-          cd marqo
-          # Get the list of changed files in the current PR
-          changed_files=$(git diff --name-only $GITHUB_SHA $GITHUB_BASE_REF)
-          echo "github_sha: $GITHUB_SHA, github_base_ref: $GITHUB_BASE_REF"
-          echo "changed files: $changed_files"
-          
-          # Check if the changed files are only .md files
-          if [[ ! "$changed_files" =~ \.md$ ]]; then
-            echo "Changes include non-md files, continuing the workflow."
-          else
-            echo "Only markdown files changed, skipping the workflow."
-          fi
-          
-          exit 0
-
       - name: Set up Python 3.8
         uses: actions/setup-python@v3
         with:
