@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from typing import ContextManager
 
 import PIL
+import ffmpeg
 import numpy as np
 import torch
 from PIL.ImageFile import ImageFile
@@ -172,7 +173,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 video_preprocessing=video_preprocessing, media_download_headers=media_download_headers
                             )
                             media_repo[doc[field]] = processed_chunks
-                        except Exception as e:
+                        except (ffmpeg.Error, S2InferenceError) as e:
                             logger.error(f"Error processing {inferred_modality} file: {str(e)}")
                             media_repo[doc[field]] = S2InferenceError(f"Error processing {inferred_modality} file: {str(e)}")
                     
