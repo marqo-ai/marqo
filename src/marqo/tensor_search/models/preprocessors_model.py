@@ -1,19 +1,15 @@
-from typing import Optional
-
-from torchvision.transforms import Compose
+from typing import Optional, Any
 
 from marqo.base_model import MarqoBaseModel
 from marqo.s2_inference.multimodal_model_load import Modality
 
 
 class Preprocessors(MarqoBaseModel):
-    image: Optional[Compose] = None
-    text: Optional[Compose] = None
-    video: Optional[Compose] = None
-    audio: Optional[Compose] = None
-
-    class Config:
-        arbitrary_types_allowed = True
+    """The type of preprocessors is unknown, so we use Any."""
+    image: Optional[Any] = None
+    text: Optional[Any] = None
+    video: Optional[Any] = None
+    audio: Optional[Any] = None
 
     def get_preprocessor(self, modality: Modality):
         if modality == Modality.IMAGE:

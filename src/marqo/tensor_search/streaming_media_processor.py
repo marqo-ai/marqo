@@ -83,7 +83,6 @@ class StreamingMediaProcessor:
             raise InternalError("media_download_headers should be a dictionary")
         return "\r\n".join([f"{key}: {value}" for key, value in raw_media_download_headers.items()])
 
-
     def _fetch_file_metadata(self) -> Tuple[float, float]:
         try:
             probe_options = {
@@ -180,37 +179,38 @@ class StreamingMediaProcessor:
         Raises:
             MediaDownloadError: If there is an error downloading the video chunk
         """
-        if self.enable_video_gpu_acceleration is True:
-            ffmpeg_command = [
-                'ffmpeg',
-                '-y',  # Enable overwrite
-                '-v', 'error', # Suppress warnings and other output
-                '-ss', str(start_time), # Start time
-                '-t', str(duration), # Duration
+        ffmpeg_command = [
+            'ffmpeg',
+            '-y',  # Enable overwrite
+            '-v', 'error',  # Suppress warnings and other output
+        ]
+
+        if self.media_download_headers:
+            # -headers must appear before -i
+            ffmpeg_command.extend(['-headers', self.media_download_headers])
+
+        if self.enable_video_gpu_acceleration:
+            ffmpeg_command.extend([
+                '-ss', str(start_time),  # Start time
+                '-t', str(duration),  # Duration
+                '-i', self.url,  # Input file
                 '-hwaccel', 'cuda', # Use GPU acceleration
                 '-hwaccel_output_format', 'cuda', # Use GPU acceleration
-                '-i', self.url, # Input file
                 '-c:a', 'copy', # Copy audio codec to speed up the conversion process by avoiding unnecessary re-encoding of the audio stream.
                 '-c:v', 'h264_nvenc', # Use NVIDIA NVENC H.264 encoder
                 '-b:v', '5M', # Set the video bitrate to 5M
                 output_file
-            ]
+            ])
         else:
-            ffmpeg_command = [
-                'ffmpeg',
-                '-y',
-                '-v', 'error',
-                '-ss', str(start_time),
-                '-t', str(duration),
-                '-i', self.url,
+            ffmpeg_command.extend([
+                '-ss', str(start_time),  # Start time
+                '-t', str(duration),  # Duration
+                '-i', self.url,  # Input file
                 '-vcodec', 'libx264',
                 '-acodec', 'aac',
                 '-f', 'mp4',
                 output_file
-            ]
-
-        if self.media_download_headers:
-            ffmpeg_command.extend(['-headers', self.media_download_headers])
+            ])
 
         result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
@@ -239,17 +239,22 @@ class StreamingMediaProcessor:
             'ffmpeg',
             '-y', # Enable overwrite
             '-v', 'error',  # Suppress warnings and other output
-            '-i', str(self.url),  # Input file
-            '-ss', str(start_time),  # Start time
-            '-t', str(duration),  # Duration
-            '-acodec', 'pcm_s16le',  # Audio codec
-            '-ar', '44100',  # Audio sample rate
-            '-f', 'wav',  # Output format
-            output_file  # Output file
         ]
-
         if self.media_download_headers:
+            # -headers must appear before -i
             ffmpeg_command.extend(['-headers', self.media_download_headers])
+
+        ffmpeg_command.extend(
+            [
+                '-i', str(self.url),  # Input file
+                '-ss', str(start_time),  # Start time
+                '-t', str(duration),  # Duration
+                '-acodec', 'pcm_s16le',  # Audio codec
+                '-ar', '44100',  # Audio sample rate
+                '-f', 'wav',  # Output format
+                output_file  # Output file
+            ]
+        )
 
         result = subprocess.run(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if result.returncode != 0:
