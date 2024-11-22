@@ -12,6 +12,9 @@ class Preprocessors(MarqoBaseModel):
     video: Optional[Compose] = None
     audio: Optional[Compose] = None
 
+    class Config:
+        arbitrary_types_allowed = True
+
     def get_preprocessor(self, modality: Modality):
         if modality == Modality.IMAGE:
             return self.image
