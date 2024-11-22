@@ -8,13 +8,13 @@ on:
     branches:
       - mainline
       - releases/*
-  pull_request_target:
+  pull_request:
     branches:
       - mainline
       - releases/*
 
 concurrency:
-  group: unit-tests-${{ github.head_ref || github.ref }}
+  group: unit-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -80,9 +80,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # override base requirements with marqo requirements, if needed:
           pip install -r marqo/requirements.dev.txt
+
+      - name: Download nltk data
+        run: |
+            python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
         run: |
@@ -161,7 +165,7 @@ jobs:
 
           cd marqo
           export PYTHONPATH="./tests:./src:."
-          pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
