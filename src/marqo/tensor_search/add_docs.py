@@ -26,6 +26,7 @@ from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_mult
 from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search import enums
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
@@ -204,7 +205,7 @@ def download_and_chunk_media(url: str, device: str, modality: Modality, marqo_in
                              preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
                              video_preprocessing: VideoPreProcessing = None,
                              media_download_headers: Optional[Dict] = None) -> List[Dict[str, torch.Tensor]]:
-    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
+    MAX_FILE_SIZE = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE)
 
     processor = StreamingMediaProcessor(
         url=url, device=device, modality=modality, marqo_index_type=marqo_index_type, marqo_index_model=marqo_index_model,
@@ -213,8 +214,8 @@ def download_and_chunk_media(url: str, device: str, modality: Modality, marqo_in
     )
 
     if processor.total_size > MAX_FILE_SIZE:
-        raise ValueError(
-            f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
+        raise S2InferenceError(
+            f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of {MAX_FILE_SIZE / 1024 / 1024:.2f} MB")
 
     return processor.process_media()
 
