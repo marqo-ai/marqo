@@ -242,7 +242,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
             url=self.mock_video_url,
             device='cpu',
             modality= Modality.VIDEO,
-            preprocessors = Preprocessors(),
+            preprocessors = None,
             audio_preprocessing = None,
             video_preprocessing = None,
             media_download_headers = {}
@@ -251,7 +251,7 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
             url=self.mock_video_url,
             device='cpu',
             modality= Modality.VIDEO,
-            preprocessors = Preprocessors(),
+            preprocessors = None,
             audio_preprocessing = None,
             video_preprocessing = None,
             media_download_headers = {}
