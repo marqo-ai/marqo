@@ -42,7 +42,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                              media_field_types_mapping: Optional[Dict[str, FieldType]] = None,
                                              media_download_headers: Optional[Dict] = None,
                                              metric_obj: Optional[RequestMetrics] = None,
-                                             preprocessors: Optional[Dict[str, Compose]] = None,
+                                             preprocessors: Optional[Preprocessors] = None,
                                              marqo_index_type: Optional[IndexType] = None,
                                              marqo_index_model: Optional[Model] = None,
                                              audio_preprocessing: Optional[AudioPreProcessing] = None,
@@ -54,7 +54,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
 
     Args:
         allocated_docs: docs with images to be downloaded by this thread,
-        image_repo: dictionary that will be mutated by this thread. It will add PIL images
+        media_repo: dictionary that will be mutated by this thread. It will add media
             as values and the URLs as keys
         tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         media_download_headers: A dict of headers for image download. Can be used
@@ -76,10 +76,6 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
     # Determine index type
     is_structured_index = marqo_index_type == IndexType.Structured
     is_unstructured_index = marqo_index_type in [IndexType.Unstructured, IndexType.SemiStructured]
-
-    if preprocessors is None:
-        preprocessors = {}
-
     # Generate pseudo-unique ID for thread metrics.
     _id = f'image_download.{threading.get_ident()}'
     TIMEOUT_SECONDS = 3
@@ -128,11 +124,11 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
-                        if "image" in preprocessors and preprocessors["image"] is not None:
+                        if preprocessors is not None and preprocessors.image is not None:
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                media_repo[doc[field]] = preprocessors['image'](media_repo[doc[field]]).to(device)
+                                media_repo[doc[field]] = preprocessors.image(media_repo[doc[field]]).to(device)
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     media_repo[doc[field]] = e
@@ -169,7 +165,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         try:
                             processed_chunks = download_and_chunk_media(
                                 url=doc[field], device=device, modality=inferred_modality,
-                                preprocessors=Preprocessors(**preprocessors), audio_preprocessing=audio_preprocessing,
+                                preprocessors=preprocessors, audio_preprocessing=audio_preprocessing,
                                 video_preprocessing=video_preprocessing, media_download_headers=media_download_headers
                             )
                             media_repo[doc[field]] = processed_chunks
@@ -350,7 +346,7 @@ def process_batch(
     )
 
     if not is_preprocess_image_model(model_properties) or patch_method_exists:
-        preprocessors['image'] = None
+        preprocessors.image = None
 
     media_repo = {}
     m = [RequestMetrics() for i in range(thread_count)]

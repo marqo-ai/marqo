@@ -31,7 +31,7 @@ class StreamingMediaProcessor:
         self.modality = modality
         self.audio_preprocessing = audio_preprocessing
         self.video_preprocessing = video_preprocessing
-        self.preprocessor = preprocessors.dict()[modality]
+        self.preprocessor = preprocessors.get_preprocessor(modality)
         self.media_download_headers = self._convert_headers_to_cli_format(media_download_headers)
         self.total_size, self.duration = self._fetch_file_metadata()
 
