@@ -590,7 +590,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             media_repo=media_repo,
             tensor_fields=['field_1', 'field_2'],
             media_download_headers={},
-            preprocessors={'image': lambda x: torch.randn(3, 224, 224)},
+            preprocessors=Preprocessors(**{'image': lambda x: torch.randn(3, 224, 224)}),
             device='cpu',
             marqo_index_type=IndexType.Unstructured,
             marqo_index_model=Model(name="test", properties={}),
