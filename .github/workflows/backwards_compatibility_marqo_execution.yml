@@ -116,18 +116,34 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       # Step to run the backwards compatibility test
-      - name: Run backwards_compatibility test
+      - name: Run backwards compatibility test
         env:
           FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
           TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}
           TO_VERSION_IMAGE_IDENTIFIER: ${{ inputs.to_version_image_identifier || github.event.inputs.to_version_image_identifier }}
-        run: |
+          id: run-backwards-compatibility
+          run: |
               export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
               python tests/backwards_compatibility_tests/compatibility_test_runner.py \
               --mode=backwards_compatibility \
               --from_version "$FROM_VERSION" \
               --to_version "$TO_VERSION" \
               --to_version_image_identifier "$TO_VERSION_IMAGE_IDENTIFIER" \
+
+      # Step to run rollback tests. Only runs if backwards compatibility tests have succeeded
+      - name: Run rollback tests
+        env:
+          FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
+          TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}
+          TO_VERSION_IMAGE_IDENTIFIER: ${{ inputs.to_version_image_identifier || github.event.inputs.to_version_image_identifier }}
+          if: ${{ steps.run-backwards-compatibility.outputs.status == 'success' }}
+          run: |
+            export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
+            python tests/backwards_compatibility_tests/compatibility_test_runner.py \
+            --mode=rollback \
+            --from_version "$FROM_VERSION" \
+            --to_version "$TO_VERSION" \
+            --to_version_image_identifier "$TO_VERSION_IMAGE_IDENTIFIER" \
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
