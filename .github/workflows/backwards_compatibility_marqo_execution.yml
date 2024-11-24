@@ -8,11 +8,11 @@ on:
     # to_version_image_identifier: A unique identifier of the to_version image uploaded to ECR. Can either be the tag or the digest of the "To be released" image. This is specifically used to pull images from ECR.  We need to pass a full qualified docker image name with tag or digest here, example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef resp.
     inputs:
       from_version:
-        description: 'Source Marqo version. This is calculated in compatibility_test_orchestrator.yml and passed to this workflow'
+        description: 'Source Marqo version. This is calculated in backwards_compatibility_marqo_orchestrator.yml and passed to this workflow'
         required: true
         type: string
       to_version:
-        description: 'Target Marqo version. This is used for logging purposes, to identify the target version of Marqo being tested and to calculate the from_versions in the compatibility_test_orchestrator.yml. It is NOT used to pull images from ECR.'
+        description: 'Target Marqo version. This is used for logging purposes, to identify the target version of Marqo being tested and to calculate the from_versions in the backwards_compatibility_marqo_orchestrator.yml. It is NOT used to pull images from ECR.'
         required: true
         type: string
       to_version_image_identifier:
