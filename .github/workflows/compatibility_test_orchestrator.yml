@@ -142,7 +142,7 @@ jobs:
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
-    uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
+    uses: ./.github/workflows/compatibility_test_execution.yml
     secrets: inherit
     permissions:
       contents: read # This permission is necessary to read repository contents
