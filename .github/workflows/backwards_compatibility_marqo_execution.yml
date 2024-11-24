@@ -132,7 +132,7 @@ jobs:
 
       # Step to run rollback tests. Only runs if backwards compatibility tests have succeeded
       - name: Run rollback tests
-        if: ${{ steps.run-backwards-compatibility.outputs.status == 'success' }}
+        if: success()
         env:
           FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
           TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}

@@ -80,7 +80,6 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
         get_indexes = self.client.get_indexes()
         self.logger.debug(f"Got these indexes {get_indexes}")
         result_from_prepare_mode = self.load_results_from_file()
-        self.logger.debug(f"Printing result_from_prepare_mode =>>> {result_from_prepare_mode}")
         for index_name in self.indexes_to_test_on:
             self.logger.debug(f"Processing index: {index_name}")
             try:
