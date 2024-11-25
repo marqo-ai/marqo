@@ -1053,6 +1053,8 @@ class TestSearch(MarqoTestCase):
                         )
                     self.assertIn("Error vectorising content", str(e.exception))
 
+    @pytest.mark.largemodel
+    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
     def test_video_size_limit(self):
         """Tests that searching with videos respects the file size limit"""
 
