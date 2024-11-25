@@ -189,3 +189,15 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             )
             # Assuming the default is GPU acceleration disabled
             self.assertFalse(streaming_media_processor_object.enable_video_gpu_acceleration)
+
+    def test_video_decoding_timeout(self):
+        """Test that a timeout error is raised for slow video decoding."""
+        valid_url = TestVideoUrls.VIDEO1.value
+        streaming_media_processor_object = StreamingMediaProcessor(
+            url=valid_url, device="cpu", modality=Modality.VIDEO, preprocessors=Preprocessors()
+        )
+        streaming_media_processor_object.VIDEO_CPU_TIMOUT_OUT_MULTIPLIER = 0.01  # Reduce timeout for testing
+
+        with self.assertRaises(MediaDownloadError) as e:
+            streaming_media_processor_object.fetch_video_chunk(0, 100, self.output_file)
+        self.assertIn("timed out", str(e.exception))

@@ -301,22 +301,30 @@ class SetEnableVideoGPUAcceleration:
             '-v', 'error',  # Suppress output
             '-hwaccel', 'cuda',  # Use CUDA for hardware acceleration
             '-f', 'lavfi',  # Input format is a lavfi (FFmpeg's built-in filter)
-            '-i', 'nullsrc=s=600x400',  # Generate a blank video source of 600x400 resolution
+            '-i', 'nullsrc=s=200x100',  # Generate a blank video source of 200x100 resolution
             '-vframes', '1',  # Process only 1 frame
             '-c:v', 'h264_nvenc',  # Use NVENC encoder
             '-f', 'null',  # Output to null (discard the output)
             '-'  # Output to stdout (discarded)
         ]
-
-        result = subprocess.run(ffmpeg_command_gpu_check, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if result.returncode != 0:
+        try:
+            _ = subprocess.run(
+                ffmpeg_command_gpu_check, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+                text=True, timeout=10
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             raise exceptions.StartupSanityCheckError(
                 f"Failed to use GPU acceleration for video processing. "
                 f"Ensure that your system has the required dependencies installed. "
                 f"You can set 'MARQO_ENABLE_VIDEO_GPU_ACCELERATION=FALSE' to disable GPU acceleration. "
                 f"Check {marqo_docs.configuring_marqo()} for more information. "
-                f"Original error message: {result.stderr.decode()}"
-            )
+                f"Original error message: {e.stderr}"
+            ) from e
+        except (ValueError, OSError) as e:
+            raise exceptions.StartupSanityCheckError(
+                f"Marqo failed to run the ffmpeg sanity check. Your ffmepeg installation might be broken. "
+                f"Original error: {e}"
+            ) from e
 
 
 class CheckNLTKTokenizers:

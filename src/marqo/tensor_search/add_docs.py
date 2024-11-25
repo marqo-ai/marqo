@@ -14,7 +14,6 @@ import ffmpeg
 import numpy as np
 import torch
 from PIL.ImageFile import ImageFile
-from torchvision.transforms import Compose
 
 import marqo.exceptions as base_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
@@ -26,6 +25,7 @@ from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
 from marqo.tensor_search import enums
+from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -191,7 +191,7 @@ def download_and_chunk_media(url: str, device: str, modality: Modality,
     processor = StreamingMediaProcessor(
         url=url, device=device, modality=modality, preprocessors=preprocessors,
         audio_preprocessing=audio_preprocessing, video_preprocessing=video_preprocessing,
-        media_download_headers=media_download_headers
+        media_download_headers=media_download_headers, enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
     )
 
     if processor.total_size > MAX_FILE_SIZE:
@@ -199,6 +199,14 @@ def download_and_chunk_media(url: str, device: str, modality: Modality,
             f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
 
     return processor.process_media()
+
+
+def _enable_video_gpu_acceleration() -> bool:
+    """A helper function to determine if the video decoding should be done on the GPU.
+
+    The environment variable MARQO_ENABLE_VIDEO_GPU_ACCELERATION is set on marqo start_on script.
+    """
+    return utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'TRUE'
 
 
 @contextmanager
