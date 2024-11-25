@@ -1,3 +1,19 @@
+# Release 2.13.2
+
+## Bug fixes and minor changes
+
+- Fix a bug where adding documents with numeric lists to an unstructured index results in a 500 error. Now, Marqo successfully processes the document batch, and returns a 400 error only for individual documents that contain numeric lists([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Fix validation of custom vector fields. Custom vector fields were silently ignored when not specified as tensor fields for an unstructured index. This will now trigger a 400 error. This helps guide users to properly define the field as a tensor field([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Improve the bootstrapping process to prevent Marqo from crashing during startup when the vector store takes longer to converge, especially with multiple indexes. This ensures a smoother startup process even if the vector store takes time to fully initialize([1036](https://github.com/marqo-ai/marqo/pull/1036)).
+
+# Release 2.13.1
+
+## Bug fixes and minor changes
+
+- Fix a bug where Marqo returns a 500 error if an inaccessible private image is encountered in the query or embed endpoint. Marqo now correctly returns a 400 error with a helpful error message ([1027](https://github.com/marqo-ai/marqo/pull/1027)).
+- Fix a bug preventing Marqo from warming up Languagebind models. Marqo now successfully warms up Languagebind models as expected ([1031](https://github.com/marqo-ai/marqo/pull/1031)).
+- Fix a bug where Languagebind models always generate normalized embeddings for non-text content. These models now correctly produce unnormalized embeddings for video, audio, and image content ([1032](https://github.com/marqo-ai/marqo/pull/1032)).
+
 # Release 2.13.0
 
 ## New features

@@ -41,7 +41,12 @@ on:
 
 jobs:
   Start-Runner:
-    permissions: write-all
+    permissions:
+      contents: read # This permission is necessary to read repository contents
+      actions: write # Used by machulav/ec2-github-runner@v2 for managing self-hosted runners. The workflow needs to create and manage GitHub Actions runners on EC2
+      id-token: write # Used by aws-actions/configure-aws-credentials@v4. Required for AWS authentication and OIDC token management
+      checks: write # Used implicitly by GitHub Actions to report job statuses and create check runs
+      statuses: write # Used implicitly by GitHub Actions to report job statuses and create check runs
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
     outputs:
@@ -126,6 +131,12 @@ jobs:
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
+    permissions:
+      contents: read # This permission is necessary to read repository contents
+      actions: write # Used by machulav/ec2-github-runner@v2 for managing self-hosted runners. The workflow needs to create and manage GitHub Actions runners on EC2
+      id-token: write # Used by aws-actions/configure-aws-credentials@v4. Required for AWS authentication and OIDC token management
+      checks: write # Used implicitly by GitHub Actions to report job statuses and create check runs
+      statuses: write # Used implicitly by GitHub Actions to report job statuses and create check runs
     needs:
       - Start-Runner # required to get output from the start-runner job
       - backwards_compatibility # required to wait when the main job is done
