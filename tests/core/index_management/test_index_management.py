@@ -42,7 +42,7 @@ class TestIndexManagement(MarqoTestCase):
                                                 zookeeper_client=self.zookeeper_client,
                                                 enable_index_operations=True,
                                                 deployment_timeout_seconds=30,
-                                                convergence_timeout_seconds=60)
+                                                convergence_timeout_seconds=120)
         # this resets the application package to a clean state
         self._test_dir = str(os.path.dirname(os.path.abspath(__file__)))
         self._deploy_initial_app_package()
@@ -100,9 +100,10 @@ class TestIndexManagement(MarqoTestCase):
 
         self.assertEqual(self.index_management.get_marqo_version(), version.get_version())
 
+    @patch('marqo.vespa.vespa_client.VespaClient.check_for_application_convergence')
     @patch('marqo.vespa.vespa_client.VespaClient.get_vespa_version')
     def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped_for_older_vespa_version(
-            self, mock_vespa_version):
+            self, mock_vespa_version, mock_check_convergence):
         mock_vespa_version.return_value = '8.382.21'
 
         def modified_post(*args, **kwargs):
@@ -111,16 +112,31 @@ class TestIndexManagement(MarqoTestCase):
         # verify the first boostrap call deploys the app to vespa
         with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
             self.assertTrue(self.index_management.bootstrap_vespa())
-            self.assertEqual(mock_post.call_count, 2)
-            self.assertTrue('prepareandactivate' in mock_post.call_args_list[1].args[0])
+            self.assertEqual(mock_post.call_count, 3)
+            # First call creates a session to download the app for app version check
+            self.assertTrue('session?from=' in mock_post.call_args_list[0].args[0])
+            # Second call creates a session to download the app to do bootstrapping
+            self.assertTrue('session?from=' in mock_post.call_args_list[1].args[0])
+            # Third call deploys the app by uploading the zip file
+            self.assertTrue('prepareandactivate' in mock_post.call_args_list[2].args[0])
+
+            # The first bootstrapping will deploy a new Vespa app, so it will check convergence
+            mock_check_convergence.assert_called_once()
+
+        mock_check_convergence.reset_mock()
 
         # verify the second boostrap call skips the deployment
         with mock.patch.object(httpx.Client, 'post', side_effect=modified_post) as mock_post:
             self.assertFalse(self.index_management.bootstrap_vespa())
             self.assertEqual(mock_post.call_count, 1)
-            self.assertFalse('prepareandactivate' in mock_post.call_args_list[0].args[0])
+            # First call creates a session to download the app for app version check
+            self.assertTrue('session?from=' in mock_post.call_args_list[0].args[0])
 
-    def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped(self):
+            # The second bootstrapping only need to check version, so it will skip convergence check
+            mock_check_convergence.assert_not_called()
+
+    @patch('marqo.vespa.vespa_client.VespaClient.check_for_application_convergence')
+    def test_bootstrap_vespa_should_skip_bootstrapping_if_already_bootstrapped(self, mock_check_convergence):
         def modified_put(*args, **kwargs):
             return httpx.put(*args, **kwargs)
 
@@ -129,11 +145,17 @@ class TestIndexManagement(MarqoTestCase):
             self.assertTrue(self.index_management.bootstrap_vespa())
             self.assertTrue('prepare' in mock_post.call_args_list[-2].args[0])
             self.assertTrue('active' in mock_post.call_args_list[-1].args[0])
+            # The first bootstrapping will deploy a new Vespa app, so it will check convergence
+            mock_check_convergence.assert_called_once()
+
+        mock_check_convergence.reset_mock()
 
         # verify the second boostrap call skips the deployment
         with mock.patch.object(httpx.Client, 'put', side_effect=modified_put) as mock_post:
             self.assertFalse(self.index_management.bootstrap_vespa())
             self.assertEqual(mock_post.call_count, 0)
+            # The second bootstrapping only need to check version, so it will skip convergence check
+            mock_check_convergence.assert_not_called()
 
     def test_boostrap_vespa_should_migrate_index_settings_from_existing_vespa_app(self):
         """
@@ -304,45 +326,45 @@ class TestIndexManagement(MarqoTestCase):
             self.assertEqual("Aborting rollback. Reason: Vector store config has been changed since the last backup.",
                              str(e.exception))
 
-    def test_index_operation_methods_should_raise_error_if_index_operation_is_disabled(self):
-        # Create an index management instance with index operation disabled (by default)
-        self.index_management = IndexManagement(self.vespa_client, zookeeper_client=None)
+    def _index_operations(self, index_management: IndexManagement):
         index_request_1 = self.structured_marqo_index_request(
             fields=[FieldRequest(name='title', type=FieldType.Text)],
             tensor_fields=['title']
         )
         index_request_2 = self.unstructured_marqo_index_request()
 
-        with self.assertRaisesStrict(InternalError):
-            self.index_management.create_index(index_request_1)
+        return [
+            ('create single index', lambda: index_management.create_index(index_request_1)),
+            ('batch create indexes', lambda: index_management.batch_create_indexes([index_request_1, index_request_2])),
+            ('delete single index', lambda: index_management.delete_index_by_name(index_request_1.name)),
+            ('batch delete indexes', lambda: index_management.batch_delete_indexes_by_name([index_request_1.name, index_request_2.name])),
+        ]
 
-        with self.assertRaisesStrict(InternalError):
-            self.index_management.batch_create_indexes([index_request_1, index_request_2])
+    def test_index_operation_methods_should_raise_error_if_index_operation_is_disabled(self):
+        index_management_without_zookeeper = IndexManagement(self.vespa_client, zookeeper_client=None)
 
-        with self.assertRaisesStrict(InternalError):
-            self.index_management.delete_index_by_name(index_request_1.name)
-
-        with self.assertRaisesStrict(InternalError):
-            self.index_management.batch_delete_indexes_by_name([index_request_1.name, index_request_2.name])
+        for test_case, index_operation in self._index_operations(index_management_without_zookeeper):
+            with self.subTest(test_case):
+                with self.assertRaisesStrict(InternalError):
+                    index_operation()
 
     def test_index_operation_methods_should_raise_error_if_marqo_is_not_bootstrapped(self):
-        index_request_1 = self.structured_marqo_index_request(
-            fields=[FieldRequest(name='title', type=FieldType.Text)],
-            tensor_fields=['title']
-        )
-        index_request_2 = self.unstructured_marqo_index_request()
+        for test_case, index_operation in self._index_operations(self.index_management):
+            with self.subTest(test_case):
+                with self.assertRaisesStrict(ApplicationNotInitializedError):
+                    index_operation()
 
-        with self.assertRaisesStrict(ApplicationNotInitializedError):
-            self.index_management.create_index(index_request_1)
+    @patch('marqo.vespa.vespa_client.VespaClient.check_for_application_convergence')
+    def test_index_operation_methods_should_check_convergence(self, mock_check_convergence):
+        for test_case, index_operation in self._index_operations(self.index_management):
+            with self.subTest(test_case):
+                try:
+                    index_operation()
+                except ApplicationNotInitializedError:
+                    pass
 
-        with self.assertRaisesStrict(ApplicationNotInitializedError):
-            self.index_management.batch_create_indexes([index_request_1, index_request_2])
-
-        with self.assertRaisesStrict(ApplicationNotInitializedError):
-            self.index_management.delete_index_by_name(index_request_1.name)
-
-        with self.assertRaisesStrict(ApplicationNotInitializedError):
-            self.index_management.batch_delete_indexes_by_name([index_request_1.name, index_request_2.name])
+                mock_check_convergence.assert_called_once()
+                mock_check_convergence.reset_mock()
 
     def test_create_and_delete_index_should_succeed(self):
         # merge batch create and delete happy path to save some testing time

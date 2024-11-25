@@ -95,9 +95,12 @@ class VespaClient:
 
         self._raise_for_status(response)
 
-    def create_deployment_session(self) -> Tuple[str, str]:
+    def create_deployment_session(self, check_for_application_convergence: bool = True) -> Tuple[str, str]:
         """
         Create a Vespa deployment session.
+        Args:
+            check_for_application_convergence: check for the application to converge before create a deployment session.
+
         Returns:
             Tuple[str, str]:
              - content_base_url is the base url for contents in this session
@@ -107,7 +110,9 @@ class VespaClient:
         via Zookeeper. Following requests should use content_base_url and prepare_url to make sure it can hit the right
         config server that this session is created on.
         """
-        self.check_for_application_convergence()
+        if check_for_application_convergence:
+            self.check_for_application_convergence()
+
         res = self._create_deploy_session(self.http_client)
         content_base_url = res['content']
         prepare_url = res['prepared']
@@ -193,7 +198,8 @@ class VespaClient:
             except (httpx.TimeoutException, httpcore.TimeoutException):
                 logger.error("Marqo timed out waiting for Vespa application to converge. Will retry.")
 
-        raise VespaError(f"Vespa application did not converge within {timeout} seconds")
+        raise VespaError(f"Vespa application did not converge within {timeout} seconds. "
+                         f"The convergence status is {self._get_convergence_status()}")
 
     def query(self, yql: str, hits: int = 10, ranking: str = None, model_restrict: str = None,
               query_features: Dict[str, Any] = None, timeout: float = None, **kwargs) -> QueryResult:
