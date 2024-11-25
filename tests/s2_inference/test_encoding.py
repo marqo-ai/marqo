@@ -89,7 +89,8 @@ class TestEncoding(unittest.TestCase):
                                                    f"{embeddings_file_name}")
 
                         with self.subTest("Model encode vs vectorize"):
-                            self.assertEqual(np.allclose(output_m, output_v, atol=eps), True)
+                            self.assertEqual(np.allclose(output_m, output_v, atol=eps), True,
+                                             f"Hardcoded embeddings do not match for {name}:{sentence}")
 
                 clear_loaded_models()
 

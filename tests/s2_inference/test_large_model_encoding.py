@@ -95,7 +95,9 @@ def run_test_vectorize(models, model_type):
                     if isinstance(sentence, str):
                         try:
                             if embeddings_python_3_8:
-                                assert np.allclose(output_m, embeddings_python_3_8[name][sentence], atol=1e-6)
+                                assert np.allclose(output_m, embeddings_python_3_8[name][sentence], atol=1e-6), \
+                                    (f"Hardcoded Python 3.8 embeddings do not match for model: {name}, "
+                                     f"sentence: {sentence}")
                         except KeyError:
                             raise KeyError(f"Hardcoded Python 3.8 embeddings not found for "
                                            f"model: {name}, sentence: {sentence} in JSON file: "
