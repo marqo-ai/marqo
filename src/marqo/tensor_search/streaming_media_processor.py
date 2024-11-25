@@ -212,7 +212,12 @@ class StreamingMediaProcessor:
 
         base_error_message = f"Error downloading the video chunk with url={self.url}, start_time={start_time},"
 
-        self._run_ffmpeg_command(ffmpeg_command, timeout, base_error_message)
+        try:
+            self._run_ffmpeg_command(ffmpeg_command, timeout, base_error_message)
+        except (MediaDownloadError, InternalError):
+            if os.path.exists(output_file): # Remove the file if it was created
+                os.remove(output_file)
+            raise
         return output_file
 
     def fetch_audio_chunk(self, start_time: float, duration: float, output_file: str) -> str:
@@ -250,10 +255,17 @@ class StreamingMediaProcessor:
         timeout = duration * self.AUDIO_CPU_TIMOUT_OUT_MULTIPLIER
 
         base_error_message = f"Error downloading the audio chunk with url={self.url}, start_time={start_time},"
-        self._run_ffmpeg_command(ffmpeg_command, timeout, base_error_message)
+        try:
+            self._run_ffmpeg_command(ffmpeg_command, timeout, base_error_message)
+        except (MediaDownloadError, InternalError):
+            if os.path.exists(output_file): # Remove the file if it was created
+                os.remove(output_file)
+            raise
         return output_file
 
-    def _run_ffmpeg_command(self, ffmpeg_command: List[str], timeout: float, base_error_message: str) -> None:
+    def _run_ffmpeg_command(
+            self, ffmpeg_command: List[str], timeout: float, base_error_message: str, output_file: str
+    ) -> None:
         """Call ffmpeg with the given command and timeout.
 
         Args:
@@ -277,4 +289,3 @@ class StreamingMediaProcessor:
                 from e
         except (OSError, ValueError) as e:
             raise InternalError(f"Error running ffmpeg command: {e}") from e
-
