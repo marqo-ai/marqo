@@ -112,6 +112,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
         (core_exceptions.TooManyFieldsError, api_exceptions.BadRequestError, None, None),
+        (core_exceptions.DeviceError, api_exceptions.InternalError, None, None),
 
         # Vespa client exceptions
         (
