@@ -54,7 +54,7 @@ jobs:
             echo "Image already exists in ECR, will not build and push again. Will be using the image digest from existing image"
             
             IMAGE_IDENTIFIER=$(echo "$IMAGE_DETAILS" | jq -r '.imageDetails[0].imageDigest')
-            REGISTRY_ID = "424082663841.dkr.ecr.us-east-1.amazonaws.com"
+            REGISTRY_ID="424082663841.dkr.ecr.us-east-1.amazonaws.com"
             FULL_IDENTIFIER="${REGISTRY_ID}/marqo-compatibility-tests@${IMAGE_IDENTIFIER}"
             echo "image_identifier=${FULL_IDENTIFIER}" >> $GITHUB_OUTPUT
           else
@@ -144,6 +144,12 @@ jobs:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
     uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
     secrets: inherit
+    permissions:
+      contents: read # This permission is necessary to read repository contents
+      actions: write # Used by machulav/ec2-github-runner@v2 for managing self-hosted runners. The workflow needs to create and manage GitHub Actions runners on EC2
+      id-token: write # Used by aws-actions/configure-aws-credentials@v4. Required for AWS authentication and OIDC token management
+      checks: write # Used implicitly by GitHub Actions to report job statuses and create check runs
+      statuses: write # Used implicitly by GitHub Actions to report job statuses and create check runs
     with:
       from_version: ${{ matrix.from_version }}
       to_version: ${{ needs.orchestrate.outputs.to_version }}

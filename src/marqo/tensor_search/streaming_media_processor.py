@@ -193,9 +193,9 @@ class StreamingMediaProcessor:
             ffmpeg_command.extend([
                 '-ss', str(start_time),  # Start time
                 '-t', str(duration),  # Duration
+                '-hwaccel', 'cuda',  # Use GPU acceleration
+                '-hwaccel_output_format', 'cuda',  # Use GPU acceleration
                 '-i', self.url,  # Input file
-                '-hwaccel', 'cuda', # Use GPU acceleration
-                '-hwaccel_output_format', 'cuda', # Use GPU acceleration
                 '-c:a', 'copy', # Copy audio codec to speed up the conversion process by avoiding unnecessary re-encoding of the audio stream.
                 '-c:v', 'h264_nvenc', # Use NVIDIA NVENC H.264 encoder
                 '-b:v', '5M', # Set the video bitrate to 5M
