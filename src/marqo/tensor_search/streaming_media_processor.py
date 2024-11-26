@@ -264,7 +264,7 @@ class StreamingMediaProcessor:
         return output_file
 
     def _run_ffmpeg_command(
-            self, ffmpeg_command: List[str], timeout: float, base_error_message: str, output_file: str
+            self, ffmpeg_command: List[str], timeout: float, base_error_message: str
     ) -> None:
         """Call ffmpeg with the given command and timeout.
 
