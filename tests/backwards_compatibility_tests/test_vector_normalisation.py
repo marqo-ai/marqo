@@ -47,7 +47,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
         # Add documents
-        self.logger.debug(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
+        self.logger.info(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
         self.create_indexes([self.index_metadata])
 
         try:

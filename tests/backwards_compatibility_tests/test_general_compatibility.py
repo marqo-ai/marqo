@@ -141,7 +141,7 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
         Prepare the indexes and add documents for the test.
         Also store the search results for later comparison.
         """
-        self.logger.debug(f"Creating indexes {self.indexes_to_test_on}")
+        self.logger.info(f"Creating indexes {self.indexes_to_test_on}")
         self.create_indexes(self.indexes_to_test_on)
         try:
             self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
@@ -179,7 +179,7 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
 
     def test_search(self):
         """Run search queries and compare the results with the stored results."""
-
+        self.logger.info(f"Running test_search on {self.__class__.__name__}")
         stored_results = self.load_results_from_file()
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
