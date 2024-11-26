@@ -20,8 +20,8 @@ from marqo.tensor_search.models.preprocessors_model import Preprocessors
 class StreamingMediaProcessor:
 
     VIDEO_CPU_TIMOUT_OUT_MULTIPLIER = 10
-    AUDIO_CPU_TIMOUT_OUT_MULTIPLIER = 2
-    VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 5
+    AUDIO_CPU_TIMOUT_OUT_MULTIPLIER = 10
+    VIDEO_GPU_TIMOUT_OUT_MULTIPLIER = 10
 
     def __init__(
             self, url: str, device: str, modality: Modality,

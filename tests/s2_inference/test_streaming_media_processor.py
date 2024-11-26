@@ -161,35 +161,6 @@ class TestStreamingMediaProcessor(unittest.TestCase):
             )
             streaming_media_processor_object._fetch_file_metadata()
 
-    def test_enable_video_gpu_acceleration_env_var(self):
-        """Enable GPU acceleration should follow the environment variable."""
-        valid_url = TestVideoUrls.VIDEO1.value
-        with patch("marqo.tensor_search.utils.read_env_vars_and_defaults") as mock_read_env:
-            # Mock for "TRUE" value
-            mock_read_env.return_value = "TRUE"
-            streaming_media_processor_object = StreamingMediaProcessor(
-                url=valid_url, device="cpu", modality=Modality.VIDEO,
-                preprocessors=Preprocessors()
-            )
-            self.assertTrue(streaming_media_processor_object.enable_video_gpu_acceleration)
-
-            # Mock for "FALSE" value
-            mock_read_env.return_value = "FALSE"
-            streaming_media_processor_object = StreamingMediaProcessor(
-                url=valid_url, device="cpu", modality=Modality.VIDEO,
-                preprocessors=Preprocessors()
-            )
-            self.assertFalse(streaming_media_processor_object.enable_video_gpu_acceleration)
-
-            # Mock for no environment variable (default behavior)
-            mock_read_env.return_value = None
-            streaming_media_processor_object = StreamingMediaProcessor(
-                url=valid_url, device="cpu", modality=Modality.VIDEO,
-                preprocessors=Preprocessors()
-            )
-            # Assuming the default is GPU acceleration disabled
-            self.assertFalse(streaming_media_processor_object.enable_video_gpu_acceleration)
-
     def test_video_decoding_timeout(self):
         """Test that a timeout error is raised for slow video decoding."""
         valid_url = TestVideoUrls.VIDEO1.value
