@@ -9,6 +9,10 @@ fi
 export LD_LIBRARY_PATH=${CUDA_HOME}/lib64
 export PATH=${CUDA_HOME}/bin:${PATH}
 
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-17.0.13.0.11-3.el8.x86_64
+export PATH=$JAVA_HOME/bin:$PATH
+
+
 trap "bash /app/scripts/shutdown.sh; exit" SIGTERM SIGINT
 
 function wait_for_process () {
