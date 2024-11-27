@@ -139,5 +139,6 @@ local_only/
 tests/cache/
 
 cache/
+src/marqo/cache/
 
 __pycache__/
