@@ -63,7 +63,7 @@ elif [ -z "$VESPA_QUERY_URL" ] && [ -z "$VESPA_DOCUMENT_URL" ] && [ -z "$VESPA_C
 
   # Try to deploy the application and branch on the output
   END_POINT="http://localhost:19071/application/v2/tenant/default/application/default"
-  MAX_RETRIES=10
+  MAX_RETRIES=20
   RETRY_COUNT=0
 
   while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
