@@ -12,6 +12,7 @@ from .video.configuration_video import LanguageBindVideoConfig
 from .video.modeling_video import LanguageBindVideo
 from .video.processing_video import LanguageBindVideoProcessor
 from .video.tokenization_video import LanguageBindVideoTokenizer
+from .download_languagebind_model import download_s3_directory
 
 config_dict = {
     'image': LanguageBindImageConfig,
@@ -30,8 +31,17 @@ transform_dict = {
 }
 
 
+marqo_s3_path = {
+    "video": "s3://opensource-languagebind-models/LanguageBind_Video_FT/",
+    "audio": "s3://opensource-languagebind-models/LanguageBind_Audio_FT/",
+    "thermal": "s3://opensource-languagebind-models/LanguageBind_Thermal/",
+    "image": "s3://opensource-languagebind-models/LanguageBind_Image/",
+    "depth": "s3://opensource-languagebind-models/LanguageBind_Depth/"
+}
+
+
 class LanguageBind(nn.Module):
-    def __init__(self, clip_type, use_temp=True, cache_dir='./cache_dir'):
+    def __init__(self, clip_type, use_temp=True, cache_dir='./cache_dir', download_from_marqo_s3=True):
         super(LanguageBind, self).__init__()
         self.use_temp = use_temp
         self.modality_encoder = {}
@@ -39,7 +49,11 @@ class LanguageBind(nn.Module):
         self.modality_scale = {}
         self.modality_config = {}
         for k, v in clip_type.items():
-            pretrained_ckpt = f'LanguageBind/{v}'
+            if download_from_marqo_s3:
+                s3_path = marqo_s3_path[k]
+                pretrained_ckpt = download_s3_directory(s3_path, cache_dir)
+            else:
+                pretrained_ckpt = v
             model = model_dict[k].from_pretrained(pretrained_ckpt, cache_dir=cache_dir)
             self.modality_encoder[k] = model.vision_model
             self.modality_proj[k] = model.visual_projection

@@ -17,6 +17,7 @@ import torch
 from urllib.parse import quote
 from marqo.core.inference.image_download import DEFAULT_HEADERS
 
+from marqo.s2_inference.languagebind.download_languagebind_model import download_s3_directory
 
 from marqo.s2_inference.multimodal_model_load import *
 from marqo.s2_inference.languagebind import (
@@ -226,19 +227,9 @@ class LanguageBindEncoder(ModelEncoder):
                 os.unlink(temp_file.name)
 
     def _get_tokenizer(self):  # this is used for text only
-        if 'image' in self.model.clip_type:
-            pretrained_ckpt = 'LanguageBind/LanguageBind_Image'
-            return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt,
-                                                              cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
-        else:
-            first_model = next(iter(self.model.clip_type.values()))
-            pretrained_ckpt = f'LanguageBind/{first_model}'
-            if "video" in first_model.lower():
-                return LanguageBindVideoTokenizer.from_pretrained(pretrained_ckpt,
-                                                                  cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
-            else:
-                return LanguageBindAudioTokenizer.from_pretrained(pretrained_ckpt,
-                                                                  cache_dir=f'{ModelCache.languagebind_cache_path}/tokenizer_cache_dir')
+
+        pretrained_ckpt = download_s3_directory("s3://opensource-languagebind-models/LanguageBind_Tokenizer/")
+        return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt)
 
     def _normalize(self, outputs):
         return outputs / outputs.norm(dim=-1, keepdim=True)
