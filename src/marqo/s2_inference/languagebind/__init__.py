@@ -13,6 +13,7 @@ from .video.modeling_video import LanguageBindVideo
 from .video.processing_video import LanguageBindVideoProcessor
 from .video.tokenization_video import LanguageBindVideoTokenizer
 from .download_languagebind_model import download_s3_directory
+from marqo.s2_inference.configs import ModelCache
 
 config_dict = {
     'image': LanguageBindImageConfig,
@@ -41,7 +42,8 @@ marqo_s3_path = {
 
 
 class LanguageBind(nn.Module):
-    def __init__(self, clip_type, use_temp=True, cache_dir='./cache_dir', download_from_marqo_s3=True):
+    def __init__(self, clip_type, use_temp=True, cache_dir=ModelCache.languagebind_cache_path,
+                 download_from_marqo_s3=True):
         super(LanguageBind, self).__init__()
         self.use_temp = use_temp
         self.modality_encoder = {}

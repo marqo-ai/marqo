@@ -228,7 +228,8 @@ class LanguageBindEncoder(ModelEncoder):
 
     def _get_tokenizer(self):  # this is used for text only
 
-        pretrained_ckpt = download_s3_directory("s3://opensource-languagebind-models/LanguageBind_Tokenizer/")
+        pretrained_ckpt = download_s3_directory("s3://opensource-languagebind-models/LanguageBind_Tokenizer/",
+                                                local_dir=ModelCache.languagebind_cache_path)
         return LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt)
 
     def _normalize(self, outputs):
