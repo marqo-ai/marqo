@@ -19,6 +19,13 @@ on:
         description: 'To version image identifier is a unique identifier for the target Marqo image, which can either be a tag or a digest. It should contain complete qualified image name with tag or digest. For example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef. This is used to pull images from ECR.'
         required: true
         type: string
+      mode:
+        description: 'The mode in which the compatibility tests are to be run. Options: "backwards_compatibility", "rollback"'
+        options:
+          - backwards_compatibility
+          - rollback
+        required: true
+        type: choice
   workflow_dispatch:
     # from_version: Used as: the identifier for a workflow call, for logging purposes and for pulling image from DockerHub. We need to pass a version here: ex: 2.11.1
     # to_version: Used as: the identifier for a workflow call and for logging purposes. We cannot use this to pull images from ECR or DockerHub (as opposed to from_version) since the to_version image has not been released yet. We need to pass a version here: ex: 2.11.5
@@ -38,6 +45,13 @@ on:
         description: 'To version image identifier is a unique identifier for the target Marqo image, which can either be a tag or a digest. It should contain complete qualified image name with tag or digest. For example: marqoai/marqo:abcd1234 or marqoai/marqo@sha256:1234567890abcdef. This is used to pull images from ECR.'
         required: true
         type: string
+      mode:
+        description: 'The mode in which the compatibility tests are to be run. Options: "backwards_compatibility", "rollback"'
+        options:
+          - backwards_compatibility
+          - rollback
+        required: true
+        type: choice
 
 jobs:
   Start-Runner:
@@ -115,35 +129,21 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Step to run the backwards compatibility test
+      # Step to run the compatibility test. This step can run both backwards_compatibility and rollback tests, based on the MODE argument
       - name: Run backwards compatibility test
         id: run-backwards-compatibility
         env:
           FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
           TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}
           TO_IMAGE: ${{ inputs.to_image || github.event.inputs.to_image }}
+          MODE: ${{ inputs.mode || github.event.inputs.mode }}
         run: |
             export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
             python tests/backwards_compatibility_tests/compatibility_test_runner.py \
-            --mode=backwards_compatibility \
+            --mode "$MODE" \
             --from_version "$FROM_VERSION" \
             --to_version "$TO_VERSION" \
             --to_image "$TO_IMAGE" \
-
-      # Step to run rollback tests. Only runs if backwards compatibility tests have succeeded
-      - name: Run rollback tests
-        if: success()
-        env:
-          FROM_VERSION: ${{ inputs.from_version || github.event.inputs.from_version }}
-          TO_VERSION: ${{ inputs.to_version || github.event.inputs.to_version }}
-          TO_IMAGE: ${{ inputs.to_image || github.event.inputs.to_image }}
-        run: |
-          export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
-          python tests/backwards_compatibility_tests/compatibility_test_runner.py \
-          --mode=rollback \
-          --from_version "$FROM_VERSION" \
-          --to_version "$TO_VERSION" \
-          --to_image "$TO_IMAGE" \
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
