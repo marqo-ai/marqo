@@ -580,16 +580,22 @@ def schema_validation(index_name: str, settings_object: dict):
     )
 
 
+@app.get('/memory', include_in_schema=False)
+@utils.enable_debug_apis()
+def memory():
+    return memory_profiler.get_memory_profile()
+
+
 @app.get("/health" , include_in_schema=False)
 def check_health(marqo_config: config.Config = Depends(get_config)):
     health_status = marqo_config.monitoring.get_health()
     return HealthResponse.from_marqo_health_status(health_status)
 
 
-@app.get('/memory', include_in_schema=False)
-@utils.enable_debug_apis()
-def memory():
-    return memory_profiler.get_memory_profile()
+@app.get("/healthz", include_in_schema=False)
+def check_health(marqo_config: config.Config = Depends(get_config)):
+    marqo_config.device_manager.cuda_device_health_check()
+    return JSONResponse(content={"status": "ok"}, status_code=200)
 
 
 if __name__ == "__main__":
