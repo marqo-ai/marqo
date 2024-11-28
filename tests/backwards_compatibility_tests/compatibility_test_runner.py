@@ -203,8 +203,8 @@ def start_marqo_container(version: str, volume_name: str):
         logger.debug("Stopped following docker logs.")
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to start Docker container {container_name}, with version: {version}, and volume_name: {volume_name}")
-        raise
+        raise RuntimeError(
+            f"Failed to start Docker container {container_name}, with version: {version}, and volume_name: {volume_name}") from e
 
     # Show the running containers
     try:
@@ -314,8 +314,8 @@ def start_marqo_container_by_transferring_state(target_version: str, source_vers
         logger.debug("Stopped following docker logs.")
 
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to start Docker container {container_name} by transferring state with target_version: {target_version}, source_version: {source_version}, source_volume: {source_volume}")
-        raise
+        raise RuntimeError(
+            f"Failed to start Docker container {container_name} by transferring state with target_version: {target_version}, source_version: {source_version}, source_volume: {source_volume}") from e
 
     # Show the running containers
     try:
@@ -479,9 +479,8 @@ def create_volume_for_marqo_version(version: str, volume_name: str = None):
         volumes_to_cleanup.add(volume_name)
         return volume_name
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to create volume: {volume_name}")
-        raise e
-
+        raise RuntimeError(
+            f"Failed to create volume: {volume_name}") from e
 
 def get_volume_name_from_marqo_version(version):
     """
@@ -526,8 +525,7 @@ def copy_state_from_container(
         subprocess.run(cmd, check=True)
         logger.info(f"Successfully copied state from {from_version_volume} to {to_version_volume}")
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to copy state from {from_version_volume} to {to_version_volume}.")
-        raise
+        raise RuntimeError(f"Failed to copy state from {from_version_volume} to {to_version_volume}.") from e
 
 def trigger_rollback_endpoint(from_version: str):
     if semver.VersionInfo.parse(from_version) < semver.VersionInfo.parse("2.13.0"):
@@ -572,8 +570,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         try:
             run_tests_in_mode(Mode.PREPARE, from_version)
         except Exception as e:
-            logger.error(f"Error running tests in 'prepare' mode across versions on from_version: {from_version}")
-            raise
+            raise RuntimeError(f"Error running tests in 'prepare' mode across versions on from_version: {from_version}") from e
         # Step 2: Stop from_version container (but don't remove it)
         stop_marqo_container(from_version)
 
@@ -586,18 +583,15 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         try:
             run_tests_in_mode(Mode.TEST, from_version)
         except Exception as e:
-            logger.error(f"Error running tests across versions in 'test' mode on from_version: {from_version}")
-            raise
+            raise RuntimeError(f"Error running tests across versions in 'test' mode on from_version: {from_version}") from e
         logger.info("Finished running tests in Test mode")
         # Step 5: Do a full test run which includes running tests in prepare and test mode on the same container
         try:
             full_test_run(to_version)
         except Exception as e:
-            logger.error(f"Error running tests in full test run, on to_version: {to_version}.")
-            raise
+            raise RuntimeError(f"Error running tests in full test run, on to_version: {to_version}.") from e
     except Exception as e:
-        logger.error(f"An error occurred while executing backwards compatibility tests, on from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
-        raise
+        raise RuntimeError(f"An error occurred while executing backwards compatibility tests, on from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}") from e
     finally:
         # Stop the to_version container (but don't remove it yet)
         logger.error("Calling stop_marqo_container with " + str(to_version))
@@ -633,8 +627,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
         try:
             run_tests_in_mode(Mode.PREPARE, from_version)
         except Exception as e:
-            logger.error(f"Error while running tests across versions in 'prepare' mode.")
-            raise
+            raise RuntimeError(f"Error while running tests across versions in 'prepare' mode.") from e
 
         # Step 2: Stop Marqo from_version container started in Step #1.
         stop_marqo_container(from_version)
@@ -659,13 +652,11 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
         try:
             run_tests_in_mode(Mode.TEST, from_version)
         except Exception as e:
-            logger.error(f"Error in rollback tests while running tests across versions in 'test' mode on version: {from_version}")
-            raise
+            raise RuntimeError(f"Error in rollback tests while running tests across versions in 'test' mode on version: {from_version}") from e
         try:
             full_test_run(to_version)
         except Exception as e:
-            logger.error(f"Error in rollback tests while running tests in full test run on version: {to_version}")
-            raise
+            raise RuntimeError(f"Error in rollback tests while running tests in full test run on version: {to_version}") from e
 
         #Step 7: Trigger rollback endpoint
         trigger_rollback_endpoint(from_version)
@@ -674,8 +665,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
         try:
             run_full_test_suite(from_version, to_version)
         except Exception as e:
-            logger.error(f"Error when running full test suite in rollback tests after rolling back vespa application, with from_version: {from_version}, to_version: {to_version}")
-            raise
+            raise RuntimeError(f"Error when running full test suite in rollback tests after rolling back vespa application, with from_version: {from_version}, to_version: {to_version}") from e
 
     finally:
         # Stop the final container (but don't remove it yet)
@@ -710,8 +700,8 @@ def prepare_volume_for_rollback(target_version: str, source_volume: str, target_
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to run command: {' '.join(cmd)} when preparing volume for rollback: {e}")
-        raise
+        raise RuntimeError(
+            f"Failed to run command: {' '.join(cmd)} when preparing volume for rollback: {e}") from e
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Marqo Testing Runner")
@@ -749,5 +739,5 @@ if __name__ == "__main__":
             rollback_test(args.to_version, args.from_version, args.to_image)
 
     except Exception as e:
-        logger.error(f"Encountered an exception: {e} while running tests in mode {args.mode}")
+        logger.error(f"Encountered an exception: {e} while running tests in mode {args.mode}, exiting")
         sys.exit(1)
