@@ -145,7 +145,7 @@ def start_marqo_container(version: str, volume_name: str):
     try:
         subprocess.run(["docker", "rm", "-f", container_name], check=True)
     except Exception as e:
-        logger.warn(f"Container {container_name} not found, skipping removal.")
+        logger.warning(f"Container {container_name} not found, skipping removal.")
 
     # Prepare the docker run command
     cmd = [
@@ -210,7 +210,7 @@ def start_marqo_container(version: str, volume_name: str):
     try:
         subprocess.run(["docker", "ps"], check=True)
     except subprocess.CalledProcessError as e:
-        logger.warn(f"Failed to list Docker containers: {e}")
+        logger.warning(f"Failed to list Docker containers: {e}")
 
 def start_marqo_container_by_transferring_state(target_version: str, source_version: str, source_volume: str,
                                                 target_version_image: str = None, source: str = "docker"):
@@ -255,7 +255,7 @@ def start_marqo_container_by_transferring_state(target_version: str, source_vers
     try:
         subprocess.run(["docker", "rm", "-f", container_name], check=True)
     except subprocess.CalledProcessError:
-        logger.warn(f"Container {container_name} not found, skipping removal.")
+        logger.warning(f"Container {container_name} not found, skipping removal.")
 
     # Prepare the docker run command
     cmd = [
@@ -321,7 +321,7 @@ def start_marqo_container_by_transferring_state(target_version: str, source_vers
     try:
         subprocess.run(["docker", "ps"], check=True)
     except subprocess.CalledProcessError as e:
-        logger.warn(f"Failed to list Docker containers: {e}")
+        logger.warning(f"Failed to list Docker containers: {e}")
 
 def stop_marqo_container(version: str):
     """
@@ -336,7 +336,7 @@ def stop_marqo_container(version: str):
         subprocess.run(["docker", "stop", container_name], check=True)
         logger.info(f"Successfully stopped container {container_name}")
     except subprocess.CalledProcessError as e:
-        logger.warn(f"Warning: Failed to stop container {container_name}")
+        logger.warning(f"Warning: Failed to stop container {container_name}")
 
 
 def cleanup_containers():
@@ -353,7 +353,7 @@ def cleanup_containers():
         try:
             subprocess.run(["docker", "rm", "-f", container_name], check=True)
         except subprocess.CalledProcessError as e:
-            logger.warn(f"Warning: Failed to remove container {container_name}: {e}")
+            logger.warning(f"Warning: Failed to remove container {container_name}: {e}")
     containers_to_cleanup.clear()
 
 def cleanup_volumes():
@@ -370,7 +370,7 @@ def cleanup_volumes():
         try:
             subprocess.run(["docker", "volume", "rm", volume_name], check=True)
         except subprocess.CalledProcessError as e:
-            logger.warn(f"Warning: Failed to remove volume {volume_name}: {e}")
+            logger.warning(f"Warning: Failed to remove volume {volume_name}: {e}")
     volumes_to_cleanup.clear()
 
 def run_tests_in_mode(mode: Mode, from_version: str):
