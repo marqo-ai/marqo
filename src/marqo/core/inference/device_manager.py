@@ -1,7 +1,6 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
-import psutil
 import torch
 from pydantic import BaseModel
 
@@ -20,11 +19,11 @@ class Device(BaseModel):
     id: int
     name: str
     type: DeviceType
-    total_memory: int
+    total_memory: Optional[int] = 0
 
     @classmethod
     def cpu(cls) -> 'Device':
-        return Device(id=-1, name='cpu', type=DeviceType.cpu, total_memory=psutil.virtual_memory().total)
+        return Device(id=-1, name='cpu', type=DeviceType.cpu)
 
     @classmethod
     def cuda(cls, device_id, name, total_memory) -> 'Device':
@@ -69,23 +68,27 @@ class DeviceManager:
             # CUDA devices could become unavailable/unreachable if the docker container running Marqo loses access
             # to the device symlinks. There is no way to recover from this, we will need to restart the container.
             # See https://github.com/NVIDIA/nvidia-container-toolkit/issues/48 for more details.
-            logger.error('Cuda device becomes unavailable.')
-            raise CudaDeviceNotAvailableError('Cuda device becomes unavailable.')
+            logger.error('Cuda device becomes unavailable')
+            raise CudaDeviceNotAvailableError('Cuda device becomes unavailable')
 
+        # TODO confirm whether we should check all devices or just the default one
         for device in self.cuda_devices:
-            # TODO confirm whether we should check all devices or just the default one
-            cuda_device = torch.device(device.name)
-            memory_stats = torch.cuda.memory_stats(cuda_device)
-            logger.debug(f'Cuda device {device.name} with total memory {device.total_memory}. '
-                         f'Memory stats: {memory_stats}')
-            
             try:
-                torch.randn(3).to(cuda_device)
+                cuda_device = torch.device(device.name)
+                memory_stats = torch.cuda.memory_stats(cuda_device)
+                logger.debug(f'Cuda device {device.name} with total memory {device.total_memory}. '
+                             f'Memory stats: {str(memory_stats)}')
+
+                torch.randn(3, device=cuda_device)
             except RuntimeError as e:
                 if 'out of memory' in str(e).lower():
                     # If we encounter 'CUDA error: out of memory' error consistently, it means some threads are
                     # holding the memory
                     logger.error(f'Cuda device {device.name} is out of memory. Total memory: {device.total_memory}. '
-                                 f'Memory stats: {memory_stats}')
-                    raise CudaOutOfMemoryError(f'Cuda device {device.name} is out of memory. '
-                                               f'({memory_stats["allocated.all.current"]}/{device.total_memory})')
+                                 f'Memory stats: {str(memory_stats)}')
+                    allocated_mem = memory_stats.get("allocated.all.current", None) if memory_stats else None
+                    raise CudaOutOfMemoryError(f'Cuda device {device.name} is out of memory: '
+                                               f'({allocated_mem}/{device.total_memory})')
+            except Exception as e:
+                # Log out a warning message when encounter other transient errors.
+                logger.warning(f'Encountered issue inspecting Cuda device {device.name}: {str(e)}')
