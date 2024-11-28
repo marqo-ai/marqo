@@ -12,6 +12,7 @@ from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.s2_inference import Modality
 from marqo.tensor_search.add_docs import threaded_download_and_preprocess_content
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.telemetry import RequestMetrics
 
 
@@ -241,8 +242,6 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
             url=self.mock_video_url,
             device='cpu',
             modality= Modality.VIDEO,
-            marqo_index_type = self.mock_marqo_index.type,
-            marqo_index_model = self.mock_marqo_index.model,
             preprocessors = None,
             audio_preprocessing = None,
             video_preprocessing = None,
@@ -252,8 +251,6 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
             url=self.mock_video_url,
             device='cpu',
             modality= Modality.VIDEO,
-            marqo_index_type = self.mock_marqo_index.type,
-            marqo_index_model = self.mock_marqo_index.model,
             preprocessors = None,
             audio_preprocessing = None,
             video_preprocessing = None,

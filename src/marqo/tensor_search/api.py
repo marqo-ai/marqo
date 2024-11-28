@@ -225,33 +225,20 @@ def shutdown_event():
     marqo_config.stop_and_close_zookeeper_client()
 
 
-@app.get("/")
+@app.get("/", summary="Basic information")
 def root():
     return {"message": "Welcome to Marqo",
             "version": version.get_version()}
 
 
-@app.get('/memory')
-@utils.enable_debug_apis()
-def memory():
-    return memory_profiler.get_memory_profile()
-
-
-@app.post('/validate/index/{index_name}')
-@utils.enable_ops_api()
-def schema_validation(index_name: str, settings_object: dict):
-    IndexManagement.validate_index_settings(index_name, settings_object)
-
-    return JSONResponse(
-        content={
-            "validated": True,
-            "index": index_name
-        }
-    )
-
-
 @app.post("/indexes/{index_name}")
 def create_index(index_name: str, settings: IndexSettings, marqo_config: config.Config = Depends(get_config)):
+    """
+    Create index with settings. Please refer to the following documents for details about creating different types
+    of index:
+    - [Unstructured Index](https://docs.marqo.ai/latest/reference/api/indexes/create-index/)
+    - [Structured Index](https://docs.marqo.ai/latest/reference/api/indexes/create-structured-index/)
+    """
     marqo_config.index_management.create_index(settings.to_marqo_index_request(index_name))
     return JSONResponse(
         content={
@@ -262,10 +249,76 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
     )
 
 
+@app.get("/indexes")
+def get_indexes(marqo_config: config.Config = Depends(get_config)):
+    """
+    List all indexes. Please refer to
+    [List index API document](https://docs.marqo.ai/latest/reference/api/indexes/list-indexes/) for details.
+    """
+    indexes = marqo_config.index_management.get_all_indexes()
+    return {
+        'results': [
+            {'indexName': index.name} for index in indexes
+        ]
+    }
+
+
+@app.get("/indexes/{index_name}/settings")
+def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Get settings of an index. Please refer to
+    [Index settings API document](https://docs.marqo.ai/latest/reference/api/settings/get-index-stats/) for details.
+    """
+    marqo_index = marqo_config.index_management.get_index(index_name)
+    return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True, by_alias=True)
+
+
+@app.delete("/indexes/{index_name}")
+def delete_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Delete an index. Please refer to
+    [Delete index API document](https://docs.marqo.ai/latest/reference/api/indexes/delete-index/) for details.
+    """
+    tensor_search.delete_index(index_name=index_name, config=marqo_config)
+    return JSONResponse(content={"acknowledged": True}, status_code=200)
+
+
+@app.get("/indexes/{index_name}/health")
+def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Provides information about the health of a Marqo index. Please refer to
+    [Index health API document](https://docs.marqo.ai/latest/reference/api/health/health/) for details.
+    """
+    health_status = marqo_config.monitoring.get_health(index_name=index_name)
+    return HealthResponse.from_marqo_health_status(health_status)
+
+
+@app.get("/indexes/{index_name}/stats")
+def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
+    """
+    Provides information about the index, including the number of documents and vectors in the index. Please refer to
+    [Index Stats API document](https://docs.marqo.ai/latest/reference/api/stats/get-index-stats/) for details.
+    """
+    stats = marqo_config.monitoring.get_index_stats_by_name(index_name)
+    return {
+        'numberOfDocuments': stats.number_of_documents,
+        'numberOfVectors': stats.number_of_vectors,
+        'backend': {
+            'memoryUsedPercentage': stats.backend.memory_used_percentage,
+            'storageUsedPercentage': stats.backend.storage_used_percentage
+        }
+    }
+
+
+
 @app.post("/indexes/{index_name}/search")
 @throttle(RequestType.SEARCH)
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
+    """
+    Search for documents matching a specific query in the given index. Please refer to
+    [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
+    """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return tensor_search.search(
             config=marqo_config, text=search_query.q,
@@ -290,6 +343,12 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
 @throttle(RequestType.SEARCH)
 def recommend(query: RecommendQuery, index_name: str,
               marqo_config: config.Config = Depends(get_config)):
+    """
+    Recommend similar documents. Input a list of existing document IDs or dict of IDs and weights, and the response
+    will be a list of "recommendations", which are documents similar to the input. These similar documents are
+    retrieved by searching using interpolated vectors from the input. No inference is done during this process.
+    Please refer to [Recommend API document](https://docs.marqo.ai/latest/reference/api/search/recommend/) for details.
+    """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
         return marqo_config.recommender.recommend(
             index_name=index_name,
@@ -310,26 +369,15 @@ def recommend(query: RecommendQuery, index_name: str,
         )
 
 
-@app.post("/indexes/{index_name}/documents")
-@throttle(RequestType.INDEX)
-def add_or_replace_documents(
-        body: AddDocsBodyParams,
-        index_name: str,
-        marqo_config: config.Config = Depends(get_config),
-        device: str = Depends(api_validation.validate_device)):
-    """add_documents endpoint (replace existing docs with the same id)"""
-    add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
-                                                             device=device)
-
-    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
-        res = marqo_config.document.add_documents(add_docs_params=add_docs_params)
-        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
-
-
 @app.post("/indexes/{index_name}/embed")
 @throttle(RequestType.SEARCH)
 def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depends(api_validation.validate_device),
           marqo_config: config.Config = Depends(get_config)):
+    """
+    Vectorise a piece of content (string or weighted dictionary) or list of content and return the corresponding
+    embeddings. Please refer to [Embed API document](https://docs.marqo.ai/latest/reference/api/embed/embed/) for
+    details.
+    """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/embed"):
         return marqo_config.embed.embed_content(
             content=embedding_request.content,
@@ -340,14 +388,36 @@ def embed(embedding_request: EmbedRequest, index_name: str, device: str = Depend
         )
 
 
+@app.post("/indexes/{index_name}/documents")
+@throttle(RequestType.INDEX)
+def add_or_replace_documents(
+        body: AddDocsBodyParams,
+        index_name: str,
+        marqo_config: config.Config = Depends(get_config),
+        device: str = Depends(api_validation.validate_device)):
+    """
+    Add an array of documents or replace them if they already exist.
+    Please refer to [Add documents API](https://docs.marqo.ai/latest/reference/api/documents/add-or-replace-documents/)
+    for details.
+    """
+    add_docs_params = api_utils.add_docs_params_orchestrator(index_name=index_name, body=body,
+                                                             device=device)
+
+    with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/documents"):
+        res = marqo_config.document.add_documents(add_docs_params=add_docs_params)
+        return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
+
+
 @app.patch("/indexes/{index_name}/documents")
 @throttle(RequestType.PARTIAL_UPDATE)
 def update_documents(
         body: UpdateDocumentsBodyParams,
         index_name: str,
         marqo_config: config.Config = Depends(get_config)):
-    """update_documents endpoint"""
-
+    """
+    Update an array of documents in a given index. Please refer to
+    [Update document API](https://docs.marqo.ai/latest/reference/api/documents/update-documents/) for details.
+    """
     res = marqo_config.document.partial_update_documents_by_index_name(
         index_name=index_name, partial_documents=body.documents)
 
@@ -358,6 +428,10 @@ def update_documents(
 def get_document_by_id(index_name: str, document_id: str,
                        marqo_config: config.Config = Depends(get_config),
                        expose_facets: bool = False):
+    """
+    Gets a document using its ID. Please refer to
+    [Get document API](https://docs.marqo.ai/latest/reference/api/documents/get-one-document/) for details.
+    """
     return tensor_search.get_document_by_id(
         config=marqo_config, index_name=index_name, document_id=document_id,
         show_vectors=expose_facets
@@ -369,6 +443,10 @@ def get_documents_by_ids(
         index_name: str, document_ids: List[str],
         marqo_config: config.Config = Depends(get_config),
         expose_facets: bool = False):
+    """
+    Gets a selection of documents based on their IDs. Please refer to
+    [Get documents API](https://docs.marqo.ai/latest/reference/api/documents/get-multiple-documents/) for details.
+    """
     res = tensor_search.get_documents_by_ids(
         config=marqo_config, index_name=index_name, document_ids=document_ids,
         show_vectors=expose_facets
@@ -376,82 +454,55 @@ def get_documents_by_ids(
     return JSONResponse(content=res.dict(exclude_none=True, by_alias=True), headers=res.get_header_dict())
 
 
-@app.get("/indexes/{index_name}/stats")
-def get_index_stats(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    stats = marqo_config.monitoring.get_index_stats_by_name(index_name)
-    return {
-        'numberOfDocuments': stats.number_of_documents,
-        'numberOfVectors': stats.number_of_vectors,
-        'backend': {
-            'memoryUsedPercentage': stats.backend.memory_used_percentage,
-            'storageUsedPercentage': stats.backend.storage_used_percentage
-        }
-    }
-
-
-@app.delete("/indexes/{index_name}")
-def delete_index(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    tensor_search.delete_index(index_name=index_name, config=marqo_config)
-    return JSONResponse(content={"acknowledged": True}, status_code=200)
-
-
 @app.post("/indexes/{index_name}/documents/delete-batch")
 def delete_docs(index_name: str, documentIds: List[str],
                 marqo_config: config.Config = Depends(get_config)):
+    """
+    Delete documents identified by an array of their IDs. Please refer to
+    [Delete documents API](https://docs.marqo.ai/latest/reference/api/documents/delete-documents/) for details.
+    """
     return tensor_search.delete_documents(
         index_name=index_name, config=marqo_config, doc_ids=documentIds
     )
 
 
-@app.get("/health")
-def check_health(marqo_config: config.Config = Depends(get_config)):
-    health_status = marqo_config.monitoring.get_health()
-    return HealthResponse.from_marqo_health_status(health_status)
-
-
-@app.get("/indexes/{index_name}/health")
-def check_index_health(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    health_status = marqo_config.monitoring.get_health(index_name=index_name)
-    return HealthResponse.from_marqo_health_status(health_status)
-
-
-@app.get("/indexes")
-def get_indexes(marqo_config: config.Config = Depends(get_config)):
-    indexes = marqo_config.index_management.get_all_indexes()
-    return {
-        'results': [
-            {'indexName': index.name} for index in indexes
-        ]
-    }
-
-
-@app.get("/indexes/{index_name}/settings")
-def get_settings(index_name: str, marqo_config: config.Config = Depends(get_config)):
-    marqo_index = marqo_config.index_management.get_index(index_name)
-    return IndexSettings.from_marqo_index(marqo_index).dict(exclude_none=True, by_alias=True)
-
-
 @app.get("/models")
 def get_loaded_models():
+    """
+    Returns information about all the loaded models in "cuda" and "cpu" devices. Please refer to
+    [Get models API document](https://docs.marqo.ai/latest/reference/api/model/get-models/) for details.
+    """
     return tensor_search.get_loaded_models()
 
 
 @app.delete("/models")
 def eject_model(model_name: str, model_device: str):
+    """
+    Eject a model from a specific device. Please refer to
+    [Eject models API document](https://docs.marqo.ai/latest/reference/api/model/eject-a-loaded-model/) for details.
+    """
     return tensor_search.eject_model(model_name=model_name, device=model_device)
 
 
 @app.get("/device/cpu")
 def get_cpu_info():
+    """
+    Gives information about your CPU usage. Please refer to
+    [Get CPU info API document](https://docs.marqo.ai/latest/reference/api/device/get-cpu-information/) for details.
+    """
     return tensor_search.get_cpu_info()
 
 
 @app.get("/device/cuda")
 def get_cuda_info(marqo_config: config.Config = Depends(get_config)):
+    """
+    Gives information about your cuda usage. Please refer to
+    [Get CUDA info API document](https://docs.marqo.ai/latest/reference/api/device/get-cuda-information/) for details.
+    """
     return marqo_config.monitoring.get_cuda_info()
 
 
-@app.post("/batch/indexes/delete")
+@app.post("/batch/indexes/delete", include_in_schema=False)
 @utils.enable_batch_apis()
 def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
@@ -460,7 +511,7 @@ def batch_delete_indexes(index_names: List[str], marqo_config: config.Config = D
                                  "index_names": index_names}, status_code=200)
 
 
-@app.post("/batch/indexes/create")
+@app.post("/batch/indexes/create", include_in_schema=False)
 @utils.enable_batch_apis()
 def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithName],
                          marqo_config: config.Config = Depends(get_config)):
@@ -480,7 +531,7 @@ def batch_create_indexes(index_settings_with_name_list: List[IndexSettingsWithNa
     )
 
 
-@app.delete("/indexes/{index_name}/documents/delete-all")
+@app.delete("/indexes/{index_name}/documents/delete-all", include_in_schema=False)
 @utils.enable_batch_apis()
 def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users.
@@ -490,7 +541,7 @@ def delete_all_documents(index_name: str, marqo_config: config.Config = Depends(
     return {"documentCount": document_count}
 
 
-@app.post("/upgrade")
+@app.post("/upgrade", include_in_schema=False)
 @utils.enable_upgrade_api()
 def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
@@ -498,7 +549,7 @@ def upgrade_marqo(marqo_config: config.Config = Depends(get_config)):
     upgrade_runner.upgrade()
 
 
-@app.post("/rollback")
+@app.post("/rollback", include_in_schema=False)
 @utils.enable_upgrade_api()
 def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(get_config)):
     """An internal API used for testing processes. Not to be used by users."""
@@ -506,7 +557,7 @@ def rollback_marqo(req: RollbackRequest, marqo_config: config.Config = Depends(g
     rollback_runner.rollback(from_version=req.from_version, to_version=req.to_version)
 
 
-@app.post("/rollback-vespa")
+@app.post("/rollback-vespa", include_in_schema=False)
 def rollback_vespa_app_to_current_version(marqo_config: config.Config = Depends(get_config)):
     marqo_config.index_management.rollback_vespa()
     return JSONResponse(
@@ -515,101 +566,30 @@ def rollback_vespa_app_to_current_version(marqo_config: config.Config = Depends(
     )
 
 
+@app.post('/validate/index/{index_name}', include_in_schema=False)
+@utils.enable_ops_api()
+def schema_validation(index_name: str, settings_object: dict):
+    IndexManagement.validate_index_settings(index_name, settings_object)
+
+    return JSONResponse(
+        content={
+            "validated": True,
+            "index": index_name
+        }
+    )
+
+
+@app.get("/health" , include_in_schema=False)
+def check_health(marqo_config: config.Config = Depends(get_config)):
+    health_status = marqo_config.monitoring.get_health()
+    return HealthResponse.from_marqo_health_status(health_status)
+
+
+@app.get('/memory', include_in_schema=False)
+@utils.enable_debug_apis()
+def memory():
+    return memory_profiler.get_memory_profile()
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8882)
-
-# try these curl commands:
-
-# ADD DOCS:
-"""
-curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/documents?refresh=true&device=cpu' -H 'Content-type:application/json' -d '
-[ 
-    {
-        "Title": "Honey is a delectable food stuff", 
-        "Desc" : "some boring description",
-        "_id": "honey_facts_119"
-    }, {
-        "Title": "Space exploration",
-        "Desc": "mooooon! Space!!!!",
-        "_id": "moon_fact_145"
-    }
-]'
-"""
-
-# SEARCH DOCS
-"""
-curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/search?device=cuda0' -H 'Content-type:application/json' -d '{
-    "q": "what do bears eat?",
-    "searchableAttributes": ["Title", "Desc", "other"],
-    "limit": 3,    
-    "searchMethod": "TENSOR",
-    "showHighlights": true,
-    "filter": "Desc:(some boring description)",
-    "attributesToRetrieve": ["Title"]
-}'
-"""
-
-# CREATE CUSTOM IMAGE INDEX:
-"""
-curl -XPOST http://localhost:8882/indexes/my-multimodal-index -H 'Content-type:application/json' -d '{
-    "index_defaults": {
-      "treat_urls_and_pointers_as_images":true,    
-      "model":"ViT-B/32"
-    },
-    "number_of_shards": 3
-}'
-"""
-
-# GET DOCUMENT BY ID:
-"""
-curl -XGET http://localhost:8882/indexes/my-irst-ix/documents/honey_facts_119
-"""
-
-# GET index stats
-"""
-curl -XGET http://localhost:8882/indexes/my-irst-ix/stats
-"""
-
-# GET index settings
-"""
-curl -XGET http://localhost:8882/indexes/my-irst-ix/settings
-"""
-# POST refresh index
-"""
-curl -XPOST  http://localhost:8882/indexes/my-irst-ix/refresh
-"""
-
-# DELETE docs
-"""
-curl -XPOST  http://localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
-    "honey_facts_119", "moon_fact_145"
-]'
-"""
-
-# DELETE index
-"""
-curl -XDELETE http://localhost:8882/indexes/my-irst-ix
-"""
-
-# check cpu info
-"""
-curl -XGET http://localhost:8882/device/cpu
-"""
-
-# check cuda info
-"""
-curl -XGET http://localhost:8882/device/cuda
-"""
-
-# check the loaded models
-"""
-curl -XGET http://localhost:8882/models
-"""
-
-# eject a model
-"""
-curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cuda'
-curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cpu'
-curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cuda' 
-curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cpu' 
-"""

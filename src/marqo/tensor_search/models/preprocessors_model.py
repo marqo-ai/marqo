@@ -1,13 +1,24 @@
-from pydantic import BaseModel
-from torchvision.transforms import Compose
-from typing import Optional
+from typing import Optional, Any
+
+from marqo.base_model import MarqoBaseModel
+from marqo.s2_inference.multimodal_model_load import Modality
 
 
-class Preprocessors(BaseModel):
-    image: Optional[Compose] = None
-    text: Optional[Compose] = None
-    video: Optional[Compose] = None
-    audio: Optional[Compose] = None
+class Preprocessors(MarqoBaseModel):
+    """The type of preprocessors is unknown, so we use Any."""
+    image: Optional[Any] = None
+    text: Optional[Any] = None
+    video: Optional[Any] = None
+    audio: Optional[Any] = None
 
-    class Config:
-        arbitrary_types_allowed = True
+    def get_preprocessor(self, modality: Modality):
+        if modality == Modality.IMAGE:
+            return self.image
+        elif modality == Modality.TEXT:
+            return self.text
+        elif modality == Modality.VIDEO:
+            return self.video
+        elif modality == Modality.AUDIO:
+            return self.audio
+        else:
+            raise ValueError(f"Unknown modality {modality}")

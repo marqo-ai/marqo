@@ -179,6 +179,59 @@ class TestCustomVectorField(MarqoTestCase):
 
             self.assertEqual(vespa_fields["marqo__vector_count"], 1)
 
+    def test_create_structured_index_with_custom_vector_not_in_tensor_fields_should_fail(self):
+        """
+        Test the structured index cannot be created with a custom vector field not in tensor fields
+        """
+        with self.assertRaises(pydantic.error_wrappers.ValidationError) as err:
+            self.create_indexes([self.structured_marqo_index_request(
+                model=Model(name='ViT-B/32'),
+                normalize_embeddings=False,
+                distance_metric=DistanceMetric.Angular,
+                fields=[
+                    FieldRequest(
+                        name="my_custom_vector",
+                        type="custom_vector",
+                        features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                    FieldRequest(
+                        name="text_field",
+                        type="text",
+                        features=[FieldFeature.LexicalSearch]),
+                ],
+                tensor_fields=["text_field"]
+            )])
+
+        self.assertIn("Field 'my_custom_vector' has type 'custom_vector' and must be a tensor field.",
+                      str(err.exception))
+
+    def test_add_documents_with_custom_vector_not_in_tensor_fields(self):
+        """
+        Add a document with a custom vector field but not declared in tensor fields (for unstructured index only)
+        should fail validation, raise a ValidationError and fail the batch
+        """
+        for index in [self.unstructured_custom_index, self.semi_structured_custom_index]:
+            with self.subTest(msg=f'{index.name}: {index.type}'):
+                with self.assertRaisesStrict(pydantic.error_wrappers.ValidationError) as err:
+                    self.add_documents(
+                        config=self.config, add_docs_params=AddDocsParams(
+                            index_name=index.name,
+                            docs=[{
+                                "_id": "0",
+                                "my_custom_vector": {
+                                    "content": "custom content",
+                                    "vector": self.random_vector_1
+                                }
+                            }],
+                            device="cpu",
+                            mappings=self.mappings,
+                            tensor_fields=[]
+                        )
+                    )
+
+                self.assertRegex(str(err.exception),
+                                 r"Cannot create custom_vector field .* as a non-tensor field. "
+                                 r"Add this field to 'tensor_fields' to fix this problem.")
+
     def test_add_documents_with_custom_vector_field_no_content(self):
         """
         Add a document with a custom vector field with no content:
