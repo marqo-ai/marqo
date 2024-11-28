@@ -1,37 +1,36 @@
 """Functions used to fulfill the add_documents endpoint"""
 import concurrent
 import copy
+import logging
 import math
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import ContextManager
-import threading
-import torch
-import ffmpeg
 
-import logging
-
-import numpy as np
 import PIL
+import ffmpeg
+import numpy as np
+import torch
 from PIL.ImageFile import ImageFile
-from torchvision.transforms import Compose
 
 import marqo.exceptions as base_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
+from marqo.exceptions import InternalError
 from marqo.s2_inference import clip_utils
+from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
+from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
-from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
-from marqo.tensor_search.enums import EnvVars
-from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from marqo.tensor_search import enums
-from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
-
-from marqo.s2_inference.models.model_type import ModelType
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                              media_field_types_mapping: Optional[Dict[str, FieldType]] = None,
                                              media_download_headers: Optional[Dict] = None,
                                              metric_obj: Optional[RequestMetrics] = None,
-                                             preprocessors: Optional[Dict[str, Compose]] = None,
+                                             preprocessors: Optional[Preprocessors] = None,
                                              marqo_index_type: Optional[IndexType] = None,
                                              marqo_index_model: Optional[Model] = None,
                                              audio_preprocessing: Optional[AudioPreProcessing] = None,
@@ -55,7 +54,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
 
     Args:
         allocated_docs: docs with images to be downloaded by this thread,
-        image_repo: dictionary that will be mutated by this thread. It will add PIL images
+        media_repo: dictionary that will be mutated by this thread. It will add media
             as values and the URLs as keys
         tensor_fields: A tuple of tensor_fields. Images will be downloaded for these fields only.
         media_download_headers: A dict of headers for image download. Can be used
@@ -77,7 +76,6 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
     # Determine index type
     is_structured_index = marqo_index_type == IndexType.Structured
     is_unstructured_index = marqo_index_type in [IndexType.Unstructured, IndexType.SemiStructured]
-
     # Generate pseudo-unique ID for thread metrics.
     _id = f'image_download.{threading.get_ident()}'
     TIMEOUT_SECONDS = 3
@@ -126,11 +124,11 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
                             continue
                         # preprocess image to tensor
-                        if preprocessors is not None and preprocessors['image'] is not None:
+                        if preprocessors is not None and preprocessors.image is not None:
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                media_repo[doc[field]] = preprocessors['image'](media_repo[doc[field]]).to(device)
+                                media_repo[doc[field]] = preprocessors.image(media_repo[doc[field]]).to(device)
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     media_repo[doc[field]] = e
@@ -167,7 +165,6 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         try:
                             processed_chunks = download_and_chunk_media(
                                 url=doc[field], device=device, modality=inferred_modality,
-                                marqo_index_type=marqo_index_type, marqo_index_model=marqo_index_model,
                                 preprocessors=preprocessors, audio_preprocessing=audio_preprocessing,
                                 video_preprocessing=video_preprocessing, media_download_headers=media_download_headers
                             )
@@ -180,36 +177,21 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         media_repo[doc[field]] = S2InferenceError(f"Error processing media file {doc}, detected as text, expected a {media_field_types_mapping[field]} pointer")
                     else:
                         pass
-
-                # For multimodal tensor combination
-                elif isinstance(doc[field], dict):
-                    for sub_field in list(doc[field].values()):
-                        if isinstance(sub_field, str) and clip_utils._is_image(sub_field):
-                            if sub_field in media_repo:
-                                continue
-                            try:
-                                media_repo[sub_field] = clip_utils.load_image_from_path(
-                                    sub_field,
-                                    media_download_headers,
-                                    timeout=TIMEOUT_SECONDS,
-                                    metrics_obj=metric_obj
-                                )
-                            except PIL.UnidentifiedImageError as e:
-                                media_repo[sub_field] = e
-                                metric_obj.increment_counter(f"{doc.get(field, '')}.UnidentifiedImageError")
-                                continue
+                else:
+                    raise InternalError(f"Invalid field type for {field} to be added in media repo. Must be a string "
+                                        f"but {type(field)}.")
 
 
-def download_and_chunk_media(url: str, device: str, modality: Modality, marqo_index_type: IndexType, marqo_index_model: Model,
+def download_and_chunk_media(url: str, device: str, modality: Modality,
                              preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
                              video_preprocessing: VideoPreProcessing = None,
                              media_download_headers: Optional[Dict] = None) -> List[Dict[str, torch.Tensor]]:
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
 
     processor = StreamingMediaProcessor(
-        url=url, device=device, modality=modality, marqo_index_type=marqo_index_type, marqo_index_model=marqo_index_model,
-        preprocessors=preprocessors, audio_preprocessing=audio_preprocessing, video_preprocessing=video_preprocessing,
-        media_download_headers=media_download_headers
+        url=url, device=device, modality=modality, preprocessors=preprocessors,
+        audio_preprocessing=audio_preprocessing, video_preprocessing=video_preprocessing,
+        media_download_headers=media_download_headers, enable_video_gpu_acceleration=_enable_video_gpu_acceleration()
     )
 
     if processor.total_size > MAX_FILE_SIZE:
@@ -217,6 +199,14 @@ def download_and_chunk_media(url: str, device: str, modality: Modality, marqo_in
             f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
 
     return processor.process_media()
+
+
+def _enable_video_gpu_acceleration() -> bool:
+    """A helper function to determine if the video decoding should be done on the GPU.
+
+    The environment variable MARQO_ENABLE_VIDEO_GPU_ACCELERATION is set on marqo start_on script.
+    """
+    return utils.read_env_vars_and_defaults(EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION) == 'TRUE'
 
 
 @contextmanager
@@ -364,7 +354,7 @@ def process_batch(
     )
 
     if not is_preprocess_image_model(model_properties) or patch_method_exists:
-        preprocessors['image'] = None
+        preprocessors.image = None
 
     media_repo = {}
     m = [RequestMetrics() for i in range(thread_count)]

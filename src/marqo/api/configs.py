@@ -53,4 +53,5 @@ def default_env_vars() -> dict:
         EnvVars.MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED: 100,
         EnvVars.MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT: 5,  # index operations acquire this distributed lock with a timeout
         EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT: 15,
+        EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION: None   # on_start_script will determine this.
     }
