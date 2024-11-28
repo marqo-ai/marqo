@@ -1,4 +1,5 @@
 name: largemodel_unit_test_CI
+run-name: Large Model Unit Tests on Marqo tag ${{ inputs.marqo_ref }} and Marqo-base tag ${{ inputs.marqo_base_ref }}
 # runs unit tests on CUDA machine with large model tests.
 
 on:
@@ -25,7 +26,7 @@ on:
       - mainline
 
 concurrency:
-  group: large-model-unit-tests-${{ github.ref }}
+  group: large-model-unit-tests-${{ inputs.marqo_ref }}
   cancel-in-progress: true
 
 permissions:
