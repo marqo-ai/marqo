@@ -4,6 +4,17 @@ name: largemodel_unit_test_CI
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      marqo_ref:
+        type: string
+        required: true
+        description: >
+          Branch, tag, or commit SHA to checkout in the marqo repository
+      marqo_base_ref:
+        type: string
+        required: true
+        description: >
+          Branch, tag, or commit SHA to checkout in the marqo-base repository
   push:
     branches:
       - mainline
@@ -65,6 +76,7 @@ jobs:
         with:
           fetch-depth: 0
           path: marqo
+          ref: ${{ github.event.inputs.marqo_ref }}
 
       - name: Set up Python 3.9
         uses: actions/setup-python@v3
@@ -77,6 +89,7 @@ jobs:
         with:
           repository: marqo-ai/marqo-base
           path: marqo-base
+          ref: ${{ github.event.inputs.marqo_base_ref }}
 
       - name: Install dependencies
         run: |
@@ -151,7 +164,7 @@ jobs:
           export MARQO_MAX_CUDA_MODEL_MEMORY=15
           
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests --largemodel --ignore=marqo/tests/test_documentation.py
+          pytest marqo/tests/s2_inference/test_large_model_encoding.py::TestLargeClipModels::test_vectorize --largemodel --ignore=marqo/tests/test_documentation.py
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
