@@ -11,12 +11,12 @@ import requests
 import semver
 
 from compatibility_test_logger import get_logger
+from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
+from enum import Enum
 
 # Marqo changed how it transfers state post version 2.9.0, this variable stores that context
 marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 
-from base_compatibility_test_case import BaseCompatibilityTestCase
-from enum import Enum
 
 class Mode(Enum):
     PREPARE = "prepare"
@@ -28,12 +28,45 @@ volumes_to_cleanup: Set[str] = set()
 
 logger = get_logger(__name__)
 
-def load_all_subclasses(package_name):
-    package = importlib.import_module(package_name)
-    package_path = package.__path__
 
-    for _, module_name, _ in pkgutil.iter_modules(package_path):
-        importlib.import_module(f"{package_name}.{module_name}")
+def load_all_subclasses(package_name):
+    """
+    Dynamically load all subclasses within a specified package,
+    including those in its subdirectories.
+
+    Args:
+        package_name (str): The top-level package name to search for subclasses.
+    """
+    # package_path = os.path.join(*package_name.split('.'))
+    # logger.debug(f"package_path = {package_path}")
+    # for root, dirs, files in os.walk(f"{package_path}"):
+    #     if root.__contains__("venv"): #Skip the directory if it's a venv.
+    #         continue
+    #     logger.debug(f"root, dirs, files = {root}, {dirs}, {files}")
+    #     logger.debug(f" root = {root}")
+    #     for file in files:
+    #         logger.debug(f"file = {file}")
+    #         if file.endswith(".py") and not file.startswith("__init__"):
+    #             full_package_name = root.replace("/", ".")
+    #             logger.debug(f"full_package_name = {full_package_name}")
+    #             module_name = file.split('.')[0]
+    #             logger.debug(f"Importing this {full_package_name}.{module_name}")
+    #             try:
+    #                 importlib.import_module(f"{full_package_name}.{module_name}")
+    #             except ImportError as e:
+    #                 logger.error(f"Could not import {module_name}: {e}")
+    package = importlib.import_module(package_name)
+    for _, name, is_pkg in pkgutil.walk_packages(package.__path__, f"{package_name}."):
+        logger.debug(f"Processing this {name}, {is_pkg}")
+        if is_pkg:
+            continue
+        try:
+            importlib.import_module(name)
+            logger.debug(f"Imported the module with name {name}")
+        except ImportError as e:
+            logger.debug(f"Could not import module with {name}")
+            logger.error(f"Could not import {name}: {e}")
+
 
 
 #TODO: Explore using docker python SDK docker-py to replace the subprocess call, https://github.com/marqo-ai/marqo/pull/1024#discussion_r1841689970
@@ -404,11 +437,16 @@ def full_test_run(marqo_version: str):
     run_test_mode(marqo_version)
 
 def run_prepare_mode(version_to_test_against: str):
+
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
-    load_all_subclasses("tests.backwards_compatibility_tests")
+    load_all_subclasses("tests.compatibility_tests")
+    # load_all_subclasses("tests.compatibility_tests.add_or_replace_documents")
+    # load_all_subclasses("tests.compatibility_tests.create_index")
     # Get all subclasses of `BaseCompatibilityTestCase` that match the `version_to_test_against` criterion
     # The below condition also checks if the test class is not marked to be skipped
+    logger.debug(f"Pritnign all subclasses {BaseCompatibilityTestCase.__subclasses__()}")
     for test_class in BaseCompatibilityTestCase.__subclasses__():
+        logger.debug(f"Test class {test_class.__name__}")
         markers = getattr(test_class, "pytestmark", [])
         # Check for specific markers
         marqo_version_marker = next( # Checks what version a compatibility test is marked with (ex: @pytest.mark.marqo_version('2.11.0')). If no version is marked, it will skip the test
@@ -443,7 +481,7 @@ def construct_pytest_arguments(version_to_test_against):
         f"--version_to_compare_against={version_to_test_against}",
         "-m", f"marqo_version",
         "-s",
-        "tests/backwards_compatibility_tests"
+        "tests/compatibility_tests"
     ]
     return pytest_args
 
@@ -594,13 +632,11 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         raise RuntimeError(f"An error occurred while executing backwards compatibility tests, on from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}") from e
     finally:
         # Stop the to_version container (but don't remove it yet)
-        logger.error("Calling stop_marqo_container with " + str(to_version))
+        logger.info("Calling stop_marqo_container with " + str(to_version))
         stop_marqo_container(to_version)
         # Clean up all containers at the end
-        cleanup_containers()
-        cleanup_volumes()
-
-
+        # cleanup_containers()
+        # cleanup_volumes()
 
 def rollback_test(to_version: str, from_version: str, to_version_image: str):
     """
@@ -739,5 +775,5 @@ if __name__ == "__main__":
             rollback_test(args.to_version, args.from_version, args.to_image)
 
     except Exception as e:
-        logger.error(f"Encountered an exception: {e} while running tests in mode {args.mode}, exiting")
+        logger.error(f"Encountered an exception: {e} while running tests in mode {args.mode}, exiting", exc_info=True)
         sys.exit(1)

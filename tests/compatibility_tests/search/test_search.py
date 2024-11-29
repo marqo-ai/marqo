@@ -1,12 +1,9 @@
 import pytest
 
-from base_compatibility_test_case import BaseCompatibilityTestCase
-from marqo_test import MarqoTestCase
-import marqo
-
+from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 @pytest.mark.marqo_version('2.11.0') #TODO: Check this again
-class GeneralCompatibilityTest(BaseCompatibilityTestCase):
+class TestSearch(BaseCompatibilityTestCase):
 
     image_model = 'open_clip/ViT-B-32/laion2b_s34b_b79k'
     multimodal_weights = {"image_field": 0.9, "text_field": 0.1}
@@ -153,29 +150,30 @@ class GeneralCompatibilityTest(BaseCompatibilityTestCase):
                                                                                    mappings=self.mappings,
                                                                                    tensor_fields=self.tensor_fields)
             self.logger.debug(f'Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}')
-        except Exception as e:
-            self.logger.error(f"Exception occurred while adding documents {e}")
+            all_results = {}
+        # Loop through queries, search methods, and result keys to populate unstructured_results
+            for index in self.indexes_to_test_on:
+                index_name = index['indexName']
+                all_results[index_name] = {}
+
+                # For each index, store results for different search methods
+                for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
+                    if index.get("type") is not None and index.get("type") == 'structured':
+                        if search_method == 'HYBRID':
+                            result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
+                        else:
+                            result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
+                    else:
+                        result = self.client.index(index_name).search(q=query, search_method=search_method)
+                    all_results[index_name][result_key] = result
+            self.save_results_to_file(all_results)
+
+        except Exception as e: #TODO: This was called out as an antipattern last time - (logging & raising - fix it)
+            self.logger.error(f"Exception occurred while adding documents {e}", exc_info=True)
             raise e
 
-        all_results = {}
-        # Loop through queries, search methods, and result keys to populate unstructured_results
-        for index in self.indexes_to_test_on:
-            index_name = index['indexName']
-            all_results[index_name] = {}
-
-            # For each index, store results for different search methods
-            for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
-                if index.get("type") is not None and index.get("type") == 'structured':
-                    if search_method == 'HYBRID':
-                        result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
-                    else:
-                        result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
-                else:
-                    result = self.client.index(index_name).search(q=query, search_method=search_method)
-                all_results[index_name][result_key] = result
 
         # store the result of search across all structured & unstructured indexes
-        self.save_results_to_file(all_results)
 
     def test_search(self):
         """Run search queries and compare the results with the stored results."""

@@ -1,8 +1,6 @@
 import pytest
 
-from base_compatibility_test_case import BaseCompatibilityTestCase
-from marqo_test import MarqoTestCase
-import marqo
+from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 
 @pytest.mark.marqo_version('2.13.0')

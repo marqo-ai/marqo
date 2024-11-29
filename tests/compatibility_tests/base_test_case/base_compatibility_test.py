@@ -23,7 +23,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
                 formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(filename)s:%(lineno)d | %(message)s')
                 handler.setFormatter(formatter)
                 cls.logger.addHandler(handler)
-            cls.logger.setLevel(logging.INFO)
+            cls.logger.setLevel(logging.DEBUG)
 
     @classmethod
     def get_results_file_path(cls):
@@ -39,6 +39,8 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         if cls.indexes_to_delete:
             cls.delete_indexes(cls.indexes_to_delete)
             cls.logger.debug(f"Deleting indexes {cls.indexes_to_delete}")
+
+        cls.delete_file()
 
     @classmethod
     def save_results_to_file(cls, results):
