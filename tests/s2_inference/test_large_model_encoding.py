@@ -203,7 +203,6 @@ class TestLargeClipModels(unittest.TestCase):
     def tearDownClass(cls) -> None:
         remove_cached_model_files()
 
-    @pytest.mark.skip(reason="Needs further investigation")
     def test_vectorize(self):
         # For GPU Memory Optimization, we shouldn't load all models at once
         run_test_vectorize(models=self.models, model_type="large_open_clip", compare_hardcoded_embeddings=False)
