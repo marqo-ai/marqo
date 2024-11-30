@@ -81,6 +81,7 @@ jobs:
         with:
           repository: marqo-ai/marqo-base
           path: marqo-base
+          ref: joshua/test-torch-no-cuda
 
       - name: Install dependencies
         run: |
