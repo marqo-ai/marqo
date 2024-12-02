@@ -61,4 +61,4 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
             except Exception as e:
                 self.logger.error(f"Exception while getting index settings {e}")
                 raise e
-            self.assertEqual(expected_settings, actual_settings)
+            self.assertEqual(expected_settings, actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")
