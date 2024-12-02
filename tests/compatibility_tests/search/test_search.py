@@ -15,7 +15,7 @@ class TestSearch(BaseCompatibilityTestCase):
     }
     tensor_fields = ["multimodal_field", "text_field", "image_field"]
     structured_index_metadata = {
-        "indexName": "structured-index-2-11",
+        "indexName": "test_search_api_structured_index",
         "type": "structured",
         "vectorNumericType": "float",
         "model": image_model,
@@ -47,7 +47,7 @@ class TestSearch(BaseCompatibilityTestCase):
     }
 
     unstructured_index_metadata = {
-        "indexName": "unstructured-index-2-11",
+        "indexName": "test_search_api_unstructured_index",
         "model": image_model,
         "treatUrlsAndPointersAsImages": True,
     }

@@ -10,7 +10,7 @@ class TestUpdateDocuments(BaseCompatibilityTestCase):
     indexes_to_test_on = [{
         "indexName": structured_index_name,
         "type": "structured",
-        "all_fields": [
+        "allFields": [
             {"name": "img", "type": "image_pointer"},
             {"name": "title", "type": "text"},
             {"name": "label", "type": "text", "features": ["filter"]},
@@ -70,7 +70,7 @@ class TestUpdateDocuments(BaseCompatibilityTestCase):
         self.logger.debug(f"Printing result {result}")
         assert result["index_name"] == self.structured_index_name
         assert len(result["items"]) == 2
-        assert result["errors"] == "false"
+        assert result["errors"] == False
         for item in result["items"]:
             if item["_id"] in {"1", "2"}:
                 assert item["status"] == 200

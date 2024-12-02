@@ -59,7 +59,7 @@ class TestDeleteDocuments(BaseCompatibilityTestCase):
                     self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs)
                 else:
                     self.client.index(index['indexName']).add_documents(documents = self.text_docs,
-                                                                        tensor_field = ["Description"])
+                                                                        tensor_fields = ["Description"])
 
             self.logger.debug(f"Finished running prepare method for test case: {self.__class__.__name__}")
         except Exception as e:
@@ -70,7 +70,7 @@ class TestDeleteDocuments(BaseCompatibilityTestCase):
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
 
-            result = self.client.index(index_name).delete_documents([])
+            result = self.client.index(index_name).delete_documents(["article_602", "article_591"])
             self.logger.debug(f"Result: {result}")
             assert result["index_name"] == index_name
             assert result["type"] == "documentDeletion"

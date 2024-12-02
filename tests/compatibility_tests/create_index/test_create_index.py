@@ -42,5 +42,4 @@ class TestCreateIndex(BaseCompatibilityTestCase):
             raise Exception(f"Exception when getting index settings for index {self.index_name}")
 
         self.logger.debug(f"Expected settings: {expected_settings}")
-        self.logger.debug(f"Expected settings: {expected_settings}")
-        self.assertEqual(expected_settings, actual_settings)
+        self.assertEqual(expected_settings, actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")

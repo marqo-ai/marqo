@@ -444,8 +444,9 @@ def run_prepare_mode(version_to_test_against: str):
     # load_all_subclasses("tests.compatibility_tests.create_index")
     # Get all subclasses of `BaseCompatibilityTestCase` that match the `version_to_test_against` criterion
     # The below condition also checks if the test class is not marked to be skipped
-    logger.debug(f"Pritnign all subclasses {BaseCompatibilityTestCase.__subclasses__()}")
+    logger.debug(f"Printing all subclasses {BaseCompatibilityTestCase.__subclasses__()}")
     for test_class in BaseCompatibilityTestCase.__subclasses__():
+        logger.info(f"=========================================================")
         logger.debug(f"Test class {test_class.__name__}")
         markers = getattr(test_class, "pytestmark", [])
         # Check for specific markers
@@ -467,14 +468,17 @@ def run_prepare_mode(version_to_test_against: str):
 
         marqo_version = marqo_version_marker.args[0]
         logger.info(f"Detected marqo_version '{marqo_version}' for testcase: {test_class.__name__}")
-
-        if semver.VersionInfo.parse(marqo_version).compare(version_to_test_against) <= 0:
-            logger.info(f"Running prepare mode on testcase: {test_class.__name__} with version: {marqo_version}")
-            test_class.setUpClass() #setUpClass will be used to create Marqo client
-            test_instance = test_class()
-            test_instance.prepare() #Prepare method will be used to create index and add documents
-        else: # Skip the test if the version_to_test_against is greater than the version the test is marked
-            logger.info(f"Skipping testcase {test_class.__name__} with version {marqo_version} as it is greater than {version_to_test_against}")
+        try:
+            if semver.VersionInfo.parse(marqo_version).compare(version_to_test_against) <= 0:
+                logger.info(f"Running prepare mode on testcase: {test_class.__name__} with version: {marqo_version}")
+                test_class.setUpClass() #setUpClass will be used to create Marqo client
+                test_instance = test_class()
+                test_instance.prepare() #Prepare method will be used to create index and add documents
+            else: # Skip the test if the version_to_test_against is greater than the version the test is marked
+                logger.info(f"Skipping testcase {test_class.__name__} with version {marqo_version} as it is greater than {version_to_test_against}")
+        except Exception as e:
+            logger.error(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. The exception was {e}", exc_info=True)
+        logger.info(f"#############################################################")
 
 def construct_pytest_arguments(version_to_test_against):
     pytest_args = [
@@ -635,8 +639,8 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.info("Calling stop_marqo_container with " + str(to_version))
         stop_marqo_container(to_version)
         # Clean up all containers at the end
-        # cleanup_containers()
-        # cleanup_volumes()
+        cleanup_containers()
+        cleanup_volumes()
 
 def rollback_test(to_version: str, from_version: str, to_version_image: str):
     """

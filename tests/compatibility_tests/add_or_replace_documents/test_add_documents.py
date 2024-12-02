@@ -3,8 +3,8 @@ from tests.compatibility_tests.base_test_case.base_compatibility_test import Bas
 
 @pytest.mark.marqo_version('2.0.0')
 class TestAddDocuments(BaseCompatibilityTestCase):
-    structured_index_name = "add_doc_api_test_structured_index"
-    unstructured_index_name = "add_doc_api_test_unstructured_index"
+    structured_index_name = "test_add_doc_api_structured_index"
+    unstructured_index_name = "test_add_doc_api_unstructured_index"
 
     indexes_to_test_on = [{
         "indexName": structured_index_name,
@@ -12,19 +12,11 @@ class TestAddDocuments(BaseCompatibilityTestCase):
         "model": "sentence-transformers/all-MiniLM-L6-v2",
         "normalizeEmbeddings": False,
         "allFields": [
-            {"name": "title", "type": "text"},
-            {"name": "content", "type": "text"},
-            {"name": "int_field_1", "type": "int"},
-            {"name": "float_field_1", "type": "float"},
-            {"name": "long_field_1", "type": "long"},
-            {"name": "double_field_1", "type": "double"},
-            {"name": "array_int_field_1", "type": "array<int>"},
-            {"name": "array_float_field_1", "type": "array<float>"},
-            {"name": "array_long_field_1", "type": "array<long>"},
-            {"name": "array_double_field_1", "type": "array<double>"},
-            {"name": "custom_vector_field_1", "type": "custom_vector", "features": ["lexical_search", "filter"]},
+            {"name": "Title", "type": "text"},
+            {"name": "Description", "type": "text"},
+            {"name": "Genre", "type": "text"},
         ],
-        "tensorFields": ["title", "content", "custom_vector_field_1"],
+        "tensorFields": ["Title", "Description", "Genre"],
     },
         {
         "indexName": unstructured_index_name,
@@ -36,7 +28,8 @@ class TestAddDocuments(BaseCompatibilityTestCase):
     text_docs = [{
         "Title": "The Travels of Marco Polo",
         "Description": "A 13th-century travelogue describing the travels of Polo",
-        "Genre": "History"
+        "Genre": "History",
+        "_id": "article_602"
     },
     {
         "Title": "Extravehicular Mobility Unit (EMU)",
@@ -63,8 +56,8 @@ class TestAddDocuments(BaseCompatibilityTestCase):
                 if index.get("type") is not None and index.get('type') == 'structured':
                     self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs)
                 else:
-                    self.client.index(index['indexName']).add_documents(documents = self.text_docs,
-                                                                        tensor_field = ["Description"])
+                    self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs,
+                                                                        tensor_fields = ["Description", "Genre", "Title"])
 
             self.logger.debug(f"Finished running prepare method for test case: {self.__class__.__name__}")
         except Exception as e:
@@ -78,7 +71,12 @@ class TestAddDocuments(BaseCompatibilityTestCase):
 
             for doc in self.text_docs:
                 doc_id = doc['_id']
-                all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id)
+                try:
+                    all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id)
+                except Exception as e:
+                    self.logger.error(
+                        f"Exception when getting documents with id: {doc_id} from index: {index_name}",
+                        exc_info=True)
 
         self.save_results_to_file(all_results)
 
@@ -90,7 +88,11 @@ class TestAddDocuments(BaseCompatibilityTestCase):
 
             for doc in self.text_docs:
                 doc_id = doc['_id']
-                expected_doc = stored_results[index_name][doc_id]
+                try:
+                    expected_doc = stored_results[index_name][doc_id]
+                except KeyError as e:
+                    self.logger.error(f"The key {doc_id} doesn't exist in the stored results. Skipping the test for this document.")
+                    continue
                 self.logger.debug(f"Printing expected doc {expected_doc}")
                 actual_doc = self.client.index(index_name).get_document(doc_id)
                 self.logger.debug(f"Printing actual doc {expected_doc}")

@@ -39,26 +39,25 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_settings_to_test_on]
+        cls.indexes_to_delete = cls.indexes_to_test_on
         super().tearDownClass()
 
     @classmethod
     def setUpClass(cls) -> None:
-        # cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
         super().setUpClass()
 
     def prepare(self):
         self.logger.info(f"Creating indexes {self.indexes_settings_to_test_on}")
-        for index_settings in self.indexes_settings_to_test_on:
-            self.client.create_index("unstructured-index", settings_dict = index_settings)
+        for index_name, index_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
+            self.client.create_index(index_name, settings_dict = index_settings)
 
     def test_expected_settings(self):
         # expected_settings = self.indexes_settings_to_test_on
         for index_name, expected_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
             try:
-                actual_settings = self.client.index("unstructured-index").get_settings()
+                actual_settings = self.client.index(index_name).get_settings()
                 self.logger.debug(f"Printing actual_settings {actual_settings}")
-                self.logger.debug(f"Printing expected_settings {actual_settings}")
+                self.logger.debug(f"Printing expected_settings {expected_settings}")
             except Exception as e:
                 self.logger.error(f"Exception while getting index settings {e}")
                 raise e

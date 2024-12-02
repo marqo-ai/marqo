@@ -52,5 +52,5 @@ class TestEmbed(BaseCompatibilityTestCase):
 
 
     def _compare_embed_results(self, expected_result, actual_result):
-        self.assertEqual(expected_result.get("embeddings"), actual_result.get("embeddings"))
-        self.assertEqual(expected_result.get("content"), actual_result.get("content"))
+        self.assertEqual(expected_result.get("embeddings"), actual_result.get("embeddings"), f"Expected embeddings don't match actual embeddings. Expected {expected_result.get('embeddings')} but got {actual_result.get('embeddings')}")
+        self.assertEqual(expected_result.get("content"), actual_result.get("content"), f"Expected results don't match actual results. Expected {expected_result.get('content')} but got {actual_result.get('content')}")
