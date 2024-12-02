@@ -134,9 +134,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.ECR_PUSHER_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-  run-execution-workflow:
-    # Job to trigger execution workflows for each version combination
-    name: Run all execution workflows
+  run-backwards-compatibility-execution-workflow:
+    # Job to trigger execution workflows for backwards compatibility test for each version combination
+    name: Run all backwards compatibility tests execution workflows
     needs: [orchestrate, check-if-image-exists, build-and-push-image]
     if: always() && (needs.orchestrate.result == 'success')
     strategy:
@@ -156,5 +156,33 @@ jobs:
       # Pass the image_identifier to the execution workflow. By image_identifier, we refer to the
       # complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
       # The image_identifier can either come from the check-if-image-exists (i.e in case the image already exists in ECR) job or the build-and-push-image (i.e in case the image was built and pushed to ECR) job.
-      to_version_image_identifier: ${{ needs.check-if-image-exists.outputs.image_exists == 'true' && needs.check-if-image-exists.outputs.image_identifier 
+      to_image: ${{ needs.check-if-image-exists.outputs.image_exists == 'true' && needs.check-if-image-exists.outputs.image_identifier 
                                   || needs.build-and-push-image.outputs.image_identifier }}
+      mode: "backwards_compatibility"
+
+
+  run-rollback-tests-execution-workflow:
+    # Job to trigger execution workflows for rollback test for each version combination
+    name: Run all rollback tests execution workflows
+    needs: [ orchestrate, check-if-image-exists, build-and-push-image ]
+    if: always() && (needs.orchestrate.result == 'success')
+    strategy:
+      matrix:
+        from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
+    uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
+    secrets: inherit
+    permissions:
+      contents: read # This permission is necessary to read repository contents
+      actions: write # Used by machulav/ec2-github-runner@v2 for managing self-hosted runners. The workflow needs to create and manage GitHub Actions runners on EC2
+      id-token: write # Used by aws-actions/configure-aws-credentials@v4. Required for AWS authentication and OIDC token management
+      checks: write # Used implicitly by GitHub Actions to report job statuses and create check runs
+      statuses: write # Used implicitly by GitHub Actions to report job statuses and create check runs
+    with:
+      from_version: ${{ matrix.from_version }}
+      to_version: ${{ needs.orchestrate.outputs.to_version }}
+      # Pass the image_identifier to the execution workflow. By image_identifier, we refer to the
+      # complete qualified image name with the image digest (i.e 424082663841.dkr.ecr.us-east-1.amazonaws.com/marqo-compatibility-tests@sha256:1234567890abcdef).
+      # The image_identifier can either come from the check-if-image-exists (i.e in case the image already exists in ECR) job or the build-and-push-image (i.e in case the image was built and pushed to ECR) job.
+      to_image: ${{ needs.check-if-image-exists.outputs.image_exists == 'true' && needs.check-if-image-exists.outputs.image_identifier
+        || needs.build-and-push-image.outputs.image_identifier }}
+      mode: "rollback"

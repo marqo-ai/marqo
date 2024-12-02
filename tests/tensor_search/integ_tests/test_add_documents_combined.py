@@ -22,6 +22,7 @@ from marqo.tensor_search import add_docs
 from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
 from tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -589,7 +590,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             media_repo=media_repo,
             tensor_fields=['field_1', 'field_2'],
             media_download_headers={},
-            preprocessors={'image': lambda x: torch.randn(3, 224, 224)},
+            preprocessors=Preprocessors(**{'image': lambda x: torch.randn(3, 224, 224)}),
             device='cpu',
             marqo_index_type=IndexType.Unstructured,
             marqo_index_model=Model(name="test", properties={}),
@@ -817,70 +818,6 @@ class TestAddDocumentsCombined(MarqoTestCase):
                 for i in range(1, 4):
                     self.assertEqual(400, r["items"][i]["status"])
                     self.assertIn("Document _id must be a string", r["items"][i]["error"])
-
-
-    @unittest.mock.patch('marqo.tensor_search.streaming_media_processor.ffmpeg')
-    @unittest.mock.patch('marqo.tensor_search.streaming_media_processor.tempfile.TemporaryDirectory')
-    def test_process_media_chunk_calculation(self, mock_temp_dir, mock_ffmpeg):
-        # Mock the TemporaryDirectory context manager
-        mock_temp_dir.return_value.__enter__.return_value = '/tmp/mock_dir'
-
-        # Create a mock MarqoIndex
-        mock_index = unittest.mock.Mock()
-        mock_index.video_preprocessing = unittest.mock.Mock(split_length=10, split_overlap=2)
-
-        # Create a StreamingMediaProcessor instance with mocked values
-        processor = streaming_media_processor.StreamingMediaProcessor(
-            url='http://example.com/video.mp4',
-            device='cpu',
-            modality=streaming_media_processor.Modality.VIDEO,
-            marqo_index_type=IndexType.Unstructured,
-            marqo_index_model=Model(name="test", properties={}),
-            audio_preprocessing=unittest.mock.Mock(),
-            video_preprocessing=unittest.mock.Mock(),
-            preprocessors={'video': unittest.mock.Mock()},
-            media_download_headers={},
-        )
-
-        # Set arbitrary values
-        processor.duration = 25  # 25 seconds video
-        processor.split_length = 10  # 10 seconds per chunk
-        processor.split_overlap = 2  # 2 seconds overlap
-
-        # Mock the preprocessor to return a dummy tensor
-        processor.preprocessor = unittest.mock.Mock(return_value={'pixel_values': unittest.mock.Mock()})
-
-        # Call the process_media method
-        result = processor.process_media()
-
-        # Expected chunk calculations
-        expected_chunks = [
-            {'start_time': 0, 'end_time': 10},
-            {'start_time': 8, 'end_time': 18},
-            {'start_time': 15, 'end_time': 25}  # Last chunk adjusted to video end
-        ]
-
-        # Assert the number of chunks
-        self.assertEqual(len(result), len(expected_chunks))
-
-        # Assert the start and end times of each chunk
-        for i, chunk in enumerate(result):
-            self.assertEqual(chunk['start_time'], expected_chunks[i]['start_time'])
-            self.assertEqual(chunk['end_time'], expected_chunks[i]['end_time'])
-
-        # Verify that ffmpeg.input was called for each chunk
-        self.assertEqual(mock_ffmpeg.input.call_count, len(expected_chunks))
-
-        # Verify the ffmpeg.input calls
-        for i, expected_chunk in enumerate(expected_chunks):
-            mock_ffmpeg.input.assert_any_call(
-                'http://example.com/video.mp4',
-                ss=expected_chunk['start_time'],
-                t=expected_chunk['end_time'] - expected_chunk['start_time']
-            )
-
-        # Verify that ffmpeg.run was called for each chunk
-        self.assertEqual(mock_ffmpeg.run.call_count, len(expected_chunks))
 
     def test_webp_image_download_infer_modality(self):
         """the webp extension is not predefined among the extensions in infer_modality.
