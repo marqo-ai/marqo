@@ -1213,7 +1213,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
 
     def test_video_size_limit_in_batch(self):
         """Tests that adding documents with videos respects the file size limit per document"""
-        with mock.patch.dict('os.environ', {'MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE': '2097152',
+        with mock.patch.dict('os.environ', {'MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE': '2097152',
                                             'MARQO_MAX_CPU_MODEL_MEMORY': '15',
                                             'MARQO_MAX_CUDA_MODEL_MEMORY': '15'}):  # 2MB limit
             # Test documents - one under limit (2.5MB), one over limit

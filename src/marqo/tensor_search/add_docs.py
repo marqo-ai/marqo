@@ -187,7 +187,7 @@ def download_and_chunk_media(url: str, device: str, modality: Modality,
                              preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
                              video_preprocessing: VideoPreProcessing = None,
                              media_download_headers: Optional[Dict] = None) -> List[Dict[str, torch.Tensor]]:
-    MAX_FILE_SIZE = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_VIDEO_AUDIO_SEARCH_FILE_SIZE)
+    MAX_FILE_SIZE = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
 
     processor = StreamingMediaProcessor(
         url=url, device=device, modality=modality, preprocessors=preprocessors,
