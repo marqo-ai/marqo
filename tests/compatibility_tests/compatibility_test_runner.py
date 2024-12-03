@@ -13,6 +13,7 @@ import semver
 from compatibility_test_logger import get_logger
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 from enum import Enum
+from tests.compatibility_tests.docker_manager import DockerManager
 
 # Marqo changed how it transfers state post version 2.9.0, this variable stores that context
 marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
@@ -28,6 +29,7 @@ volumes_to_cleanup: Set[str] = set()
 
 logger = get_logger(__name__)
 
+docker_manager = DockerManager()
 
 def load_all_subclasses(package_name):
     """
@@ -125,10 +127,10 @@ def pull_marqo_image(image_name: str, source: str):
     try:
         if source == "docker":
             logger.info(f"pulling this image: {image_name} from Dockerhub")
-            subprocess.run(["docker", "pull", image_name], check=True)
+            docker_manager.pull_marqo_image(image_name, source)
             return image_name
         elif source == "ECR":
-            return pull_remote_image_from_ecr(image_name)
+            return docker_manager.pull_remote_image_from_ecr(image_name)
     except subprocess.CalledProcessError as e:
         raise Exception(f"Failed to pull Docker image: {image_name}, from source: {source}.")
 
@@ -153,7 +155,7 @@ def start_marqo_container(version: str, volume_name: str):
     logger.info(f"Using image: {image_name} with container name: {container_name}")
 
     # Pull the image before starting the container
-    pull_marqo_image(image_name, source)
+    docker_manager.pull_image_from_dockerhub(image_name)
 
     # Stop and remove the container if it exists
     try:
@@ -264,7 +266,7 @@ def start_marqo_container_by_transferring_state(target_version: str, source_vers
     else:
         image_name = target_version_image
     # Pull the image before starting the container
-    target_version_image_name = pull_marqo_image(image_name, source)
+    target_version_image_name = docker_manager.pull_marqo_image(image_name, source)
     logger.info(f" Printing image name {target_version_image_name}")
     try:
         subprocess.run(["docker", "rm", "-f", container_name], check=True)
@@ -579,10 +581,10 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
 
         # Generate a volume name to be used with the "from_version" Marqo container for state transfer.
-        from_version_volume = get_volume_name_from_marqo_version(from_version)
+        from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
 
         #Start from_version container
-        start_marqo_container(from_version, from_version_volume)
+        docker_manager.start_marqo_container(from_version, from_version_volume)
         logger.info(f"Started Marqo container {from_version}")
 
         try:
@@ -590,12 +592,13 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         except Exception as e:
             raise RuntimeError(f"Error running tests in 'prepare' mode across versions on from_version: {from_version}") from e
         # Step 2: Stop from_version container (but don't remove it)
-        stop_marqo_container(from_version)
+        docker_manager.stop_marqo_container(from_version)
 
         # Step 3: Start to_version container by transferring state
-        logger.info(f"Starting Marqo to_version: {to_version} container by transferring state from version {from_version} to {to_version}")
-        start_marqo_container_by_transferring_state(to_version, from_version, from_version_volume,
+        logger.debug(f"Starting Marqo to_version: {to_version} container by transferring state from version {from_version} to {to_version}")
+        docker_manager.start_marqo_container_by_transferring_state(to_version, from_version, from_version_volume,
                                                     to_version_image, "ECR")
+
         logger.info(f"Started Marqo to_version: {to_version} container by transferring state")
         # Step 4: Run tests
         try:
@@ -615,8 +618,8 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.info("Calling stop_marqo_container with " + str(to_version))
         stop_marqo_container(to_version)
         # Clean up all containers at the end
-        cleanup_containers()
-        cleanup_volumes()
+        docker_manager.cleanup_containers()
+        docker_manager.cleanup_volumes()
 
 def rollback_test(to_version: str, from_version: str, to_version_image: str):
     """
