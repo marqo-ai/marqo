@@ -20,7 +20,7 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
 from marqo.s2_inference import clip_utils
-from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
+from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError, MediaExceedsMaxSizeError
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
@@ -196,7 +196,7 @@ def download_and_chunk_media(url: str, device: str, modality: Modality,
     )
 
     if processor.total_size > MAX_FILE_SIZE:
-        raise S2InferenceError(
+        raise MediaExceedsMaxSizeError(
             f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of {MAX_FILE_SIZE / 1024 / 1024:.2f} MB")
 
     return processor.process_media()
