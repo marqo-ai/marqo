@@ -13,33 +13,20 @@ class TestCreateIndex(BaseCompatibilityTestCase):
 
     def prepare(self):
 
+        all_results = {}
         try:
             self.client.create_index(index_name = self.index_name)
+            all_results[self.index_name] = self.client.index(self.index_name).get_settings()
+            self.save_results_to_file(all_results)
         except Exception as e:
             raise Exception(f"Exception when creating index with name {self.index_name}")
 
     def test_expected_settings(self):
-        expected_settings = {
-            'type': 'unstructured',
-            'treatUrlsAndPointersAsImages': False,
-            'treatUrlsAndPointersAsMedia': False,
-            'filterStringMaxLength': 50,
-            'model': 'hf/e5-base-v2',
-            'normalizeEmbeddings': True,
-            'textPreprocessing': {'splitLength': 2, 'splitOverlap': 0, 'splitMethod': 'sentence'},
-            'imagePreprocessing': {},
-            'audioPreprocessing': {'splitLength': 10, 'splitOverlap': 3},
-            'videoPreprocessing': {'splitLength': 20, 'splitOverlap': 3},
-            'vectorNumericType': 'float',
-            'annParameters': {
-                'spaceType': 'prenormalized-angular', 'parameters': {
-                    'efConstruction': 512, 'm': 16}
-            }
-        }
         try:
+            expected_settings = self.load_results_from_file()
             actual_settings = self.client.index(self.index_name).get_settings()
         except Exception as e:
             raise Exception(f"Exception when getting index settings for index {self.index_name}")
 
         self.logger.debug(f"Expected settings: {expected_settings}")
-        self.assertEqual(expected_settings, actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")
+        self.assertEqual(expected_settings[self.index_name], actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")

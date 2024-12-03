@@ -48,17 +48,20 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
 
     def prepare(self):
         self.logger.info(f"Creating indexes {self.indexes_settings_to_test_on}")
+        all_results = {}
         for index_name, index_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
             self.client.create_index(index_name, settings_dict = index_settings)
+            all_results[index_name] = self.client.index(index_name).get_settings()
+        self.save_results_to_file(all_results)
 
     def test_expected_settings(self):
-        # expected_settings = self.indexes_settings_to_test_on
-        for index_name, expected_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
+        expected_settings = self.load_results_from_file()
+        for index_name in self.indexes_to_test_on:
             try:
                 actual_settings = self.client.index(index_name).get_settings()
                 self.logger.debug(f"Printing actual_settings {actual_settings}")
-                self.logger.debug(f"Printing expected_settings {expected_settings}")
+                self.logger.debug(f"Printing expected_settings {expected_settings.get(index_name)}")
             except Exception as e:
                 self.logger.error(f"Exception while getting index settings {e}")
                 raise e
-            self.assertEqual(expected_settings, actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")
+            self.assertEqual(expected_settings.get(index_name), actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")

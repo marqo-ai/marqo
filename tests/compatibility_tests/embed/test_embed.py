@@ -8,6 +8,12 @@ class TestEmbed(BaseCompatibilityTestCase):
         "indexName": "test_embed_api_index",
          "model": "hf/e5-base-v2"
     }]
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
+        super().tearDownClass()
+
     def prepare(self):
         """
         Prepare the indexes and add documents for the test.
