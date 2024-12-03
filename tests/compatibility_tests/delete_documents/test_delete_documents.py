@@ -63,7 +63,7 @@ class TestDeleteDocuments(BaseCompatibilityTestCase):
 
             self.logger.debug(f"Finished running prepare method for test case: {self.__class__.__name__}")
         except Exception as e:
-            raise e
+            raise Exception(f"Exception occurred while adding documents to indexes {e}") from e
 
     def test_delete_document(self):
         self.logger.info(f"Running test_delete_document on {self.__class__.__name__}")

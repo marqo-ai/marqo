@@ -1,3 +1,5 @@
+from sys import exc_info
+
 import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
@@ -19,14 +21,15 @@ class TestCreateIndex(BaseCompatibilityTestCase):
             all_results[self.index_name] = self.client.index(self.index_name).get_settings()
             self.save_results_to_file(all_results)
         except Exception as e:
-            raise Exception(f"Exception when creating index with name {self.index_name}")
+            raise Exception(f"Exception when creating index with name {self.index_name}") from e
 
     def test_expected_settings(self):
         try:
             expected_settings = self.load_results_from_file()
             actual_settings = self.client.index(self.index_name).get_settings()
         except Exception as e:
-            raise Exception(f"Exception when getting index settings for index {self.index_name}")
+            raise Exception(f"Exception when getting index settings for index {self.index_name}") from e
 
         self.logger.debug(f"Expected settings: {expected_settings}")
+        self.logger.debug(f"Actual settings: {actual_settings}")
         self.assertEqual(expected_settings[self.index_name], actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")

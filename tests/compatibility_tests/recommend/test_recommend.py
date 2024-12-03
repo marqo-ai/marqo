@@ -112,8 +112,7 @@ class TestRecommend(BaseCompatibilityTestCase):
                                                                                    tensor_fields=self.tensor_fields)
             self.logger.debug(f'Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}')
         except Exception as e:
-            self.logger.error(f"Exception occurred while adding documents {e}")
-            raise e
+            raise Exception(f"Exception occurred while adding documents") from e
 
         all_results = {}
         # Loop through queries, search methods, and result keys to populate unstructured_results
