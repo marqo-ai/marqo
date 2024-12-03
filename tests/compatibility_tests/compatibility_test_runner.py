@@ -37,24 +37,6 @@ def load_all_subclasses(package_name):
     Args:
         package_name (str): The top-level package name to search for subclasses.
     """
-    # package_path = os.path.join(*package_name.split('.'))
-    # logger.debug(f"package_path = {package_path}")
-    # for root, dirs, files in os.walk(f"{package_path}"):
-    #     if root.__contains__("venv"): #Skip the directory if it's a venv.
-    #         continue
-    #     logger.debug(f"root, dirs, files = {root}, {dirs}, {files}")
-    #     logger.debug(f" root = {root}")
-    #     for file in files:
-    #         logger.debug(f"file = {file}")
-    #         if file.endswith(".py") and not file.startswith("__init__"):
-    #             full_package_name = root.replace("/", ".")
-    #             logger.debug(f"full_package_name = {full_package_name}")
-    #             module_name = file.split('.')[0]
-    #             logger.debug(f"Importing this {full_package_name}.{module_name}")
-    #             try:
-    #                 importlib.import_module(f"{full_package_name}.{module_name}")
-    #             except ImportError as e:
-    #                 logger.error(f"Could not import {module_name}: {e}")
     package = importlib.import_module(package_name)
     for _, name, is_pkg in pkgutil.walk_packages(package.__path__, f"{package_name}."):
         logger.debug(f"Processing this {name}, {is_pkg}")
@@ -62,10 +44,9 @@ def load_all_subclasses(package_name):
             continue
         try:
             importlib.import_module(name)
-            logger.debug(f"Imported the module with name {name}")
+            logger.debug(f"Imported module with name {name}")
         except ImportError as e:
-            logger.debug(f"Could not import module with {name}")
-            logger.error(f"Could not import {name}: {e}")
+            logger.error(f"Could not import module with {name}")
 
 
 
@@ -440,14 +421,9 @@ def run_prepare_mode(version_to_test_against: str):
 
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     load_all_subclasses("tests.compatibility_tests")
-    # load_all_subclasses("tests.compatibility_tests.add_or_replace_documents")
-    # load_all_subclasses("tests.compatibility_tests.create_index")
-    # Get all subclasses of `BaseCompatibilityTestCase` that match the `version_to_test_against` criterion
-    # The below condition also checks if the test class is not marked to be skipped
     logger.debug(f"Printing all subclasses {BaseCompatibilityTestCase.__subclasses__()}")
     for test_class in BaseCompatibilityTestCase.__subclasses__():
         logger.info(f"=========================================================")
-        logger.debug(f"Test class {test_class.__name__}")
         markers = getattr(test_class, "pytestmark", [])
         # Check for specific markers
         marqo_version_marker = next( # Checks what version a compatibility test is marked with (ex: @pytest.mark.marqo_version('2.11.0')). If no version is marked, it will skip the test

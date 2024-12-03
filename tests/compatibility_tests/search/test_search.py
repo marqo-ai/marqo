@@ -168,9 +168,8 @@ class TestSearch(BaseCompatibilityTestCase):
                     all_results[index_name][result_key] = result
             self.save_results_to_file(all_results)
 
-        except Exception as e: #TODO: This was called out as an antipattern last time - (logging & raising - fix it)
-            self.logger.error(f"Exception occurred while adding documents {e}", exc_info=True)
-            raise e
+        except Exception as e:
+            raise Exception(f"Exception occurred while running prepare method") from e
 
 
         # store the result of search across all structured & unstructured indexes

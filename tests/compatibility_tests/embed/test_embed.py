@@ -35,8 +35,7 @@ class TestEmbed(BaseCompatibilityTestCase):
             self.logger.debug(f"Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}")
             self.save_results_to_file(all_results)
         except Exception as e: #TODO: This was called out as an antipattern last time - (logging & raising - fix it)
-            self.logger.error(f"Exception occurred while embedding documents {e}")
-            raise e
+            raise Exception(f"Exception occurred while embedding documents") from e
 
     def test_embed(self):
         self.logger.info(f"Running test_embed on {self.__class__.__name__}")

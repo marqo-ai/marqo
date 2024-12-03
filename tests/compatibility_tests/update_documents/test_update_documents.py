@@ -59,7 +59,7 @@ class TestUpdateDocuments(BaseCompatibilityTestCase):
                     self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs, mappings = self.mappings, tensor_fields = self.tensor_fields)
 
         except Exception as e:
-            raise e
+            raise Exception(f"Exception occurred while adding documents to index") from e
 
     def test_update_doc(self):
         self.logger.info(f"Running test_update_doc on {self.__class__.__name__}")

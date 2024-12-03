@@ -23,7 +23,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
                 formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(filename)s:%(lineno)d | %(message)s')
                 handler.setFormatter(formatter)
                 cls.logger.addHandler(handler)
-            cls.logger.setLevel(logging.DEBUG)
+            cls.logger.setLevel(logging.INFO)
 
     @classmethod
     def get_results_file_path(cls):
