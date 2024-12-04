@@ -23,6 +23,14 @@ class TestDeviceManager(unittest.TestCase):
 
             return DeviceManager()
 
+    def _device_manager_with_multiple_cuda_devices(self, total_memory: int = 1_000_000):
+        with mock.patch("torch.cuda.is_available", return_value=True), \
+             mock.patch("torch.cuda.device_count", return_value=2), \
+             mock.patch("torch.cuda.get_device_name", side_effect=['cuda:0', 'cuda:1']), \
+             mock.patch("torch.cuda.get_device_properties", return_value=SimpleNamespace(total_memory=total_memory)):
+
+            return DeviceManager()
+
     def test_init_with_cpu(self):
         device_manager = self._device_manager_without_cuda()
 
@@ -64,7 +72,7 @@ class TestDeviceManager(unittest.TestCase):
             with self.assertRaises(CudaDeviceNotAvailableError) as err:
                 device_manager.cuda_device_health_check()
 
-            self.assertEqual(str(err.exception), "Cuda device becomes unavailable")
+            self.assertEqual(str(err.exception), "CUDA device/s have become unavailable")
 
     def test_cuda_health_check_should_fail_when_cuda_device_is_out_of_memory(self):
         device_manager = self._device_manager_with_cuda(total_memory=1_000_000)
@@ -77,14 +85,42 @@ class TestDeviceManager(unittest.TestCase):
 
             self.assertEqual(str(err.exception), "Cuda device cuda:0 is out of memory: (900000/1000000)")
 
-    def test_cuda_health_check_should_pass_and_log_warning_message_when_cuda_calls_encounter_issue(self):
-        device_manager = self._device_manager_with_cuda()
+    def test_cuda_health_check_should_fail_when_any_cuda_device_is_out_of_memory(self):
+        device_manager = self._device_manager_with_multiple_cuda_devices(total_memory=1_000_000)
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
-                mock.patch("torch.cuda.memory_stats", side_effect=Exception("random exception")), \
+                mock.patch("torch.randn", side_effect=[torch.tensor([1, 2, 3]), RuntimeError("CUDA error: out of memory")]), \
+                mock.patch("torch.cuda.memory_stats", return_value=OrderedDict({"allocated.all.current": 900_000})):
+            with self.assertRaises(CudaOutOfMemoryError) as err:
+                device_manager.cuda_device_health_check()
+
+            self.assertEqual(str(err.exception), "Cuda device cuda:1 is out of memory: (900000/1000000)")
+
+    def test_cuda_health_check_should_check_if_all_cuda_devices_are_out_of_memory(self):
+        device_manager = self._device_manager_with_multiple_cuda_devices(total_memory=1_000_000)
+
+        with mock.patch("torch.cuda.is_available", return_value=True), \
+                mock.patch("torch.randn",
+                           side_effect=[RuntimeError("CUDA error: out of memory"), RuntimeError("CUDA error: out of memory")]), \
+                mock.patch("torch.cuda.memory_stats", return_value=OrderedDict({"allocated.all.current": 900_000})):
+            with self.assertRaises(CudaOutOfMemoryError) as err:
+                device_manager.cuda_device_health_check()
+
+            self.assertEqual(str(err.exception), "Cuda device cuda:0 is out of memory: (900000/1000000);"
+                                                 "Cuda device cuda:1 is out of memory: (900000/1000000)")
+
+    def test_cuda_health_check_should_pass_and_log_warning_message_when_cuda_calls_encounter_issue_other_than_oom(self):
+        device_manager = self._device_manager_with_multiple_cuda_devices()
+
+        with mock.patch("torch.cuda.is_available", return_value=True), \
+                mock.patch("torch.cuda.memory_stats", side_effect=[RuntimeError("not a memory issue"), Exception("random exception")]), \
                 mock.patch("marqo.core.inference.device_manager.logger") as mock_logger:
             device_manager.cuda_device_health_check()
 
         self.assertEqual('warning', mock_logger.mock_calls[0][0])
-        self.assertEqual('Encountered issue inspecting Cuda device cuda:0: random exception',
+        self.assertEqual('Encountered issue inspecting Cuda device cuda:0: not a memory issue',
                          mock_logger.mock_calls[0][1][0])
+
+        self.assertEqual('warning', mock_logger.mock_calls[1][0])
+        self.assertEqual('Encountered issue inspecting Cuda device cuda:1: random exception',
+                         mock_logger.mock_calls[1][1][0])

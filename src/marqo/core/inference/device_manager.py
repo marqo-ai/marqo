@@ -19,7 +19,7 @@ class Device(BaseModel):
     id: int
     name: str
     type: DeviceType
-    total_memory: Optional[int] = 0
+    total_memory: Optional[int] = None
 
     @classmethod
     def cpu(cls) -> 'Device':
@@ -68,10 +68,10 @@ class DeviceManager:
             # CUDA devices could become unavailable/unreachable if the docker container running Marqo loses access
             # to the device symlinks. There is no way to recover from this, we will need to restart the container.
             # See https://github.com/NVIDIA/nvidia-container-toolkit/issues/48 for more details.
-            logger.error('Cuda device becomes unavailable')
-            raise CudaDeviceNotAvailableError('Cuda device becomes unavailable')
+            logger.error('CUDA device/s have become unavailable')
+            raise CudaDeviceNotAvailableError('CUDA device/s have become unavailable')
 
-        # TODO confirm whether we should check all devices or just the default one
+        oom_errors = []
         for device in self.cuda_devices:
             try:
                 cuda_device = torch.device(device.name)
@@ -82,13 +82,23 @@ class DeviceManager:
                 torch.randn(3, device=cuda_device)
             except RuntimeError as e:
                 if 'out of memory' in str(e).lower():
-                    # If we encounter 'CUDA error: out of memory' error consistently, it means some threads are
-                    # holding the memory
+                    # `~torch.cuda.empty_cache` doesn't increase the amount of GPU memory available for PyTorch.
+                    # However, it may help reduce fragmentation of GPU memory in certain cases.
+                    torch.cuda.empty_cache()
+
                     logger.error(f'Cuda device {device.name} is out of memory. Total memory: {device.total_memory}. '
                                  f'Memory stats: {str(memory_stats)}')
                     allocated_mem = memory_stats.get("allocated.all.current", None) if memory_stats else None
-                    raise CudaOutOfMemoryError(f'Cuda device {device.name} is out of memory: '
-                                               f'({allocated_mem}/{device.total_memory})')
+                    oom_errors.append(f'Cuda device {device.name} is out of memory:'
+                                      f' ({allocated_mem}/{device.total_memory})')
+                else:
+                    # Log out a warning message when encounter other transient errors.
+                    logger.warning(f'Encountered issue inspecting Cuda device {device.name}: {str(e)}')
             except Exception as e:
                 # Log out a warning message when encounter other transient errors.
                 logger.warning(f'Encountered issue inspecting Cuda device {device.name}: {str(e)}')
+
+        if oom_errors:
+            # We error out if any cuda device is out of memory. If this happens consistently, the memory might be held
+            # by a long-running thread, and Marqo will need to be restarted to get to a healthy status
+            raise CudaOutOfMemoryError(';'.join(oom_errors))

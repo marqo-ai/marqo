@@ -593,7 +593,16 @@ def check_health(marqo_config: config.Config = Depends(get_config)):
 
 
 @app.get("/healthz", include_in_schema=False)
-def check_health(marqo_config: config.Config = Depends(get_config)):
+def liveness_check(marqo_config: config.Config = Depends(get_config)) -> JSONResponse:
+    """
+    This liveness check endpoint does a quick status check, and error out if any component encounters unrecoverable
+    issues. This only does a check on the cuda devices right now.
+    Docker schedulers could leverage this endpoint to decide whether to restart the Marqo container.
+
+    Returns:
+        200 - if all checks pass
+        500 - if any check fails
+    """
     marqo_config.device_manager.cuda_device_health_check()
     return JSONResponse(content={"status": "ok"}, status_code=200)
 
