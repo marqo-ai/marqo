@@ -98,10 +98,10 @@ class DeviceManager:
                                       f' ({allocated_mem}/{device.total_memory})')
                 else:
                     # Log out a warning message when encounter other transient errors.
-                    logger.warning(f'Encountered issue inspecting CUDA device {device.full_name}: {str(e)}')
+                    logger.error(f'Encountered issue inspecting CUDA device {device.full_name}: {str(e)}')
             except Exception as e:
                 # Log out a warning message when encounter other transient errors.
-                logger.warning(f'Encountered issue inspecting CUDA device {device.full_name}: {str(e)}')
+                logger.error(f'Encountered issue inspecting CUDA device {device.full_name}: {str(e)}')
 
         if oom_errors:
             # We error out if any CUDA device is out of memory. If this happens consistently, the memory might be held

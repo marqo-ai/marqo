@@ -109,7 +109,7 @@ class TestDeviceManager(unittest.TestCase):
             self.assertEqual(str(err.exception), "CUDA device cuda:0(Tesla T4) is out of memory: (900000/1000000);"
                                                  "CUDA device cuda:1(Tesla H200) is out of memory: (900000/1000000)")
 
-    def test_cuda_health_check_should_pass_and_log_warning_message_when_cuda_calls_encounter_issue_other_than_oom(self):
+    def test_cuda_health_check_should_pass_and_log_error_message_when_cuda_calls_encounter_issue_other_than_oom(self):
         device_manager = self._device_manager_with_multiple_cuda_devices()
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
@@ -117,10 +117,10 @@ class TestDeviceManager(unittest.TestCase):
                 mock.patch("marqo.core.inference.device_manager.logger") as mock_logger:
             device_manager.cuda_device_health_check()
 
-        self.assertEqual('warning', mock_logger.mock_calls[0][0])
+        self.assertEqual('error', mock_logger.mock_calls[0][0])
         self.assertEqual('Encountered issue inspecting CUDA device cuda:0(Tesla T4): not a memory issue',
                          mock_logger.mock_calls[0][1][0])
 
-        self.assertEqual('warning', mock_logger.mock_calls[1][0])
+        self.assertEqual('error', mock_logger.mock_calls[1][0])
         self.assertEqual('Encountered issue inspecting CUDA device cuda:1(Tesla H200): random exception',
                          mock_logger.mock_calls[1][1][0])
