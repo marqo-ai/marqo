@@ -536,14 +536,14 @@ class TestApiErrors(MarqoTestCase):
 
     def test_healthz_fails_if_exception_raised(self):
         for cuda_exception in [
-            CudaDeviceNotAvailableError('Cuda device becomes unavailable'),
-            CudaOutOfMemoryError('Cuda device cuda:0 is out of memory')
+            CudaDeviceNotAvailableError('CUDA device(s) have become unavailable'),
+            CudaOutOfMemoryError('CUDA device cuda:0(Tesla T4) is out of memory')
         ]:
             with self.subTest(cuda_exception):
                 with patch("marqo.core.inference.device_manager.DeviceManager.cuda_device_health_check",
                            side_effect=cuda_exception):
                     response = self.client.get("/healthz")
-                    self.assertEqual(response.status_code, 500)
+                    self.assertEqual(response.status_code, 503)
                     self.assertIn(cuda_exception.message, response.json()['message'])
 
     def test_log_stack_trace_for_core_exceptions(self):
