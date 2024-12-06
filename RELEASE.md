@@ -3,9 +3,9 @@
 ## New features
 
 - FFmpeg-CUDA Support ([#1030](https://github.com/marqo-ai/marqo/pull/1030)).   Add GPU acceleration for video decoding by integrating FFmpeg with CUDA support.
-This feature significantly improves video processing performance, making video handling up to 5 times faster. Check [here](#TBD) for guidance and requirements.
+This feature significantly improves video processing performance, making video handling up to 5 times faster. Check [here](https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/#marqo-video-gpu-acceleration-configuration) for guidance and requirements.
 
-- Video and audio file size limits ([#1012](https://github.com/marqo-ai/marqo/pull/1012)). Introduce configurable size limits for video and audio files in the add_documents, search, and embed endpoints. This enhancement allows users to manage and optimize resource usage effectively, ensuring smoother processing of multimedia content. Check [here](#TBD) for more details. 
+- Video and audio file size limits ([#1012](https://github.com/marqo-ai/marqo/pull/1012)). Introduce configurable size limits for video and audio files in the add_documents, search, and embed endpoints. This enhancement allows users to manage and optimize resource usage effectively, ensuring smoother processing of multimedia content. Check [here](#https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/) for more details. 
 
 - Upgrade to Python 3.9 ([#1006](https://github.com/marqo-ai/marqo/pull/1006)).
 Upgrade the Marqo Docker image to use Python 3.9. With Python 3.8 reaching its End of Life (EOL), we have upgraded our platform to Python 3.9 to maintain security, compatibility, and access to ongoing support.
