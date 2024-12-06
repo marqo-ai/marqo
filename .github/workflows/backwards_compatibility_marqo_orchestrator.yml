@@ -19,7 +19,7 @@ on:
 
 # Setting MAX_VERSIONS_TO_TEST, this can be a configurable value or if no input is provided, it can be a default value.
 env:
-  MAX_VERSIONS_TO_TEST: ${{ github.event.inputs.max_versions_to_test || 3 }}
+  MAX_VERSIONS_TO_TEST: ${{ github.event.inputs.max_versions_to_test || 5 }}
 
 jobs:
   check-if-image-exists:
