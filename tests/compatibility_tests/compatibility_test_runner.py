@@ -353,8 +353,6 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
         docker_manager.stop_marqo_container(from_version)
         # Clean up all containers and volumes at the end
         logger.debug("Cleaning up containers and volumes")
-        cleanup_containers()
-        cleanup_volumes()
         docker_manager.cleanup_containers()
         docker_manager.cleanup_volumes()
 
