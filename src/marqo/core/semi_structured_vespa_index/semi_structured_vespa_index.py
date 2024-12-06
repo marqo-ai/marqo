@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional, cast
 
-from marqo.core.constants import MARQO_DOC_HIGHLIGHTS
+from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
+from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
@@ -67,3 +68,55 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     def _get_filter_term(cls, marqo_query: MarqoQuery) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term
         return UnstructuredVespaIndex._get_filter_term(marqo_query)
+
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any],
+                                  original_marqo_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        vespa_id: Optional[str] = None
+        vespa_fields: Dict[str, Any] = dict()
+        int_fields_changed = False
+        float_fields_changed = False
+
+        if MARQO_DOC_ID not in marqo_document:
+            raise MarqoDocumentParsingError(f"'{MARQO_DOC_ID}' is a required field but it does not exist")
+        else:
+            vespa_id = marqo_document[MARQO_DOC_ID]
+            self._verify_id_field(vespa_id)
+
+        for marqo_field in marqo_document:
+            if marqo_field == MARQO_DOC_ID:
+                continue
+
+            # TODO error out if marqo_field is tensor field
+
+            if marqo_field in original_marqo_document:
+                if type(marqo_document[marqo_field]) != type(original_marqo_document[marqo_field]):
+                    raise MarqoDocumentParsingError(f"'{marqo_field}' type mismatch, expected "
+                                                    f"{type(original_marqo_document[marqo_field])}, "
+                                                    f"but was {type(marqo_document[marqo_field])}")
+                if marqo_document[marqo_field] == original_marqo_document[marqo_field]:
+                    continue
+
+            if isinstance(marqo_document[marqo_field], int):
+                field_name = f'{common.INT_FIELDS}{{{marqo_field}}}'
+                vespa_fields[field_name] = {"assign": marqo_document[marqo_field]}
+                int_fields_changed = True
+
+            if isinstance(marqo_document[marqo_field], float):
+                field_name = f'{common.FLOAT_FIELDS}{{{marqo_field}}}'
+                vespa_fields[field_name] = {"assign": marqo_document[marqo_field]}
+                float_fields_changed = True
+
+            original_marqo_document[marqo_field] = marqo_document[marqo_field]
+
+        doc = SemiStructuredVespaDocument.from_marqo_document(original_marqo_document, self.get_marqo_index())
+        if int_fields_changed or float_fields_changed:
+            vespa_fields[common.SCORE_MODIFIERS] = {
+                "modify": {
+                    "operation": "replace",
+                    "cells": doc.fixed_fields.score_modifiers_fields
+                }
+            }
+
+        return {"id": vespa_id, "create_timestamp": doc.fixed_fields.create_timestamp,  "fields": vespa_fields}
+
+

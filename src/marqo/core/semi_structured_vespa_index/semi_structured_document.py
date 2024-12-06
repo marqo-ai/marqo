@@ -1,4 +1,5 @@
 import json
+import time
 from typing import List, Dict, Any
 
 from pydantic import Field
@@ -14,6 +15,7 @@ from marqo.core.semi_structured_vespa_index import common
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
+    create_timestamp: float = Field(default_factory=time.time, alias='marqo__create_timestamp')
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=common.STRING_ARRAY)
@@ -21,7 +23,8 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
-    vespa_multimodal_params: Dict[str, str] = Field(default_factory=str, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
+    vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
+
 
 
 class SemiStructuredVespaDocument(MarqoBaseModel):
@@ -87,8 +90,11 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         doc_id = document[index_constants.MARQO_DOC_ID]
         instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id))
 
+        if 'marqo__create_timestamp' in document:
+            instance.fixed_fields.create_timestamp = document['marqo__create_timestamp']
+
         for field_name, field_content in document.items():
-            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS]:
+            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS, 'marqo__create_timestamp']:
                 continue
             if isinstance(field_content, str):
                 if field_name not in marqo_index.field_map:
@@ -173,6 +179,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         marqo_document.update(self.fixed_fields.float_fields)
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
+        marqo_document['marqo__create_timestamp'] = self.fixed_fields.create_timestamp
 
         # text fields
         for field_name, field_content in self.text_fields.items():

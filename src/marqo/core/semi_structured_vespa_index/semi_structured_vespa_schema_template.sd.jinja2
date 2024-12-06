@@ -7,6 +7,12 @@ schema {{ index.schema_name }} {
             rank: filter
         }
 
+        field marqo__create_timestamp type double {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
+        }
+
         {# Reserved fields for bool, int and float fields -#}
         field marqo__int_fields type map<string, long> {
             indexing: summary
@@ -227,6 +233,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
+        summary marqo__create_timestamp type double {}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
@@ -241,6 +248,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
+        summary marqo__create_timestamp type double {}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}

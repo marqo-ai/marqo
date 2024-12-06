@@ -596,7 +596,8 @@ class VespaClient:
             200: (200, None),
             404: (404, "Document does not exist in the index"),
             # Update documents get 412 from Vespa for document not found as we use condition
-            412: (404, "Document does not exist in the index"),
+            # TODO this is a breaking change
+            412: (412, "Condition check failed when updating document"),
             429: (429, "Marqo vector store receives too many requests. Please try again later"),
             507: (400, "Marqo vector store is out of memory or disk space"),
         }
@@ -834,7 +835,7 @@ class VespaClient:
 
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
-            data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
+            data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\" and {schema}.marqo__create_timestamp=={document.create_timestamp}'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
             except httpx.RequestError as e:

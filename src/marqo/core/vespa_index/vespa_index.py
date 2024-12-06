@@ -82,7 +82,8 @@ class VespaIndex(ABC):
         pass
 
     @abstractmethod
-    def to_vespa_partial_document(self, marqo_partial_document: Dict[str, Any]) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_partial_document: Dict[str, Any],
+                                  original_marqo_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Convert a marqo_partial_update_document to a Vespa partial document.
 
