@@ -116,10 +116,6 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                     elif isinstance(v, float):
                         instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
-                    else:
-                        raise MarqoDocumentParsingError(f"In document {doc_id}, field {field_name} has an "
-                                                        f"unsupported element type {type(v)} for key {k} "
-                                                        f"which has not been validated in advance.")
             else:
                 raise MarqoDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "
