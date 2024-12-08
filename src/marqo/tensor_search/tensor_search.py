@@ -1781,7 +1781,8 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
         marqo_doc = vespa_index.to_marqo_document(doc.dict(), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
 
-        if marqo_index.type == IndexType.Unstructured and attributes_to_retrieve is not None:
+        if (marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured] and
+                attributes_to_retrieve is not None):
             # For an unstructured index, we do the attributes_to_retrieve after search
             marqo_doc = unstructured_index_attributes_to_retrieve(marqo_doc, attributes_to_retrieve)
 

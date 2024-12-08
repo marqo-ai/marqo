@@ -116,6 +116,10 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                     elif isinstance(v, float):
                         instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
+                    else:
+                        raise MarqoDocumentParsingError(f"In document {doc_id}, field {field_name} has an "
+                                                        f"unsupported element type {type(v)} for key {k} "
+                                                        f"which has not been validated in advance.")
             else:
                 raise MarqoDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "
@@ -168,9 +172,24 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 marqo_document[key] = []
             marqo_document[key].append(value)
 
-        # marqo_document.update(self.fixed_fields.short_string_fields)
-        marqo_document.update(self.fixed_fields.int_fields)
-        marqo_document.update(self.fixed_fields.float_fields)
+        for key, value in self.fixed_fields.int_fields.items():
+            if '.' in key:
+                map_field, map_key = key.split('.', 1)
+                if map_field not in marqo_document:
+                    marqo_document[map_field] = {}
+                marqo_document[map_field][map_key] = int(value)
+            else:
+                marqo_document[key] = int(value)
+
+        for key, value in self.fixed_fields.float_fields.items():
+            if '.' in key:
+                map_field, map_key = key.split('.', 1)
+                if map_field not in marqo_document:
+                    marqo_document[map_field] = {}
+                marqo_document[map_field][map_key] = float(value)
+            else:
+                marqo_document[key] = float(value)
+
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
 
