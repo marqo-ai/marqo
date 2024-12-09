@@ -28,9 +28,17 @@ class TestGetDocuments(MarqoTestCase):
                 FieldRequest(name='title1', type=FieldType.Text),
                 FieldRequest(name='desc2', type=FieldType.Text),
                 FieldRequest(name='int_field', type=FieldType.Int),
+                FieldRequest(name='int_array_field', type=FieldType.ArrayInt),
                 FieldRequest(name='int_map_field', type=FieldType.MapInt),
                 FieldRequest(name='float_field', type=FieldType.Float),
+                FieldRequest(name='float_array_field', type=FieldType.ArrayFloat),
                 FieldRequest(name='float_map_field', type=FieldType.MapFloat),
+                FieldRequest(name='long_field', type=FieldType.Long),
+                FieldRequest(name='long_array_field', type=FieldType.ArrayLong),
+                FieldRequest(name='long_map_field', type=FieldType.MapLong),
+                FieldRequest(name='double_field', type=FieldType.Double),
+                FieldRequest(name='double_array_field', type=FieldType.ArrayDouble),
+                FieldRequest(name='double_map_field', type=FieldType.MapDouble),
                 FieldRequest(name='string_array_field', type=FieldType.ArrayText),
                 FieldRequest(name='bool_field', type=FieldType.Bool),
                 FieldRequest(name='custom_vector_field', type=FieldType.CustomVector),
@@ -60,18 +68,54 @@ class TestGetDocuments(MarqoTestCase):
     def tearDown(self) -> None:
         self.device_patcher.stop()
 
-    def test_get_documents_by_ids(self):
-        for index in self.indexes:
-            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
-                if index.type == IndexType.Structured:
-                    tensor_fields = None
-                    mappings = None
-                    flatten_map_fields = False
-                else:
-                    tensor_fields = ["title1", "desc2", "custom_vector_field"]
-                    mappings = {"custom_vector_field": {"type": "custom_vector"}}
-                    flatten_map_fields = True
+    def test_get_documents_by_ids_structured(self):
+        index = self.indexes[0]
 
+        docs = [
+            {"_id": "1", "title1": "content 1",
+             "int_field": 1, "int_array_field": [1, 2], "int_map_field": {"a": 1},
+             "float_field": 2.9, "float_array_field": [1.0, 2.0], "float_map_field": {"b": 2.9},
+             "long_field": 10, "long_array_field": [10, 20], "long_map_field": {"a": 10},
+             "double_field": 3.9, "double_array_field": [3.0, 5.0], "double_map_field": {"b": 5.9},
+             "bool_field": True, "string_array_field": ["a", "b", "c"]},
+            {"_id": "2", "title1": "content 2", "custom_vector_field": {"content": "a", "vector": [1.0] * 384}},
+            {"_id": "3", "title1": "content 3"}
+        ]
+
+        self.add_documents(
+            config=self.config,
+            add_docs_params=AddDocsParams(
+                index_name=index.name, docs=docs, device="cpu"
+            )
+        )
+        res = tensor_search.get_documents_by_ids(
+            config=self.config, index_name=index.name, document_ids=['1', '2', '3'],
+            show_vectors=True).dict(exclude_none=True, by_alias=True)
+
+        # Check that the documents are found and have the correct content
+        for i in range(3):
+            self.assertEqual(res['results'][i]['_found'], True)
+
+            for field_name, value in res['results'][i].items():
+                if field_name in [enums.TensorField.tensor_facets, "_found"]:
+                    # ignore meta fields
+                    continue
+                if field_name == "custom_vector_field":
+                    expected_value = docs[i]["custom_vector_field"]["content"]
+                else:
+                    expected_value = docs[i][field_name]
+
+                self.assertEqual(expected_value, value)
+
+            self.assertIn(enums.TensorField.tensor_facets, res['results'][i])
+            self.assertIn(enums.TensorField.embedding, res['results'][i][enums.TensorField.tensor_facets][0])
+
+    def test_get_documents_by_ids_unstructured(self):
+        for index in self.indexes:
+            if index.type == IndexType.Structured:
+                continue
+
+            with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
                 docs = [
                     {"_id": "1", "title1": "content 1", "int_field": 1, "int_map_field": {"a": 1}, "float_field": 2.9,
                      "float_map_field": {"b": 2.9}, "bool_field": True, "string_array_field": ["a", "b", "c"]},
@@ -82,8 +126,8 @@ class TestGetDocuments(MarqoTestCase):
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name, docs=docs, device="cpu",
-                        tensor_fields=tensor_fields,
-                        mappings=mappings
+                        tensor_fields=["title1", "desc2", "custom_vector_field"],
+                        mappings={"custom_vector_field": {"type": "custom_vector"}}
                     )
                 )
                 res = tensor_search.get_documents_by_ids(
@@ -100,7 +144,7 @@ class TestGetDocuments(MarqoTestCase):
                             continue
                         if field_name == "custom_vector_field":
                             expected_value = docs[i]["custom_vector_field"]["content"]
-                        elif flatten_map_fields and '.' in field_name:
+                        elif '.' in field_name:
                             # unstructured and semi-structured indexes have all map fields flattened
                             map_field_name, key = field_name.split('.', 1)
                             expected_value = docs[i][map_field_name][key]

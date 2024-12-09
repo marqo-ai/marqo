@@ -882,7 +882,7 @@ class TestSearchUnstructured(MarqoTestCase):
         map_fields_flattened = {"int_map.a", "int_map.b", "float_map.c", "float_map.d"}
 
         test_cases = (
-            # attributes_to_retrieve, expectured result
+            # attributes_to_retrieve, expected result excluding meta_fields
             ([], set()),  # no field is selected
             (["non_existent_field"], set()),  # non_existent field is provided
             (["multimodal_combo_field"], set()),  # multimodal_combination fields cannot be selected

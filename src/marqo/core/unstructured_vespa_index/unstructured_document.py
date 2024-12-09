@@ -23,7 +23,7 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.SCORE_MODIFIERS)
     vespa_chunks: List[str] = Field(default_factory=list, alias=unstructured_common.VESPA_DOC_CHUNKS)
     vespa_embeddings: Dict[str, Any] = Field(default_factory=dict, alias=unstructured_common.VESPA_DOC_EMBEDDINGS)
-    vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict,
+    vespa_multimodal_params: Dict[str, str] = Field(default_factory=str,
                                                     alias=unstructured_common.VESPA_DOC_MULTIMODAL_PARAMS)
     vector_counts: int = Field(default=0, alias=unstructured_common.FIELD_VECTOR_COUNT)
 
