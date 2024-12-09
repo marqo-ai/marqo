@@ -45,10 +45,10 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
 
-        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
+        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5", "BAAI/bge-base-en-v1.5"]
 
         # TODO: Re-add snowflake models when HF pooling issue is resolved
         # names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
@@ -98,7 +98,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_vectorize_normalise(self):
-        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k"]
+        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k", "Marqo/ViT-B-32/laion2b_s34b_b79k"]
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
 
@@ -136,8 +136,8 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
 
@@ -195,8 +195,8 @@ class TestEncoding(unittest.TestCase):
     def test_load_hf_text_model(self):
         names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
 
         device = 'cpu'
@@ -248,8 +248,8 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -272,8 +272,8 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -303,8 +303,8 @@ class TestEncoding(unittest.TestCase):
                  "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5",
                   "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
