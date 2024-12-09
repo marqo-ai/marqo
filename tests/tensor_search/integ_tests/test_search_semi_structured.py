@@ -862,35 +862,43 @@ class TestSearchSemiStructured(MarqoTestCase):
 
         # meta fields are always returned
         meta_fields = {"_id", "_score", "_highlights"}
+        non_map_fields = {"short_string_field", "long_string_field", "int_field", "float_field", "bool_field",
+                          "bool_field2", "string_array", "custom_vector_field"}
+        map_fields_flattened = {"int_map.a", "int_map.b", "float_map.c", "float_map.d"}
 
         test_cases = (
-            (None, doc.keys()),  # not provided
+            # attributes_to_retrieve, expectured result
             ([], set()),  # no field is selected
-            (list(doc.keys()), doc.keys()),  # all fields are selected
             (["non_existent_field"], set()),  # non_existent field is provided
             (["multimodal_combo_field"], set()),  # multimodal_combination fields cannot be selected
 
+            # None or all fields
+            (None, non_map_fields | map_fields_flattened),  # not provided
+            (list(doc.keys()), non_map_fields | map_fields_flattened),  # all fields are selected
+
             # one field
-            (["short_string_field"],  {"short_string_field"}),
-            (["long_string_field"],  {"long_string_field"}),
-            (["int_field"],  {"int_field"}),
-            (["float_field"],  {"float_field"}),
-            (["string_array"],  {"string_array"}),
-            (["int_map"],  {"int_map"}),
-            (["float_map"],  {"float_map"}),
-            (["bool_field"],  {"bool_field"}),
-            (["custom_vector_field"],  {"custom_vector_field"}),
+            (["short_string_field"], {"short_string_field"}),
+            (["long_string_field"], {"long_string_field"}),
+            (["int_field"], {"int_field"}),
+            (["float_field"], {"float_field"}),
+            (["string_array"], {"string_array"}),
+            (["int_map"], {"int_map.a", "int_map.b"}),
+            (["float_map"], {"float_map.c", "float_map.d"}),
+            (["bool_field"], {"bool_field"}),
+            (["custom_vector_field"], {"custom_vector_field"}),
             # combination of short and long string fields
-            (["short_string_field", "long_string_field"],  {"short_string_field", "long_string_field"}),
+            (["short_string_field", "long_string_field"], {"short_string_field", "long_string_field"}),
             # combination of int and int map fields
-            (["int_field", "int_map"], {"int_field", "int_map"}),
+            (["int_field", "int_map"], {"int_field", "int_map.a", "int_map.b"}),
             # combination of fload and fload map fields
-            (["float_field", "float_map"], {"float_field", "float_map"}),
+            (["float_field", "float_map"], {"float_field", "float_map.c", "float_map.d"}),
             # multiple boolean fields
             (["bool_field", "bool_field2"], {"bool_field", "bool_field2"}),
             # combination of all types of fields include non-existent fields
-            (["short_string_field", "long_string_field", "int_map", "bool_field", "multimodal_combo_field", "string_array", "custom_vector_field"],
-             {"short_string_field", "long_string_field", "int_map", "bool_field", "string_array", "custom_vector_field"})
+            (["short_string_field", "long_string_field", "int_map", "bool_field", "multimodal_combo_field",
+              "string_array", "custom_vector_field"],
+             {"short_string_field", "long_string_field", "int_map.a", "int_map.b", "bool_field", "string_array",
+              "custom_vector_field"})
         )
 
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
@@ -906,6 +914,9 @@ class TestSearchSemiStructured(MarqoTestCase):
                     for attribute in expected_fields:
                         if attribute == "custom_vector_field":
                             self.assertEqual(res["hits"][0][attribute], doc[attribute]["content"])
+                        elif '.' in attribute:
+                            map_field_name, key = attribute.split('.', maxsplit=1)
+                            self.assertEqual(res["hits"][0][attribute], doc[map_field_name][key])
                         else:
                             self.assertEqual(res["hits"][0][attribute], doc[attribute])
 

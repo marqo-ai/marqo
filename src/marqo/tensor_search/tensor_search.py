@@ -1798,7 +1798,11 @@ def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attribu
     str, Any]:
     # attributes_to_retrieve should already be validated at the start of search
     attributes_to_retrieve = list(set(attributes_to_retrieve).union({"_id", "_score", "_highlights"}))
-    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve}
+    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve or
+            # Please note that numeric map fields are flattened for unstructured or semi-structured indexes.
+            # Therefore, when filtering on attributes_to_retrieve, we need to also include flattened map fields
+            # with the specified attributes as prefixes. We keep this behaviour only for compatibility reasons.
+            any([k.startswith(attribute + ".") for attribute in attributes_to_retrieve])}
 
 
 def assign_query_to_vector_job(

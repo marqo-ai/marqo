@@ -154,23 +154,10 @@ class UnstructuredVespaDocument(MarqoBaseModel):
             marqo_document[key].append(value)
 
         # Add int and float fields back
-        for key, value in self.fields.int_fields.items():
-            if '.' in key:
-                map_field, map_key = key.split('.', 1)
-                if map_field not in marqo_document:
-                    marqo_document[map_field] = {}
-                marqo_document[map_field][map_key] = int(value)
-            else:
-                marqo_document[key] = int(value)
-
-        for key, value in self.fields.float_fields.items():
-            if '.' in key:
-                map_field, map_key = key.split('.', 1)
-                if map_field not in marqo_document:
-                    marqo_document[map_field] = {}
-                marqo_document[map_field][map_key] = float(value)
-            else:
-                marqo_document[key] = float(value)
+        # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert
+        # them back to the format when they are indexed. We will keep the behaviour as is to avoid breaking changes.
+        marqo_document.update(self.fields.int_fields)
+        marqo_document.update(self.fields.float_fields)
 
         marqo_document.update({k: bool(v) for k, v in self.fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fields.marqo__id

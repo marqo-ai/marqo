@@ -63,6 +63,15 @@ class TestGetDocuments(MarqoTestCase):
     def test_get_documents_by_ids(self):
         for index in self.indexes:
             with self.subTest(f"Index type: {index.type}. Index name: {index.name}"):
+                if index.type == IndexType.Structured:
+                    tensor_fields = None
+                    mappings = None
+                    flatten_map_fields = False
+                else:
+                    tensor_fields = ["title1", "desc2", "custom_vector_field"]
+                    mappings = {"custom_vector_field": {"type": "custom_vector"}}
+                    flatten_map_fields = True
+
                 docs = [
                     {"_id": "1", "title1": "content 1", "int_field": 1, "int_map_field": {"a": 1}, "float_field": 2.9,
                      "float_map_field": {"b": 2.9}, "bool_field": True, "string_array_field": ["a", "b", "c"]},
@@ -73,10 +82,8 @@ class TestGetDocuments(MarqoTestCase):
                     config=self.config,
                     add_docs_params=AddDocsParams(
                         index_name=index.name, docs=docs, device="cpu",
-                        tensor_fields=["title1", "desc2", "custom_vector_field"] if isinstance(index, UnstructuredMarqoIndex) else None,
-                        mappings={
-                            "custom_vector_field": {"type": "custom_vector"}
-                        } if isinstance(index, UnstructuredMarqoIndex) else None
+                        tensor_fields=tensor_fields,
+                        mappings=mappings
                     )
                 )
                 res = tensor_search.get_documents_by_ids(
@@ -87,9 +94,20 @@ class TestGetDocuments(MarqoTestCase):
                 for i in range(3):
                     self.assertEqual(res['results'][i]['_found'], True)
 
-                    for field, value in docs[i].items():
-                        expected_value = value["content"] if field == "custom_vector_field" else value
-                        self.assertEqual(expected_value, res['results'][i][field])
+                    for field_name, value in res['results'][i].items():
+                        if field_name in [enums.TensorField.tensor_facets, "_found"]:
+                            # ignore meta fields
+                            continue
+                        if field_name == "custom_vector_field":
+                            expected_value = docs[i]["custom_vector_field"]["content"]
+                        elif flatten_map_fields and '.' in field_name:
+                            # unstructured and semi-structured indexes have all map fields flattened
+                            map_field_name, key = field_name.split('.', 1)
+                            expected_value = docs[i][map_field_name][key]
+                        else:
+                            expected_value = docs[i][field_name]
+
+                        self.assertEqual(expected_value, value)
 
                     self.assertIn(enums.TensorField.tensor_facets, res['results'][i])
                     self.assertIn(enums.TensorField.embedding, res['results'][i][enums.TensorField.tensor_facets][0])
