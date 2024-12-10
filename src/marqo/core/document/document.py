@@ -218,11 +218,13 @@ class Document:
         # Remove duplicated documents based on _id
         partial_documents, doc_ids = self.remove_duplicated_documents(partial_documents)
 
-        existing_documents = []
+        existing_vespa_documents = []
         if marqo_index.type == IndexType.SemiStructured:
-            existing_documents = self.get_documents_by_ids(marqo_index, doc_ids, ignore_invalid_ids=True).results
+            get_batch_response = self.vespa_client.get_batch(list(doc_ids), marqo_index.schema_name)
+            existing_vespa_documents = [doc_response.document for doc_response in get_batch_response.responses
+                                        if doc_response.status == 200]
 
-        existing_documents_map = {doc['_id']: doc for doc in existing_documents if isinstance(doc, Dict)}
+        existing_documents_map = {doc.id: doc.fields for doc in existing_vespa_documents}
 
         for index, doc in enumerate(partial_documents):
             try:

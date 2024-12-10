@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, cast
+from typing import Dict, Any, Optional, cast, Union
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
@@ -7,9 +7,12 @@ from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument
+from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
+from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.exceptions import InternalError
+from marqo.tensor_search.validation import validate_map_numeric_field
 
 
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
@@ -70,11 +73,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         return UnstructuredVespaIndex._get_filter_term(marqo_query)
 
     def to_vespa_partial_document(self, marqo_document: Dict[str, Any],
-                                  original_marqo_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                  original_vespa_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
-        int_fields_changed = False
-        float_fields_changed = False
 
         if MARQO_DOC_ID not in marqo_document:
             raise MarqoDocumentParsingError(f"'{MARQO_DOC_ID}' is a required field but it does not exist")
@@ -82,41 +83,151 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             vespa_id = marqo_document[MARQO_DOC_ID]
             self._verify_id_field(vespa_id)
 
-        for marqo_field in marqo_document:
+        original_doc = SemiStructuredVespaDocument.from_marqo_document(original_vespa_document, self.get_marqo_index())
+        new_string_array = original_doc.fixed_fields.string_arrays.copy()
+
+        all_numeric_field_map = dict()
+        all_numeric_field_map.update(original_doc.fixed_fields.int_fields)
+        all_numeric_field_map.update(original_doc.fixed_fields.float_fields)
+
+        for marqo_field, value in marqo_document.items():
             if marqo_field == MARQO_DOC_ID:
                 continue
 
-            # TODO error out if marqo_field is tensor field
+            # TODO move the validation logic out of validation.py
+            validate_field_name(marqo_field)
 
-            if marqo_field in original_marqo_document:
-                if type(marqo_document[marqo_field]) != type(original_marqo_document[marqo_field]):
-                    raise MarqoDocumentParsingError(f"'{marqo_field}' type mismatch, expected "
-                                                    f"{type(original_marqo_document[marqo_field])}, "
-                                                    f"but was {type(marqo_document[marqo_field])}")
-                if marqo_document[marqo_field] == original_marqo_document[marqo_field]:
+            if self._is_tensor_field(marqo_field, original_doc):
+                raise MarqoDocumentParsingError(f'field {marqo_field} is a tensor field or a dependant field of a '
+                                                f'multimodal combo fields, we cannot update its value')
+
+            if value is None:
+                # TODO handle removal of a field
+                # https://docs.vespa.ai/en/reference/document-json-format.html#clearing-a-field
+                pass
+
+            if isinstance(value, bool):
+                # Assign values to a map: https://docs.vespa.ai/en/reference/document-json-format.html#assign-map-field
+                if value != original_doc.fixed_fields.bool_fields.get(marqo_field, None):
+                    field_name = f'{common.BOOL_FIELDS}{{{marqo_field}}}'
+                    vespa_fields[field_name] = {"assign": int(value)}
+
+            # Handle numeric fields including numeric maps
+            if isinstance(value, dict):
+                # numeric dict need to be handled separately since the original_marqo_doc has them flattened
+                # TODO move the validation logic
+                validate_map_numeric_field(value)
+
+                # remove all entries from the flattened map, and repopulate
+                all_numeric_field_map = {key: value for key, value in all_numeric_field_map.items()
+                                         if not key.startswith(f'{marqo_field}.')}
+                # TODO what if v == None?
+                all_numeric_field_map.update({f'{marqo_field}.{k}': v for k, v in value.items()})
+
+            if isinstance(value, (int, float)):
+                all_numeric_field_map[marqo_field] = value
+
+            # Handle string array fields
+            if isinstance(marqo_document[marqo_field], list):
+                # TODO move the validation logic
+                if any(not isinstance(v, str) for v in marqo_document[marqo_field]):
+                    raise MarqoDocumentParsingError('Only string array is supported')
+
+                new_string_array = [value for value in new_string_array if not value.startswith(f'{marqo_field}::')]
+                new_string_array.extend([f'{marqo_field}::{value}' for value in marqo_document[marqo_field]])
+
+            # Handle string fields (lexical only)
+            if isinstance(marqo_document[marqo_field], str):
+                # Handle lexical field change
+                lexical_field_name = f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{marqo_field}'
+
+                if lexical_field_name not in original_vespa_document:
+                    raise MarqoDocumentParsingError(f'{marqo_field} of type str does not exist in the original '
+                                                    f'document. We do not support adding new lexical fields in '
+                                                    f'partial updates')
+
+                if value == original_vespa_document[lexical_field_name]:
+                    # Skip changing this field
                     continue
 
-            if isinstance(marqo_document[marqo_field], int):
-                field_name = f'{common.INT_FIELDS}{{{marqo_field}}}'
-                vespa_fields[field_name] = {"assign": marqo_document[marqo_field]}
-                int_fields_changed = True
+                # update the lexical field, please note that the lexical field name has a prefix
+                # https://docs.vespa.ai/en/reference/document-json-format.html#single-field-value
+                vespa_fields[lexical_field_name] = {"assign": value}
 
-            if isinstance(marqo_document[marqo_field], float):
-                field_name = f'{common.FLOAT_FIELDS}{{{marqo_field}}}'
-                vespa_fields[field_name] = {"assign": marqo_document[marqo_field]}
-                float_fields_changed = True
+                # Update the short string map
+                #   short string -> long string, we'll need to remove it from short string map
+                #   long string -> short string, we'll need to add it to the short string map
+                #   short string -> short string, we'll need to update it in the short string map
+                field_name = f'{common.SHORT_STRINGS_FIELDS}{{{marqo_field}}}'
+                if len(marqo_document[marqo_field]) <= self.get_marqo_index().filter_string_max_length:
+                    # Add or update the value in the map
+                    # https://docs.vespa.ai/en/reference/document-json-format.html#assign-map-field
+                    vespa_fields[field_name] = {"assign": marqo_document[marqo_field]}
+                else:
+                    # remove from map: https://docs.vespa.ai/en/reference/document-json-format.html#map-field-remove
+                    vespa_fields[field_name] = {"remove": 0}
 
-            original_marqo_document[marqo_field] = marqo_document[marqo_field]
+        # Handle string array change
+        items_to_remove = set(original_doc.fixed_fields.string_arrays) - set(new_string_array)
+        items_to_add = set(new_string_array) - set(original_doc.fixed_fields.string_arrays)
+        if items_to_remove:
+            # https://docs.vespa.ai/en/reference/document-json-format.html#array-field
+            vespa_fields[common.STRING_ARRAY] = {"assign": new_string_array}
+        elif items_to_add:
+            # if we only need to add items, it can be appended to the array, which requires smaller change
+            # https://docs.vespa.ai/en/reference/document-json-format.html#add-array-elements
+            vespa_fields[common.STRING_ARRAY] = {"add": list(items_to_add)}
 
-        doc = SemiStructuredVespaDocument.from_marqo_document(original_marqo_document, self.get_marqo_index())
-        if int_fields_changed or float_fields_changed:
+        # Handle all numeric values (including score modifiers)
+        numeric_field_changed = (self._update_numeric_field(int, all_numeric_field_map, original_doc, vespa_fields) or
+                                 self._update_numeric_field(float, all_numeric_field_map, original_doc, vespa_fields))
+        if numeric_field_changed:
+            # TODO SCORE_MODIFIERS is a tensor, find out if it can be updated in the same way as a map, is it faster?
+            #   If not, we copied the replace logic from structured_vespa_index, should we rather use assign here?
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-field
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-add
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-remove
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-modify
             vespa_fields[common.SCORE_MODIFIERS] = {
                 "modify": {
                     "operation": "replace",
-                    "cells": doc.fixed_fields.score_modifiers_fields
+                    "cells": all_numeric_field_map
                 }
             }
 
-        return {"id": vespa_id, "create_timestamp": doc.fixed_fields.create_timestamp,  "fields": vespa_fields}
+        return {"id": vespa_id, "create_timestamp": original_doc.fixed_fields.create_timestamp,  "fields": vespa_fields}
 
+    def _update_numeric_field(self, numeric_type, all_numeric_field_map, original_doc, vespa_fields) -> bool:
+        field_name_prefix = common.INT_FIELDS if numeric_type == int else common.FLOAT_FIELDS
+        original_fields = original_doc.fixed_fields.int_fields if numeric_type == int \
+            else original_doc.fixed_fields.float_fields
+        new_fields = {key: value for key, value in all_numeric_field_map.items() if isinstance(value, numeric_type)}
 
+        changed = False
+
+        for k, v in new_fields.items():
+            if k not in original_fields or original_fields[k] != v:
+                vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"assign": v}
+                changed = True
+
+        for k, v in original_fields.items():
+            if k not in new_fields:
+                vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"remove": 0}
+                changed = True
+
+        return changed
+
+    def _is_tensor_field(self, partial_update_field_name, original_doc):
+        # Please note that we cannot rely on the tensor_fields property in the index to derive the tensor fields
+        # info. tensor_fields is a superset for all tensor fields in the index. For each individual document, we
+        # will need to derive the info based on whether chunks fields exists or if the field is a dependant field
+        # of a multimodal combo field.
+        potential_tensor_field_name = f'{SemiStructuredVespaSchema.FIELD_CHUNKS_PREFIX}{partial_update_field_name}'
+        if potential_tensor_field_name in original_doc.tensor_fields:
+            return True
+
+        if (original_doc.fixed_fields.vespa_multimodal_params and
+                partial_update_field_name in original_doc.fixed_fields.vespa_multimodal_params["weights"]):
+            return True
+
+        return False
