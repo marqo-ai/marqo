@@ -45,7 +45,7 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
                     "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5", "BAAI/bge-base-en-v1.5"]
@@ -78,6 +78,8 @@ class TestEncoding(unittest.TestCase):
 
                         output_m = model.encode(sentence, normalize=True)
 
+                        print(f"Printing output_m for name: {name}, sentence: {sentence}. Output_m: {output_m}")
+
                         # Embeddings must match hardcoded python 3.8.20 embeddings
                         if isinstance(sentence, str):
                             with self.subTest("Hardcoded Python 3.8 Embeddings Comparison"):
@@ -98,7 +100,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_vectorize_normalise(self):
-        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k", "Marqo/ViT-B-32/laion2b_s34b_b79k"]
+        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k", "Marqo/ViT-B-32.laion2b_s34b_b79k"]
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
 
@@ -136,7 +138,7 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
                     "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
@@ -195,7 +197,7 @@ class TestEncoding(unittest.TestCase):
     def test_load_hf_text_model(self):
         names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
                     "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
 
@@ -248,7 +250,7 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
                     "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
                  
@@ -272,7 +274,7 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
                     "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
                  
@@ -303,7 +305,7 @@ class TestEncoding(unittest.TestCase):
                  "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5",
                   "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2"
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
                     "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
 
@@ -334,8 +336,8 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
         self.open_clip_test_model = [
-            'open_clip/RN50/yfcc15m', 'Marqo/ViT-B-32/laion2b_s34b_b79k', 'open_clip/ViT-B-32/laion2b_s34b_b79k',
-            'open_clip/ViT-B-16/laion2b_s34b_b88k', 'Marqo/ViT-B-16/laion2b_s34b_b88k', 'open_clip/convnext_base/laion400m_s13b_b51k',
+            'open_clip/RN50/yfcc15m', 'Marqo/ViT-B-32.laion2b_s34b_b79k', 'open_clip/ViT-B-32/laion2b_s34b_b79k',
+            'open_clip/ViT-B-16/laion2b_s34b_b88k', 'Marqo/ViT-B-16.laion2b_s34b_b88k', 'open_clip/convnext_base/laion400m_s13b_b51k',
             'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
             'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
             'open_clip/EVA02-B-16/merged2b_s8b_b131k',

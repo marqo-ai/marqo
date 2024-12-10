@@ -8,7 +8,7 @@ import marqo
 @pytest.mark.marqo_version('2.11.0') #TODO: Check this again
 class GeneralCompatibilityTest(BaseCompatibilityTestCase):
 
-    image_model = 'Marqo/ViT-B-32/laion2b_s34b_b79k'
+    image_model = 'open_clip/ViT-B-32/laion2b_s34b_b79k'
     multimodal_weights = {"image_field": 0.9, "text_field": 0.1}
     mappings = {
         "multimodal_field": {
