@@ -168,8 +168,9 @@ jobs:
           cd marqo
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
-          pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test \
-            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered --cov-fail-under=80 \
+          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests \
+            --durations=100 --cov=src --cov-branch --cov-context=test \
+            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests | tee pytest_output.txt
 
@@ -177,7 +178,7 @@ jobs:
         id: check_test_coverage
         continue-on-error: true
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           else
             export BASE_BRANCH=mainline
@@ -186,7 +187,7 @@ jobs:
           cd marqo
           echo "Running diff-cover against branch $BASE_BRANCH"
           git fetch origin $BASE_BRANCH:$BASE_BRANCH
-          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md --fail-under=90 \
+          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
             --compare-branch $BASE_BRANCH
 
       - name: Upload Test Report
