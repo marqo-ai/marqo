@@ -162,13 +162,14 @@ jobs:
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
-          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
+          cd marqo
+          export PYTHONPATH="./tests:./src:."
           set -o pipefail
-          pytest marqo/tests --largemodel --ignore=marqo/tests/test_documentation.py --ignore=marqo/tests/backwards_compatibility_tests \
+          pytest --largemodel --ignore=marqo/tests/test_documentation.py --ignore=marqo/tests/backwards_compatibility_tests \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            marqo/tests | tee pytest_output.txt
+            tests | tee pytest_output.txt
 
       - name: Check Test Coverage of New Code
         id: check_test_coverage
