@@ -12,7 +12,7 @@ on:
 
       number_of_replicas:
         type: number
-        description: 'Number of replicas (groups in Vespa - 1)'
+        description: 'Number of replicas (groups in Vespa minus 1). Minimum of 0.'
         required: true
         default: 0
 
@@ -80,11 +80,44 @@ jobs:
               {"Key": "PoloRole", "Value": "testing"}
             ]
 
+  # TODO: Maybe delete this whole block.
+  Determine-Vespa-Setup:
+    runs-on: ubuntu-latest
+    outputs:
+      VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
+    steps:
+      - name: Determine VESPA_MULTINODE_SETUP
+        id: set_var
+        run: |
+          # Initialize as false
+          echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
+          
+          # Check if the event is workflow_call or workflow_dispatch
+          if [[ "${{ github.event_name }}" == "workflow_call" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
+            NUMBER_OF_SHARDS="${{ github.event.inputs.number_of_shards || 1 }}"
+            NUMBER_OF_REPLICAS="${{ github.event.inputs.number_of_replicas || 0 }}"
+          
+            # Convert inputs to integers
+            NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
+            NUMBER_OF_REPLICAS_INT=$(echo "$NUMBER_OF_REPLICAS" | awk '{print int($0)}')
+          
+            # Evaluate the conditions
+            if [[ "$NUMBER_OF_SHARDS_INT" -gt 1 || "$NUMBER_OF_REPLICAS_INT" -gt 0 ]]; then
+              echo "Using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
+              echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
+            fi
+          fi
+
   Test-Marqo:
     name: Run Unit Tests
-    needs: Start-Runner # required to start the main job when the runner is ready
+    needs:
+      - Start-Runner
+      - Determine-Vespa-Setup
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
+    env:
+      VESPA_MULTINODE_SETUP: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP }}
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
@@ -144,10 +177,10 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-
+          
           cd marqo/scripts/vespa_local
           set -x
-          python vespa_local.py start
+          python vespa_local.py start --Shards ${{ github.event.inputs.number_of_shards }} --Replicas ${{ github.event.inputs.number_of_replicas }}
           set +x
 
           echo "Waiting for Vespa to start"
@@ -157,9 +190,9 @@ jobs:
           done
           echo -e "\nDone waiting."
 
-          # Zip up schemas and services
+          # Zip up schemas, hosts, and services
           sudo apt-get install zip -y
-          zip -r vespa_tester_app.zip services.xml schemas
+          zip -r vespa_tester_app.zip . -x README.md .env .gitignore "*.yml"  # zip the whole directory except for the listed files
 
           # Deploy application with test schema
           curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
@@ -168,6 +201,8 @@ jobs:
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
             (echo "Vespa (Document URL) did not start in time" && exit 1)
 
+          # TODO: If multinode, output status of all nodes, check distribution.
+          
           echo "Vespa document API is available. Local Vespa setup complete."
 
           # Delete the zip file
