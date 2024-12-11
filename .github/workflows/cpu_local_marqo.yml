@@ -99,11 +99,11 @@ jobs:
       - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
           if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]]; then
-            echo "MQ_PY_MARQO_BRANCH=marqo" >> $GITHUB_ENV
+            MQ_PY_MARQO_BRANCH=marqo
           elif [[ "${{ inputs.py_marqo_branch }}" == "" ]]; then
-            echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@mainline" >> $GITHUB_ENV
+            MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@mainline
           else
-            echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
+            MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}
           fi
           
           pip install $MQ_PY_MARQO_BRANCH
