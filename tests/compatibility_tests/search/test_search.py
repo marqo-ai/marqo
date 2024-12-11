@@ -140,24 +140,29 @@ class TestSearch(BaseCompatibilityTestCase):
         """
         self.logger.info(f"Creating indexes {self.indexes_to_test_on}")
         self.create_indexes(self.indexes_to_test_on)
-        try:
-            self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
-            for index in self.indexes_to_test_on:
+        errors = []  # Collect errors to report them at the end
+
+        self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
+        for index in self.indexes_to_test_on:
+            try:
                 if index.get("type") is not None and index.get('type') == 'structured':
                     self.client.index(index_name=index['indexName']).add_documents(documents=self.docs)
                 else:
                     self.client.index(index_name=index['indexName']).add_documents(documents=self.docs,
-                                                                                   mappings=self.mappings,
-                                                                                   tensor_fields=self.tensor_fields)
-            self.logger.debug(f'Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}')
-            all_results = {}
-        # Loop through queries, search methods, and result keys to populate unstructured_results
-            for index in self.indexes_to_test_on:
-                index_name = index['indexName']
-                all_results[index_name] = {}
+                                                                               mappings=self.mappings,
+                                                                               tensor_fields=self.tensor_fields)
+            except Exception as e:
+                errors.append((index, str(e)))
 
-                # For each index, store results for different search methods
-                for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
+        all_results = {}
+        # Loop through queries, search methods, and result keys to populate unstructured_results
+        for index in self.indexes_to_test_on:
+            index_name = index['indexName']
+            all_results[index_name] = {}
+
+            # For each index, store results for different search methods
+            for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
+                try:
                     if index.get("type") is not None and index.get("type") == 'structured':
                         if search_method == 'HYBRID':
                             result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
@@ -166,10 +171,17 @@ class TestSearch(BaseCompatibilityTestCase):
                     else:
                         result = self.client.index(index_name).search(q=query, search_method=search_method)
                     all_results[index_name][result_key] = result
-            self.save_results_to_file(all_results)
+                except Exception as e:
+                    errors.append((query, search_method, index_name, str(e)))
 
-        except Exception as e:
-            raise Exception(f"Exception occurred while running prepare method") from e
+        if errors:
+            failure_message = "\n".join([
+                f"Failure in query {query}, search_method {search_method}, idx: {idx} : {error}"
+                for query, search_method, idx, error in errors
+            ])
+            self.logger.error(f"Some subtests failed:\n{failure_message}. When the corresponding test runs for this index, it is expected to fail")
+        self.save_results_to_file(all_results)
+
 
 
         # store the result of search across all structured & unstructured indexes
@@ -178,21 +190,32 @@ class TestSearch(BaseCompatibilityTestCase):
         """Run search queries and compare the results with the stored results."""
         self.logger.info(f"Running test_search on {self.__class__.__name__}")
         stored_results = self.load_results_from_file()
+        test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
+
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
 
             # For each index, search for different queries and compare results
             for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
-                if index.get("type") is not None and index.get("type") == 'structured':
-                    if search_method == 'HYBRID':
-                        result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
+                try:
+                    if index.get("type") is not None and index.get("type") == 'structured':
+                        if search_method == 'HYBRID':
+                            result = self.client.index(index_name).search(q=query, search_method=search_method, hybrid_parameters=self.hybrid_search_params)
+                        else:
+                            result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
                     else:
-                        result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
-                else:
-                    result = self.client.index(index_name).search(q=query, search_method=search_method)
+                        result = self.client.index(index_name).search(q=query, search_method=search_method)
+                    self._compare_search_results(stored_results[index_name][result_key], result)
 
-                self._compare_search_results(stored_results[index_name][result_key], result)
+                except Exception as e:
+                    test_failures.append((query, search_method, index_name, str(e)))
 
+            if test_failures:
+                failure_message = "\n".join([
+                    f"Failure in query {query}, search_method {search_method}, idx: {idx} : {error}"
+                    for query, search_method, idx, error in test_failures
+                ])
+                self.fail(f"Some subtests failed:\n{failure_message}")
 
     def _compare_search_results(self, expected_result, actual_result):
         """Compare two search results and assert if they match."""

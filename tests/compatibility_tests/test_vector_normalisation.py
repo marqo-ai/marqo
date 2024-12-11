@@ -70,25 +70,35 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
             self.save_results_to_file(result)
             self.logger.debug(f'Ran prepare mode test for {self.text_index_with_normalize_embeddings_true} inside test class {self.__class__.__name__}')
         except Exception as e:
-            raise Exception(f"Eception occurred while adding documents to index {self.text_index_with_normalize_embeddings_true}") from e
+            self.logger.error(f"Exception occurred while adding documents to index {self.text_index_with_normalize_embeddings_true}. When the corresponding test runs, it is expected to fail.")
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
         # This runs on to_version
         get_indexes = self.client.get_indexes()
-        self.logger.debug(f"Got these indexes {get_indexes}")
+        test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
+
+
         result_from_prepare_mode = self.load_results_from_file()
         for index_name in self.indexes_to_test_on:
-            self.logger.debug(f"Processing index: {index_name}")
-            try:
-                doc_res_normalized = self.client.index(index_name).get_document(
-                document_id="doc1",
-                expose_facets=True)
-                self.assertEqual(doc_res_normalized["custom_vector_field_1"], "custom vector text")
-                self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
-                self._compare_results(result_from_prepare_mode, doc_res_normalized)
-            except Exception as e:
-                self.logger.error(f"Got an exception while trying to query index: {e}")
-
+            with self.subTest(index=index_name):
+                self.logger.debug(f"Processing index: {index_name}")
+                try:
+                    with self.subTest(index=index_name):
+                        doc_res_normalized = self.client.index(index_name).get_document(
+                        document_id="doc1",
+                        expose_facets=True)
+                        self.assertEqual(doc_res_normalized["custom_vector_field_1"], "custom vector text")
+                        self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
+                        self._compare_results(result_from_prepare_mode, doc_res_normalized)
+                except Exception as e:
+                    test_failures.append((index_name, str(e)))
+        # After all subtests, raise a comprehensive failure if any occurred
+        if test_failures:
+            failure_message = "\n".join([
+                f"Failure in index {idx}: {error}"
+                for idx, error in test_failures
+            ])
+            self.fail(f"Some subtests failed:\n{failure_message}")
 
     def _compare_results(self, expected_result, actual_result):
         """Compare two search results and assert if they match."""

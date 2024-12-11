@@ -100,55 +100,78 @@ class TestRecommend(BaseCompatibilityTestCase):
         Also store the search results for later comparison.
         """
         self.logger.info(f"Creating indexes {self.indexes_to_test_on}")
+        errors = []  # Collect errors to report them at the end
         self.create_indexes(self.indexes_to_test_on)
-        try:
-            self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
-            for index in self.indexes_to_test_on:
+        self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
+        for index in self.indexes_to_test_on:
+            try:
                 if index.get("type") is not None and index.get('type') == 'structured':
                     self.client.index(index_name=index['indexName']).add_documents(documents=self.docs)
                 else:
                     self.client.index(index_name=index['indexName']).add_documents(documents=self.docs,
-                                                                                   mappings=self.mappings,
-                                                                                   tensor_fields=self.tensor_fields)
-            self.logger.debug(f'Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}')
-        except Exception as e:
-            raise Exception(f"Exception occurred while adding documents") from e
+                                                                               mappings=self.mappings,
+                                                                               tensor_fields=self.tensor_fields)
+
+            except Exception as e:
+                errors.append((index, str(e)))
+
 
         all_results = {}
         # Loop through queries, search methods, and result keys to populate unstructured_results
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
-            all_results[index_name] = {}
+            try:
+                all_results[index_name] = {}
 
-            result = self.client.index(index_name).recommend(
-                documents = ["example_doc_1", "example_doc_2"],
-                limit = 10,
-                offset = 0,
-                show_highlights = True,
-                attributes_to_retrieve=["text_field", "tags", "caption"]
-            )
-            all_results[index_name] = result
+                result = self.client.index(index_name).recommend(
+                    documents = ["example_doc_1", "example_doc_2"],
+                    limit = 10,
+                    offset = 0,
+                    show_highlights = True,
+                    attributes_to_retrieve=["text_field", "tags", "caption"]
+                )
+                all_results[index_name] = result
+            except Exception as e:
+                errors.append((index, str(e)))
+        if errors:
+            failure_message = "\n".join([
+                f"Failure in index {idx}, {error}"
+                for idx, error in errors
+            ])
+            self.logger.error(f"Some subtests failed:\n{failure_message}. When the corresponding test runs for this index, it is expected to fail")
 
         # store the result of search across all structured & unstructured indexes
         self.save_results_to_file(all_results)
+        self.logger.debug(f'Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}')
 
     def test_recommender(self):
         self.logger.info(f"Running test_recommender on {self.__class__.__name__}")
         stored_results = self.load_results_from_file()
+        test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
+
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
-
-            actual_result = self.client.index(index_name).recommend(
-                documents = ["example_doc_1", "example_doc_2"],
-                limit = 10,
-                offset = 0,
-                show_highlights = True,
-                attributes_to_retrieve=["text_field", "tags", "caption"]
-            )
-            expected_result = stored_results[index_name]
-            self.logger.debug(f"Printing expected_result {expected_result}")
-            self.logger.debug(f"Printing actual_result {actual_result}")
-            self._compare_hits(expected_result, actual_result)
+            try:
+                actual_result = self.client.index(index_name).recommend(
+                    documents = ["example_doc_1", "example_doc_2"],
+                    limit = 10,
+                    offset = 0,
+                    show_highlights = True,
+                    attributes_to_retrieve=["text_field", "tags", "caption"]
+                )
+                expected_result = stored_results[index_name]
+                self.logger.debug(f"Printing expected_result {expected_result}")
+                self.logger.debug(f"Printing actual_result {actual_result}")
+                self._compare_hits(expected_result, actual_result)
+            except Exception as e:
+                test_failures.append((index_name, str(e)))
+        # After all subtests, raise a comprehensive failure if any occurred
+        if test_failures:
+            failure_message = "\n".join([
+                f"Failure in index {idx}, doc_id {doc_id}: {error}"
+                for idx, doc_id, error in test_failures
+            ])
+            self.fail(f"Some subtests failed:\n{failure_message}")
 
     def _compare_hits(self, expected_result, actual_result):
         self.assertEqual(expected_result.get("hits"), actual_result.get("hits"), f"Results do not match. Expected: {expected_result}, Got: {actual_result}")

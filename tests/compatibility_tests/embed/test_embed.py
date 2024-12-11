@@ -22,37 +22,52 @@ class TestEmbed(BaseCompatibilityTestCase):
         self.logger.info(f"Creating indexes {self.indexes_to_test_on}")
         self.create_indexes(self.indexes_to_test_on)
         all_results = {}
-        try:
-            self.logger.debug(f'Embedding documents in {self.indexes_to_test_on}')
-            for index in self.indexes_to_test_on:
+        errors = []  # Collect any errors to report them at the end
+        self.logger.debug(f'Embedding documents in {self.indexes_to_test_on}')
+        for index in self.indexes_to_test_on:
+            try:
                 all_results[index['indexName']]  = self.client.index(index_name = index['indexName']).embed(
-                    content=[
-                        "Men shoes brown",
-                        {"Large grey hat": 0.7, "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg": 0.3}
-                    ],
-                    content_type=None
-                )
-            self.logger.debug(f"Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}")
-            self.save_results_to_file(all_results)
-        except Exception as e: #TODO: This was called out as an antipattern last time - (logging & raising - fix it)
-            raise Exception(f"Exception occurred while embedding documents") from e
+                content=[
+                    "Men shoes brown",
+                    {"Large grey hat": 0.7, "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg": 0.3}
+                ],
+                content_type=None
+            )
+            except Exception as e:
+                errors.append((index['indexName'], str(e)))
+        if errors:
+            self.logger.error("\n".join(errors)) # Fail the prepare method with all collected errors
+
+        self.logger.debug(f"Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}")
+        self.save_results_to_file(all_results)
 
     def test_embed(self):
         self.logger.info(f"Running test_embed on {self.__class__.__name__}")
         stored_results = self.load_results_from_file()
+        test_failures = [] # this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
 
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
-            expected_result = stored_results[index_name]
-            actual_result = self.client.index(index_name).embed(                    content=[
-                        "Men shoes brown",
-                        {"Large grey hat": 0.7, "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg": 0.3}
-                    ],
-                    content_type=None
-            )
-            self.logger.debug(f"Printing expected result {expected_result}")
-            self.logger.debug(f"Printing actual_result {actual_result}")
-            self._compare_embed_results(expected_result, actual_result)
+            try:
+                expected_result = stored_results[index_name]
+                actual_result = self.client.index(index_name).embed(                    content=[
+                            "Men shoes brown",
+                            {"Large grey hat": 0.7, "https://marqo-assets.s3.amazonaws.com/tests/images/image1.jpg": 0.3}
+                        ],
+                        content_type=None
+                )
+                self.logger.debug(f"Printing expected result {expected_result}")
+                self.logger.debug(f"Printing actual_result {actual_result}")
+                self._compare_embed_results(expected_result, actual_result)
+
+            except Exception as e:
+                test_failures.append((index_name, str(e)))
+            if test_failures:
+                failure_message = "\n".join([
+                    f"Failure in index {idx}, {error}"
+                    for idx, error in test_failures
+                ])
+
 
 
 

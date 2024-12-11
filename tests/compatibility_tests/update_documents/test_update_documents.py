@@ -50,27 +50,41 @@ class TestUpdateDocuments(BaseCompatibilityTestCase):
         self.logger.info(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
         self.create_indexes(self.indexes_to_test_on)
 
-        try:
-            self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
-            for index in self.indexes_to_test_on:
+        self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
+        for index in self.indexes_to_test_on:
+            index_name = index['indexName']
+            with self.subTest(indexName = index_name):
                 if index.get("type") is not None and index.get('type') == 'structured':
                     self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs)
                 else:
                     self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs, mappings = self.mappings, tensor_fields = self.tensor_fields)
 
-        except Exception as e:
-            raise Exception(f"Exception occurred while adding documents to index") from e
-
     def test_update_doc(self):
         self.logger.info(f"Running test_update_doc on {self.__class__.__name__}")
 
-        result = self.client.index(self.structured_index_name).update_documents(
-            [{"_id": "1", "label": "person"}, {"_id": "2", "label": "plane"}]
-        )
-        self.logger.debug(f"Printing result {result}")
-        assert result["index_name"] == self.structured_index_name
-        assert len(result["items"]) == 2
-        assert result["errors"] == False
-        for item in result["items"]:
-            if item["_id"] in {"1", "2"}:
-                assert item["status"] == 200
+        test_failures = [] # this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
+
+        for index in self.indexes_to_test_on:
+            index_name = index['indexName']
+            try:
+                with self.subTest(indexName = index_name):
+                    result = self.client.index(index_name).update_documents(
+                        [{"_id": "1", "label": "person"}, {"_id": "2", "label": "plane"}]
+                    )
+                    self.logger.debug(f"Printing result {result}")
+                    assert result["index_name"] == self.structured_index_name
+                    assert len(result["items"]) == 2
+                    assert result["errors"] == False
+                    for item in result["items"]:
+                        if item["_id"] in {"1", "2"}:
+                            assert item["status"] == 200
+            except Exception as e:
+                test_failures.append((index_name, str(e)))
+
+        # After all subtests, raise a comprehensive failure if any occurred
+        if test_failures:
+            failure_message = "\n".join([
+                f"Failure in index {idx}, {error}"
+                for idx, error in test_failures
+            ])
+            self.fail(f"Some subtests failed:\n{failure_message}")

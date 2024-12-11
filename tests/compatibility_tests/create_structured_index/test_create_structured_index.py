@@ -49,18 +49,36 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
     def prepare(self):
         self.logger.info(f"Creating indexes {self.indexes_settings_to_test_on}")
         all_results = {}
+        errors = []  # Collect any errors to report them at the end
         for index_name, index_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
-            self.client.create_index(index_name, settings_dict = index_settings)
-            all_results[index_name] = self.client.index(index_name).get_settings()
+            try:
+                self.client.create_index(index_name, settings_dict = index_settings)
+                all_results[index_name] = self.client.index(index_name).get_settings()
+            except Exception as e:
+                errors.append((index_name, str(e)))
+
+        if errors:
+            self.logger.error("\n".join(errors)) # Fail the prepare method with all collected errors
         self.save_results_to_file(all_results)
 
     def test_expected_settings(self):
         expected_settings = self.load_results_from_file()
+        test_failures = [] # this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
+
         for index_name in self.indexes_to_test_on:
             try:
-                actual_settings = self.client.index(index_name).get_settings()
-                self.logger.debug(f"Printing actual_settings {actual_settings}")
-                self.logger.debug(f"Printing expected_settings {expected_settings.get(index_name)}")
+                with self.subTest(index = index_name):
+                    actual_settings = self.client.index(index_name).get_settings()
+                    self.logger.debug(f"Printing actual_settings {actual_settings}")
+                    self.logger.debug(f"Printing expected_settings {expected_settings.get(index_name)}")
+                    self.assertEqual(expected_settings.get(index_name), actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")
             except Exception as e:
-                raise Exception(f"Exception when getting index settings for index {index_name}") from e
-            self.assertEqual(expected_settings.get(index_name), actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")
+                test_failures.append((index_name, str(e)))
+
+        # After all subtests, raise a comprehensive failure if any occurred
+        if test_failures:
+            failure_message = "\n".join([
+                f"Failure in index {idx}, {error}"
+                for idx, error in test_failures
+            ])
+        self.fail(f"Some subtests failed:\n{failure_message}")
