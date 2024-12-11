@@ -500,7 +500,9 @@ class TestAddDocumentsStructured(MarqoTestCase):
                     )
                 ).dict(exclude_none=True, by_alias=True)
                 assert add_res['errors'] is True
-                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert all(['error' in item for item in add_res['items']])
+                assert all(['All list elements must be of the same type and that type must be int, float or string'
+                            in item['message'] for item in add_res['items']])
 
     def test_add_documents_set_device(self):
         """

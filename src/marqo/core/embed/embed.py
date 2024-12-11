@@ -29,6 +29,7 @@ class Embed:
         self.default_device = default_device
 
     @pydantic.validator('default_device')
+    # TODO [Refactoring device logic] deprecate default_device since it's not used
     def validate_default_device(cls, value):
         if not value:
             raise ValueError("Default Device cannot be 'None'. Marqo default device must have been declared upon startup.")
@@ -66,6 +67,7 @@ class Embed:
         )
         
         # Set default device if not provided
+        # TODO [Refactoring device logic] use device info gathered from device manager
         if device is None:
             device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
 

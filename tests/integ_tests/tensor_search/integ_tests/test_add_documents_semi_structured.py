@@ -322,7 +322,10 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.tags_ = [
             [{"_id": "to_fail_123", "tags": ["wow", "this", False]}],
             [{"_id": "to_fail_124", "tags": [1, None, 3]}],
-            [{"_id": "to_fail_125", "tags": [{}]}]
+            [{"_id": "to_fail_125", "tags": [{}]}],
+            [{"_id": "to_fail_126", "tags": [1, 2, 3]}],
+            [{"_id": "to_fail_127", "tags": [1.0, 2.0, 3.0]}],
+            [{"_id": "to_fail_128", "tags": [1, 2.0, 3]}],
         ]
         bad_doc_args = self.tags_
         for bad_doc_arg in bad_doc_args:
@@ -336,7 +339,9 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                     )
                 ).dict(exclude_none=True, by_alias=True)
                 assert add_res['errors'] is True
-                assert all(['error' in item for item in add_res['items'] if item['_id'].startswith('to_fail')])
+                assert all(['error' in item for item in add_res['items']])
+                assert all(['Unstructured Marqo index only supports string lists.' in item['message']
+                            for item in add_res['items']])
 
     def test_add_documents_set_device(self):
         """

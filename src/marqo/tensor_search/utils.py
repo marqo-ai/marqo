@@ -88,6 +88,7 @@ def construct_authorized_url(url_base: str, username: str, password: str) -> str
 
 
 def check_device_is_available(device: str) -> bool:
+    # TODO [Refactoring device logic] move this logic to device manager
     """Checks if a device is available on the machine
 
     Args:
@@ -341,6 +342,7 @@ def generate_batches(seq: Sequence, batch_size: int):
 
 
 def get_best_available_device() -> str:
+    # TODO [Refactoring device logic] replace this with device manager
     """Get the best available device for Marqo to use and validate it."""
     device = read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
     if device is None or not check_device_is_available(device):

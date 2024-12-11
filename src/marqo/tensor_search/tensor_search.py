@@ -1557,6 +1557,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     if verbose:
         print(f"determined_search_method: {search_method}, text query: {text}")
 
+    # TODO [Refactoring device logic] use device info gathered from device manager
     if device is None:
         selected_device = utils.read_env_vars_and_defaults("MARQO_BEST_AVAILABLE_DEVICE")
         if selected_device is None:
@@ -2263,6 +2264,7 @@ def eject_model(model_name: str, device: str) -> dict:
     return result
 
 
+# TODO [Refactoring device logic] move to device manager
 def get_cpu_info() -> dict:
     return {
         "cpu_usage_percent": f"{psutil.cpu_percent(1)} %",  # The number 1 is a time interval for CPU usage calculation.

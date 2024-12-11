@@ -47,7 +47,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
         # Add documents
-        self.logger.debug(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
+        self.logger.info(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
         self.create_indexes([self.index_metadata])
 
         try:
@@ -66,7 +66,10 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                         "_id": "doc2"
                     }
                 ])
+
+            result = self.client.index(index_name = self.text_index_with_normalize_embeddings_true).get_document(document_id="doc1", expose_facets=True)
             self.logger.debug(f"Added documents to index: {add_docs_res_normalized}")
+            self.save_results_to_file(result)
             self.logger.debug(f'Ran prepare mode test for {self.text_index_with_normalize_embeddings_true} inside test class {self.__class__.__name__}')
         except Exception as e:
             self.logger.error(f"Exception occurred while adding documents {e}")
@@ -76,7 +79,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
         # This runs on to_version
         get_indexes = self.client.get_indexes()
         self.logger.debug(f"Got these indexes {get_indexes}")
-
+        result_from_prepare_mode = self.load_results_from_file()
         for index_name in self.indexes_to_test_on:
             self.logger.debug(f"Processing index: {index_name}")
             try:
@@ -85,6 +88,11 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                 expose_facets=True)
                 self.assertEqual(doc_res_normalized["custom_vector_field_1"], "custom vector text")
                 self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
-                self.assertEqual(doc_res_normalized['_tensor_facets'][0]['_embedding'], self.expected_custom_vector_after_normalization)
+                self._compare_results(result_from_prepare_mode, doc_res_normalized)
             except Exception as e:
                 self.logger.error(f"Got an exception while trying to query index: {e}")
+
+
+    def _compare_results(self, expected_result, actual_result):
+        """Compare two search results and assert if they match."""
+        self.assertEqual(expected_result, actual_result, f"Results do not match. Expected: {expected_result}, Got: {actual_result}")

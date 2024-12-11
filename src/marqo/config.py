@@ -2,6 +2,7 @@ from typing import Optional, Union
 
 from kazoo.handlers.threading import KazooTimeoutError
 
+from marqo.core.inference.device_manager import DeviceManager
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.core.document.document import Document
 from marqo.core.embed.embed import Embed
@@ -39,6 +40,7 @@ class Config:
 
         self.timeout = timeout
         self.backend = backend if backend is not None else enums.SearchDb.vespa
+        # TODO [Refactoring device logic] deprecate default_device since it's not used
         self.default_device = default_device if default_device is not None else (
             utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE))
 
@@ -52,6 +54,7 @@ class Config:
         self.document = Document(vespa_client, self.index_management)
         self.recommender = Recommender(vespa_client, self.index_management)
         self.embed = Embed(vespa_client, self.index_management, self.default_device)
+        self.device_manager = DeviceManager()
 
     def set_is_remote(self, vespa_client: VespaClient):
         local_host_markers = ["localhost", "0.0.0.0", "127.0.0.1"]

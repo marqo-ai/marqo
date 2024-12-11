@@ -5,6 +5,7 @@ import typing
 
 
 def validate_api_device_string(device: typing.Optional[str]) -> typing.Optional[str]:
+    # TODO [Refactoring device logic] move this logic to device manager
     """Validates a device which is an API parameter
 
     Args:
@@ -47,6 +48,7 @@ def validate_api_device_string(device: typing.Optional[str]) -> typing.Optional[
 
 
 async def validate_device(device: typing.Optional[str] = None) -> typing.Optional[str]:
+    # TODO [Refactoring device logic] move this logic to device manager
     """Translates and validates the device string. Checks if the requested
     device is available.
 
