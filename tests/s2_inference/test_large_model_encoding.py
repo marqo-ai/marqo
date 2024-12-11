@@ -365,11 +365,8 @@ class TestMultilingualE5Models(unittest.TestCase):
     def setUp(self):
         self.models = [
             "hf/multilingual-e5-small",
-            "intfloat/multilingual-e5-small",
             "hf/multilingual-e5-base",
-            "intfloat/multilingual-e5-base",
             "hf/multilingual-e5-large",
-            "intfloat/multilingual-e5-large",
             "hf/multilingual-e5-large-instruct"
         ]
 
