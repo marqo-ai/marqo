@@ -233,6 +233,9 @@ class VespaLocalMultiNode:
 
     @classmethod
     def start(cls, number_of_shards, number_of_replicas):
+        if not os.path.exists("multinode"):
+            os.makedirs("multinode")
+
         # Generate the docker compose file
         VespaLocalMultiNode.generate_docker_compose(
             number_of_shards=number_of_shards,

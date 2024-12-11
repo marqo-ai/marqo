@@ -224,6 +224,7 @@ class VespaClient:
             'hits': hits,
             'ranking': ranking,
             'model.restrict': model_restrict,
+            # 'model.searchPath': '0/0',
             **query_features_list,
             **kwargs
         }
