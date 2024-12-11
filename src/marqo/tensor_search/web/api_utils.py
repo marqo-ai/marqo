@@ -10,6 +10,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 
 
 def translate_api_device(device: Optional[str]) -> Optional[str]:
+    # TODO [Refactoring device logic] move this logic to device manager
     """Translates an API device as given through the API into an internal enum.
 
     Args:

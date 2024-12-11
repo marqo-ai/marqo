@@ -1515,6 +1515,6 @@ class TestSearchUnstructured(MarqoTestCase):
         if failed_characters:
             print(f"\nFailed characters (4XX or 500 errors): {failed_characters}")
 
-        # Assert that " is the only failed character
-        self.assertEqual(failed_characters, ['"'], 
-                         f"Expected only double quote to fail, but got: {failed_characters}")
+        # Assert that no characters fail
+        self.assertEqual(failed_characters, [],
+                         f"Expected no characters to fail, but got: {failed_characters}")

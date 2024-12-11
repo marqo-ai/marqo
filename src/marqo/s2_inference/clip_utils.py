@@ -18,11 +18,16 @@ from torchvision.transforms import InterpolationMode
 
 from marqo import marqo_docs
 from marqo.api.exceptions import InternalError
+from marqo.tensor_search.enums import EnvVars
+from marqo.core.inference.embedding_models.abstract_clip_model import AbstractCLIPModel
+from marqo.core.inference.embedding_models.open_clip_model_properties import OpenCLIPModelProperties, ImagePreprocessor
 from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError, ImageDownloadError
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.types import *
+from marqo.s2_inference.types import Modality
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search.enums import ModelProperties, InferenceParams
 from marqo.tensor_search.models.private_models import ModelLocation
 from marqo.tensor_search.telemetry import RequestMetrics
@@ -145,19 +150,25 @@ def validate_url(url: str) -> bool:
 
 
 
-def download_image_from_url(image_path: str, media_download_headers: dict, timeout_ms: int = 3000) -> BytesIO:
+
+def download_image_from_url(image_path: str, media_download_headers: dict, timeout_ms: int = 3000, modality: Optional[str] = None) -> BytesIO:
     """Download an image from a URL and return a PIL image using pycurl.
+
+    For video/audio files, we check the file size during download rather than making a separate HEAD request upfront.
+    While checking Content-Length beforehand is possible, it would add latency to every request. Since most files
+    are expected to be under the size limit, we optimize for the common case by checking size during download.
 
     Args:
         image_path (str): URL to the image.
         media_download_headers (dict): Headers for the image download.
         timeout_ms (int): Timeout in milliseconds, for the whole request.
+        modality (Optional[str]): Type of media being downloaded ('video', 'audio', or None)
 
     Returns:
         buffer (BytesIO): The image as a BytesIO object.
 
     Raises:
-        ImageDownloadError: If the image download fails.
+        ImageDownloadError: If the image download fails or exceeds size limit for video/audio.
     """
 
     if not isinstance(timeout_ms, int):
@@ -166,7 +177,7 @@ def download_image_from_url(image_path: str, media_download_headers: dict, timeo
     try:
         encoded_url = encode_url(image_path)
     except UnicodeEncodeError as e:
-        raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the media url {image_path}. "
                                  f"The url could not be encoded properly. Original error: {e}")
     buffer = BytesIO()
     c = pycurl.Curl()
@@ -182,15 +193,31 @@ def download_image_from_url(image_path: str, media_download_headers: dict, timeo
     headers.update(media_download_headers)
     c.setopt(pycurl.HTTPHEADER, [f"{k}: {v}" for k, v in headers.items()])
 
+    # callback to check file size for video and audio
+    if modality in [Modality.VIDEO, Modality.AUDIO]:
+        max_size = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_SEARCH_VIDEO_AUDIO_FILE_SIZE)
+        def progress(download_total, downloaded, upload_total, uploaded):
+            if downloaded > max_size:
+                return 1
+        c.setopt(pycurl.NOPROGRESS, False)
+        c.setopt(pycurl.XFERINFOFUNCTION, progress)
+
     try:
         c.perform()
         if c.getinfo(pycurl.RESPONSE_CODE) != 200:
-            raise ImageDownloadError(f"image url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}")
+            raise ImageDownloadError(f"media url `{image_path}` returned {c.getinfo(pycurl.RESPONSE_CODE)}")
     except pycurl.error as e:
-        raise ImageDownloadError(f"Marqo encountered an error when downloading the image url {image_path}. "
-                                 f"The original error is: {e}")
+        error_message = str(e)
+        if len(e.args) > 0:
+            error_code = e.args[0]
+            if error_code == pycurl.E_ABORTED_BY_CALLBACK:
+                error_message = f"Media file `{image_path}` exceeds the maximum allowed size for {modality}."
+        raise ImageDownloadError(f"Marqo encountered an error when downloading the media url {image_path}. "
+                                 f"The original error is: {error_message}")
+
     finally:
         c.close()
+        
     buffer.seek(0)
     return buffer
 

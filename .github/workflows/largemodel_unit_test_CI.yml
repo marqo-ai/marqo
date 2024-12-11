@@ -7,16 +7,18 @@ on:
   push:
     branches:
       - mainline
+      - releases/*
     paths-ignore:
       - '**.md'
-  pull_request_target:
+  pull_request:
     branches:
       - mainline
+      - releases/*
     paths-ignore:
       - '**.md'
 
 concurrency:
-  group: large-model-unit-tests-${{ github.head_ref || github.ref }}
+  group: large-model-unit-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -68,10 +70,10 @@ jobs:
           fetch-depth: 0
           path: marqo
 
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
-          python-version: "3.8"
+          python-version: "3.9"
           cache: "pip"
 
       - name: Checkout marqo-base for requirements
@@ -82,10 +84,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements.txt
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # override base requirements with marqo requirements, if needed: 
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
+
+      - name: Download nltk data
+        run: |
+            python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
         run: |
@@ -157,7 +163,7 @@ jobs:
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
           export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests --largemodel --ignore=marqo/tests/test_documentation.py
+          pytest marqo/tests --largemodel --ignore=marqo/tests/test_documentation.py --ignore=marqo/tests/backwards_compatibility_tests 
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner

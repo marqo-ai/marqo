@@ -1,3 +1,45 @@
+# Release 2.14.0 
+
+## New features
+
+- FFmpeg-CUDA Support ([#1030](https://github.com/marqo-ai/marqo/pull/1030)).   Add GPU acceleration for video decoding by integrating FFmpeg with CUDA support.
+This feature significantly improves video processing performance, making video handling up to 5 times faster. Check [here](https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/#marqo-video-gpu-acceleration-configuration) for guidance and requirements.
+
+- Video and audio file size limits ([#1012](https://github.com/marqo-ai/marqo/pull/1012)). Introduce configurable size limits for video and audio files in the add_documents, search, and embed endpoints. This enhancement allows users to manage and optimize resource usage effectively, ensuring smoother processing of multimedia content. Check [here](https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/#configuring-usage-limits) for more details. 
+
+- Upgrade to Python 3.9 ([#1006](https://github.com/marqo-ai/marqo/pull/1006)).
+Upgrade the Marqo Docker image to use Python 3.9. With Python 3.8 reaching its End of Life (EOL), we have upgraded our platform to Python 3.9 to maintain security, compatibility, and access to ongoing support.
+
+
+## Bug fixes and minor changes
+
+- Move NLTK resource downloads to Marqo's startup process and remove the unsafe punkt package. This avoids potential code start issues and enhances security ([#1040](https://github.com/marqo-ai/marqo/pull/1040)).
+
+- Fix model serialization in OpenAPI specifications. This community-contributed PR resolves issues with OpenAPI spec generation and SwaggerUI by fixing incorrect type hints in the API definition, ensuring accurate model serialization and improving API documentation accessibility ([#986](https://github.com/marqo-ai/marqo/pull/986)). 
+
+- Add brief description for each endpoint in the OpenAPI specifications. This improves API documentation clarity for users ([#1042](https://github.com/marqo-ai/marqo/pull/1042)).
+
+## Contributor shout-out
+- Shoutouts to our valuable 4.7k stargazers!
+- Thanks a lot for the heated discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+- Special thanks to community contributor [@gabauer](https://github.com/gabauer) for their impactful PR, helping improve Marqo for everyone!
+
+# Release 2.13.2
+
+## Bug fixes and minor changes
+
+- Fix a bug where adding documents with numeric lists to an unstructured index results in a 500 error. Now, Marqo successfully processes the document batch, and returns a 400 error only for individual documents that contain numeric lists([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Fix validation of custom vector fields. Custom vector fields were silently ignored when not specified as tensor fields for an unstructured index. This will now trigger a 400 error. This helps guide users to properly define the field as a tensor field([1034](https://github.com/marqo-ai/marqo/pull/1034)).
+- Improve the bootstrapping process to prevent Marqo from crashing during startup when the vector store takes longer to converge, especially with multiple indexes. This ensures a smoother startup process even if the vector store takes time to fully initialize([1036](https://github.com/marqo-ai/marqo/pull/1036)).
+
+# Release 2.13.1
+
+## Bug fixes and minor changes
+
+- Fix a bug where Marqo returns a 500 error if an inaccessible private image is encountered in the query or embed endpoint. Marqo now correctly returns a 400 error with a helpful error message ([1027](https://github.com/marqo-ai/marqo/pull/1027)).
+- Fix a bug preventing Marqo from warming up Languagebind models. Marqo now successfully warms up Languagebind models as expected ([1031](https://github.com/marqo-ai/marqo/pull/1031)).
+- Fix a bug where Languagebind models always generate normalized embeddings for non-text content. These models now correctly produce unnormalized embeddings for video, audio, and image content ([1032](https://github.com/marqo-ai/marqo/pull/1032)).
+
 # Release 2.13.0
 
 ## New features

@@ -267,6 +267,7 @@ class VespaLocalMultiNode:
         here = os.path.dirname(os.path.abspath(__file__))
         os.system(f'vespa deploy "{here}"')
 
+
 def container_exists(container_name):
     client = docker.from_env()
     try:

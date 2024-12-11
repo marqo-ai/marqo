@@ -154,6 +154,7 @@ class Monitoring:
         )
 
     def get_cuda_info(self) -> MarqoCudaInfoResponse:
+        # TODO [Refactoring device logic] move this logic to device manager
         """A function to get information about the CUDA devices on the machine
 
         Returns:
