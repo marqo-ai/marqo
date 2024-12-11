@@ -46,9 +46,10 @@ class TestEncoding(unittest.TestCase):
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
         names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
-                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small", "intfloat/multilingual-e5-large", "intfloat/e5-large-v2",
+                    "intfloat/e5-small-v2", "intfloat/multilingual-e5-base"]
 
-        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5", "BAAI/bge-base-en-v1.5"]
+        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5", "BAAI/bge-base-en-v1.5",  "BAAI/bge-large-en-v1.5"]
 
         # TODO: Re-add snowflake models when HF pooling issue is resolved
         # names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
@@ -78,15 +79,13 @@ class TestEncoding(unittest.TestCase):
 
                         output_m = model.encode(sentence, normalize=True)
 
-                        print(f"Printing output_m for name: {name}, sentence: {sentence}. Output_m: {output_m}")
-
                         # Embeddings must match hardcoded python 3.8.20 embeddings
                         if isinstance(sentence, str):
                             with self.subTest("Hardcoded Python 3.8 Embeddings Comparison"):
                                 try:
                                     self.assertEqual(np.allclose(output_m, embeddings_python_3_8[name][sentence],
                                                                  atol=1e-6),
-                                                 True)
+                                                 True, f"Calculated embeddings do not match hardcoded embeddings for model: {name}, sentence: {sentence}. Printing output: {output_m}")
                                 except KeyError:
                                     raise KeyError(f"Hardcoded Python 3.8 embeddings not found for "
                                                    f"model: {name}, sentence: {sentence} in JSON file: "
@@ -305,8 +304,8 @@ class TestEncoding(unittest.TestCase):
                  "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5",
                   "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
-                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
+                    "hf/multilingual-e5-small"]
         names += names_e5
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]

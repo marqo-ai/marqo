@@ -324,7 +324,7 @@ def _get_open_clip_properties() -> Dict:
                                                          'note': 'open_clip models',
                                                          'type': 'open_clip',
                                                          'pretrained': 'laion2b_s12b_b32k'},
-        'Marqo/roberta-ViT-B-32.laion2b_s12b_b32k': {'name': 'hfhub:laion/CLIP-ViT-B-32-roberta-base-laion2B-s12B-b32k/',
+        'Marqo/roberta-ViT-B-32.laion2b_s12b_b32k': {'name': 'hf-hub:laion/CLIP-ViT-B-32-roberta-base-laion2B-s12B-b32k',
                                                          'dimensions': 512,
                                                          'note': 'open_clip models',
                                                          'type': 'open_clip',
@@ -336,7 +336,7 @@ def _get_open_clip_properties() -> Dict:
             'type': 'open_clip',
             'pretrained': 'laion5b_s13b_b90k'},
         'Marqo/xlm-roberta-base-ViT-B-32.laion5b_s13b_b90k': {
-            'name': 'hf_hub:laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k/',
+            'name': 'hf-hub:laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k',
             'dimensions': 512,
             'note': 'open_clip models',
             'type': 'open_clip',
@@ -348,7 +348,7 @@ def _get_open_clip_properties() -> Dict:
             'type': 'open_clip',
             'pretrained': 'frozen_laion5b_s13b_b90k'},
         'Marqo/xlm-roberta-large-ViT-H-14.frozen_laion5b_s13b_b90k': {
-            'name': 'hf_hub:laion/CLIP-ViT-H-14-frozen-xlm-roberta-large-laion5B-s13B-b90k/',
+            'name': 'hf-hub:laion/CLIP-ViT-H-14-frozen-xlm-roberta-large-laion5B-s13B-b90k',
             'dimensions': 1024,
             'note': 'open_clip models',
             'type': 'open_clip',
