@@ -336,7 +336,7 @@ def _get_open_clip_properties() -> Dict:
             'type': 'open_clip',
             'pretrained': 'laion5b_s13b_b90k'},
         'Marqo/xlm-roberta-base-ViT-B-32.laion5b_s13b_b90k': {
-            'name': 'hf-hub:laion/CLIP-ViT-B-32-xlm-roberta-base-laion5B-s13B-b90k',
+            'name': 'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
             'dimensions': 512,
             'note': 'open_clip models',
             'type': 'open_clip',
