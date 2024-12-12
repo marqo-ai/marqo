@@ -1,208 +1,93 @@
-# """Abstractions for Multimodal Models"""
-#
-# import requests
-# from contextlib import contextmanager
-# import tempfile
-# import os
-# import validators
-# import magic
-# import io
-#
-# from pydantic import BaseModel
-# from abc import ABC, abstractmethod
-# from typing import List, Dict, Any, Union, Optional
-# from PIL.Image import Image
-# import torch
-# from urllib.parse import quote
-# from marqo.core.inference.image_download import DEFAULT_HEADERS
-#
-#
-# from marqo.s2_inference.multimodal_model_load import *
-# from marqo.s2_inference.languagebind import (
-#     LanguageBind,
-#     LanguageBindVideoProcessor, LanguageBindAudioProcessor, LanguageBindImageProcessor,
-#     to_device
-# )
-# from marqo.s2_inference.errors import MediaDownloadError
-# from marqo.core.inference.image_download import encode_url
-# from marqo.s2_inference.clip_utils import download_image_from_url, validate_url
-# from marqo.s2_inference.languagebind.image.tokenization_image import LanguageBindImageTokenizer
-# from marqo.s2_inference.languagebind.video.tokenization_video import LanguageBindVideoTokenizer
-# from marqo.s2_inference.languagebind.audio.tokenization_audio import LanguageBindAudioTokenizer
-# from marqo.s2_inference.configs import ModelCache
-# from marqo.s2_inference.types import Modality
-#
-#
-# class MultimodalModelProperties(BaseModel):
-#     name: str
-#     loader: str
-#     supported_modalities: List[Modality]
-#     dimensions: int
-#     type: str = "multimodal"
-#     video_chunk_length: int  # in seconds
-#     audio_chunk_length: int  # in seconds
-#
-#
-# class MultimodalModel:
-#     def __init__(self, model_name: str, model_properties: Dict[str, Any], device: str):
-#         self.model_name = model_name
-#         self.properties = MultimodalModelProperties(**model_properties)
-#         self.device = device
-#         self.model = None
-#         self.encoder = None
-#
-#     def _load_multimodal_model(self):
-#         if self.properties.loader == "languagebind":
-#             model = self._load_languagebind_model()
-#             return model
-#
-#         elif self.properties.loader == "imagebind":
-#             # Load ImageBind model
-#             pass
-#         else:
-#             raise ValueError(f"Unsupported loader: {self.properties.loader}")
-#
-#     def _load_languagebind_model(self):
-#         if self.model_name == "LanguageBind/Video_V1.5_FT_Audio_FT_Image":
-#             self.clip_type = {
-#                 'video': 'LanguageBind_Video_V1.5_FT',
-#                 'audio': 'LanguageBind_Audio_FT',
-#                 'image': 'LanguageBind_Image',
-#             }
-#         elif self.model_name == "LanguageBind/Video_V1.5_FT_Audio_FT":
-#             self.clip_type = {
-#                 'video': 'LanguageBind_Video_V1.5_FT',
-#                 'audio': 'LanguageBind_Audio_FT',
-#             }
-#         elif self.model_name == "LanguageBind/Video_V1.5_FT_Image":
-#             self.clip_type = {
-#                 'video': 'LanguageBind_Video_V1.5_FT',
-#                 'image': 'LanguageBind_Image',
-#             }
-#         elif self.model_name == "LanguageBind/Audio_FT_Image":
-#             self.clip_type = {
-#                 'audio': 'LanguageBind_Audio_FT',
-#                 'image': 'LanguageBind_Image',
-#             }
-#         elif self.model_name == "LanguageBind/Audio_FT":
-#             self.clip_type = {
-#                 'audio': 'LanguageBind_Audio_FT',
-#             }
-#         elif self.model_name == "LanguageBind/Video_V1.5_FT":
-#             self.clip_type = {
-#                 'video': 'LanguageBind_Video_V1.5_FT',
-#             }
-#         else:
-#             raise ValueError(f"Unsupported LanguageBind model: {self.model_name}")
-#         model = LanguageBind(clip_type=self.clip_type, cache_dir=ModelCache.languagebind_cache_path).to(self.device)
-#         model.eval()
-#         return model
-#
-#     def preprocessor(self, modality):
-#         if self.encoder is None:
-#             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
-#         return self.encoder.preprocessor(modality)
-#
-#     def encode(self, content, modality, media_download_headers: Optional[Dict]=None, normalize=True, **kwargs):
-#         if self.encoder is None:
-#             raise ValueError("Model has not been loaded yet. Call _load_model() first.")
-#         return self.encoder.encode(
-#             content=content, modality=modality, media_download_headers=media_download_headers,
-#             normalize=normalize, **kwargs
-#         )
-#
-#
-# class ModelEncoder(ABC):
-#     @abstractmethod
-#     def encode(self, content, modality, media_download_headers, **kwargs):
-#         pass
-#
-#
-# class DefaultEncoder(ModelEncoder):
-#     def __init__(self, model):
-#         self.model = model
-#
-#     def encode(self, content, modality, media_download_headers, **kwargs):
-#         return self.model.encode(content, modality=modality, media_download_headers=media_download_headers, **kwargs)
-#
-#
-# @contextmanager
-# def fetch_content_sample(url, media_download_headers: Optional[dict] = None, sample_size=10240):  # 10 KB
-#     # It's ok to pass None to requests.get() for headers and it won't change the default headers
-#     """Fetch a sample of the content from the URL.
-#
-#     Raises:
-#         HTTPError: If the response status code is not 200
-#     """
-#     response = requests.get(url, stream=True, headers=media_download_headers)
-#     response.raise_for_status()
-#     buffer = io.BytesIO()
-#     try:
-#         for chunk in response.iter_content(chunk_size=min(sample_size, 8192)):
-#             buffer.write(chunk)
-#             if buffer.tell() >= sample_size:
-#                 break
-#         buffer.seek(0)
-#         yield buffer
-#     finally:
-#         buffer.close()
-#         response.close()
-#
-#
-# def infer_modality(content: Union[str, List[str], bytes], media_download_headers: Optional[dict] = None) -> Modality:
-#     """
-#     Infer the modality of the content. Video, audio, image or text.
-#     """
-#     if isinstance(content, str):
-#         if not validate_url(content):
-#             return Modality.TEXT
-#
-#         # Encode the URL
-#         encoded_url = encode_url(content)
-#         extension = encoded_url.split('.')[-1].lower()
-#         if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
-#             return Modality.IMAGE
-#         elif extension in ['mp4', 'avi', 'mov']:
-#             return Modality.VIDEO
-#         elif extension in ['mp3', 'wav', 'ogg']:
-#             return Modality.AUDIO
-#         if validate_url(encoded_url):
-#             # Use context manager to handle content sample
-#             try:
-#                 with fetch_content_sample(encoded_url, media_download_headers) as sample:
-#                     mime = magic.from_buffer(sample.read(), mime=True)
-#                     if mime.startswith('image/'):
-#                         return Modality.IMAGE
-#                     elif mime.startswith('video/'):
-#                         return Modality.VIDEO
-#                     elif mime.startswith('audio/'):
-#                         return Modality.AUDIO
-#             except requests.exceptions.RequestException as e:
-#                 raise MediaDownloadError(f"Error downloading media file {content}: {e}") from e
-#             except magic.MagicException as e:
-#                 raise MediaDownloadError(f"Error determining MIME type for {encoded_url}: {e}") from e
-#             except IOError as e:
-#                 raise MediaDownloadError(f"IO error while processing {encoded_url}: {e}") from e
-#
-#         return Modality.TEXT
-#
-#     elif isinstance(content, bytes):
-#         # Use python-magic for byte content
-#         mime = magic.from_buffer(content, mime=True)
-#         if mime.startswith('image/'):
-#             return Modality.IMAGE
-#         elif mime.startswith('video/'):
-#             return Modality.VIDEO
-#         elif mime.startswith('audio/'):
-#             return Modality.AUDIO
-#         else:
-#             return Modality.TEXT
-#
-#     else:
-#         return Modality.TEXT
-#
-#
-#
+"""Abstractions for Multimodal Models"""
+
+import io
+from contextlib import contextmanager
+from typing import Optional, Union, List
+
+import magic
+import requests
+
+from marqo.core.inference.image_download import encode_url
+from marqo.s2_inference.clip_utils import validate_url
+from marqo.s2_inference.errors import MediaDownloadError
+from marqo.s2_inference.types import Modality
+
+
+@contextmanager
+def fetch_content_sample(url, media_download_headers: Optional[dict] = None, sample_size=10240):  # 10 KB
+    # It's ok to pass None to requests.get() for headers and it won't change the default headers
+    """Fetch a sample of the content from the URL.
+
+    Raises:
+        HTTPError: If the response status code is not 200
+    """
+    response = requests.get(url, stream=True, headers=media_download_headers)
+    response.raise_for_status()
+    buffer = io.BytesIO()
+    try:
+        for chunk in response.iter_content(chunk_size=min(sample_size, 8192)):
+            buffer.write(chunk)
+            if buffer.tell() >= sample_size:
+                break
+        buffer.seek(0)
+        yield buffer
+    finally:
+        buffer.close()
+        response.close()
+
+
+def infer_modality(content: Union[str, List[str], bytes], media_download_headers: Optional[dict] = None) -> Modality:
+    """
+    Infer the modality of the content. Video, audio, image or text.
+    """
+    if isinstance(content, str):
+        if not validate_url(content):
+            return Modality.TEXT
+
+        # Encode the URL
+        encoded_url = encode_url(content)
+        extension = encoded_url.split('.')[-1].lower()
+        if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+            return Modality.IMAGE
+        elif extension in ['mp4', 'avi', 'mov']:
+            return Modality.VIDEO
+        elif extension in ['mp3', 'wav', 'ogg']:
+            return Modality.AUDIO
+        if validate_url(encoded_url):
+            # Use context manager to handle content sample
+            try:
+                with fetch_content_sample(encoded_url, media_download_headers) as sample:
+                    mime = magic.from_buffer(sample.read(), mime=True)
+                    if mime.startswith('image/'):
+                        return Modality.IMAGE
+                    elif mime.startswith('video/'):
+                        return Modality.VIDEO
+                    elif mime.startswith('audio/'):
+                        return Modality.AUDIO
+            except requests.exceptions.RequestException as e:
+                raise MediaDownloadError(f"Error downloading media file {content}: {e}") from e
+            except magic.MagicException as e:
+                raise MediaDownloadError(f"Error determining MIME type for {encoded_url}: {e}") from e
+            except IOError as e:
+                raise MediaDownloadError(f"IO error while processing {encoded_url}: {e}") from e
+
+        return Modality.TEXT
+
+    elif isinstance(content, bytes):
+        # Use python-magic for byte content
+        mime = magic.from_buffer(content, mime=True)
+        if mime.startswith('image/'):
+            return Modality.IMAGE
+        elif mime.startswith('video/'):
+            return Modality.VIDEO
+        elif mime.startswith('audio/'):
+            return Modality.AUDIO
+        else:
+            return Modality.TEXT
+
+    else:
+        return Modality.TEXT
+
 # class LanguageBindEncoder(ModelEncoder):
 #     def __init__(self, model: MultimodalModel):
 #         self.model = model
