@@ -240,7 +240,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
         Returns:
             A dictionary containing the preprocessed image tensors in the format:
-            > {"pixel_values": torch.Tensor}, where the tensor is of shape [N, C, H, W] and N is the number of images.
+            > {"pixel_values": torch.Tensor}, where the tensor is of shape [N, 3, 224, 224] and N is the number of images.
         """
 
         def process_image_dict(image):
@@ -255,11 +255,10 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
         # Process content based on its type
         if isinstance(content[0], str):
-            images = [format_and_load_CLIP_images(image_url, media_download_headers=media_download_headers)
-                      for image_url in content]
+            images = format_and_load_CLIP_images(content, media_download_headers=media_download_headers)
             processed_images = self._preprocessors["image"](images, return_tensors='pt')["pixel_values"]
         elif isinstance(content[0], dict):
-            processed_images = torch.stack([process_image_dict(image) for image in content], dim=0)
+            processed_images = torch.stack([process_image_dict(image).squeeze(0) for image in content], dim=0)
         else:
             raise InternalError(f"Invalid image input format: {content}")
 

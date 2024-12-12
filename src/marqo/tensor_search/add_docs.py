@@ -129,7 +129,12 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                media_repo[doc[field]] = preprocessors.image(media_repo[doc[field]]).to(device)
+                                preprocessed_results = preprocessors.image(media_repo[doc[field]])
+                                if isinstance(preprocessed_results, torch.Tensor):
+                                    media_repo[doc[field]] = preprocessed_results.to(device)
+                                elif isinstance(preprocessed_results, dict):
+                                    media_repo[doc[field]] = {k: v.to(device) for k, v in preprocessed_results.items()}
+                                # media_repo[doc[field]] = preprocessors.image(media_repo[doc[field]]).to(device)
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     media_repo[doc[field]] = e
