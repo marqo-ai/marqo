@@ -7,7 +7,8 @@ from typing import List, Dict, Optional
 
 import numpy as np
 import torch
-from PIL import UnidentifiedImageError, Image
+from PIL import UnidentifiedImageError
+from PIL.Image import Image
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
