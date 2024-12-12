@@ -58,7 +58,8 @@ class VespaLocalMultiNode:
             'ports': [
                 '19071:19071',
                 '8080:8080',
-                '5005:5005'
+                '5005:5005',
+                '2181:2181'
             ],
             'command': 'configserver,services'
         }
