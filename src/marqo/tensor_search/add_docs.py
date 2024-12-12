@@ -22,7 +22,7 @@ from marqo.exceptions import InternalError
 from marqo.s2_inference import clip_utils
 from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError, MediaExceedsMaxSizeError
 from marqo.s2_inference.models.model_type import ModelType
-from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
+from marqo.s2_inference.s2_inference import is_preprocessor_preload, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search import enums
@@ -346,16 +346,16 @@ def process_batch(
     docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
 
-    model, preprocessors = load_multimodal_model_and_get_preprocessors(
-        model_name=model_name,
-        model_properties=model_properties,
-        device=device,
-        model_auth=model_auth,
-        normalize_embeddings=normalize_embeddings
-    )
-
-    if not is_preprocess_image_model(model_properties) or patch_method_exists:
-        preprocessors.image = None
+    if is_preprocessor_preload(model_properties) and not patch_method_exists:
+        _, preprocessors = load_multimodal_model_and_get_preprocessors(
+            model_name=model_name,
+            model_properties=model_properties,
+            device=device,
+            model_auth=model_auth,
+            normalize_embeddings=normalize_embeddings
+        )
+    else:
+        preprocessors = None
 
     media_repo = {}
     m = [RequestMetrics() for i in range(thread_count)]

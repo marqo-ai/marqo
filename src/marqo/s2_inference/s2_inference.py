@@ -185,7 +185,7 @@ def get_marqo_inference_cache() -> MarqoInferenceCache:
     return _marqo_inference_cache
 
 
-def is_preprocess_image_model(model_properties: dict = None) -> bool:
+def is_preprocessor_preload(model_properties: dict = None) -> bool:
     """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module
         model_properties: Validated model properties. The model properties should have been validated in marqo_index
     """
