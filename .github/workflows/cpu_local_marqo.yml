@@ -118,10 +118,10 @@ jobs:
           
           DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 -q
           
-          bash tests/api-tests/v1/scripts/start_local_marqo.sh
+          bash tests/api-tests/v1/scripts/start_local_marqo.sh $MQ_API_TEST_IMG
           
           pytest tests/api-tests/v1/tests/
-  
+
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:
