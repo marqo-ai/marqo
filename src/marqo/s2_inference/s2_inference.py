@@ -230,18 +230,11 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
 
     if model_properties.get("type") in ['languagebind']:
         preprocessors = model.get_preprocessors()
-    elif model_properties.get("type") in ['openclip', 'clip']:
+    elif model_properties.get("type") in [ModelType.OpenCLIP, ModelType.CLIP]:
         preprocessors = {"image": getattr(model, "preprocess", None)}
     else:
         raise InternalError(f"Model type {model_properties.get('type')} does not support preprocessors pre loading in"
                             f"add_document ")
-    # preprocessors = {
-    #     "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
-    #     "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
-    #     "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
-    #     "text": None  # Future preprocessor
-    # }
-
     return model, Preprocessors(**preprocessors)
 
 
