@@ -32,7 +32,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
             model_flags: Optional[HuggingFaceModelFlags] = None,
             tokenizer_flags: Optional[HuggingFaceTokenizerFlags] = None
     ):
-        super().__init__(model_properties, device, model_auth)
+        super().__init__(model_properties=model_properties, device=device, model_auth=model_auth)
 
         self._model_flags = model_flags or HuggingFaceModelFlags()
         self._tokenizer_flags = tokenizer_flags or HuggingFaceTokenizerFlags()

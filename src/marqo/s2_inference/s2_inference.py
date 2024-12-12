@@ -7,6 +7,7 @@ from typing import List, Dict, Optional
 
 import numpy as np
 from PIL import UnidentifiedImageError
+from torch.utils.hipify.hipify_python import preprocessor
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
@@ -136,7 +137,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                           **kwargs) -> List[List[float]]:
     try:
         model = _available_models[model_cache_key][AvailableModelsKey.model]
-        encoder = get_encoder(model)
+        # encoder = get_encoder(model)
 
         if isinstance(content, str):
             vectorised = model.encode(
@@ -155,7 +156,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
 
                 # TODO maybe the infer parameter can be replaced by modality
                 infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
-                encoded_batch = encoder.encode(
+                encoded_batch = model.encode(
                     batch, modality=modality, normalize=normalize_embeddings,
                     media_download_headers=media_download_headers, infer = infer, **kwargs)
                 
@@ -241,12 +242,19 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
 
-    preprocessors = {
-        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
-        "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
-        "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
-        "text": None  # Future preprocessor
-    }
+    if model_properties.get("type") in ['languagebind']:
+        preprocessors = model.get_preprocessors()
+    elif model_properties.get("type") in ['openclip', 'clip']:
+        preprocessors = {"image": getattr(model, "preprocess", None)}
+    else:
+        raise InternalError(f"Model type {model_properties.get('type')} does not support preprocessors pre loading in"
+                            f"add_document ")
+    # preprocessors = {
+    #     "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
+    #     "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
+    #     "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
+    #     "text": None  # Future preprocessor
+    # }
 
     return model, Preprocessors(**preprocessors)
 
@@ -551,11 +559,11 @@ def _load_model(
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    if model_properties.get('type') in [ModelType.LanguageBind]:
-        model = MultimodalModel(model_name, model_properties, device)
-        model.model = model._load_multimodal_model()
-        model.encoder = get_encoder(model)
-        return model
+    # if model_properties.get('type') in [ModelType.LanguageBind]:
+    #     model = MultimodalModel(model_name, model_properties, device)
+    #     model.model = model._load_multimodal_model()
+    #     model.encoder = get_encoder(model)
+    #     return model
 
     print(f"loading for: model_name={model_name} and properties={model_properties}")
 
@@ -564,7 +572,7 @@ def _load_model(
 
     # TODO For each refactored model class, add a new elif block here and remove the if block
     #  once we have all models refactored
-    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA):
+    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
         model = loader(
             device=device,
             model_properties=model_properties,
