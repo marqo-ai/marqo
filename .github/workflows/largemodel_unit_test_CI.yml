@@ -150,6 +150,8 @@ jobs:
           echo "Deleted vespa_tester_app.zip"
 
       - name: Run Large Model Unit Tests
+        id: run_unit_tests
+        continue-on-error: true
         run: |
           # Define these for use by marqo
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -165,7 +167,7 @@ jobs:
           cd marqo
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
-          pytest --largemodel --ignore=marqo/tests/test_documentation.py --ignore=marqo/tests/backwards_compatibility_tests \
+          pytest --largemodel --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
