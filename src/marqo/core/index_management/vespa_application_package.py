@@ -530,7 +530,7 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
 
 
 class VespaApplicationPackage:
-    """
+    r"""
     Represents a Vespa application package. This class provides useful methods to manage contents in the application
     package. A Vespa application package usually contains the following contents
     app-root
