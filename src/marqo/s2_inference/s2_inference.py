@@ -137,7 +137,6 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                           **kwargs) -> List[List[float]]:
     try:
         model = _available_models[model_cache_key][AvailableModelsKey.model]
-        # encoder = get_encoder(model)
 
         if isinstance(content, str):
             vectorised = model.encode(
@@ -183,15 +182,6 @@ def get_available_models() -> Dict:
 def get_marqo_inference_cache() -> MarqoInferenceCache:
     """Returns the _marqo_inference_cache object"""
     return _marqo_inference_cache
-
-
-def get_encoder(model):
-    if isinstance(model, MultimodalModel):
-        if model.properties.loader == "languagebind":
-            return LanguageBindEncoder(model)
-        else:
-            raise NotImplementedError(f"Model {model.name} is not supported")
-    return DefaultEncoder(model)
 
 
 def is_preprocess_image_model(model_properties: dict = None) -> bool:
@@ -559,12 +549,6 @@ def _load_model(
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    # if model_properties.get('type') in [ModelType.LanguageBind]:
-    #     model = MultimodalModel(model_name, model_properties, device)
-    #     model.model = model._load_multimodal_model()
-    #     model.encoder = get_encoder(model)
-    #     return model
-
     print(f"loading for: model_name={model_name} and properties={model_properties}")
 
     model_type = model_properties.get("type")
@@ -589,16 +573,6 @@ def _load_model(
         )
     model.load()
     return model
-
-
-def chunk_video(video_path: str, chunk_length: int, frames_per_chunk: int) -> List[List[Image]]:
-    # Implement video chunking and frame extraction
-    pass
-
-
-def chunk_audio(audio_path: str, chunk_length: int) -> List[np.ndarray]:
-    # Implement audio chunking
-    pass
 
 
 def clear_loaded_models() -> None:

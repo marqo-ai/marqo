@@ -13,7 +13,7 @@ from marqo.core.inference.model_download import (download_model_from_hf, downloa
                                                  download_pretrained_from_s3, extract_zip_file)
 from marqo.exceptions import InternalError
 from marqo.s2_inference.configs import ModelCache
-from marqo.s2_inference.errors import InvalidModelPropertiesError
+from marqo.s2_inference.errors import InvalidModelPropertiesError, MediaMismatchError
 from marqo.s2_inference.languagebind import LanguageBindImageTokenizer, LanguageBind, transform_dict, to_device
 from marqo.s2_inference.types import *
 from marqo.tensor_search.models.private_models import ModelAuth
@@ -22,7 +22,7 @@ from marqo.tensor_search.models.private_models import ModelAuth
 class CLIPType(MarqoBaseModel):
     """A wrapper class that is used to store the model location for each modality.
     The key is the modality and the value is the location of the model.
-    A value can either be a HuggingFace repo ID or a directory containing the model files.
+    A location can either be a HuggingFace repo ID or a directory containing the model files.
     """
     image: Optional[str] = None
     video: Optional[str] = None
@@ -110,6 +110,9 @@ class LanguagebindModel(AbstractEmbeddingModel):
     def _generate_clip_type(self) -> CLIPType:
         """
         Generate a CLIPType object that contains the model location for each modality.
+
+        Returns:
+            A CLIPType object that contains the model location for each modality.
         """
         if self.model_properties.name:
             # Loading from a registered Languagebind model
@@ -190,6 +193,10 @@ class LanguagebindModel(AbstractEmbeddingModel):
     def encode(self, content, modality, media_download_headers: Optional[Dict]=None, normalize=True, **kwargs):
         if media_download_headers is None:
             media_download_headers = dict()
+
+        if modality not in self.model_properties.supportedModalities:
+            raise MediaMismatchError(f"The provided modality is not supported by the model. This model support " 
+                                     f"the following modalities: {self.model_properties.supportedModalities}")
 
         if modality == Modality.TEXT:
             return self._encode_text(content, normalize)
