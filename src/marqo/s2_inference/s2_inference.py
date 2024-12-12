@@ -192,11 +192,6 @@ def is_preprocess_image_model(model_properties: dict = None) -> bool:
     return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
 
 
-def load_multimodal_model(model_name: str, model_properties: Dict[str, Any], device: str) -> MultimodalModel:
-    model = MultimodalModel(model_name, model_properties, device)
-    return model
-
-
 def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
                                                 device: Optional[str] = None,
                                                 model_auth: Optional[ModelAuth] = None,

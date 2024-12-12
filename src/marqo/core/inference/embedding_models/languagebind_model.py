@@ -30,7 +30,6 @@ class CLIPType(MarqoBaseModel):
 
 
 class LanguagebindModel(AbstractEmbeddingModel):
-
     DEFAULT_TOKENIZER_REPO = 'lb203/LanguageBind_Image'
 
     MODEL_NAME_CLIP_TYPE_MAPPING = {
@@ -187,15 +186,19 @@ class LanguagebindModel(AbstractEmbeddingModel):
                     f" Original error message = {e}") from e
 
     def _load_preprocessor(self):
+        """Load the preprocessors for each modality.
+
+        It is a dictionary where the key is the modality and the value is the preprocessor function.
+        """
         self._preprocessors = {c: transform_dict[c](self._model.modality_config[c]) for c in
                                self._clip_type.dict(exclude_none=True).keys()}
 
-    def encode(self, content, modality, media_download_headers: Optional[Dict]=None, normalize=True, **kwargs):
+    def encode(self, content, modality, media_download_headers: Optional[Dict] = None, normalize=True, **kwargs):
         if media_download_headers is None:
             media_download_headers = dict()
 
         if modality not in self.model_properties.supportedModalities:
-            raise MediaMismatchError(f"The provided modality is not supported by the model. This model support " 
+            raise MediaMismatchError(f"The provided modality is not supported by the model. This model support "
                                      f"the following modalities: {self.model_properties.supportedModalities}")
 
         if modality == Modality.TEXT:
@@ -210,7 +213,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
     def _encode_text(self, text: Union[str, list[str]], normalize=True):
         formated_input = dict()
         processed_text = self._tokenizer(text, max_length=77, padding='max_length',
-                                             truncation=True, return_tensors='pt').to(self.device)
+                                         truncation=True, return_tensors='pt').to(self.device)
         formated_input['language'] = processed_text
 
         with torch.no_grad():
@@ -239,6 +242,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
             A dictionary containing the preprocessed image tensors in the format:
             > {"pixel_values": torch.Tensor}, where the tensor is of shape [N, C, H, W] and N is the number of images.
         """
+
         def process_image_dict(image):
             if "pixel_values" not in image:
                 raise InternalError(f"Invalid image input format: {image}")
@@ -355,7 +359,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
         return self._convert_output(outputs)
 
-    def _preprocess_audio(self, content, media_download_headers)-> dict:
+    def _preprocess_audio(self, content, media_download_headers) -> dict:
         """
         Preprocess the audio content to be encoded. It can be represented in the following ways:
             - A str, which is the URL of the audio from search query
@@ -422,7 +426,6 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
         return self._convert_output(outputs)
 
-
     def _download_content(self, url, filename, media_download_headers: Optional[Dict] = None,
                           modality: Optional[str] = None):
         # 3 seconds for images, 20 seconds for audio and video
@@ -432,7 +435,6 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
         with open(filename, 'wb') as f:
             f.write(buffer.getvalue())
-
 
     def _download_languagebind_model(self, modality_location: ModalityLocation) -> str:
         """Download the Languagebind model zip file via a given location. The location is a ModalityLocation object.
