@@ -6,8 +6,8 @@ import threading
 from typing import List, Dict, Optional
 
 import numpy as np
-from PIL import UnidentifiedImageError
-from torch.utils.hipify.hipify_python import preprocessor
+import torch
+from PIL import UnidentifiedImageError, Image
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
@@ -143,7 +143,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                 content, normalize=normalize_embeddings, modality=modality,
                 media_download_headers=media_download_headers, **kwargs
             )
-        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
+        elif isinstance(content, Tensor):
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         else:
             vector_batches = []
@@ -385,10 +385,8 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                                                   f"and 'type = no_model', but received 'model = {model_name}' and "
                                                   f"'type = {model_type}'.")
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
-                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
+                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX, ModelType.LanguageBind):
             pass
-        elif model_type in [ModelType.LanguageBind]:
-            MultimodalModelProperties(**model_properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
                                               f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
