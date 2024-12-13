@@ -67,8 +67,8 @@ class MarqoTestCase(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
-        if cls.indexes:
-            cls.index_management.batch_delete_indexes_by_name([index.name for index in cls.indexes])
+        # if cls.indexes:
+        #     cls.index_management.batch_delete_indexes_by_name([index.name for index in cls.indexes])
 
     @classmethod
     def setUpClass(cls) -> None:

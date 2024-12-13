@@ -10,9 +10,9 @@ class TestPartialUpdate(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        semi_structured_index_request = cls.unstructured_marqo_index_request()
-        cls.create_indexes([semi_structured_index_request])
-        cls.index = cls.indexes[0]
+        # semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured')
+        # cls.create_indexes([semi_structured_index_request])
+        cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
 
     @classmethod
     def tearDownClass(cls):
@@ -24,11 +24,12 @@ class TestPartialUpdate(MarqoTestCase):
             '_id': '1',
             'tensor_field': 'title',
             'tensor_subfield': 'description',
-            "short_string_field": "Exact match hehehe",
-            "long_string_field": "This is a very long string." * 10,
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
             "int_field": 123,
             "float_field": 123.0,
-            "string_array": ["123", "123"],
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
             "int_map": {"a": 1, "b": 2},
             "float_map": {"c": 1.0, "d": 2.0},
             "bool_field": True,
@@ -99,10 +100,27 @@ class TestPartialUpdate(MarqoTestCase):
         pass
 
     def test_partial_update_should_allow_changing_numeric_types_in_map(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'int_map': {
+            'a': 2.0,  # update int to float
+            'c': 3,  # add new int value
+            'd': 4.0  # add new float value
+        }}], self.index)
+        self.assertFalse(res.errors)
+
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        self.assertEqual(2.0, doc['int_map.a'])
+        self.assertNotIn('int_map.b', doc)  # b will be deleted
+        self.assertEqual(3, doc['int_map.c'])
+        self.assertEqual(4.0, doc['int_map.d'])
+        self._assert_fields_unchanged(doc, ['int_map'])
 
     def test_partial_update_should_update_string_array(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'string_array': ["ccc"]}], self.index)
+        self.assertFalse(res.errors)
+
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        self.assertEqual(["ccc"], doc['string_array'])
+        self._assert_fields_unchanged(doc, ['string_array'])
 
     def test_partial_update_should_update_short_string(self):
         pass
@@ -111,10 +129,37 @@ class TestPartialUpdate(MarqoTestCase):
         pass
 
     def test_partial_update_should_update_long_string_to_short_string(self):
-        pass
+        res = tensor_search.search(self.config, self.index.name, text='*',
+                                   filter=f'long_string_field:{self.doc["long_string_field"]}')
+        self.assertEqual(0, len(res['hits']))
+
+        res = self.config.document.partial_update_documents([{'_id': '1', 'long_string_field': 'short'}], self.index)
+        print(res)
+        self.assertFalse(res.errors)
+
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        self.assertEqual('short', doc['long_string_field'])
+        self._assert_fields_unchanged(doc, ['long_string_field'])
+
+        res = tensor_search.search(self.config, self.index.name, text='*', filter=f'long_string_field:short')
+        self.assertEqual(1, len(res['hits']))
 
     def test_partial_update_should_update_short_string_to_long_string(self):
-        pass
+        res = tensor_search.search(self.config, self.index.name, text='*',
+                                   filter=f'short_string_field:{self.doc["short_string_field"]}')
+        self.assertEqual(1, len(res['hits']))
+
+        res = self.config.document.partial_update_documents([{'_id': '1', 'short_string_field': 'verylongstring'*10}], self.index)
+        print(res)
+        self.assertFalse(res.errors)
+
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        self.assertEqual('verylongstring'*10, doc['short_string_field'])
+        self._assert_fields_unchanged(doc, ['short_string_field'])
+
+        res = tensor_search.search(self.config, self.index.name, text='*',
+                                   filter=f'short_string_field:{doc["short_string_field"]}')
+        self.assertEqual(0, len(res['hits']))
 
     def test_partial_update_should_update_score_modifiers(self):
         pass
@@ -125,6 +170,10 @@ class TestPartialUpdate(MarqoTestCase):
 
     # Test remove field
     def test_partial_update_should_remove_field_if_set_to_none(self):
+        pass
+
+    # Test add new fields
+    def test_partial_update_should_add_new_fields(self):
         pass
 
     # Reject any tensor field change

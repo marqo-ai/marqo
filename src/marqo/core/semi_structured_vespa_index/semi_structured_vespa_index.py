@@ -142,12 +142,12 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 # Handle lexical field change
                 lexical_field_name = f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{marqo_field}'
 
-                if lexical_field_name not in original_vespa_document:
+                if lexical_field_name not in self.get_marqo_index().lexical_field_map:
                     raise MarqoDocumentParsingError(f'{marqo_field} of type str does not exist in the original '
                                                     f'document. We do not support adding new lexical fields in '
                                                     f'partial updates')
 
-                if value == original_vespa_document[lexical_field_name]:
+                if value == original_vespa_document.get(marqo_field, None):
                     # Skip changing this field
                     continue
 
