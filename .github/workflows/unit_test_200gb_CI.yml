@@ -41,7 +41,7 @@ on:
       - releases/*
 
 concurrency:
-  group: unit-tests-${{ github.ref }}
+  group: unit-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
   cancel-in-progress: true
 
 permissions:
@@ -86,12 +86,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
+      IGNORED_TESTS: ${{ steps.set_var.outputs.IGNORED_TESTS }}
     steps:
       - name: Determine VESPA_MULTINODE_SETUP
         id: set_var
         run: |
           # Initialize as false
           echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
+          echo "IGNORED_TESTS=\"\"" >> $GITHUB_OUTPUT
           
           # Check if the event is workflow_call or workflow_dispatch
           if [[ "${{ github.event_name }}" == "workflow_call" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -107,6 +109,8 @@ jobs:
             if [[ "$NUMBER_OF_SHARDS_INT" -gt 1 || "$NUMBER_OF_REPLICAS_INT" -gt 0 ]]; then
               echo "Using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
               echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
+              # If multinode vespa, ignore unrelated tests to save time
+              echo "IGNORED_TESTS=\"--ignore=tests/core/inference --ignore=tests/processing --ignore=tests/s2_inference\"" >> $GITHUB_OUTPUT
             fi
           fi
 
@@ -119,6 +123,7 @@ jobs:
     environment: marqo-test-suite
     env:
       VESPA_MULTINODE_SETUP: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP }}
+      IGNORED_TESTS: ${{ needs.Determine-Vespa-Setup.outputs.IGNORED_TESTS }}
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
@@ -227,7 +232,7 @@ jobs:
 
           cd marqo
           export PYTHONPATH="./tests:./src:."
-          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          pytest ${{ env.IGNORED_TESTS }} --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
