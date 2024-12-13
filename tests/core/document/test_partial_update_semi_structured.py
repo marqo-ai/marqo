@@ -10,9 +10,10 @@ class TestPartialUpdate(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        # semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured')
-        # cls.create_indexes([semi_structured_index_request])
-        cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
+        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured')
+        cls.create_indexes([semi_structured_index_request])
+        cls.index = cls.indexes[0]
+        # cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
 
     @classmethod
     def tearDownClass(cls):
@@ -210,5 +211,8 @@ class TestPartialUpdate(MarqoTestCase):
     # * update only 1 float field
     # * update only 1 float map
     # * update only 1 string array
+    # * update 1/10 of the fields
+    # * update 1/2 of the fields
+    # * update all available fields
 
     # Add doc override 100 docs 10 times, with using existing tensor enabled
