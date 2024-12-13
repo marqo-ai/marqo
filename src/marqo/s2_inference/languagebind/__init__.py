@@ -65,12 +65,5 @@ class LanguageBind(nn.Module):
 
 
 def to_device(x, device):
-    if isinstance(x, dict):
-        out_dict = {k: v.to(device) for k, v in x.items() if isinstance(v, Tensor)}
-    elif isinstance(x, list):
-        out_dict = [i.to(device) for i in x if isinstance(i, Tensor)]
-    elif isinstance(x, Tensor):
-        out_dict = x.to(device)
-    else:
-        raise ValueError(f"Unsupported type {type(x)}")
+    out_dict = {k: v.to(device) for k, v in x.items() if isinstance(v, Tensor)}
     return out_dict

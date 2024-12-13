@@ -212,8 +212,10 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
     def _encode_text(self, text: Union[str, list[str]], normalize=True):
         formated_input = dict()
-        processed_text = self._tokenizer(text, max_length=77, padding='max_length',
-                                         truncation=True, return_tensors='pt').to(self.device)
+        processed_text = to_device(
+            self._tokenizer(text, max_length=77, padding='max_length',
+                            truncation=True, return_tensors='pt'), self.device
+        )
         formated_input['language'] = processed_text
 
         with torch.no_grad():
