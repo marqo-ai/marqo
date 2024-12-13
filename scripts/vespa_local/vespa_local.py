@@ -5,9 +5,11 @@ import yaml
 import docker
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import math
 import argparse
 
 VESPA_VERSION=os.getenv('VESPA_VERSION', '8.431.32')  # default version baked into marqo-base:44
+MINIMUM_API_NODES = 2
 
 class VespaLocalSingleNode:
     def __init__(self):
@@ -39,32 +41,73 @@ class VespaLocalMultiNode:
         """
         services = {}
 
-        # TODO: Find better name for this
+        print(f"Creating `multinode/docker-compose.yml` with {number_of_shards} shards and {number_of_replicas} replicas.")
+
+        BASE_CONFIG_PORT_A = 19071
+        BASE_CONFIG_PORT_B = 19100
+        BASE_CONFIG_PORT_C = 19050
+        BASE_CONFIG_PORT_D = 20092
+
+        BASE_API_PORT_A = 8080
+        BASE_API_PORT_B = 20096
+
         BASE_CONTENT_PORT_A = 19107
         BASE_CONTENT_PORT_B = 20100
 
-        # TODO: change this to 3 config nodes.
-        # Config Node (config-0)
-        services['config-0'] = {
-            'image': f"vespaengine/vespa:{vespa_version or 'latest'}",
-            'container_name': 'config-0',
-            'hostname': 'config-0.vespanet',
-            'environment': [
-                'VESPA_CONFIGSERVERS=config-0.vespanet'
-            ],
-            'networks': [
-                'vespanet'
-            ],
-            'ports': [
-                '19071:19071',
-                '8080:8080',
-                '5005:5005',
-                '2181:2181'
-            ],
-            'command': 'configserver,services'
-        }
+        TOTAL_CONTENT_NODES = (number_of_replicas + 1) * number_of_shards
+        TOTAL_API_NODES = max(MINIMUM_API_NODES, math.ceil(TOTAL_CONTENT_NODES / 4))
+        print(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
 
-        # Generate Content Nodes
+        # Config Nodes (3)
+        TOTAL_CONFIG_NODES = 3
+        for config_node in range(TOTAL_CONFIG_NODES):
+            services[f'config-{config_node}'] = {
+                'image': f"vespaengine/vespa:{vespa_version or 'latest'}",
+                'container_name': f'config-{config_node}',
+                'hostname': f'config-{config_node}.vespanet',
+                'environment': [
+                    'VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet'
+                ],
+                'networks': [
+                    'vespanet'
+                ],
+                'ports': [
+                    f'{BASE_CONFIG_PORT_A+config_node}:19071',
+                    f'{BASE_CONFIG_PORT_B+config_node}:19100',
+                    f'{BASE_CONFIG_PORT_C+config_node}:19050',
+                    f'{BASE_CONFIG_PORT_D+config_node}:19092'
+                ],
+                'command': 'configserver,services'
+            }
+            # Add additional ports for debugging and zookeeper to adminserver
+            if config_node == 0:
+                services[f'config-{config_node}']['ports'].extend([
+                    '19098:19098',  # for adminserver
+                    '5005:5005',  # for debugging
+                    '2181:2181'  # for zookeeper
+                ])
+
+
+        # API Nodes
+        for api_node in range(TOTAL_API_NODES):
+            services[f'api-{api_node}'] = {
+                'image': f"vespaengine/vespa:{vespa_version or 'latest'}",
+                'container_name': f'api-{api_node}',
+                'hostname': f'api-{api_node}.vespanet',
+                'environment': [
+                    'VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet'
+                ],
+                'networks': [
+                    'vespanet'
+                ],
+                'ports': [
+                    f'{BASE_API_PORT_A + api_node}:8080',
+                    f'{BASE_API_PORT_B + api_node}:19092'
+                ],
+                'command': 'services'
+            }
+
+        # Content Nodes
         i = 0  # counter of content nodes generated
         for group in range(number_of_replicas + 1):
             for shard in range(number_of_shards):
@@ -78,7 +121,7 @@ class VespaLocalMultiNode:
                     'container_name': node_name,
                     'hostname': f'{node_name}.vespanet',
                     'environment': [
-                        'VESPA_CONFIGSERVERS=config-0.vespanet'
+                        'VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet'
                     ],
                     'networks': [
                         'vespanet'
@@ -113,6 +156,9 @@ class VespaLocalMultiNode:
         """
 
         print(f"Creating `multinode/services.xml` with {number_of_shards} shards and {number_of_replicas} replicas.")
+        TOTAL_CONTENT_NODES = (number_of_replicas + 1) * number_of_shards
+        TOTAL_API_NODES = max(MINIMUM_API_NODES, math.ceil(TOTAL_CONTENT_NODES / 4))
+        print(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
 
         # Define the root element with namespaces
         services = ET.Element('services', {
@@ -122,24 +168,36 @@ class VespaLocalMultiNode:
         })
 
         # Admin Section
-        # TODO: Change to 3 config servers
         admin = ET.SubElement(services, 'admin', {'version': '2.0'})
 
         configservers = ET.SubElement(admin, 'configservers')
         ET.SubElement(configservers, 'configserver', {'hostalias': 'config-0'})
+        ET.SubElement(configservers, 'configserver', {'hostalias': 'config-1'})
+        ET.SubElement(configservers, 'configserver', {'hostalias': 'config-2'})
 
         cluster_controllers = ET.SubElement(admin, 'cluster-controllers')
         ET.SubElement(cluster_controllers, 'cluster-controller', {
             'hostalias': 'config-0',
             'jvm-options': '-Xms32M -Xmx64M'
         })
+        ET.SubElement(cluster_controllers, 'cluster-controller', {
+            'hostalias': 'config-1',
+            'jvm-options': '-Xms32M -Xmx64M'
+        })
+        ET.SubElement(cluster_controllers, 'cluster-controller', {
+            'hostalias': 'config-2',
+            'jvm-options': '-Xms32M -Xmx64M'
+        })
 
         slobroks = ET.SubElement(admin, 'slobroks')
         ET.SubElement(slobroks, 'slobrok', {'hostalias': 'config-0'})
+        ET.SubElement(slobroks, 'slobrok', {'hostalias': 'config-1'})
+        ET.SubElement(slobroks, 'slobrok', {'hostalias': 'config-2'})
 
+        # Note: We only have 1 config node for admin.
         ET.SubElement(admin, 'adminserver', {'hostalias': 'config-0'})
 
-        # Container Section
+        # Container Section (API nodes)
         container = ET.SubElement(services, 'container', {'id': 'default', 'version': '1.0'})
         ET.SubElement(container, 'document-api')
         ET.SubElement(container, 'search')
@@ -148,7 +206,8 @@ class VespaLocalMultiNode:
         ET.SubElement(nodes, 'jvm', {
             'options': '-Xms32M -Xmx256M -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005'
         })
-        ET.SubElement(nodes, 'node', {'hostalias': 'config-0'})
+        for api_node_number in range(TOTAL_API_NODES):
+            ET.SubElement(nodes, 'node', {'hostalias': f'api-{api_node_number}'})
 
         # Content Section
         content = ET.SubElement(services, 'content', {'id': 'content_default', 'version': '1.0'})
@@ -202,15 +261,32 @@ class VespaLocalMultiNode:
         """
 
         print(f"Creating `multinode/hosts.xml` with {number_of_shards} shards and {number_of_replicas} replicas.")
+        TOTAL_CONTENT_NODES = (number_of_replicas + 1) * number_of_shards
+        TOTAL_API_NODES = max(MINIMUM_API_NODES, math.ceil(TOTAL_CONTENT_NODES / 4))
+        print(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
 
         # Define the root element
         hosts = ET.Element('hosts')
 
-        # Config Nodes
-        # TODO: Change to 3 config servers
+        # Config Nodes (3)
         config_0 = ET.SubElement(hosts, 'host', {'name': 'config-0.vespanet'})
         alias_config_0 = ET.SubElement(config_0, 'alias')
         alias_config_0.text = 'config-0'
+
+        config_1 = ET.SubElement(hosts, 'host', {'name': 'config-1.vespanet'})
+        alias_config_1 = ET.SubElement(config_1, 'alias')
+        alias_config_1.text = 'config-1'
+
+        config_2 = ET.SubElement(hosts, 'host', {'name': 'config-2.vespanet'})
+        alias_config_2 = ET.SubElement(config_2, 'alias')
+        alias_config_2.text = 'config-2'
+
+        # API Nodes (container)
+        for api_node_number in range(TOTAL_API_NODES):
+            api_node = ET.SubElement(hosts, 'host',
+                                     {'name': f'api-{api_node_number}.vespanet'})
+            alias_api_node = ET.SubElement(api_node, 'alias')
+            alias_api_node.text = f'api-{api_node_number}'
 
         # Content Nodes
         for group_number in range(number_of_replicas + 1):  # +1 for the primary group
