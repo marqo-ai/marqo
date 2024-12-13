@@ -5,7 +5,7 @@
         <document-api/>
         <search/>
         <nodes>
-            <jvm options="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005" />
+            <jvm options="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"/>
             <node hostalias="node1"/>
         </nodes>
     </container>
@@ -17,6 +17,11 @@
         <nodes>
             <node hostalias="node1" distribution-key="0"/>
         </nodes>
+        <tuning>
+            <resource-limits>
+                <disk>1.0</disk>
+            </resource-limits>
+        </tuning>
     </content>
 
 </services>
