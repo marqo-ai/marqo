@@ -69,99 +69,6 @@ class Document:
         res: DeleteAllDocumentsResponse = self.vespa_client.delete_all_docs(marqo_index.schema_name)
         return res.document_count
 
-    def get_documents_by_ids(self, marqo_index: MarqoIndex, document_ids: Collection[str],
-                             show_vectors: bool = False, ignore_invalid_ids: bool = False
-    ) -> MarqoGetDocumentsByIdsResponse:
-        """
-        Returns documents by their IDs.
-
-        Args:
-            ignore_invalid_ids: If True, invalid IDs will be ignored and not returned in the response. If False, an error
-                will be raised if any of the IDs are invalid
-        """
-        if not isinstance(document_ids, Collection):
-            raise api_exceptions.InvalidArgError("Get documents must be passed a collection of IDs!")
-        if len(document_ids) <= 0:
-            raise api_exceptions.InvalidArgError("Can't get empty collection of IDs!")
-
-        # max_docs_limit = utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_RETRIEVABLE_DOCS)
-        # if max_docs_limit is not None and len(document_ids) > int(max_docs_limit):
-        #     raise api_exceptions.IllegalRequestedDocCount(
-        #         f"{len(document_ids)} documents were requested, which is more than the allowed limit of [{max_docs_limit}], "
-        #         f"set by the environment variable `{EnvVars.MARQO_MAX_RETRIEVABLE_DOCS}`")
-
-        unsuccessful_docs: List[Tuple[int, MarqoGetDocumentsByIdsItem]] = []
-
-        validated_ids = []
-        for loc, doc_id in enumerate(document_ids):
-            try:
-                validated_ids.append(validation.validate_id(doc_id))
-            except api_exceptions.InvalidDocumentIdError as e:
-                if not ignore_invalid_ids:
-                    unsuccessful_docs.append(
-                        (
-                            loc, MarqoGetDocumentsByIdsItem(
-                                # Invalid IDs are not returned in the response
-                                id=doc_id,
-                                message=e.message,
-                                status=int(e.status_code)
-                            )
-                        )
-                    )
-                else:
-                    logger.debug(f'Invalid document ID {doc_id} ignored')
-
-        if len(validated_ids) == 0:  # Can only happen when ignore_invalid_ids is True
-            return MarqoGetDocumentsByIdsResponse(errors=True, results=[i[1] for i in unsuccessful_docs])
-
-        batch_get = self.vespa_client.get_batch(validated_ids, marqo_index.schema_name)
-        vespa_index = vespa_index_factory(marqo_index)
-
-        results: List[Union[MarqoGetDocumentsByIdsItem, Dict]] = []
-        errors = batch_get.errors
-
-        for response in batch_get.responses:
-            if response.status == 200:
-                marqo_document = vespa_index.to_marqo_document(response.document.dict())
-                # if show_vectors:
-                #     if constants.MARQO_DOC_TENSORS in marqo_document:
-                #         marqo_document[TensorField.tensor_facets] = _get_tensor_facets(
-                #             marqo_document[constants.MARQO_DOC_TENSORS])
-                #     else:
-                #         marqo_document[TensorField.tensor_facets] = []
-
-                if not show_vectors:
-                    if MARQO_DOC_MULTIMODAL_PARAMS in marqo_document:
-                        del marqo_document[MARQO_DOC_MULTIMODAL_PARAMS]
-
-                if MARQO_DOC_TENSORS in marqo_document:
-                    del marqo_document[MARQO_DOC_TENSORS]
-
-                results.append(
-                    {
-                        TensorField.found: True,
-                        **marqo_document
-                    }
-                )
-            else:
-                status, message = self.vespa_client.translate_vespa_document_response(response.status, None)
-                results.append(
-                    MarqoGetDocumentsByIdsItem(
-                        id=self._get_id_from_vespa_id(response.id), status=status,
-                        found=False, message=message)
-                )
-
-        # Insert the error documents at the correct locations
-        for loc, error_info in unsuccessful_docs:
-            results.insert(loc, error_info)
-            errors = True
-
-        return MarqoGetDocumentsByIdsResponse(errors=errors, results=results)
-
-    def _get_id_from_vespa_id(self, vespa_id: str) -> str:
-        """Returns the document ID from a Vespa ID. Vespa IDs are of the form `namespace::document_id`."""
-        return vespa_id.split('::')[-1]
-
     def partial_update_documents_by_index_name(self, index_name,
                                                partial_documents: List[Dict]) \
             -> MarqoUpdateDocumentsResponse:
@@ -224,7 +131,7 @@ class Document:
             existing_vespa_documents = [doc_response.document for doc_response in get_batch_response.responses
                                         if doc_response.status == 200]
 
-        existing_documents_map = {doc.id: doc.fields for doc in existing_vespa_documents}
+        existing_documents_map = {doc.fields['marqo__id']: doc.dict() for doc in existing_vespa_documents}
 
         for index, doc in enumerate(partial_documents):
             try:

@@ -1,4 +1,5 @@
-from typing import Dict, Any, Optional, cast, Union
+import json
+from typing import Dict, Any, Optional, cast
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
@@ -83,7 +84,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             vespa_id = marqo_document[MARQO_DOC_ID]
             self._verify_id_field(vespa_id)
 
-        original_doc = SemiStructuredVespaDocument.from_marqo_document(original_vespa_document, self.get_marqo_index())
+        original_doc = SemiStructuredVespaDocument.from_vespa_document(original_vespa_document, self.get_marqo_index())
         new_string_array = original_doc.fixed_fields.string_arrays.copy()
 
         all_numeric_field_map = dict()
@@ -113,7 +114,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     vespa_fields[field_name] = {"assign": int(value)}
 
             # Handle numeric fields including numeric maps
-            if isinstance(value, dict):
+            elif isinstance(value, dict):
                 # numeric dict need to be handled separately since the original_marqo_doc has them flattened
                 # TODO move the validation logic
                 validate_map_numeric_field(value)
@@ -124,11 +125,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 # TODO what if v == None?
                 all_numeric_field_map.update({f'{marqo_field}.{k}': v for k, v in value.items()})
 
-            if isinstance(value, (int, float)):
+            elif isinstance(value, (int, float)):
                 all_numeric_field_map[marqo_field] = value
 
             # Handle string array fields
-            if isinstance(marqo_document[marqo_field], list):
+            elif isinstance(marqo_document[marqo_field], list):
                 # TODO move the validation logic
                 if any(not isinstance(v, str) for v in marqo_document[marqo_field]):
                     raise MarqoDocumentParsingError('Only string array is supported')
@@ -137,7 +138,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 new_string_array.extend([f'{marqo_field}::{value}' for value in marqo_document[marqo_field]])
 
             # Handle string fields (lexical only)
-            if isinstance(marqo_document[marqo_field], str):
+            elif isinstance(marqo_document[marqo_field], str):
                 # Handle lexical field change
                 lexical_field_name = f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{marqo_field}'
 
@@ -166,6 +167,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 else:
                     # remove from map: https://docs.vespa.ai/en/reference/document-json-format.html#map-field-remove
                     vespa_fields[field_name] = {"remove": 0}
+            else:
+                raise MarqoDocumentParsingError(f'Unsupported field type {type(value)} '
+                                                f'for field {marqo_field} in doc {vespa_id}')
 
         # Handle string array change
         items_to_remove = set(original_doc.fixed_fields.string_arrays) - set(new_string_array)
@@ -179,9 +183,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             vespa_fields[common.STRING_ARRAY] = {"add": list(items_to_add)}
 
         # Handle all numeric values (including score modifiers)
-        numeric_field_changed = (self._update_numeric_field(int, all_numeric_field_map, original_doc, vespa_fields) or
-                                 self._update_numeric_field(float, all_numeric_field_map, original_doc, vespa_fields))
-        if numeric_field_changed:
+        int_fields_changed = self._update_numeric_field(int, all_numeric_field_map, original_doc, vespa_fields)
+        float_fields_changed = self._update_numeric_field(float, all_numeric_field_map, original_doc, vespa_fields)
+
+        if int_fields_changed or float_fields_changed:
             # TODO SCORE_MODIFIERS is a tensor, find out if it can be updated in the same way as a map, is it faster?
             #   If not, we copied the replace logic from structured_vespa_index, should we rather use assign here?
             # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-field
@@ -227,7 +232,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             return True
 
         if (original_doc.fixed_fields.vespa_multimodal_params and
-                partial_update_field_name in original_doc.fixed_fields.vespa_multimodal_params["weights"]):
+            any([partial_update_field_name in json.loads(config)["weights"] for config
+                 in original_doc.fixed_fields.vespa_multimodal_params.values()])):
             return True
 
         return False
