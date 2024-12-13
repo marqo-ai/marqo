@@ -94,7 +94,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r tests/api-tests/v1/requirements.txt
 
       - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
