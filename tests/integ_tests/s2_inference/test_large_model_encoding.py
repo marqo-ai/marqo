@@ -179,11 +179,13 @@ class TestLargeClipModels(unittest.TestCase):
     def setUp(self):
         self.models = [
             'open_clip/ViT-L-14/laion400m_e32',
+            'Marqo/ViT-L-14.laion400m_e32',
             'open_clip/coca_ViT-L-14/mscoco_finetuned_laion2b_s13b_b90k',
             'open_clip/convnext_xxlarge/laion2b_s34b_b82k_augreg_soup',
             'open_clip/convnext_large_d_320/laion2b_s29b_b131k_ft_soup',
             'open_clip/convnext_large_d/laion2b_s26b_b102k_augreg',
             'open_clip/xlm-roberta-base-ViT-B-32/laion5b_s13b_b90k',
+            'Marqo/xlm-roberta-base-ViT-B-32.laion5b_s13b_b90k',
             'open_clip/ViT-H-14-378-quickgelu/dfn5b',
             'open_clip/ViT-SO400M-14-SigLIP-384/webli',
             "visheratin/nllb-siglip-mrl-large",
@@ -242,7 +244,7 @@ class TestLargeClipModels(unittest.TestCase):
 
     @patch("torch.cuda.amp.autocast")
     def test_autocast_called_in_open_clip(self, mock_autocast):
-        names = ["open_clip/ViT-B-32/laion400m_e31"]
+        names = ["open_clip/ViT-B-32/laion400m_e31", "Marqo/ViT-B-32.laion400m_e31"]
         contents = ['this is a test sentence. so is this.',
                     TestImageUrls.IMAGE0.value]
         for model_name in names:
