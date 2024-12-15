@@ -31,7 +31,7 @@ class TestModelRegistry(unittest.TestCase):
             ("Marqo/ViT-B-32.laion2b_s34b_b79k", "open_clip/ViT-B-32/laion2b_s34b_b79k"),
             ("Marqo/ViT-B-16.openai", "open_clip/ViT-B-16/openai"),
             ("Marqo/ViT-B-16.laion400m_e31", "open_clip/ViT-B-16/laion400m_e31"),
-            ("Marqo/ViT-B-16.laion400m_e32", "open_clip/ViT-B-16.laion400m_e32"),
+            ("Marqo/ViT-B-16.laion400m_e32", "open_clip/ViT-B-16/laion400m_e32"),
             ("Marqo/ViT-B-16.laion2b_s34b_b88k", "open_clip/ViT-B-16/laion2b_s34b_b88k"),
             ("Marqo/ViT-L-14.openai", "open_clip/ViT-L-14/openai"),
             ("Marqo/ViT-L-14.laion400m_e31", "open_clip/ViT-L-14/laion400m_e31"),
