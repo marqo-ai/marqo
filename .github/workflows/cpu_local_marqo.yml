@@ -116,6 +116,7 @@ jobs:
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           export TESTING_CONFIGURATION=CPU_LOCAL_MARQO
+          export MARQO_API_TESTS_ROOT=tests/api-tests/v1
           
           DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 -q
           
