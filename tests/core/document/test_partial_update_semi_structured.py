@@ -10,10 +10,10 @@ class TestPartialUpdate(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured')
-        cls.create_indexes([semi_structured_index_request])
-        cls.index = cls.indexes[0]
-        # cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
+        # semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured')
+        # cls.create_indexes([semi_structured_index_request])
+        # cls.index = cls.indexes[0]
+        cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
 
     @classmethod
     def tearDownClass(cls):
@@ -43,7 +43,7 @@ class TestPartialUpdate(MarqoTestCase):
         self.add_documents(self.config, add_docs_params=AddDocsParams(
             index_name=self.index.name,
             docs=[self.doc],
-            tensor_fields=['title', 'custom_vector_field', 'multimodal_combo_field'],
+            tensor_fields=['tensor_field', 'custom_vector_field', 'multimodal_combo_field'],
             mappings={
                 "custom_vector_field": {"type": "custom_vector"},
                 "multimodal_combo_field": {
@@ -198,21 +198,3 @@ class TestPartialUpdate(MarqoTestCase):
 
     # Concurrent update, last write wins
     # Concurrent update with add doc override, last write winds
-
-    # Perf test cases
-    # 100 docs with each: 2 tensor fields, 1 multimodal, 10 text field, 10 int field, 10 float field, 10 bool field,
-    # 2 int map with 10 items, 2 float map with 10 items, 2 string array fields with 10 items each
-
-    # Update 100 docs 10 times
-    # * update only 1 text field
-    # * update only 1 bool field
-    # * update only 1 int field
-    # * update only 1 int map
-    # * update only 1 float field
-    # * update only 1 float map
-    # * update only 1 string array
-    # * update 1/10 of the fields
-    # * update 1/2 of the fields
-    # * update all available fields
-
-    # Add doc override 100 docs 10 times, with using existing tensor enabled

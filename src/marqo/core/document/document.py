@@ -21,6 +21,7 @@ from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_fa
 from marqo.logging import get_logger
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import TensorField
+from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
 from marqo.vespa.models.feed_response import FeedBatchResponse
@@ -127,7 +128,8 @@ class Document:
 
         existing_vespa_documents = []
         if marqo_index.type == IndexType.SemiStructured:
-            get_batch_response = self.vespa_client.get_batch(list(doc_ids), marqo_index.schema_name)
+            with RequestMetricsStore.for_request().time("partial_update.vespa._get_batch"):
+                get_batch_response = self.vespa_client.get_batch(list(doc_ids), marqo_index.schema_name)
             existing_vespa_documents = [doc_response.document for doc_response in get_batch_response.responses
                                         if doc_response.status == 200]
 
@@ -143,13 +145,17 @@ class Document:
                     (index, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''), error=e.message,
                                                      status=int(api_exceptions.InvalidArgError.status_code))))
 
-        vespa_res: UpdateDocumentsBatchResponse = (
-            self.vespa_client.update_documents_batch(vespa_documents,
-                                                     marqo_index.schema_name,
-                                                     vespa_id_field=vespa_index.get_vespa_id_field()))
+        with RequestMetricsStore.for_request().time("partial_update.vespa._bulk"):
+            vespa_res: UpdateDocumentsBatchResponse = (
+                self.vespa_client.update_documents_batch(vespa_documents,
+                                                         marqo_index.schema_name,
+                                                         vespa_id_field=vespa_index.get_vespa_id_field()))
 
-        return self._translate_update_document_response(vespa_res, unsuccessful_docs,
-                                                        marqo_index.name, start_time)
+        with RequestMetricsStore.for_request().time("partial_update.postprocess"):
+            result = self._translate_update_document_response(vespa_res, unsuccessful_docs,
+                                                              marqo_index.name, start_time)
+
+        return result
 
     def _translate_update_document_response(self, responses: UpdateDocumentsBatchResponse, unsuccessful_docs: List,
                                             index_name: str, start_time) \

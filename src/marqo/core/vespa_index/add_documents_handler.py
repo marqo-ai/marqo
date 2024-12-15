@@ -158,9 +158,9 @@ class AddDocumentsHandler(ABC):
 
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
-                # TODO capture the telemetry data for retrieving exiting docs?
-                result = self.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
-                                                            self.marqo_index.schema_name)
+                with RequestMetricsStore.for_request().time("add_documents.vespa._get_batch"):
+                    result = self.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
+                                                         self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
                 self._populate_existing_tensors(existing_vespa_docs)
 
