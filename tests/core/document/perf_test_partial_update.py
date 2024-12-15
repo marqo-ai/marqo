@@ -23,16 +23,16 @@ class Metrics:
     def get_metrics(self):
         return {
             "mean": np.mean(self._metrics, axis=0),
-            "percentile": np.percentile(self._metrics, [50, 90, 99], axis=0),
+            "percentile": np.percentile(self._metrics, [50, 90, 95], axis=0),
         }
 
     def print_metrics(self, batch_size):
         metrics = self.get_metrics()
-        print(f'\nMetrics(timeMs) for {self.name} of batch_size: {batch_size}, total_batch: {len(metrics)}')
+        print(f'\nMetrics(timeMs) for {self.name} of batch_size: {batch_size}, total_batch: {len(self._metrics)}')
         print(f'mean: {metrics["mean"]}')
         print(f'p50: {metrics["percentile"][0]}')
         print(f'p90: {metrics["percentile"][1]}')
-        print(f'p99: {metrics["percentile"][2]}')
+        print(f'p95: {metrics["percentile"][2]}')
 
 
 class TestPartialUpdatePerf(MarqoTestCase):
