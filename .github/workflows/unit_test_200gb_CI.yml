@@ -81,7 +81,6 @@ jobs:
               {"Key": "PoloRole", "Value": "testing"}
             ]
 
-  # TODO: Maybe delete this whole block.
   Determine-Vespa-Setup:
     runs-on: ubuntu-latest
     outputs:
@@ -110,7 +109,7 @@ jobs:
               echo "Using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
               echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
               # If multinode vespa, ignore unrelated tests to save time
-              echo "IGNORED_TESTS=\"--ignore=tests/core/inference --ignore=tests/processing --ignore=tests/s2_inference\"" >> $GITHUB_OUTPUT
+              echo "IGNORED_TESTS=--ignore=tests/core/inference --ignore=tests/processing --ignore=tests/s2_inference" >> $GITHUB_OUTPUT
             fi
           fi
 
@@ -190,7 +189,7 @@ jobs:
           
           cd marqo/scripts/vespa_local
           set -x
-          python vespa_local.py start --Shards ${{ github.event.inputs.number_of_shards }} --Replicas ${{ github.event.inputs.number_of_replicas }}
+          START_SCRIPT_OUTPUT=$(python vespa_local.py start --Shards ${{ github.event.inputs.number_of_shards }} --Replicas ${{ github.event.inputs.number_of_replicas }})
           set +x
 
           echo "Waiting for Vespa to start"
@@ -206,14 +205,47 @@ jobs:
 
           # Deploy application with test schema
           curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
-
-          # wait for vespa to start (document url):
-          timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
-            (echo "Vespa (Document URL) did not start in time" && exit 1)
-
-          # TODO: If multinode, output status of all nodes, check distribution.
+    
+          # For single node: wait for vespa to start (document url):
+          if [[ "$VESPA_MULTINODE_SETUP" == "false" ]]; then
+            timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
+              (echo "Vespa (Document URL) did not start in time" && exit 1)
+            echo "Vespa document API is available. Local single node Vespa setup complete."
+            
+          elif [[ "$VESPA_MULTINODE_SETUP" == "true" ]]; then
+            # For multinode: wait for all vespa nodes to start
+            echo "Extracting URLs from vespa_local.py output..."
+            URL_LIST=$(echo "$START_SCRIPT_OUTPUT" | grep -Eo 'http://[^ ]+')
+      
+            if [[ -z "$URL_LIST" ]]; then
+                echo "Error: No URLs found in vespa_local.py output."
+                exit 1
+            fi
+      
+            echo "Found the following URLs to check:"
+            echo "$URL_LIST"
+      
+            # Total timeout in seconds (10 minutes)
+            TOTAL_TIMEOUT=600
+            INTERVAL=10
+            MAX_ATTEMPTS=$((TOTAL_TIMEOUT / INTERVAL))
           
-          echo "Vespa document API is available. Local Vespa setup complete."
+            for url in $URL_LIST; do
+                CURRENT_ATTEMPT=0
+                echo "Checking health of: $url"
+                while ! curl -f -s $url >/dev/null 2>&1; do
+                    echo "$url is not yet ready. Waiting for $INTERVAL seconds..."
+                    if [[ $CURRENT_ATTEMPT -ge $MAX_ATTEMPTS ]]; then
+                        echo "Error: Timeout reached. Exiting."
+                        exit 1
+                    fi
+                    sleep $INTERVAL
+                    ((CURRENT_ATTEMPT++))
+                done
+                echo "$url is ready."
+            done
+            echo "All API and content nodes are available. Local multinode Vespa setup complete."
+          fi
 
           # Delete the zip file
           rm vespa_tester_app.zip

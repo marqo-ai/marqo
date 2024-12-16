@@ -60,6 +60,7 @@ class VespaLocalMultiNode:
 
         # Config Nodes (3)
         nodes_created = 0
+        urls_to_health_check = []   # List all API and content node URLs here
         TOTAL_CONFIG_NODES = 3
         for config_node in range(TOTAL_CONFIG_NODES):
             services[f'config-{config_node}'] = {
@@ -118,6 +119,7 @@ class VespaLocalMultiNode:
                     'config-2': {'condition': 'service_healthy'}
                 }
             }
+            urls_to_health_check.append(f"http://localhost:{BASE_API_PORT_A + api_node}/state/v1/health")
             nodes_created += 1
 
         # Content Nodes
@@ -147,6 +149,7 @@ class VespaLocalMultiNode:
                         'config-2': {'condition': 'service_healthy'}
                     }
                 }
+                urls_to_health_check.append(f"http://localhost:{BASE_CONTENT_PORT_A + i}/state/v1/health")
                 i += 1
                 nodes_created += 1
 
@@ -166,6 +169,10 @@ class VespaLocalMultiNode:
         with open('multinode/docker-compose.yml', 'w') as f:
             yaml.dump(docker_compose, f, sort_keys=False)
         print(f"Generated `multinode/docker-compose.yml` successfully.")
+
+        print("Health check URLs:")
+        for url in urls_to_health_check:
+            print(url)
 
     @classmethod
     def generate_services_xml(cls, number_of_shards: int, number_of_replicas: int):
