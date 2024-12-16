@@ -493,7 +493,7 @@ class TestCreateIndex(MarqoTestCase):
 
         t1 = threading.Thread(target=delete_index)
         t1.start()
-        time.sleep(0.5)
+        time.sleep(0.2)
 
         try:
             with self.assertRaises(MarqoWebError) as e:
