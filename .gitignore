@@ -158,7 +158,6 @@ scripts/vespa_local/docker-compose.yml
 scripts/vespa_local/services.xml
 scripts/vespa_local/hosts.xml
 
-scripts/multinode/vespa_local/docker-compose.yml
-scripts/multinode/vespa_local/services.xml
-scripts/multinode/vespa_local/hosts.xml
-
+scripts/vespa_local/multinode/docker-compose.yml
+scripts/vespa_local/multinode/services.xml
+scripts/vespa_local/multinode/hosts.xml
