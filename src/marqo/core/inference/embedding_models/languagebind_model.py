@@ -84,7 +84,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
         self._model = self._model.to(self.device)
         self._model.eval()
 
-    def get_preprocessors(self):
+    def get_preprocessors(self) -> dict:
         return self._preprocessors
 
     def _check_loaded_components(self):
