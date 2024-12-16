@@ -20,3 +20,4 @@ class Modality(str, Enum):
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+    TEXT_2 = "text"
