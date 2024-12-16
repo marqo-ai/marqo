@@ -136,11 +136,12 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
         Each modality must have a corresponding location in the model location, except for text and language modalities.
         """
         model_location = values.get("modelLocation")
-        supported_modalities = values.get("supportedModalities")
-        for supported_modality in supported_modalities:
-            if supported_modality not in [Modality.TEXT, Modality.TEXT_2]: # Skip text
-                if not getattr(model_location, supported_modality.lower()):
-                    raise ValueError(f"Mismatch between supported modalities and model location. The supported "
-                                     f"modality {supported_modality} does not have a corresponding modelLocation "
-                                     f"in the model")
+        if model_location:
+            supported_modalities = values.get("supportedModalities")
+            for supported_modality in supported_modalities:
+                if supported_modality not in [Modality.TEXT, Modality.TEXT_2]: # Skip text
+                    if not getattr(model_location, supported_modality.lower()):
+                        raise ValueError(f"Mismatch between supported modalities and model location. The supported "
+                                         f"modality {supported_modality} does not have a corresponding modelLocation "
+                                         f"in the model")
         return values

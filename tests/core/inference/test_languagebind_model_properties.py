@@ -106,6 +106,11 @@ class TestLanguagebindModelProperties(unittest.TestCase):
                      "image": {"s3": {"Bucket": "test_bucket", "Key": "test_key"}},
                      "audio": {"hf": {"repoId": "test_repo"}}},
                  **base_model_properties}, "A mixture of all modalities and tokenizers from different locations"
+            ),
+            (
+                {"supportedModalities": [Modality.TEXT, Modality.IMAGE],
+                 "name": "test_model",
+                 **base_model_properties}, "Marqo registered model with name"
             )
         ]
 
