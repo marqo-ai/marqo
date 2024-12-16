@@ -43,22 +43,23 @@ class VespaLocalMultiNode:
 
         print(f"Creating `multinode/docker-compose.yml` with {number_of_shards} shards and {number_of_replicas} replicas.")
 
-        BASE_CONFIG_PORT_A = 19071
-        BASE_CONFIG_PORT_B = 19100
-        BASE_CONFIG_PORT_C = 19050
-        BASE_CONFIG_PORT_D = 20092
+        BASE_CONFIG_PORT_A = 19071                  # configserver (deploy here)
+        BASE_SLOBROK_PORT = 19100                   # slobrok
+        BASE_CLUSTER_CONTROLLER_PORT = 19050        # cluster-controller
+        BASE_ZOOKEEPER_PORT = 2181                  # zookeeper
+        BASE_METRICS_PROXY_PORT = 20092             # metrics-proxy (every node has it)
 
-        BASE_API_PORT_A = 8080
-        BASE_API_PORT_B = 20096
+        BASE_API_PORT_A = 8080                      # document/query API
+        BASE_DEBUG_PORT = 5005                      # debugging port
 
         BASE_CONTENT_PORT_A = 19107
-        BASE_CONTENT_PORT_B = 20100
 
         TOTAL_CONTENT_NODES = (number_of_replicas + 1) * number_of_shards
         TOTAL_API_NODES = max(MINIMUM_API_NODES, math.ceil(TOTAL_CONTENT_NODES / 4))
         print(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
 
         # Config Nodes (3)
+        nodes_created = 0
         TOTAL_CONFIG_NODES = 3
         for config_node in range(TOTAL_CONFIG_NODES):
             services[f'config-{config_node}'] = {
@@ -73,19 +74,24 @@ class VespaLocalMultiNode:
                 ],
                 'ports': [
                     f'{BASE_CONFIG_PORT_A+config_node}:19071',
-                    f'{BASE_CONFIG_PORT_B+config_node}:19100',
-                    f'{BASE_CONFIG_PORT_C+config_node}:19050',
-                    f'{BASE_CONFIG_PORT_D+config_node}:19092'
+                    f'{BASE_SLOBROK_PORT+config_node}:19100',
+                    f'{BASE_CLUSTER_CONTROLLER_PORT+config_node}:19050',
+                    f'{BASE_ZOOKEEPER_PORT+config_node}:2181',
+                    f'{BASE_METRICS_PROXY_PORT + nodes_created}:19092'
                 ],
-                'command': 'configserver,services'
+                'command': 'configserver,services',
+                'healthcheck': {
+                    'test': "curl http://localhost:19071/state/v1/health",
+                    'timeout': '10s',
+                    'retries': 3,
+                    'start_period': '40s'
+                }
             }
-            # Add additional ports for debugging and zookeeper to adminserver
+            # Add additional ports to adminserver
             if config_node == 0:
-                services[f'config-{config_node}']['ports'].extend([
-                    '19098:19098',  # for adminserver
-                    '5005:5005',  # for debugging
-                    '2181:2181'  # for zookeeper
-                ])
+                services[f'config-{config_node}']['ports'].append('19098:19098')
+
+            nodes_created += 1
 
 
         # API Nodes
@@ -102,10 +108,17 @@ class VespaLocalMultiNode:
                 ],
                 'ports': [
                     f'{BASE_API_PORT_A + api_node}:8080',
-                    f'{BASE_API_PORT_B + api_node}:19092'
+                    f'{BASE_DEBUG_PORT + api_node}:5005',
+                    f'{BASE_METRICS_PROXY_PORT + nodes_created}:19092'
                 ],
-                'command': 'services'
+                'command': 'services',
+                'depends_on': {
+                    'config-0': {'condition': 'service_healthy'},
+                    'config-1': {'condition': 'service_healthy'},
+                    'config-2': {'condition': 'service_healthy'}
+                }
             }
+            nodes_created += 1
 
         # Content Nodes
         i = 0  # counter of content nodes generated
@@ -114,7 +127,7 @@ class VespaLocalMultiNode:
                 node_name = f'content-{group}-{shard}'
                 host_ports = [
                     f'{BASE_CONTENT_PORT_A + i}:19107',
-                    f'{BASE_CONTENT_PORT_B + i}:19092'
+                    f'{BASE_METRICS_PROXY_PORT + nodes_created}:19092'
                 ]
                 services[node_name] = {
                     'image': f'vespaengine/vespa:{vespa_version or "latest"}',
@@ -127,9 +140,15 @@ class VespaLocalMultiNode:
                         'vespanet'
                     ],
                     'ports': host_ports,
-                    'command': 'services'
+                    'command': 'services',
+                    'depends_on': {
+                        'config-0': {'condition': 'service_healthy'},
+                        'config-1': {'condition': 'service_healthy'},
+                        'config-2': {'condition': 'service_healthy'}
+                    }
                 }
                 i += 1
+                nodes_created += 1
 
         # Define Networks
         networks = {
