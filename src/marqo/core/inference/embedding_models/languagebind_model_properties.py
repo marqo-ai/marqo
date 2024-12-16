@@ -92,9 +92,9 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
         Returns:
             Return the supported modalities if either 'text' or 'language' is in the supported modalities.
         """
-        if Modality.LANGUAGE not in v and Modality.TEXT not in v:
+        if Modality.TEXT not in v and Modality.TEXT not in v:
             raise ValueError("You model must include 'text' as a supported modality")
-        if Modality.LANGUAGE in v and Modality.TEXT in v:
+        if Modality.TEXT_2 in v and Modality.TEXT in v:
             raise ValueError("You cannot have both 'text' and 'language' as supported modalities. 'languege' is "
                              "deprecated and please use 'text' instead")
         return v
@@ -130,28 +130,17 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
 
     @root_validator(pre=False, skip_on_failure=True)
     def _validate_modalities_match_model_location(cls, values):
-        """Validate that the supported modalities match the model location.
+        """Validate that the supported modalities match the model location. We skip the check for text and tokenizers
+        as they are not required.
 
         Each modality must have a corresponding location in the model location, except for text and language modalities.
         """
         model_location = values.get("modelLocation")
-        if model_location:
-            # Get the modalities provided in model location and the supported modalities
-            provided_modalities = set(model_location.dict().keys())
-            supported_modalities = set(values.get("supportedModalities", []))
-
-            # Remove text and language modalities as they are exceptions
-            supported_modalities.discard(Modality.TEXT)
-            supported_modalities.discard(Modality.LANGUAGE)
-
-            # Validate if the modalities match
-            if supported_modalities != provided_modalities:
-                raise ValueError(
-                    "Mismatch between supported modalities and model location. "
-                    "Each supported modality must have a corresponding entry in the model location, "
-                    "except for the 'text' modality. "
-                    f"Supported modalities (excluding text/language): {supported_modalities}. "
-                    f"Provided model location modalities: {provided_modalities}. "
-                    f"Please ensure the modalities align properly or adjust the model properties"
-                )
+        supported_modalities = values.get("supportedModalities")
+        for supported_modality in supported_modalities:
+            if supported_modality not in [Modality.TEXT, Modality.TEXT_2]: # Skip text
+                if not getattr(model_location, supported_modality.lower()):
+                    raise ValueError(f"Mismatch between supported modalities and model location. The supported "
+                                     f"modality {supported_modality} does not have a corresponding modelLocation "
+                                     f"in the model")
         return values

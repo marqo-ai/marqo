@@ -1,13 +1,9 @@
 import unittest
-from unittest import mock
 
 import pytest
 from pydantic import ValidationError
 
 from marqo.core.inference.embedding_models.languagebind_model_properties import *
-from marqo.tensor_search.models.external_apis.hf import HfModelLocation, HfAuth
-from marqo.tensor_search.models.external_apis.s3 import S3Location, S3Auth
-from marqo.tensor_search.models.private_models import ModelLocation
 
 
 @pytest.mark.unittest
@@ -24,7 +20,7 @@ class TestLanguagebindModelProperties(unittest.TestCase):
         }
 
         test_cases = [
-            ({"supportedModalities": [Modality.LANGUAGE], **base_test_case}, "Must support one of audio, image, video"),
+            ({"supportedModalities": [Modality.TEXT], **base_test_case}, "Must support one of audio, image, video"),
             ({"supportedModalities": [Modality.IMAGE], **base_test_case},  "Text modality is required"),
             ({"supportedModalities": ["text1"], **base_test_case}, "Invalid modality, "
                                                                    "must be one of 'text', 'image', 'audio', 'video'"),
@@ -38,20 +34,6 @@ class TestLanguagebindModelProperties(unittest.TestCase):
                 with self.assertRaises(ValidationError) as context:
                     LanguagebindModelProperties(**test_case)
                 self.assertIn("supported_modalities", str(context.exception))
-
-    def test_supported_modalities_can_accept_both_text_and_language(self):
-        """Ensure that supported modalities can accept both 'text' and 'language'."""
-        base_test_case = {
-            "dimensions": 764,
-            "type": "languagebind",
-            "name": "test_model",
-        }
-        test_case = {
-            "supportedModalities": [Modality.LANGUAGE, Modality.LANGUAGE],
-            **base_test_case
-        }
-        properties = LanguagebindModelProperties(**test_case)
-        self.assertEqual(properties.supportedModalities, [Modality.LANGUAGE, Modality.LANGUAGE])
 
     def test_name_or_model_location_must_be_provided(self):
         """A test for checking that only one of name or modelLocation must be provided."""
@@ -81,8 +63,7 @@ class TestLanguagebindModelProperties(unittest.TestCase):
         language_bind_model_location = LanguagebindModelLocation(
             audio=ModalityLocation(url = "http://example.com"),
         )
-
-        supported_modalities = [Modality.LANGUAGE, Modality.IMAGE]
+        supported_modalities = [Modality.TEXT, Modality.IMAGE]
 
         with self.assertRaises(ValueError) as context:
             LanguagebindModelProperties(
@@ -93,115 +74,54 @@ class TestLanguagebindModelProperties(unittest.TestCase):
         self.assertIn("Mismatch between supported modalities and model location.",
                       str(context.exception))
 
+    def test_model_location_auth_required_validation(self):
+        """Test that authRequired can only be true for s3 or hf locations."""
+        with self.assertRaises(ValueError) as context:
+            ModalityLocation(url="http://example.com", authRequired=True)
+        self.assertIn("authRequired must be False when url is provided", str(context.exception))
 
+    def test_valid_model_properties(self):
+        """Test that valid model properties are accepted."""
+        base_model_properties = {
+            "dimensions": 764,
+            "type": "languagebind",
+        }
 
-    # def test_modality_location_invalid_url_and_auth(self):
-    #     with self.assertRaises(ValueError) as context:
-    #         ModalityLocation(url="http://example.com", authRequired=True)
-    #     self.assertIn("authRequired must be False when url is provided", str(context.exception))
-    #
-    # def test_languagebind_model_location_valid(self):
-    #     hf_auth = HfAuth(token="test_token")
-    #     hf_location = HfModelLocation(
-    #         repo_id="hf/test-model",
-    #         filename="model.bin",
-    #         auth=hf_auth
-    #     )
-    #     modality_location = ModalityLocation(hf=hf_location, authRequired=True)
-    #     model_location = LanguagebindModelLocation(audio=modality_location)
-    #     self.assertEqual(model_location.audio, modality_location)
-    #
-    # def test_languagebind_model_location_invalid_no_modality(self):
-    #     with self.assertRaises(ValueError) as context:
-    #         LanguagebindModelLocation()
-    #     self.assertIn("At least one of audio, image, video must be provided", str(context.exception))
-    #
-    # def test_languagebind_model_properties_valid(self):
-    #     hf_auth = HfAuth(token="test_token")
-    #     hf_location = HfModelLocation(
-    #         repo_id="hf/test-model",
-    #         filename="model.bin",
-    #         auth=hf_auth
-    #     )
-    #     modality_location = ModalityLocation(hf=hf_location, authRequired=True)
-    #     model_location = LanguagebindModelLocation(audio=modality_location)
-    #     properties = LanguagebindModelProperties(
-    #         name="test_model",
-    #         modelLocation=model_location,
-    #         supportedModalities=[Modality.LANGUAGE],
-    #         dimensions=768
-    #     )
-    #     self.assertEqual(properties.name, "test_model")
-    #     self.assertEqual(properties.modelLocation, model_location)
-    #
-    # def test_languagebind_model_properties_invalid_name_and_model_location(self):
-    #     hf_auth = HfAuth(token="test_token")
-    #     hf_location = HfModelLocation(
-    #         repo_id="hf/test-model",
-    #         filename="model.bin",
-    #         auth=hf_auth
-    #     )
-    #     modality_location = ModalityLocation(hf=hf_location, authRequired=True)
-    #     model_location = LanguagebindModelLocation(audio=modality_location)
-    #     with self.assertRaises(ValueError) as context:
-    #         LanguagebindModelProperties(
-    #             name="test_model",
-    #             modelLocation=model_location,
-    #             supportedModalities=[Modality.LANGUAGE],
-    #             dimensions=768
-    #         )
-    #     self.assertIn("Only one of name or modelLocation must be provided", str(context.exception))
-    #
-    # def test_languagebind_model_properties_invalid_modalities(self):
-    #     hf_auth = HfAuth(token="test_token")
-    #     hf_location = HfModelLocation(
-    #         repo_id="hf/test-model",
-    #         filename="model.bin",
-    #         auth=hf_auth
-    #     )
-    #     modality_location = ModalityLocation(hf=hf_location, authRequired=True)
-    #     model_location = LanguagebindModelLocation(audio=modality_location)
-    #     with self.assertRaises(ValueError) as context:
-    #         LanguagebindModelProperties(
-    #             modelLocation=model_location,
-    #             supportedModalities=[]
-    #         )
-    #     self.assertIn("You model must include 'text' as a supported modality", str(context.exception))
-    #
-    # def test_languagebind_model_properties_valid_modalities_with_text(self):
-    #     s3_auth = S3Auth(
-    #         aws_secret_access_key="test_secret",
-    #         aws_access_key_id="test_key"
-    #     )
-    #     s3_location = S3Location(
-    #         Bucket="test-bucket",
-    #         Key="model/key",
-    #         auth=s3_auth
-    #     )
-    #     modality_location = ModalityLocation(s3=s3_location, authRequired=True)
-    #     model_location = LanguagebindModelLocation(audio=modality_location)
-    #     properties = LanguagebindModelProperties(
-    #         modelLocation=model_location,
-    #         supportedModalities=[Modality.LANGUAGE],
-    #         dimensions=768
-    #     )
-    #     self.assertIn(Modality.LANGUAGE, properties.supportedModalities)
-    #
-    # def test_languagebind_model_properties_invalid_modality_without_location(self):
-    #     hf_auth = HfAuth(token="test_token")
-    #     hf_location = HfModelLocation(
-    #         repo_id="hf/test-model",
-    #         filename="model.bin",
-    #         auth=hf_auth
-    #     )
-    #     modality_location = ModalityLocation(hf=hf_location, authRequired=True)
-    #     model_location = LanguagebindModelLocation(audio=modality_location)
-    #
-    #     # Missing the 'image' modality in modelLocation while it's part of supportedModalities
-    #     with self.assertRaises(ValueError) as context:
-    #         LanguagebindModelProperties(
-    #             modelLocation=model_location,
-    #             supportedModalities=[Modality.LANGUAGE, Modality.IMAGE],  # Including 'text' as required
-    #             dimensions=768
-    #         )
-    #     self.assertIn("The supported modality 'image' is not in the model location", str(context.exception))
+        valid_model_properties_list = [
+            (
+                {"supportedModalities": [Modality.TEXT, Modality.IMAGE],
+                 "modelLocation": {"image": {"url": "http://example.com"}},
+                 **base_model_properties}, "Custom model with image modality from URL"
+            ),
+            (
+                {"supportedModalities": [Modality.TEXT, Modality.VIDEO],
+                 "modelLocation": {"video": {"hf": {"repoId": "test_repo"}}},
+                 **base_model_properties}, "Custom model with video modality from Hugging Face"
+            ),
+            (
+                {"supportedModalities": [Modality.TEXT, Modality.VIDEO, Modality.IMAGE, Modality.AUDIO],
+                 "modelLocation": {
+                     "tokenizer": {"hf": {"repoId": "test_repo"}},
+                     "video": {"url": "http://example.com/video"},
+                     "image": {"s3": {"Bucket": "test_bucket", "Key": "test_key"}},
+                     "audio": {"hf": {"repoId": "test_repo"}}},
+                 **base_model_properties}, "A mixture of all modalities and tokenizers from different locations"
+            )
+        ]
+
+        for model_properties, msg in valid_model_properties_list:
+            with self.subTest(msg=msg):
+                LanguagebindModelProperties(**model_properties)
+
+    def test_model_location_exactly_one_field(self):
+        """Test that exactly one of url, s3, or hf must be provided in ModalityLocation."""
+        test_cases = [
+            ({}, "No field provided"),
+            ({"url": "http://example.com", "s3": S3Location(Bucket="test", Key="test")}, "Multiple fields provided"),
+        ]
+
+        for test_case, msg in test_cases:
+            with self.subTest(msg=msg):
+                with self.assertRaises(ValueError) as context:
+                    ModalityLocation(**test_case)
+                self.assertIn("Exactly one of url, s3, hf must be provided", str(context.exception))
