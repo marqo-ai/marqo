@@ -45,10 +45,11 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small", "intfloat/multilingual-e5-large", "intfloat/e5-large-v2",
+                    "intfloat/e5-small-v2", "intfloat/multilingual-e5-base"]
 
-        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
+        names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5", "BAAI/bge-base-en-v1.5",  "BAAI/bge-large-en-v1.5"]
 
         # TODO: Re-add snowflake models when HF pooling issue is resolved
         # names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
@@ -84,7 +85,7 @@ class TestEncoding(unittest.TestCase):
                                 try:
                                     self.assertEqual(np.allclose(output_m, embeddings_python_3_8[name][sentence],
                                                                  atol=1e-6),
-                                                 True)
+                                                 True, f"Calculated embeddings do not match hardcoded embeddings for model: {name}, sentence: {sentence}. Printing output: {output_m}")
                                 except KeyError:
                                     raise KeyError(f"Hardcoded Python 3.8 embeddings not found for "
                                                    f"model: {name}, sentence: {sentence} in JSON file: "
@@ -98,7 +99,7 @@ class TestEncoding(unittest.TestCase):
 
 
     def test_vectorize_normalise(self):
-        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k"]
+        open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k", "Marqo/ViT-B-32.laion2b_s34b_b79k"]
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
 
@@ -136,8 +137,8 @@ class TestEncoding(unittest.TestCase):
                  "all-MiniLM-L6-v1", "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5"]
 
@@ -195,8 +196,8 @@ class TestEncoding(unittest.TestCase):
     def test_load_hf_text_model(self):
         names = ["hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6", "hf/bge-small-en-v1.5"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
 
         device = 'cpu'
@@ -248,8 +249,8 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -272,8 +273,8 @@ class TestEncoding(unittest.TestCase):
                  "all_datasets_v4_MiniLM-L6", "hf/all-MiniLM-L6-v1", "hf/all_datasets_v4_MiniLM-L6",
                  "hf/bge-small-en-v1.5", "onnx/all-MiniLM-L6-v1", "onnx/all_datasets_v4_MiniLM-L6"]
 
-        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2",
-                    "hf/multilingual-e5-small"]
+        names_e5 = ["hf/e5-small", "hf/e5-base", "hf/e5-small-unsupervised", "hf/e5-base-unsupervised", "hf/e5-base-v2", "intfloat/e5-base-v2",
+                    "hf/multilingual-e5-small", "intfloat/multilingual-e5-small"]
         names += names_e5
                  
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
@@ -334,8 +335,8 @@ class TestOpenClipModelEncoding(unittest.TestCase):
 
     def setUp(self) -> None:
         self.open_clip_test_model = [
-            'open_clip/RN50/yfcc15m', 'open_clip/ViT-B-32/laion2b_s34b_b79k',
-            'open_clip/ViT-B-16/laion2b_s34b_b88k', 'open_clip/convnext_base/laion400m_s13b_b51k',
+            'open_clip/RN50/yfcc15m', 'Marqo/ViT-B-32.laion2b_s34b_b79k', 'open_clip/ViT-B-32/laion2b_s34b_b79k',
+            'open_clip/ViT-B-16/laion2b_s34b_b88k', 'Marqo/ViT-B-16.laion2b_s34b_b88k', 'open_clip/convnext_base/laion400m_s13b_b51k',
             'open_clip/convnext_base_w/laion_aesthetic_s13b_b82k',
             'open_clip/coca_ViT-B-32/mscoco_finetuned_laion2b_s13b_b90k',
             'open_clip/EVA02-B-16/merged2b_s8b_b131k',

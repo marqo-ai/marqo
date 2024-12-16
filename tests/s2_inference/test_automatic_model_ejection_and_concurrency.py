@@ -40,6 +40,7 @@ class TestAutomaticModelEject(unittest.TestCase):
         small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
                                 "sentence-transformers/all-MiniLM-L6-v2",
                                 "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
+                                'Marqo/ViT-B-16.laion2b_s34b_b88k',
                                 'open_clip/ViT-B-16/laion2b_s34b_b88k']
         content = "Try to kill the cpu"
 
@@ -56,6 +57,7 @@ class TestAutomaticModelEject(unittest.TestCase):
         small_list_of_models = ['open_clip/convnext_base_w_320/laion_aesthetic_s13b_b82k',
                                 "sentence-transformers/all-MiniLM-L6-v2",
                                 "flax-sentence-embeddings/all_datasets_v4_mpnet-base",
+                                'Marqo/ViT-B-16.laion2b_s34b_b88k',
                                 'open_clip/ViT-B-16/laion2b_s34b_b88k']
 
         content = "Try to kill the cpu"
