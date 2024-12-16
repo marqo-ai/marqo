@@ -129,7 +129,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
                 "audio": None
             }
             for modality in self.model_properties.supportedModalities:
-                if modality == Modality.TEXT:
+                if modality == Modality.LANGUAGE:
                     continue
                 model_location: ModalityLocation = getattr(self.model_properties.modelLocation, modality)
                 if model_location is None:
@@ -201,7 +201,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
             raise MediaMismatchError(f"The provided modality is not supported by the model. This model support "
                                      f"the following modalities: {self.model_properties.supportedModalities}")
 
-        if modality == Modality.TEXT:
+        if modality == Modality.LANGUAGE:
             return self._encode_text(content, normalize)
         elif modality == Modality.IMAGE:
             return self._encode_image(content, normalize, media_download_headers)
