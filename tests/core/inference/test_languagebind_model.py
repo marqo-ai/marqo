@@ -19,7 +19,7 @@ class TestLanguagebindModels(unittest.TestCase):
     to the vector database.
     """
     AUDIO_HF_REPO_NAME = "Marqo/LanguageBind_Audio_FT"
-    IMAGE_HF_REPO_NAME = "Marqo/LanguageBind_Image_FT"
+    IMAGE_HF_REPO_NAME = "Marqo/LanguageBind_Image"
     VIDEO_HF_REPO_NAME = "Marqo/LanguageBind_Video_V1.5_FT"
 
     def _help_test_encode_text_modality(self, model: LanguagebindModel, dimension = 764):
