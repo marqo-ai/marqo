@@ -154,3 +154,30 @@ class TestLanguagebindModels(unittest.TestCase):
         for test_case, msg, in test_cases:
             with self.subTest(msg=msg):
                 test_case(model)
+
+    def test_loading_languagebind_model_from_a_zip_on_s3(self):
+        """A test for loading a LanguagebindModel from a zip file on S3."""
+        model_properties = {
+            "dimensions": 768,
+            "type": "languagebind",
+            "supportedModalities": ["text", "image", "audio", "video"],
+            "modelLocation": {
+                "image": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Image.zip"}},
+                "audio": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Audio_FT.zip"}},
+                "video": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Video_V1.5_FT.zip"}}
+            }
+        }
+
+        model = LanguagebindModel(device="cuda", model_properties=model_properties)
+        model.load()
+
+        test_cases = [
+            (self._help_test_encode_text_modality, "Test text modality"),
+            (self._help_test_encode_image_modality, "Test image modality"),
+            (self._help_test_encode_audio_modality, "Test audio modality"),
+            (self._help_test_encode_video_modality, "Test video modality")
+        ]
+
+        for test_case, msg, in test_cases:
+            with self.subTest(msg=msg):
+                test_case(model)
