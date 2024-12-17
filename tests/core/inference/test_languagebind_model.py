@@ -7,8 +7,11 @@ from marqo.core.inference.embedding_models.languagebind_model_properties import 
 from marqo.core.inference.image_download import format_and_load_CLIP_images
 from marqo.s2_inference.s2_inference import _convert_vectorized_output
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
+import os
 
 
 @mark.unittest
@@ -21,8 +24,10 @@ class TestLanguagebindModels(unittest.TestCase):
     AUDIO_HF_REPO_NAME = "Marqo/LanguageBind_Audio_FT"
     IMAGE_HF_REPO_NAME = "Marqo/LanguageBind_Image"
     VIDEO_HF_REPO_NAME = "Marqo/LanguageBind_Video_V1.5_FT"
+    aws_access_key_id = os.getenv("PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID", None)
+    aws_secret_access_key = os.getenv("PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY", None)
 
-    def _help_test_encode_text_modality(self, model: LanguagebindModel, dimension = 768):
+    def _help_test_encode_text_modality(self, model: LanguagebindModel, dimension=768):
         """A helper function for testing the encode method for text modality.
 
         The Languagebind model should be able to encode text in the following formats:
@@ -36,7 +41,7 @@ class TestLanguagebindModels(unittest.TestCase):
         for test_case in test_cases:
             output = model.encode(test_case, modality=Modality.TEXT)
             converted_output = _convert_vectorized_output(output)
-            self.assertEqual(len(converted_output ), len(test_case) if isinstance(test_case, list) else 1)
+            self.assertEqual(len(converted_output), len(test_case) if isinstance(test_case, list) else 1)
             for tensor in converted_output:
                 self.assertEqual(dimension, len(tensor))
 
@@ -67,7 +72,7 @@ class TestLanguagebindModels(unittest.TestCase):
             for tensor in converted_output:
                 self.assertEqual(dimension, len(tensor))
 
-    def _help_test_encode_audio_modality(self, model, dimension = 768):
+    def _help_test_encode_audio_modality(self, model, dimension=768):
         """A helper function for testing the encode method for audio modality.
 
         The languagebind model should be able to encode images in the following formats:
@@ -79,18 +84,18 @@ class TestLanguagebindModels(unittest.TestCase):
             TestAudioUrls.AUDIO1.value,
             [TestAudioUrls.AUDIO2.value, TestAudioUrls.AUDIO3.value]
         ]
-        
+
         list_of_audios = [TestAudioUrls.AUDIO2.value, TestAudioUrls.AUDIO3.value]
         list_of_processed_audio = []
         for audio in list_of_audios:
             streaming_media_processor = StreamingMediaProcessor(
-                url = audio, device="cuda", modality=Modality.AUDIO, 
+                url=audio, device="cuda", modality=Modality.AUDIO,
                 preprocessors=Preprocessors(**model.get_preprocessors()),
             )
             list_of_processed_audio.append(streaming_media_processor.process_media()[0]["tensor"])
-            
+
         test_cases.append(list_of_processed_audio)
-        
+
         for test_case in test_cases:
             output = model.encode(test_case, modality=Modality.AUDIO)
             converted_output = _convert_vectorized_output(output)
@@ -98,7 +103,7 @@ class TestLanguagebindModels(unittest.TestCase):
             for tensor in converted_output:
                 self.assertEqual(dimension, len(tensor))
 
-    def _help_test_encode_video_modality(self, model, dimension = 768):
+    def _help_test_encode_video_modality(self, model, dimension=768):
         """A helper function for testing the encode method for video modality.
 
         The languagebind model should be able to encode images in the following formats:
@@ -164,11 +169,18 @@ class TestLanguagebindModels(unittest.TestCase):
             "modelLocation": {
                 "image": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Image.zip"}},
                 "audio": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Audio_FT.zip"}},
-                "video": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Video_V1.5_FT.zip"}}
+                "video": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Video_V1.5_FT.zip"}},
+                "authRequired": True
             }
         }
 
-        model = LanguagebindModel(device="cuda", model_properties=model_properties)
+        model_auth = ModelAuth(
+            s3=S3Auth(
+                aws_secret_access_key=self.aws_secret_access_key,
+                aws_access_key_id=self.aws_access_key_id)
+        )
+        model = LanguagebindModel(
+            device="cuda", model_properties=model_properties, model_auth=model_auth)
         model.load()
 
         test_cases = [
