@@ -87,7 +87,7 @@ class TestLanguagebindModels(unittest.TestCase):
                 url = audio, device="cuda", modality=Modality.AUDIO, 
                 preprocessors=Preprocessors(**model.get_preprocessors()),
             )
-            list_of_processed_audio.append(streaming_media_processor.process_media())
+            list_of_processed_audio.append(streaming_media_processor.process_media()[0]["tensor"])
             
         test_cases.append(list_of_processed_audio)
         
@@ -119,8 +119,7 @@ class TestLanguagebindModels(unittest.TestCase):
                 preprocessors=Preprocessors(**model.get_preprocessors()),
                 enable_video_gpu_acceleration=True
             )
-            (list_of_processed_videos.append
-             (streaming_media_processor.process_media()))
+            list_of_processed_videos.append(streaming_media_processor.process_media()[0]["tensor"])
         test_cases.append(list_of_processed_videos)
         for test_case in test_cases:
             output = model.encode(test_case, modality=Modality.VIDEO)
