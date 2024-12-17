@@ -133,7 +133,6 @@ class TestLanguagebindModels(unittest.TestCase):
         model_properties = {
             "dimensions": 764,
             "type": "languagebind",
-            "name": "test_model",
             "supportedModalities": ["text", "image", "audio", "video"],
             "modelLocation": {
                 "image": {"hf": {"repoId": self.IMAGE_HF_REPO_NAME}},
