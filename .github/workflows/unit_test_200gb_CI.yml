@@ -92,13 +92,13 @@ jobs:
         run: |
           # Initialize as false
           echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
-          echo "IGNORED_TESTS=\"\"" >> $GITHUB_OUTPUT
+          echo "IGNORED_TESTS=" >> $GITHUB_OUTPUT
           
           # Check if the event is workflow_call or workflow_dispatch
           if [[ "${{ github.event_name }}" == "workflow_call" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
-            NUMBER_OF_SHARDS="${{ github.event.inputs.number_of_shards || 1 }}"
-            NUMBER_OF_REPLICAS="${{ github.event.inputs.number_of_replicas || 0 }}"
+            NUMBER_OF_SHARDS="${{ inputs.number_of_shards || 1 }}"
+            NUMBER_OF_REPLICAS="${{ inputs.number_of_replicas || 0 }}"
           
             # Convert inputs to integers
             NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
@@ -189,7 +189,7 @@ jobs:
           
           cd marqo/scripts/vespa_local
           set -x
-          START_SCRIPT_OUTPUT=$(python vespa_local.py start --Shards ${{ github.event.inputs.number_of_shards }} --Replicas ${{ github.event.inputs.number_of_replicas }})
+          START_SCRIPT_OUTPUT=$(python vespa_local.py start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }})
           set +x
 
           echo "Waiting for Vespa to start"
