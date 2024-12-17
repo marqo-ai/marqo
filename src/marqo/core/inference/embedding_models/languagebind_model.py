@@ -199,8 +199,8 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
         if modality not in [Modality.TEXT,
                             Modality.TEXT_2] and modality not in self.model_properties.supportedModalities:
-            raise MediaMismatchError(f"The provided modality is not supported by the model. This model supports "
-                                     f"the following modalities: {self.model_properties.supportedModalities}")
+            raise MediaMismatchError(f"The provided modality {modality} is not supported by the model. This model "
+                                     f"supports the following modalities: {self.model_properties.supportedModalities}")
 
         if modality in [Modality.TEXT, Modality.TEXT_2]:
             return self._encode_text(content, normalize)

@@ -22,7 +22,7 @@ class TestLanguagebindModels(unittest.TestCase):
     IMAGE_HF_REPO_NAME = "Marqo/LanguageBind_Image"
     VIDEO_HF_REPO_NAME = "Marqo/LanguageBind_Video_V1.5_FT"
 
-    def _help_test_encode_text_modality(self, model: LanguagebindModel, dimension = 764):
+    def _help_test_encode_text_modality(self, model: LanguagebindModel, dimension = 768):
         """A helper function for testing the encode method for text modality.
 
         The Languagebind model should be able to encode text in the following formats:
@@ -40,7 +40,7 @@ class TestLanguagebindModels(unittest.TestCase):
             for tensor in converted_output:
                 self.assertEqual(dimension, len(tensor))
 
-    def _help_test_encode_image_modality(self, model: LanguagebindModel, dimension=764):
+    def _help_test_encode_image_modality(self, model: LanguagebindModel, dimension=768):
         """A helper function for testing the encode method for image modality.
 
         The languagebind model should be able to encode images in the following formats:
@@ -66,7 +66,7 @@ class TestLanguagebindModels(unittest.TestCase):
             for tensor in converted_output:
                 self.assertEqual(dimension, len(tensor))
 
-    def _help_test_encode_audio_modality(self, model, dimension = 764):
+    def _help_test_encode_audio_modality(self, model, dimension = 768):
         """A helper function for testing the encode method for audio modality.
 
         The languagebind model should be able to encode images in the following formats:
@@ -97,7 +97,7 @@ class TestLanguagebindModels(unittest.TestCase):
             for tensor in converted_output:
                 self.assertEqual(dimension, len(tensor))
 
-    def _help_test_encode_video_modality(self, model, dimension = 764):
+    def _help_test_encode_video_modality(self, model, dimension = 768):
         """A helper function for testing the encode method for video modality.
 
         The languagebind model should be able to encode images in the following formats:
@@ -131,7 +131,7 @@ class TestLanguagebindModels(unittest.TestCase):
     def test_loading_languagebind_model_from_a_hf_repo(self):
         """A test for loading a LanguagebindModel from a Hugging Face repo."""
         model_properties = {
-            "dimensions": 764,
+            "dimensions": 768,
             "type": "languagebind",
             "supportedModalities": ["text", "image", "audio", "video"],
             "modelLocation": {
