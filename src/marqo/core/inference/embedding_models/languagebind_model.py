@@ -129,7 +129,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
                 "audio": None
             }
             for modality in self.model_properties.supportedModalities:
-                if modality == Modality.TEXT:
+                if modality == Modality.TEXT or modality == Modality.TEXT_2:
                     continue
                 model_location: ModalityLocation = getattr(self.model_properties.modelLocation, modality)
                 if model_location is None:
