@@ -1,5 +1,4 @@
-import torch
-from torch import nn, Tensor
+from torch import nn
 
 from .audio.configuration_audio import LanguageBindAudioConfig
 from .audio.modeling_audio import LanguageBindAudio
@@ -65,5 +64,5 @@ class LanguageBind(nn.Module):
 
 
 def to_device(x, device):
-    out_dict = {k: v.to(device) for k, v in x.items() if isinstance(v, Tensor)}
+    out_dict = {k: v.to(device) for k, v in x.items()}
     return out_dict

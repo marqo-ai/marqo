@@ -190,7 +190,7 @@ def is_preprocessor_preload(model_properties: dict = None) -> bool:
         model_properties: Validated model properties. The model properties should have been validated in marqo_index
     """
     model_type = model_properties.get("type", None)
-    return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
+    return model_type in constants.PREPROCESS_PRELOAD_MODELS
 
 
 def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
