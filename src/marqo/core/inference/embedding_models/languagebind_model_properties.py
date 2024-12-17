@@ -92,7 +92,7 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
         Returns:
             Return the supported modalities if either 'text' or 'language' is in the supported modalities.
         """
-        if Modality.TEXT not in v and Modality.TEXT not in v:
+        if Modality.TEXT not in v and Modality.TEXT_2 not in v:
             raise ValueError("You model must include 'text' as a supported modality")
         if Modality.TEXT_2 in v and Modality.TEXT in v:
             raise ValueError("You cannot have both 'text' and 'language' as supported modalities. 'languege' is "

@@ -1,17 +1,14 @@
-from marqo.core.inference.embedding_models.languagebind_model import LanguagebindModel
-from pytest import mark
-
 import unittest
 
-import pytest
-from pydantic import ValidationError
+from pytest import mark
 
+from marqo.core.inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.core.inference.embedding_models.languagebind_model_properties import *
-from marqo.s2_inference.s2_inference import _convert_vectorized_output
-from tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
 from marqo.core.inference.image_download import format_and_load_CLIP_images
-from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+from marqo.s2_inference.s2_inference import _convert_vectorized_output
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
+from tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
 
 
 @mark.unittest
