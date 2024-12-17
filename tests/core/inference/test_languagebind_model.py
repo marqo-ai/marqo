@@ -52,7 +52,8 @@ class TestLanguagebindModels(unittest.TestCase):
             TestImageUrls.IMAGE2.value,
             [TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value],
         ]
-        list_of_pil_images = format_and_load_CLIP_images([TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value])
+        list_of_pil_images = format_and_load_CLIP_images(
+            [TestImageUrls.IMAGE1.value, TestImageUrls.IMAGE2.value], dict())
 
         list_of_processed_image = [
             model.get_preprocessors()[Modality.IMAGE.value](image, return_tensors='pt') for image in list_of_pil_images
