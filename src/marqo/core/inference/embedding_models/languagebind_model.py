@@ -197,11 +197,12 @@ class LanguagebindModel(AbstractEmbeddingModel):
         if media_download_headers is None:
             media_download_headers = dict()
 
-        if modality not in self.model_properties.supportedModalities:
-            raise MediaMismatchError(f"The provided modality is not supported by the model. This model support "
+        if modality not in [Modality.TEXT,
+                            Modality.TEXT_2] and modality not in self.model_properties.supportedModalities:
+            raise MediaMismatchError(f"The provided modality is not supported by the model. This model supports "
                                      f"the following modalities: {self.model_properties.supportedModalities}")
 
-        if modality == Modality.TEXT:
+        if modality in [Modality.TEXT, Modality.TEXT_2]:
             return self._encode_text(content, normalize)
         elif modality == Modality.IMAGE:
             return self._encode_image(content, normalize, media_download_headers)
