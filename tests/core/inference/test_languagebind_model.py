@@ -92,7 +92,7 @@ class TestLanguagebindModels(unittest.TestCase):
         test_cases.append(list_of_processed_audio)
         
         for test_case in test_cases:
-            output = model.encode(test_case, modality=Modality.IMAGE)
+            output = model.encode(test_case, modality=Modality.AUDIO)
             converted_output = _convert_vectorized_output(output)
             self.assertEqual(len(converted_output), len(test_case) if isinstance(test_case, list) else 1)
             for tensor in converted_output:
@@ -123,7 +123,7 @@ class TestLanguagebindModels(unittest.TestCase):
              (streaming_media_processor.process_media()))
         test_cases.append(list_of_processed_videos)
         for test_case in test_cases:
-            output = model.encode(test_case, modality=Modality.IMAGE)
+            output = model.encode(test_case, modality=Modality.VIDEO)
             converted_output = _convert_vectorized_output(output)
             self.assertEqual(len(converted_output), len(test_case) if isinstance(test_case, list) else 1)
             for tensor in converted_output:
