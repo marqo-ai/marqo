@@ -2,7 +2,7 @@ import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.0.0')
+@pytest.mark.marqo_version('2.5.0')
 class TestEmbed(BaseCompatibilityTestCase):
     indexes_to_test_on = [{
         "indexName": "test_embed_api_index",

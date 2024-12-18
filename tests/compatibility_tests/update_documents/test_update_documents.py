@@ -3,7 +3,7 @@ import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 
-@pytest.mark.marqo_version('2.0.0')
+@pytest.mark.marqo_version('2.3.0')
 class TestUpdateDocuments(BaseCompatibilityTestCase):
     structured_index_name = "update_doc_api_test_structured_index"
 

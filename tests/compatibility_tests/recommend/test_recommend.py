@@ -2,7 +2,7 @@ import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.0.0')
+@pytest.mark.marqo_version('2.5.0')
 class TestRecommend(BaseCompatibilityTestCase):
 
     image_model = 'open_clip/ViT-B-32/laion2b_s34b_b79k'
