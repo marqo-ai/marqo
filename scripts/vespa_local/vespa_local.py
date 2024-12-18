@@ -68,7 +68,9 @@ class VespaLocalMultiNode:
                 'container_name': f'config-{config_node}',
                 'hostname': f'config-{config_node}.vespanet',
                 'environment': [
-                    'VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet'
+                    'VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet',
+                    'VESPA_CONFIGSERVER_JVMARGS="-Xms32M -Xmx128M"',
+                    'VESPA_CONFIGPROXY_JVMARGS="-Xms32M -Xmx128M"',
                 ],
                 'networks': [
                     'vespanet'
