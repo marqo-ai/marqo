@@ -42,12 +42,20 @@ class TestAudioUrls(str, Enum):
     AUDIO2 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115545-C-48.wav"
     AUDIO3 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-119125-A-45.wav"
 
+    MP3_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.mp3"
+    ACC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
+    OGG_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
+
 
 class TestVideoUrls(str, Enum):
     __test__ = False
     VIDEO1 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
     VIDEO2 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4"
     VIDEO3 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--mI_-gaZLk_000018_000028.mp4"
+
+    MKV_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.mkv"
+    WEBM_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.webm"
+    AVI_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.avi"
 
 
 
