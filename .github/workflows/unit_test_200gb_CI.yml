@@ -48,7 +48,41 @@ permissions:
   contents: read
 
 jobs:
+  Determine-Vespa-Setup:
+    runs-on: ubuntu-latest
+    outputs:
+      VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
+      IGNORED_TESTS: ${{ steps.set_var.outputs.IGNORED_TESTS }}
+    steps:
+      - name: Determine VESPA_MULTINODE_SETUP
+        id: set_var
+        run: |
+          # Initialize as false
+          echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
+          echo "IGNORED_TESTS=" >> $GITHUB_OUTPUT
+
+          # Check if the event is workflow_call or workflow_dispatch
+          if [[ "${{ github.event_name }}" == "workflow_call" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
+            NUMBER_OF_SHARDS="${{ inputs.number_of_shards || 1 }}"
+            NUMBER_OF_REPLICAS="${{ inputs.number_of_replicas || 0 }}"
+
+            # Convert inputs to integers
+            NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
+            NUMBER_OF_REPLICAS_INT=$(echo "$NUMBER_OF_REPLICAS" | awk '{print int($0)}')
+
+            # Evaluate the conditions
+            if [[ "$NUMBER_OF_SHARDS_INT" -gt 1 || "$NUMBER_OF_REPLICAS_INT" -gt 0 ]]; then
+              echo "Using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
+              echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
+              # If multinode vespa, ignore unrelated tests to save time
+              echo "IGNORED_TESTS=--ignore=tests/core/inference --ignore=tests/processing --ignore=tests/s2_inference" >> $GITHUB_OUTPUT
+            fi
+          fi
+
   Start-Runner:
+    needs:
+      - Determine-Vespa-Setup
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
     outputs:
@@ -68,7 +102,8 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           ec2-image-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-          ec2-instance-type: m6i.xlarge
+          # m6i.xlarge if single node vespa, but m6i.2xlarge if multinode vespa
+          ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
           subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
           security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
           aws-resource-tags: > # optional, requires additional permissions
@@ -80,38 +115,6 @@ jobs:
               {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
               {"Key": "PoloRole", "Value": "testing"}
             ]
-
-  Determine-Vespa-Setup:
-    runs-on: ubuntu-latest
-    outputs:
-      VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
-      IGNORED_TESTS: ${{ steps.set_var.outputs.IGNORED_TESTS }}
-    steps:
-      - name: Determine VESPA_MULTINODE_SETUP
-        id: set_var
-        run: |
-          # Initialize as false
-          echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
-          echo "IGNORED_TESTS=" >> $GITHUB_OUTPUT
-          
-          # Check if the event is workflow_call or workflow_dispatch
-          if [[ "${{ github.event_name }}" == "workflow_call" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
-            NUMBER_OF_SHARDS="${{ inputs.number_of_shards || 1 }}"
-            NUMBER_OF_REPLICAS="${{ inputs.number_of_replicas || 0 }}"
-          
-            # Convert inputs to integers
-            NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
-            NUMBER_OF_REPLICAS_INT=$(echo "$NUMBER_OF_REPLICAS" | awk '{print int($0)}')
-          
-            # Evaluate the conditions
-            if [[ "$NUMBER_OF_SHARDS_INT" -gt 1 || "$NUMBER_OF_REPLICAS_INT" -gt 0 ]]; then
-              echo "Using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
-              echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
-              # If multinode vespa, ignore unrelated tests to save time
-              echo "IGNORED_TESTS=--ignore=tests/core/inference --ignore=tests/processing --ignore=tests/s2_inference" >> $GITHUB_OUTPUT
-            fi
-          fi
 
   Test-Marqo:
     name: Run Unit Tests
