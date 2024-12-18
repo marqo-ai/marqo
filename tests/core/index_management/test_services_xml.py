@@ -201,6 +201,10 @@ class TestIndexSettingStore(unittest.TestCase):
         self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
 
     def test_config_components_should_preserve_document_processing_nodes(self):
+        """
+        This test case tests that document-processing node in the `container` section is preserved when configuring
+        components since it is usually referenced in the `content` section, and we do not change content section.
+        """
         xml = """<?xml version="1.0" encoding="utf-8" ?>
                             <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
                                 <container id="default" version="1.0">
