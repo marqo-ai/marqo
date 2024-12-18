@@ -78,7 +78,9 @@ jobs:
     name: Run CPU Local Marqo API Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-
+    defaults:
+      run:
+        working-directory: tests/api-tests/v1
     environment: marqo-test-suite
 
     steps:
@@ -94,7 +96,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -r tests/api-tests/v1/requirements.txt
+          pip install -r requirements.txt
 
       - name: Set MQ_PY_MARQO_BRANCH variable
         run: |
@@ -116,14 +118,14 @@ jobs:
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
           export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           export TESTING_CONFIGURATION=CPU_LOCAL_MARQO
-          export MARQO_API_TESTS_ROOT=tests/api-tests/v1
+          export MARQO_API_TESTS_ROOT=$(pwd)
           export MARQO_IMAGE_NAME=$MQ_API_TEST_IMG
           
           DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 -q
           
-          bash tests/api-tests/v1/scripts/start_local_marqo.sh $MQ_API_TEST_IMG
+          bash scripts/start_local_marqo.sh $MQ_API_TEST_IMG
           
-          pytest tests/api-tests/v1/tests/
+          pytest tests/
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
