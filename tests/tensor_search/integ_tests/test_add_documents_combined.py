@@ -1292,7 +1292,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                                 "audio_field_1"] if index == self.unstructured_language_bind_index_name else None
                         )
                     )
-                    self.assertFalse(res.errors)
+                    self.assertFalse(res.errors, msg=res.dict())
                     self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
                     self.assertGreaterEqual(self.monitoring.get_index_stats_by_name(index_name=index).number_of_vectors,
                                             1)
@@ -1332,7 +1332,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                                 "video_field_1"] if index == self.unstructured_language_bind_index_name else None
                         )
                     )
-                    self.assertFalse(res.errors)
+                    self.assertFalse(res.errors, msg=res.dict())
                     self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
                     self.assertGreaterEqual(self.monitoring.get_index_stats_by_name(index_name=index).number_of_vectors,
                                             1)
