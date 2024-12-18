@@ -116,14 +116,16 @@ jobs:
       - name: Run Integration Tests - CPU Local Marqo
         run: |
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
-          export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           export TESTING_CONFIGURATION=CPU_LOCAL_MARQO
           export MARQO_API_TESTS_ROOT=$(pwd)
-          export MARQO_IMAGE_NAME=$MQ_API_TEST_IMG
+          export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
           
-          DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0 -q
+          if [ "$MARQO_IMAGE_NAME" = "marqo_docker_0" ]; then
+            echo "Building Marqo image as no image identifier was provided"
+            DOCKER_BUILDKIT=1 docker build . -t marqo_docker_0
+          fi
           
-          bash scripts/start_local_marqo.sh $MQ_API_TEST_IMG
+          bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
           pytest tests/
 
