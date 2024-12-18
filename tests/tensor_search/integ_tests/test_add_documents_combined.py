@@ -1276,7 +1276,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
         for test_case, audio_format in test_cases:
             for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
                 with self.subTest(f"{index} - {audio_format}"):
-                    self.clear_index_by_name(index_name=index)
+                    self.clear_index_by_name(index_name=self.index_management.get_index(index_name=index).schema_name)
                     self.assertEqual(0, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
                     document = {
                         "audio_field_1": test_case,
@@ -1316,7 +1316,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
         for test_case, audio_format in test_cases:
             for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
                 with self.subTest(f"{index} - {audio_format}"):
-                    self.clear_index_by_name(index_name=index)
+                    self.clear_index_by_name(index_name=self.index_management.get_index(index_name=index).schema_name)
                     self.assertEqual(0, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
                     document = {
                         "video_field_1": test_case,

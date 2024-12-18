@@ -120,6 +120,7 @@ class MarqoTestCase(unittest.TestCase):
             self.clear_index_by_name(index.schema_name)
 
     def clear_index_by_name(self, index_name: str):
+        """Not that the index_name here is the schema_name, not the index name"""
         self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)
 
     def random_index_name(self) -> str:
