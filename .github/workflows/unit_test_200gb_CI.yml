@@ -1,5 +1,5 @@
 name: unit_test_200gb_CI
-run-name: Unit Tests with ${{ inputs.number_of_shards }} shards and ${{ inputs.number_of_replicas }} replicas
+run-name: Unit Tests with ${{ inputs.number_of_shards || 1 }} shards and ${{ inputs.number_of_replicas || 0 }} replicas
 # runs unit tests on AMD64 machine
 
 on:
