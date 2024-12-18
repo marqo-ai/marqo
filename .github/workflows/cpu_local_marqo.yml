@@ -122,7 +122,7 @@ jobs:
           
           if [ "$MARQO_IMAGE_NAME" = "marqo_docker_0" ]; then
             echo "Building Marqo image as no image identifier was provided"
-            DOCKER_BUILDKIT=1 docker build ../../../ -t marqo_docker_0
+            DOCKER_BUILDKIT=1 docker build ../../../ -t marqo_docker_0 -q
           fi
           
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
