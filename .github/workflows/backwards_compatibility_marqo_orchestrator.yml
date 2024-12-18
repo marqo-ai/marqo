@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - mainline
+      - releases/*
     paths-ignore:
       - '**.md'
   workflow_dispatch:
