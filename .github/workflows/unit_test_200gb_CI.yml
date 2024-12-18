@@ -267,7 +267,7 @@ jobs:
 
           cd marqo
           export PYTHONPATH="./tests:./src:."
-          pytest ${{ env.IGNORED_TESTS }} --ignore=tests/core/index_management/test_index_management.py --ignore=tests/core/monitoring/test_monitoring.py --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          pytest ${{ env.IGNORED_TESTS }} --ignore=tests/core/index_management/test_index_management.py --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
