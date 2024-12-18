@@ -26,7 +26,8 @@ class VespaLocalSingleNode:
 
         # Copy services.xml to base dir. It can be zipped from here.
         os.system("cp singlenode/services.xml services.xml")
-        print("Copied services.xml to base directory.")
+        os.system("rm -f hosts.xml")
+        print("Copied services.xml to base directory. Removed hosts.xml.")
 
 
 class VespaLocalMultiNode:
@@ -88,17 +89,7 @@ class VespaLocalMultiNode:
                     'timeout': '10s',
                     'retries': 3,
                     'start_period': '40s'
-                },
-                #'deploy': {
-                #    'resources': {
-                #        'limits': {
-                #            'memory': '512M'
-                #        },
-                #        'reservations': {
-                #            'memory': '256M'
-                #        }
-                #    }
-                #}
+                }
             }
             # Add additional ports to adminserver
             if config_node == 0:
@@ -129,17 +120,7 @@ class VespaLocalMultiNode:
                     'config-0': {'condition': 'service_healthy'},
                     'config-1': {'condition': 'service_healthy'},
                     'config-2': {'condition': 'service_healthy'}
-                },
-                #'deploy': {
-                #    'resources': {
-                #        'limits': {
-                #            'memory': '512M'
-                #        },
-                #        'reservations': {
-                #            'memory': '256M'
-                #        }
-                #    }
-                #}
+                }
             }
             urls_to_health_check.append(f"http://localhost:{BASE_API_PORT_A + api_node}/state/v1/health")
             nodes_created += 1
