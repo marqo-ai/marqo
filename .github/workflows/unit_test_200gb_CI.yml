@@ -63,7 +63,6 @@ jobs:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
           path: marqo
 
       - name: Set up Python 3.9
@@ -164,10 +163,8 @@ jobs:
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
 
           cd marqo
-          export PYTHONPATH="./tests/integ_tests:./src:."
-          echo "It works!"
-          exit 0
-#          pytest --ignore=tests/integ_tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          export PYTHONPATH="./src"
+          pytest --ignore=tests/integ_tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests/integ_tests/
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
