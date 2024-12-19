@@ -80,7 +80,7 @@ jobs:
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     defaults:
       run:
-        working-directory: tests/api-tests/v1
+        working-directory: tests/api_tests/v1
     environment: marqo-test-suite
     
     steps:
@@ -99,9 +99,6 @@ jobs:
 
       - name: Install py-marqo
         run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
