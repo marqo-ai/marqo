@@ -3,10 +3,12 @@
 # $1 : marqo_image_name - name of the image you want to test
 # $@ : env_vars - strings representing all args to pass docker call
 
+set -e
+
 MARQO_DOCKER_IMAGE="$1"
 shift
 
-docker rm -f marqo;
+docker rm -f marqo 2>/dev/null || true
 
 # Explanation:
 # -d detaches docker from process (so subprocess does not wait for it)

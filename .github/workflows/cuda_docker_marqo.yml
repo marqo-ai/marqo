@@ -20,7 +20,7 @@ on:
           The "api-tests" branch this test is running against.
           This is optional. If left as the default value "mainline", we run the api tests based at branch
           "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
-      image_to_test:
+      image_identifier:
         required: false
         # This is the name of the docker image that is built by the build script:
         default: marqo_docker_0

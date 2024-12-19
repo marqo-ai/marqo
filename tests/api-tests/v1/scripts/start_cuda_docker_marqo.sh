@@ -2,16 +2,18 @@
 # args:
 # $1 : marqo_image_name - name of the image you want to test
 # $@ : env_vars - strings representing all args to pass docker call
-docker rm -f marqo;
+set -e
 
 MARQO_DOCKER_IMAGE="$1"
 shift
+
+docker rm -f marqo 2>/dev/null || true
 
 # Explanation:
 # -d detaches docker from process (so subprocess does not wait for it)
 # ${@:+"$@"} adds ALL args (past $1) if any exist.
 set -x
-docker run -d --name marqo --gpus all --privileged -p 8882:8882 --add-host host.docker.internal:host-gateway \
+docker run -d --name marqo --gpus all -p 8882:8882 \
   -e MARQO_ENABLE_BATCH_APIS=TRUE \
   -e MARQO_MAX_CUDA_MODEL_MEMORY=15 \
   -e MARQO_MAX_CPU_MODEL_MEMORY=15 \
