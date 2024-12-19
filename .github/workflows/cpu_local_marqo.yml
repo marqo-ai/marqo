@@ -85,7 +85,7 @@ jobs:
 
     steps:
 
-      - name: Checkout marqo repo
+      - name: Checkout Marqo repo
         uses: actions/checkout@v3
 
       - name: Set up Python 3.9
@@ -97,7 +97,7 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Set MQ_PY_MARQO_BRANCH variable
+      - name: Install py-marqo
         run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
 
       - name: Set up Docker Buildx
