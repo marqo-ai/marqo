@@ -1269,7 +1269,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
 
         test_cases = [
             (TestAudioUrls.MP3_AUDIO1.value, "mp3"),
-            (TestAudioUrls.ACC_AUDIO1, "aac"),
+            (TestAudioUrls.ACC_AUDIO1.value, "aac"),
             (TestAudioUrls.OGG_AUDIO1.value, "ogg")
         ]
 
