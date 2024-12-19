@@ -11,7 +11,7 @@ on:
         description: >
           The "py-marqo" branch this test is running against.
           This is optional. If left as the default value "mainline", we run the test based on the "mainline" branch of
-          py-marqo. Otherwise, the specified branch is tested. For example "li/test-xx". You can also use "marqo" and 
+          py-marqo. Otherwise, the specified branch is tested. For example "prefix/test-xx". You can also use "marqo" and 
           it will use the latest pypi release.
       image_identifier:
         required: false
