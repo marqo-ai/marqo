@@ -14,6 +14,7 @@ from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
+import pytest
 
 
 class TestHybridSearch(MarqoTestCase):

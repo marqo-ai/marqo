@@ -4,6 +4,7 @@ import random
 import string
 import unittest
 from unittest import mock
+import pytest
 
 import requests
 
