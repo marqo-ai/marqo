@@ -744,6 +744,7 @@ class TestHybridSearch(MarqoTestCase):
                     # doc11 and doc13 has score 0, so their order is non-deterministic
                     self.assertSetEqual({'doc11', 'doc13'}, {hit["_id"] for hit in hybrid_res["hits"][1:]})
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_score_modifiers(self):
         """
         Tests that score modifiers work as expected for all methods
@@ -892,7 +893,7 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_lexical_score"], base_lexical_score * -10 * 3)
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -10 * 3)
 
-
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):
         """
         Tests that if we do hybrid search with lexical retrieval and tensor ranking, we can use both lexical and tensor
@@ -959,7 +960,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(hybrid_res["hits"][2]["_id"], "doc10")     # (score*-10*3)
                 self.assertEqual(hybrid_res["hits"][2]["_score"], -30.0)
 
-
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):
         """
         Tests that hybrid search with:
@@ -1063,6 +1064,7 @@ class TestHybridSearch(MarqoTestCase):
                         self.assertEqual(len(hybrid_res["hits"]), 1)
                         self.assertEqual(hybrid_res["hits"][0]["_id"], "doc8")
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_with_images(self):
         """
         Tests that hybrid search is accurate with images, both in query and in documents.

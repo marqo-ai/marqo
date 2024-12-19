@@ -167,6 +167,7 @@ class TestSearchableAttributes(MarqoTestCase):
                         )
                         self.assertEqual(3, len(res["hits"]))
 
+    @pytest.mark.skip_for_multinode
     def test_searchable_attributes_behaves_the_same_way_for_different_types_of_indexes(self):
         for index_name in [self.structured_text_index, self.semi_structured_text_index]:
             self._add_documents(index_name)

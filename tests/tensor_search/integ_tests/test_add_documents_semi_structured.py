@@ -729,6 +729,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 print(res)
                 self.assertEqual(res['errors'], error)
 
+    @pytest.mark.skip_for_multinode
     def test_duplicate_ids_behaviour(self):
         """Test the behaviour when there are duplicate ids in a single batch.
 

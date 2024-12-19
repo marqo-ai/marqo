@@ -96,6 +96,7 @@ class TestSearchRegression(MarqoTestCase):
         super().tearDown()
         self.device_patcher.stop()
 
+    @pytest.mark.skip_for_multinode
     def test_search_result_scores_match_2_9(self):
         """
         Tests that both lexical and tensor search results and scores match those
