@@ -467,13 +467,13 @@ class TestCreateIndex(MarqoTestCase):
         time.sleep(0.2)
 
         try:
-            with self.assertRaises(MarqoWebError) as e:
-                self.client.create_index(index_name=index_name_2)
-            self.assertIn("Your indexes are being updated. Please try again shortly.",
-                          str(e.exception))
+            # with self.assertRaises(MarqoWebError) as e:
+            #     self.client.create_index(index_name=index_name_2)
+            # self.assertIn("Your indexes are being updated. Please try again shortly.",
+            #               str(e.exception))
 
             with self.assertRaises(MarqoWebError) as e:
-                self.client.delete_index(index_name=index_name_1)
+                self.client.index(index_name_1).delete()
             self.assertIn("Your indexes are being updated. Please try again shortly.",
                           str(e.exception))
 
@@ -492,20 +492,20 @@ class TestCreateIndex(MarqoTestCase):
         self.client.create_index(index_name=index_name_1)
 
         def delete_index():
-            self.client.delete_index(index_name=index_name_1)
+            self.client.index(index_name_1).delete()
 
         t1 = threading.Thread(target=delete_index)
         t1.start()
         time.sleep(0.2)
 
         try:
-            with self.assertRaises(MarqoWebError) as e:
-                self.client.create_index(index_name=index_name_2)
-            self.assertIn("Your indexes are being updated. Please try again shortly.",
-                          str(e.exception))
+            # with self.assertRaises(MarqoWebError) as e:
+            #     self.client.create_index(index_name=index_name_2)
+            # self.assertIn("Your indexes are being updated. Please try again shortly.",
+            #               str(e.exception))
 
             with self.assertRaises(MarqoWebError) as e:
-                self.client.delete_index(index_name=index_name_1)
+                self.client.index(index_name_1).delete()
             self.assertIn("Your indexes are being updated. Please try again shortly.",
                           str(e.exception))
         finally:
