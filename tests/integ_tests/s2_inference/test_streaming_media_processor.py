@@ -8,7 +8,7 @@ from marqo.tensor_search.streaming_media_processor import StreamingMediaProcesso
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.core.exceptions import InternalError
-from tests.marqo_test import TestVideoUrls, TestAudioUrls
+from integ_tests.marqo_test import TestVideoUrls, TestAudioUrls
 from unittest.mock import patch
 import time
 

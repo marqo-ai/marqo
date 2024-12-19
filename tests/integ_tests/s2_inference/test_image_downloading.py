@@ -9,7 +9,7 @@ from starlette.routing import Route
 
 from marqo.s2_inference.clip_utils import encode_url, download_image_from_url
 from marqo.s2_inference.errors import ImageDownloadError
-from tests.marqo_test import MockHttpServer
+from integ_tests.marqo_test import MockHttpServer
 from marqo.tensor_search.enums import EnvVars
 from io import BytesIO
 

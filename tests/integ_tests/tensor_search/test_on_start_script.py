@@ -7,7 +7,7 @@ from marqo.api.exceptions import StartupSanityCheckError
 from marqo.tensor_search import enums
 from marqo.tensor_search import on_start_script
 from marqo.tensor_search.enums import EnvVars
-from tests.marqo_test import MarqoTestCase
+from integ_tests.marqo_test import MarqoTestCase
 
 
 class TestOnStartScript(MarqoTestCase):

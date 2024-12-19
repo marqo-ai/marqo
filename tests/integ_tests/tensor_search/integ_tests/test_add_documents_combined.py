@@ -21,7 +21,7 @@ from marqo.s2_inference.multimodal_model_load import infer_modality
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
-from tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 
 

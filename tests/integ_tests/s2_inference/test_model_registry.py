@@ -1,8 +1,6 @@
 import unittest
 
 from marqo.s2_inference.model_registry import _get_open_clip_properties, load_model_properties
-from tests.marqo_test import MarqoTestCase
-
 
 class TestModelRegistry(unittest.TestCase):
     """
