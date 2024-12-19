@@ -44,7 +44,7 @@ class TestAudioUrls(str, Enum):
 
     MP3_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.mp3"
     ACC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
-    OGG_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
+    OGG_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.ogg"
 
 
 class TestVideoUrls(str, Enum):
