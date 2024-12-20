@@ -825,7 +825,7 @@ class TestAddDocumentsStructured(MarqoTestCase):
 
         doc_counts = 1, 2, 25
         for c in doc_counts:
-            self.clear_index_by_name(self.index_name_img_random)
+            self.clear_index_by_schema_name(self.index_name_img_random)
 
             res1 = self.add_documents(
                 self.config,

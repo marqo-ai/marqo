@@ -117,9 +117,18 @@ class MarqoTestCase(unittest.TestCase):
 
     def clear_indexes(self, indexes: List[MarqoIndex]):
         for index in indexes:
-            self.clear_index_by_name(index.schema_name)
+            self.clear_index_by_schema_name(index.schema_name)
 
-    def clear_index_by_name(self, schema_name: str):
+    def clear_index_by_index_name(self, index_name: str):
+        """Delete all documents in the given index.
+
+        Args:
+            index_name: The name of the index to clear.
+        """
+        schema_name = self.index_management.get_index(index_name).schema_name
+        return self.clear_index_by_schema_name(schema_name)
+
+    def clear_index_by_schema_name(self, schema_name: str):
         """Delete all documents in the given index.
 
         Args:

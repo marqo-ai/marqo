@@ -1353,7 +1353,9 @@ class TestSearchUnstructured(MarqoTestCase):
 
         for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
             with self.subTest(msg):
-                self.clear_index_by_name(self.default_text_index)
+                self.clear_index_by_schema_name(self.default_text_index)
+                print(self.default_text_index)
+                print(self.index_management.get_index(index_name=self.default_text_index).schema_name)
                 self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
