@@ -330,11 +330,11 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
 
         #Step 6: Run tests in test mode, then run full test run
         try:
-            run_tests_in_mode(Mode.TEST, from_version)
+            run_tests_in_mode(Mode.TEST, from_version) # This will validate results from the older indexes added as part of the PREPARE mode above.
         except Exception as e:
             raise RuntimeError(f"Error in rollback tests while running tests across versions in 'test' mode on version: {from_version}") from e
         try:
-            full_test_run(to_version)
+            full_test_run(from_version) # This will validate results by creating newer indexes and adding documents to them. This is required just so that we know that even after transferring state from an older version, we are able to create new indexes in the older state seamlessly.
         except Exception as e:
             raise RuntimeError(f"Error in rollback tests while running tests in full test run on version: {to_version}") from e
 
