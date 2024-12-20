@@ -86,7 +86,7 @@ class ServicesXml:
         """
         container_element = self._ensure_only_one('container')
         for child in container_element.findall('*'):
-            if child.tag in ['document-api', 'search']:
+            if child.tag in ['document-api', 'document-processing', 'search']:
                 child.clear()
             elif child.tag != 'nodes':
                 container_element.remove(child)
