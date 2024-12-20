@@ -419,5 +419,5 @@ if __name__ == "__main__":
             rollback_test(args.to_version, args.from_version, args.to_image)
 
     except Exception as e:
-        logger.error(f"Encountered an exception: {e} while running tests in mode {args.mode}, exiting", exc_info=True)
+        logger.exception(f"Encountered an exception: {e} while running tests in mode {args.mode}, exiting", exc_info=True)
         sys.exit(1)

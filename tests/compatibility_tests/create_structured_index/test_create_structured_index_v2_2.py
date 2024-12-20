@@ -2,8 +2,12 @@ import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.0.0')
+@pytest.mark.marqo_version('2.2.0')
 class TestCreateStructuredIndex(BaseCompatibilityTestCase):
+    """
+    New structured index data types: long, double, array<long> and array<double> for a higher precision and range of values Available for indexes created with Marqo 2.2+ (#722)
+    Ref: https://github.com/marqo-ai/marqo/releases/tag/2.2.0
+    """
     indexes_settings_to_test_on = [
         {
             "type": "structured",
@@ -32,6 +36,10 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
                 {"name": "float_field_1", type: "float"},
                 {"name": "array_int_field_1", type: "array<int>"},
                 {"name": "array_float_field_1", type: "array<float>"},
+                {"name": "array_long_field_1", "type": "array<long>"},
+                {"name": "array_double_field_1", "type": "array<double>"},
+                {"name": "long_field_1", "type": "long"},
+                {"name": "double_field_1", "type": "double"},
             ],
             "tensorFields": ["multimodal_field"],
             "annParameters": {

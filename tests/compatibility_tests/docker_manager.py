@@ -302,7 +302,10 @@ class DockerManager:
 
         # Pull the image
         self.logger.info(f"Pulling image: {image_name}")
-        self.docker_client.images.pull(image_name)
+        try:
+            self.pull_marqo_image(image_name, source)
+        except Exception as e:
+            raise RuntimeError(f"Failed to pull image: {image_name}") from e
 
         # Remove existing container if it exists
         try:
