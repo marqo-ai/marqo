@@ -452,12 +452,35 @@ class TestCreateIndex(MarqoTestCase):
             [{'features': ['lexical_search', 'filter'], 'name': 'my_custom_vector', 'type': 'custom_vector'}],
             index_settings['allFields'])
 
-    def test_createIndexCanBlockOtherRequests(self):
+    def test_createIndexCanBlockCreateRequests(self):
         """Tests if create_index request can block other create/delete index requests."""
         # Create a new index
 
         index_name_1 = "test_index_" + str(uuid.uuid4())
         index_name_2 = "test_index_" + str(uuid.uuid4())
+
+        def create_index():
+            self.client.create_index(index_name=index_name_1)
+            self.indexes_to_delete.append(index_name_1)
+
+        t1 = threading.Thread(target=create_index)
+        t1.start()
+        time.sleep(0.2)
+
+        try:
+            with self.assertRaises(MarqoWebError) as e:
+                self.client.create_index(index_name=index_name_2)
+            self.assertIn("Your indexes are being updated. Please try again shortly.",
+                          str(e.exception))
+
+        finally:
+            t1.join()
+
+    def test_createIndexCanBlockDeleteRequests(self):
+        """Tests if create_index request can block other create/delete index requests."""
+        # Create a new index
+
+        index_name_1 = "test_index_" + str(uuid.uuid4())
 
         def create_index():
             self.client.create_index(index_name=index_name_1)
@@ -467,11 +490,6 @@ class TestCreateIndex(MarqoTestCase):
         time.sleep(0.2)
 
         try:
-            # with self.assertRaises(MarqoWebError) as e:
-            #     self.client.create_index(index_name=index_name_2)
-            # self.assertIn("Your indexes are being updated. Please try again shortly.",
-            #               str(e.exception))
-
             with self.assertRaises(MarqoWebError) as e:
                 self.client.index(index_name_1).delete()
             self.assertIn("Your indexes are being updated. Please try again shortly.",
@@ -483,7 +501,7 @@ class TestCreateIndex(MarqoTestCase):
         finally:
             t1.join()
 
-    def test_deleteIndexCanBlockOtherRequests(self):
+    def test_deleteIndexCanBlockCreateRequests(self):
         """Test if delete_index request can block other create/delete index requests."""
         index_name_1 = "test_index_" + str(uuid.uuid4())
         index_name_2 = "test_index_" + str(uuid.uuid4())
@@ -499,11 +517,30 @@ class TestCreateIndex(MarqoTestCase):
         time.sleep(0.2)
 
         try:
-            # with self.assertRaises(MarqoWebError) as e:
-            #     self.client.create_index(index_name=index_name_2)
-            # self.assertIn("Your indexes are being updated. Please try again shortly.",
-            #               str(e.exception))
+            with self.assertRaises(MarqoWebError) as e:
+                self.client.create_index(index_name=index_name_2)
+            self.assertIn("Your indexes are being updated. Please try again shortly.",
+                          str(e.exception))
 
+        finally:
+            t1.join()
+
+    def test_deleteIndexCanBlockDeleteRequests(self):
+        """Test if delete_index request can block other create/delete index requests."""
+        index_name_1 = "test_index_" + str(uuid.uuid4())
+        index_name_2 = "test_index_" + str(uuid.uuid4())
+
+        # Create a dummy index for deletion
+        self.client.create_index(index_name=index_name_1)
+
+        def delete_index():
+            self.client.index(index_name_1).delete()
+
+        t1 = threading.Thread(target=delete_index)
+        t1.start()
+        time.sleep(0.2)
+
+        try:
             with self.assertRaises(MarqoWebError) as e:
                 self.client.index(index_name_1).delete()
             self.assertIn("Your indexes are being updated. Please try again shortly.",
