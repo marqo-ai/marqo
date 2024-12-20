@@ -46,6 +46,8 @@ class TestAudioUrls(str, Enum):
     ACC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
     OGG_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.ogg"
 
+    FLAC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.flac"
+
 
 class TestVideoUrls(str, Enum):
     __test__ = False
