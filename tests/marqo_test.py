@@ -119,9 +119,13 @@ class MarqoTestCase(unittest.TestCase):
         for index in indexes:
             self.clear_index_by_name(index.schema_name)
 
-    def clear_index_by_name(self, index_name: str):
-        """Not that the index_name here is the schema_name, not the index name"""
-        self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)
+    def clear_index_by_name(self, schema_name: str):
+        """Delete all documents in the given index.
+
+        Args:
+            schema_name: The schema name of the index to clear. It is not the same as the index name.
+        """
+        self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, schema_name)
 
     def random_index_name(self) -> str:
         return 'a' + str(uuid.uuid4()).replace('-', '')

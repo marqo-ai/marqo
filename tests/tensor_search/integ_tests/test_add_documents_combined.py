@@ -900,15 +900,15 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
             self.maxDiff = None  # allow output all diffs
             with self.subTest(f'{index.name} with type {index.type}'):
-                self.clear_index_by_name(index_name=index.schema_name)
+                self.clear_index_by_name(schema_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_FIELD)
                 docs_added_using_per_field_strategy = get_docs()
 
-                self.clear_index_by_name(index_name=index.schema_name)
+                self.clear_index_by_name(schema_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
                 docs_added_using_per_doc_strategy = get_docs()
 
-                self.clear_index_by_name(index_name=index.schema_name)
+                self.clear_index_by_name(schema_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
                 docs_added_using_per_batch_strategy = get_docs()
 
@@ -1276,7 +1276,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
         for test_case, audio_format in test_cases:
             for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
                 with self.subTest(f"{index} - {audio_format}"):
-                    self.clear_index_by_name(index_name=self.index_management.get_index(index_name=index).schema_name)
+                    self.clear_index_by_name(schema_name=self.index_management.get_index(index_name=index).schema_name)
                     self.assertEqual(0, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
                     document = {
                         "audio_field_1": test_case,
@@ -1296,13 +1296,14 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                     self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
                     self.assertGreaterEqual(self.monitoring.get_index_stats_by_name(index_name=index).number_of_vectors,
                                             1)
-
-                    _ = tensor_search.search(
-                        config=self.config,
-                        index_name=index,
-                        text=test_case,
-                        search_method = "TENSOR"
-                    )
+                    if test_case not in [TestAudioUrls.ACC_AUDIO1.value,]:
+                    # .acc is not support
+                        _ = tensor_search.search(
+                            config=self.config,
+                            index_name=index,
+                            text=test_case,
+                            search_method = "TENSOR"
+                        )
 
     def test_supported_video_format(self):
         """Test the supported video format for the LanguageBind model in add_documents and search."""
@@ -1316,7 +1317,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
         for test_case, audio_format in test_cases:
             for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
                 with self.subTest(f"{index} - {audio_format}"):
-                    self.clear_index_by_name(index_name=self.index_management.get_index(index_name=index).schema_name)
+                    self.clear_index_by_name(schema_name=self.index_management.get_index(index_name=index).schema_name)
                     self.assertEqual(0, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
                     document = {
                         "video_field_1": test_case,
