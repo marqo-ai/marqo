@@ -186,7 +186,9 @@ jobs:
             diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
               --compare-branch $BASE_BRANCH
           else
-            echo "Skipped diff-cover on Push events" > marqo/diff_cov.html
+            echo "Skipping diff-cover on Push events"
+            echo "Skipped diff-cover on Push events" > marqo/diff_cov.md
+            touch marqo/diff_cov.html
           fi
 
       - name: Upload Test Report
