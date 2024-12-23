@@ -118,7 +118,7 @@ def run_test_vectorize_to_restore(models, model_type, compare_hardcoded_embeddin
         assert run()
 
 
-def run_test_vectorize(models, model_type):
+def run_test_vectorize(models, model_type, compare_hardcoded_embeddings):
     """
     model_type determines the filename with which the embeddings are saved/loaded
     """
