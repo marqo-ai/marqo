@@ -57,7 +57,7 @@ class RedisDriver:
             logger.info(f"Took {((t1 - t0) * 1000):.3f}ms to connect to redis and load scripts.")
 
         except Exception as e:
-            logger.warn(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))
+            logger.warning(generate_redis_warning(skipped_operation="loading throttling scripts", exc=e))
             self.faulty = True
 
     def connect(self) -> redis.Redis:

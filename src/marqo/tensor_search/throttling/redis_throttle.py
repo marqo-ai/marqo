@@ -52,7 +52,7 @@ def throttle(request_type: str):
                 try:
                     redis.zrem(key, name)
                 except Exception as e:
-                    logger.warn(generate_redis_warning(skipped_operation="throttling thread count decrement", exc=e))
+                    logger.warning(generate_redis_warning(skipped_operation="throttling thread count decrement", exc=e))
                     redis_driver.set_faulty(True)
 
             # Check current thread count / increment using LUA script
@@ -66,7 +66,7 @@ def throttle(request_type: str):
                     utils.read_env_vars_and_defaults(EnvVars.MARQO_THREAD_EXPIRY_TIME)  # expire_time
                 )
             except Exception as e:
-                logger.warn(generate_redis_warning(skipped_operation="throttling thread count check", exc=e))
+                logger.warning(generate_redis_warning(skipped_operation="throttling thread count check", exc=e))
                 redis_driver.set_faulty(True)
                 return function(*args, **kwargs)
 
