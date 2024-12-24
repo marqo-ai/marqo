@@ -95,22 +95,6 @@ class TestHybridSearchStructured(BaseCompatibilityTestCase):
         }
     ]
 
-    extra_docs = [
-        {
-            '_id': 'example_doc_5',
-            'text_field': 'Woman looking at phone',
-            'image_field': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg',
-            'tags': ['women', 'phone'],
-            'my_int': 3
-        },
-        {
-            "_id": f"example_doc_6",
-            "text_field": "Woman skiing",
-            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-clip-onnx/main/examples/coco.jpg",
-            'tags': ['ski'],
-            'caption': 'example_doc_6'
-        },
-    ]
     indexes_to_test_on = [structured_index_metadata]
     queries = ["travel", "horse light", "travel with plane"]
     search_methods = ["HYBRID"]

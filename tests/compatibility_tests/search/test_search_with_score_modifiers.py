@@ -134,7 +134,9 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
         for type_of_score_modifier in ["double_score_mods", "long_score_mods", "rating", "popularity"]:
             for index in self.indexes_to_test_on:
                 index_name = index['indexName']
-                all_results[index_name] = {}
+                if index_name not in all_results:
+                    all_results[index_name] = {}
+
                 try:
                     result = self.client.index(index_name).search(
                         q="",

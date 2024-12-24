@@ -1,5 +1,4 @@
 import traceback
-from sys import exc_info
 
 import pytest
 
@@ -44,10 +43,11 @@ class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
         },
         "normalizeEmbeddings": True,
     }
+    indexes_to_test_on = [load_from_hf_index_name, load_from_public_url_index_name, load_from_public_url_with_custom_configurations_index_name]
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.indexes_to_delete = [cls.index_name]
+        cls.indexes_to_delete = [cls.indexes_to_test_on]
         super().tearDownClass()
 
     def prepare(self):

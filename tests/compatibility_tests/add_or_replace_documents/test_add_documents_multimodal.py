@@ -69,11 +69,11 @@ class TestAddDocumentsMultiModal(BaseCompatibilityTestCase):
 
     def prepare(self):
         self.logger.debug(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
+        errors = []  # Collect errors to report them at the end
         self.create_indexes(self.indexes_to_test_on)
 
         self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
 
-        errors = []  # Collect errors to report them at the end
 
         for index in self.indexes_to_test_on:
             try:

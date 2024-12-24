@@ -171,8 +171,8 @@ class TestRecommend(BaseCompatibilityTestCase):
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:
             failure_message = "\n".join([
-                f"Failure in index {idx}, doc_id {doc_id}: {error}"
-                for idx, doc_id, error in test_failures
+                f"Failure in index {idx}: {error}"
+                for idx, error in test_failures
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
 

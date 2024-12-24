@@ -10,7 +10,7 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
 
     indexes_to_test_on = [
         {
-            "indexName": "test_add_docs_api_structured_index",
+            "indexName": structured_index_name,
             "type": "structured",
             "vectorNumericType": "float",
             "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
@@ -27,7 +27,7 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
                 {"name": "audio_field_1", "type": "audio_pointer"},
                 {"name": "text_field_3", "type": "text", "features": ["lexical_search"]},
             ],
-            "tensorFields": ["video_field_1"],
+            "tensorFields": ["video_field_1", "audio_field_1", "image_field", "text_field_3"],
             "annParameters": {
                 "spaceType": "prenormalized-angular",
                 "parameters": {"efConstruction": 512, "m": 16},

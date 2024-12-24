@@ -9,7 +9,7 @@ class TestAddDocumentsv2_9(BaseCompatibilityTestCase):
 
     indexes_settings_to_test_on = [
         {
-            "indexName": "test_add_docs_api_structured_index",
+            "indexName": structured_index_name,
             "type": "structured",
             "vectorNumericType": "float",
             "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
