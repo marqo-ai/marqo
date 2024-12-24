@@ -13,15 +13,24 @@ Before running Marqo locally, you will need to do some preparations to set up Ve
 
 ### Preparations
 
-1. Clone the Marqo GitHub repo and cd into it
+1. Clone the Marqo GitHub repo and marqo-base repo
 ```bash
 git clone https://github.com/marqo-ai/marqo.git
-cd marqo
+git clone https://github.com/marqo-ai/marqo-base.git
 ```
 
-2. Install Marqo dependencies
+2. Install Marqo dependencies. Please choose the appropriate requirements file based on your environment.
+**For AMD machine**, no matter you have a GPU or not: 
 ```bash
-pip install -r requirements.dev.txt
+pip install -r marqo-base/requirements/amd64-gpu-requirements.txt  # For AMD machine, no matter you have a GPU or not
+```
+**For ARM machine**:
+```bash
+pip install -r marqo-base/requirements/arm64-requirements.txt  # For ARM machine
+```
+The above requirements are for running Marqo locally. If you need to run tests, you need:
+```bash
+pip install -r marqo/requirements.dev.txt  # For test purposes
 ```
 
 3. Pull and run the Vespa docker image

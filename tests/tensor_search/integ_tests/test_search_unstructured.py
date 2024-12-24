@@ -827,7 +827,7 @@ class TestSearchUnstructured(MarqoTestCase):
             ("filter on id 1234", "_id:1234", 1, ["1234"]),
             ("AND filter", "_id:5678 AND status:active", 1, ["5678"]),
             ("OR filter", "_id:5678 OR _id:1234", 2, ["5678", "1234"]),
-            ("Complex filter", "_id:5678 OR (abc:some\ text AND status:inactive)", 2, ["5678", "1234"]),
+            ("Complex filter", r"_id:5678 OR (abc:some\ text AND status:inactive)", 2, ["5678", "1234"]),
             ("Non-ID field filter", "status:active", 2, ["5678", "9012"]),
             ("No result filter", "_id:0000", 0, [])
         ]
@@ -1515,6 +1515,6 @@ class TestSearchUnstructured(MarqoTestCase):
         if failed_characters:
             print(f"\nFailed characters (4XX or 500 errors): {failed_characters}")
 
-        # Assert that " is the only failed character
-        self.assertEqual(failed_characters, ['"'], 
-                         f"Expected only double quote to fail, but got: {failed_characters}")
+        # Assert that no characters fail
+        self.assertEqual(failed_characters, [],
+                         f"Expected no characters to fail, but got: {failed_characters}")

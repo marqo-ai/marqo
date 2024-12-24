@@ -66,12 +66,12 @@ jobs:
           fetch-depth: 0
           path: marqo
 
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v3
         with:
-          python-version: "3.8"
+          python-version: "3.9"
           cache: "pip"
-          
+
       - name: Checkout marqo-base for requirements
         uses: actions/checkout@v3
         with:
@@ -80,15 +80,19 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements.txt
-          # override base requirements with marqo requirements, if needed: 
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # override base requirements with marqo requirements, if needed:
           pip install -r marqo/requirements.dev.txt
+
+      - name: Download nltk data
+        run: |
+            python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
         run: |
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
-          
+
           # Function to wait for the dpkg lock to be released
           function wait_for_dpkg_lock() {
             while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
@@ -96,13 +100,13 @@ jobs:
               sleep 5
             done
           }
-      
+
           # Wait for the dpkg lock before updating and installing
           wait_for_dpkg_lock
-          
+
           echo "Updating package list"
           apt-get update -y
-          
+
           # Build Vespa components
           echo "Installing jdk 17"
           sudo apt-get install openjdk-17-jdk -y
@@ -118,7 +122,7 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          
+
           cd marqo/scripts/vespa_local
           set -x
           python vespa_local.py start
@@ -130,7 +134,7 @@ jobs:
               sleep 1
           done
           echo -e "\nDone waiting."
-          
+
           # Zip up schemas and services
           sudo apt-get install zip -y
           zip -r vespa_tester_app.zip services.xml schemas
@@ -141,34 +145,81 @@ jobs:
           # wait for vespa to start (document url):
           timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
             (echo "Vespa (Document URL) did not start in time" && exit 1)
-          
+
           echo "Vespa document API is available. Local Vespa setup complete."
 
           # Delete the zip file
           rm vespa_tester_app.zip
           echo "Deleted vespa_tester_app.zip"
-          
+
       - name: Run Unit Tests
+        id: run_unit_tests
+        continue-on-error: true
         run: |
           # Define these for use by marqo
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          
+
           export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
-          
+
           cd marqo
           export PYTHONPATH="./tests:./src:."
-          pytest --ignore=tests/test_documentation.py --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info tests
+          set -o pipefail
+          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests \
+            --durations=100 --cov=src --cov-branch --cov-context=test \
+            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests | tee pytest_output.txt
+
+      - name: Check Test Coverage of New Code
+        id: check_test_coverage
+        continue-on-error: true
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+            cd marqo
+            echo "Running diff-cover against branch $BASE_BRANCH"
+            git fetch origin $BASE_BRANCH:$BASE_BRANCH
+            diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
+              --compare-branch $BASE_BRANCH
+          else
+            echo "Skipping diff-cover on Push events"
+            echo "Skipped diff-cover on Push events" > marqo/diff_cov.md
+            touch marqo/diff_cov.html
+          fi
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: marqo-test-report
-          path: marqo/cov_html/
-  
+          path: |
+            marqo/cov_html/
+            marqo/diff_cov.html
+
+      - name: Test and coverage report summary
+        continue-on-error: true
+        run: |
+          echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
+          cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
+          
+          echo "# Coverage Summary, Slow Tests and Failed Tests" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail Job If Tests or Coverage Failed
+        if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
+        run: |
+          echo "Tests or coverage checks failed. Marking job as failed."
+          exit 1
+        shell: bash
+
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:

@@ -3,32 +3,28 @@ The functions defined here would have endpoints, later on.
 """
 import datetime
 import threading
+from typing import List, Dict, Optional
 
 import numpy as np
-import torch
 from PIL import UnidentifiedImageError
-from PIL.Image import Image
-from torch import Tensor
 from torchvision.transforms import Compose
-from typing import List, Dict, Any, Optional
 
 from marqo import marqo_docs
+from marqo.api.configs import EnvVars
 from marqo.api.exceptions import ModelCacheManagementError, ConfigurationError, InternalError
+from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 from marqo.s2_inference import constants
-from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
-from marqo.s2_inference.clip_utils import CLIP
 from marqo.s2_inference.configs import get_default_normalization, get_default_seq_length
 from marqo.s2_inference.errors import (
     VectoriseError, InvalidModelPropertiesError, ModelLoadError,
     UnknownModelError, ModelNotInCacheError, ModelDownloadError)
-from marqo.inference.inference_cache.marqo_inference_cache import MarqoInferenceCache
 from marqo.s2_inference.logger import get_logger
 from marqo.s2_inference.model_registry import load_model_properties
 from marqo.s2_inference.models.model_type import ModelType
-from marqo.s2_inference.types import *
 from marqo.s2_inference.multimodal_model_load import *
-from marqo.api.configs import EnvVars
+from marqo.s2_inference.types import *
 from marqo.tensor_search.enums import AvailableModelsKey
+from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.utils import read_env_vars_and_defaults, generate_batches, read_env_vars_and_defaults_ints
 
@@ -214,7 +210,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
                                                 device: Optional[str] = None,
                                                 model_auth: Optional[ModelAuth] = None,
                                                 normalize_embeddings: bool = get_default_normalization()) \
-        -> Tuple[Any, Dict[str, Optional[Compose]]]:
+        -> Tuple[Any, Preprocessors]:
     """Load the model and return preprocessors for different modalities.
 
     Args:
@@ -252,7 +248,7 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
         "text": None  # Future preprocessor
     }
 
-    return model, preprocessors
+    return model, Preprocessors(**preprocessors)
 
 
 def _get_max_vectorise_batch_size() -> int:

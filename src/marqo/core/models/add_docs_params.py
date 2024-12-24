@@ -62,6 +62,7 @@ class AddDocsParams(BaseModel):
     batch_vectorisation_mode: BatchVectorisationMode = BatchVectorisationMode.PER_DOCUMENT
 
     def __init__(self, **data: Any):
+        # TODO [Refactoring device logic] use device info gathered from device manager
         # Ensure `None` and passing nothing are treated the same for device
         if "device" not in data or data["device"] is None:
             data["device"] = get_best_available_device()
