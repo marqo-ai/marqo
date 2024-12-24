@@ -147,7 +147,7 @@ class TestEncoding(unittest.TestCase):
                 clear_loaded_models()
 
         # Write everything to JSON
-        with open(f"embeddings_reference/embeddings_python_3_8.json", "w") as f:
+        with open(f"embeddings_reference/embeddings_all_models_python_3_8.json", "w") as f:
             json.dump(embeddings_python_3_8, f)
 
 
@@ -193,7 +193,7 @@ class TestEncoding(unittest.TestCase):
                 clear_loaded_models()
 
         # Write everything to JSON
-        with open(f"embeddings_reference/embeddings_python_3_8.json", "w") as f:
+        with open(embeddings_file_name, "w") as f:
             json.dump(embeddings_python_3_8, f)
 
 
