@@ -6,7 +6,7 @@ from tests.compatibility_tests.base_test_case.base_compatibility_test import Bas
 
 @pytest.mark.marqo_version('2.12.0')
 class TestCreateIndexWithNoModel(BaseCompatibilityTestCase):
-    index_name = "test_create_index_api"
+    index_name = "test_create_index_api_no_model"
     settings = {
         "treatUrlsAndPointersAsImages": False,
         "model": "no_model",

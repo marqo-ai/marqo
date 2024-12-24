@@ -1,42 +1,58 @@
+import traceback
+from inspect import trace
+
 import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.2.0')
-class TestAddDocuments(BaseCompatibilityTestCase):
-    structured_index_name = "test_add_doc_api_structured_index"
-    unstructured_index_name = "test_add_doc_api_unstructured_index"
+@pytest.mark.marqo_version('2.12.0')
+class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
+    structured_index_name = "test_add_doc_api_structured_index_2_12_0"
 
-    indexes_to_test_on = [{
-        "indexName": structured_index_name,
-        "type": "structured",
-        "model": "sentence-transformers/all-MiniLM-L6-v2",
-        "normalizeEmbeddings": True,
-        "allFields": [
-            {"name": "Title", "type": "text"},
-            {"name": "Description", "type": "text"},
-            {"name": "Genre", "type": "text"},
-        ],
-        "tensorFields": ["Title", "Description", "Genre"],
-    },
+    indexes_to_test_on = [
         {
-        "indexName": unstructured_index_name,
-        "type": "unstructured",
-        "model": "sentence-transformers/all-MiniLM-L6-v2",
-        "normalizeEmbeddings": True,
-    }]
+            "indexName": "test_add_docs_api_structured_index",
+            "type": "structured",
+            "vectorNumericType": "float",
+            "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
+            "normalizeEmbeddings": True,
+            "textPreprocessing": {
+                "splitLength": 2,
+                "splitOverlap": 0,
+                "splitMethod": "sentence",
+            },
+            "imagePreprocessing": {"patchMethod": None},
+            "allFields": [
+                {"name": "image_field", "type": "image_pointer"},
+                {"name": "video_field_1", "type": "video_pointer"}, #TODO: write this example for video_pointer and audio_pointers
+                {"name": "audio_field_1", "type": "audio_pointer"},
+                {"name": "text_field_3", "type": "text", "features": ["lexical_search"]},
+            ],
+            "tensorFields": ["video_field_1"],
+            "annParameters": {
+                "spaceType": "prenormalized-angular",
+                "parameters": {"efConstruction": 512, "m": 16},
+            }
+        }]
 
-    text_docs = [{
-        "Title": "The Travels of Marco Polo",
-        "Description": "A 13th-century travelogue describing the travels of Polo",
-        "Genre": "History",
-        "_id": "article_602"
-    },
-    {
-        "Title": "Extravehicular Mobility Unit (EMU)",
-        "Description": "The EMU is a spacesuit that provides environmental protection",
-        "_id": "article_591",
-        "Genre": "Science"
-    }]
+    documents = [
+        {
+            "video_field_1": "https://marqo-k400-video-test-dataset.s3.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4",
+            "_id": "1"
+        },
+        {
+            "audio_field_1": "https://marqo-ecs-50-audio-test-dataset.s3.amazonaws.com/audios/marqo-audio-test.mp3",
+            "_id": "2"
+        },
+        {
+            "image_field": "https://raw.githubusercontent.com/marqo-ai/marqo-api-tests/mainline/assets/ai_hippo_realistic.png",
+            "_id": "3"
+        },
+        {
+            "text_field_3": "hello there Padawan. Today you will begin your training to be a Jedi",
+            "_id": "4"
+        },
+    ]
+
     @classmethod
     def tearDownClass(cls) -> None:
         cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
@@ -47,35 +63,32 @@ class TestAddDocuments(BaseCompatibilityTestCase):
         super().setUpClass()
 
     def prepare(self):
-        self.logger.info(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
         self.create_indexes(self.indexes_to_test_on)
-
-        self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
 
         errors = []  # Collect errors to report them at the end
 
         for index in self.indexes_to_test_on:
+            self.logger.info(
+                f"Creating indexes {index.get('indexName')} in test case: {self.__class__.__name__}")
             try:
                 if index.get("type") is not None and index.get('type') == 'structured':
-                    self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs) #makes sense to add more context here and capture and rethrow an exception
-                else:
-                    self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs,
-                                                                tensor_fields = ["Description", "Genre", "Title"])
+                    self.client.index(index_name = index['indexName']).add_documents(documents = self.documents) #makes sense to add more context here and capture and rethrow an exception
             except Exception as e:
-                errors.append((index, str(e)))
+                errors.append((index, traceback.format_exc()))
 
         all_results = {}
 
         for index in self.indexes_to_test_on:
+            self.logger.debug(f'Feeding documents to {index.get("indexName")}')
             index_name = index['indexName']
             all_results[index_name] = {}
 
-            for doc in self.text_docs:
+            for doc in self.documents:
                 try:
                     doc_id = doc['_id']
                     all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id) #makes sense to add more context here and capture and rethrow an exception
                 except Exception as e:
-                    errors.append((index, str(e)))
+                    errors.append((index, traceback.format_exc()))
 
         if errors:
             failure_message = "\n".join([
@@ -93,7 +106,7 @@ class TestAddDocuments(BaseCompatibilityTestCase):
 
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
-            for doc in self.text_docs:
+            for doc in self.documents:
                 doc_id = doc['_id']
                 try:
                     with self.subTest(index=index_name, doc_id=doc_id):
@@ -103,7 +116,7 @@ class TestAddDocuments(BaseCompatibilityTestCase):
                         self.assertEqual(expected_doc, actual_doc)
 
                 except Exception as e:
-                    test_failures.append((index_name, doc_id, str(e)))
+                    test_failures.append((index_name, doc_id, traceback.format_exc()))
 
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:

@@ -1,28 +1,30 @@
+import traceback
+
 import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 @pytest.mark.marqo_version('2.3.0')
 class TestAddDocumentsWithCustomVector(BaseCompatibilityTestCase):
-    structured_index_name = "test_add_doc_api_structured_index"
-    unstructured_index_name = "test_add_doc_api_unstructured_index"
+    structured_index_name = "test_add_doc_api_structured_index_custom_vector"
+    unstructured_index_name = "test_add_doc_api_unstructured_index_custom_vector"
 
     indexes_to_test_on = [
         {
             "indexName": structured_index_name,
             "type": "structured",
             "model": "ViT-B/32",
-            "all_fields": [{"name": "my_custom_vector", "type": "custom_vector"}],
-            "tensor_fields": ["my_custom_vector"],
-            "ann_parameters": {
+            "allFields": [{"name": "my_custom_vector", "type": "custom_vector"}],
+            "tensorFields": ["my_custom_vector"],
+            "annParameters": {
                 "spaceType": "angular",
                 "parameters": {"efConstruction": 512, "m": 16},
             },
         },
         {
             "indexName": unstructured_index_name,
-            "treat_urls_and_pointers_as_images": True,
+            "treatUrlsAndPointersAsImages": True,
             "model": "ViT-B/32",
-            "ann_parameters": {
+            "annParameters": {
                 "spaceType": "angular",
                 "parameters": {"efConstruction": 512, "m": 16},
             },
@@ -60,7 +62,7 @@ class TestAddDocumentsWithCustomVector(BaseCompatibilityTestCase):
         super().setUpClass()
 
     def prepare(self):
-        self.logger.info(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
+        self.logger.debug(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
         self.create_indexes(self.indexes_to_test_on)
 
         self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
@@ -76,7 +78,7 @@ class TestAddDocumentsWithCustomVector(BaseCompatibilityTestCase):
                                                                                      tensor_fields=["my_custom_vector"],
                                                                                      mappings={"my_custom_vector": {"type": "custom_vector"}})
             except Exception as e:
-                errors.append((index, str(e)))
+                errors.append((index, traceback.format_exc()))
 
         all_results = {}
 
@@ -89,7 +91,7 @@ class TestAddDocumentsWithCustomVector(BaseCompatibilityTestCase):
                     doc_id = doc['_id']
                     all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id) #makes sense to add more context here and capture and rethrow an exception
                 except Exception as e:
-                    errors.append((index, str(e)))
+                    errors.append((index, traceback.format_exc()))
 
         if errors:
             failure_message = "\n".join([
@@ -117,7 +119,7 @@ class TestAddDocumentsWithCustomVector(BaseCompatibilityTestCase):
                         self.assertEqual(expected_doc, actual_doc)
 
                 except Exception as e:
-                    test_failures.append((index_name, doc_id, str(e)))
+                    test_failures.append((index_name, doc_id, traceback.format_exc()))
 
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:

@@ -1,3 +1,5 @@
+import traceback
+
 import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
@@ -45,7 +47,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
         # Add documents
-        self.logger.info(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
+        self.logger.debug(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
         self.create_indexes([self.index_metadata])
 
         try:
@@ -91,7 +93,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                         self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
                         self._compare_results(result_from_prepare_mode, doc_res_normalized)
                 except Exception as e:
-                    test_failures.append((index_name, str(e)))
+                    test_failures.append((index_name, traceback.format_exc()))
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:
             failure_message = "\n".join([

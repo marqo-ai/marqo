@@ -1,3 +1,4 @@
+import traceback
 from sys import exc_info
 
 import pytest
@@ -5,8 +6,8 @@ import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 @pytest.mark.marqo_version('2.12.0')
-class TestCreateIndex(BaseCompatibilityTestCase):
-    load_from_hf_index_name = "test_create_index_api"
+class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
+    load_from_hf_index_name = "test_create_index_api_bring_your_own_model"
 
     load_from_hf_index_settings = {
         "treatUrlsAndPointersAsImages": True,
@@ -59,7 +60,7 @@ class TestCreateIndex(BaseCompatibilityTestCase):
                 self.client.create_index(index_name = index_name, settings_dict = settings)
                 all_results[index_name] = self.client.index(index_name).get_settings()
             except Exception as e:
-                errors.append((index_name, str(e)))
+                errors.append((index_name, traceback.format_exc()))
 
         if errors:
             failure_message = "\n".join([
@@ -80,7 +81,7 @@ class TestCreateIndex(BaseCompatibilityTestCase):
                 actual_setting = self.client.index(index_name).get_settings()
                 self.assertEqual(expected_setting, actual_setting, f"Index settings do not match expected settings, expected {expected_setting}, but got {actual_setting}")
             except Exception as e:
-                test_failures.append((index_name, str(e)))
+                test_failures.append((index_name, traceback.format_exc()))
 
         if test_failures:
             failure_message = "\n".join([

@@ -1,57 +1,62 @@
+import traceback
+
 import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 @pytest.mark.marqo_version('2.0.0')
 class TestAddDocumentsMultiModal(BaseCompatibilityTestCase):
-    structured_index_name = "test_add_doc_api_structured_index"
-    unstructured_index_name = "test_add_doc_api_unstructured_index"
+    structured_index_name = "test_add_doc_api_structured_index_multi_modal"
+    unstructured_index_name = "test_add_doc_api_unstructured_index_multi_modal"
 
     indexes_to_test_on = [{
         "indexName": structured_index_name,
         "type": "structured",
         "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
-        "all_fields": [
+        "allFields": [
             {"name": "caption", "type": "text"},
             {"name": "img", "type": "image_pointer"},
             {
                 "name": "my_combination_field",
                 "type": "multimodal_combination",
-                "dependent_fields": {"caption": 0.5, "img": 0.5},
+                "dependentFields": {"caption": 0.5, "img": 0.5}
             },
         ],
-        "tensor_fields": ["my_combination_field"],
+        "tensorFields": ["my_combination_field"],
     },
         {
         "indexName": unstructured_index_name,
         "type": "unstructured",
-        "treat_urls_and_pointers_as_images": "True",
+        "treatUrlsAndPointersAsImages": "True",
         "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
     }]
 
     text_docs = [
         {
+            "_id": "doc_1",
             "img": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg",
             "caption": "A man riding horse",
         },
         {
+            "_id": "doc_2",
             "img": "https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image2.jpg",
             "caption": "An airplane flying in the sky",
         },
         ]
+
     unstructured_mappings={
         "my_combination_field": {
             "type": "multimodal_combination",
-            "weights": {"img": 0.5, "caption": 0.5},
+            "weights": {"img": 0.9, "caption": 0.1}
         }
-    },
+    }
     structured_mappings={
         "my_combination_field": {
             "type": "multimodal_combination",
             "weights": {"img": 0.6, "caption": 0.4},
         }
-    },
+    }
 
-    tensor_fields=["my_combination_field"],
+    tensor_fields=["my_combination_field"]
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -63,7 +68,7 @@ class TestAddDocumentsMultiModal(BaseCompatibilityTestCase):
         super().setUpClass()
 
     def prepare(self):
-        self.logger.info(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
+        self.logger.debug(f"Creating indexes {self.indexes_to_test_on} in test case: {self.__class__.__name__}")
         self.create_indexes(self.indexes_to_test_on)
 
         self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
@@ -73,14 +78,13 @@ class TestAddDocumentsMultiModal(BaseCompatibilityTestCase):
         for index in self.indexes_to_test_on:
             try:
                 if index.get("type") is not None and index.get('type') == 'structured':
-                    self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs,
-                                                                                     mappings = self.structured_mappings) #makes sense to add more context here and capture and rethrow an exception
+                    self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs, mappings = self.structured_mappings) #makes sense to add more context here and capture and rethrow an exception
                 else:
                     self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs,
                                                                                      tensor_fields = self.tensor_fields,
                                                                                      mappings = self.unstructured_mappings)
             except Exception as e:
-                errors.append((index, str(e)))
+                errors.append((index, traceback.format_exc()))
 
         all_results = {}
 
@@ -93,7 +97,7 @@ class TestAddDocumentsMultiModal(BaseCompatibilityTestCase):
                     doc_id = doc['_id']
                     all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id) #makes sense to add more context here and capture and rethrow an exception
                 except Exception as e:
-                    errors.append((index, str(e)))
+                    errors.append((index, traceback.format_exc()))
 
         if errors:
             failure_message = "\n".join([
@@ -121,7 +125,7 @@ class TestAddDocumentsMultiModal(BaseCompatibilityTestCase):
                         self.assertEqual(expected_doc, actual_doc)
 
                 except Exception as e:
-                    test_failures.append((index_name, doc_id, str(e)))
+                    test_failures.append((index_name, doc_id, traceback.format_exc()))
 
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:

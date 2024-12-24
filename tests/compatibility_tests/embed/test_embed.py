@@ -1,3 +1,5 @@
+import traceback
+
 import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
@@ -14,12 +16,17 @@ class TestEmbed(BaseCompatibilityTestCase):
         cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
         super().tearDownClass()
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
+        super().setUpClass()
+
     def prepare(self):
         """
         Prepare the indexes and add documents for the test.
         Also store the search results for later comparison.
         """
-        self.logger.info(f"Creating indexes {self.indexes_to_test_on}")
+        self.logger.debug(f"Creating indexes {self.indexes_to_test_on}")
         self.create_indexes(self.indexes_to_test_on)
         all_results = {}
         errors = []  # Collect any errors to report them at the end
@@ -34,9 +41,10 @@ class TestEmbed(BaseCompatibilityTestCase):
                 content_type=None
             )
             except Exception as e:
-                errors.append((index['indexName'], str(e)))
+                errors.append((index['indexName'], traceback.format_exc()))
         if errors:
-            self.logger.error("\n".join(errors)) # Fail the prepare method with all collected errors
+            formatted_errors = [f"Index: {index_name}, Error: {error}" for index_name, error in errors]
+            self.logger.error("\n".join(formatted_errors))  # Fail the prepare method with all collected errors
 
         self.logger.debug(f"Ran prepare method for {self.indexes_to_test_on} inside test class {self.__class__.__name__}")
         self.save_results_to_file(all_results)
@@ -61,12 +69,14 @@ class TestEmbed(BaseCompatibilityTestCase):
                 self._compare_embed_results(expected_result, actual_result)
 
             except Exception as e:
-                test_failures.append((index_name, str(e)))
+                test_failures.append((index_name, traceback.format_exc()))
             if test_failures:
                 failure_message = "\n".join([
                     f"Failure in index {idx}, {error}"
                     for idx, error in test_failures
                 ])
+                self.logger.error("\n".join(failure_message))  # Fail the prepare method with all collected errors
+
 
 
 

@@ -5,8 +5,8 @@ import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.0.0')
-class TestSearch(BaseCompatibilityTestCase):
+@pytest.mark.marqo_version('2.11.0')
+class TestHybridSearchUnstructured(BaseCompatibilityTestCase):
 
     image_model = 'open_clip/ViT-B-32/laion2b_s34b_b79k'
     multimodal_weights = {"image_field": 0.9, "text_field": 0.1}
@@ -17,42 +17,26 @@ class TestSearch(BaseCompatibilityTestCase):
         }
     }
     tensor_fields = ["multimodal_field", "text_field", "image_field"]
-    structured_index_metadata = {
-        "indexName": "test_search_api_structured_index",
-        "type": "structured",
-        "vectorNumericType": "float",
-        "model": image_model,
-        "normalizeEmbeddings": True,
-        "textPreprocessing": {
-            "splitLength": 2,
-            "splitOverlap": 0,
-            "splitMethod": "sentence",
-        },
-        "imagePreprocessing": {"patchMethod": None},
-        "allFields": [
-            {"name": "text_field", "type": "text", "features": ["lexical_search"]},
-            {"name": "caption", "type": "text", "features": ["lexical_search", "filter"]},
-            {"name": "tags", "type": "array<text>", "features": ["filter"]},
-            {"name": "image_field", "type": "image_pointer"},
-            {"name": "my_int", "type": "int", "features": ["score_modifier"]},
-            # this field maps the above image field and text fields into a multimodal combination.
-            {
-                "name": "multimodal_field",
-                "type": "multimodal_combination",
-                "dependentFields": multimodal_weights,
-            },
-        ],
-        "tensorFields": tensor_fields,
-        "annParameters": {
-            "spaceType": "prenormalized-angular",
-            "parameters": {"efConstruction": 512, "m": 16},
-        },
-    }
 
     unstructured_index_metadata = {
         "indexName": "test_search_api_unstructured_index",
         "model": image_model,
         "treatUrlsAndPointersAsImages": True,
+    }
+
+    hybrid_search_params = {
+        "retrievalMethod": "disjunction",
+        "rankingMethod": "rrf",
+        "alpha": 0.3,
+        "rrfK": 60,
+        "searchableAttributesLexical": ["text_field"],
+        "searchableAttributesTensor": ['image_field', 'multimodal_field'],
+        "scoreModifiersTensor": {
+            "add_to_score": [{"field_name": "my_int", "weight": 0.01}]
+        },
+        "scoreModifiersLexical": {
+            "add_to_score": [{"field_name": "my_int", "weight": 0.01}]
+        },
     }
 
     docs = [
@@ -102,9 +86,9 @@ class TestSearch(BaseCompatibilityTestCase):
             'caption': 'example_doc_6'
         },
     ]
-    indexes_to_test_on = [structured_index_metadata, unstructured_index_metadata]
+    indexes_to_test_on = [unstructured_index_metadata]
     queries = ["travel", "horse light", "travel with plane"]
-    search_methods = ["TENSOR", "LEXICAL"]
+    search_methods = ["HYBRID"]
     result_keys = search_methods # Set the result keys to be the same as search methods for easy comparison
     searchable_attributes = {"TENSOR": ['image_field', 'multimodal_field'], "LEXICAL": ['text_field']}
 

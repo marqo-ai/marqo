@@ -1,9 +1,11 @@
+import traceback
+
 import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.9.0')
-class TestCreateStructuredIndex(BaseCompatibilityTestCase):
+@pytest.mark.marqo_version('2.12.0')
+class TestCreateStructuredIndexv2_12(BaseCompatibilityTestCase):
     """
     Ref: https://github.com/marqo-ai/marqo/releases/tag/2.9.0
     """
@@ -32,9 +34,9 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
                     "dependentFields": {"image_field": 0.9, "text_field": 0.1},
                 },
                 {"name": "boolean_field", "type": "bool"},
-                {"name": "float_field_1", type: "float"},
-                {"name": "array_int_field_1", type: "array<int>"},
-                {"name": "array_float_field_1", type: "array<float>"},
+                {"name": "float_field_1", "type": "float"},
+                {"name": "array_int_field_1", "type": "array<int>"},
+                {"name": "array_float_field_1", "type": "array<float>"},
                 {"name": "array_long_field_1", "type": "array<long>"},
                 {"name": "array_double_field_1", "type": "array<double>"},
                 {"name": "long_field_1", "type": "long"},
@@ -52,7 +54,7 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
                 "parameters": {"efConstruction": 512, "m": 16},
             }
         }]
-    indexes_to_test_on = ["test_create_index_api_structured_index"]
+    indexes_to_test_on = ["test_create_index_api_structured_index_2_12_0"]
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -64,7 +66,7 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
         super().setUpClass()
 
     def prepare(self):
-        self.logger.info(f"Creating indexes {self.indexes_settings_to_test_on}")
+        self.logger.debug(f"Creating indexes {self.indexes_settings_to_test_on}")
         all_results = {}
         errors = []  # Collect any errors to report them at the end
         for index_name, index_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
@@ -72,10 +74,11 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
                 self.client.create_index(index_name, settings_dict = index_settings)
                 all_results[index_name] = self.client.index(index_name).get_settings()
             except Exception as e:
-                errors.append((index_name, str(e)))
+                errors.append((index_name, traceback.format_exc()))
 
         if errors:
-            self.logger.error("\n".join(errors)) # Fail the prepare method with all collected errors
+            formatted_errors = [f"Index: {index_name}, Error: {error}" for index_name, error in errors]
+            self.logger.error("\n".join(formatted_errors))  # Fail the prepare method with all collected errors
         self.save_results_to_file(all_results)
 
     def test_expected_settings(self):
@@ -90,7 +93,7 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
                     self.logger.debug(f"Printing expected_settings {expected_settings.get(index_name)}")
                     self.assertEqual(expected_settings.get(index_name), actual_settings, f"Index settings do not match expected settings, expected {expected_settings}, but got {actual_settings}")
             except Exception as e:
-                test_failures.append((index_name, str(e)))
+                test_failures.append((index_name, traceback.format_exc()))
 
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:
@@ -98,4 +101,4 @@ class TestCreateStructuredIndex(BaseCompatibilityTestCase):
                 f"Failure in index {idx}, {error}"
                 for idx, error in test_failures
             ])
-        self.fail(f"Some subtests failed:\n{failure_message}")
+            self.fail(f"Some subtests failed:\n{failure_message}")

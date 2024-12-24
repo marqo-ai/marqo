@@ -3,45 +3,83 @@ import traceback
 import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
-@pytest.mark.marqo_version('2.0.0')
-class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
-    """
-    This class tests the add_documents API on both structured and unstructured indexes
-    """
-    structured_index_name = "test_add_doc_api_structured_index"
-    unstructured_index_name = "test_add_doc_api_unstructured_index"
+@pytest.mark.marqo_version('2.2.0')
+class TestAddDocumentsv2_2(BaseCompatibilityTestCase):
+    structured_index_name = "test_add_doc_api_structured_index_2_2_0"
 
-    indexes_to_test_on = [{
-        "indexName": structured_index_name,
-        "type": "structured",
-        "model": "sentence-transformers/all-MiniLM-L6-v2",
-        "normalizeEmbeddings": True,
-        "allFields": [
-            {"name": "Title", "type": "text"},
-            {"name": "Description", "type": "text"},
-            {"name": "Genre", "type": "text"},
-        ],
-        "tensorFields": ["Title", "Description", "Genre"],
-    },
+    indexes_to_test_on = [
         {
-        "indexName": unstructured_index_name,
-        "type": "unstructured",
-        "model": "sentence-transformers/all-MiniLM-L6-v2",
-        "normalizeEmbeddings": True,
-    }]
+            "indexName": structured_index_name,
+            "type": "structured",
+            "vectorNumericType": "float",
+            "model": "open_clip/ViT-B-32/laion2b_s34b_b79k",
+            "normalizeEmbeddings": True,
+            "textPreprocessing": {
+                "splitLength": 2,
+                "splitOverlap": 0,
+                "splitMethod": "sentence",
+            },
+            "imagePreprocessing": {"patchMethod": None},
+            "allFields": [
+                {"name": "text_field", "type": "text", "features": ["lexical_search"]},
+                {"name": "caption", "type": "text", "features": ["lexical_search", "filter"]},
+                {"name": "tags", "type": "array<text>", "features": ["filter"]},
+                {"name": "image_field", "type": "image_pointer"},
+                {"name": "my_int", "type": "int", "features": ["score_modifier"]},
+                # this field maps the above image field and text fields into a multimodal combination.
+                {
+                    "name": "multimodal_field",
+                    "type": "multimodal_combination",
+                    "dependentFields": {"image_field": 0.9, "text_field": 0.1},
+                },
+                {"name": "boolean_field", "type": "bool"},
+                {"name": "float_field_1", "type": "float"},
+                {"name": "array_int_field_1", "type": "array<int>"},
+                {"name": "array_float_field_1", "type": "array<float>"},
+                {"name": "array_long_field_1", "type": "array<long>"},
+                {"name": "array_double_field_1", "type": "array<double>"},
+                {"name": "long_field_1", "type": "long"},
+                {"name": "double_field_1", "type": "double"},
+            ],
+            "tensorFields": ["multimodal_field"],
+            "annParameters": {
+                "spaceType": "prenormalized-angular",
+                "parameters": {"efConstruction": 512, "m": 16},
+            }
+        }]
 
     text_docs = [{
-        "Title": "The Travels of Marco Polo",
-        "Description": "A 13th-century travelogue describing the travels of Polo",
-        "Genre": "History",
+        "text_field": "The Travels of Marco Polo",
+        "caption": "A 13th-century travelogue describing the travels of Polo",
+        "tags": ["wow", "this", "is", "awesome"],
+        "my_int": 123,
+        "boolean_field": True,
+        "float_field_1": 1.23,
+        "array_int_field_1": [1, 2, 3],
+        "array_float_field_1": [1.23, 2.34, 3.45],
+        "array_long_field_1": [1234567890, 2345678901, 3456789012],
+        "array_double_field_1": [1.234567890, 2.345678901, 3.456789012],
+        "long_field_1": 1234567890,
+        "double_field_1": 1.234567890,
+
         "_id": "article_602"
     },
     {
-        "Title": "Extravehicular Mobility Unit (EMU)",
-        "Description": "The EMU is a spacesuit that provides environmental protection",
-        "_id": "article_591",
-        "Genre": "Science"
+        "text_field": "Extravehicular Mobility Unit (EMU)",
+        "caption": "The EMU is a spacesuit that provides environmental protection",
+        "tags": ["space", "EMU", "NASA", "astronaut"],
+        "my_int": 354,
+        "boolean_field": True,
+        "float_field_1": 1.56,
+        "array_int_field_1": [4, 5, 6],
+        "array_float_field_1": [1.14, 2.21, 3.31],
+        "array_long_field_1": [3456789012, 1234567890, 2345678901],
+        "array_double_field_1": [1.234567890, 2.345678901, 3.456789012],
+        "long_field_1": 1234567890,
+        "double_field_1": 1.234567890,
+        "_id": "article_603"
     }]
+
     @classmethod
     def tearDownClass(cls) -> None:
         cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
@@ -114,7 +152,7 @@ class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
         # After all subtests, raise a comprehensive failure if any occurred
         if test_failures:
             failure_message = "\n".join([
-                f"Failure in index_name: {idx}, doc_id: {doc_id}: {error}"
+                f"Failure in index {idx}, doc_id {doc_id}: {error}"
                 for idx, doc_id, error in test_failures
             ])
-            self.fail(f"Some subtests failed:\n {failure_message}")
+            self.fail(f"Some subtests failed:\n{failure_message}")
