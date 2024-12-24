@@ -34,6 +34,8 @@ class HybridParameters(StrictBaseModel):
     scoreModifiersTensor: Optional[ScoreModifierLists] = None
     scoreModifiersGlobal: Optional[ScoreModifierLists] = None
 
+    rerankCountGlobal: Optional[int] = None
+
     @root_validator(pre=False)
     def validate_properties(cls, values):
         # alpha can only be defined for RRF and NormalizeLinear
@@ -86,6 +88,13 @@ class HybridParameters(StrictBaseModel):
         if values.get('scoreModifiersGlobal') is not None:
             if values.get('rankingMethod') != RankingMethod.RRF:
                 raise ValueError("'scoreModifiersGlobal' can only be defined for 'rrf' ranking method")
+
+        # rerankCountGlobal can only be defined for RRF and if scoreModifiersGlobal is defined
+        if values.get('rerankCountGlobal') is not None:
+            if values.get('rankingMethod') != RankingMethod.RRF:
+                raise ValueError("'rerankCountGlobal' can only be defined for 'rrf' ranking method")
+            if values.get('scoreModifiersGlobal') is None:
+                raise ValueError("'rerankCountGlobal' can only be defined if 'scoreModifiersGlobal' is defined")
 
         # if retrievalMethod == Disjunction, then ranking_method must be RRF, NormalizeLinear
         if values.get('retrievalMethod') == RetrievalMethod.Disjunction:

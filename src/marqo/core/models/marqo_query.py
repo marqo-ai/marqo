@@ -61,6 +61,8 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     # Core module will use these fields instead of the score_modifiers_lexical and score_modifiers_tensor inside the HybridParameters
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
+    score_modifiers_global: Optional[List[ScoreModifier]] = None
+
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):
         # score_modifiers cannot defined for hybrid search

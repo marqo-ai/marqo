@@ -548,6 +548,8 @@ class StructuredVespaIndex(VespaIndex):
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL])
         if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR])
+        if hybrid_score_modifiers[constants.MARQO_SCORE_MODIFIERS_GLOBAL]:
+            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SCORE_MODIFIERS_GLOBAL])
 
         query = {
             'searchChain': 'marqo',

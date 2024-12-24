@@ -186,6 +186,8 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersLexical is not None else None,
             score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
             if hybrid_parameters.scoreModifiersTensor is not None else None,
+            score_modifiers_global=hybrid_parameters.scoreModifiersGlobal.to_marqo_score_modifiers()
+            if hybrid_parameters.scoreModifiersGlobal is not None else None,
             hybrid_parameters=hybrid_parameters
         )
 
