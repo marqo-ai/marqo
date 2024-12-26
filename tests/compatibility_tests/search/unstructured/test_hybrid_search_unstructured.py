@@ -19,7 +19,7 @@ class TestHybridSearchUnstructured(BaseCompatibilityTestCase):
     tensor_fields = ["multimodal_field", "text_field", "image_field"]
 
     unstructured_index_metadata = {
-        "indexName": "test_search_api_unstructured_index",
+        "indexName": "test_search_api_unstructured_index_hybrid",
         "model": image_model,
         "treatUrlsAndPointersAsImages": True,
     }

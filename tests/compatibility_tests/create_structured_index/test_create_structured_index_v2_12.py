@@ -72,10 +72,12 @@ class TestCreateStructuredIndexv2_12(BaseCompatibilityTestCase):
         for index_name, index_settings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
             try:
                 self.client.create_index(index_name, settings_dict = index_settings)
+            except Exception as e:
+                errors.append((index_name, traceback.format_exc()))
+            try:
                 all_results[index_name] = self.client.index(index_name).get_settings()
             except Exception as e:
                 errors.append((index_name, traceback.format_exc()))
-
         if errors:
             formatted_errors = [f"Index: {index_name}, Error: {error}" for index_name, error in errors]
             self.logger.error("\n".join(formatted_errors))  # Fail the prepare method with all collected errors

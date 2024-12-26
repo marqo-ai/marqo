@@ -18,7 +18,7 @@ class TestHybridSearchStructured(BaseCompatibilityTestCase):
     }
     tensor_fields = ["multimodal_field", "text_field", "image_field"]
     structured_index_metadata = {
-        "indexName": "test_hybrid_search_api_structured_index",
+        "indexName": "test_search_api_structured_index_hybrid",
         "type": "structured",
         "vectorNumericType": "float",
         "model": image_model,

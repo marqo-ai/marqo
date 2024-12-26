@@ -56,7 +56,7 @@ class TestRecommend(BaseCompatibilityTestCase):
 
     docs = [
         {
-            '_id': 'example_doc_1',
+            '_id': f"example_doc_1",
             'text_field': 'Man riding a horse',
             'image_field': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
             'tags': ['man', 'horse'],
@@ -165,7 +165,7 @@ class TestRecommend(BaseCompatibilityTestCase):
                 expected_result = stored_results[index_name]
                 self.logger.debug(f"Printing expected_result {expected_result}")
                 self.logger.debug(f"Printing actual_result {actual_result}")
-                self._compare_hits(expected_result, actual_result)
+                self.assert_search_results_match(expected_result, actual_result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
         # After all subtests, raise a comprehensive failure if any occurred
@@ -176,5 +176,60 @@ class TestRecommend(BaseCompatibilityTestCase):
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
 
-    def _compare_hits(self, expected_result, actual_result):
-        self.assertEqual(expected_result.get("hits"), actual_result.get("hits"), f"Results do not match. Expected: {expected_result}, Got: {actual_result}")
+    def compare_search_results(expected, actual, ignore_fields=None):
+        """
+        Compare search results while ignoring order of items in hits and specific fields.
+
+        Args:
+            expected (dict): Expected search result
+            actual (dict): Actual search result
+            ignore_fields (list): Fields to ignore in comparison (e.g. ['processingTimeMs'])
+
+        Returns:
+            bool: True if results match ignoring order, False otherwise
+        """
+        if ignore_fields is None:
+            ignore_fields = ['processingTimeMs']
+
+        # Create copies and remove ignored fields
+        expected_copy = expected.copy()
+        actual_copy = actual.copy()
+
+        for field in ignore_fields:
+            expected_copy.pop(field, None)
+            actual_copy.pop(field, None)
+
+        # Get hits from both results
+        expected_hits = expected_copy.pop('hits', [])
+        actual_hits = actual_copy.pop('hits', [])
+
+        # Compare non-hits parts
+        if expected_copy != actual_copy:
+            return False
+
+        # Convert hits to tuples of sorted items for comparison
+        def hit_to_comparable(hit):
+            # Convert the hit dictionary into a sorted tuple of (key, value) pairs
+            # For list values, sort them first
+            return tuple(sorted(
+                (k, tuple(sorted(v)) if isinstance(v, list) else v)
+                for k, v in hit.items()
+            ))
+
+        # Convert hits to sets of comparable tuples
+        expected_set = {hit_to_comparable(hit) for hit in expected_hits}
+        actual_set = {hit_to_comparable(hit) for hit in actual_hits}
+
+        return expected_set == actual_set
+
+    def assert_search_results_match(self, expected, actual, ignore_fields=None):
+        """
+        Assert that search results match while ignoring order.
+
+        Args:
+            expected (dict): Expected search result
+            actual (dict): Actual search result
+            ignore_fields (list): Fields to ignore in comparison
+        """
+        assert self.compare_search_results(expected, actual, ignore_fields), \
+            f"Results do not match when comparing ignoring order.\nExpected: {expected}\nGot: {actual}"
