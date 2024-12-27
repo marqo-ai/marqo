@@ -6,6 +6,7 @@ import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.AsyncExecution;
@@ -54,7 +55,6 @@ public class HybridSearcher extends Searcher {
         // Ranking methods: rrf, normalize_linear, tensor, lexical
         STANDARD_SEARCH_TYPES.add(MARQO_SEARCH_METHOD_LEXICAL);
         STANDARD_SEARCH_TYPES.add(MARQO_SEARCH_METHOD_TENSOR);
-
         boolean verbose = query.properties().getBoolean("marqo__hybrid.verbose", false);
 
         logIfVerbose("Starting Hybrid Search script.", verbose);
@@ -266,6 +266,8 @@ public class HybridSearcher extends Searcher {
                 rank++;
             }
         }
+        // Apply global score modifiers on result list
+        result = applyGlobalScoreModifiers(result, verbose);
 
         // Sort and trim results.
         logIfVerbose("Combined list (UNSORTED)", verbose);
@@ -458,5 +460,41 @@ public class HybridSearcher extends Searcher {
             throw new InternalException(
                     "Vespa doc ID could not be extracted from the full hit ID: " + fullPath + ".");
         }
+    }
+
+    /**
+     * Apply global score modifiers to the hit group
+     * @param hits
+     * @param verbose
+     */
+    HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
+        FeatureData hitMatchFeatures;
+        double mult_modifier, add_modifier;
+        if (hits.size() == 0) {
+            logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
+            return hits;
+        }
+
+        // TODO: Apply configurable depth. For now, it's all elements
+        for (Hit hit : hits) {
+            logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
+            // Extract the mult and add modifiers from match-features
+            hitMatchFeatures = (FeatureData) hits.get(0).getField("matchfeatures");
+            if (hitMatchFeatures != null) {
+                mult_modifier = hitMatchFeatures.getDouble("global_mult_modifier");
+                add_modifier = hitMatchFeatures.getDouble("global_add_modifier");
+
+                // Apply the modifiers to the hit's relevance
+                hit.setRelevance(hit.getRelevance().getScore() * mult_modifier + add_modifier);
+            } else {
+                // TODO: Maybe error out instead of logging
+                logIfVerbose(
+                        "WARNING: No match features found for hit. Not applying global score"
+                                + " modifiers. "
+                                + hit.getId(),
+                        verbose);
+            }
+        }
+        return hits;
     }
 }

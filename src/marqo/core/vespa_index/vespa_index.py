@@ -188,7 +188,7 @@ class VespaIndex(ABC):
         result = {
             constants.MARQO_SEARCH_METHOD_LEXICAL: None,
             constants.MARQO_SEARCH_METHOD_TENSOR: None,
-            constants.MARQO_SEARCH_METHOD_GLOBAL: None
+            constants.MARQO_SCORE_MODIFIERS_GLOBAL: None
         }
 
         if hybrid_query.score_modifiers_lexical:
