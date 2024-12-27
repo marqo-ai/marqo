@@ -121,7 +121,7 @@ class TestHybridSearchStructured(BaseCompatibilityTestCase):
         """
         self.logger.debug(f"Creating indexes {self.indexes_to_test_on}")
         self.create_indexes(self.indexes_to_test_on)
-        errors = []  # Collect errors to report them at the end
+        add_docs_errors = []  # Collect add_docs_errors to report them at the end
 
         self.logger.debug(f'Feeding documents to {self.indexes_to_test_on}')
         for index in self.indexes_to_test_on:
@@ -133,9 +133,10 @@ class TestHybridSearchStructured(BaseCompatibilityTestCase):
                                                                                mappings=self.mappings,
                                                                                tensor_fields=self.tensor_fields)
             except Exception as e:
-                errors.append((index, str(e)))
+                add_docs_errors.append((index, traceback.format_exc()))
 
         all_results = {}
+        search_errors = []
         # Loop through queries, search methods, and result keys to populate unstructured_results
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
@@ -153,12 +154,17 @@ class TestHybridSearchStructured(BaseCompatibilityTestCase):
                         result = self.client.index(index_name).search(q=query, search_method=search_method)
                     all_results[index_name][result_key] = result
                 except Exception as e:
-                    errors.append((query, search_method, index_name, traceback.format_exc()))
-
-        if errors:
+                    search_errors.append((query, search_method, index_name, traceback.format_exc()))
+        if add_docs_errors:
+            failure_message = "\n".join([
+                f"Failure in index {idx}, {error}"
+                for idx, error in add_docs_errors
+            ])
+            self.logger.error(f"Failed to add documents to index: {failure_message}. When the corresponding test runs for this index, it is expected to fail")
+        if search_errors:
             failure_message = "\n".join([
                 f"Failure in query {query}, search_method {search_method}, idx: {idx} : {error}"
-                for query, search_method, idx, error in errors
+                for query, search_method, idx, error in search_errors
             ])
             self.logger.error(f"Some subtests failed:\n{failure_message}. When the corresponding test runs for this index, it is expected to fail")
         self.save_results_to_file(all_results)

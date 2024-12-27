@@ -176,7 +176,7 @@ class TestRecommend(BaseCompatibilityTestCase):
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
 
-    def compare_search_results(expected, actual, ignore_fields=None):
+    def compare_search_results(self, expected, actual, ignore_fields=None):
         """
         Compare search results while ignoring order of items in hits and specific fields.
 
