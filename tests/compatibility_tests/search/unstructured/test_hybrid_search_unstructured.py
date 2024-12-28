@@ -41,7 +41,7 @@ class TestHybridSearchUnstructured(BaseCompatibilityTestCase):
 
     docs = [
         {
-            '_id': 'example_doc_1',
+            '_id': f"example_doc_1",
             'text_field': 'Man riding a horse',
             'image_field': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image1.jpg',
             'tags': ['man', 'horse'],
@@ -72,7 +72,7 @@ class TestHybridSearchUnstructured(BaseCompatibilityTestCase):
 
     extra_docs = [
         {
-            '_id': 'example_doc_5',
+            '_id': f"example_doc_5",
             'text_field': 'Woman looking at phone',
             'image_field': 'https://raw.githubusercontent.com/marqo-ai/marqo/mainline/examples/ImageSearchGuide/data/image0.jpg',
             'tags': ['women', 'phone'],

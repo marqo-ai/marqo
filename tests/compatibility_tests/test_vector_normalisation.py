@@ -15,7 +15,6 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     index_metadata = {
                 "indexName": text_index_with_normalize_embeddings_true,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": True,
                 "allFields": [
                     {"name": "title", "type": "text"},
@@ -41,8 +40,12 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     # prepare method of this class
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.indexes_to_delete = [cls.text_index_with_normalize_embeddings_true]
+        cls.indexes_to_delete = cls.indexes_to_test_on
         super().tearDownClass()
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.indexes_to_delete = cls.indexes_to_test_on
 
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true

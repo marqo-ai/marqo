@@ -21,6 +21,11 @@ class TestCreateIndexWithNoModel(BaseCompatibilityTestCase):
         cls.indexes_to_delete = [cls.index_name]
         super().tearDownClass()
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.indexes_to_delete = [cls.index_name]
+        super().setUpClass()
+    
     def prepare(self):
 
         all_results = {}

@@ -47,12 +47,12 @@ class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.indexes_to_delete = [cls.indexes_to_test_on]
+        cls.indexes_to_delete = cls.indexes_to_test_on
         super().tearDownClass()
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.indexes_to_delete = [cls.indexes_to_test_on]
+        cls.indexes_to_delete = cls.indexes_to_test_on
         super().setUpClass()
 
     def prepare(self):

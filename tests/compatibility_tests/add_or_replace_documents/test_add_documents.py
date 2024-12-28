@@ -14,7 +14,6 @@ class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
     indexes_to_test_on = [{
         "indexName": structured_index_name,
         "type": "structured",
-        "model": "sentence-transformers/all-MiniLM-L6-v2",
         "normalizeEmbeddings": True,
         "allFields": [
             {"name": "Title", "type": "text"},
@@ -26,7 +25,6 @@ class TestAddDocumentsv2_0(BaseCompatibilityTestCase):
         {
         "indexName": unstructured_index_name,
         "type": "unstructured",
-        "model": "sentence-transformers/all-MiniLM-L6-v2",
         "normalizeEmbeddings": True,
     }]
 

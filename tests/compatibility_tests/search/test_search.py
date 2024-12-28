@@ -140,9 +140,17 @@ class TestSearch(BaseCompatibilityTestCase):
                                                                                mappings=self.mappings,
                                                                                tensor_fields=self.tensor_fields)
             except Exception as e:
-                errors.append((index, str(e)))
+                errors.append((index, traceback.format_exc()))
+
+        if errors:
+            failure_message = "\n".join([
+                f"Failure while Feeding documents to idx: {idx} : {error}"
+                for idx, error in errors
+            ])
+            self.logger.error(f"Some subtests failed:\n{failure_message}. When the corresponding test runs for this index, it is expected to fail")
 
         all_results = {}
+        errors = []  # Redefining to Collect errors related to search to report them at the end
         # Loop through queries, search methods, and result keys to populate unstructured_results
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
