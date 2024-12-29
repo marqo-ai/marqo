@@ -46,6 +46,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.indexes_to_delete = cls.indexes_to_test_on
+        super().setUpClass()
 
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
