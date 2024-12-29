@@ -114,7 +114,7 @@ class TestAddDocumentsv2_9(BaseCompatibilityTestCase):
         for indexName, indexSettings in zip(self.indexes_to_test_on, self.indexes_settings_to_test_on):
             try:
                 if indexSettings.get("type") is not None and indexSettings.get('type') == 'structured':
-                    self.client.index(index_name = indexName).add_documents(documents = self.text_docs) #makes sense to add more context here and capture and rethrow an exception
+                    self.client.index(index_name = indexName).add_documents(documents = self.text_docs)
             except Exception as e:
                 errors.append((indexName, indexSettings, traceback.format_exc()))
 
@@ -127,7 +127,7 @@ class TestAddDocumentsv2_9(BaseCompatibilityTestCase):
             for doc in self.text_docs:
                 try:
                     doc_id = doc['_id']
-                    all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id) #makes sense to add more context here and capture and rethrow an exception
+                    all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id)
                 except Exception as e:
                     errors.append((indexName, indexSettings, traceback.format_exc()))
 

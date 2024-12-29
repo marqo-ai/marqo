@@ -76,7 +76,7 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
                 f"Feeding document to index {index.get('indexName')} in test case: {self.__class__.__name__}")
             try:
                 if index.get("type") is not None and index.get('type') == 'structured':
-                    self.client.index(index_name = index['indexName']).add_documents(documents = self.documents) #makes sense to add more context here and capture and rethrow an exception
+                    self.client.index(index_name = index['indexName']).add_documents(documents = self.documents)
             except Exception as e:
                 errors.append((index, traceback.format_exc()))
 
@@ -90,7 +90,7 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
             for doc in self.documents:
                 try:
                     doc_id = doc['_id']
-                    all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id) #makes sense to add more context here and capture and rethrow an exception
+                    all_results[index_name][doc_id] = self.client.index(index_name).get_document(doc_id)
                 except Exception as e:
                     errors.append((index, traceback.format_exc()))
 
