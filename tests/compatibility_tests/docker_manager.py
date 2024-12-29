@@ -484,11 +484,10 @@ class DockerManager:
             container = self.docker_client.containers.run(
                 image=image_name,
                 name=f"prepare-rollback-{target_version}",
-                command="sh -c 'chown -R vespa:vespa /opt/vespa/var'",
+                command=["/bin/sh", "-c", "chown -R vespa:vespa /opt/vespa/var"],  # Using verified shell path
                 volumes={source_volume: {'bind': '/opt/vespa/var', 'mode': 'rw'}},
-                entrypoint="/bin/sh",
-                remove=True,  # Automatically remove the container after execution
-                detach=False  # Run in the foreground for immediate execution
+                remove=True,
+                detach=False
             )
             self.logger.info(f"Volume {source_volume} prepared successfully for rollback.")
         except APIError as e:

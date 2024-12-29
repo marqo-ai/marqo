@@ -79,7 +79,6 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
         # This runs on to_version
-        get_indexes = self.client.get_indexes()
         test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
 
 
