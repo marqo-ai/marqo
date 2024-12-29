@@ -40,8 +40,8 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _validate_add_docs_params(self, add_docs_params):
         validate_tensor_fields(add_docs_params.tensor_fields)
-        if add_docs_params.unstructured_mappings:
-            validate_mappings_object_format(add_docs_params.unstructured_mappings)
+        if add_docs_params.mappings:
+            validate_mappings_object_format(add_docs_params.mappings)
 
     def _create_tensor_fields_container(self) -> TensorFieldsContainer:
         mappings = self.add_docs_params.mappings or dict()

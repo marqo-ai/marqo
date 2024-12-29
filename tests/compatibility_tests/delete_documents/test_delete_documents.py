@@ -25,13 +25,13 @@ class TestDeleteDocuments(BaseCompatibilityTestCase):
 
     text_docs = [
         {
-            "Title": "The Travels of Marco Polo",
+            "title": "The Travels of Marco Polo",
             "Description": "A 13th-century travelogue describing the travels of Polo",
             "Genre": "History",
             "_id": "article_602"
     },
         {
-            "Title": "Extravehicular Mobility Unit (EMU)",
+            "title": "Extravehicular Mobility Unit (EMU)",
             "Description": "The EMU is a spacesuit that provides environmental protection",
             "_id": "article_591",
             "Genre": "Science"
