@@ -20,10 +20,11 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
 from marqo.s2_inference import clip_utils
-from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError
+from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError, MediaExceedsMaxSizeError
 from marqo.s2_inference.models.model_type import ModelType
 from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
+from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search import enums
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
@@ -186,7 +187,7 @@ def download_and_chunk_media(url: str, device: str, modality: Modality,
                              preprocessors: Preprocessors, audio_preprocessing: AudioPreProcessing = None,
                              video_preprocessing: VideoPreProcessing = None,
                              media_download_headers: Optional[Dict] = None) -> List[Dict[str, torch.Tensor]]:
-    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB in bytes
+    MAX_FILE_SIZE = read_env_vars_and_defaults_ints(EnvVars.MARQO_MAX_ADD_DOCS_VIDEO_AUDIO_FILE_SIZE)
 
     processor = StreamingMediaProcessor(
         url=url, device=device, modality=modality, preprocessors=preprocessors,
@@ -195,8 +196,8 @@ def download_and_chunk_media(url: str, device: str, modality: Modality,
     )
 
     if processor.total_size > MAX_FILE_SIZE:
-        raise ValueError(
-            f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of 100 MB")
+        raise MediaExceedsMaxSizeError(
+            f"File size ({processor.total_size / 1024 / 1024:.2f} MB) exceeds the maximum allowed size of {MAX_FILE_SIZE / 1024 / 1024:.2f} MB")
 
     return processor.process_media()
 

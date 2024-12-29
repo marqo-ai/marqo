@@ -112,6 +112,7 @@ def marqo_base_exception_handler(request: Request, exc: base_exceptions.MarqoErr
         (core_exceptions.InternalError, api_exceptions.InternalError, None, None),
         (core_exceptions.ApplicationRollbackError, api_exceptions.ApplicationRollbackError, None, None),
         (core_exceptions.TooManyFieldsError, api_exceptions.BadRequestError, None, None),
+        (core_exceptions.DeviceError, api_exceptions.ServiceUnavailableError, None, None),
 
         # Vespa client exceptions
         (
@@ -579,16 +580,31 @@ def schema_validation(index_name: str, settings_object: dict):
     )
 
 
+@app.get('/memory', include_in_schema=False)
+@utils.enable_debug_apis()
+def memory():
+    return memory_profiler.get_memory_profile()
+
+
 @app.get("/health" , include_in_schema=False)
 def check_health(marqo_config: config.Config = Depends(get_config)):
     health_status = marqo_config.monitoring.get_health()
     return HealthResponse.from_marqo_health_status(health_status)
 
 
-@app.get('/memory', include_in_schema=False)
-@utils.enable_debug_apis()
-def memory():
-    return memory_profiler.get_memory_profile()
+@app.get("/healthz", include_in_schema=False)
+def liveness_check(marqo_config: config.Config = Depends(get_config)) -> JSONResponse:
+    """
+    This liveness check endpoint does a quick status check, and error out if any component encounters unrecoverable
+    issues. This only does a check on the cuda devices right now.
+    Docker schedulers could leverage this endpoint to decide whether to restart the Marqo container.
+
+    Returns:
+        200 - if all checks pass
+        500 - if any check fails
+    """
+    marqo_config.device_manager.cuda_device_health_check()
+    return JSONResponse(content={"status": "ok"}, status_code=200)
 
 
 if __name__ == "__main__":

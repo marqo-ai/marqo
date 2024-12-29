@@ -112,3 +112,15 @@ class DuplicateDocumentError(AddDocumentsError):
 
 class TooManyFieldsError(MarqoError):
     pass
+
+
+class DeviceError(MarqoError):
+    pass
+
+
+class CudaDeviceNotAvailableError(DeviceError):
+    pass
+
+
+class CudaOutOfMemoryError(DeviceError):
+    pass

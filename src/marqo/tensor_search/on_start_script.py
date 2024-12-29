@@ -85,6 +85,7 @@ class PopulateCache:
 
 
 class CUDAAvailable:
+    # TODO [Refactoring device logic] move this logic to device manager
     """checks the status of cuda
     """
     logger = get_logger('CUDA device summary')
@@ -109,6 +110,7 @@ class CUDAAvailable:
 
 
 class SetBestAvailableDevice:
+    # TODO [Refactoring device logic] move this logic to device manager, get rid of MARQO_BEST_AVAILABLE_DEVICE envvar
     """sets the MARQO_BEST_AVAILABLE_DEVICE env var
     """
     logger = get_logger('SetBestAvailableDevice')
@@ -151,6 +153,7 @@ class CacheModels:
             self.models = warmed_models
         # TBD to include cross-encoder/ms-marco-TinyBERT-L-2-v2
 
+        # TODO [Refactoring device logic] use device info gathered from device manager
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cuda', 'cpu']
 
         self.logger.info(f"pre-loading {self.models} onto devices={self.default_devices}")
@@ -230,6 +233,7 @@ class CachePatchModels:
                     f"Invalid patch model: {model}. Please ensure that this is a valid patch model."
                 )
 
+        # TODO [Refactoring device logic] use device info gathered from device manager
         self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
 
     def run(self):

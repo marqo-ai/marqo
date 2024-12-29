@@ -226,6 +226,12 @@ class InternalError(MarqoWebError):
     status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
 
+class ServiceUnavailableError(MarqoWebError):
+    error_type = "service_unavailable"
+    code = "service_unavailable"
+    status_code = HTTPStatus.SERVICE_UNAVAILABLE
+
+
 class BackendCommunicationError(InternalError):
     """Error when connecting to Vespa"""
     code = "backend_communication_error"

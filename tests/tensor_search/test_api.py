@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 import marqo.tensor_search.api as api
 from marqo import exceptions as base_exceptions
 from marqo.core import exceptions as core_exceptions
+from marqo.core.exceptions import CudaDeviceNotAvailableError, CudaOutOfMemoryError
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search.enums import EnvVars
@@ -527,6 +528,23 @@ class TestApiErrors(MarqoTestCase):
                 self.assertEqual(response.status_code, 422)
                 self.assertIn("allFields", response.text)
                 self.assertIn("features", response.text)
+
+    def test_healthz_happy_pass(self):
+        response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+
+    def test_healthz_fails_if_exception_raised(self):
+        for cuda_exception in [
+            CudaDeviceNotAvailableError('CUDA device(s) have become unavailable'),
+            CudaOutOfMemoryError('CUDA device cuda:0(Tesla T4) is out of memory')
+        ]:
+            with self.subTest(cuda_exception):
+                with patch("marqo.core.inference.device_manager.DeviceManager.cuda_device_health_check",
+                           side_effect=cuda_exception):
+                    response = self.client.get("/healthz")
+                    self.assertEqual(response.status_code, 503)
+                    self.assertIn(cuda_exception.message, response.json()['message'])
 
     def test_log_stack_trace_for_core_exceptions(self):
         """Ensure stack trace is logged for core exceptions, e.g.,IndexExistsError"""

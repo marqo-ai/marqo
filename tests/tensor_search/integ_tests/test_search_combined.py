@@ -3,8 +3,10 @@ import uuid
 from unittest import mock
 import torch
 import pytest
+import pycurl
 
 import marqo.core.exceptions as core_exceptions
+from marqo.s2_inference.errors import ImageDownloadError
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
@@ -192,7 +194,10 @@ class TestSearch(MarqoTestCase):
     def setUp(self) -> None:
         super().setUp()
         # Any tests that call add_documents, search, bulk_search need this env var
-        self.device_patcher = mock.patch.dict(os.environ, {"MARQO_BEST_AVAILABLE_DEVICE": "cpu"})
+        self.device_patcher = mock.patch.dict(os.environ, {
+            "MARQO_BEST_AVAILABLE_DEVICE": "cpu",
+            "MARQO_MAX_CPU_MODEL_MEMORY": "15"
+        })
         self.device_patcher.start()
 
     def tearDown(self) -> None:
@@ -1047,3 +1052,42 @@ class TestSearch(MarqoTestCase):
                             text=query, config=self.config, index_name=index_name.name,
                         )
                     self.assertIn("Error vectorising content", str(e.exception))
+
+    @pytest.mark.largemodel
+    @pytest.mark.skipif(torch.cuda.is_available() is False, reason="We skip the large model test if we don't have cuda support")
+    def test_video_size_limit(self):
+        """Tests that searching with videos respects the file size limit"""
+
+        with mock.patch('marqo.s2_inference.clip_utils.pycurl.Curl') as mock_curl:
+            # Setup mock curl instance
+            mock_curl_instance = mock.MagicMock()
+            mock_curl.return_value = mock_curl_instance
+
+            # Store the progress callback
+            progress_callback = None
+
+            def mock_setopt(option, value):
+                nonlocal progress_callback
+                if option == pycurl.XFERINFOFUNCTION:
+                    progress_callback = value
+                return mock_curl_instance
+
+            def mock_perform():
+                # Call the stored progress callback with a large file size
+                if progress_callback:
+                    progress_callback(0, 400_000_000, 0, 0)  # Simulate 400MB download
+                raise pycurl.error(pycurl.E_ABORTED_BY_CALLBACK, "Callback aborted")
+
+            mock_curl_instance.setopt.side_effect = mock_setopt
+            mock_curl_instance.perform.side_effect = mock_perform
+            mock_curl_instance.getinfo.return_value = 200
+
+            with self.assertRaises(api_exceptions.InvalidArgError) as e:
+                tensor_search.search(
+                    config=self.config,
+                    index_name=self.unstructured_languagebind_index.name,  # Use an index that supports video
+                    text="http://example.com/large_video.mp4",
+                    search_method=SearchMethod.TENSOR,
+                )
+
+            self.assertIn("exceeds the maximum allowed size", str(e.exception))
