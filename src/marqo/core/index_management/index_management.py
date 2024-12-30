@@ -109,7 +109,8 @@ class IndexManagement:
 
             # Only retrieving existing index when the vespa app is not configured and the index settings schema exists
             existing_indexes = self._get_existing_indexes() if not vespa_app.is_configured and \
-                vespa_app.has_schema(self._MARQO_SETTINGS_SCHEMA_NAME) else None
+                                                               vespa_app.has_schema(
+                                                                   self._MARQO_SETTINGS_SCHEMA_NAME) else None
 
             vespa_app.bootstrap(to_version, existing_indexes)
 
@@ -169,7 +170,9 @@ class IndexManagement:
             if request.model.text_chunk_prefix is None:
                 request.model.text_chunk_prefix = request.model.get_default_text_chunk_prefix()
 
-            index_to_create.append(vespa_schema_factory(request).generate_schema())
+            schema, marqo_index = vespa_schema_factory(request).generate_schema()
+            index_to_create.append((schema, marqo_index))
+            logger.debug(f'Creating index {str(request.name)} with schema:\n{schema}')
 
         with self._vespa_deployment_lock():
             self._get_vespa_application().batch_add_index_setting_and_schema(index_to_create)
