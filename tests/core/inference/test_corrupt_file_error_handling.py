@@ -125,6 +125,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                 mock_os_remove.assert_not_called()
 
     def test_load_clip_model_into_open_clip_no_mock(self):
+        # FIXME this test has failed after pytorch 2.5 upgrade
         model_properties = {
             "name": "ViT-B-32",
             "dimensions": 512,
