@@ -495,14 +495,6 @@ class StructuredVespaSchema(VespaSchema):
         summaries.extend(vector_summary_fields)
         summaries.append('}')
 
-        # TODO: remove if we don't end up using this solution.
-        #if any(FieldFeature.ScoreModifier in f.features for f in self._index_request.fields):
-        #    summaries.append(f'document-summary {common.SUMMARY_SCORE_MODIFIERS} {{')
-        #    summaries.append(f'summary {common.FIELD_ID} type string {{ }}')
-        #    summaries.append(f'summary {common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG} type tensor<double>(p{{}}) {{ }}')
-        #    summaries.append(f'summary {common.FIELD_SCORE_MODIFIERS_FLOAT} type tensor<float>(p{{}}) {{ }}')
-        #    summaries.append('}')
-
         return summaries
 
     def _get_vespa_type(self, marqo_type: FieldType) -> str:

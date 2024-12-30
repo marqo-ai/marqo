@@ -226,7 +226,9 @@ class UnstructuredVespaSchema(VespaSchema):
                 first-phase {{
                     expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
                 }}
-                match-features: closest({self._EMBEDDINGS})
+                match-features inherits {common.RANK_PROFILE_BASE} {{
+                    closest({self._EMBEDDINGS})
+                }}
             }}
             
             rank-profile {unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER} inherits default {{
@@ -238,6 +240,8 @@ class UnstructuredVespaSchema(VespaSchema):
                     query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
                     query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
                     query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}) tensor<double>(p{{}})
                 }}
             }}
             
@@ -248,7 +252,9 @@ class UnstructuredVespaSchema(VespaSchema):
                 second-phase {{
                     expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
                 }}
-                match-features: closest({self._EMBEDDINGS})
+                match-features inherits {common.RANK_PROFILE_BASE} {{
+                    closest({self._EMBEDDINGS})
+                }}
             }}
             
             rank-profile {unstructured_common.RANK_PROFILE_HYBRID_EMBEDDING_SIMILARITY_THEN_BM25} inherits {unstructured_common.RANK_PROFILE_BASE} {{
@@ -263,11 +269,15 @@ class UnstructuredVespaSchema(VespaSchema):
 
     def _generate_base_rank_profile(self, marqo_index: UnstructuredMarqoIndex):
         model_dim = marqo_index.model.get_dimension()
-        score_modifier_expression = (
+        mult_modifier_expression = (
             f'if (count(mult_weights * attribute({self._SCORE_MODIFIERS})) == 0, '
             f'  1, reduce(mult_weights * attribute({self._SCORE_MODIFIERS}), prod)) '
-            f'* score '
-            f'+ reduce(add_weights * attribute({self._SCORE_MODIFIERS}), sum)'
+        )
+        add_modifier_expression = (
+            f'reduce(add_weights * attribute({self._SCORE_MODIFIERS}), sum)'
+        )
+        score_modifier_expression = (
+            'mult_modifier(mult_weights) * score + add_modifier(add_weights)'
         )
 
         return textwrap.dedent(
@@ -279,10 +289,24 @@ class UnstructuredVespaSchema(VespaSchema):
                     query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})
                     query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})
                     query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}) tensor<double>(p{{}})
+                    query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}) tensor<double>(p{{}})
                 }}
 
+                function mult_modifier(mult_weights) {{
+                    expression: {mult_modifier_expression}
+                }}
+                function add_modifier(add_weights) {{
+                    expression: {add_modifier_expression}
+                }}
                 function modify(score, mult_weights, add_weights) {{
                     expression: {score_modifier_expression}
+                }}
+                function global_mult_modifier() {{
+                    expression: mult_modifier(query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}))
+                }}
+                function global_add_modifier() {{
+                    expression: add_modifier(query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}))
                 }}
 
                 function lexical_score() {{
@@ -292,6 +316,7 @@ class UnstructuredVespaSchema(VespaSchema):
                 function embedding_score() {{
                     expression: closeness(field, {self._EMBEDDINGS})
                 }}
+                match-features: global_mult_modifier global_add_modifier
             }}
             """
         )
