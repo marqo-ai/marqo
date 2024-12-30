@@ -385,6 +385,10 @@ class StructuredVespaSchema(VespaSchema):
                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
             rank_profiles.append(
                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
+            rank_profiles.append(
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
+            rank_profiles.append(
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
 
             rank_profiles.append('}')
             rank_profiles.append('}')

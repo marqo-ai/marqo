@@ -469,7 +469,7 @@ public class HybridSearcher extends Searcher {
      */
     HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
         FeatureData hitMatchFeatures;
-        double mult_modifier, add_modifier;
+        double mult_modifier, add_modifier, original_score, modified_score;
         if (hits.size() == 0) {
             logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
             return hits;
@@ -479,13 +479,21 @@ public class HybridSearcher extends Searcher {
         for (Hit hit : hits) {
             logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
             // Extract the mult and add modifiers from match-features
-            hitMatchFeatures = (FeatureData) hits.get(0).getField("matchfeatures");
+            hitMatchFeatures = (FeatureData) hit.getField("matchfeatures");
             if (hitMatchFeatures != null) {
                 mult_modifier = hitMatchFeatures.getDouble("global_mult_modifier");
                 add_modifier = hitMatchFeatures.getDouble("global_add_modifier");
 
                 // Apply the modifiers to the hit's relevance
-                hit.setRelevance(hit.getRelevance().getScore() * mult_modifier + add_modifier);
+                original_score = hit.getRelevance().getScore();
+                modified_score = original_score * mult_modifier + add_modifier;
+                logIfVerbose(
+                        String.format(
+                                "Original score: %.7f, mult modifier: %.2f, add modifier: %.2f,"
+                                        + " Modified score: %.7f",
+                                original_score, mult_modifier, add_modifier, modified_score),
+                        verbose);
+                hit.setRelevance(modified_score);
             } else {
                 // TODO: Maybe error out instead of logging
                 logIfVerbose(
