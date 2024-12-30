@@ -768,7 +768,7 @@ class TestHybridSearch(MarqoTestCase):
                             if isinstance(index, UnstructuredMarqoIndex) else None
                     )
                 )
-                """
+
                 with self.subTest("retrieval: lexical, ranking: tensor"):
                     hybrid_res = tensor_search.search(
                         config=self.config,
@@ -837,7 +837,7 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][3]["_id"], "doc6")  # ORIGINAL SCORE
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_score"], base_lexical_score * -10 * 3)
-                """
+
                 with self.subTest("retrieval: disjunction, ranking: rrf"):
                     hybrid_res = tensor_search.search(
                         config=self.config,
