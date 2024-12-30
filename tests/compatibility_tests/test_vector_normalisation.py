@@ -16,6 +16,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
                 "indexName": text_index_with_normalize_embeddings_true,
                 "type": "structured",
                 "normalizeEmbeddings": True,
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text"},
                     {"name": "content", "type": "text"},
@@ -76,7 +77,7 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
             self.save_results_to_file(result)
             self.logger.debug(f'Ran prepare mode test for {self.text_index_with_normalize_embeddings_true} inside test class {self.__class__.__name__}')
         except Exception as e:
-            self.logger.error(f"Exception occurred while adding documents to index {self.text_index_with_normalize_embeddings_true}. When the corresponding test runs, it is expected to fail."
+            self.logger.error(f"Exception occurred while adding documents / getting documents to / from index {self.text_index_with_normalize_embeddings_true}. When the corresponding test runs, it is expected to fail."
                               f"Exception traceback was: {traceback.format_exc()}")
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
