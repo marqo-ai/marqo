@@ -4,7 +4,7 @@
 # Currently, all the packages are included in the base-image
 # Check https://github.com/marqo-ai/marqo-base/tree/main/requirements for the
 # list of packages in the base-image
-onnx==1.16.2
-onnxruntime==1.20.1
-onnxruntime-gpu==1.20.1 ; platform_machine == "x86_64"
-protobuf==3.20.2
+onnx==1.16.2  # latest compatible version for the runtime 1.19
+onnxruntime==1.19.2  # the latest version supported by python 3.9
+onnxruntime-gpu==1.19.2 ; platform_machine == "x86_64"  # the latest version supported by python 3.9
+protobuf==3.20.2  # TODO decide if to upgrade to the latest version
