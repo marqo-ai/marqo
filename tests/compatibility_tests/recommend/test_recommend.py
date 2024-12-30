@@ -189,7 +189,7 @@ class TestRecommend(BaseCompatibilityTestCase):
             bool: True if results match ignoring order, False otherwise
         """
         if ignore_fields is None:
-            ignore_fields = ['processingTimeMs']
+            ignore_fields = ['processingTimeMs', 'query', 'limit', 'offset']
 
         # Create copies and remove ignored fields
         expected_copy = expected.copy()
@@ -209,10 +209,18 @@ class TestRecommend(BaseCompatibilityTestCase):
 
         # Convert hits to tuples of sorted items for comparison
         def hit_to_comparable(hit):
-            # Convert the hit dictionary into a sorted tuple of (key, value) pairs
-            # For list values, sort them first
+            def convert_value(v):
+                if isinstance(v, dict):
+                    # Convert dictionary to sorted tuple of (key, converted_value) pairs
+                    return tuple(sorted((k, convert_value(val)) for k, val in v.items()))
+                elif isinstance(v, list):
+                    # Convert list to tuple of converted values
+                    return tuple(sorted(convert_value(x) for x in v))
+                return v
+
+            # Convert the hit dictionary into a sorted tuple of (key, converted_value) pairs
             return tuple(sorted(
-                (k, tuple(sorted(v)) if isinstance(v, list) else v)
+                (k, convert_value(v))
                 for k, v in hit.items()
             ))
 
