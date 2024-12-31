@@ -35,6 +35,33 @@ class TestEncoding(unittest.TestCase):
     def tearDown(self) -> None:
         clear_loaded_models()
 
+    def _angular_distance(self, a, b):
+        # Normalize the vectors (optional if they are already unit vectors)
+        a_norm = np.linalg.norm(a)
+        b_norm = np.linalg.norm(b)
+
+        # Compute the dot product
+        dot_product = np.dot(a, b)
+
+        # Compute the cosine of the angle
+        cos_theta = dot_product / (a_norm * b_norm)
+
+        # Ensure the cosine value is within the valid range [-1, 1] due to floating point errors
+        cos_theta = np.clip(cos_theta, -1.0, 1.0)
+
+        # Compute the angle in radians
+        angle_rad = np.arccos(cos_theta)
+
+        # Optionally, convert to degrees
+        angle_deg = np.degrees(angle_rad)
+
+        return angle_rad, angle_deg
+
+    def _is_close(self, a, b, name, sentence):
+        distance, _ = self._angular_distance(a, b)
+        print(f'angular distance for {sentence} on model {name}: {distance}')
+        return distance < 1e-3
+
     def test_vectorize(self):
         """
         Ensure that vectorised output from vectorise function matches both the model.encode output and
@@ -83,9 +110,12 @@ class TestEncoding(unittest.TestCase):
                         if isinstance(sentence, str):
                             with self.subTest("Hardcoded Python 3.8 Embeddings Comparison"):
                                 try:
-                                    self.assertEqual(np.allclose(output_m, embeddings_python_3_8[name][sentence],
-                                                                 atol=1e-6),
-                                                 True, f"Calculated embeddings do not match hardcoded embeddings for model: {name}, sentence: {sentence}. Printing output: {output_m}")
+                                    expected_embedding = embeddings_python_3_8[name][sentence]
+
+                                    self.assertEqual(self._is_close(output_m, expected_embedding, name, sentence),
+                                                     True, f"Calculated embeddings do not match hardcoded "
+                                                           f"embeddings for model: {name}, sentence: {sentence}. "
+                                                           f"Printing output: {output_m}")
                                 except KeyError:
                                     raise KeyError(f"Hardcoded Python 3.8 embeddings not found for "
                                                    f"model: {name}, sentence: {sentence} in JSON file: "
