@@ -20,7 +20,6 @@ from tests.marqo_test import TestImageUrls
 
 _load_model = functools.partial(og_load_model, calling_func = "unit_test")
 
-
 def get_absolute_file_path(filename: str) -> str:
     currentdir = os.path.dirname(os.path.abspath(__file__))
     abspath = os.path.join(currentdir, filename)
@@ -36,12 +35,14 @@ class TestEncoding(unittest.TestCase):
         clear_loaded_models()
 
     def _angular_distance(self, a, b):
+        # Compute the dot product
+        a = a.flatten()
+        b = np.array(b).reshape(a.shape)
+        dot_product = np.dot(a, b)
+
         # Normalize the vectors (optional if they are already unit vectors)
         a_norm = np.linalg.norm(a)
         b_norm = np.linalg.norm(b)
-
-        # Compute the dot product
-        dot_product = np.dot(a, b)
 
         # Compute the cosine of the angle
         cos_theta = dot_product / (a_norm * b_norm)
@@ -59,7 +60,7 @@ class TestEncoding(unittest.TestCase):
 
     def _is_close(self, a, b, name, sentence):
         distance, _ = self._angular_distance(a, b)
-        print(f'angular distance for {sentence} on model {name}: {distance}')
+        print(f'angular distance for sentence "{sentence}" on model "{name}": {distance}')
         return distance < 1e-3
 
     def test_vectorize(self):
