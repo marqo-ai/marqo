@@ -139,7 +139,7 @@ class SBERT_ONNX(object):
                                   # where to save the model (can be a file or file-like object)
                                   f=self.export_model_name,
                                   # the ONNX version to export the model to
-                                  opset_version=11,
+                                  opset_version=21,
                                   # whether to execute constant folding for optimization
                                   do_constant_folding=True,
                                   input_names=['input_ids',                         # the model's input names
