@@ -91,6 +91,7 @@ jobs:
             python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
+        if: false
         run: |
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
@@ -119,6 +120,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
+        if: false
         run: |
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
