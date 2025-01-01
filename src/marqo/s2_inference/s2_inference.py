@@ -557,7 +557,7 @@ def _load_model(
         model.encoder = get_encoder(model)
         return model
 
-    print(f"loading for: model_name={model_name} and properties={model_properties}")
+    # print(f"loading for: model_name={model_name} and properties={model_properties}")
 
     model_type = model_properties.get("type")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)

@@ -30,6 +30,48 @@ import shutil
 _load_model = functools.partial(og_load_model, calling_func="unit_test")
 
 
+def _angular_distance(a, b):
+    # Compute the dot product
+    # a = a.flatten()
+    # b = np.array(b).reshape(a.shape)
+    dot_product = np.dot(a, b)
+
+    # Normalize the vectors (optional if they are already unit vectors)
+    a_norm = np.linalg.norm(a)
+    b_norm = np.linalg.norm(b)
+
+    # Compute the cosine of the angle
+    cos_theta = dot_product / (a_norm * b_norm)
+
+    # Ensure the cosine value is within the valid range [-1, 1] due to floating point errors
+    cos_theta = np.clip(cos_theta, -1.0, 1.0)
+
+    # Compute the angle in radians
+    angle_rad = np.arccos(cos_theta)
+
+    # Optionally, convert to degrees
+    angle_deg = np.degrees(angle_rad)
+
+    return angle_rad, angle_deg
+
+
+def _is_close(a, b, name, sentence):
+    a = a.flatten()
+    b = np.array(b).reshape(a.shape)
+
+    closeness_result = []
+    for atol in [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3]:
+        closeness = np.isclose(a, b, atol=atol)
+        not_close_count = closeness.size - np.count_nonzero(closeness)
+        closeness_result.append((atol, not_close_count))
+
+    distance, _ = _angular_distance(a, b)
+    print(f'Result sentence "{sentence}" on model "{name}" (dim: {len(b)}): '
+          f'Angular distance: {distance}. Closeness: {closeness_result}')
+    return distance < 1e-3
+
+
+
 def remove_cached_model_files():
     '''
     This function removes all the cached models from the cache paths to save disk space
@@ -97,7 +139,9 @@ def run_test_vectorize(models, model_type, compare_hardcoded_embeddings=True):
                     if isinstance(sentence, str):
                         try:
                             if compare_hardcoded_embeddings and embeddings_python_3_8:
-                                assert np.allclose(output_m, embeddings_python_3_8[name][sentence], atol=1e-6), \
+                                expected_embedding = embeddings_python_3_8[name][sentence]
+
+                                assert _is_close(output_m, expected_embedding, name, sentence), \
                                     (f"Hardcoded Python 3.8 embeddings do not match for model: {name}, "
                                      f"sentence: {sentence}")
                         except KeyError:

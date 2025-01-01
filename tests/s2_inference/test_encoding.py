@@ -28,8 +28,8 @@ def get_absolute_file_path(filename: str) -> str:
 
 def _angular_distance(a, b):
     # Compute the dot product
-    a = a.flatten()
-    b = np.array(b).reshape(a.shape)
+    # a = a.flatten()
+    # b = np.array(b).reshape(a.shape)
     dot_product = np.dot(a, b)
 
     # Normalize the vectors (optional if they are already unit vectors)
@@ -52,8 +52,18 @@ def _angular_distance(a, b):
 
 
 def _is_close(a, b, name, sentence):
+    a = a.flatten()
+    b = np.array(b).reshape(a.shape)
+
+    closeness_result = []
+    for atol in [1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3]:
+        closeness = np.isclose(a, b, atol=atol)
+        not_close_count = closeness.size - np.count_nonzero(closeness)
+        closeness_result.append((atol, not_close_count))
+
     distance, _ = _angular_distance(a, b)
-    print(f'angular distance for sentence "{sentence}" on model "{name}": {distance}')
+    print(f'Result sentence "{sentence}" on model "{name}" (dim: {len(b)}): '
+          f'Angular distance: {distance}. Closeness: {closeness_result}')
     return distance < 1e-3
 
 
