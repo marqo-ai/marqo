@@ -226,7 +226,7 @@ class UnstructuredVespaSchema(VespaSchema):
                 first-phase {{
                     expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
                 }}
-                match-features inherits {common.RANK_PROFILE_BASE} {{
+                match-features inherits {unstructured_common.RANK_PROFILE_BASE} {{
                     closest({self._EMBEDDINGS})
                 }}
             }}
@@ -252,7 +252,7 @@ class UnstructuredVespaSchema(VespaSchema):
                 second-phase {{
                     expression: modify(embedding_score(), query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}), query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))
                 }}
-                match-features inherits {common.RANK_PROFILE_BASE} {{
+                match-features inherits {unstructured_common.RANK_PROFILE_BASE} {{
                     closest({self._EMBEDDINGS})
                 }}
             }}
