@@ -8,3 +8,4 @@ onnx==1.16.2  # latest compatible version for the runtime 1.19
 onnxruntime==1.19.2  # the latest version supported by python 3.9
 onnxruntime-gpu==1.19.2 ; platform_machine == "x86_64"  # the latest version supported by python 3.9
 protobuf==3.20.2  # TODO decide if to upgrade to the latest version
+open_clip_torch==2.29.0
