@@ -5,7 +5,7 @@ from tests.compatibility_tests.compatibility_test_logger import get_logger
 logger = get_logger(__name__)
 
 def pytest_addoption(parser):
-    parser.addoption("--version_to_compare_against", action="store", default="2.7", help="version to start from")
+    parser.addoption("--version_to_compare_against", action="store", default="2.7.0", help="version to start from")
 
 @pytest.fixture
 def version_to_compare_against(request):
