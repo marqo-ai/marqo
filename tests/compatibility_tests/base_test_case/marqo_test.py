@@ -1,5 +1,7 @@
 """This test class requires you to have a running Marqo instance to test against!
 
+The 'marqo' package refers the py-marqo client installed in the environment, instead of the Marqo repo.
+
 Pass its settings to local_marqo_settings.
 """
 from typing import List, Dict
