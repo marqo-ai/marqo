@@ -113,7 +113,7 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.to_version }}" ]; then
             VERSION="${{ github.event.inputs.to_version }}"
           else
-            VERSION=$(python tests/backwards_compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
+            VERSION=$(python tests/compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
           fi
           echo "to_version=${VERSION}" >> $GITHUB_OUTPUT
       # Step to generate the list of versions to test
@@ -121,7 +121,7 @@ jobs:
         id: generate-versions
         run: |
           # Run the Python script and capture its output
-          VERSION_LIST=$(python tests/backwards_compatibility_tests/scripts/generate_versions.py ${{ steps.get-to-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
+          VERSION_LIST=$(python tests/compatibility_tests/scripts/generate_versions.py ${{ steps.get-to-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
           echo "list=${VERSION_LIST}" >> $GITHUB_OUTPUT
       # Step to display the versions to test
       - name: display versions
