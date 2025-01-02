@@ -168,7 +168,7 @@ jobs:
           cd marqo
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
-          pytest --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests \
+          pytest --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
