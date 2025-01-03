@@ -77,18 +77,16 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         if not isinstance(field_content, str):
             return None
 
-        try:
-            modality = infer_modality(field_content, media_download_headers)
-
-            if not self.marqo_index.treat_urls_and_pointers_as_media and modality in [Modality.AUDIO, Modality.VIDEO]:
+        if self.marqo_index.treat_urls_and_pointers_as_images is True or self.marqo_index.treat_urls_and_pointers_as_media is True:
+            try:
+                modality = infer_modality(field_content, media_download_headers)
+            except MediaDownloadError as err:
+                raise AddDocumentsError(err.message) from err
+            if (self.marqo_index.treat_urls_and_pointers_as_media is False) and modality in [Modality.AUDIO, Modality.VIDEO]:
                 modality = Modality.TEXT
-
-            if not self.marqo_index.treat_urls_and_pointers_as_images and modality == Modality.IMAGE:
-                modality = Modality.TEXT
-
             return MODALITY_FIELD_TYPE_MAP[modality]
-        except MediaDownloadError as err:
-            raise AddDocumentsError(err.message) from err
+        else:
+            return FieldType.Text
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:
