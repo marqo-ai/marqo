@@ -60,8 +60,7 @@ class TestAddDocumentHandler(MarqoTestCase):
     def test_add_documents_main_workflow_happy_path(self, mock_get_batch, mock_feed_batch):
         mock_get_batch.side_effect = [GetBatchResponse(errors=True, responses=[
             GetBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1',
-                                     document=Document(id='id:index1:index1:1', fields={'marqo__id': '1'}),
-                                     status=200),
+                                     document=Document(id='id:index1:index1:1', fields={'marqo__id': '1'}), status=200),
             GetBatchDocumentResponse(id='id:index1:index1::2', pathId='path_id2', status=404),
             GetBatchDocumentResponse(id='id:index1:index1::3', pathId='path_id3', status=404)
         ])]
@@ -131,8 +130,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertEqual(1, handler.to_vespa_doc_call_count)
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
-    def test_add_documents_should_skip_duplicate_documents_even_when_the_latter_one_errors_out(self,
-                                                                                               mock_feed_batch):
+    def test_add_documents_should_skip_duplicate_documents_even_when_the_latter_one_errors_out(self, mock_feed_batch):
         handler = self.DummyAddDocumentsHandler(
             vespa_client=self.vespa_client,
             marqo_index=self.unstructured_marqo_index('index1', 'index1'),
@@ -233,8 +231,7 @@ class TestAddDocumentHandler(MarqoTestCase):
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     @patch('marqo.s2_inference.s2_inference.vectorise', wraps=s2_inference.vectorise)
-    def test_add_documents_should_vectorise_tensor_fields_using_different_strategies(self, mock_vectorise,
-                                                                                     _):
+    def test_add_documents_should_vectorise_tensor_fields_using_different_strategies(self, mock_vectorise, _):
         for batch_mode, expected_vectorise_call_count, expected_call_args in [
             (BatchVectorisationMode.PER_FIELD, 3, [['hello'], ['hello world'], ['ok']]),
             (BatchVectorisationMode.PER_DOCUMENT, 2, [['hello'], ['hello world', 'ok']]),
@@ -263,8 +260,7 @@ class TestAddDocumentHandler(MarqoTestCase):
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     @patch('marqo.s2_inference.s2_inference.vectorise')
-    def test_add_documents_should_fail_a_doc_using_vectorise_per_field_strategy(self, mock_vectorise,
-                                                                                mock_feed_batch):
+    def test_add_documents_should_fail_a_doc_using_vectorise_per_field_strategy(self, mock_vectorise, mock_feed_batch):
         mock_vectorise.side_effect = [S2InferenceError('vectorise error'), [[1.0, 2.0]]]
         mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
             FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
@@ -290,8 +286,7 @@ class TestAddDocumentHandler(MarqoTestCase):
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     @patch('marqo.s2_inference.s2_inference.vectorise')
-    def test_add_documents_should_fail_a_doc_using_vectorise_per_doc_strategy(self, mock_vectorise,
-                                                                              mock_feed_batch):
+    def test_add_documents_should_fail_a_doc_using_vectorise_per_doc_strategy(self, mock_vectorise, mock_feed_batch):
         mock_vectorise.side_effect = [S2InferenceError('vectorise error'), [[1.0, 2.0]]]
         mock_feed_batch.side_effect = [FeedBatchResponse(errors=False, responses=[
             FeedBatchDocumentResponse(id='id:index1:index1::1', pathId='path_id1', status=200),
