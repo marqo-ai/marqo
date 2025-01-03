@@ -33,12 +33,12 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertTrue(self.container.is_multimodal_field('combo_field2'))
         self.assertFalse(self.container.is_multimodal_field('combo_field3'))
 
-        self.assertEquals({'subfield1', 'tensor_field2'}, self.container.get_multimodal_sub_fields())
-        self.assertEquals({'subfield1': 1.0}, self.container.get_multimodal_field_mapping('combo_field1'))
-        self.assertEquals({'subfield1': 2.0, 'tensor_field2': 5.0},
+        self.assertEqual({'subfield1', 'tensor_field2'}, self.container.get_multimodal_sub_fields())
+        self.assertEqual({'subfield1': 1.0}, self.container.get_multimodal_field_mapping('combo_field1'))
+        self.assertEqual({'subfield1': 2.0, 'tensor_field2': 5.0},
                           self.container.get_multimodal_field_mapping('combo_field2'))
 
-        self.assertEquals(0, len(self.container._tensor_field_map))
+        self.assertEqual(0, len(self.container._tensor_field_map))
 
     def test_collect_non_tensor_fields(self):
         test_cases = [
@@ -58,9 +58,9 @@ class TestTensorFieldsContainer(unittest.TestCase):
         for (field_content, field_type) in test_cases:
             with self.subTest(msg=f'field_content {field_content} of type {field_type}'):
                 content = self.container.collect('doc_id1', 'field1', field_content, field_type)
-                self.assertEquals(field_content, content)
+                self.assertEqual(field_content, content)
                 # verify that they won't be collected to tensor field maps
-                self.assertEquals(0, len(self.container._tensor_field_map))
+                self.assertEqual(0, len(self.container._tensor_field_map))
 
     def test_collect_custom_vector_field(self):
         content = self.container.collect('doc_id1', 'custom_vector_field1', {
@@ -68,15 +68,15 @@ class TestTensorFieldsContainer(unittest.TestCase):
             'vector': [1.0, 2.0]
         }, None)
 
-        self.assertEquals('content1', content)
+        self.assertEqual('content1', content)
         self.assertIn('doc_id1', self.container._tensor_field_map)
         self.assertIn('custom_vector_field1', self.container._tensor_field_map['doc_id1'])
 
         tensor_field_content = self.container._tensor_field_map['doc_id1']['custom_vector_field1']
-        self.assertEquals('content1', tensor_field_content.field_content)
-        self.assertEquals(FieldType.CustomVector, tensor_field_content.field_type)
-        self.assertEquals(['content1'], tensor_field_content.chunks)
-        self.assertEquals([[0.4472135954999579, 0.8944271909999159]], tensor_field_content.embeddings)  # normalised
+        self.assertEqual('content1', tensor_field_content.field_content)
+        self.assertEqual(FieldType.CustomVector, tensor_field_content.field_type)
+        self.assertEqual(['content1'], tensor_field_content.chunks)
+        self.assertEqual([[0.4472135954999579, 0.8944271909999159]], tensor_field_content.embeddings)  # normalised
         self.assertTrue(tensor_field_content.is_tensor_field)
         self.assertFalse(tensor_field_content.is_multimodal_subfield)
 
@@ -113,15 +113,15 @@ class TestTensorFieldsContainer(unittest.TestCase):
         for text_field_type in [FieldType.Text, FieldType.ImagePointer, FieldType.AudioPointer, FieldType.VideoPointer]:
             with self.subTest(msg=f'field_type {text_field_type}'):
                 content = self.container.collect('doc_id1', 'tensor_field1', 'content', text_field_type)
-                self.assertEquals('content', content)
+                self.assertEqual('content', content)
                 self.assertIn('doc_id1', self.container._tensor_field_map)
                 self.assertIn('tensor_field1', self.container._tensor_field_map['doc_id1'])
 
                 tensor_field_content = self.container._tensor_field_map['doc_id1']['tensor_field1']
-                self.assertEquals('content', tensor_field_content.field_content)
-                self.assertEquals(text_field_type, tensor_field_content.field_type)
-                self.assertEquals([], tensor_field_content.chunks)
-                self.assertEquals([], tensor_field_content.embeddings)
+                self.assertEqual('content', tensor_field_content.field_content)
+                self.assertEqual(text_field_type, tensor_field_content.field_type)
+                self.assertEqual([], tensor_field_content.chunks)
+                self.assertEqual([], tensor_field_content.embeddings)
                 self.assertTrue(tensor_field_content.is_tensor_field)
                 self.assertFalse(tensor_field_content.is_multimodal_subfield)
 
@@ -137,8 +137,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
                 self.container.collect('doc_id1', field_name, 'content', FieldType.Text)
 
                 tensor_field_content = self.container._tensor_field_map['doc_id1'][field_name]
-                self.assertEquals(is_tensor_field, tensor_field_content.is_tensor_field)
-                self.assertEquals(is_multimodal_subfield, tensor_field_content.is_multimodal_subfield)
+                self.assertEqual(is_tensor_field, tensor_field_content.is_tensor_field)
+                self.assertEqual(is_multimodal_subfield, tensor_field_content.is_multimodal_subfield)
 
     def test_remove_doc(self):
         self.container.collect('doc_id1', 'tensor_field1', 'content', FieldType.Text)
@@ -157,8 +157,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
 
     def test_collect_multimodal_fields_should_return_all(self):
         fields = list(self.container.collect_multi_modal_fields('doc_id1', True))
-        self.assertEquals(('combo_field1', {'subfield1': 1.0}), fields[0])
-        self.assertEquals(('combo_field2', {'subfield1': 2.0, 'tensor_field2': 5.0}), fields[1])
+        self.assertEqual(('combo_field1', {'subfield1': 1.0}), fields[0])
+        self.assertEqual(('combo_field2', {'subfield1': 2.0, 'tensor_field2': 5.0}), fields[1])
 
     def test_collect_multimodal_fields_should_populate_subfields(self):
         self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
@@ -170,17 +170,17 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertIn('combo_field1', self.container._tensor_field_map['doc_id1'])
 
         combo_field1 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field1'])
-        self.assertEquals(FieldType.MultimodalCombination, combo_field1.field_type)
-        self.assertEquals('', combo_field1.field_content)
+        self.assertEqual(FieldType.MultimodalCombination, combo_field1.field_type)
+        self.assertEqual('', combo_field1.field_content)
         self.assertTrue(combo_field1.is_tensor_field)
         self.assertFalse(combo_field1.is_multimodal_subfield)
-        self.assertEquals({'subfield1': 1.0}, combo_field1.weights)
-        self.assertEquals({'subfield1': self.container._tensor_field_map['doc_id1']['subfield1']},
+        self.assertEqual({'subfield1': 1.0}, combo_field1.weights)
+        self.assertEqual({'subfield1': self.container._tensor_field_map['doc_id1']['subfield1']},
                           combo_field1.subfields)
         self.assertTrue(combo_field1.normalize_embeddings)
 
         combo_field2 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field2'])
-        self.assertEquals({'subfield1': self.container._tensor_field_map['doc_id1']['subfield1'],
+        self.assertEqual({'subfield1': self.container._tensor_field_map['doc_id1']['subfield1'],
                            'tensor_field2': self.container._tensor_field_map['doc_id1']['tensor_field2']},
                           combo_field2.subfields)
 
@@ -190,10 +190,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
         list(self.container.collect_multi_modal_fields('doc_id1', True))
 
         combo_field1 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field1'])
-        self.assertEquals({}, combo_field1.subfields)
+        self.assertEqual({}, combo_field1.subfields)
 
         combo_field2 = cast(MultiModalTensorFieldContent, self.container._tensor_field_map['doc_id1']['combo_field2'])
-        self.assertEquals({'tensor_field2': self.container._tensor_field_map['doc_id1']['tensor_field2']},
+        self.assertEqual({'tensor_field2': self.container._tensor_field_map['doc_id1']['tensor_field2']},
                           combo_field2.subfields)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_doc_id_does_not_match(self):
@@ -208,8 +208,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }
         }, {})
 
-        self.assertEquals([], tensor_field1.chunks)
-        self.assertEquals([], tensor_field1.embeddings)
+        self.assertEqual([], tensor_field1.chunks)
+        self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_should_populate_if_doc_id_matches(self):
         self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
@@ -223,8 +223,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }
         }, {})
 
-        self.assertEquals(['tensor_field1_content'], tensor_field1.chunks)
-        self.assertEquals([[1.0, 2.0]], tensor_field1.embeddings)
+        self.assertEqual(['tensor_field1_content'], tensor_field1.chunks)
+        self.assertEqual([[1.0, 2.0]], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_content_changes(self):
         self.container.collect('doc_id1', 'tensor_field1', 'changed_content', FieldType.Text)
@@ -238,8 +238,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }
         }, {})
 
-        self.assertEquals([], tensor_field1.chunks)
-        self.assertEquals([], tensor_field1.embeddings)
+        self.assertEqual([], tensor_field1.chunks)
+        self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_field_does_not_exist(self):
         self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
@@ -251,8 +251,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             MARQO_DOC_TENSORS: {}
         }, {})
 
-        self.assertEquals([], tensor_field1.chunks)
-        self.assertEquals([], tensor_field1.embeddings)
+        self.assertEqual([], tensor_field1.chunks)
+        self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_embedding_does_not_exist(self):
         self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
@@ -264,8 +264,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             MARQO_DOC_TENSORS: {}  # embedding for tensor_field1 does not exist in the existing doc
         }, {})
 
-        self.assertEquals([], tensor_field1.chunks)
-        self.assertEquals([], tensor_field1.embeddings)
+        self.assertEqual([], tensor_field1.chunks)
+        self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_existing_field_is_multimodal_combo_field(self):
         self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
@@ -278,8 +278,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }
         }, {'tensor_field1': {'subfield1': 1.0}})  # tensor_field1 is a multimodal combo field
 
-        self.assertEquals([], tensor_field1.chunks)
-        self.assertEquals([], tensor_field1.embeddings)
+        self.assertEqual([], tensor_field1.chunks)
+        self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_for_custom_vector_field(self):
         self.container.collect('doc_id1', 'custom_vector_field1', {
@@ -296,8 +296,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }  # embedding for tensor_field1 does not exist in the existing doc
         }, {})
 
-        self.assertEquals(['content1'], custom_vector_field1.chunks)
-        self.assertEquals([[0.4472135954999579, 0.8944271909999159]], custom_vector_field1.embeddings)
+        self.assertEqual(['content1'], custom_vector_field1.chunks)
+        self.assertEqual([[0.4472135954999579, 0.8944271909999159]], custom_vector_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_for_multimodal_field_if_it_does_not_exist(self):
         combo_field2 = self._get_combo_field2()
@@ -309,8 +309,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             MARQO_DOC_TENSORS: {}  # embedding for combo_field2 does not exist in the existing doc
         }, {})
 
-        self.assertEquals([], combo_field2.chunks)
-        self.assertEquals([], combo_field2.embeddings)
+        self.assertEqual([], combo_field2.chunks)
+        self.assertEqual([], combo_field2.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_multimodal_field_with_another_type(self):
         combo_field2 = self._get_combo_field2()
@@ -325,8 +325,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }  # although called combo_field2, it is not a multimodal_tensor field in the existing doc
         }, {})
 
-        self.assertEquals([], combo_field2.chunks)
-        self.assertEquals([], combo_field2.embeddings)
+        self.assertEqual([], combo_field2.chunks)
+        self.assertEqual([], combo_field2.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_multimodal_field_with_different_weight(self):
         combo_field2 = self._get_combo_field2()
@@ -340,8 +340,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }
         }, {'combo_field2': {'subfield1': 0.5, 'tensor_field2': 5.0}})  # weight is different
 
-        self.assertEquals([], combo_field2.chunks)
-        self.assertEquals([], combo_field2.embeddings)
+        self.assertEqual([], combo_field2.chunks)
+        self.assertEqual([], combo_field2.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_multimodal_field_with_different_subfields(self):
         combo_field2 = self._get_combo_field2()
@@ -355,8 +355,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }
         }, {'combo_field2': {'subfield1': 2.0, 'tensor_field2': 5.0}})
 
-        self.assertEquals([], combo_field2.chunks)
-        self.assertEquals([], combo_field2.embeddings)
+        self.assertEqual([], combo_field2.chunks)
+        self.assertEqual([], combo_field2.embeddings)
 
     def test_populate_tensor_from_existing_docs_should_populate_multimodal_field_if_all_conditions_match(self):
         combo_field2 = self._get_combo_field2()
@@ -370,8 +370,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
             }  # although called combo_field2, it is not a multimodal_tensor field in the existing doc
         }, {'combo_field2': {'subfield1': 2.0, 'tensor_field2': 5.0}})
 
-        self.assertEquals(['combo_field2_content'], combo_field2.chunks)
-        self.assertEquals([[1.0, 2.0]], combo_field2.embeddings)
+        self.assertEqual(['combo_field2_content'], combo_field2.chunks)
+        self.assertEqual([[1.0, 2.0]], combo_field2.embeddings)
 
     def _get_combo_field2(self):
         self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
@@ -406,10 +406,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
         tensor_field1.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
 
         fields = list(self.container.tensor_fields_to_vectorise(FieldType.Text))
-        self.assertEquals(1, len(fields))
+        self.assertEqual(1, len(fields))
         (doc_id, field_name, _) = fields[0]
-        self.assertEquals('doc_id1', doc_id)
-        self.assertEquals('subfield1', field_name)
+        self.assertEqual('doc_id1', doc_id)
+        self.assertEqual('subfield1', field_name)
 
     def test_traversing_tensor_fields_to_vectorise_skips_removed_doc(self):
         self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
@@ -423,7 +423,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
             if doc_id == 'doc_id1':  # after taking in the first field of doc_id1, remove doc_id1 to simulate a failure
                 self.container.remove_doc(doc_id)
 
-        self.assertEquals(3, len(fields))
+        self.assertEqual(3, len(fields))
         self.assertIn(('doc_id1', 'tensor_field1'), fields)
         self.assertIn(('doc_id2', 'tensor_field1'), fields)
         self.assertIn(('doc_id2', 'tensor_field2'), fields)
@@ -433,10 +433,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.ImagePointer)
 
         fields = list(self.container.tensor_fields_to_vectorise(FieldType.ImagePointer))
-        self.assertEquals(1, len(fields))
+        self.assertEqual(1, len(fields))
         (doc_id, field_name, _) = fields[0]
-        self.assertEquals('doc_id1', doc_id)
-        self.assertEquals('tensor_field2', field_name)
+        self.assertEqual('doc_id1', doc_id)
+        self.assertEqual('tensor_field2', field_name)
 
     def test_traversing_tensor_fields_to_vectorise_skips_subfields_for_resolved_multimodal_fields(self):
         self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
@@ -452,8 +452,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
         combo_field2.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
 
         fields = list(self.container.tensor_fields_to_vectorise(FieldType.Text))
-        self.assertEquals(1, len(fields))
-        self.assertEquals('tensor_field1', fields[0][1])
+        self.assertEqual(1, len(fields))
+        self.assertEqual('tensor_field1', fields[0][1])
 
         # subfield 1 does not need to be vectorised since all the combo fields using it are resolved
         # tensor_fields2 does not need to be vectorised since its embeddings are populated and the combo field that
@@ -469,7 +469,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.container._tensor_field_map['doc_id1']['tensor_field2'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
 
         fields = self.container.get_tensor_field_content('doc_id1')
-        self.assertEquals(4, len(fields))
+        self.assertEqual(4, len(fields))
         self.assertIn('tensor_field1', fields)
         self.assertIn('tensor_field2', fields)
         self.assertIn('combo_field1', fields)
@@ -484,7 +484,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.container._tensor_field_map['doc_id1']['tensor_field2'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
 
         fields = self.container.get_tensor_field_content('doc_id1')
-        self.assertEquals(3, len(fields))
+        self.assertEqual(3, len(fields))
         self.assertIn('tensor_field1', fields)
         self.assertIn('tensor_field2', fields)
         self.assertIn('combo_field2', fields)  # combo_field2 has tensor_field2 as subfield

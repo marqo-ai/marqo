@@ -170,7 +170,8 @@ jobs:
           cd marqo
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
-          pytest -s --ignore=tests/test_documentation.py --ignore=tests/backwards_compatibility_tests --ignore=tests/tensor_search/test_model_cache_management.py \
+          
+          pytest -s --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests --ignore=tests/tensor_search/test_model_cache_management.py \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
@@ -182,15 +183,16 @@ jobs:
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+            cd marqo
+            echo "Running diff-cover against branch $BASE_BRANCH"
+            git fetch origin $BASE_BRANCH:$BASE_BRANCH
+            diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
+              --compare-branch $BASE_BRANCH
           else
-            export BASE_BRANCH=mainline
+            echo "Skipping diff-cover on Push events"
+            echo "Skipped diff-cover on Push events" > marqo/diff_cov.md
+            touch marqo/diff_cov.html
           fi
-          
-          cd marqo
-          echo "Running diff-cover against branch $BASE_BRANCH"
-          git fetch origin $BASE_BRANCH:$BASE_BRANCH
-          diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
-            --compare-branch $BASE_BRANCH
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
