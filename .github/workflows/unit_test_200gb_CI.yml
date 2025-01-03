@@ -83,7 +83,7 @@ jobs:
         run: |
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # override base requirements with marqo requirements, if needed:
-          pip install -r marqo/requirements.txt --upgrade
+          # pip install -r marqo/requirements.txt --upgrade
           pip install -r marqo/requirements.dev.txt
 
       - name: Download nltk data
@@ -171,11 +171,11 @@ jobs:
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
           
-          pytest -s --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests --ignore=tests/tensor_search/test_model_cache_management.py \
+          pytest --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests --ignore=tests/tensor_search/test_model_cache_management.py \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/s2_inference/test_encoding.py | tee pytest_output.txt
+            tests | tee pytest_output.txt
 
       - name: Check Test Coverage of New Code
         id: check_test_coverage

@@ -87,7 +87,7 @@ jobs:
         run: |
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
           # override base requirements with marqo requirements, if needed: 
-          pip install -r marqo/requirements.txt --upgrade
+          # pip install -r marqo/requirements.txt --upgrade
           pip install -r marqo/requirements.dev.txt
 
       - name: Download nltk data
@@ -95,7 +95,6 @@ jobs:
             python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
-        if: false
         run: |
           systemctl stop unattended-upgrades
           apt-get remove -y unattended-upgrades
@@ -115,7 +114,6 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        if: false
         run: |
           # Define these for checking if Vespa is ready
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -171,11 +169,11 @@ jobs:
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
 
-          pytest -s --largemodel --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests \
+          pytest --largemodel --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/s2_inference/test_large_model_encoding.py | tee pytest_output.txt
+            tests | tee pytest_output.txt
 
       - name: Check Test Coverage of New Code
         id: check_test_coverage
