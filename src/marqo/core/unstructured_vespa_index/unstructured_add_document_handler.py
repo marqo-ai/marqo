@@ -18,15 +18,13 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsHandler, AddDocumentsError
 from marqo.s2_inference.errors import MediaDownloadError
 from marqo.s2_inference.multimodal_model_load import infer_modality, Modality
-
-from marqo.vespa.models import VespaDocument
-from marqo.vespa.models.get_document_response import Document
-from marqo.vespa.vespa_client import VespaClient
-
 # TODO deps to tensor_search needs to be removed
 from marqo.tensor_search.constants import ALLOWED_UNSTRUCTURED_FIELD_TYPES
 from marqo.tensor_search.validation import validate_custom_vector, \
     validate_map_numeric_field
+from marqo.vespa.models import VespaDocument
+from marqo.vespa.models.get_document_response import Document
+from marqo.vespa.vespa_client import VespaClient
 
 
 class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
@@ -74,15 +72,46 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _infer_field_type(self, field_content: Any, media_download_headers: Optional[Dict] = None) \
             -> Optional[FieldType]:
+        """Infer the field type based on the field content. This is used for both unstructured and semi-structured
+        indexes.
+
+        We should only infer the field type if the field content is a string.
+        We only infer the field type if the index is configured to treat URLs and pointers as images or media.
+
+        treatUrlsAndPointersAsMedia is a new parameter introduced in Marqo 2.12 to support the new modalities
+        of video and audio. Here is how it interacts with treatUrlsAndPointersAsImages:
+            Both False: All content is processed as text only.
+                treatUrlsAndPointersAsImages True, treatUrlsAndPointersAsMedia False:
+            Processes URLs and pointers as images
+                Does not process other media types (video, audio)
+            treatUrlsAndPointersAsImages False, treatUrlsAndPointersAsMedia True:
+                Invalid state since this is a conflict.
+            Both True:
+                Processes URLs and pointers as various media types (images, videos, audio)
+
+        The values of treatUrlsAndPointersAsMedia and treatUrlsAndPointersAsImages are validated in the MarqoIndex class
+        so we do not need to validate them here.
+
+        Args:
+            field_content: The content of the field.
+            media_download_headers: The headers to use when downloading media content.
+        Returns:
+            The inferred field type if the field content is a string and the index is configured to treat URLs and
+            pointers as images or media. None otherwise.
+        Raises:
+            AddDocumentsError: If the modality of the media content cannot be inferred.
+        """
         if not isinstance(field_content, str):
             return None
 
-        if self.marqo_index.treat_urls_and_pointers_as_images is True or self.marqo_index.treat_urls_and_pointers_as_media is True:
+        if (self.marqo_index.treat_urls_and_pointers_as_images is True or
+                self.marqo_index.treat_urls_and_pointers_as_media is True):
             try:
                 modality = infer_modality(field_content, media_download_headers)
             except MediaDownloadError as err:
                 raise AddDocumentsError(err.message) from err
-            if (self.marqo_index.treat_urls_and_pointers_as_media is False) and modality in [Modality.AUDIO, Modality.VIDEO]:
+            if ((self.marqo_index.treat_urls_and_pointers_as_media is False) and modality in
+                    [Modality.AUDIO, Modality.VIDEO]):
                 modality = Modality.TEXT
             return MODALITY_FIELD_TYPE_MAP[modality]
         else:
