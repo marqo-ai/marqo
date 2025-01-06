@@ -134,6 +134,7 @@ jobs:
           
       - name: Run Integration Tests - CPU Local Marqo
         run: |
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 424082663841.dkr.ecr.us-east-1.amazonaws.com >/dev/null
           export MQ_API_TEST_BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
           echo "$MQ_API_TEST_BRANCH"
           CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
