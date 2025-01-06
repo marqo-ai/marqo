@@ -71,6 +71,7 @@ jobs:
           ec2-instance-type: m6i.xlarge
           subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
           security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+          iam-role-name: UseECR
           aws-resource-tags: > # optional, requires additional permissions
             [
               {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
