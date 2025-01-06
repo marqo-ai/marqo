@@ -114,10 +114,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             AddDocumentsError: If the modality of the media content cannot be inferred.
         """
         if not isinstance(field_content, str):
-            raise AddDocumentsError(
-                f"Field content {field_content} is a tensor field or a dependent field of a multimodal field. "
-                f"It must be a string but is of type {type(field_content).__name__}"
-            )
+            return None # This means a custom vector field
 
         if (self.marqo_index.treat_urls_and_pointers_as_images is True or
                 self.marqo_index.treat_urls_and_pointers_as_media is True):
