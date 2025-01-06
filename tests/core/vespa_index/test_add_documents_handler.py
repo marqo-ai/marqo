@@ -16,10 +16,12 @@ from marqo.core.unstructured_vespa_index.unstructured_add_document_handler impor
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import S2InferenceError
+from marqo.s2_inference.types import Modality
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
 from tests.marqo_test import MarqoTestCase
 from tests.marqo_test import TestAudioUrls, TestVideoUrls, TestImageUrls
+
 
 @pytest.mark.unittest
 class TestAddDocumentHandler(MarqoTestCase):
@@ -405,6 +407,61 @@ class TestAddDocumentHandler(MarqoTestCase):
             with self.subTest(msg=test_case):
                 self.assertEqual(expected_field_type,
                                  unstructured_add_documents_handler._infer_field_type(url))
+
+    def test_collect_tensor_field_content_infer_modality_logic(self):
+        """A test to ensure collect_tensor_field_content method in UnstructuredAddDocumentsHandler infer modality
+        for tensor fields and multimodal sub-fields, but not for non-tensor fields."""
+        unstructured_add_documents_handler = UnstructuredAddDocumentsHandler(
+            marqo_index=self.unstructured_marqo_index(
+                'index1', 'index1',
+                treat_urls_and_pointers_as_images=True,
+                treat_urls_and_pointers_as_media=True
+            ),
+            add_docs_params=AddDocsParams(
+                index_name='index1', tensor_fields=["tensor_field", "my_multimodal_field"], docs=[{'_id': '1'}],
+                mappings={
+                    "my_multimodal_field":
+                        {
+                            "type": "multimodal_combination",
+                            "weights": {
+                                "text_field": 0.5, "image_field": 0.8
+                            }
+                        }
+                }
+            ),
+            vespa_client=self.vespa_client
+        )
+        test_doc = {
+            "non_tensor_field": TestAudioUrls.AUDIO1.value,
+            "tensor_field": "This is a tensor field so its modality should be inferred",
+            "text_field": "This is a sub field of my_multimodal_field so its modality should be inferred",
+            "image_field": TestImageUrls.IMAGE1.value,
+            "another_non_tensor_field": TestImageUrls.IMAGE1.value,
+            "_id": "test"
+        }
+
+        test_cases = (
+            ("non_tensor_field", "A non-tensor field should not be inferred for modality", False),
+            ("tensor_field", "A tensor field should be inferred for modality", True),
+            ("text_field", "A sub field of a multimodal field should be inferred for modality", True),
+            ("image_field", "A sub field of a multimodal field should be inferred for modality", True),
+            ("another_non_tensor_field", "A non-tensor field should not be inferred for modality", False),
+
+        )
+
+        for field_name, msg, called in test_cases:
+            with self.subTest(f"{field_name} - {msg}"):
+                with (patch("marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality",
+                            return_value=Modality.TEXT) as mock_infer_modality):
+                    _ = unstructured_add_documents_handler._collect_tensor_field_content(
+                        test_doc, field_name=field_name,
+                        field_content=test_doc[field_name]
+                    )
+                if called:
+                    mock_infer_modality.assert_called_once_with(test_doc[field_name], None)
+                else:
+                    mock_infer_modality.assert_not_called()
+
 
 @pytest.mark.unittest
 class TestAddDocumentsResponseCollector(unittest.TestCase):

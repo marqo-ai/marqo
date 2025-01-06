@@ -63,11 +63,23 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             except api_errors.InvalidArgError as err:
                 raise AddDocumentsError(err.message, error_code=err.code, status_code=err.status_code) from err
 
+    def _collect_tensor_field_content(self, marqo_doc: dict, field_name: str, field_content: Any) -> Any:
+        """Collect the tensor field content. If the field need to be processed as a tensor field, the content will be
+        collected by the tensor_fields_container. Otherwise, the content will be returned as is.
+        """
+        if field_name in self.tensor_fields_container._tensor_fields or field_name in \
+            self.tensor_fields_container._multimodal_sub_field_reverse_map:
+            text_field_type = self._infer_field_type(field_content, self.add_docs_params.media_download_headers)
+            content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name,
+                                                           field_content, text_field_type)
+        else:
+            content = field_content
+
+        return content
+
     def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
-        text_field_type = self._infer_field_type(field_content, self.add_docs_params.media_download_headers)
-        content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name,
-                                                       field_content, text_field_type)
+        content = self._collect_tensor_field_content(marqo_doc, field_name, field_content)
         marqo_doc[field_name] = content
 
     def _infer_field_type(self, field_content: Any, media_download_headers: Optional[Dict] = None) \
@@ -102,7 +114,10 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
             AddDocumentsError: If the modality of the media content cannot be inferred.
         """
         if not isinstance(field_content, str):
-            return None
+            raise AddDocumentsError(
+                f"Field content {field_content} is a tensor field or a dependent field of a multimodal field. "
+                f"It must be a string but is of type {type(field_content).__name__}"
+            )
 
         if (self.marqo_index.treat_urls_and_pointers_as_images is True or
                 self.marqo_index.treat_urls_and_pointers_as_media is True):
