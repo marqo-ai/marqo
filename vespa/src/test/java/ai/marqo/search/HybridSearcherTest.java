@@ -18,6 +18,7 @@ import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
 import java.util.List;
 import java.util.Map;
+import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 class HybridSearcherTest {
-
     private HybridSearcher hybridSearcher;
 
     private Searcher downstreamSearcher;
@@ -124,7 +124,7 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 6, 6, verbose);
 
             // Check that the result size is correct
             assertThat(result.asList()).hasSize(6);
@@ -195,7 +195,7 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 6, 6, verbose);
 
             // Check that the result size is correct
             assertThat(result.asList()).hasSize(6);
@@ -241,6 +241,138 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+        }
+
+        @Ignore
+        void scoreModifiersWithRerankCount() {
+            /*
+             * Test that the score modifiers are correctly applied and rerank count is respected
+             */
+            // Create tensor hits (3)
+            HitGroup hitsTensor = new HitGroup();
+
+            Hit tensorHit1 = new Hit("index:test/0/tensor1", 1.0);
+            /*
+            TensorType tensorType = new TensorType.Builder().mapped("test_matchfeatures").build();
+            Tensor tensorHit1MatchFeatures =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("global_mult_modifier"), 1.0)
+                            .cell(TensorAddress.ofLabels("global_add_modifier"), 1.0)
+                            .build();
+            tensorHit1.setField("matchfeatures", (FeatureData) tensorHit1MatchFeatures);
+            */
+            // TODO: upgrade vespa version to make this work
+            /*
+            tensorHit1.setField(
+                    "matchfeatures",
+                    new FeatureData((Map.of("global_mult_modifier", Tensor.from(1.0))));
+            hitsTensor.add(tensorHit1);
+            */
+            Hit tensorHit2 = new Hit("index:test/0/tensor2", 0.8);
+            /*
+            Tensor tensorHit2MatchFeatures =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("global_mult_modifier"), 2.0)
+                            .cell(TensorAddress.ofLabels("global_add_modifier"), 2.0)
+                            .build();
+            tensorHit2.setField("matchfeatures", (FeatureData) tensorHit2MatchFeatures);
+             */
+            hitsTensor.add(tensorHit2);
+
+            // Both hit has no global score modifier
+            hitsTensor.add(new Hit("index:test/0/both1", 0.4));
+
+            // Create lexical hits (2). 1 hit shared with tensor, for a total of 4 hits.
+            HitGroup hitsLexical = new HitGroup();
+            // Lexical hit will have negative modifier, should go to bottom.
+            Hit lexicalHit1 = new Hit("index:test/0/lexical1", 1.0);
+            /*
+            Tensor lexicalHit1MatchFeatures =
+                    Tensor.Builder.of(tensorType)
+                            .cell(TensorAddress.ofLabels("global_mult_modifier"), -1.0)
+                            .cell(TensorAddress.ofLabels("global_add_modifier"), -1.0)
+                            .build();
+            lexicalHit1.setField("matchfeatures", (FeatureData) lexicalHit1MatchFeatures);
+            */
+            hitsLexical.add(lexicalHit1);
+
+            hitsLexical.add(new Hit("index:test/0/both1", 0.45));
+
+            // Set parameters
+            int k = 60;
+            double alpha = 0.5;
+            boolean verbose = false;
+
+            // Correct order without score modifiers: both1, lexical1, tensor1, tensor2
+            // Relevance after score modifiers
+            double relevance_both1 = alpha * (1.0 / (5 + k)) + alpha * (1.0 / (4 + k));
+            double relevance_lexical1 = -1 * (alpha * (1.0 / (1 + k))) - 1;
+            double relevance_tensor1 = 1 * alpha * (1.0 / (1 + k)) + 1;
+            double relevance_tensor2 = 2 * alpha * (1.0 / (2 + k)) + 2;
+
+            // Case 1 (base): limit == rerankCount == hits.size()
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 4, 4, verbose);
+
+            // Check that the result size is correct
+            assertThat(result.asList()).hasSize(4);
+
+            // Check that result order and scores are correct
+
+            assertThat(result.asList())
+                    .containsExactly(
+                            new Hit("index:test/0/tensor2", relevance_tensor2),
+                            new Hit("index:test/0/tensor1", relevance_tensor1),
+                            new Hit("index:test/0/both1", relevance_both1),
+                            new Hit("index:test/0/lexical1", relevance_lexical1));
+
+            // Check that lexical/tensor scores were not altered by global score modifiers.
+            assertThat(result.get(0).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+            assertThat(result.get(1).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 1.0));
+            assertThat(result.get(2).fields())
+                    .containsAllEntriesOf(
+                            Map.of(
+                                    "marqo__raw_tensor_score",
+                                    0.4,
+                                    "marqo__raw_lexical_score",
+                                    0.45));
+            assertThat(result.get(3).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 1.0));
+
+            // Case 2: limit < rerankCount < hits.size()
+            // Rerank the top 3, but only take the top 2.
+            // Top 3: both1, lexical1, tensor1. Rerank --> tensor1, both1, lexical1
+            // Top 2: tensor1, both1
+            result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 2, 3, verbose);
+            assertThat(result.asList()).hasSize(2);
+            assertThat(result.asList())
+                    .containsExactly(
+                            new Hit("index:test/0/tensor1", relevance_tensor1),
+                            new Hit("index:test/0/both1", relevance_both1));
+
+            // Case 3: limit == rerankCount < hits.size()
+            // Rerank the top 2, and only take the top 2.
+            // Top 2: both1, lexical1. Rerank --> both1, lexical1
+            result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 2, 2, verbose);
+            assertThat(result.asList()).hasSize(2);
+            assertThat(result.asList())
+                    .containsExactly(
+                            new Hit("index:test/0/both1", relevance_both1),
+                            new Hit("index:test/0/lexical1", relevance_lexical1));
+
+            // Case 4: rerankCount < limit < hits.size()
+            // Rerank the top 2, then add on the original 3rd.
+            // Original top 3: both1, lexical1, tensor1. Rerank top 2 --> both1, lexical1
+            // Add tensor1 to the end. Final: both1, lexical1, tensor1
+
+            result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 3, 2, verbose);
+            assertThat(result.asList()).hasSize(3);
+            assertThat(result.asList())
+                    .containsExactly(
+                            new Hit("index:test/0/both1", relevance_both1),
+                            new Hit("index:test/0/lexical1", relevance_lexical1),
+                            new Hit("index:test/0/tensor1", relevance_tensor1));
         }
     }
 
