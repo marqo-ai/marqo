@@ -453,7 +453,7 @@ class TestAddDocumentHandler(MarqoTestCase):
             with self.subTest(f"{field_name} - {msg}"):
                 with (patch("marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality",
                             return_value=Modality.TEXT) as mock_infer_modality):
-                    _ = unstructured_add_documents_handler._collect_tensor_field_content(
+                    _ = unstructured_add_documents_handler._handle_field(
                         test_doc, field_name=field_name,
                         field_content=test_doc[field_name]
                     )

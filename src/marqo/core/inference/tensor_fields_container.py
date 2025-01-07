@@ -1,7 +1,7 @@
 import hashlib
 import json
 from abc import ABC, abstractmethod
-from typing import List, Dict, Set, Optional, Any, Generator, Tuple, cast, TypeVar
+from typing import List, Dict, Set, Optional, Any, Generator, Tuple, cast, TypeVar, Callable
 
 import numpy as np
 from PIL.Image import Image
@@ -493,7 +493,18 @@ class TensorFieldsContainer:
             tensor_content.populate_chunks_and_embeddings(existing_tensor[constants.MARQO_DOC_CHUNKS],
                                                           existing_tensor[constants.MARQO_DOC_EMBEDDINGS])
 
-    def collect(self, doc_id: str, field_name: str, field_content: Any, field_type: Optional[FieldType]) -> Any:
+    def collect(self, doc_id: str, field_name: str, field_content: Any, infer_field_type: Callable) -> Any:
+        """
+        Collect tensor field content from the document if it is a tensor field.
+
+        Args:
+            doc_id: document id
+            field_name: name of the field
+            field_content: content of the field
+            infer_field_type: A callable that takes the field content and returns the field type
+        Returns:
+            The field content
+        """
         if field_name not in self._tensor_fields and field_name not in self._multimodal_sub_field_reverse_map:
             # not tensor fields, no need to collect
             return field_content
@@ -510,6 +521,8 @@ class TensorFieldsContainer:
             raise AddDocumentsError(
                 f'Invalid type {type(field_content)} for tensor field {field_name}'
             )
+
+        field_type = infer_field_type(field_content)
 
         self._add_tensor_field_content(
             doc_id, field_name, TensorFieldContent(
