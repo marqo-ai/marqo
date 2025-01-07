@@ -10,9 +10,7 @@ from marqo.core.inference.embedding_models.languagebind_model_properties import 
 class TestLanguagebindModelProperties(unittest.TestCase):
 
     def test_supported_modalities(self):
-        """A test for supported modalities in LanguagebindModelProperties.
-        LANGUAGE modality is required, and at least one of the other modalities must be supported.
-        """
+        """Test language/text modality is required and at least one of audio, image, video is provided."""
         base_test_case = {
             "dimensions": 764,
             "type": "languagebind",

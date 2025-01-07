@@ -118,7 +118,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
             if self.model_properties.name not in self.MODEL_NAME_CLIP_TYPE_MAPPING:
                 raise InvalidModelPropertiesError(
                     f"Model name '{self.model_properties.name}' is not a registered Languagebind model."
-                    f"If you are loading a custom model, please provide the modelLocation and remove the 'name' field "
+                    f"If you are loading a custom model, please provide the modelLocation and remove the 'name' field"
                 )
             clip_type = self.MODEL_NAME_CLIP_TYPE_MAPPING[self.model_properties.name]
         elif self.model_properties.modelLocation:
@@ -136,12 +136,17 @@ class LanguagebindModel(AbstractEmbeddingModel):
                     continue
                 elif model_location.hf and not model_location.hf.filename:
                     clip_type_dict[modality.value] = model_location.hf.repo_id
-                else:
+                elif (model_location.hf and model_location.hf.filename) or model_location.s3 or model_location.url:
                     downloaded_zip_file = self._download_languagebind_model(model_location)
                     clip_type_dict[modality.value] = extract_zip_file(downloaded_zip_file)
+                else:
+                    raise InvalidModelPropertiesError(
+                        f"Invalid model location provided for modality {modality}"
+                    )
             clip_type = CLIPType(**clip_type_dict)
         else:
-            raise InternalError("Invalid model properties provided. Either 'name' or 'modelLocation' must be provided.")
+            raise InvalidModelPropertiesError("Invalid model properties provided. Either 'name' or "
+                                              "'modelLocation' must be provided.")
         return clip_type
 
     def _load_tokenizer(self):
@@ -153,12 +158,12 @@ class LanguagebindModel(AbstractEmbeddingModel):
             )
 
     def _load_custom_tokenizer(self):
-        """Custom tokenizer loading. The tokenizer can be loaded in twa ways:
+        """Custom tokenizer loading. The tokenizer can be loaded in two ways:
 
         1. A huggingface repo, e.g., 'lb203/LanguageBind_Image'
         2. A directory containing the tokenizer files
         """
-        tokenizer_location = self.model_properties.modelLocation.tokenizer
+        tokenizer_location: ModalityLocation = self.model_properties.modelLocation.tokenizer
         if tokenizer_location is None:
             # Use the default tokenizer repo
             self._tokenizer = LanguageBindImageTokenizer.from_pretrained(
@@ -170,7 +175,8 @@ class LanguagebindModel(AbstractEmbeddingModel):
             self._tokenizer = LanguageBindImageTokenizer.from_pretrained(
                 tokenizer_location.hf.repo_id, cache_dir=ModelCache.languagebind_cache_path, token=token
             )
-        else:
+        elif ((tokenizer_location.hf and tokenizer_location.hf.filename) or tokenizer_location.s3 or
+              tokenizer_location.url):
             # Loading from a directory provided by a zip file
             downloaded_zip_file = self._download_languagebind_model(tokenizer_location)
             extracted_dir = extract_zip_file(downloaded_zip_file)
@@ -184,6 +190,9 @@ class LanguagebindModel(AbstractEmbeddingModel):
                     f"Marqo encountered an error loading the Languagebind tokenizer, "
                     f"modelProperties={self.model_properties}. "
                     f" Original error message = {e}") from e
+        else:
+            raise InvalidModelPropertiesError(f"Invalid tokenizer location provided for tokenizer: "
+                                              f"{tokenizer_location}")
 
     def _load_preprocessor(self):
         """Load the preprocessors for each modality.

@@ -17,26 +17,16 @@ class ModalityLocation(MarqoBaseModel):
     """
     s3: Optional[S3Location] = None
     hf: Optional[HfModelLocation] = None
-    authRequired: bool = Field(default=False, alias="auth_required")
     url: Optional[str] = None
 
     @root_validator(skip_on_failure=True)
     def _validate_minimum_provided_fields(cls, values):
-        """Validate that at least one location is provided."""
+        """Validate that at exactly one location is provided."""
         s3 = values.get("s3")
         hf = values.get("hf")
         url = values.get("url")
         if sum([1 for x in [s3, hf, url] if x]) != 1:
             raise ValueError("Exactly one of url, s3, hf must be provided to load the model")
-        return values
-
-    @root_validator(skip_on_failure=True)
-    def _validate_auth_required(cls, values):
-        """Validate that authRequired can only be set to True when s3 or hf is provided."""
-        auth_required = values.get("authRequired")
-        url = values.get("url")
-        if url and auth_required:
-            raise ValueError("authRequired must be False when url is provided. It only works with s3 or hf")
         return values
 
 
@@ -96,7 +86,7 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
             raise ValueError("You model must include 'text' as a supported modality")
         if Modality.TEXT_2 in v and Modality.TEXT in v:
             raise ValueError("You cannot have both 'text' and 'language' as supported modalities. 'languege' is "
-                             "deprecated and please use 'text' instead")
+                             "deprecated. Please use 'text' instead")
         return v
 
     @validator('supportedModalities')
