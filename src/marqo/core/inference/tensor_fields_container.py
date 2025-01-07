@@ -10,7 +10,7 @@ from torch import Tensor
 
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import AddDocumentsError, ModelError
+from marqo.core.exceptions import AddDocumentsError, ModelError, InternalError
 from marqo.core.models.marqo_index import FieldType, TextPreProcessing, ImagePreProcessing
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
@@ -526,8 +526,10 @@ class TensorFieldsContainer:
 
         if isinstance(infer_field_type, FieldType):
             field_type = infer_field_type
-        else:
+        elif isinstance(infer_field_type, Callable):
             field_type = infer_field_type(field_name, field_content)
+        else:
+            raise InternalError(f'Invalid infer_field_type type {type(infer_field_type)}.')
 
         self._add_tensor_field_content(
             doc_id, field_name, TensorFieldContent(
