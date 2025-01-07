@@ -664,7 +664,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         doc_counts = 1, 2, 25
         for c in doc_counts:
-            self.clear_index_by_name(self.image_index_with_random_model)
+            self.clear_index_by_index_name(self.image_index_with_random_model)
 
             res1 = self.add_documents(
                 self.config,
@@ -744,7 +744,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         ]
 
         for documents, number_of_docs, msg in test_cases:
-            self.clear_index_by_name(self.default_text_index)
+            self.clear_index_by_index_name(self.default_text_index)
             with self.subTest(msg):
                 r = self.add_documents(config=self.config,
                                        add_docs_params=AddDocsParams(

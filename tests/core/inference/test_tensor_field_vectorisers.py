@@ -36,10 +36,10 @@ class TestTensorFieldVectorisers(unittest.TestCase):
 
                 embeddings = SingleVectoriser(modality, self.model_config).vectorise(chunks)
 
-                self.assertEquals([[1.0, 2.0], [3.0, 4.0]], embeddings)
-                self.assertEquals(1, mock_vectorise.call_count)
-                self.assertEquals(chunks, mock_vectorise.call_args_list[0].kwargs['content'])
-                self.assertEquals(modality, mock_vectorise.call_args_list[0].kwargs['modality'])
+                self.assertEqual([[1.0, 2.0], [3.0, 4.0]], embeddings)
+                self.assertEqual(1, mock_vectorise.call_count)
+                self.assertEqual(chunks, mock_vectorise.call_args_list[0].kwargs['content'])
+                self.assertEqual(modality, mock_vectorise.call_args_list[0].kwargs['modality'])
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_single_vectoriser_should_vectorise_audio_and_video_chunks_one_at_a_time(self, mock_vectorise):
@@ -51,10 +51,10 @@ class TestTensorFieldVectorisers(unittest.TestCase):
 
                 embeddings = SingleVectoriser(modality, self.model_config).vectorise(chunks)
 
-                self.assertEquals([[1.0, 2.0], [3.0, 4.0]], embeddings)
-                self.assertEquals(2, mock_vectorise.call_count)
-                self.assertEquals(['chunk1'], mock_vectorise.call_args_list[0].kwargs['content'])
-                self.assertEquals(['chunk2'], mock_vectorise.call_args_list[1].kwargs['content'])
+                self.assertEqual([[1.0, 2.0], [3.0, 4.0]], embeddings)
+                self.assertEqual(2, mock_vectorise.call_count)
+                self.assertEqual(['chunk1'], mock_vectorise.call_args_list[0].kwargs['content'])
+                self.assertEqual(['chunk2'], mock_vectorise.call_args_list[1].kwargs['content'])
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_batch_vectoriser_should_vectorise_chunks_in_one_batch(self, mock_vectorise):
@@ -66,14 +66,14 @@ class TestTensorFieldVectorisers(unittest.TestCase):
 
                 batch_vectoriser = BatchCachingVectoriser(modality, all_chunks, self.model_config)
 
-                self.assertEquals(1, mock_vectorise.call_count)
-                self.assertEquals(['chunk1', 'chunk2'], mock_vectorise.call_args_list[0].kwargs['content'])
+                self.assertEqual(1, mock_vectorise.call_count)
+                self.assertEqual(['chunk1', 'chunk2'], mock_vectorise.call_args_list[0].kwargs['content'])
 
                 # verify if the embeddings are cached
                 mock_vectorise.reset_mock()
                 embeddings = batch_vectoriser.vectorise(['chunk1', 'chunk2'], key_prefix='key')
-                self.assertEquals([[1.0, 2.0], [3.0, 4.0]], embeddings)
-                self.assertEquals(0, mock_vectorise.call_count)
+                self.assertEqual([[1.0, 2.0], [3.0, 4.0]], embeddings)
+                self.assertEqual(0, mock_vectorise.call_count)
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_batch_vectoriser_should_vectorise_audio_and_video_chunks_one_at_a_time(self, mock_vectorise):
@@ -85,15 +85,15 @@ class TestTensorFieldVectorisers(unittest.TestCase):
 
                 batch_vectoriser = BatchCachingVectoriser(modality, all_chunks, self.model_config)
 
-                self.assertEquals(2, mock_vectorise.call_count)
-                self.assertEquals(['chunk1'], mock_vectorise.call_args_list[0].kwargs['content'])
-                self.assertEquals(['chunk2'], mock_vectorise.call_args_list[1].kwargs['content'])
+                self.assertEqual(2, mock_vectorise.call_count)
+                self.assertEqual(['chunk1'], mock_vectorise.call_args_list[0].kwargs['content'])
+                self.assertEqual(['chunk2'], mock_vectorise.call_args_list[1].kwargs['content'])
 
                 # verify if the embeddings are cached
                 mock_vectorise.reset_mock()
                 embeddings = batch_vectoriser.vectorise(['chunk2'], key_prefix='key_1')
-                self.assertEquals([[3.0, 4.0]], embeddings)
-                self.assertEquals(0, mock_vectorise.call_count)
+                self.assertEqual([[3.0, 4.0]], embeddings)
+                self.assertEqual(0, mock_vectorise.call_count)
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_batch_vectoriser_should_support_different_content_chunk_types(self, mock_vectorise):
@@ -115,7 +115,7 @@ class TestTensorFieldVectorisers(unittest.TestCase):
                 batch_vectoriser = BatchCachingVectoriser(modality, content_chunks, self.model_config)
 
                 embeddings = batch_vectoriser.vectorise([content_chunks[1]], key_prefix='key_1')
-                self.assertEquals([[3.0, 4.0]], embeddings)
+                self.assertEqual([[3.0, 4.0]], embeddings)
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_vectoriser_should_raise_error_when_model_fails(self, mock_vectorise):
