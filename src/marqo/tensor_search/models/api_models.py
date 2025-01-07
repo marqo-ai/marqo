@@ -10,7 +10,7 @@ import pydantic
 from pydantic import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
-from marqo.core.models.hybrid_parameters import HybridParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
@@ -130,10 +130,10 @@ class SearchQuery(BaseMarqoModel):
         rerank_count = values.get('rerankCount')
 
         if rerank_count is not None:
-            if not search_method.upper() != SearchMethod.HYBRID:
-                raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search.")
+            if search_method.upper() != SearchMethod.HYBRID:
+                raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search method.")
             if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
-                raise ValueError(f"'rerankCount' is currently only supported for 'RRF' hybrid search ranking method.")
+                raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
 
         # Default rerank count to limit + offset
         if rerank_count is None:

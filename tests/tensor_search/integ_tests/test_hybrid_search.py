@@ -231,6 +231,8 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         text="dogs",
                         search_method="HYBRID",
+                        rerank_count=3,
+                        result_count=3,
                         hybrid_parameters=HybridParameters(
                             retrievalMethod="disjunction",
                             rankingMethod="rrf",
@@ -270,6 +272,8 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.6)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 61)
+                self.assertEqual(vespa_query_kwargs["marqo__hybrid.rerankCountGlobal"], 3)
+                self.assertEqual(vespa_query_kwargs["hits"], 3)
 
                 self.assertEqual(vespa_query_kwargs["ranking"], "hybrid_custom_searcher")
                 self.assertEqual(vespa_query_kwargs["marqo__ranking.lexical.lexical"], "bm25")
@@ -1893,10 +1897,9 @@ class TestHybridSearch(MarqoTestCase):
                             )
                         self.assertIn(error_message, str(e.exception))
 
-    def test_hybrid_search_conflicting_parameters_fails(self):
+    def test_hybrid_search_searchable_attributes_fails(self):
         """
         Ensure that searchable_attributes cannot be set in hybrid search.
-        score_modifiers can only be set for hybrid Marqo 2.15.0 onward
         """
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
@@ -1913,8 +1916,12 @@ class TestHybridSearch(MarqoTestCase):
                         )
                     self.assertIn("'searchableAttributes' cannot be used for hybrid", str(e.exception))
 
-        # score_modifiers only raises error for the legacy unstructured index (has old version Marqo 2.12.0)
-        with self.subTest("score_modifiers active"):
+    def test_hybrid_search_score_modifiers_fails(self):
+        """
+        score_modifiers can only be set for hybrid Marqo 2.15.0 onward
+        """
+        # Legacy Unstructured Index too old for root score_modifiers (has old version Marqo 2.12.0)
+        with self.subTest("score_modifiers for legacy unstructured"):
             with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
                 tensor_search.search(
                     config=self.config,
@@ -1932,6 +1939,31 @@ class TestHybridSearch(MarqoTestCase):
                 )
             self.assertIn("global score modifiers is only supported for "
                           "Marqo indexes created with Marqo 2.15.0", str(e.exception))
+
+        # Structured / semi-structured score modifiers but not RRF
+        with self.subTest("score_modifiers for structured/semi-structured but not RRF ranking"):
+            for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+                with self.subTest(index=type(index)):
+                    with self.assertRaises(ValueError) as e:
+                        tensor_search.search(
+                            config=self.config,
+                            index_name=index.name,
+                            text="dogs",
+                            search_method="HYBRID",
+                            hybrid_parameters=HybridParameters(
+                                rankingMethod="tensor",
+                                retrievalMethod="lexical"
+                            ),
+                            score_modifiers=ScoreModifierLists(
+                                multiply_score_by=[
+                                    {"field_name": "mult_field_1", "weight": 1.0}
+                                ],
+                                add_to_score=[
+                                    {"field_name": "add_field_1", "weight": 1.0}
+                                ]
+                            ),
+                        )
+                    self.assertIn("if 'rankingMethod' is 'RRF'", str(e.exception))
 
     def test_hybrid_search_structured_invalid_fields_fails(self):
         """

@@ -68,8 +68,8 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
         # score_modifiers can only be set for hybrid search - RRF
         hybrid_parameters = values.get("hybrid_parameters")
         if values.get("score_modifiers") is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
-            raise ValueError(f"'scoreModifiers' is only supported for hybrid search if ranking method is 'RRF'. "
-                             f"For your ranking method: {hybrid_parameters.rankingMethod}, define the "
+            raise ValueError(f"'scoreModifiers' is only supported for hybrid search if 'rankingMethod' is 'RRF'. "
+                             f"For your 'rankingMethod': {hybrid_parameters.rankingMethod}, define the "
                              f"'scoreModifiersTensor' and/or 'scoreModifiersLexical' keys inside the "
                              f"'hybridParameters' dict parameter.")
 
