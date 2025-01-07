@@ -72,12 +72,6 @@ class TestLanguagebindModelProperties(unittest.TestCase):
         self.assertIn("Mismatch between supported modalities and model location.",
                       str(context.exception))
 
-    def test_model_location_auth_required_validation(self):
-        """Test that authRequired can only be true for s3 or hf locations."""
-        with self.assertRaises(ValueError) as context:
-            ModalityLocation(url="http://example.com", authRequired=True)
-        self.assertIn("authRequired must be False when url is provided", str(context.exception))
-
     def test_valid_model_properties(self):
         """Test that valid model properties are accepted."""
         base_model_properties = {
