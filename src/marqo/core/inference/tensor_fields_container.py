@@ -493,7 +493,8 @@ class TensorFieldsContainer:
             tensor_content.populate_chunks_and_embeddings(existing_tensor[constants.MARQO_DOC_CHUNKS],
                                                           existing_tensor[constants.MARQO_DOC_EMBEDDINGS])
 
-    def collect(self, doc_id: str, field_name: str, field_content: Any, infer_field_type: Callable) -> Any:
+    def collect(self, doc_id: str, field_name: str, field_content: Any,
+                infer_field_type: Callable[[str, Any],FieldType]) -> Any:
         """
         Collect tensor field content from the document if it is a tensor field.
 
