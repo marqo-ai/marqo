@@ -494,7 +494,7 @@ class TensorFieldsContainer:
                                                           existing_tensor[constants.MARQO_DOC_EMBEDDINGS])
 
     def collect(self, doc_id: str, field_name: str, field_content: Any,
-                infer_field_type: Union[Callable[[str, Any], FieldType], FieldType]) -> Any:
+                infer_field_type: Callable[[str, Any], FieldType]) -> Any:
         """
         Collect tensor field content from the document if it is a tensor field.
 
@@ -524,12 +524,7 @@ class TensorFieldsContainer:
                 f'Invalid type {type(field_content)} for tensor field {field_name}'
             )
 
-        if isinstance(infer_field_type, FieldType):
-            field_type = infer_field_type
-        elif isinstance(infer_field_type, Callable):
-            field_type = infer_field_type(field_name, field_content)
-        else:
-            raise InternalError(f'Invalid infer_field_type type {type(infer_field_type)}.')
+        field_type = infer_field_type(field_name, field_content)
 
         self._add_tensor_field_content(
             doc_id, field_name, TensorFieldContent(
