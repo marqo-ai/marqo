@@ -501,7 +501,7 @@ class TensorFieldsContainer:
             doc_id: document id
             field_name: name of the field
             field_content: content of the field
-            infer_field_type: A callable that takes the field content and returns the field type
+            infer_field_type: A callable that takes the field content and field name and returns the field type
         Returns:
             The field content
         """
@@ -522,7 +522,7 @@ class TensorFieldsContainer:
                 f'Invalid type {type(field_content)} for tensor field {field_name}'
             )
 
-        field_type = infer_field_type(field_content)
+        field_type = infer_field_type(field_name, field_content)
 
         self._add_tensor_field_content(
             doc_id, field_name, TensorFieldContent(

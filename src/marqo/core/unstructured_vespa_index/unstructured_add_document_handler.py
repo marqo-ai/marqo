@@ -71,7 +71,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         )
         marqo_doc[field_name] = content
 
-    def _infer_field_type(self, field_content: Any) -> Optional[FieldType]:
+    def _infer_field_type(self, field_name:str, field_content: Any) -> Optional[FieldType]:
         """Infer the field type based on the field content. This is used for both unstructured and semi-structured
         indexes.
 
