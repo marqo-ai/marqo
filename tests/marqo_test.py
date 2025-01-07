@@ -42,12 +42,22 @@ class TestAudioUrls(str, Enum):
     AUDIO2 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-115545-C-48.wav"
     AUDIO3 = "https://marqo-ecs-50-audio-test-dataset.s3.us-east-1.amazonaws.com/audios/1-119125-A-45.wav"
 
+    MP3_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.mp3"
+    ACC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.aac"
+    OGG_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.ogg"
+
+    FLAC_AUDIO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample3.flac"
+
 
 class TestVideoUrls(str, Enum):
     __test__ = False
     VIDEO1 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--_S9IDQPLg_000135_000145.mp4"
     VIDEO2 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/---QUuC4vJs_000084_000094.mp4"
     VIDEO3 = "https://marqo-k400-video-test-dataset.s3.us-east-1.amazonaws.com/videos/--mI_-gaZLk_000018_000028.mp4"
+
+    MKV_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.mkv"
+    WEBM_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.webm"
+    AVI_VIDEO1 = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/test-media-types/sample_640x360.avi"
 
 
 
@@ -109,10 +119,24 @@ class MarqoTestCase(unittest.TestCase):
 
     def clear_indexes(self, indexes: List[MarqoIndex]):
         for index in indexes:
-            self.clear_index_by_name(index.schema_name)
+            self.clear_index_by_schema_name(index.schema_name)
 
-    def clear_index_by_name(self, index_name: str):
-        self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, index_name)
+    def clear_index_by_index_name(self, index_name: str):
+        """Delete all documents in the given index.
+
+        Args:
+            index_name: The name of the index to clear.
+        """
+        schema_name = self.index_management.get_index(index_name).schema_name
+        return self.clear_index_by_schema_name(schema_name)
+
+    def clear_index_by_schema_name(self, schema_name: str):
+        """Delete all documents in the given index.
+
+        Args:
+            schema_name: The schema name of the index to clear. It is not the same as the index name.
+        """
+        self.pyvespa_client.delete_all_docs(self.CONTENT_CLUSTER, schema_name)
 
     def random_index_name(self) -> str:
         return 'a' + str(uuid.uuid4()).replace('-', '')

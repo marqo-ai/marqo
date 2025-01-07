@@ -1,6 +1,4 @@
 import os
-import unittest.mock
-import unittest.mock
 import uuid
 from unittest import mock
 from unittest.mock import patch
@@ -21,8 +19,8 @@ from marqo.s2_inference.multimodal_model_load import infer_modality
 from marqo.tensor_search import add_docs
 from marqo.tensor_search import streaming_media_processor
 from marqo.tensor_search import tensor_search
-from tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
+from tests.marqo_test import MarqoTestCase, TestImageUrls, TestAudioUrls, TestVideoUrls
 
 
 class TestAddDocumentsCombined(MarqoTestCase):
@@ -902,15 +900,15 @@ class TestAddDocumentsCombined(MarqoTestCase):
 
             self.maxDiff = None  # allow output all diffs
             with self.subTest(f'{index.name} with type {index.type}'):
-                self.clear_index_by_name(index_name=index.schema_name)
+                self.clear_index_by_schema_name(schema_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_FIELD)
                 docs_added_using_per_field_strategy = get_docs()
 
-                self.clear_index_by_name(index_name=index.schema_name)
+                self.clear_index_by_schema_name(schema_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
                 docs_added_using_per_doc_strategy = get_docs()
 
-                self.clear_index_by_name(index_name=index.schema_name)
+                self.clear_index_by_schema_name(schema_name=index.schema_name)
                 add_docs(BatchVectorisationMode.PER_DOCUMENT)
                 docs_added_using_per_batch_strategy = get_docs()
 
@@ -1243,7 +1241,6 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                             tensor_fields=tensor_fields
                         )
                     ).dict(exclude_none=True, by_alias=True)
-                    print(result)
 
                     # Verify results
                     self.assertTrue(result["errors"])  # Should have errors due to second document
@@ -1266,3 +1263,87 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                     
                     self.assertEqual(1, len(get_result["results"]))
                     self.assertEqual("1", get_result["results"][0]["_id"])
+
+    def test_supported_audio_format(self):
+        """Test the supported audio format for the LanguageBind model in add_documents and search."""
+
+        test_cases = [
+            (TestAudioUrls.MP3_AUDIO1.value, "mp3"),
+            (TestAudioUrls.ACC_AUDIO1.value, "aac"),
+            (TestAudioUrls.OGG_AUDIO1.value, "ogg"),
+            (TestAudioUrls.FLAC_AUDIO1.value, "flac")
+        ]
+
+        for test_case, audio_format in test_cases:
+            for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+                with self.subTest(f"{index} - {audio_format}"):
+                    self.clear_index_by_schema_name(
+                        schema_name=self.index_management.get_index(index_name=index).schema_name)
+                    self.assertEqual(0, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
+                    document = {
+                        "audio_field_1": test_case,
+                        "_id": "1"
+                    }
+
+                    res = tensor_search.add_documents(
+                        self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index,
+                            docs=[document],
+                            tensor_fields=[
+                                "audio_field_1"] if index == self.unstructured_language_bind_index_name else None
+                        )
+                    )
+                    self.assertFalse(res.errors, msg=res.dict())
+                    self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
+                    self.assertGreaterEqual(self.monitoring.get_index_stats_by_name(index_name=index).number_of_vectors,
+                                            1)
+                    if test_case not in [TestAudioUrls.ACC_AUDIO1.value,]:
+                    # .acc is not support
+                        _ = tensor_search.search(
+                            config=self.config,
+                            index_name=index,
+                            text=test_case,
+                            search_method = "TENSOR"
+                        )
+
+    def test_supported_video_format(self):
+        """Test the supported video format for the LanguageBind model in add_documents and search."""
+
+        test_cases = [
+            (TestVideoUrls.AVI_VIDEO1.value, "avi"),
+            (TestVideoUrls.MKV_VIDEO1.value, "mkv"),
+            (TestVideoUrls.WEBM_VIDEO1.value, "webm")
+        ]
+
+        for test_case, audio_format in test_cases:
+            for index in [self.structured_language_bind_index_name, self.unstructured_language_bind_index_name]:
+                with self.subTest(f"{index} - {audio_format}"):
+                    self.clear_index_by_schema_name(
+                        schema_name=self.index_management.get_index(index_name=index).schema_name)
+                    self.assertEqual(0, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
+                    document = {
+                        "video_field_1": test_case,
+                        "_id": "1"
+                    }
+
+                    res = tensor_search.add_documents(
+                        self.config,
+                        add_docs_params=AddDocsParams(
+                            index_name=index,
+                            docs=[document],
+                            tensor_fields=[
+                                "video_field_1"] if index == self.unstructured_language_bind_index_name else None
+                        )
+                    )
+                    self.assertFalse(res.errors, msg=res.dict())
+                    self.assertEqual(1, self.monitoring.get_index_stats_by_name(index_name=index).number_of_documents)
+                    self.assertGreaterEqual(self.monitoring.get_index_stats_by_name(index_name=index).number_of_vectors,
+                                            1)
+
+                    _ = tensor_search.search(
+                        config=self.config,
+                        index_name=index,
+                        text=test_case,
+                        search_method = "TENSOR"
+                    )
