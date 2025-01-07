@@ -51,11 +51,8 @@ class TestEncoding(unittest.TestCase):
 
         names_bge = ["hf/bge-small-en-v1.5", "hf/bge-base-en-v1.5", "BAAI/bge-base-en-v1.5",  "BAAI/bge-large-en-v1.5"]
 
-        # TODO: Re-add snowflake models when HF pooling issue is resolved
-        # names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
-        # names = names + names_e5 + names_bge + names_snowflake
-
-        names = names + names_e5 + names_bge
+        names_snowflake = ["hf/snowflake-arctic-embed-m", "hf/snowflake-arctic-embed-m-v1.5"]
+        names = names + names_e5 + names_bge + names_snowflake
 
         sentences = ['hello', 'this is a test sentence. so is this.', ['hello', 'this is a test sentence. so is this.']]
         device = 'cpu'
@@ -96,7 +93,6 @@ class TestEncoding(unittest.TestCase):
                                              f"Hardcoded embeddings do not match for {name}:{sentence}")
 
                 clear_loaded_models()
-
 
     def test_vectorize_normalise(self):
         open_clip_names = ["open_clip/ViT-B-32/laion2b_s34b_b79k", "Marqo/ViT-B-32.laion2b_s34b_b79k"]
