@@ -57,10 +57,10 @@ class TestTensorFieldContent(unittest.TestCase):
                 )
 
                 tensor_field_content.populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
-                self.assertEquals(['hello world'], tensor_field_content.chunks)
-                self.assertEquals([], tensor_field_content.content_chunks)
-                self.assertEquals([[1.0, 1.2]], tensor_field_content.embeddings)
-                self.assertEquals(resolved_after_population, tensor_field_content.is_resolved)
+                self.assertEqual(['hello world'], tensor_field_content.chunks)
+                self.assertEqual([], tensor_field_content.content_chunks)
+                self.assertEqual([[1.0, 1.2]], tensor_field_content.embeddings)
+                self.assertEqual(resolved_after_population, tensor_field_content.is_resolved)
 
     def test_chunk_resolved_field_will_not_generate_more_content_chunks(self):
         tensor_field_content = TensorFieldContent(

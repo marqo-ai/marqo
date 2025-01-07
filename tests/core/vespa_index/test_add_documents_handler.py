@@ -102,7 +102,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertEqual([Document(id='id:index1:index1:1', fields={'marqo__id': '1'})],
                          handler.existing_vespa_docs)  # only the doc with 200 status code is passed to the method
 
-        self.assertEquals(3, handler.to_vespa_doc_call_count)
+        self.assertEqual(3, handler.to_vespa_doc_call_count)
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     def test_add_documents_should_skip_duplicate_documents(self, mock_feed_batch):
@@ -124,7 +124,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertEqual({
             ('1', 'field4'), ('1', 'field5'),  # the second doc with the same id overrides the first one
         }, set(handler.handled_fields))
-        self.assertEquals(1, handler.to_vespa_doc_call_count)
+        self.assertEqual(1, handler.to_vespa_doc_call_count)
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     def test_add_documents_should_skip_duplicate_documents_even_when_the_latter_one_errors_out(self, mock_feed_batch):
@@ -152,7 +152,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         self.assertEqual('some error', response.items[0].message)
 
         self.assertEqual([('1', 'field4')], handler.handled_fields)
-        self.assertEquals(0, handler.to_vespa_doc_call_count)
+        self.assertEqual(0, handler.to_vespa_doc_call_count)
 
         self.assertEqual(1, mock_feed_batch.call_count)
         self.assertEqual(([], 'index1'), mock_feed_batch.call_args_list[0][0])  # no vespa docs to persist
@@ -191,7 +191,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         response = handler.add_documents()
         self.assertTrue(response.errors)
 
-        self.assertEquals([
+        self.assertEqual([
             MarqoAddDocumentsItem(status=400, id='1',
                                   message='The document contains invalid characters in the fields. Original error: Could not parse field field1 ',
                                   error='The document contains invalid characters in the fields. Original error: Could not parse field field1 ',
@@ -242,7 +242,7 @@ class TestAddDocumentHandler(MarqoTestCase):
                 mock_vectorise.reset_mock()
 
                 handler.add_documents()
-                self.assertEquals(expected_vectorise_call_count, mock_vectorise.call_count)
+                self.assertEqual(expected_vectorise_call_count, mock_vectorise.call_count)
                 # please note that assertCountEqual compares two list ignoring order
                 self.assertCountEqual(expected_call_args,
                                       [args.kwargs['content'] for args in mock_vectorise.call_args_list])
@@ -267,11 +267,11 @@ class TestAddDocumentHandler(MarqoTestCase):
         )
 
         response = handler.add_documents()
-        self.assertEquals(2, mock_vectorise.call_count)
+        self.assertEqual(2, mock_vectorise.call_count)
         self.assertTrue(response.errors)
-        self.assertEquals(200, response.items[0].status)
-        self.assertEquals(400, response.items[1].status)
-        self.assertEquals('vectorise error', response.items[1].message)
+        self.assertEqual(200, response.items[0].status)
+        self.assertEqual(400, response.items[1].status)
+        self.assertEqual('vectorise error', response.items[1].message)
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     @patch('marqo.s2_inference.s2_inference.vectorise')
@@ -293,11 +293,11 @@ class TestAddDocumentHandler(MarqoTestCase):
         )
 
         response = handler.add_documents()
-        self.assertEquals(2, mock_vectorise.call_count)
+        self.assertEqual(2, mock_vectorise.call_count)
         self.assertTrue(response.errors)
-        self.assertEquals(200, response.items[0].status)
-        self.assertEquals(400, response.items[1].status)
-        self.assertEquals('vectorise error', response.items[1].message)
+        self.assertEqual(200, response.items[0].status)
+        self.assertEqual(400, response.items[1].status)
+        self.assertEqual('vectorise error', response.items[1].message)
 
     @patch('marqo.s2_inference.s2_inference.vectorise')
     def test_add_documents_should_fail_a_batch_using_vectorise_per_doc_strategy(self, mock_vectorise):
@@ -318,7 +318,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         with self.assertRaisesStrict(InternalError) as context:
             handler.add_documents()
 
-        self.assertEquals('Encountered problem when vectorising batch of documents. Reason: vectorise error',
+        self.assertEqual('Encountered problem when vectorising batch of documents. Reason: vectorise error',
                           str(context.exception))
 
 
@@ -333,13 +333,13 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         collector.collect_marqo_doc(1, marqo_doc1, 'doc_id1')
         collector.collect_marqo_doc(2, marqo_doc2, None)
 
-        self.assertEquals(marqo_doc1, collector.marqo_docs['doc_id1'])
-        self.assertEquals(marqo_doc2, collector.marqo_docs['doc_id2'])
-        self.assertEquals(1, collector.marqo_doc_loc_map['doc_id1'])
-        self.assertEquals(2, collector.marqo_doc_loc_map['doc_id2'])
+        self.assertEqual(marqo_doc1, collector.marqo_docs['doc_id1'])
+        self.assertEqual(marqo_doc2, collector.marqo_docs['doc_id2'])
+        self.assertEqual(1, collector.marqo_doc_loc_map['doc_id1'])
+        self.assertEqual(2, collector.marqo_doc_loc_map['doc_id2'])
         self.assertTrue(collector.visited('doc_id1'))
         self.assertFalse(collector.visited('doc_id2'))
-        self.assertEquals({'doc_id1'}, collector.valid_original_ids())
+        self.assertEqual({'doc_id1'}, collector.valid_original_ids())
 
     def test_collect_error_response_should_skip_duplicate_document_error(self):
         collector = AddDocumentsResponseCollector()
@@ -352,12 +352,12 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'), loc=1)
         self.assertTrue(collector.errors)
         loc, add_doc_item = collector.responses[0]
-        self.assertEquals(1, loc)
-        self.assertEquals('doc_id1', add_doc_item.id)
-        self.assertEquals('error message', add_doc_item.message)
-        self.assertEquals('error message', add_doc_item.error)
-        self.assertEquals(400, add_doc_item.status)
-        self.assertEquals('invalid_argument', add_doc_item.code)
+        self.assertEqual(1, loc)
+        self.assertEqual('doc_id1', add_doc_item.id)
+        self.assertEqual('error message', add_doc_item.message)
+        self.assertEqual('error message', add_doc_item.error)
+        self.assertEqual(400, add_doc_item.status)
+        self.assertEqual('invalid_argument', add_doc_item.code)
 
     def test_collect_error_response_should_capture_add_document_error_with_custom_values(self):
         collector = AddDocumentsResponseCollector()
@@ -365,25 +365,25 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
                                                                       error_code='err_code', status_code=403), loc=1)
         self.assertTrue(collector.errors)
         loc, add_doc_item = collector.responses[0]
-        self.assertEquals(1, loc)
-        self.assertEquals('doc_id1', add_doc_item.id)
-        self.assertEquals('error message 2', add_doc_item.message)
-        self.assertEquals('error message 2', add_doc_item.error)
-        self.assertEquals(403, add_doc_item.status)
-        self.assertEquals('err_code', add_doc_item.code)
+        self.assertEqual(1, loc)
+        self.assertEqual('doc_id1', add_doc_item.id)
+        self.assertEqual('error message 2', add_doc_item.message)
+        self.assertEqual('error message 2', add_doc_item.error)
+        self.assertEqual(403, add_doc_item.status)
+        self.assertEqual('err_code', add_doc_item.code)
 
     def test_collect_error_response_should_infer_loc_if_not_provided(self):
         collector = AddDocumentsResponseCollector()
         collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, 'doc_id1')
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'))
         loc, _ = collector.responses[0]
-        self.assertEquals(5, loc)
+        self.assertEqual(5, loc)
 
     def test_collect_marqo_error_response_should_set_loc_to_none_if_not_provided(self):
         collector = AddDocumentsResponseCollector()
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'))
         loc, _ = collector.responses[0]
-        self.assertEquals(None, loc)
+        self.assertEqual(None, loc)
 
     def test_collect_marqo_error_response_should_remove_the_collected_marqo_doc(self):
         collector = AddDocumentsResponseCollector()
@@ -400,7 +400,7 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         collector = AddDocumentsResponseCollector()
         collector.collect_error_response(None, AddDocumentsError('error message'))
         loc, _ = collector.responses[0]
-        self.assertEquals(None, loc)
+        self.assertEqual(None, loc)
 
     def test_collect_marqo_error_response_should_set_id_as_empty_if_original_id_is_none(self):
         """
@@ -411,7 +411,7 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, None)
         collector.collect_error_response('doc_id1', AddDocumentsError('error message'))
         _, add_document_item = collector.responses[0]
-        self.assertEquals('', add_document_item.id)
+        self.assertEqual('', add_document_item.id)
 
     def test_collect_marqo_error_response_should_set_doc_visited_if_original_id_is_present(self):
         """
@@ -427,9 +427,9 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         collector.collect_marqo_doc(5, {'_id': 'doc_id1'}, 'doc_id1')
         collector.collect_successful_response('doc_id1')
         loc, add_doc_item = collector.responses[0]
-        self.assertEquals(5, loc)
-        self.assertEquals('doc_id1', add_doc_item.id)
-        self.assertEquals(200, add_doc_item.status)
+        self.assertEqual(5, loc)
+        self.assertEqual('doc_id1', add_doc_item.id)
+        self.assertEqual(200, add_doc_item.status)
         self.assertIsNone(add_doc_item.error)
         self.assertIsNone(add_doc_item.message)
         self.assertFalse(collector.errors)
@@ -449,14 +449,14 @@ class TestAddDocumentsResponseCollector(unittest.TestCase):
         # location should be reversed again in the response to revert the operation when we handle the batch of docs
         response = collector.to_add_doc_responses(index_name='index')
         self.assertTrue(response.errors)
-        self.assertEquals('index', response.index_name)
-        self.assertEquals(1000, response.processingTimeMs)
+        self.assertEqual('index', response.index_name)
+        self.assertEqual(1000, response.processingTimeMs)
 
-        self.assertEquals(4, len(response.items))
-        self.assertEquals('doc_id4', response.items[0].id)  # doc_id4 is the original doc_id
-        self.assertEquals('error message 4', response.items[0].message)
-        self.assertEquals('doc_id3', response.items[1].id)  # doc_id3 should be returned since it's persisted
-        self.assertEquals('', response.items[2].id)  # gen_doc_id2 is generated, should not be returned for error
-        self.assertEquals('error message 2', response.items[2].message)
-        self.assertEquals('', response.items[3].id)  # doc_id1 error message does not contain id, this came last
-        self.assertEquals('error message 1', response.items[3].message)
+        self.assertEqual(4, len(response.items))
+        self.assertEqual('doc_id4', response.items[0].id)  # doc_id4 is the original doc_id
+        self.assertEqual('error message 4', response.items[0].message)
+        self.assertEqual('doc_id3', response.items[1].id)  # doc_id3 should be returned since it's persisted
+        self.assertEqual('', response.items[2].id)  # gen_doc_id2 is generated, should not be returned for error
+        self.assertEqual('error message 2', response.items[2].message)
+        self.assertEqual('', response.items[3].id)  # doc_id1 error message does not contain id, this came last
+        self.assertEqual('error message 1', response.items[3].message)

@@ -1031,7 +1031,7 @@ class VespaClient:
                     ):
                         # The soft doom error is a bug in certain Vespa versions. Newer versions should always return
                         # a code 12 for timeouts
-                        logger.warn('Detected soft doomed query')
+                        logger.warning('Detected soft doomed query')
                         raise VespaTimeoutError(message=resp.text, cause=e) from e
 
                 raise e

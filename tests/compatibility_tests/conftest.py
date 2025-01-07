@@ -1,6 +1,6 @@
 import pytest
 import semver
-from tests.backwards_compatibility_tests.compatibility_test_logger import get_logger
+from tests.compatibility_tests.compatibility_test_logger import get_logger
 
 logger = get_logger(__name__)
 

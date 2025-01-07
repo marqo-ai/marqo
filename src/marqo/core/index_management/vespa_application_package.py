@@ -58,7 +58,7 @@ class ServicesXml:
 
     def add_schema(self, name: str) -> None:
         if self._documents.find(f'document[@type="{name}"]') is not None:
-            logger.warn(f'Schema {name} already exists in services.xml, nothing to add')
+            logger.warning(f'Schema {name} already exists in services.xml, nothing to add')
         else:
             new_document = ET.SubElement(self._documents, 'document')
             new_document.set('type', name)
@@ -67,7 +67,7 @@ class ServicesXml:
     def remove_schema(self, name: str) -> None:
         docs = self._documents.findall(f'document[@type="{name}"]')
         if not docs:
-            logger.warn(f'Schema {name} does not exist in services.xml, nothing to remove')
+            logger.warning(f'Schema {name} does not exist in services.xml, nothing to remove')
         else:
             for doc in docs:
                 self._documents.remove(doc)
@@ -210,7 +210,7 @@ class IndexSettingStore:
 
     def delete_index_setting(self, index_setting_name: str) -> None:
         if index_setting_name not in self._index_settings:
-            logger.warn(f"Index setting {index_setting_name} does not exist, nothing to delete")
+            logger.warning(f"Index setting {index_setting_name} does not exist, nothing to delete")
         else:
             self._move_to_history(index_setting_name)
             del self._index_settings[index_setting_name]
@@ -452,7 +452,7 @@ class VespaApplicationFileStore(VespaApplicationStore):
     def save_file(self, content: Union[str, bytes], *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
         path = self._full_path(*paths)
         if os.path.exists(path):
-            logger.warn(f"{path} already exists in application package, overwriting")
+            logger.warning(f"{path} already exists in application package, overwriting")
             if backup is not None:
                 backup.backup_file(self.read_binary_file(*paths), *paths)
         else:  # add file
@@ -467,7 +467,7 @@ class VespaApplicationFileStore(VespaApplicationStore):
     def remove_file(self, *paths: str, backup: Optional[VespaAppBackup] = None) -> None:
         path = self._full_path(*paths)
         if not os.path.exists(path):
-            logger.warn(f"{path} does not exist in application package, nothing to delete")
+            logger.warning(f"{path} does not exist in application package, nothing to delete")
         else:
             if backup is not None:
                 backup.backup_file(self.read_binary_file(*paths), *paths)
@@ -530,7 +530,7 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
 
 
 class VespaApplicationPackage:
-    """
+    r"""
     Represents a Vespa application package. This class provides useful methods to manage contents in the application
     package. A Vespa application package usually contains the following contents
     app-root

@@ -812,7 +812,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             ("filter on id 1234", "_id:1234", 1, ["1234"]),
             ("AND filter", "_id:5678 AND status:active", 1, ["5678"]),
             ("OR filter", "_id:5678 OR _id:1234", 2, ["5678", "1234"]),
-            ("Complex filter", "_id:5678 OR (abc:some\ text AND status:inactive)", 2, ["5678", "1234"]),
+            ("Complex filter", r"_id:5678 OR (abc:some\ text AND status:inactive)", 2, ["5678", "1234"]),
             ("Non-ID field filter", "status:active", 2, ["5678", "9012"]),
             ("No result filter", "_id:0000", 0, [])
         ]
