@@ -339,9 +339,6 @@ class UnstructuredVespaIndex(VespaIndex):
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_LEXICAL])
         if hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR]:
             query_inputs.update(hybrid_score_modifiers[constants.MARQO_SEARCH_METHOD_TENSOR])
-        if hybrid_score_modifiers[constants.MARQO_SCORE_MODIFIERS_GLOBAL]:
-            query_inputs.update(hybrid_score_modifiers[constants.MARQO_SCORE_MODIFIERS_GLOBAL])
-
 
         query = {
             'searchChain': 'marqo',
@@ -372,8 +369,9 @@ class UnstructuredVespaIndex(VespaIndex):
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:  # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
+
+        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
-            query["marqo__hybrid.rerankCountGlobal"] = marqo_query.rerank_count
 
         return query
 
