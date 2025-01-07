@@ -33,8 +33,9 @@ class UnstructuredVespaDocumentFields(MarqoBaseModel):
         if not self.match_features:
             raise VespaDocumentParsingError("No match features found in the document")
 
-        if self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"]["cells"] == {}:
-            # No match feature found, return empty highlights
+        if f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})" not in self.match_features or \
+                self.match_features[f"closest({unstructured_common.VESPA_DOC_EMBEDDINGS})"]["cells"] == {}:
+            # No embedding match feature found, return empty highlights
             return []
         else:
             if not self.vespa_chunks:

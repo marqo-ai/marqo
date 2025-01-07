@@ -32,9 +32,6 @@ class HybridParameters(StrictBaseModel):
     # Input for API, but form will change before being passed to core Hybrid Query.
     scoreModifiersLexical: Optional[ScoreModifierLists] = None
     scoreModifiersTensor: Optional[ScoreModifierLists] = None
-    scoreModifiersGlobal: Optional[ScoreModifierLists] = None
-
-    rerankCountGlobal: Optional[int] = None
 
     @root_validator(pre=False)
     def validate_properties(cls, values):
@@ -83,18 +80,6 @@ class HybridParameters(StrictBaseModel):
             if values.get('rankingMethod') not in [RankingMethod.Tensor, RankingMethod.RRF]:
                 raise ValueError(
                     "'scoreModifiersTensor' can only be defined for 'tensor', 'rrf', ranking methods")  # TODO: re-add normalize_linear
-
-        # score_modifiers_global can only be defined for RRF
-        if values.get('scoreModifiersGlobal') is not None:
-            if values.get('rankingMethod') != RankingMethod.RRF:
-                raise ValueError("'scoreModifiersGlobal' can only be defined for 'rrf' ranking method")
-
-        # rerankCountGlobal can only be defined for RRF and if scoreModifiersGlobal is defined
-        if values.get('rerankCountGlobal') is not None:
-            if values.get('rankingMethod') != RankingMethod.RRF:
-                raise ValueError("'rerankCountGlobal' can only be defined for 'rrf' ranking method")
-            if values.get('scoreModifiersGlobal') is None:
-                raise ValueError("'rerankCountGlobal' can only be defined if 'scoreModifiersGlobal' is defined")
 
         # if retrievalMethod == Disjunction, then ranking_method must be RRF, NormalizeLinear
         if values.get('retrievalMethod') == RetrievalMethod.Disjunction:

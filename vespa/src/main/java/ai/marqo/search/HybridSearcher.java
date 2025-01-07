@@ -6,6 +6,7 @@ import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
@@ -64,6 +65,9 @@ public class HybridSearcher extends Searcher {
 
         Integer rrf_k = query.properties().getInteger("marqo__hybrid.rrf_k", 60);
         Double alpha = query.properties().getDouble("marqo__hybrid.alpha", 0.5);
+        Integer rerankCountGlobal =
+                query.properties().getInteger("marqo__hybrid.rerankCountGlobal", null);
+        Integer limit = query.properties().getInteger("hits", null);
         Integer timeout = query.properties().getInteger("timeout", 1000);
 
         // Log fetched variables
@@ -71,10 +75,24 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("Ranking method found: %s", rankingMethod), verbose);
         logIfVerbose(String.format("alpha found: %.2f", alpha), verbose);
         logIfVerbose(String.format("RRF k found: %d", rrf_k), verbose);
+        logIfVerbose(String.format("Rerank count global found: %d", rerankCountGlobal), verbose);
+        logIfVerbose(String.format("Limit found: %d", limit), verbose);
         logIfVerbose(String.format("Timeout int found: %d", timeout), verbose);
 
         logIfVerbose(String.format("Base Query is: "), verbose);
         logIfVerbose(query.toDetailString(), verbose);
+
+        // Validation for limit and rerank count
+        if (limit == null) {
+            throw new RuntimeException("Query limit cannot be null.");
+        }
+        if (rerankCountGlobal == null) {
+            rerankCountGlobal = limit;
+            logIfVerbose(
+                    String.format(
+                            "Rerank count global not set. Setting to limit: %d", rerankCountGlobal),
+                    verbose);
+        }
 
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
@@ -115,9 +133,14 @@ public class HybridSearcher extends Searcher {
             // Execute fusion ranking on 2 results.
             if (rankingMethod.equals("rrf")) {
                 HitGroup fusedHitList =
-                        rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
-                logIfVerbose("RRF Fused Hit Group", verbose);
-                logHitGroup(fusedHitList, verbose);
+                        rrf(
+                                resultTensor.hits(),
+                                resultLexical.hits(),
+                                rrf_k,
+                                alpha,
+                                limit,
+                                rerankCountGlobal,
+                                verbose);
                 return new Result(query, fusedHitList);
             } else {
                 throw new RuntimeException(
@@ -152,7 +175,13 @@ public class HybridSearcher extends Searcher {
      * @param verbose
      */
     HitGroup rrf(
-            HitGroup hitsTensor, HitGroup hitsLexical, Integer k, Double alpha, boolean verbose) {
+            HitGroup hitsTensor,
+            HitGroup hitsLexical,
+            Integer k,
+            Double alpha,
+            Integer limit,
+            Integer rerankCountGlobal,
+            boolean verbose) {
 
         HashMap<String, Double> rrfScores = new HashMap<>();
         HashMap<String, String> docIdsToHitIds = new HashMap<>();
@@ -166,9 +195,21 @@ public class HybridSearcher extends Searcher {
 
         logIfVerbose(String.format("alpha is %.2f", alpha), verbose);
         logIfVerbose(String.format("k is %d", k), verbose);
+        logIfVerbose(String.format("Limit is %d", limit), verbose);
+        logIfVerbose(String.format("Rerank count global is %d", rerankCountGlobal), verbose);
+
+        // Raise error if either list has an error
+        ErrorMessage tensorError = hitsTensor.getError();
+        if (tensorError != null) {
+            throw new RuntimeException("Error in RRF tensor search: " + tensorError);
+        }
+
+        ErrorMessage lexicalError = hitsLexical.getError();
+        if (lexicalError != null) {
+            throw new RuntimeException("Error in RRF lexical search: " + lexicalError);
+        }
 
         // Iterate through tensor hits list
-
         int rank = 1;
         if (alpha > 0.0) {
             logIfVerbose(
@@ -267,23 +308,42 @@ public class HybridSearcher extends Searcher {
             }
         }
         // Apply global score modifiers on result list
-        result = applyGlobalScoreModifiers(result, verbose);
+        HitGroup result_to_rerank = result.clone();
+        result_to_rerank.trim(0, rerankCountGlobal);
 
-        // Sort and trim results.
-        logIfVerbose("Combined list (UNSORTED)", verbose);
-        logHitGroup(result, verbose);
+        logIfVerbose("Result list to rerank: ", verbose);
+        logHitGroup(result_to_rerank, verbose);
 
-        result.sort();
-        logIfVerbose("Combined list (SORTED)", verbose);
-        logHitGroup(result, verbose);
+        // Retain any excess hits (limit - rerankCountGlobal) to be added back after reranking
+        result.trim(rerankCountGlobal, Math.max(0, limit - rerankCountGlobal));
+        HitGroup reranked_result = applyGlobalScoreModifiers(result_to_rerank, verbose);
 
-        // Only return top hits (max length)
-        Integer finalLength = Math.max(hitsTensor.size(), hitsLexical.size());
-        result.trim(0, finalLength);
-        logIfVerbose("Combined list (TRIMMED)", verbose);
-        logHitGroup(result, verbose);
+        logIfVerbose("Rescored result list (UNSORTED): ", verbose);
+        logHitGroup(reranked_result, verbose);
 
-        return result;
+        reranked_result.sort();
+
+        logIfVerbose("Reranked result list (SORTED): ", verbose);
+        logHitGroup(reranked_result, verbose);
+
+        if (limit > rerankCountGlobal) {
+            // Add excess hits to the end of reranked results then sorting
+            logIfVerbose(
+                    String.format(
+                            "Adding %d excess hits to the end of reranked results and sorting.",
+                            result.size()),
+                    verbose);
+            reranked_result.addAll(result.asList());
+        } else if (limit < rerankCountGlobal) {
+            // Trim reranked results to limit
+            logIfVerbose(String.format("Trimming reranked results to limit: %d", limit), verbose);
+            reranked_result.trim(0, limit);
+        }
+
+        logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
+        logHitGroup(reranked_result, verbose);
+
+        return reranked_result;
     }
 
     /**
@@ -475,7 +535,6 @@ public class HybridSearcher extends Searcher {
             return hits;
         }
 
-        // TODO: Apply configurable depth. For now, it's all elements
         for (Hit hit : hits) {
             logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
             // Extract the mult and add modifiers from match-features

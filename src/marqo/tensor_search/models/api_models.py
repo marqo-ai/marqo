@@ -40,6 +40,7 @@ class SearchQuery(BaseMarqoModel):
     searchMethod: SearchMethod = SearchMethod.TENSOR
     limit: int = 10
     offset: int = 0
+    rerankCount: Optional[int] = None
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
     showHighlights: bool = True
@@ -119,6 +120,25 @@ class SearchQuery(BaseMarqoModel):
         if hybrid_parameters is not None and search_method.upper() != SearchMethod.HYBRID:
             raise ValueError(f"Hybrid parameters can only be provided for 'HYBRID' search. "
                              f"Search method is {search_method}.")
+        return values
+
+    @root_validator(pre=False)
+    def validate_rerank_count(cls, values):
+        """Validate that rerank_count is only set for hybrid search - RRF. """
+        hybrid_parameters = values.get('hybridParameters')
+        search_method = values.get('searchMethod')
+        rerank_count = values.get('rerankCount')
+
+        if rerank_count is not None:
+            if not search_method.upper() != SearchMethod.HYBRID:
+                raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search.")
+            if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
+                raise ValueError(f"'rerankCount' is currently only supported for 'RRF' hybrid search ranking method.")
+
+        # Default rerank count to limit + offset
+        if rerank_count is None:
+            values['rerankCount'] = values.get('limit') + values.get('offset')
+
         return values
 
     @pydantic.validator('searchMethod')

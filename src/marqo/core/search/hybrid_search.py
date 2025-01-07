@@ -29,8 +29,8 @@ import semver
 class HybridSearch:
     def search(
             self, config: Config, index_name: str, query: Optional[Union[str, CustomVectorQuery]],
-            result_count: int = 5,
-            offset: int = 0, ef_search: Optional[int] = None, approximate: bool = True,
+            result_count: int = 5, offset: int = 0, rerank_count: Optional[int] = None,
+            ef_search: Optional[int] = None, approximate: bool = True,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
             attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
             media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
@@ -101,6 +101,15 @@ class HybridSearch:
                 f"{str(constants.MARQO_UNSTRUCTURED_HYBRID_SEARCH_MINIMUM_VERSION)} or later. "
                 f"This index was created with Marqo {marqo_index_version}."
             )
+
+        if score_modifiers is not None \
+                and marqo_index_version < constants.MARQO_SCORE_MODIFIERS_GLOBAL_MINIMUM_VERSION:
+            raise core_exceptions.UnsupportedFeatureError(
+                f"Hybrid search with global score modifiers is only supported for Marqo indexes created with Marqo "
+                f"{str(constants.MARQO_SCORE_MODIFIERS_GLOBAL_MINIMUM_VERSION)} or later. "
+                f"This index was created with Marqo {marqo_index_version}."
+            )
+
 
         # Use default hybrid settings if not provided
         if hybrid_parameters is None:
@@ -176,6 +185,7 @@ class HybridSearch:
             ef_search=ef_search,
             approximate=approximate,
             offset=offset,
+            rerank_count=rerank_count,
             or_phrases=optional_terms,
             and_phrases=required_terms,
             attributes_to_retrieve=attributes_to_retrieve,
@@ -186,8 +196,6 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersLexical is not None else None,
             score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
             if hybrid_parameters.scoreModifiersTensor is not None else None,
-            score_modifiers_global=hybrid_parameters.scoreModifiersGlobal.to_marqo_score_modifiers()
-            if hybrid_parameters.scoreModifiersGlobal is not None else None,
             hybrid_parameters=hybrid_parameters
         )
 

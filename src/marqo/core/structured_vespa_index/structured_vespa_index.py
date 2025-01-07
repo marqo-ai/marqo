@@ -581,9 +581,8 @@ class StructuredVespaIndex(VespaIndex):
 
         if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}: # TODO: Add NormalizeLinear
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
-
-        if marqo_query.hybrid_parameters.rankingMethod in {RankingMethod.RRF}:
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
+            query["marqo__hybrid.rerankCountGlobal"] = marqo_query.rerank_count
 
         return query
 

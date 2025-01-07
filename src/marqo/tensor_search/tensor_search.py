@@ -1457,7 +1457,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 
 
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
-           result_count: int = 3, offset: int = 0,
+           result_count: int = 3, offset: int = 0, rerank_count: Optional[int] = None,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
@@ -1592,6 +1592,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             from marqo.core.search.hybrid_search import HybridSearch
             search_result = HybridSearch().search(
                 config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
+                rerank_count=rerank_count,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
