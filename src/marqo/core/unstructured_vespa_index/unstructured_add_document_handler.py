@@ -71,7 +71,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         )
         marqo_doc[field_name] = content
 
-    def _infer_field_type(self, field_name:str, field_content: Any) -> Optional[FieldType]:
+    def _infer_field_type(self, field_name:str, field_content: Any) -> FieldType:
         """Infer the field type based on the field content. This is used for both unstructured and semi-structured
         indexes.
 
@@ -95,8 +95,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         Args:
             field_content: The content of the field.
         Returns:
-            The inferred field type if the field content is a string and the index is configured to treat URLs and
-            pointers as images or media. None otherwise.
+            The inferred field type.
         Raises:
             AddDocumentsError: If the modality of the media content cannot be inferred.
         """
