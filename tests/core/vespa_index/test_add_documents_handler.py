@@ -43,7 +43,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         def _handle_field(self, marqo_doc, field_name, field_content) -> None:
             doc_id = marqo_doc[MARQO_DOC_ID]
             marqo_doc[field_name] = field_content
-            self.tensor_fields_container.collect(doc_id, field_name, field_content, FieldType.Text)
+            self.tensor_fields_container.collect(doc_id, field_name, field_content, self._infer_field_type)
             self.handled_fields.append((doc_id, field_name))
 
         def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
@@ -56,6 +56,9 @@ class TestAddDocumentHandler(MarqoTestCase):
         def _to_vespa_doc(self, marqo_doc: Dict[str, Any]) -> VespaDocument:
             self.to_vespa_doc_call_count += 1
             return VespaDocument(id=marqo_doc[MARQO_DOC_ID], fields={})
+
+        def _infer_field_type(self, field_name: str, field_content: Any) -> FieldType:
+            return FieldType.Text
 
     @patch('marqo.vespa.vespa_client.VespaClient.feed_batch')
     @patch('marqo.vespa.vespa_client.VespaClient.get_batch')
@@ -354,8 +357,10 @@ class TestAddDocumentHandler(MarqoTestCase):
                 with (patch(
                         "marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality") as
                       mock_infer_modality):
-                    self.assertEqual(FieldType.Text,
-                                     unstructured_add_documents_handler._infer_field_type(url))
+                    self.assertEqual(
+                        FieldType.Text, unstructured_add_documents_handler.
+                        _infer_field_type(field_name="dummy_field_name", field_content=url)
+                    )
                 mock_infer_modality.assert_not_called()
 
     def test_unstructured_add_documents_handler_infer_modality_logic_image_true_and_media_false(self):
@@ -380,8 +385,13 @@ class TestAddDocumentHandler(MarqoTestCase):
 
         for url, test_case, expected_field_type in test_cases:
             with self.subTest(msg=test_case):
-                self.assertEqual(expected_field_type,
-                                 unstructured_add_documents_handler._infer_field_type(url))
+                self.assertEqual(
+                    expected_field_type,
+                    unstructured_add_documents_handler._infer_field_type(
+                        field_name="dummy_field_name",
+                        field_content=url
+                    )
+                )
 
     def test_unstructured_add_documents_handler_infer_modality_logic_image_true_and_media_true(self):
         """Test the logic of the infer_modality method in UnstructuredAddDocumentsHandler when
@@ -405,8 +415,13 @@ class TestAddDocumentHandler(MarqoTestCase):
 
         for url, test_case, expected_field_type in test_cases:
             with self.subTest(msg=test_case):
-                self.assertEqual(expected_field_type,
-                                 unstructured_add_documents_handler._infer_field_type(url))
+                self.assertEqual(
+                    expected_field_type,
+                    unstructured_add_documents_handler._infer_field_type(
+                        field_name="dummy_field_name",
+                        field_content=url
+                    )
+                )
 
     def test_collect_tensor_field_content_infer_modality_logic(self):
         """A test to ensure collect_tensor_field_content method in UnstructuredAddDocumentsHandler infer modality
