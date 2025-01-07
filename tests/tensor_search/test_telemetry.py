@@ -2,6 +2,7 @@ import json
 import unittest
 from unittest.mock import patch
 
+import pytest
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
@@ -289,6 +290,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         response = client.get("/?telemetry=true")
         self.assertNotIn("telemetry", response.json())
 
+    @pytest.mark.asyncio
     @patch('starlette.testclient.TestClient.send')
     async def test_dispatch_no_telemetry(self, mock_send):
         # Mock the send function to return a mock response
@@ -304,6 +306,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         self.assertIsInstance(response, Response)
         self.assertNotIn("telemetry", response.body.decode())
 
+    @pytest.mark.asyncio
     @patch('starlette.testclient.TestClient.send')
     async def test_dispatch_telemetry_not_dict(self, mock_send):
         mock_send.return_value = Response()
@@ -317,6 +320,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         self.assertIsInstance(response, Response)
         self.assertNotIn("telemetry", response.body.decode())
 
+    @pytest.mark.asyncio
     @patch('starlette.testclient.TestClient.send')
     async def test_dispatch_telemetry_dict(self, mock_send):
         self.scope = {'type': 'http', 'query_string': b'telemetry=true'}
@@ -341,6 +345,7 @@ class TestTelemetryMiddleware(unittest.IsolatedAsyncioTestCase, unittest.TestCas
         self.request = Request(self.scope)
         self.assertFalse(TelemetryMiddleware(self.app).telemetry_enabled_for_request(self.request))
 
+    @pytest.mark.asyncio
     @patch('starlette.testclient.TestClient.send')
     async def test_dispatch_cleanup(self, mock_send):
         scopes = {

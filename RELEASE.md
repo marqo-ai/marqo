@@ -1,3 +1,29 @@
+# Release 2.14.1
+
+## New features
+
+- Add support for [hf_transfer](https://github.com/huggingface/hf_transfer) to accelerate the downloading speed of HuggingFace models by 10 to 30 times. See [here](https://docs.marqo.ai/latest/other-resources/guides/advanced-usage/configuration/#third-party-environment-variables) for details about how to enable it ([#1066](https://github.com/marqo-ai/marqo/pull/1066)).
+- Add `/healthz` endpoint for Marqo container liveness checks, which performs a status check for CUDA devices and returns a 500 error if any existing CUDA devices become unavailable or run out of memory ([#1068](https://github.com/marqo-ai/marqo/pull/1068)). 
+
+## Bug fixes and minor changes
+
+- Fix a bug where numeric map fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created prior to Marqo 2.13 ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
+- Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
+- Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1079)).
+
+# Release 2.13.4
+
+## Bug fixes and minor changes
+
+- Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1075)). 
+
+# Release 2.13.3
+
+## Bug fixes and minor changes
+
+- Fix a bug where numeric map fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created prior to Marqo 2.13 ([#1062](https://github.com/marqo-ai/marqo/pull/1062)).
+- Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1062)).
+
 # Release 2.14.0 
 
 ## New features
