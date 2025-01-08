@@ -69,7 +69,7 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
             raise ValueError('type must be "languagebind" for this model')
         return v
 
-    @validator('supportedModalities')
+    @validator('supportedModalities', pre=True)
     def _validate_supported_modalities_text_must_be_supported(cls, v):
         """
         Validate that the supported modalities include 'text' or 'language'.
@@ -82,11 +82,15 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
         Returns:
             Return the supported modalities if either 'text' or 'language' is in the supported modalities.
         """
-        if Modality.TEXT not in v and Modality.TEXT_2 not in v:
+        if not isinstance(v, list):
+            raise ValueError("Invalid data type, must be a list")
+        if Modality.TEXT not in v and "text" not in v:
             raise ValueError("You model must include 'text' as a supported modality")
-        if Modality.TEXT_2 in v and Modality.TEXT in v:
-            raise ValueError("You cannot have both 'text' and 'language' as supported modalities. 'languege' is "
+        if Modality.TEXT in v and "text" in v:
+            raise ValueError("You cannot have both 'text' and 'language' as supported modalities. 'language' is "
                              "deprecated. Please use 'text' instead")
+        # Replace 'text' with 'language' as we still use 'language' internally
+        v = list(set([Modality.TEXT if x == "text" else x for x in v]))
         return v
 
     @validator('supportedModalities')
@@ -129,7 +133,7 @@ class LanguagebindModelProperties(MarqoBaseModelProperties):
         if model_location is not None:
             supported_modalities = values.get("supportedModalities")
             for supported_modality in supported_modalities:
-                if supported_modality not in [Modality.TEXT, Modality.TEXT_2]: # Skip text
+                if supported_modality not in [Modality.TEXT, "test"]: # Skip text
                     if not getattr(model_location, supported_modality.lower()):
                         raise ValueError(f"Mismatch between supported modalities and model location. The supported "
                                          f"modality {supported_modality} does not have a corresponding modelLocation "

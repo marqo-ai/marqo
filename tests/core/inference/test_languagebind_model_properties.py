@@ -122,3 +122,22 @@ class TestLanguagebindModelProperties(unittest.TestCase):
                 with self.assertRaises(ValueError) as context:
                     ModalityLocation(**test_case)
                 self.assertIn("Exactly one of url, s3, hf must be provided", str(context.exception))
+
+    def test_both_text_and_language_are_accepted_as_supported_modalities(self):
+        """Test that both 'text' and 'language' are accepted as supported modalities and are mapped to 'language'."""
+        base_model_properties = {
+            "dimensions": 764,
+            "type": "languagebind",
+            "modelLocation": {"image": {"url": "http://example.com"}}
+        }
+        test_cases = [
+            ({"supportedModalities": ["text", "image"], **base_model_properties}, "Text modality is accepted"),
+            ({"supportedModalities": ["language", "image"], **base_model_properties}, "Language modality is accepted"),
+        ]
+
+        for model_properties, msg in test_cases:
+            with self.subTest(msg=msg):
+                self.assertEqual(
+                    LanguagebindModelProperties(**model_properties).supportedModalities,
+                    [Modality.TEXT, Modality.IMAGE]
+                )

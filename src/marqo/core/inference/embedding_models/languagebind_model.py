@@ -129,7 +129,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
                 "audio": None
             }
             for modality in self.model_properties.supportedModalities:
-                if modality == Modality.TEXT or modality == Modality.TEXT_2:
+                if modality == Modality.TEXT or modality == "text":
                     continue
                 model_location: ModalityLocation = getattr(self.model_properties.modelLocation, modality)
                 if model_location is None:
@@ -206,12 +206,11 @@ class LanguagebindModel(AbstractEmbeddingModel):
         if media_download_headers is None:
             media_download_headers = dict()
 
-        if modality not in [Modality.TEXT,
-                            Modality.TEXT_2] and modality not in self.model_properties.supportedModalities:
+        if modality not in self.model_properties.supportedModalities:
             raise MediaMismatchError(f"The provided modality {modality} is not supported by the model. This model "
                                      f"supports the following modalities: {self.model_properties.supportedModalities}")
 
-        if modality in [Modality.TEXT, Modality.TEXT_2]:
+        if modality == Modality.TEXT:
             return self._encode_text(content, normalize)
         elif modality == Modality.IMAGE:
             return self._encode_image(content, normalize, media_download_headers)
@@ -264,6 +263,9 @@ class LanguagebindModel(AbstractEmbeddingModel):
         content = [content] if isinstance(content, str) else content
         if not isinstance(content, list):
             raise InternalError(f"Invalid image input format: {content}")
+
+        if len(content) == 0:
+            raise InternalError(f"Invalid image input format: {content}. The input list is empty.")
 
         # Process content based on its type
         if isinstance(content[0], str):
@@ -334,6 +336,9 @@ class LanguagebindModel(AbstractEmbeddingModel):
         if not isinstance(content, list):
             raise InternalError(f"Invalid video input format: {content}")
 
+        if len(content) == 0:
+            raise InternalError(f"Invalid image input format: {content}. The input list is empty.")
+
         # Process content based on its type
         if isinstance(content[0], str):
             processed_videos = [process_video_url(video_url) for video_url in content]
@@ -401,6 +406,9 @@ class LanguagebindModel(AbstractEmbeddingModel):
         content = [content] if isinstance(content, str) else content
         if not isinstance(content, list):
             raise InternalError(f"Invalid audio input format: {content}")
+
+        if len(content) == 0:
+            raise InternalError(f"Invalid image input format: {content}. The input list is empty.")
 
         # Process content based on its type
         if isinstance(content[0], str):

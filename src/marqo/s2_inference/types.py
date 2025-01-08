@@ -17,10 +17,8 @@ from typing import (
 
 class Modality(str, Enum):
     """language/TEXT is widely used by language models so we keep it as internal use for now.
-    text/TEXT_2 is more user-friendly and should be used in the API.
     """
     TEXT = "language"
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
-    TEXT_2 = "text"

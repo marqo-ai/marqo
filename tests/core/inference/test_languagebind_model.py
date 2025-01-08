@@ -6,6 +6,7 @@ from marqo.core.inference.embedding_models.languagebind_model import Languagebin
 from marqo.core.inference.embedding_models.languagebind_model_properties import *
 from marqo.core.inference.image_download import format_and_load_CLIP_images
 from marqo.s2_inference.s2_inference import _convert_vectorized_output
+from marqo.tensor_search.models.external_apis.hf import HfAuth
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.models.external_apis.s3 import S3Auth
@@ -24,8 +25,12 @@ class TestLanguagebindModels(unittest.TestCase):
     AUDIO_HF_REPO_NAME = "Marqo/LanguageBind_Audio_FT"
     IMAGE_HF_REPO_NAME = "Marqo/LanguageBind_Image"
     VIDEO_HF_REPO_NAME = "Marqo/LanguageBind_Video_V1.5_FT"
+    PRIVATE_VIDEO_HF_REPO = "Marqo/private-LanguageBind_Video_V1.5_FT"
+    AUDIO_URL = "https://opensource-languagebind-models.s3.us-east-1.amazonaws.com/LanguageBind_Audio_FT.zip"
+
     aws_access_key_id = os.getenv("PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID", None)
     aws_secret_access_key = os.getenv("PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY", None)
+    hf_token = os.getenv("PRIVATE_MODEL_TESTS_HF_TOKEN", None)
 
     def _help_test_encode_text_modality(self, model: LanguagebindModel, dimension=768):
         """A helper function for testing the encode method for text modality.
@@ -134,7 +139,7 @@ class TestLanguagebindModels(unittest.TestCase):
                 self.assertEqual(dimension, len(tensor))
 
     def test_loading_languagebind_model_from_a_hf_repo(self):
-        """A test for loading a LanguagebindModel from a Hugging Face repo."""
+        """A test for loading a LanguagebindModel from a public Hugging Face repo."""
         model_properties = {
             "dimensions": 768,
             "type": "languagebind",
@@ -154,6 +159,54 @@ class TestLanguagebindModels(unittest.TestCase):
             (self._help_test_encode_image_modality, "Test image modality"),
             (self._help_test_encode_audio_modality, "Test audio modality"),
             (self._help_test_encode_video_modality, "Test video modality")
+        ]
+
+        for test_case, msg, in test_cases:
+            with self.subTest(msg=msg):
+                test_case(model)
+
+    def test_loading_languagebind_model_from_a_private_hf_repo(self):
+        """A test for loading a LanguagebindModel from a private Hugging Face repo."""
+        model_properties = {
+            "dimensions": 768,
+            "type": "languagebind",
+            "supportedModalities": ["text", "video"],
+            "modelLocation": {
+                "video": {"hf": {"repoId": self.PRIVATE_VIDEO_HF_REPO}}
+            }
+        }
+
+        mode_auth = ModelAuth(hf=HfAuth(token=self.hf_token))
+
+        model = LanguagebindModel(device="cuda", model_properties=model_properties, model_auth=mode_auth)
+        model.load()
+
+        test_cases = [
+            (self._help_test_encode_text_modality, "Test text modality"),
+            (self._help_test_encode_video_modality, "Test video modality")
+        ]
+
+        for test_case, msg, in test_cases:
+            with self.subTest(msg=msg):
+                test_case(model)
+
+    def test_loading_languagebind_model_from_a_url(self):
+        """A test for loading a LanguagebindModel from a URL."""
+        model_properties = {
+            "dimensions": 768,
+            "type": "languagebind",
+            "supportedModalities": ["text", "audio"],
+            "modelLocation": {
+                "audio": {"url": self.AUDIO_URL}
+            }
+        }
+
+        model = LanguagebindModel(device="cuda", model_properties=model_properties)
+        model.load()
+
+        test_cases = [
+            (self._help_test_encode_text_modality, "Test text modality"),
+            (self._help_test_encode_audio_modality, "Test audio modality")
         ]
 
         for test_case, msg, in test_cases:
