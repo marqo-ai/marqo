@@ -191,6 +191,14 @@ class TestSearch(BaseCompatibilityTestCase):
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
 
+            # For unstructured indexes, add a new document, which will redeploy schema with
+            # new tensor + lexical field (behavior of semi-structured indexes 2.13.0 onwards).
+            if index.get("type") is None or index.get("type") == 'unstructured':
+                self.client.index(index_name).add_documents(
+                    documents=[{"_id": "to_be_removed", "new_field": "randomwords,removefromresults"}],
+                    tensor_fields=["new_field"]
+                )
+
             # For each index, search for different queries and compare results
             for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
                 try:
@@ -201,6 +209,12 @@ class TestSearch(BaseCompatibilityTestCase):
                             result = self.client.index(index_name).search(q=query, search_method=search_method, searchable_attributes=self.searchable_attributes[search_method])
                     else:
                         result = self.client.index(index_name).search(q=query, search_method=search_method)
+
+                        # Remove the 'to_be_removed' doc from results if it exists
+                        for index, dict_item in enumerate(result["hits"]):
+                            if dict_item.get("_id") == "to_be_removed":
+                                del result["hits"][index]
+                                break
                     self._compare_search_results(stored_results[index_name][result_key], result)
 
                 except Exception as e:

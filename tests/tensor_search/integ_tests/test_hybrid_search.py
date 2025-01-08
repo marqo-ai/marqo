@@ -38,6 +38,11 @@ class TestHybridSearch(MarqoTestCase):
             normalize_embeddings=False
         )
 
+        semi_structured_text_index_2_14 = cls.unstructured_marqo_index_request(
+            model=Model(name='sentence-transformers/all-MiniLM-L6-v2'),
+            marqo_version='2.14.0'
+        )
+
         # Legacy UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='sentence-transformers/all-MiniLM-L6-v2'),
@@ -124,6 +129,12 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=[]
         )
 
+        structured_text_index_2_14 = cls.structured_marqo_index_request(
+            marqo_version="2.14.0",
+            fields=[FieldRequest(name='text_field_1', type=FieldType.Text, features=[FieldFeature.LexicalSearch])],
+            tensor_fields=["text_field_1"]
+        )
+
         structured_index_one_tensor_field = cls.structured_marqo_index_request(
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
@@ -144,10 +155,12 @@ class TestHybridSearch(MarqoTestCase):
             structured_index_with_no_model,
             structured_index_empty,
             structured_index_2_9,
+            structured_text_index_2_14,
             structured_index_one_tensor_field,
             semi_structured_default_text_index,
             semi_structured_default_image_index,
             semi_structured_index_with_no_model,
+            semi_structured_text_index_2_14
         ])
 
         # Assign to objects so they can be used in tests
@@ -161,11 +174,13 @@ class TestHybridSearch(MarqoTestCase):
         cls.structured_index_with_no_model = cls.indexes[6]
         cls.structured_index_empty = cls.indexes[7]
         cls.structured_index_2_9 = cls.indexes[8]
-        cls.structured_index_one_tensor_field = cls.indexes[9]
+        cls.structured_text_index_2_14 = cls.indexes[9]
+        cls.structured_index_one_tensor_field = cls.indexes[10]
 
-        cls.semi_structured_default_text_index = cls.indexes[10]
-        cls.semi_structured_default_image_index = cls.indexes[11]
-        cls.semi_structured_index_with_no_model = cls.indexes[12]
+        cls.semi_structured_default_text_index = cls.indexes[11]
+        cls.semi_structured_default_image_index = cls.indexes[12]
+        cls.semi_structured_index_with_no_model = cls.indexes[13]
+        cls.semi_structured_text_index_2_14 = cls.indexes[14]
 
     def setUp(self) -> None:
         super().setUp()
@@ -1268,7 +1283,6 @@ class TestHybridSearch(MarqoTestCase):
                             self.assertEqual(hit["_score"], -2*unmodified_scores[hit["_id"]] - 2)
 
 
-
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):
         """
         Tests that if we do hybrid search with lexical retrieval and tensor ranking, we can use both lexical and tensor
@@ -1917,30 +1931,33 @@ class TestHybridSearch(MarqoTestCase):
                         )
                     self.assertIn("'searchableAttributes' cannot be used for hybrid", str(e.exception))
 
-    def test_hybrid_search_score_modifiers_fails(self):
+    def test_hybrid_search_score_modifiers_old_version_fails(self):
         """
         score_modifiers can only be set for hybrid Marqo 2.15.0 onward
         """
-        # Legacy Unstructured Index too old for root score_modifiers (has old version Marqo 2.12.0)
-        with self.subTest("score_modifiers for legacy unstructured"):
-            with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
-                tensor_search.search(
-                    config=self.config,
-                    index_name=self.unstructured_default_text_index.name,
-                    text="dogs",
-                    search_method="HYBRID",
-                    score_modifiers=ScoreModifierLists(
-                        multiply_score_by=[
-                            {"field_name": "mult_field_1", "weight": 1.0}
-                        ],
-                        add_to_score=[
-                            {"field_name": "add_field_1", "weight": 1.0}
-                        ]
-                    ),
-                )
-            self.assertIn("global score modifiers is only supported for "
-                          "Marqo indexes created with Marqo 2.15.0", str(e.exception))
+        # Legacy Index too old for root score_modifiers
+        for index in [self.unstructured_default_text_index, self.semi_structured_text_index_2_14,
+                      self.structured_text_index_2_14]:
+            with self.subTest(index=type(index)):
+                with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=self.unstructured_default_text_index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(
+                            multiply_score_by=[
+                                {"field_name": "mult_field_1", "weight": 1.0}
+                            ],
+                            add_to_score=[
+                                {"field_name": "add_field_1", "weight": 1.0}
+                            ]
+                        ),
+                    )
+                self.assertIn("global score modifiers is only supported for "
+                              "Marqo indexes created with Marqo 2.15.0", str(e.exception))
 
+    def test_hybrid_search_score_modifiers_wrong_ranking_method_fails(self):
         # Structured / semi-structured score modifiers but not RRF
         with self.subTest("score_modifiers for structured/semi-structured but not RRF ranking"):
             for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
