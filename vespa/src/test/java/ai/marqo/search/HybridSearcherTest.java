@@ -81,6 +81,27 @@ class HybridSearcherTest {
     }
 
     @Nested
+    class ValidationTest {
+        @Ignore
+        void rerankCountGlobalSetToLimit() {
+            // Ensure rerankCountGlobal defaults to limit (hits) if not set
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__hybrid.retrievalMethod", "disjunction");
+            query.properties().set("marqo__hybrid.rankingMethod", "rrf");
+            query.properties().set("marqo__hybrid.rrf_k", 60);
+            query.properties().set("marqo__hybrid.alpha", 0.5);
+            query.properties().set("hits", 20);
+
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            // TODO: Check if rerankCount is limit
+        }
+    }
+
+    @Nested
     class RRFTest {
         @Test
         void shouldFuseWithDefaultParameters() {
