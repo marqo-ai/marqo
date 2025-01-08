@@ -1,20 +1,19 @@
+import os
 import unittest
-
-from more_itertools.more import side_effect
-from pytest import mark
 from unittest.mock import patch
+
+from pytest import mark
 
 from marqo.core.inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.core.inference.embedding_models.languagebind_model_properties import *
 from marqo.core.inference.image_download import format_and_load_CLIP_images
 from marqo.s2_inference.s2_inference import _convert_vectorized_output
 from marqo.tensor_search.models.external_apis.hf import HfAuth
+from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
-from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
 from tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
-import os
 
 
 @mark.unittest
