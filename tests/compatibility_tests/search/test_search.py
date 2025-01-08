@@ -193,6 +193,7 @@ class TestSearch(BaseCompatibilityTestCase):
 
             # For unstructured indexes, add a new document, which will redeploy schema with
             # new tensor + lexical field (behavior of semi-structured indexes 2.13.0 onwards).
+            # This will cause lexical score to differ slightly, but result order will remain the same.
             if index.get("type") is None or index.get("type") == 'unstructured':
                 self.client.index(index_name).add_documents(
                     documents=[{"_id": "to_be_removed", "new_field": "randomwords,removefromresults"}],
