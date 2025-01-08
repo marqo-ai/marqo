@@ -202,17 +202,13 @@ public class HybridSearcher extends Searcher {
         ErrorMessage tensorError = hitsTensor.getError();
         if (tensorError != null) {
             throw new RuntimeException(
-                    String.format(
-                            "Error in RRF tensor search: ",
-                            tensorError));
+                    String.format("Error in RRF tensor search: %s", tensorError));
         }
 
         ErrorMessage lexicalError = hitsLexical.getError();
         if (lexicalError != null) {
             throw new RuntimeException(
-                    String.format(
-                            "Error in RRF tensor search: ",
-                            lexicalError));
+                    String.format("Error in RRF tensor search: %s", lexicalError));
         }
 
         // Iterate through tensor hits list
