@@ -266,8 +266,9 @@ class TestLanguagebindModels(unittest.TestCase):
         raised_exception = RuntimeError("Stop here")
         with (patch("marqo.core.inference.model_download.get_presigned_s3_url",side_effect=raised_exception)
               as mock_presigned_url):
-            with self.assertRaises(RuntimeError) as context:
-                model.load()
+            with patch("marqo.core.inference.model_download.check_s3_model_already_exists", return_value=False):
+                with self.assertRaises(RuntimeError) as context:
+                    model.load()
 
         # Ensure that the get_presigned_s3_url function was called thus role based access was attempted
         mock_presigned_url.assert_called_once()

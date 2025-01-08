@@ -97,8 +97,12 @@ class LanguagebindModel(AbstractEmbeddingModel):
 
     def _load_model(self):
         try:
-            self._model = LanguageBind(self._clip_type.dict(exclude_none=True),
-                                       cache_dir=ModelCache.languagebind_cache_path)
+            token = self.model_auth.hf.token if (self.model_auth and self.model_auth.hf) else None
+            self._model = LanguageBind(
+                self._clip_type.dict(exclude_none=True),
+                cache_dir=ModelCache.languagebind_cache_path,
+                token = token
+            )
         except (OSError, ValueError, RuntimeError) as e:
             raise InvalidModelPropertiesError(
                 f"Marqo encountered an error loading the Languagebind model, "
@@ -167,7 +171,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
         if tokenizer_location is None:
             # Use the default tokenizer repo
             self._tokenizer = LanguageBindImageTokenizer.from_pretrained(
-                self.DEFAULT_TOKENIZER_REPO, cache_dir=ModelCache.languagebind_cache_path
+                self.DEFAULT_TOKENIZER_REPO, cache_dir=ModelCache.languagebind_cache_path,
             )
         elif tokenizer_location.hf and (not tokenizer_location.hf.filename):
             # Loading from a HuggingFace repo
