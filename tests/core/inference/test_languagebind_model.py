@@ -1,6 +1,8 @@
 import unittest
 
+from more_itertools.more import side_effect
 from pytest import mark
+from unittest.mock import patch
 
 from marqo.core.inference.embedding_models.languagebind_model import LanguagebindModel
 from marqo.core.inference.embedding_models.languagebind_model_properties import *
@@ -223,7 +225,6 @@ class TestLanguagebindModels(unittest.TestCase):
                 "image": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Image.zip"}},
                 "audio": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Audio_FT.zip"}},
                 "video": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Video_V1.5_FT.zip"}},
-                "authRequired": True
             }
         }
 
@@ -246,3 +247,28 @@ class TestLanguagebindModels(unittest.TestCase):
         for test_case, msg, in test_cases:
             with self.subTest(msg=msg):
                 test_case(model)
+
+    def test_loading_languagebind_model_from_a_zip_on_s3_with_role(self):
+        """A test for loading a LanguagebindModel from a zip file on S3 using a role."""
+        model_properties = {
+            "dimensions": 768,
+            "type": "languagebind",
+            "supportedModalities": ["text", "image", "audio", "video"],
+            "modelLocation": {
+                "image": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Image.zip"}},
+                "audio": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Audio_FT.zip"}},
+                "video": {"s3": {"Bucket": "opensource-languagebind-models", "Key": "LanguageBind_Video_V1.5_FT.zip"}},
+            }
+        }
+
+        model = LanguagebindModel(
+            device="cuda", model_properties=model_properties
+        )
+        raised_exception = RuntimeError("Stop here")
+        with (patch("marqo.core.inference.model_download.get_presigned_s3_url",side_effect=raised_exception)
+              as mock_presigned_url):
+            with self.assertRaises(RuntimeError) as context:
+                model.load()
+
+        # Ensure that the get_presigned_s3_url function was called thus role based access was attempted
+        mock_presigned_url.assert_called_once()
