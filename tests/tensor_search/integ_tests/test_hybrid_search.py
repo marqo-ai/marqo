@@ -272,7 +272,6 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.6)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 61)
-                self.assertEqual(vespa_query_kwargs["marqo__hybrid.rerankCountGlobal"], 3)
                 self.assertEqual(vespa_query_kwargs["hits"], 3)
 
                 self.assertEqual(vespa_query_kwargs["ranking"], "hybrid_custom_searcher")
@@ -302,6 +301,8 @@ class TestHybridSearch(MarqoTestCase):
                                      {'marqo__lexical_text_field_1': 1, 'marqo__lexical_text_field_2': 1})
                     self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"],
                                      {'marqo__embeddings_text_field_2': 1, 'marqo__embeddings_text_field_3': 1})
+                    # global rerankCount & score modifiers are not available for legacy unstructured
+                    self.assertEqual(vespa_query_kwargs["marqo__hybrid.rerankCountGlobal"], 3)
 
                 elif isinstance(index, UnstructuredMarqoIndex):
                     self.assertIn("({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
