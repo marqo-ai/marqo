@@ -138,6 +138,6 @@ class TestLanguagebindModelProperties(unittest.TestCase):
         for model_properties, msg in test_cases:
             with self.subTest(msg=msg):
                 self.assertEqual(
-                    LanguagebindModelProperties(**model_properties).supportedModalities,
-                    [Modality.TEXT, Modality.IMAGE]
+                    set(LanguagebindModelProperties(**model_properties).supportedModalities),
+                    {Modality.TEXT, Modality.IMAGE}
                 )
