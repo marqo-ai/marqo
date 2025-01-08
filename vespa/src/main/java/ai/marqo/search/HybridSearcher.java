@@ -198,15 +198,21 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("Limit is %d", limit), verbose);
         logIfVerbose(String.format("Rerank count global is %d", rerankCountGlobal), verbose);
 
-        // Raise error if either list has an error
+        // Raise error if either list has an error. Make sure error has the same code as original.
         ErrorMessage tensorError = hitsTensor.getError();
         if (tensorError != null) {
-            throw new RuntimeException("Error in RRF tensor search: " + tensorError);
+            throw new RuntimeException(
+                    String.format(
+                            "Error in RRF tensor search: ",
+                            tensorError));
         }
 
         ErrorMessage lexicalError = hitsLexical.getError();
         if (lexicalError != null) {
-            throw new RuntimeException("Error in RRF lexical search: " + lexicalError);
+            throw new RuntimeException(
+                    String.format(
+                            "Error in RRF tensor search: ",
+                            lexicalError));
         }
 
         // Iterate through tensor hits list
@@ -529,7 +535,7 @@ public class HybridSearcher extends Searcher {
      */
     HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
         FeatureData hitMatchFeatures;
-        double mult_modifier, add_modifier, original_score, modified_score;
+        Double mult_modifier, add_modifier, original_score, modified_score;
         if (hits.size() == 0) {
             logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
             return hits;
@@ -543,21 +549,29 @@ public class HybridSearcher extends Searcher {
                 mult_modifier = hitMatchFeatures.getDouble("global_mult_modifier");
                 add_modifier = hitMatchFeatures.getDouble("global_add_modifier");
 
-                // Apply the modifiers to the hit's relevance
-                original_score = hit.getRelevance().getScore();
-                modified_score = original_score * mult_modifier + add_modifier;
-                logIfVerbose(
-                        String.format(
-                                "Original score: %.7f, mult modifier: %.2f, add modifier: %.2f,"
-                                        + " Modified score: %.7f",
-                                original_score, mult_modifier, add_modifier, modified_score),
-                        verbose);
-                hit.setRelevance(modified_score);
+                if (mult_modifier != null && add_modifier != null) {
+                    // Apply the modifiers to the hit's relevance
+                    original_score = hit.getRelevance().getScore();
+                    modified_score = original_score * mult_modifier + add_modifier;
+                    logIfVerbose(
+                            String.format(
+                                    "Original score: %.7f, mult modifier: %.2f, add modifier: %.2f,"
+                                            + " Modified score: %.7f",
+                                    original_score, mult_modifier, add_modifier, modified_score),
+                            verbose);
+                    hit.setRelevance(modified_score);
+                } else {
+                    // Skip if either modifier is null (legacy indexes)
+                    logIfVerbose(
+                            String.format(
+                                    "SKIPPING score modifiers for Hit %s since it has null global"
+                                            + " score modifiers.",
+                                    hit.getId()),
+                            verbose);
+                }
             } else {
-                // TODO: Maybe error out instead of logging
                 logIfVerbose(
-                        "WARNING: No match features found for hit. Not applying global score"
-                                + " modifiers. "
+                        "SKIPPING score modifiers for Hit %s since it has null matchfeatures."
                                 + hit.getId(),
                         verbose);
             }
