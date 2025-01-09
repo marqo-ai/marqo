@@ -369,8 +369,6 @@ class VespaClient:
         """
         try:
             resp = self.http_client.get(f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}')
-
-
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
