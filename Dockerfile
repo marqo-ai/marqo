@@ -20,10 +20,6 @@ ARG TARGETPLATFORM
 ARG COMMITHASH
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
-RUN pip3 install --no-cache-dir -r requirements.txt
-RUN rm requirements.txt
-
 # Stage 3: Final stage that builds on the base image
 FROM base_image
 
