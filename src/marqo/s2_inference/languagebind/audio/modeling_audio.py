@@ -12,26 +12,8 @@ from transformers.models.clip.modeling_clip import CLIPMLP, CLIPAttention, CLIPT
     CLIPVisionModelWithProjection, CLIPTextModelWithProjection, CLIPOutput, clip_loss
 from transformers.utils import add_start_docstrings_to_model_forward, replace_return_docstrings
 
+from marqo.s2_inference.languagebind.common import _expand_mask
 from .configuration_audio import LanguageBindAudioConfig, CLIPVisionConfig, CLIPTextConfig
-
-
-def _expand_mask(mask: torch.Tensor, dtype: torch.dtype, tgt_len: Optional[int] = None):
-    """
-    Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
-
-    The method is copied from here: https://github.com/huggingface/transformers/blob/e42587f596181396e1c4b63660abf0c736
-    b10dae/src/transformers/models/clip/modeling_clip.py#L49C1-L60C91
-
-    Our existing transformers library does not have this method, so we copied it here.
-    """
-    bsz, src_len = mask.size()
-    tgt_len = tgt_len if tgt_len is not None else src_len
-
-    expanded_mask = mask[:, None, None, :].expand(bsz, 1, tgt_len, src_len).to(dtype)
-
-    inverted_mask = 1.0 - expanded_mask
-
-    return inverted_mask.masked_fill(inverted_mask.to(torch.bool), torch.finfo(dtype).min)
 
 
 class PatchDropout(nn.Module):

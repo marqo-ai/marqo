@@ -12,7 +12,7 @@ from transformers.models.clip.modeling_clip import CLIPMLP, CLIPAttention, CLIPT
     CLIPVisionModelWithProjection, CLIPTextModelWithProjection, CLIPOutput, clip_loss
 from transformers.utils import add_start_docstrings_to_model_forward, replace_return_docstrings
 
-from marqo.s2_inference.languagebind.audio.modeling_audio import _expand_mask
+from marqo.s2_inference.languagebind.common import _expand_mask
 from .configuration_video import LanguageBindVideoConfig, CLIPVisionConfig, CLIPTextConfig
 
 

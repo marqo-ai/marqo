@@ -144,8 +144,8 @@ class LanguagebindModel(AbstractEmbeddingModel):
                     downloaded_zip_file = self._download_languagebind_model(model_location)
                     clip_type_dict[modality.value] = extract_zip_file(downloaded_zip_file)
                 else:
-                    raise InvalidModelPropertiesError(
-                        f"Invalid model location provided for modality {modality}"
+                    raise InternalError(
+                        f"Invalid model location {model_location} provided for modality {modality}"
                     )
             clip_type = CLIPType(**clip_type_dict)
         else:
@@ -195,7 +195,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
                     f"modelProperties={self.model_properties}. "
                     f" Original error message = {e}") from e
         else:
-            raise InvalidModelPropertiesError(f"Invalid tokenizer location provided for tokenizer: "
+            raise InternalError(f"Invalid tokenizer location provided for tokenizer: "
                                               f"{tokenizer_location}")
 
     def _load_preprocessor(self):
