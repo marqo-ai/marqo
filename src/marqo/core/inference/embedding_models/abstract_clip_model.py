@@ -39,7 +39,7 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
             model_auth (ModelAuth): The authentication information for the model. Defaults to `None` if not provided
         """
 
-        super().__init__(model_properties, device, model_auth)
+        super().__init__(model_properties=model_properties, device=device, model_auth=model_auth)
 
         self.model = None
         self.tokenizer = None

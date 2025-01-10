@@ -435,7 +435,7 @@ class TestLexicalSearch(MarqoTestCase):
         assert res_filtered_same['hits'][0]['_id'] == '1235'
 
         res_filtered_other_list = tensor_search.search(
-            **{'text': "b_1", 'filter': 'fun\ list:truk', **base_search_args})
+            **{'text': "b_1", 'filter': r'fun\ list:truk', **base_search_args})
         assert len(res_filtered_other_list['hits']) == 1
         assert res_filtered_other_list['hits'][0]['_id'] == '1001'
 

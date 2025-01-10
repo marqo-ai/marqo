@@ -83,12 +83,12 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
 
     def test_add_documents_should_successfully_add_new_tensor_fields(self):
         doc1 = self._add_and_get_doc(self.text_index_1, "123", ["title"])
-        self.assertEquals(1, len(doc1['_tensor_facets']))
+        self.assertEqual(1, len(doc1['_tensor_facets']))
         self.assertIn('title', doc1['_tensor_facets'][0])
 
         # add a second doc with different tensor_fields
         doc2 = self._add_and_get_doc(self.text_index_1, "456", ["desc"])
-        self.assertEquals(1, len(doc2['_tensor_facets']))
+        self.assertEqual(1, len(doc2['_tensor_facets']))
         self.assertIn('desc', doc2['_tensor_facets'][0])
 
         updated_index = cast(SemiStructuredMarqoIndex, self.config.index_management.get_index(self.text_index_1))
@@ -96,12 +96,12 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
 
     def test_add_documents_should_override_tensor_fields_for_the_same_doc(self):
         doc1 = self._add_and_get_doc(self.text_index_1, "123", ["title"])
-        self.assertEquals(1, len(doc1['_tensor_facets']))
+        self.assertEqual(1, len(doc1['_tensor_facets']))
         self.assertIn('title', doc1['_tensor_facets'][0])
 
         # override the same doc with different tensor_fields
         doc1 = self._add_and_get_doc(self.text_index_1, "123", ["desc"])
-        self.assertEquals(1, len(doc1['_tensor_facets']))
+        self.assertEqual(1, len(doc1['_tensor_facets']))
         self.assertIn('desc', doc1['_tensor_facets'][0])
 
     def test_add_documents_should_use_existing_tensors_from_the_same_doc(self):
@@ -111,7 +111,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
             doc2 = self._add_and_get_doc(self.text_index_1, "123", ["title"],
                                          use_existing_tensors=True)
             self.assertFalse(mock_vectorise.called)
-            self.assertEquals(doc1['_tensor_facets'], doc2['_tensor_facets'])
+            self.assertEqual(doc1['_tensor_facets'], doc2['_tensor_facets'])
 
     def test_add_documents_should_add_string_fields_as_lexical_fields(self):
         self._add_and_get_doc(self.text_index_2, "123", [])

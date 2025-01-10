@@ -670,7 +670,7 @@ class TestUpdate(MarqoTestCase):
                                      "float_field_filter", "bool_field_filter"}
 
             for _ in range(number_of_updates):
-                picked_fields = random.sample(updating_fields_pools, 3)
+                picked_fields = random.sample(list(updating_fields_pools), 3)
 
                 updated_doc = {
                     "_id": "1"

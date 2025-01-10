@@ -1,6 +1,7 @@
 from unittest import mock
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -107,6 +108,7 @@ class TestBaseExceptionHandler(MarqoTestCase):
         self.assertNotIn("This should not be propagated.", converted_error.message)
         self.assertIn("unexpected internal error", converted_error.message)
 
+    @pytest.mark.asyncio
     async def test_validation_exception_handler_CorrectResponseBody(self):
         """Ensure that the validation exception handler returns the correct response body when 422 is raised."""
         # Create a mock request

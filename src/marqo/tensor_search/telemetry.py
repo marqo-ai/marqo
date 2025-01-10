@@ -26,7 +26,7 @@ class Timer:
     def start(self) -> None:
         """Start a new timer"""
         if self.start_time is not None:
-            logger.warn(f"'.start()' called on already running timer.")
+            logger.warning(f"'.start()' called on already running timer.")
         else:
             self.start_time = time.perf_counter()
 
@@ -104,7 +104,7 @@ class RequestMetrics:
             self.add_time(k, elapsed_time)
             return elapsed_time
         except TimerError:
-            logger.warn(f"timer {k} stopped incorrectly. Time not recorded.")
+            logger.warning(f"timer {k} stopped incorrectly. Time not recorded.")
 
     def increment_counter(self, k: str, v: int = 1):
         self.counter[k] += v

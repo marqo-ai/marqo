@@ -33,7 +33,6 @@ from marqo.vespa.models import VespaDocument
 from integ_tests.marqo_test import MarqoTestCase
 
 
-@pytest.mark.slowtest
 class TestIndexManagement(MarqoTestCase):
 
     def setUp(self):

@@ -13,22 +13,22 @@ app.router.route_class = MarqoCustomRoute
 
 
 @app.get("/test-route")
-async def test_route():
+async def route():
     raise ValueError("Test Error for MarqoCustomRoute")
 
 
 @app.get("/raise-api-exception")
-async def test_raise_api_exception():
+async def raise_api_exception():
     raise api_exceptions.MarqoWebError("Test API exceptions for MarqoCustomRoute")
 
 
 @app.get("/raise-base-exception")
-async def test_raise_base_exception():
+async def raise_base_exception():
     raise base_exceptions.MarqoError("Test Base exceptions for MarqoCustomRoute")
 
 
 @app.get("/normal-route")
-async def test_route():
+async def route():
     return {"message": "Hello, World!"}
 
 client = TestClient(app)

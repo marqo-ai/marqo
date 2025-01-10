@@ -53,7 +53,6 @@ def get_absolute_file_path(filename: str) -> str:
 
 
 def run_test_vectorize(models, model_type, compare_hardcoded_embeddings=True):
-    
     # model_type determines the filename with which the embeddings are saved/loaded
     # Ensure that vectorised output from vectorise function matches both the model.encode output and
     # hardcoded embeddings from Python 3.8
@@ -205,7 +204,6 @@ class TestLargeClipModels(unittest.TestCase):
     def tearDownClass(cls) -> None:
         remove_cached_model_files()
 
-    @pytest.mark.skip(reason="Needs further investigation")
     def test_vectorize(self):
         # For GPU Memory Optimization, we shouldn't load all models at once
         run_test_vectorize(models=self.models, model_type="large_open_clip", compare_hardcoded_embeddings=False)

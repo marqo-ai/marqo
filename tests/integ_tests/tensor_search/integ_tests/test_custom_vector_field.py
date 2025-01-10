@@ -1376,14 +1376,14 @@ class TestCustomVectorFieldWithIndexNormalizeEmbeddingsTrue(MarqoTestCase):
                 )
 
             if isinstance(index, (StructuredMarqoIndex, SemiStructuredMarqoIndex)):
-                self.assertEquals(add_documents_response.errors, True)
+                self.assertEqual(add_documents_response.errors, True)
                 self.assertIn("Field my_custom_vector has zero magnitude vector, cannot normalize.",
                               add_documents_response.items[0].message)
                 self.assertEqual(add_documents_response.items[0].status, 400)
                 self.assertEqual(add_documents_response.items[0].code, 'invalid_argument')
             elif isinstance(index, UnstructuredMarqoIndex):
                 # legacy unstructured index will not have custom vector normalised
-                self.assertEquals(add_documents_response.errors, False)
+                self.assertEqual(add_documents_response.errors, False)
 
     def test_search_with_custom_vector_field_normalize_embeddings_true(self):
         """

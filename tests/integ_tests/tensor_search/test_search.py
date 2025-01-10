@@ -569,13 +569,13 @@ class TestVectorSearch(MarqoTestCase):
             ], auto_refresh=True)
 
         res = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text='', filter="other\ field:baaadd")
+            config=self.config, index_name=self.index_name_1, text='', filter=r"other\ field:baaadd")
 
         assert len(res['hits']) == 1
         assert res['hits'][0]['_id'] == "5678"
 
         res_mult = tensor_search.search(
-            config=self.config, index_name=self.index_name_1, text='', filter="other\ field:(Close match hehehe)")
+            config=self.config, index_name=self.index_name_1, text='', filter=r"other\ field:(Close match hehehe)")
         assert len(res_mult['hits']) == 2
         assert res_mult['hits'][0]['_id'] in {'1234', '1233'}
         assert res_mult['hits'][1]['_id'] in {'1234', '1233'}
@@ -583,7 +583,7 @@ class TestVectorSearch(MarqoTestCase):
 
         res_float = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text='',
-            filter="(Floaty\ Field:[0 TO 1]) AND (abc:(some text))")
+            filter=r"(Floaty\ Field:[0 TO 1]) AND (abc:(some text))")
         get_res = tensor_search.get_document_by_id(config=self.config, index_name=self.index_name_1, document_id='344')
 
         assert len(res_float['hits']) == 1
@@ -694,7 +694,7 @@ class TestVectorSearch(MarqoTestCase):
             ("my_int:5", "other doc"), ("my_int:[1 TO 10]", "other doc"),
             ("a_float:0.61", "123456"), ("field1:(other things)", "123456"),
             ("fake_int:234", "other doc"), ("fake_float:1.23", "other doc"),
-            ("fake_float:[0 TO 2]", "other doc"), ("gapped\ field_name:gap", "other doc")
+            ("fake_float:[0 TO 2]", "other doc"), (r"gapped\ field_name:gap", "other doc")
         ]
 
         for filter, expected in pairs:

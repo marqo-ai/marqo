@@ -9,7 +9,7 @@ from marqo.core.exceptions import InternalError
 from marqo.core.index_management.vespa_application_package import ServicesXml
 
 
-@pytest.mark.unnittest
+@pytest.mark.unittest
 class TestIndexSettingStore(unittest.TestCase):
 
     _TEMPLATE = Template(textwrap.dedent("""<?xml version="1.0" encoding="utf-8" ?>

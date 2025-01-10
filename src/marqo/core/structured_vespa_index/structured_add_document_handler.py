@@ -56,9 +56,14 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
 
     def _handle_field(self, marqo_doc, field_name, field_content):
         self._validate_field(field_name, field_content)
-        field_type = self.marqo_index.field_map[field_name].type
-        content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name, field_content, field_type)
+        content = self.tensor_fields_container.collect(
+            marqo_doc[MARQO_DOC_ID], field_name, field_content,
+            self._infer_field_type
+        )
         marqo_doc[field_name] = content
+
+    def _infer_field_type(self, field_name:str, field_content: Any) -> FieldType:
+        return self.marqo_index.field_map[field_name].type
 
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:

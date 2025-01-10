@@ -6,7 +6,9 @@ import threading
 from typing import List, Dict, Optional
 
 import numpy as np
+import torch
 from PIL import UnidentifiedImageError
+from PIL.Image import Image
 from torchvision.transforms import Compose
 
 from marqo import marqo_docs
@@ -136,14 +138,13 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
                           **kwargs) -> List[List[float]]:
     try:
         model = _available_models[model_cache_key][AvailableModelsKey.model]
-        encoder = get_encoder(model)
 
         if isinstance(content, str):
             vectorised = model.encode(
                 content, normalize=normalize_embeddings, modality=modality,
                 media_download_headers=media_download_headers, **kwargs
             )
-        elif isinstance(content, (torch.Tensor, torch.FloatTensor)):
+        elif isinstance(content, Tensor):
             vectorised = model.encode(content, normalize=normalize_embeddings, modality=modality, **kwargs)
         else:
             vector_batches = []
@@ -155,7 +156,7 @@ def _encode_without_cache(model_cache_key: str, content: Union[str, List[str], L
 
                 # TODO maybe the infer parameter can be replaced by modality
                 infer = kwargs.pop('infer', False if modality == Modality.TEXT else True)
-                encoded_batch = encoder.encode(
+                encoded_batch = model.encode(
                     batch, modality=modality, normalize=normalize_embeddings,
                     media_download_headers=media_download_headers, infer = infer, **kwargs)
                 
@@ -184,26 +185,12 @@ def get_marqo_inference_cache() -> MarqoInferenceCache:
     return _marqo_inference_cache
 
 
-def get_encoder(model):
-    if isinstance(model, MultimodalModel):
-        if model.properties.loader == "languagebind":
-            return LanguageBindEncoder(model)
-        else:
-            raise NotImplementedError(f"Model {model.name} is not supported")
-    return DefaultEncoder(model)
-
-
-def is_preprocess_image_model(model_properties: dict = None) -> bool:
+def is_preprocessor_preload(model_properties: dict = None) -> bool:
     """Check if the model should be preloaded with an image preprocessor to preprocess image tensor_search module
         model_properties: Validated model properties. The model properties should have been validated in marqo_index
     """
     model_type = model_properties.get("type", None)
-    return model_type in constants.PREPROCESS_IMAGE_MODEL_LIST
-
-
-def load_multimodal_model(model_name: str, model_properties: Dict[str, Any], device: str) -> MultimodalModel:
-    model = MultimodalModel(model_name, model_properties, device)
-    return model
+    return model_type in constants.PREPROCESS_PRELOAD_MODELS
 
 
 def load_multimodal_model_and_get_preprocessors(model_name: str, model_properties: Optional[dict] = None,
@@ -241,13 +228,13 @@ def load_multimodal_model_and_get_preprocessors(model_name: str, model_propertie
 
     model = _available_models[model_cache_key][AvailableModelsKey.model]
 
-    preprocessors = {
-        "image": getattr(model, "preprocess", None) if is_preprocess_image_model(model_properties) else None,
-        "video": model.preprocessor(Modality.VIDEO) if isinstance(model, MultimodalModel) else None,
-        "audio": model.preprocessor(Modality.AUDIO) if isinstance(model, MultimodalModel) else None,
-        "text": None  # Future preprocessor
-    }
-
+    if model_properties.get("type") in ['languagebind']:
+        preprocessors = model.get_preprocessors()
+    elif model_properties.get("type") in [ModelType.OpenCLIP, ModelType.CLIP]:
+        preprocessors = {"image": getattr(model, "preprocess", None)}
+    else:
+        raise InternalError(f"Model type {model_properties.get('type')} does not support preprocessors pre loading in"
+                            f"add_document ")
     return model, Preprocessors(**preprocessors)
 
 
@@ -392,10 +379,8 @@ def validate_model_properties(model_name: str, model_properties: dict) -> dict:
                                                   f"and 'type = no_model', but received 'model = {model_name}' and "
                                                   f"'type = {model_type}'.")
         elif model_type in (ModelType.Test, ModelType.Random, ModelType.MultilingualClip, ModelType.FP16_CLIP,
-                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX):
+                            ModelType.SBERT_ONNX, ModelType.CLIP_ONNX, ModelType.LanguageBind):
             pass
-        elif model_type in [ModelType.LanguageBind]:
-            MultimodalModelProperties(**model_properties)
         else:
             raise InvalidModelPropertiesError(f"Invalid model type. Please check the model type in model_properties. "
                                               f"Supported model types are '{ModelType.SBERT}', '{ModelType.OpenCLIP}', "
@@ -551,12 +536,6 @@ def _load_model(
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
                            f"`unit_test` or `_update_available_models` for threading safeness.")
 
-    if model_properties.get('type') in [ModelType.LanguageBind]:
-        model = MultimodalModel(model_name, model_properties, device)
-        model.model = model._load_multimodal_model()
-        model.encoder = get_encoder(model)
-        return model
-
     print(f"loading for: model_name={model_name} and properties={model_properties}")
 
     model_type = model_properties.get("type")
@@ -564,7 +543,7 @@ def _load_model(
 
     # TODO For each refactored model class, add a new elif block here and remove the if block
     #  once we have all models refactored
-    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA):
+    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
         model = loader(
             device=device,
             model_properties=model_properties,
@@ -581,16 +560,6 @@ def _load_model(
         )
     model.load()
     return model
-
-
-def chunk_video(video_path: str, chunk_length: int, frames_per_chunk: int) -> List[List[Image]]:
-    # Implement video chunking and frame extraction
-    pass
-
-
-def chunk_audio(audio_path: str, chunk_length: int) -> List[np.ndarray]:
-    # Implement audio chunking
-    pass
 
 
 def clear_loaded_models() -> None:

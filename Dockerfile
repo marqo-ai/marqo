@@ -6,7 +6,7 @@ COPY vespa .
 RUN mvn clean package
 
 # Stage 2: Base image for Python setup
-FROM marqoai/marqo-base:46 as base_image
+FROM marqoai/marqo-base:48 as base_image
 
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var
@@ -19,10 +19,6 @@ ENV VESPA_SKIP_UPGRADE_CHECK true
 ARG TARGETPLATFORM
 ARG COMMITHASH
 WORKDIR /app
-
-COPY requirements.txt requirements.txt
-RUN pip3 install --no-cache-dir -r requirements.txt
-RUN rm requirements.txt
 
 # Stage 3: Final stage that builds on the base image
 FROM base_image

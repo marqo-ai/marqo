@@ -1,4 +1,0 @@
-pytest==7.4.3
-marqo
-semver==3.0.2
-uvicorn[STANDARD]

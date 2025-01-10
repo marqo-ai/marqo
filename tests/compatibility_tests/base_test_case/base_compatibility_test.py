@@ -2,7 +2,7 @@ import json
 import logging
 from abc import abstractmethod, ABC
 from pathlib import Path
-from marqo_test import MarqoTestCase
+from tests.compatibility_tests.base_test_case.marqo_test import MarqoTestCase
 
 
 class BaseCompatibilityTestCase(MarqoTestCase, ABC):
@@ -40,6 +40,8 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
             cls.delete_indexes(cls.indexes_to_delete)
             cls.logger.debug(f"Deleting indexes {cls.indexes_to_delete}")
 
+        cls.delete_file()
+
     @classmethod
     def save_results_to_file(cls, results):
         """Save results to a JSON file."""
@@ -61,8 +63,11 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     def delete_file(cls):
         """Delete the results file."""
         filepath = cls.get_results_file_path()
-        filepath.unlink()
-        cls.logger.debug(f"Results file deleted: {filepath}")
+        if filepath.exists():
+            filepath.unlink()
+            cls.logger.debug(f"Results file deleted: {filepath}")
+        else:
+            cls.logger.debug(f"Not deleting, as the results file was never created in the first place.")
 
     @abstractmethod
     def prepare(self):
