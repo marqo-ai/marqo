@@ -13,7 +13,7 @@ from marqo.tensor_search.models.external_apis.s3 import S3Auth
 from marqo.tensor_search.models.preprocessors_model import Preprocessors
 from marqo.tensor_search.models.private_models import ModelAuth
 from marqo.tensor_search.streaming_media_processor import StreamingMediaProcessor
-from tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
+from integ_tests.marqo_test import TestAudioUrls, TestImageUrls, TestVideoUrls
 
 
 @mark.unittest

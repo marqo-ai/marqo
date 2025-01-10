@@ -19,8 +19,8 @@ from marqo.s2_inference.errors import S2InferenceError
 from marqo.s2_inference.types import Modality
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
-from tests.marqo_test import MarqoTestCase
-from tests.marqo_test import TestAudioUrls, TestVideoUrls, TestImageUrls
+from integ_tests.marqo_test import MarqoTestCase
+from integ_tests.marqo_test import TestAudioUrls, TestVideoUrls, TestImageUrls
 
 
 @pytest.mark.unittest
