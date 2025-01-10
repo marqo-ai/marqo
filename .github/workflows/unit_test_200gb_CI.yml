@@ -116,7 +116,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: python3 tests/api_tests/v1/scripts/start_vespa.py
+        run: python marqo/tests/api_tests/v1/scripts/start_vespa.py
 
       - name: Run Unit Tests
         run: |
