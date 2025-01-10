@@ -145,7 +145,8 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 6, 6, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            result = hybridSearcher.postFusionProcessing(result, 6, 6, verbose);
 
             // Check that the result size is correct
             assertThat(result.asList()).hasSize(6);
@@ -216,7 +217,8 @@ class HybridSearcherTest {
             boolean verbose = false;
 
             // Call the rrf function
-            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, 6, 6, verbose);
+            HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
+            result = hybridSearcher.postFusionProcessing(result, 6, 6, verbose);
 
             // Check that the result size is correct
             assertThat(result.asList()).hasSize(6);
