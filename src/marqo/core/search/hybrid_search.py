@@ -103,10 +103,10 @@ class HybridSearch:
             )
 
         if score_modifiers is not None \
-                and marqo_index_version < constants.MARQO_SCORE_MODIFIERS_GLOBAL_MINIMUM_VERSION:
+                and marqo_index_version < constants.MARQO_GLOBAL_SCORE_MODIFIERS_MINIMUM_VERSION:
             raise core_exceptions.UnsupportedFeatureError(
                 f"Hybrid search with global score modifiers is only supported for Marqo indexes created with Marqo "
-                f"{str(constants.MARQO_SCORE_MODIFIERS_GLOBAL_MINIMUM_VERSION)} or later. "
+                f"{str(constants.MARQO_GLOBAL_SCORE_MODIFIERS_MINIMUM_VERSION)} or later. "
                 f"This index was created with Marqo {marqo_index_version}."
             )
 

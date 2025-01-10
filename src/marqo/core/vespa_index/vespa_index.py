@@ -188,7 +188,7 @@ class VespaIndex(ABC):
         result = {
             constants.MARQO_SEARCH_METHOD_LEXICAL: None,
             constants.MARQO_SEARCH_METHOD_TENSOR: None,
-            constants.MARQO_SCORE_MODIFIERS_GLOBAL: None
+            constants.MARQO_GLOBAL_SCORE_MODIFIERS: None
         }
 
         if hybrid_query.score_modifiers_lexical:
@@ -208,7 +208,7 @@ class VespaIndex(ABC):
         # Treat root level score modifiers as global. Currently only supported for RRF.
         if hybrid_query.score_modifiers:
             mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(hybrid_query.score_modifiers)
-            result[constants.MARQO_SCORE_MODIFIERS_GLOBAL] = {
+            result[constants.MARQO_GLOBAL_SCORE_MODIFIERS] = {
                 constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL: mult_tensor,
                 constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL: add_tensor
             }

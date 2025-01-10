@@ -1962,26 +1962,32 @@ class TestHybridSearch(MarqoTestCase):
         with self.subTest("score_modifiers for structured/semi-structured but not RRF ranking"):
             for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
                 with self.subTest(index=type(index)):
-                    with self.assertRaises(ValueError) as e:
-                        tensor_search.search(
-                            config=self.config,
-                            index_name=index.name,
-                            text="dogs",
-                            search_method="HYBRID",
-                            hybrid_parameters=HybridParameters(
-                                rankingMethod="tensor",
-                                retrievalMethod="lexical"
-                            ),
-                            score_modifiers=ScoreModifierLists(
-                                multiply_score_by=[
-                                    {"field_name": "mult_field_1", "weight": 1.0}
-                                ],
-                                add_to_score=[
-                                    {"field_name": "add_field_1", "weight": 1.0}
-                                ]
-                            ),
-                        )
-                    self.assertIn("if 'rankingMethod' is 'RRF'", str(e.exception))
+                    for retrieval_method, ranking_method in [
+                        (RetrievalMethod.Tensor, RankingMethod.Lexical),
+                        (RetrievalMethod.Lexical, RankingMethod.Tensor),
+                        (RetrievalMethod.Tensor, RankingMethod.Tensor),
+                        (RetrievalMethod.Lexical, RankingMethod.Lexical)
+                    ]:
+                        with self.assertRaises(ValueError) as e:
+                            tensor_search.search(
+                                config=self.config,
+                                index_name=index.name,
+                                text="dogs",
+                                search_method="HYBRID",
+                                hybrid_parameters=HybridParameters(
+                                    retrievalMethod=retrieval_method,
+                                    rankingMethod=ranking_method
+                                ),
+                                score_modifiers=ScoreModifierLists(
+                                    multiply_score_by=[
+                                        {"field_name": "mult_field_1", "weight": 1.0}
+                                    ],
+                                    add_to_score=[
+                                        {"field_name": "add_field_1", "weight": 1.0}
+                                    ]
+                                ),
+                            )
+                        self.assertIn("if 'rankingMethod' is 'RRF'", str(e.exception))
 
     def test_hybrid_search_structured_invalid_fields_fails(self):
         """

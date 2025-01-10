@@ -265,7 +265,7 @@ class StructuredVespaSchema(VespaSchema):
         ) if score_modifier_fields_names else '0'
         score_modifier_expression = (
             'mult_modifier(mult_weights) * score + add_modifier(add_weights)'
-        )
+        ) if score_modifier_fields_names else 'score'
 
         embedding_match_features_expression = [f'match-features inherits {common.RANK_PROFILE_BASE} {{']
         for field in marqo_index.tensor_fields:

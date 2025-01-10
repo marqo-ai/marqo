@@ -4,6 +4,28 @@ import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
+
+def compare_search_results(self, expected_result, actual_result):
+    """Compare two search results and assert if they match."""
+    self.assertEqual(len(expected_result.get("hits")), len(actual_result.get("hits")),
+                     f'Number of hits for expected & actual result do not match. '
+                     f'Expected: {len(expected_result.get("hits"))}, Got: {len(actual_result.get("hits"))}')
+    # We compare just the hits because the result contains other fields like processingTime which changes in every search API call.
+    for i in range(len(expected_result.get("hits"))):
+        self.assertEqual(
+            expected_result.get("hits")[i]["_score"],
+            actual_result.get("hits")[i]["_score"],
+            f'The _score field of the {i} hit for expected & actual result do not match. '
+            f'Expected: {expected_result.get("hits")[i]["_score"]}, Got: {actual_result.get("hits")[i]["_score"]}'
+        )
+        self.assertEqual(
+            expected_result.get("hits")[i]["_id"],
+            actual_result.get("hits")[i]["_id"],
+            f'The _id field of the {i} hit for expected & actual result do not match. '
+            f'Expected: {expected_result.get("hits")[i]["_score"]}, Got: {actual_result.get("hits")[i]["_score"]}'
+        )
+
+
 @pytest.mark.marqo_version('2.9.0')
 class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
 
@@ -177,7 +199,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                     "add_to_score": [{"field_name": "double_score_mods", "weight": 2}],
                     }
                 )
-                self._compare_search_results(stored_results[index_name]["double_score_mods"], result)
+                compare_search_results(stored_results[index_name]["double_score_mods"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -203,7 +225,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "long_score_mods", "weight": 2}],
                     }
                 )
-                self._compare_search_results(stored_results[index_name]["long_score_mods"], result)
+                compare_search_results(stored_results[index_name]["long_score_mods"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -229,7 +251,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "rating", "weight": 2}],
                     }
                 )
-                self._compare_search_results(stored_results[index_name]["rating"], result)
+                compare_search_results(stored_results[index_name]["rating"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -255,7 +277,7 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "popularity", "weight": 2}],
                     }
                 )
-                self._compare_search_results(stored_results[index_name]["popularity"], result)
+                compare_search_results(stored_results[index_name]["popularity"], result)
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -265,20 +287,6 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                 for idx, error in test_failures
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
-
-    def _compare_search_results(self, expected_result, actual_result):
-        """Compare two search results and assert if they match."""
-        # We compare just the hits because the result contains other fields like processingTime which changes in every search API call.
-        self.assertEqual(
-            expected_result.get("hits")[0]["_score"],
-            actual_result.get("hits")[0]["_score"],
-            f'The _score field of the first hit for expected & actual result do not match. Expected: {expected_result.get("hits")[0]["_score"]}, Got: {actual_result.get("hits")[0]["_score"]}'
-        )
-        self.assertEqual(
-            expected_result.get("hits")[0]["_id"],
-            actual_result.get("hits")[0]["_id"],
-            f'The _id field of the first hit for expected & actual result do not match. Expected: {expected_result.get("hits")[0]["_score"]}, Got: {actual_result.get("hits")[0]["_score"]}'
-        )
 
 
 @pytest.mark.marqo_version('2.15.0')
@@ -307,7 +315,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
     }
 
     docs = [
-        {"_id": "both1", "text_field": "dogs", "multiply_1": -1, "add_1": -1},  # HIGH tensor, LOW lexical
+        {"_id": "both1", "text_field": "dogs", "multiply_1": -1, "add_1": -1},  # HIGH tensor and lexical
         {"_id": "tensor1", "text_field": "puppies", "multiply_1": 2, "add_1": 2},  # MID tensor
         {"_id": "tensor2", "text_field": "random words", "multiply_1": 3, "add_1": 3},  # LOW tensor
     ]
@@ -368,11 +376,13 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                             "rankingMethod": ranking_method
                         },
                         score_modifiers={
-                            "add_to_score": [
+                            "multiply_score_by": [
                                 {
                                     "field_name": "multiply_1",
                                     "weight": 2
-                                },
+                                }
+                            ],
+                            "add_to_score": [
                                 {
                                     "field_name": "add_1",
                                     "weight": 3
@@ -413,11 +423,13 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                             "rankingMethod": ranking_method
                         },
                         score_modifiers={
-                            "add_to_score": [
+                            "multiply_score_by": [
                                 {
                                     "field_name": "multiply_1",
                                     "weight": 2
-                                },
+                                }
+                            ],
+                            "add_to_score": [
                                 {
                                     "field_name": "add_1",
                                     "weight": 3
@@ -426,7 +438,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                         },
                         rerank_count=2  # To show not all results are reranked
                     )
-                    self._compare_search_results(stored_results[index_name][retrieval_method][ranking_method], result)
+                    compare_search_results(stored_results[index_name][retrieval_method][ranking_method], result)
                 except Exception as e:
                     test_failures.append((index_name, traceback.format_exc()))
 
@@ -436,17 +448,3 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                 for idx, error in test_failures
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
-
-    def _compare_search_results(self, expected_result, actual_result):
-        """Compare two search results and assert if they match."""
-        # We compare just the hits because the result contains other fields like processingTime which changes in every search API call.
-        self.assertEqual(
-            expected_result.get("hits")[0]["_score"],
-            actual_result.get("hits")[0]["_score"],
-            f'The _score field of the first hit for expected & actual result do not match. Expected: {expected_result.get("hits")[0]["_score"]}, Got: {actual_result.get("hits")[0]["_score"]}'
-        )
-        self.assertEqual(
-            expected_result.get("hits")[0]["_id"],
-            actual_result.get("hits")[0]["_id"],
-            f'The _id field of the first hit for expected & actual result do not match. Expected: {expected_result.get("hits")[0]["_score"]}, Got: {actual_result.get("hits")[0]["_score"]}'
-        )

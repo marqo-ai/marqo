@@ -171,7 +171,12 @@ schema marqo__test_00semi_00structured_00schema {
         first-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
-        match-features inherits base_rank_profile { closest(marqo__embeddings_tensor_field1) closest(marqo__embeddings_tensor_field2) distance(field, marqo__embeddings_tensor_field1) distance(field, marqo__embeddings_tensor_field2)}
+        match-features inherits base_rank_profile {
+            closest(marqo__embeddings_tensor_field1)
+            closest(marqo__embeddings_tensor_field2)
+            distance(field, marqo__embeddings_tensor_field1)
+            distance(field, marqo__embeddings_tensor_field2)
+        }
     }
 
     rank-profile hybrid_custom_searcher inherits default {
@@ -195,7 +200,12 @@ schema marqo__test_00semi_00structured_00schema {
         second-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
-        match-features inherits base_rank_profile { closest(marqo__embeddings_tensor_field1) closest(marqo__embeddings_tensor_field2) distance(field, marqo__embeddings_tensor_field1) distance(field, marqo__embeddings_tensor_field2)}
+        match-features inherits base_rank_profile {
+            closest(marqo__embeddings_tensor_field1)
+            closest(marqo__embeddings_tensor_field2)
+            distance(field, marqo__embeddings_tensor_field1)
+            distance(field, marqo__embeddings_tensor_field2)
+        }
     }
 
     rank-profile hybrid_embedding_similarity_then_bm25 inherits base_rank_profile {

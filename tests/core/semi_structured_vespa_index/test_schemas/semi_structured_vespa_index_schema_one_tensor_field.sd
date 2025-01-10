@@ -121,7 +121,10 @@ schema marqo__test_00semi_00structured_00schema {
         first-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
-        match-features inherits base_rank_profile { closest(marqo__embeddings_tensor_field) distance(field, marqo__embeddings_tensor_field)}
+        match-features inherits base_rank_profile {
+            closest(marqo__embeddings_tensor_field)
+            distance(field, marqo__embeddings_tensor_field)
+        }
     }
 
 

@@ -204,8 +204,12 @@ schema {{ index.schema_name }} {
         }
         {% if index.tensor_fields -%}
         match-features inherits base_rank_profile {
-            {%- for field in index.tensor_fields %} closest({{ field.embeddings_field_name }}){% endfor -%}
-            {%- for field in index.tensor_fields %} distance(field, {{ field.embeddings_field_name }}){% endfor -%}
+            {%- for field in index.tensor_fields %}
+            closest({{ field.embeddings_field_name }})
+            {%- endfor %}
+            {%- for field in index.tensor_fields %}
+            distance(field, {{ field.embeddings_field_name }})
+            {%- endfor %}
         }
         {%- endif %}
     }
@@ -233,8 +237,12 @@ schema {{ index.schema_name }} {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
         match-features inherits base_rank_profile {
-            {%- for field in index.tensor_fields %} closest({{ field.embeddings_field_name }}){% endfor -%}
-            {%- for field in index.tensor_fields %} distance(field, {{ field.embeddings_field_name }}){% endfor -%}
+            {%- for field in index.tensor_fields %}
+            closest({{ field.embeddings_field_name }})
+            {%- endfor %}
+            {%- for field in index.tensor_fields %}
+            distance(field, {{ field.embeddings_field_name }})
+            {%- endfor %}
         }
     }
 
