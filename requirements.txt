@@ -1,1 +1,1 @@
-# Marqo's requirements file are stored in marqo-base repo: https://github.com/marqo-ai/marqo-base/tree/main/requirements
+# Marqo's requirements files are stored in marqo-base repo: https://github.com/marqo-ai/marqo-base/tree/main/requirements
