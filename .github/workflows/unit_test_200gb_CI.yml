@@ -160,7 +160,7 @@ jobs:
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          export HF_HUB_ENABLE_HF_TRANSFER=1
+          export MARQO_ENABLE_THROTTLING=FALSE
 
           export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
