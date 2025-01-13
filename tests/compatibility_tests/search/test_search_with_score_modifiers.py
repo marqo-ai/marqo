@@ -5,27 +5,6 @@ import pytest
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 
-def compare_search_results(self, expected_result, actual_result):
-    """Compare two search results and assert if they match."""
-    self.assertEqual(len(expected_result.get("hits")), len(actual_result.get("hits")),
-                     f'Number of hits for expected & actual result do not match. '
-                     f'Expected: {len(expected_result.get("hits"))}, Got: {len(actual_result.get("hits"))}')
-    # We compare just the hits because the result contains other fields like processingTime which changes in every search API call.
-    for i in range(len(expected_result.get("hits"))):
-        self.assertEqual(
-            expected_result.get("hits")[i]["_score"],
-            actual_result.get("hits")[i]["_score"],
-            f'The _score field of the {i} hit for expected & actual result do not match. '
-            f'Expected: {expected_result.get("hits")[i]["_score"]}, Got: {actual_result.get("hits")[i]["_score"]}'
-        )
-        self.assertEqual(
-            expected_result.get("hits")[i]["_id"],
-            actual_result.get("hits")[i]["_id"],
-            f'The _id field of the {i} hit for expected & actual result do not match. '
-            f'Expected: {expected_result.get("hits")[i]["_score"]}, Got: {actual_result.get("hits")[i]["_score"]}'
-        )
-
-
 @pytest.mark.marqo_version('2.9.0')
 class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
 
@@ -199,8 +178,6 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                     "add_to_score": [{"field_name": "double_score_mods", "weight": 2}],
                     }
                 )
-                # TODO: Remove
-                # compare_search_results(stored_results[index_name]["double_score_mods"], result)
                 self.assertEqual(stored_results[index_name]["double_score_mods"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
@@ -227,7 +204,6 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "long_score_mods", "weight": 2}],
                     }
                 )
-                # compare_search_results(stored_results[index_name]["long_score_mods"], result)
                 self.assertEqual(stored_results[index_name]["long_score_mods"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
@@ -254,7 +230,6 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "rating", "weight": 2}],
                     }
                 )
-                # compare_search_results(stored_results[index_name]["rating"], result)
                 self.assertEqual(stored_results[index_name]["rating"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
@@ -281,7 +256,6 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "popularity", "weight": 2}],
                     }
                 )
-                # compare_search_results(stored_results[index_name]["popularity"], result)
                 self.assertEqual(stored_results[index_name]["popularity"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
@@ -443,7 +417,6 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                         },
                         rerank_count=2  # To show not all results are reranked
                     )
-                    # compare_search_results(stored_results[index_name][retrieval_method][ranking_method], result)
                     self.assertEqual(stored_results[index_name][retrieval_method][ranking_method].get("hits"),
                                      result.get("hits"))
                 except Exception as e:

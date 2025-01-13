@@ -146,10 +146,10 @@ class HybridSearcherTest {
 
             // Call the rrf function
             HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
-            result = hybridSearcher.postFusionProcessing(result, 6, 6, verbose);
 
             // Check that the result size is correct
-            assertThat(result.asList()).hasSize(6);
+            // RRF function returns all interleaved hits. Pagination, trimming, reranking, are done in post-processing
+            assertThat(result.asList()).hasSize(9);
 
             // Check that result order and scores are correct
             assertThat(result.asList())
@@ -166,7 +166,10 @@ class HybridSearcherTest {
                             new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/0/tensor1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/0/lexical2", alpha * (1.0 / (2 + k))),
-                            new Hit("index:test/0/tensor2", alpha * (1.0 / (2 + k))));
+                            new Hit("index:test/0/tensor2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/0/lexical3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/0/tensor3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/0/tensor4", alpha * (1.0 / (4 + k))));
 
             assertThat(result.get(0).fields())
                     .containsAllEntriesOf(
@@ -190,6 +193,12 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+            assertThat(result.get(6).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.5));
+            assertThat(result.get(7).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
+            assertThat(result.get(8).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.5));
         }
 
         @Test
@@ -218,10 +227,9 @@ class HybridSearcherTest {
 
             // Call the rrf function
             HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
-            result = hybridSearcher.postFusionProcessing(result, 6, 6, verbose);
 
             // Check that the result size is correct
-            assertThat(result.asList()).hasSize(6);
+            assertThat(result.asList()).hasSize(9);
 
             // Check that result order and scores are correct
             // If results have the same score, they will be sorted by alphabetical hit ID.
@@ -240,7 +248,10 @@ class HybridSearcherTest {
                             new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/5/tensor1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/1/lexical2", alpha * (1.0 / (2 + k))),
-                            new Hit("index:test/6/tensor2", alpha * (1.0 / (2 + k))));
+                            new Hit("index:test/6/tensor2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/2/lexical3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/7/tensor3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/8/tensor4", alpha * (1.0 / (4 + k))));
 
             assertThat(result.get(0).fields())
                     .containsAllEntriesOf(
@@ -264,8 +275,17 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+            assertThat(result.get(6).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.5));
+            assertThat(result.get(7).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
+            assertThat(result.get(8).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.5));
         }
     }
+    // TODO: post processing test
+    // global score modifiers tests
+    // pagination tests
 
     @Nested
     class IdExtractorTest {
