@@ -199,7 +199,9 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                     "add_to_score": [{"field_name": "double_score_mods", "weight": 2}],
                     }
                 )
-                compare_search_results(stored_results[index_name]["double_score_mods"], result)
+                # TODO: Remove
+                # compare_search_results(stored_results[index_name]["double_score_mods"], result)
+                self.assertEqual(stored_results[index_name]["double_score_mods"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -225,7 +227,8 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "long_score_mods", "weight": 2}],
                     }
                 )
-                compare_search_results(stored_results[index_name]["long_score_mods"], result)
+                # compare_search_results(stored_results[index_name]["long_score_mods"], result)
+                self.assertEqual(stored_results[index_name]["long_score_mods"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -251,7 +254,8 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "rating", "weight": 2}],
                     }
                 )
-                compare_search_results(stored_results[index_name]["rating"], result)
+                # compare_search_results(stored_results[index_name]["rating"], result)
+                self.assertEqual(stored_results[index_name]["rating"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -277,7 +281,8 @@ class TestSearchWithScoreModifiers(BaseCompatibilityTestCase):
                         "add_to_score": [{"field_name": "popularity", "weight": 2}],
                     }
                 )
-                compare_search_results(stored_results[index_name]["popularity"], result)
+                # compare_search_results(stored_results[index_name]["popularity"], result)
+                self.assertEqual(stored_results[index_name]["popularity"].get("hits"), result.get("hits"))
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
 
@@ -438,7 +443,9 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                         },
                         rerank_count=2  # To show not all results are reranked
                     )
-                    compare_search_results(stored_results[index_name][retrieval_method][ranking_method], result)
+                    # compare_search_results(stored_results[index_name][retrieval_method][ranking_method], result)
+                    self.assertEqual(stored_results[index_name][retrieval_method][ranking_method].get("hits"),
+                                     result.get("hits"))
                 except Exception as e:
                     test_failures.append((index_name, traceback.format_exc()))
 

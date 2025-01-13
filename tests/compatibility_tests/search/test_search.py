@@ -199,6 +199,7 @@ class TestSearch(BaseCompatibilityTestCase):
                     documents=[{"_id": "to_be_removed", "new_field": "randomwords,removefromresults"}],
                     tensor_fields=["new_field"]
                 )
+                self.client.index(index_name).delete_documents(["to_be_removed"])
 
             # For each index, search for different queries and compare results
             for query, search_method, result_key in zip(self.queries, self.search_methods, self.result_keys):
@@ -211,11 +212,6 @@ class TestSearch(BaseCompatibilityTestCase):
                     else:
                         result = self.client.index(index_name).search(q=query, search_method=search_method)
 
-                        # Remove the 'to_be_removed' doc from results if it exists
-                        for index, dict_item in enumerate(result["hits"]):
-                            if dict_item.get("_id") == "to_be_removed":
-                                del result["hits"][index]
-                                break
                     self._compare_search_results(stored_results[index_name][result_key], result)
 
                 except Exception as e:
