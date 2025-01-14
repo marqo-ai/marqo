@@ -102,11 +102,16 @@ public class HybridSearcher extends Searcher {
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
             // Pagination variables. Since pagination is done in the searcher, we perform operations
-            // on
-            // all the hits (limit + offset) before trimming at the end. We will then trim offset
+            // on all the hits (limit + offset) before trimming at the end. We will then trim offset
             // hits.
-            totalHitsBeforePagination = limit + offset;
-            totalHitsToTrim = offset;
+
+            // Temporary values before fixing disjunction pagination
+            totalHitsBeforePagination = limit;
+            totalHitsToTrim = 0;
+
+            // TODO: Change total hits before pagination and to trim when we fix disjunction pagination
+            // totalHitsBeforePagination = limit + offset;
+            // totalHitsToTrim = offset;
 
             Result resultLexical, resultTensor;
             Query queryLexical =
@@ -594,7 +599,7 @@ public class HybridSearcher extends Searcher {
                     modified_score = original_score * mult_modifier + add_modifier;
                     logIfVerbose(
                             String.format(
-                                    "Original score: %.7f, mult modifier: %.2f, add modifier: %.2f,"
+                                    "Original score: %.7f, mult modifier: %.5f, add modifier: %.5f,"
                                             + " Modified score: %.7f",
                                     original_score, mult_modifier, add_modifier, modified_score),
                             verbose);

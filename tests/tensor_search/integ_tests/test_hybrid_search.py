@@ -1081,6 +1081,8 @@ class TestHybridSearch(MarqoTestCase):
         Make sure scores of modified results are calculated correctly based on unmodified scores.
         Return 'limit' results whenever possible. If rerankCount < limit, add on the extra unranked results after reranking.
         """
+        # TODO: make test with just 1 of multiply_score_by or add_to_score
+        # TODO: offset test
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=type(index)):
@@ -1094,7 +1096,7 @@ class TestHybridSearch(MarqoTestCase):
                             {"_id": "tensor2", "text_tensor_only": "something completely unrelated. garbage.", "add_field_1": 2.0, "mult_field_1": 2.0},    # tensor LOW score, no lexical match
                             {"_id": "lexical1", "text_lexical_only": "dogs dogs", "add_field_1": -2.0, "mult_field_1": -2.0},    # lexical HIGH score, no tensor
                             {"_id": "lexical2", "text_lexical_only": "dogs", "add_field_1": -1.0, "mult_field_1": -1.0},  # lexical LOWER score, no tensor
-                            {"_id": "both1", "text_field_1": "dogs dogs"}     # both tensor and lexical, HIGHEST rank in each list.
+                            {"_id": "both1", "text_field_1": "dogs dogs", "add_field_1": 0.0001}     # both tensor and lexical, HIGHEST rank in each list.
                         ],
                         tensor_fields=["text_tensor_only", "text_field_1"] \
                             if isinstance(index, UnstructuredMarqoIndex) else None
@@ -1150,6 +1152,12 @@ class TestHybridSearch(MarqoTestCase):
                     # Order with score modifiers: tensor2, tensor1, both1, lexical2, lexical1
                     self.assertEqual(["tensor2", "tensor1", "both1", "lexical2", "lexical1"],
                                      [hit["_id"] for hit in modified_res["hits"]])
+                    # Assert scores are all correctly modified
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], 2*unmodified_scores["tensor2"] + 2)
+                    self.assertAlmostEqual(modified_res["hits"][1]["_score"], 1*unmodified_scores["tensor1"] + 1)
+                    self.assertAlmostEqual(modified_res["hits"][2]["_score"], unmodified_scores["both1"] + 0.0001)
+                    self.assertAlmostEqual(modified_res["hits"][3]["_score"], -1*unmodified_scores["lexical2"] - 1)
+                    self.assertAlmostEqual(modified_res["hits"][4]["_score"], -2*unmodified_scores["lexical1"] - 2)
 
                 with self.subTest(f"Case 2: limit < rerankCount < hits.size()"):
                     # Rerank the top 3, then take the top 2 from there.
@@ -1278,14 +1286,18 @@ class TestHybridSearch(MarqoTestCase):
                     for hit in modified_res["hits"]:
                         if hit["_id"] == "tensor1":
                             self.assertEqual(hit["_score"], 1*unmodified_scores[hit["_id"]] + 1)
-                        elif hit["_id"] in ["both1", "tensor2", "lexical2"]:     # both1 has no score_modifiers, so it will be unaffected
+                        elif hit["_id"] == "both1":
+                            self.assertAlmostEqual(hit["_score"], unmodified_scores[hit["_id"]] + 0.0001)
+                        elif hit["_id"] in ["tensor2", "lexical2"]:
                             self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
-                        if hit["_id"] == "lexical1":
+                        elif hit["_id"] == "lexical1":
                             self.assertEqual(hit["_score"], -2*unmodified_scores[hit["_id"]] - 2)
 
                 with self.subTest("Case 6: 2*limit < rerankCount"):
                     # We attempt to rerank more hits than what is possible to retrieve (tensor + lexical search)
-                    # Initial search will give us
+                    # Initial search will give us both1 in both tensor and lexical
+                    # Only 1 hit to rerank
+                    # Trim to just both1
                     modified_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -1307,7 +1319,10 @@ class TestHybridSearch(MarqoTestCase):
                         result_count=1,
                         rerank_count=4
                     )
-                    self.assertEqual(len(modified_res["hits"]), 5)
+                    self.assertEqual(len(modified_res["hits"]), 1)
+                    self.assertEqual("both1", modified_res["hits"][0]["_id"])
+                    # Ensure score is modified
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"] + 0.0001)
 
 
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):
