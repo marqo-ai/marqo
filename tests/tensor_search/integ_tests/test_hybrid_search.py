@@ -1143,8 +1143,6 @@ class TestHybridSearch(MarqoTestCase):
         Make sure scores of modified results are calculated correctly based on unmodified scores.
         Return 'limit' results whenever possible. If rerankCount < limit, add on the extra unranked results after reranking.
         """
-        # TODO: make test with just 1 of multiply_score_by or add_to_score
-        # TODO: offset test
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=type(index)):
@@ -1385,6 +1383,35 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual("both1", modified_res["hits"][0]["_id"])
                     # Ensure score is modified
                     self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"] + 0.0001)
+
+            with self.subTest("Case 7: No rerankCount"):
+                # Set limit to 3 so all results are included, but since no rerankCount, it will rerank everything
+                # Original top all: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
+                # Reranked top all: tensor2, tensor1, both1, lexical2, lexical1
+                # Top 3 after: tensor2, tensor1, both1
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1},
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 1}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=3
+                )
+                self.assertEqual(len(modified_res["hits"]), 3)
+                self.assertEqual(["tensor2", "tensor1", "both1"], [hit["_id"] for hit in modified_res["hits"]])
+
 
 
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):

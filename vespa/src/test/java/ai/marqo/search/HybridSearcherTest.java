@@ -286,6 +286,7 @@ class HybridSearcherTest {
     }
 
     // TODO: post processing test
+    // if rerankCountGlobal is null, rerank everything
     // global score modifiers tests
     // pagination tests (use offset)
     // mult weights & add weights both dont exist, make sure apply global score mod is skipped

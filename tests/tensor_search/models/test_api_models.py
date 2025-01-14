@@ -84,13 +84,10 @@ class TestSearchQuery(MarqoTestCase):
 
     def test_search_query_rerank_count_default_value(self):
         """
-        Tests that rerank_count is set to limit + offset if not provided.
+        Tests that rerank_count is set to None if not provided.
         """
         search_query = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, limit=10, offset=5, rerankCount=20)
         self.assertEqual(20, search_query.rerankCount)
 
         search_query = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, limit=10, offset=5)
-        self.assertEqual(15, search_query.rerankCount)
-
-        search_query = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, limit=10)
-        self.assertEqual(10, search_query.rerankCount)
+        self.assertEqual(None, search_query.rerankCount)

@@ -135,10 +135,6 @@ class SearchQuery(BaseMarqoModel):
             if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
                 raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
 
-        # Default rerank count to limit + offset
-        if rerank_count is None:
-            values['rerankCount'] = values.get('limit') + values.get('offset')
-
         return values
 
     @pydantic.validator('searchMethod')
