@@ -148,7 +148,8 @@ class HybridSearcherTest {
             HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
 
             // Check that the result size is correct
-            // RRF function returns all interleaved hits. Pagination, trimming, reranking, are done in post-processing
+            // RRF function returns all interleaved hits. Pagination, trimming, reranking, are done
+            // in post-processing
             assertThat(result.asList()).hasSize(9);
 
             // Check that result order and scores are correct
@@ -283,9 +284,14 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.5));
         }
     }
+
     // TODO: post processing test
     // global score modifiers tests
-    // pagination tests
+    // pagination tests (use offset)
+    // mult weights & add weights both dont exist, make sure apply global score mod is skipped
+    // mult weights & add weights both empty, make sure apply global score mod is skipped
+    // mult weights exist but not add weights, & vice versa
+    // empty mult weights or empty add weights
 
     @Nested
     class IdExtractorTest {

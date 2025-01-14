@@ -101,8 +101,10 @@ public class HybridSearcher extends Searcher {
 
         HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
-            // Pagination variables. Since pagination is done in the searcher, we perform operations on
-            // all the hits (limit + offset) before trimming at the end. We will then trim offset hits.
+            // Pagination variables. Since pagination is done in the searcher, we perform operations
+            // on
+            // all the hits (limit + offset) before trimming at the end. We will then trim offset
+            // hits.
             totalHitsBeforePagination = limit + offset;
             totalHitsToTrim = offset;
 
@@ -154,7 +156,8 @@ public class HybridSearcher extends Searcher {
 
         } else if (STANDARD_SEARCH_TYPES.contains(retrievalMethod)) {
             if (STANDARD_SEARCH_TYPES.contains(rankingMethod)) {
-                // Pagination variables. Since pagination is done before reaching searcher, we ignore offset
+                // Pagination variables. Since pagination is done before reaching searcher, we
+                // ignore offset
                 // and do not trim any beginning hits.
                 totalHitsBeforePagination = limit;
                 totalHitsToTrim = 0;
@@ -178,7 +181,8 @@ public class HybridSearcher extends Searcher {
         // Post-process result list
 
         // Split original hits into 2 lists: result to rerank and excess hits
-        // Excess hits will not be reranked, and will be added back after reranking the other results
+        // Excess hits will not be reranked, and will be added back after reranking the other
+        // results
         HitGroup resultToRerank = new HitGroup();
         HitGroup excessHits = new HitGroup();
 
@@ -205,11 +209,13 @@ public class HybridSearcher extends Searcher {
 
         // Apply global score modifiers and rerank
         // Skip whole process if global modifier weight tensors don't exist in query
-        Tensor queryMultWeightsGlobal = extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
-        Tensor queryAddWeightsGlobal = extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
+        Tensor queryMultWeightsGlobal =
+                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
+        Tensor queryAddWeightsGlobal =
+                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
 
-        if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty()) ||
-                (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
+        if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
+                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
             logIfVerbose("Applying global score modifiers and reranking.", verbose);
             resultToRerank = applyGlobalScoreModifiers(resultToRerank, verbose);
         } else {
@@ -237,8 +243,9 @@ public class HybridSearcher extends Searcher {
         // Paginate and/or trim
         // Result list should always have limit length (if possible)
         // If totalHitsToTrim > 0, this is manual pagination
-        logIfVerbose(String.format("Trimming result list. " +
-                "limit: %d, offset: %d", limit, offset), verbose);
+        logIfVerbose(
+                String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
+                verbose);
         resultToRerank.trim(totalHitsToTrim, limit);
 
         logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);

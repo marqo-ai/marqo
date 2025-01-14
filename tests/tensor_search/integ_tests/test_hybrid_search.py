@@ -1208,6 +1208,7 @@ class TestHybridSearch(MarqoTestCase):
 
                 with self.subTest(f"Case 4: limit < hits.size() < rerankCount"):
                     # Attempt to rerank top 10 (will only be able to do 5), then return 4.
+                    # Even though rerankCount > 2*limit, we just rerank the highest number of results possible
                     # Original top 5: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
                     # Reranked top 5: tensor2, tensor1, both1, lexical2, lexical1
                     # Top 4 after: tensor2, tensor1, both1, lexical2
@@ -1281,6 +1282,32 @@ class TestHybridSearch(MarqoTestCase):
                             self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
                         if hit["_id"] == "lexical1":
                             self.assertEqual(hit["_score"], -2*unmodified_scores[hit["_id"]] - 2)
+
+                with self.subTest("Case 6: 2*limit < rerankCount"):
+                    # We attempt to rerank more hits than what is possible to retrieve (tensor + lexical search)
+                    # Initial search will give us
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1},
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 1}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=1,
+                        rerank_count=4
+                    )
+                    self.assertEqual(len(modified_res["hits"]), 5)
 
 
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):
