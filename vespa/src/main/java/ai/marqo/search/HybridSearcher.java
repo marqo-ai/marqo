@@ -158,82 +158,11 @@ public class HybridSearcher extends Searcher {
         }
 
         // Post-process result list
+        HitGroup processedHits =
+                postProcessResults(
+                        hitsForPostProcessing, query, rerankCountGlobal, limit, offset, verbose);
 
-        // Split original hits into 2 lists: result to rerank and excess hits
-        // Excess hits will not be reranked, and will be added back after reranking the other
-        // results
-        HitGroup resultToRerank = new HitGroup();
-        HitGroup excessHits = new HitGroup();
-
-        int idx = 0;
-        // If rerank count global is not set, rerank all hits
-        if (rerankCountGlobal == null) {
-            rerankCountGlobal = hitsForPostProcessing.size();
-        }
-        for (Hit hit : hitsForPostProcessing) {
-            if (idx < rerankCountGlobal) {
-                resultToRerank.add(hit);
-            } else if (idx < limit) {
-                // Total hits to return caps out at limit
-                excessHits.add(hit);
-            } else {
-                // Ignore all hits after limit
-                break;
-            }
-            idx++;
-        }
-
-        logIfVerbose("Result list to rerank: ", verbose);
-        logHitGroup(resultToRerank, verbose);
-        if (excessHits.size() > 0) {
-            logIfVerbose("Excess hits (will not be rescored): ", verbose);
-            logHitGroup(excessHits, verbose);
-        }
-
-        // Apply global score modifiers and rerank
-        // Skip whole process if global modifier weight tensors don't exist in query
-        Tensor queryMultWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
-        Tensor queryAddWeightsGlobal =
-                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
-
-        if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
-                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
-            logIfVerbose("Applying global score modifiers and reranking.", verbose);
-            resultToRerank = applyGlobalScoreModifiers(resultToRerank, verbose);
-        } else {
-            logIfVerbose("No weights found. Skipping applying global score modifiers.", verbose);
-        }
-
-        logIfVerbose("Rescored result list (UNSORTED): ", verbose);
-        logHitGroup(resultToRerank, verbose);
-
-        resultToRerank.sort();
-
-        logIfVerbose("Reranked result list (SORTED): ", verbose);
-        logHitGroup(resultToRerank, verbose);
-
-        if (limit > rerankCountGlobal) {
-            // Add excess hits to the end of reranked results then sort
-            logIfVerbose(
-                    String.format(
-                            "Adding %d excess hits to the end of reranked results and sorting.",
-                            excessHits.size()),
-                    verbose);
-            resultToRerank.addAll(excessHits.asList());
-        }
-
-        // Paginate and/or trim
-        // Result list should always have limit length (if possible)
-        logIfVerbose(
-                String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
-                verbose);
-        resultToRerank.trim(0, limit);
-
-        logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
-        logHitGroup(resultToRerank, verbose);
-
-        return new Result(query, resultToRerank);
+        return new Result(query, processedHits);
     }
 
     /**
@@ -360,6 +289,93 @@ public class HybridSearcher extends Searcher {
         }
 
         return result;
+    }
+
+    /**
+     * Post-processes the result list, applying global score modifiers and reranking.
+     */
+    HitGroup postProcessResults(
+            HitGroup hitsForPostProcessing,
+            Query query,
+            Integer rerankCountGlobal,
+            int limit,
+            int offset,
+            boolean verbose) {
+        // Split original hits into 2 lists: result to rerank and excess hits
+        // Excess hits will not be reranked, and will be added back after reranking the other
+        // results
+        HitGroup resultToRerank = new HitGroup();
+        HitGroup excessHits = new HitGroup();
+
+        int idx = 0;
+        // If rerank count global is not set, rerank all hits
+        if (rerankCountGlobal == null) {
+            rerankCountGlobal = hitsForPostProcessing.size();
+        }
+        for (Hit hit : hitsForPostProcessing) {
+            if (idx < rerankCountGlobal) {
+                resultToRerank.add(hit);
+            } else if (idx < limit) {
+                // Total hits to return caps out at limit
+                excessHits.add(hit);
+            } else {
+                // Ignore all hits after limit
+                break;
+            }
+            idx++;
+        }
+
+        logIfVerbose("Result list to rerank: ", verbose);
+        logHitGroup(resultToRerank, verbose);
+        if (excessHits.size() > 0) {
+            logIfVerbose("Excess hits (will not be rescored): ", verbose);
+            logHitGroup(excessHits, verbose);
+        }
+
+        // Apply global score modifiers and rerank
+        // Skip whole process if global modifier weight tensors don't exist in query
+        Tensor queryMultWeightsGlobal =
+                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
+        Tensor queryAddWeightsGlobal =
+                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
+
+        if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
+                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
+            logIfVerbose("Applying global score modifiers and reranking.", verbose);
+            resultToRerank = applyGlobalScoreModifiers(resultToRerank, verbose);
+        } else {
+            logIfVerbose("No weights found. Skipping applying global score modifiers.", verbose);
+        }
+
+        logIfVerbose("Rescored result list (UNSORTED): ", verbose);
+        logHitGroup(resultToRerank, verbose);
+
+        resultToRerank.sort();
+
+        logIfVerbose("Reranked result list (SORTED): ", verbose);
+        logHitGroup(resultToRerank, verbose);
+
+        if (limit > rerankCountGlobal) {
+            // Add excess hits to the end of reranked results then sort
+            logIfVerbose(
+                    String.format(
+                            "Adding %d excess hits to the end of reranked results and sorting.",
+                            excessHits.size()),
+                    verbose);
+            resultToRerank.addAll(excessHits.asList());
+        }
+
+        // Paginate and/or trim
+        // Result list should always have limit length (if possible)
+        logIfVerbose(
+                String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
+                verbose);
+        resultToRerank.trim(0, limit);
+
+        logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
+        logHitGroup(resultToRerank, verbose);
+
+        return resultToRerank;
     }
 
     void raiseErrorIfPresent(Result resultLexical, Result resultTensor) {
