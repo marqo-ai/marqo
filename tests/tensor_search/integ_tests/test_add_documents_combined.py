@@ -1185,10 +1185,6 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
         super().tearDownClass()
         s2_inference.clear_loaded_models()
 
-    def test_nothing(self):
-        print
-
-
     def test_language_bind_model_can_add_all_media_modalities(self):
         """Test to ensure that the LanguageBind model can add all media types to the index"""
         documents = [
