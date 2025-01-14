@@ -235,7 +235,6 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
 
         # Verify that download_and_chunk_media was called twice
         self.assertEqual(mock_download_and_chunk.call_count, 2)
-        print(mock_download_and_chunk.call_args_list)
 
         # Verify the calls to download_and_chunk_media
         mock_download_and_chunk.assert_any_call(
@@ -255,6 +254,62 @@ class TestThreadedDownloadAndPreprocess(unittest.TestCase):
             audio_preprocessing = None,
             video_preprocessing = None,
             media_download_headers = {}
+        )
+
+    @patch("marqo.tensor_search.add_docs.download_and_chunk_media")
+    @patch("marqo.tensor_search.add_docs.infer_modality")
+    def test_video_and_audio_works_with_supportedModalities(self, mock_infer_modality, mock_download_and_chunk):
+        """A test to ensure supportedModalities also works."""
+        self.mock_model.properties["type"] = ModelType.LanguageBind
+        self.mock_model.properties["supported_modalities"] = None
+        self.mock_model.properties["supportedModalities"] = [Modality.VIDEO, Modality.AUDIO, Modality.TEXT]
+
+        # Test data
+        docs = [
+            {"field1": self.mock_video_url},
+            {"field2": self.mock_audio_url}
+        ]
+        media_repo = {}
+        tensor_fields = ["field1", "field2"]
+
+        # Mock the infer_modality and download_and_chunk_media functions
+        mock_infer_modality.side_effect = [Modality.VIDEO, Modality.AUDIO]
+        mock_download_and_chunk.side_effect = [self.mock_video_chunks, self.mock_audio_chunks]
+
+        # Call the function
+        threaded_download_and_preprocess_content(
+            docs, media_repo, tensor_fields, media_download_headers={}, device="cpu",
+            marqo_index_type=self.mock_marqo_index.type,
+            marqo_index_model=self.mock_marqo_index.model,
+        )
+
+        # Assertions
+        self.assertIn(self.mock_video_url, media_repo)
+        self.assertIn(self.mock_audio_url, media_repo)
+        self.assertEqual(media_repo[self.mock_video_url], self.mock_video_chunks)
+        self.assertEqual(media_repo[self.mock_audio_url], self.mock_audio_chunks)
+
+        # Verify that download_and_chunk_media was called twice
+        self.assertEqual(mock_download_and_chunk.call_count, 2)
+
+        # Verify the calls to download_and_chunk_media
+        mock_download_and_chunk.assert_any_call(
+            url=self.mock_video_url,
+            device='cpu',
+            modality=Modality.VIDEO,
+            preprocessors=None,
+            audio_preprocessing=None,
+            video_preprocessing=None,
+            media_download_headers={}
+        )
+        mock_download_and_chunk.assert_any_call(
+            url=self.mock_video_url,
+            device='cpu',
+            modality=Modality.VIDEO,
+            preprocessors=None,
+            audio_preprocessing=None,
+            video_preprocessing=None,
+            media_download_headers={}
         )
 
     @patch("marqo.tensor_search.add_docs.download_and_chunk_media")
