@@ -109,7 +109,8 @@ public class HybridSearcher extends Searcher {
             totalHitsBeforePagination = limit;
             totalHitsToTrim = 0;
 
-            // TODO: Change total hits before pagination and to trim when we fix disjunction pagination
+            // TODO: Change total hits before pagination and to trim when we fix disjunction
+            // pagination
             // totalHitsBeforePagination = limit + offset;
             // totalHitsToTrim = offset;
 

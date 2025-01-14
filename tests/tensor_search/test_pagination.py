@@ -162,10 +162,10 @@ class TestPagination(MarqoTestCase):
 
         for index in [self.index_structured, self.index_unstructured]:
             # Create docs
-            title = "my title"
+            static_title = "my title"
             docs = []
             for i in range(num_docs):
-                title += " ".join(self.generate_unique_strings(i))
+                title =  static_title + " ".join(self.generate_unique_strings(i % batch_size)) # Doc has 0 to 99 unique words
                 doc = {"_id": str(i),
                        "title": title,
                        'desc': 'my description'}
@@ -173,20 +173,20 @@ class TestPagination(MarqoTestCase):
 
             # Add them in batches
             for j in range(0, num_docs, batch_size):
-                self.add_documents(
+                r = self.add_documents(
                     config=self.config,
-                    add_docs_params=AddDocsParams(index_name=self.index_structured.name,
+                    add_docs_params=AddDocsParams(index_name=index.name,
                                                   docs=docs[j:j + batch_size],
                                                   device="cpu",
                                                   tensor_fields=['title'] if isinstance(index, UnstructuredMarqoIndex)
                                                   else None)
-                )
+                ).dict(exclude_none=True, by_alias=True)
                 self.assertFalse(r['errors'], "Errors in add documents call")
 
             test_cases = [
                 ("disjunction", "rrf"),
-                #("lexical", "tensor"),
-                #("tensor", "lexical"),
+                ("lexical", "tensor"),
+                ("tensor", "lexical"),
             ]
 
             for retrieval_method, ranking_method in test_cases:
@@ -201,7 +201,7 @@ class TestPagination(MarqoTestCase):
                         result_count=num_docs)
 
                     # TODO: Re-add page size 5, 10 when KNN inconsistency bug is fixed
-                    for page_size in [100, 200]:
+                    for page_size in [10, 100, 200]:
                         with self.subTest(f'Index: {index.type}, Page size: {page_size}'):
                             paginated_search_results = {"hits": []}
 
@@ -222,12 +222,11 @@ class TestPagination(MarqoTestCase):
 
                             # Compare paginated to full results (length only for now)
                             self.assertEqual(len(full_search_results["hits"]), len(paginated_search_results["hits"]))
-                            # TODO: Compare actual result IDs when fix is implemented.
-                            # Scores need to match, except for disjunction/rrf (where scores are determined by rank)
-                            if (retrieval_method, ranking_method) != ("disjunction", "rrf"):
-                                for i in range(len(full_search_results["hits"])):
-                                    self.assertEqual(full_search_results["hits"][i]["_score"],
-                                                     paginated_search_results["hits"][i]["_score"])
+                            # TODO: Compare actual result IDs and scores when fix is implemented.
+                            # Scores and IDs need to match
+                            #for i in range(len(full_search_results["hits"])):
+                            #    self.assertEqual(full_search_results["hits"][i]["_score"],
+                            #                     paginated_search_results["hits"][i]["_score"])
 
     @unittest.skip
     def test_pagination_hybrid_lexical_tensor_with_modifiers(self):

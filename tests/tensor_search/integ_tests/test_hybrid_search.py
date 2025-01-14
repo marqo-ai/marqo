@@ -1074,6 +1074,68 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(modified_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-1000*3)
                 self.assertAlmostEqual(modified_res["hits"][-1]["_score"], unmodified_scores["doc10"] * -1000 * 3)
 
+                # Show that we can use just 1 or the other (multiply or add)
+                with self.subTest("Only multiply_score_by"):
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="HELLO WORLD",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1000},
+                                {"field_name": "mult_field_2", "weight": -1000}
+                            ],
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=10
+                    )
+
+                    self.assertEqual(modified_res["hits"][0]["_id"], "doc9")
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc9"] * 1000 * 3)
+
+                    self.assertEqual(modified_res["hits"][0]["_id"], "doc9")  # highest score (score*1000*3)
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc9"] * 1000 * 3)
+
+                    self.assertEqual(modified_res["hits"][1]["_id"], "doc8")  # (score*1000*2)
+                    self.assertAlmostEqual(modified_res["hits"][1]["_score"], unmodified_scores["doc8"] * 1000 * 2)
+
+                    # doc6 and doc7 have the same score, so their order is non-deterministic
+                    self.assertSetEqual({'doc6', 'doc7'}, {hit["_id"] for hit in modified_res["hits"][2:4]})
+                    for hits in modified_res["hits"][2:4]:
+                        self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
+
+                    self.assertEqual(modified_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-1000*3)
+                    self.assertAlmostEqual(modified_res["hits"][-1]["_score"], unmodified_scores["doc10"] * -1000 * 3)
+
+                with self.subTest("Only add_to_score"):
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="HELLO WORLD",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=10
+                    )
+
+                    self.assertEqual(modified_res["hits"][0]["_id"], "doc7")
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc7"] + 5*1)
+                    for hits in modified_res["hits"][1:]:
+                        self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
+
 
     def test_hybrid_search_global_score_modifiers_with_rerank_count(self):
         """
