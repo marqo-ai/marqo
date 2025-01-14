@@ -1144,27 +1144,29 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             model=Model(
                 name="my-custom-language-bind-model",
                 properties={
-                "dimensions": 768,
-                "type": "languagebind",
-                "supportedModalities": ["text", "audio", "video", "image"],
-                "modelLocation": {
-                    "video": {
-                        "hf": {
-                            "repoId": "Marqo/LanguageBind_Video_V1.5_FT",
+                    "dimensions": 768,
+                    "type": "languagebind",
+                    "supportedModalities": ["text", "audio", "video", "image"],
+                    "modelLocation": {
+                        "video": {
+                            "hf": {
+                                "repoId": "Marqo/LanguageBind_Video_V1.5_FT",
+                            },
                         },
+                        "audio": {
+                            "hf": {
+                                "repoId": "Marqo/LanguageBind_Audio_FT",
+                            },
+                        },
+                        "image":{
+                            "hf": {
+                                "repoId": "Marqo/LanguageBind_Image",
+                            },
+                        }
                     },
-                    "audio": {
-                        "hf": {
-                            "repoId": "Marqo/LanguageBind_Audio_FT",
-                        },
-                    },
-                    "image":{
-                        "hf": {
-                            "repoId": "Marqo/LanguageBind_Image",
-                        },
-                    }
                 },
-            }),
+                custom=True
+            ),
             treat_urls_and_pointers_as_images = True,
             treat_urls_and_pointers_as_media = True
         )
@@ -1182,6 +1184,10 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
     def tearDownClass(cls) -> None:
         super().tearDownClass()
         s2_inference.clear_loaded_models()
+
+    def test_nothing(self):
+        print
+
 
     def test_language_bind_model_can_add_all_media_modalities(self):
         """Test to ensure that the LanguageBind model can add all media types to the index"""
