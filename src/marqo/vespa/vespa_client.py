@@ -810,7 +810,7 @@ class VespaClient:
                 asyncio.create_task(
                     self._update_document_async(semaphore, async_client, document, schema, timeout, vespa_id_field)
                 )
-                for document in batch
+                for document in batch # this is coming from partial updates request (this gets populated with timestamp before this update_documents_batch_async)
             ]
             await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
@@ -829,13 +829,16 @@ class VespaClient:
                                      timeout: int, vespa_id_field: str) -> UpdateDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
+        types = document.field_types
 
         # only used for documents that are not updated
         error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
-
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
-            data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\" and {schema}.marqo__create_timestamp=={document.create_timestamp}'
+            data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
+            for key, value in types.items():
+                data["condition"] += f' and {schema}.marqo__field_types{{\"{key}\"}}==\"{value}\"'
+                # data["condition"].extend(f'{schema}.marqo__field_types.{key}==\"{value}\"'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
             except httpx.RequestError as e:

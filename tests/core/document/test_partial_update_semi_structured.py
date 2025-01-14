@@ -10,10 +10,10 @@ class TestPartialUpdate(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        # semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured')
-        # cls.create_indexes([semi_structured_index_request])
-        # cls.index = cls.indexes[0]
-        cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
+        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured_2')
+        cls.create_indexes([semi_structured_index_request])
+        cls.index = cls.indexes[0]
+        # cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
 
     @classmethod
     def tearDownClass(cls):
@@ -68,10 +68,14 @@ class TestPartialUpdate(MarqoTestCase):
 
     # Test update single field
     def test_partial_update_should_update_bool_field(self):
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        print("Printing the document", doc)
         res = self.config.document.partial_update_documents([{'_id': '1', 'bool_field': False}], self.index)
+        print(res)
         self.assertFalse(res.errors)
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        print(doc)
         self.assertFalse(doc['bool_field'])
         self._assert_fields_unchanged(doc, ['bool_field'])
 
@@ -110,7 +114,7 @@ class TestPartialUpdate(MarqoTestCase):
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
         self.assertEqual(2.0, doc['int_map.a'])
-        self.assertNotIn('int_map.b', doc)  # b will be deleted
+        self.assertNotIn('int_map.b', doc)  # b will be deleted, as it's not in the partial_update_documents call. This seems like we make updates at a field level, not at things defined in the field. So if I wanna update int_map entire int_map will be updated together, I cannot go and change int_map.get('a') to something else just. I will have to specific int_map {'a': 2.0, 'b': 3} such that b is not deleted in the process.
         self.assertEqual(3, doc['int_map.c'])
         self.assertEqual(4.0, doc['int_map.d'])
         self._assert_fields_unchanged(doc, ['int_map'])
@@ -163,38 +167,69 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(0, len(res['hits']))
 
     def test_partial_update_should_update_score_modifiers(self):
+
         pass
 
     # Test update multiple fields
     def test_partial_update_should_update_multiple_fields(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'int_field': 500, 'bool_field': False, 'float_field': 500.0}], self.index)
+        self.assertFalse(res.errors)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        print(doc)
 
     # Test remove field
+    # This feature itself is unimplemented. #TODO: Implement the feature
     def test_partial_update_should_remove_field_if_set_to_none(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'int_field': "None"}], self.index)
+        print(res)
+        # self.assertFalse(res.errors)
+        # doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        # self.assertNotIn('int_field', doc)
 
     # Test add new fields
     def test_partial_update_should_add_new_fields(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'new_field': 500}], self.index)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        self.assertEqual(500, doc['new_field'])
 
     # Reject any tensor field change
     def test_partial_update_should_reject_tensor_field(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'tensor_field': 'new_title'}], self.index)
+        print(res)
+        self.assertTrue(res.errors)
 
     def test_partial_update_should_reject_tensor_subfield(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'tensor_subfield': 'new_description'}], self.index)
+        print(res)
+        self.assertTrue(res.errors)
 
     def test_partial_update_should_reject_custom_vector_field(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'custom_vector_field': {
+            "content": "efgh",
+            "vector": [1.0] * 32
+        }}], self.index)
+        print(res)
+        self.assertTrue(res.errors)
 
     def test_partial_update_should_reject_multimodal_combo_field(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '1', 'multimodal_combo_field': {
+            "tensor_field": "new_title",
+            "tensor_subfield": "new_description"
+        }}], self.index)
+        print(res)
+        self.assertTrue(res.errors)
 
-    # Other edge cases
-    # * reject numeric array field type
-    # * reject adding new lexical field
-    # * invalid field name
-    # * invalid contents
+    def test_partial_update_should_reject_numeric_array_field_type(self):
+        res = self.config.document.partial_update_documents([{'_id': '1', 'int_array': [1, 2, 3]}], self.index)
+        print(res)
+        self.assertTrue(res.errors)
 
-    # Concurrent update, last write wins
-    # Concurrent update with add doc override, last write winds
+    def test_partial_update_should_reject_new_lexical_field(self):
+        res = self.config.document.partial_update_documents([{'_id': '1', 'new_lexical_field': 'some string that signifies new lexical field'}], self.index)
+        print(res)
+        self.assertTrue(res.errors)
+
+    def test_partial_update_invalid_field_name(self):
+        res = self.config.document.partial_update_documents([{'_id': '1', 'marqo__': 1}], self.index)
+        print(res)
+        self.assertTrue(res.errors)

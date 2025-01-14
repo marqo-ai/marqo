@@ -90,7 +90,7 @@ class Document:
         return self.partial_update_documents(partial_documents, marqo_index)
 
     def partial_update_documents(self, partial_documents: List[Dict], marqo_index) \
-            -> MarqoUpdateDocumentsResponse:
+            -> MarqoUpdateDocumentsResponse: # partial_documents is the one you have given in request
         """Partially update documents in the given index by marqo_index object.
 
         The partial_documents without _id will error out and the error will be returned in the response without
@@ -126,19 +126,9 @@ class Document:
         # Remove duplicated documents based on _id
         partial_documents, doc_ids = self.remove_duplicated_documents(partial_documents)
 
-        existing_vespa_documents = []
-        if marqo_index.type == IndexType.SemiStructured:
-            with RequestMetricsStore.for_request().time("partial_update.vespa._get_batch"):
-                get_batch_response = self.vespa_client.get_batch(list(doc_ids), marqo_index.schema_name)
-            existing_vespa_documents = [doc_response.document for doc_response in get_batch_response.responses
-                                        if doc_response.status == 200]
-
-        existing_documents_map = {doc.fields['marqo__id']: doc.dict() for doc in existing_vespa_documents}
-
         for index, doc in enumerate(partial_documents):
             try:
-                vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(
-                    doc, existing_documents_map.get(doc['_id'], None)))
+                vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc))
                 vespa_documents.append(vespa_document)
             except ParsingError as e:
                 unsuccessful_docs.append(

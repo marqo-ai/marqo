@@ -24,7 +24,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
-
+    field_types: Dict[str, str] = Field(default_factory=dict, alias='marqo__field_types')
 
 
 class SemiStructuredVespaDocument(MarqoBaseModel):
@@ -104,24 +104,31 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 instance.text_fields[field.lexical_field_name] = field_content
                 if len(field_content) <= marqo_index.filter_string_max_length:
                     instance.fixed_fields.short_string_fields[field_name] = field_content
+                    instance.fixed_fields.field_types[field_name] = 'short_string'
             elif isinstance(field_content, bool):
                 instance.fixed_fields.bool_fields[field_name] = int(field_content)
+                instance.fixed_fields.field_types[field_name] = 'bool'
             elif isinstance(field_content, list) and all(isinstance(elem, str) for elem in field_content):
                 instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
+                instance.fixed_fields.field_types[field_name] = 'string_array'
             elif isinstance(field_content, int):
                 instance.fixed_fields.int_fields[field_name] = field_content
                 instance.fixed_fields.score_modifiers_fields[field_name] = field_content
+                instance.fixed_fields.field_types[field_name] = 'int'
             elif isinstance(field_content, float):
                 instance.fixed_fields.float_fields[field_name] = field_content
                 instance.fixed_fields.score_modifiers_fields[field_name] = field_content
+                instance.fixed_fields.field_types[field_name] = 'float'
             elif isinstance(field_content, dict):
                 for k, v in field_content.items():
                     if isinstance(v, int):
                         instance.fixed_fields.int_fields[f"{field_name}.{k}"] = v
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
+                        instance.fixed_fields.field_types[f"{field_name}.{k}"] = 'int_map'
                     elif isinstance(v, float):
                         instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
+                        instance.fixed_fields.field_types[f"{field_name}.{k}"] = 'float_map'
             else:
                 raise MarqoDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "
@@ -180,6 +187,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
         marqo_document['marqo__create_timestamp'] = self.fixed_fields.create_timestamp
+        marqo_document.update(self.fixed_fields.field_types)
 
         # text fields
         for field_name, field_content in self.text_fields.items():
