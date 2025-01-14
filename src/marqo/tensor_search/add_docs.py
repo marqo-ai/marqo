@@ -91,7 +91,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
         )
     else:
         supported_modalities = marqo_index_model.properties.get('supported_modalities') or \
-                                marqo_index_model.properties.get('supportedModalities')
+                                marqo_index_model.properties.get('supportedModalities') or []
 
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
