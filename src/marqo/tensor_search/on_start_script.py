@@ -284,9 +284,12 @@ class SetEnableVideoGPUAcceleration:
                 self.logger.debug(f"Failed to use GPU acceleration for video processing. We will disable it. "
                                   f"Original error message: {e}")
                 os.environ[EnvVars.MARQO_ENABLE_VIDEO_GPU_ACCELERATION] = "FALSE"
+                logger.info(f"Video processing with GPU acceleration is disabled")
         elif env_value == "TRUE":
             self._check_video_gpu_acceleration_availability()
+            logger.info(f"Video processing with GPU acceleration is enabled")
         elif env_value == "FALSE":
+            logger.info(f"Video processing with GPU acceleration is disabled")
             pass
         else:
             raise exceptions.EnvVarError(
