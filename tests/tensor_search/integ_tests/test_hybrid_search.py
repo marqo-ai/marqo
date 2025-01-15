@@ -1384,7 +1384,39 @@ class TestHybridSearch(MarqoTestCase):
                     # Ensure score is modified
                     self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"] + 0.0001)
 
-            with self.subTest("Case 7: No rerankCount"):
+            with self.subTest("Case 7: rerankCount == 0"):
+                # Result order and scores should be same as original search
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1},
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 1}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=5,
+                    rerank_count=0
+                )
+                self.assertEqual(len(modified_res["hits"]), 5)
+                self.assertEqual(len(unmodified_res["hits"]), 5)
+                self.assertEqual("both1", unmodified_res["hits"][0]["_id"])
+                self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][1:3]]), {"tensor1", "lexical1"})
+                self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][3:5]]), {"tensor2", "lexical2"})
+
+                for hit in modified_res["hits"]:
+                    self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
+
+            with self.subTest("Case 8: No rerankCount"):
                 # Set limit to 3 so all results are included, but since no rerankCount, it will rerank everything
                 # Original top all: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
                 # Reranked top all: tensor2, tensor1, both1, lexical2, lexical1

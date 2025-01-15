@@ -583,7 +583,7 @@ class StructuredVespaIndex(VespaIndex):
             query["marqo__hybrid.alpha"] = marqo_query.hybrid_parameters.alpha
             query["marqo__hybrid.rrf_k"] = marqo_query.hybrid_parameters.rrfK
 
-        if marqo_query.rerank_count:
+        if marqo_query.rerank_count is not None:
             query["marqo__hybrid.rerankCountGlobal"] = marqo_query.rerank_count
 
         return query
