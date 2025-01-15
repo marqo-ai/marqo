@@ -134,6 +134,8 @@ class SearchQuery(BaseMarqoModel):
                 raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search method.")
             if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
                 raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
+            if rerank_count < 0:
+                raise ValueError(f"rerankCount cannot be negative.")
 
         return values
 

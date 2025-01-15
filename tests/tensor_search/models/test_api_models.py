@@ -82,6 +82,14 @@ class TestSearchQuery(MarqoTestCase):
                 )
             self.assertIn("only supported for 'HYBRID' search with the 'RRF' rankingMethod", str(e.exception))
 
+    def test_search_query_rerank_count_fails_if_negative(self):
+        """
+        Tests that creating a search query with rerank_count fails if the value is negative.
+        """
+        with self.assertRaises(ValueError) as e:
+            _ = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, rerankCount=-5)
+        self.assertIn("rerankCount cannot be negative", str(e.exception))
+
     def test_search_query_rerank_count_default_value(self):
         """
         Tests that rerank_count is set to None if not provided.
