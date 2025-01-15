@@ -14,7 +14,7 @@ on:
       - releases/*
 
 concurrency:
-  group: unit-tests-${{ github.ref }}
+  group: integ-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
