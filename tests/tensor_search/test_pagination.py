@@ -568,7 +568,7 @@ class TestPagination(MarqoTestCase):
                 index_name=self.index_name_1, auto_refresh=True,
                 docs=[d0, d1, d2], device="cpu")
         )
-        res = tensor_search._lexical_search(
+        res = tensor_search.search(
             config=self.config, index_name=self.index_name_1, text="extravagant",
-            searchable_attributes=[], result_count=3, offset=1)
+            searchable_attributes=[], result_count=3, offset=1, search_method="LEXICAL")
         assert res["hits"] == []

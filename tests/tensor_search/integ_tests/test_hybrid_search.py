@@ -2120,6 +2120,25 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("global score modifiers is only supported for "
                               "Marqo indexes created with Marqo 2.15.0", str(e.exception))
 
+    def test_hybrid_search_rerank_count_old_version_fails(self):
+        """
+        rerank_count can only be set for hybrid Marqo 2.15.0 onward
+        """
+        # Legacy Index too old for root score_modifiers
+        for index in [self.unstructured_default_text_index, self.semi_structured_text_index_2_14,
+                      self.structured_text_index_2_14]:
+            with self.subTest(index=type(index)):
+                with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+                    res = tensor_search.search(
+                        config=self.config,
+                        index_name=self.unstructured_default_text_index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        rerank_count=5
+                    )
+                self.assertIn("'rerankCount' search parameter is only supported for indexes created "
+                              "with Marqo version 2.15.0", str(e.exception))
+
     def test_hybrid_search_score_modifiers_wrong_ranking_method_fails(self):
         # Structured / semi-structured score modifiers but not RRF
         with self.subTest("score_modifiers for structured/semi-structured but not RRF ranking"):
