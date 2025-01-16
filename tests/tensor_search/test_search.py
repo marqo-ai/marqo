@@ -638,11 +638,10 @@ class TestVectorSearch(MarqoTestCase):
         index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         for to_search in [1, 1.2, True, "blah"]:
             assert "hits" in tensor_search._lexical_search(
-                text=str(to_search), config=self.config, index_name=self.index_name_1,
-                marqo_index=index_object
+                text=str(to_search), config=self.config, marqo_index=index_object
             )
             assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.index_name_1, device="cpu",
+                query=str(to_search), config=self.config, device="cpu",
                 marqo_index=index_object
             )
 

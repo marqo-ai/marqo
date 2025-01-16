@@ -1,15 +1,12 @@
-import time
+import copy
 import unittest
 
+from marqo.api.exceptions import InvalidArgError, IndexNotFoundError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-import copy
-from marqo.api.exceptions import InvalidArgError, IndexNotFoundError
 from tests.marqo_test import MarqoTestCase
-import random
-import requests
-import json
-from marqo.core.models.add_docs_params import AddDocsParams
+
 
 @unittest.skip
 class TestLexicalSearch(MarqoTestCase):

@@ -29,7 +29,7 @@ import semver
 
 class HybridSearch:
     def search(
-            self, config: Config, index_name: str, marqo_index: MarqoIndex, query: Optional[Union[str, CustomVectorQuery]],
+            self, config: Config, marqo_index: MarqoIndex, query: Optional[Union[str, CustomVectorQuery]],
             result_count: int = 5, offset: int = 0, rerank_count: Optional[int] = None,
             ef_search: Optional[int] = None, approximate: bool = True,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
@@ -42,7 +42,6 @@ class HybridSearch:
 
             Args:
                 config:
-                index_name:
                 marqo_index: index object fetched by calling function
                 query: either a string query (which can be a URL or natural language text), a dict of
                     <query string>:<weight float> pairs, or None with a context
@@ -84,6 +83,8 @@ class HybridSearch:
             raise api_exceptions.MarqoWebError('Boosting is not currently supported with Vespa')
 
         RequestMetricsStore.for_request().start("search.hybrid.processing_before_vespa")
+
+        index_name = marqo_index.name
 
         # Version checks (different for structured and unstructured)
         marqo_index_version = marqo_index.parsed_marqo_version()

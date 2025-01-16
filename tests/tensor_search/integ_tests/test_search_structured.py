@@ -178,9 +178,7 @@ class TestSearchStructured(MarqoTestCase):
                 )
                 index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
                 search_res = tensor_search._vector_text_search(
-                    config=self.config, index_name=index_name,
-                    query=" efgh ", result_count=10, device="cpu",
-                    marqo_index=index_object
+                    config=self.config, query=" efgh ", result_count=10, device="cpu", marqo_index=index_object
                 )
                 assert len(search_res['hits']) == 2
 
@@ -214,7 +212,7 @@ class TestSearchStructured(MarqoTestCase):
         try:
             index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
             search_res = tensor_search._vector_text_search(
-                config=self.config, index_name=self.default_text_index, marqo_index=index_object,
+                config=self.config, marqo_index=index_object,
                 result_count=5, query="some text...")
             raise AssertionError
         except errors.InternalError:
@@ -223,7 +221,7 @@ class TestSearchStructured(MarqoTestCase):
     def test_vector_search_against_empty_index(self):
         index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index,
+            config=self.config,
             marqo_index=index_object,
             result_count=5, query="some text...", device="cpu")
         assert {'hits': []} == search_res
@@ -257,7 +255,7 @@ class TestSearchStructured(MarqoTestCase):
         )
         index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index, query=query_text, device="cpu",
+            config=self.config, query=query_text, device="cpu",
             marqo_index=index_object
         )
 
@@ -541,11 +539,10 @@ class TestSearchStructured(MarqoTestCase):
         for to_search in [1, 1.2, True, "blah"]:
 
             assert "hits" in tensor_search._lexical_search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
-                marqo_index=index_object
+                text=str(to_search), config=self.config, marqo_index=index_object
             )
             assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.default_text_index, device="cpu",
+                query=str(to_search), config=self.config, device="cpu",
                 marqo_index=index_object
             )
 
