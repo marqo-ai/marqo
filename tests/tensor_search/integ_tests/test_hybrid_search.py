@@ -218,8 +218,7 @@ class TestHybridSearch(MarqoTestCase):
         Test all hybrid search calls the correct vespa queries.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
-                      self.unstructured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
             with self.subTest(index=index.name):
                 original_query = self.config.vespa_client.query
                 def pass_through_query(*arg, **kwargs):
@@ -2454,3 +2453,29 @@ class TestHybridSearch(MarqoTestCase):
         # TODO: Use api.search() instead of tensor_search.search()
         # Covered in API tests
         pass
+
+    def test_correct_error_is_raised_if_rerank_count_is_provided_on_old_marqo_version(self):
+        """
+        Tests that an error is raised if rerank_count is provided on an old marqo version.
+        """
+
+        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_default_text_index.name,
+                text="dogs",
+                search_method="HYBRID",
+                rerank_count=3,
+                result_count=3
+            )
+
+        self.assertIn("Marqo version 2.15.0 or later", str(e.exception))
+
+        _ = tensor_search.search(
+            config=self.config,
+            index_name=self.unstructured_default_text_index.name,
+            text="dogs",
+            search_method="HYBRID",
+            # rerank_count=3, # This should not raise an error
+            result_count=3
+        )
