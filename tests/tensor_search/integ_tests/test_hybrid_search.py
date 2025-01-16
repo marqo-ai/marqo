@@ -218,7 +218,8 @@ class TestHybridSearch(MarqoTestCase):
         Test all hybrid search calls the correct vespa queries.
         """
 
-        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
+                      self.unstructured_default_text_index]:
             with self.subTest(index=index.name):
                 original_query = self.config.vespa_client.query
                 def pass_through_query(*arg, **kwargs):
@@ -245,7 +246,7 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         text="dogs",
                         search_method="HYBRID",
-                        rerank_count=3,
+                        rerank_count=None if index == self.unstructured_default_text_index else 3,
                         result_count=3,
                         hybrid_parameters=HybridParameters(
                             retrievalMethod="disjunction",
