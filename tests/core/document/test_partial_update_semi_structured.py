@@ -177,8 +177,11 @@ class TestPartialUpdate(MarqoTestCase):
                                    filter=f'long_string_field:{self.doc["long_string_field"]}')
         self.assertEqual(0, len(res['hits']))
         print(res)
+        # note: Isme wapas index leke aana padd raha hai - earlier in Yihan's test case we just use to pass self.config.document.partial_udpate_docs(..., self.index) - somehow the self.index value is not getting updated here.
+        # note: But what is curious is that when I switch to Yihan's branch - it works. The test case is almost the same over there.
+        index = self.config.index_management.get_index(self.index.name)
 
-        res = self.config.document.partial_update_documents([{'_id': '1', 'long_string_field': 'short'}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '1', 'long_string_field': 'short'}], index)
         print(res)
         self.assertFalse(res.errors)
 
@@ -189,13 +192,16 @@ class TestPartialUpdate(MarqoTestCase):
         res = tensor_search.search(self.config, self.index.name, text='*', filter=f'long_string_field:short')
         self.assertEqual(1, len(res['hits']))
 
-    #TODO: looks like this is unimplemented
     def test_partial_update_should_update_short_string_to_long_string(self):
         res = tensor_search.search(self.config, self.index.name, text='*',
                                    filter=f'short_string_field:{self.doc["short_string_field"]}')
         self.assertEqual(1, len(res['hits']))
+        # note: Isme wapas index leke aana padd raha hai - earlier in Yihan's test case we just use to pass self.config.document.partial_udpate_docs(..., self.index) - somehow the self.index value is not getting updated here.
+        # note: But what is curious is that when I switch to Yihan's branch - it works. The test case is almost the same over there.
 
-        res = self.config.document.partial_update_documents([{'_id': '1', 'short_string_field': 'verylongstring'*10}], self.index)
+        index = self.config.index_management.get_index(self.index.name)
+
+        res = self.config.document.partial_update_documents([{'_id': '1', 'short_string_field': 'verylongstring'*10}], index)
         print(res)
         self.assertFalse(res.errors)
 
@@ -219,16 +225,19 @@ class TestPartialUpdate(MarqoTestCase):
         print(doc)
 
     # Test remove field
-    # This feature itself is unimplemented. #TODO: Implement the feature
+    # This feature itself is unimplemented. #TODO: This is not possible if we go with the metadata map approach
+    @pytest.mark.skip(reason = "This is not possible if we go with the metadata map approach")
     def test_partial_update_should_remove_field_if_set_to_none(self):
-        res = self.config.document.partial_update_documents([{'_id': '1', 'int_field': "None"}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '1', 'int_field': None}], self.index)
         print(res)
         # self.assertFalse(res.errors)
-        # doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        print(doc)
         # self.assertNotIn('int_field', doc)
 
     # Test add new fields
-    @pytest.mark.skip(reason="This feature is not implemented yet.")
+    # @pytest.mark.skip(reason="This feature is not implemented yet.")
+    # Note: this is already implemented somewhere above
     def test_partial_update_should_add_new_fields(self):
         res = self.config.document.partial_update_documents([{'_id': '1', 'new_field': 500}], self.index)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')

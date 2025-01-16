@@ -226,8 +226,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             if isinstance(marqo_field_value, bool):
                 # Assign values to a map: https://docs.vespa.ai/en/reference/document-json-format.html#assign-map-field
-                field_name = f'{common.BOOL_FIELDS}{{{marqo_field_key}}}'
-                vespa_fields[field_name] = {"assign": int(marqo_field_value)}
+                string_field_name = f'{common.BOOL_FIELDS}{{{marqo_field_key}}}'
+                vespa_fields[string_field_name] = {"assign": int(marqo_field_value)}
                 vespa_field_types[marqo_field_key] = 'bool'
             elif isinstance(marqo_field_value, dict):
                 for key, value in marqo_field_value.items():
@@ -259,11 +259,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                                                     f'partial updates')
                 vespa_fields[lexical_field_name] = {"assign": marqo_field_value}
 
-                field_name = f'{common.SHORT_STRINGS_FIELDS}{{{marqo_field_key}}}'
+                string_field_name = f'{common.SHORT_STRINGS_FIELDS}{{{marqo_field_key}}}'
                 if len(marqo_document[marqo_field_key]) <= self.get_marqo_index().filter_string_max_length:
-                    vespa_fields[field_name] = {"assign": marqo_document[marqo_field_key]}
+                    vespa_fields[string_field_name] = {"assign": marqo_document[marqo_field_key]}
                 else:
-                    vespa_fields[field_name] = {"remove": 0}
+                    vespa_fields[string_field_name] = {"remove": 0}
                 vespa_field_types[marqo_field_key] = 'string'
             else:
                 raise MarqoDocumentParsingError(f'Unsupported field type {type(marqo_field_value)} for field {marqo_field_key} in doc {vespa_id}')

@@ -104,7 +104,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 instance.text_fields[field.lexical_field_name] = field_content
                 if len(field_content) <= marqo_index.filter_string_max_length:
                     instance.fixed_fields.short_string_fields[field_name] = field_content
-                    instance.fixed_fields.field_types[field_name] = 'short_string'
+                instance.fixed_fields.field_types[field_name] = 'string'
             elif isinstance(field_content, bool):
                 instance.fixed_fields.bool_fields[field_name] = int(field_content)
                 instance.fixed_fields.field_types[field_name] = 'bool'
