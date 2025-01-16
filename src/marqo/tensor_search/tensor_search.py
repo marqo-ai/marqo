@@ -1571,10 +1571,10 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
     marqo_index_version = marqo_index.parsed_marqo_version()
     if rerank_depth is not None \
-            and marqo_index_version < constants.MARQO_RERANK_COUNT_MINIMUM_VERSION:
+            and marqo_index_version < constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION:
         raise core_exceptions.UnsupportedFeatureError(
             f"The 'rerankDepth' search parameter is only supported for indexes created with Marqo version "
-            f"{str(constants.MARQO_RERANK_COUNT_MINIMUM_VERSION)} or later. "
+            f"{str(constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION)} or later. "
             f"This index was created with Marqo {marqo_index_version}."
         )
 
