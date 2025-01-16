@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 import httpcore
 import httpx
+import orjson
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
@@ -245,7 +246,7 @@ class VespaClient:
 
         self._query_raise_for_status(resp)
 
-        return QueryResult(**resp.json())
+        return QueryResult(**orjson.loads(resp.text))
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """

@@ -1,6 +1,7 @@
 """The API entrypoint for Tensor Search"""
 import json
-from typing import List
+import orjson
+from typing import List, Dict
 
 import pydantic
 import uvicorn
@@ -83,6 +84,11 @@ app.router.route_class = MarqoCustomRoute
 
 def get_config():
     return _config
+
+
+class ORJSONResponse(JSONResponse):
+    def render(self, content: Dict) -> bytes:
+        return orjson.dumps(content)
 
 
 @app.exception_handler(base_exceptions.MarqoError)
@@ -267,7 +273,7 @@ def create_index(index_name: str, settings: IndexSettings, marqo_config: config.
 def search(search_query: SearchQuery, index_name: str, device: str = Depends(api_validation.validate_device),
            marqo_config: config.Config = Depends(get_config)):
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
-        return tensor_search.search(
+        result = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
             searchable_attributes=search_query.searchableAttributes,
@@ -284,6 +290,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             text_query_prefix=search_query.textQueryPrefix,
             hybrid_parameters=search_query.hybridParameters
         )
+        return ORJSONResponse(result)
 
 
 @app.post("/indexes/{index_name}/recommend")
