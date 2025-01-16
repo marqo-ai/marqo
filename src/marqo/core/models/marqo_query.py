@@ -17,7 +17,7 @@ class MarqoQuery(StrictBaseModel, ABC):
     index_name: str
     limit: int
     offset: Optional[int] = None
-    rerank_count: Optional[int] = None
+    rerank_depth: Optional[int] = None
     searchable_attributes: Optional[List[str]] = None
     attributes_to_retrieve: Optional[List[str]] = None
     filter: Optional[SearchFilter] = None

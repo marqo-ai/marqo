@@ -51,17 +51,17 @@ class TestSearchQuery(MarqoTestCase):
         search_query = SearchQuery(q="test")
         self.assertEqual(SearchMethod.TENSOR, search_query.searchMethod)
 
-    def test_search_query_rerank_count_fails_if_not_hybrid_search_rrf(self):
+    def test_search_query_rerank_depth_fails_if_not_hybrid_search_rrf(self):
         """
-        Tests that creating a search query with rerank_count fails if not using
+        Tests that creating a search query with rerank_depth fails if not using
         hybrid search with the RRF rankingMethod.
         """
-        # TODO: Remove this test when rerank_count is supported for tensor, lexical, tensor/lexical, lexical/tensor search.
+        # TODO: Remove this test when rerank_depth is supported for tensor, lexical, tensor/lexical, lexical/tensor search.
 
         # Non-hybrid search
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             with self.assertRaises(ValueError) as e:
-                _ = SearchQuery(q="test", searchMethod=search_method, rerankCount=5)
+                _ = SearchQuery(q="test", searchMethod=search_method, rerankDepth=5)
             self.assertIn("only supported for 'HYBRID' search", str(e.exception))
 
         # Hybrid search with non-RRF rankingMethod
@@ -73,7 +73,7 @@ class TestSearchQuery(MarqoTestCase):
         ]:
             with self.assertRaises(ValueError) as e:
                 _ = SearchQuery(
-                    q="test", rerankCount=5,
+                    q="test", rerankDepth=5,
                     searchMethod=SearchMethod.HYBRID,
                     hybridParameters=HybridParameters(
                         retrievalMethod=retrieval_method,
@@ -82,20 +82,20 @@ class TestSearchQuery(MarqoTestCase):
                 )
             self.assertIn("only supported for 'HYBRID' search with the 'RRF' rankingMethod", str(e.exception))
 
-    def test_search_query_rerank_count_fails_if_negative(self):
+    def test_search_query_rerank_depth_fails_if_negative(self):
         """
-        Tests that creating a search query with rerank_count fails if the value is negative.
+        Tests that creating a search query with rerank_depth fails if the value is negative.
         """
         with self.assertRaises(ValueError) as e:
-            _ = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, rerankCount=-5)
-        self.assertIn("rerankCount cannot be negative", str(e.exception))
+            _ = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, rerankDepth=-5)
+        self.assertIn("rerankDepth cannot be negative", str(e.exception))
 
-    def test_search_query_rerank_count_default_value(self):
+    def test_search_query_rerank_depth_default_value(self):
         """
-        Tests that rerank_count is set to None if not provided.
+        Tests that rerank_depth is set to None if not provided.
         """
-        search_query = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, limit=10, offset=5, rerankCount=20)
-        self.assertEqual(20, search_query.rerankCount)
+        search_query = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, limit=10, offset=5, rerankDepth=20)
+        self.assertEqual(20, search_query.rerankDepth)
 
         search_query = SearchQuery(q="test", searchMethod=SearchMethod.HYBRID, limit=10, offset=5)
-        self.assertEqual(None, search_query.rerankCount)
+        self.assertEqual(None, search_query.rerankDepth)

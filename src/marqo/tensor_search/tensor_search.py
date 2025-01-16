@@ -1457,7 +1457,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 
 
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
-           result_count: int = 3, offset: int = 0, rerank_count: Optional[int] = None,
+           result_count: int = 3, offset: int = 0, rerank_depth: Optional[int] = None,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
@@ -1487,7 +1487,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         text:
         result_count:
         offset:
-        rerank_count:
+        rerank_depth:
         search_method:
         searchable_attributes:
         verbose:
@@ -1570,10 +1570,10 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     # Fetch marqo index to pass to search method
     marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
     marqo_index_version = marqo_index.parsed_marqo_version()
-    if rerank_count is not None \
+    if rerank_depth is not None \
             and marqo_index_version < constants.MARQO_RERANK_COUNT_MINIMUM_VERSION:
         raise core_exceptions.UnsupportedFeatureError(
-            f"The 'rerankCount' search parameter is only supported for indexes created with Marqo version "
+            f"The 'rerankDepth' search parameter is only supported for indexes created with Marqo version "
             f"{str(constants.MARQO_RERANK_COUNT_MINIMUM_VERSION)} or later. "
             f"This index was created with Marqo {marqo_index_version}."
         )
@@ -1604,7 +1604,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             from marqo.core.search.hybrid_search import HybridSearch
             search_result = HybridSearch().search(
                 config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
-                rerank_count=rerank_count,
+                rerank_depth=rerank_depth,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,

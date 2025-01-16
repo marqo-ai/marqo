@@ -246,7 +246,7 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         text="dogs",
                         search_method="HYBRID",
-                        rerank_count=None if index == self.unstructured_default_text_index else 3,
+                        rerank_depth=None if index == self.unstructured_default_text_index else 3,
                         result_count=3,
                         hybrid_parameters=HybridParameters(
                             retrievalMethod="disjunction",
@@ -316,8 +316,8 @@ class TestHybridSearch(MarqoTestCase):
                                      {'marqo__lexical_text_field_1': 1, 'marqo__lexical_text_field_2': 1})
                     self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"],
                                      {'marqo__embeddings_text_field_2': 1, 'marqo__embeddings_text_field_3': 1})
-                    # global rerankCount & score modifiers are not available for legacy unstructured
-                    self.assertEqual(vespa_query_kwargs["marqo__hybrid.rerankCountGlobal"], 3)
+                    # global rerankDepth & score modifiers are not available for legacy unstructured
+                    self.assertEqual(vespa_query_kwargs["marqo__hybrid.rerankDepthGlobal"], 3)
 
                 elif isinstance(index, UnstructuredMarqoIndex):
                     self.assertIn("({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
@@ -1137,11 +1137,11 @@ class TestHybridSearch(MarqoTestCase):
                         self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
 
 
-    def test_hybrid_search_global_score_modifiers_with_rerank_count(self):
+    def test_hybrid_search_global_score_modifiers_with_rerank_depth(self):
         """
-        Tests that global score modifiers work as expected for RRF / Disjunction with rerankCount
+        Tests that global score modifiers work as expected for RRF / Disjunction with rerankDepth
         Make sure scores of modified results are calculated correctly based on unmodified scores.
-        Return 'limit' results whenever possible. If rerankCount < limit, add on the extra unranked results after reranking.
+        Return 'limit' results whenever possible. If rerankDepth < limit, add on the extra unranked results after reranking.
         """
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
@@ -1187,7 +1187,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][1:3]]), {"tensor1", "lexical1"})
                 self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][3:5]]), {"tensor2", "lexical2"})
 
-                with self.subTest(f"Case 1: limit == rerankCount == result.size()"):
+                with self.subTest(f"Case 1: limit == rerankDepth == result.size()"):
                     modified_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
@@ -1207,7 +1207,7 @@ class TestHybridSearch(MarqoTestCase):
                             verbose=True
                         ),
                         result_count=5,
-                        rerank_count=5
+                        rerank_depth=5
                     )
                     # Order with score modifiers: tensor2, tensor1, both1, lexical2, lexical1
                     self.assertEqual(["tensor2", "tensor1", "both1", "lexical2", "lexical1"],
@@ -1219,7 +1219,7 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertAlmostEqual(modified_res["hits"][3]["_score"], -1*unmodified_scores["lexical2"] - 1)
                     self.assertAlmostEqual(modified_res["hits"][4]["_score"], -2*unmodified_scores["lexical1"] - 2)
 
-                with self.subTest(f"Case 2: limit < rerankCount < hits.size()"):
+                with self.subTest(f"Case 2: limit < rerankDepth < hits.size()"):
                     # Rerank the top 3, then take the top 2 from there.
                     # Original top 3: both1, lexical1, tensor1. Rerank --> tensor1, both1, lexical1
                     # Top 2 after: tensor1, both1
@@ -1242,12 +1242,12 @@ class TestHybridSearch(MarqoTestCase):
                             verbose=True
                         ),
                         result_count=2,
-                        rerank_count=3
+                        rerank_depth=3
                     )
                     self.assertEqual(len(modified_res["hits"]), 2)
                     self.assertEqual(["tensor1", "both1"], [hit["_id"] for hit in modified_res["hits"]])
 
-                with self.subTest(f"Case 3: limit == rerankCount < hits.size()"):
+                with self.subTest(f"Case 3: limit == rerankDepth < hits.size()"):
                     # Rerank the top 3, then only take the top 3.
                     # Original top 2: both1, (lexical1 or tensor1). Rerank --> tensor1, both1, lexical1
                     modified_res = tensor_search.search(
@@ -1269,14 +1269,14 @@ class TestHybridSearch(MarqoTestCase):
                             verbose=True
                         ),
                         result_count=3,
-                        rerank_count=3
+                        rerank_depth=3
                     )
                     self.assertEqual(len(modified_res["hits"]), 3)
                     self.assertEqual(["tensor1", "both1", "lexical1"], [hit["_id"] for hit in modified_res["hits"]])
 
-                with self.subTest(f"Case 4: limit < hits.size() < rerankCount"):
+                with self.subTest(f"Case 4: limit < hits.size() < rerankDepth"):
                     # Attempt to rerank top 10 (will only be able to do 5), then return 4.
-                    # Even though rerankCount > 2*limit, we just rerank the highest number of results possible
+                    # Even though rerankDepth > 2*limit, we just rerank the highest number of results possible
                     # Original top 5: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
                     # Reranked top 5: tensor2, tensor1, both1, lexical2, lexical1
                     # Top 4 after: tensor2, tensor1, both1, lexical2
@@ -1299,12 +1299,12 @@ class TestHybridSearch(MarqoTestCase):
                             verbose=True
                         ),
                         result_count=4,
-                        rerank_count=10
+                        rerank_depth=10
                     )
                     self.assertEqual(len(modified_res["hits"]), 4)
                     self.assertEqual(["tensor2", "tensor1", "both1", "lexical2"], [hit["_id"] for hit in modified_res["hits"]])
 
-                with self.subTest(f"Case 5: rerankCount < hits.size() < limit"):
+                with self.subTest(f"Case 5: rerankDepth < hits.size() < limit"):
                     # Rerank the top 3, but attempt to return 10 (will only be able to do 5).
                     # We can't control whether tensor1 or lexical1 (same rank in their respective lists) is first,
                     #   since it's sorted alphabetically by randomized Vespa ID
@@ -1332,7 +1332,7 @@ class TestHybridSearch(MarqoTestCase):
                             verbose=True
                         ),
                         result_count=10,
-                        rerank_count=3
+                        rerank_depth=3
                     )
                     self.assertEqual(len(modified_res["hits"]), 5)
 
@@ -1353,7 +1353,7 @@ class TestHybridSearch(MarqoTestCase):
                         elif hit["_id"] == "lexical1":
                             self.assertEqual(hit["_score"], -2*unmodified_scores[hit["_id"]] - 2)
 
-                with self.subTest("Case 6: 2*limit < rerankCount"):
+                with self.subTest("Case 6: 2*limit < rerankDepth"):
                     # We attempt to rerank more hits than what is possible to retrieve (tensor + lexical search)
                     # Initial search will give us both1 in both tensor and lexical
                     # Only 1 hit to rerank
@@ -1377,14 +1377,14 @@ class TestHybridSearch(MarqoTestCase):
                             verbose=True
                         ),
                         result_count=1,
-                        rerank_count=4
+                        rerank_depth=4
                     )
                     self.assertEqual(len(modified_res["hits"]), 1)
                     self.assertEqual("both1", modified_res["hits"][0]["_id"])
                     # Ensure score is modified
                     self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"] + 0.0001)
 
-            with self.subTest("Case 7: rerankCount == 0"):
+            with self.subTest("Case 7: rerankDepth == 0"):
                 # Result order and scores should be same as original search
                 modified_res = tensor_search.search(
                     config=self.config,
@@ -1405,7 +1405,7 @@ class TestHybridSearch(MarqoTestCase):
                         verbose=True
                     ),
                     result_count=5,
-                    rerank_count=0
+                    rerank_depth=0
                 )
                 self.assertEqual(len(modified_res["hits"]), 5)
                 self.assertEqual(len(unmodified_res["hits"]), 5)
@@ -1416,8 +1416,8 @@ class TestHybridSearch(MarqoTestCase):
                 for hit in modified_res["hits"]:
                     self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
 
-            with self.subTest("Case 8: No rerankCount"):
-                # Set limit to 3 so all results are included, but since no rerankCount, it will rerank everything
+            with self.subTest("Case 8: No rerankDepth"):
+                # Set limit to 3 so all results are included, but since no rerankDepth, it will rerank everything
                 # Original top all: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
                 # Reranked top all: tensor2, tensor1, both1, lexical2, lexical1
                 # Top 3 after: tensor2, tensor1, both1
@@ -2120,9 +2120,9 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertIn("global score modifiers is only supported for "
                               "Marqo indexes created with Marqo 2.15.0", str(e.exception))
 
-    def test_hybrid_search_rerank_count_old_version_fails(self):
+    def test_hybrid_search_rerank_depth_old_version_fails(self):
         """
-        rerank_count can only be set for hybrid Marqo 2.15.0 onward
+        rerank_depth can only be set for hybrid Marqo 2.15.0 onward
         """
         # Legacy Index too old for root score_modifiers
         for index in [self.unstructured_default_text_index, self.semi_structured_text_index_2_14,
@@ -2134,9 +2134,9 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=self.unstructured_default_text_index.name,
                         text="dogs",
                         search_method="HYBRID",
-                        rerank_count=5
+                        rerank_depth=5
                     )
-                self.assertIn("'rerankCount' search parameter is only supported for indexes created "
+                self.assertIn("'rerankDepth' search parameter is only supported for indexes created "
                               "with Marqo version 2.15.0", str(e.exception))
 
     def test_hybrid_search_score_modifiers_wrong_ranking_method_fails(self):
@@ -2455,9 +2455,9 @@ class TestHybridSearch(MarqoTestCase):
         # Covered in API tests
         pass
 
-    def test_correct_error_is_raised_if_rerank_count_is_provided_on_old_marqo_version(self):
+    def test_correct_error_is_raised_if_rerank_depth_is_provided_on_old_marqo_version(self):
         """
-        Tests that an error is raised if rerank_count is provided on an old marqo version.
+        Tests that an error is raised if rerank_depth is provided on an old marqo version.
         """
 
         with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
@@ -2466,7 +2466,7 @@ class TestHybridSearch(MarqoTestCase):
                 index_name=self.unstructured_default_text_index.name,
                 text="dogs",
                 search_method="HYBRID",
-                rerank_count=3,
+                rerank_depth=3,
                 result_count=3
             )
 
@@ -2477,6 +2477,6 @@ class TestHybridSearch(MarqoTestCase):
             index_name=self.unstructured_default_text_index.name,
             text="dogs",
             search_method="HYBRID",
-            # rerank_count=3, # This should not raise an error
+            # rerank_depth=3, # This should not raise an error
             result_count=3
         )

@@ -30,7 +30,7 @@ import semver
 class HybridSearch:
     def search(
             self, config: Config, marqo_index: MarqoIndex, query: Optional[Union[str, CustomVectorQuery]],
-            result_count: int = 5, offset: int = 0, rerank_count: Optional[int] = None,
+            result_count: int = 5, offset: int = 0, rerank_depth: Optional[int] = None,
             ef_search: Optional[int] = None, approximate: bool = True,
             searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
             attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
@@ -186,7 +186,7 @@ class HybridSearch:
             ef_search=ef_search,
             approximate=approximate,
             offset=offset,
-            rerank_count=rerank_count,
+            rerank_depth=rerank_depth,
             or_phrases=optional_terms,
             and_phrases=required_terms,
             attributes_to_retrieve=attributes_to_retrieve,

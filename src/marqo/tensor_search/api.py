@@ -327,7 +327,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             searchable_attributes=search_query.searchableAttributes,
             search_method=search_query.searchMethod,
             result_count=search_query.limit, offset=search_query.offset,
-            rerank_count=search_query.rerankCount,
+            rerank_depth=search_query.rerankDepth,
             ef_search=search_query.efSearch, approximate=search_query.approximate,
             reranker=search_query.reRanker,
             filter=search_query.filter, device=device,

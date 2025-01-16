@@ -368,7 +368,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                                 }
                             ]
                         },
-                        rerank_count=2      # To show not all results are reranked
+                        rerank_depth=2      # To show not all results are reranked
                     )
                     all_results[index_name][retrieval_method][ranking_method] = result
                 except Exception as e:
@@ -415,7 +415,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                                 }
                             ]
                         },
-                        rerank_count=2  # To show not all results are reranked
+                        rerank_depth=2  # To show not all results are reranked
                     )
                     self.assertEqual(stored_results[index_name][retrieval_method][ranking_method].get("hits"),
                                      result.get("hits"))

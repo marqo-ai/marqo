@@ -67,8 +67,8 @@ public class HybridSearcher extends Searcher {
 
         Integer rrf_k = query.properties().getInteger("marqo__hybrid.rrf_k", 60);
         Double alpha = query.properties().getDouble("marqo__hybrid.alpha", 0.5);
-        Integer rerankCountGlobal =
-                query.properties().getInteger("marqo__hybrid.rerankCountGlobal", null);
+        Integer rerankDepthGlobal =
+                query.properties().getInteger("marqo__hybrid.rerankDepthGlobal", null);
         Integer limit = query.properties().getInteger("hits", null);
         Integer offset = query.properties().getInteger("offset", 0);
         Integer timeout = query.properties().getInteger("timeout", 1000);
@@ -78,7 +78,7 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("Ranking method found: %s", rankingMethod), verbose);
         logIfVerbose(String.format("alpha found: %.2f", alpha), verbose);
         logIfVerbose(String.format("RRF k found: %d", rrf_k), verbose);
-        logIfVerbose(String.format("Rerank count global found: %d", rerankCountGlobal), verbose);
+        logIfVerbose(String.format("Rerank count global found: %d", rerankDepthGlobal), verbose);
         logIfVerbose(String.format("Limit found: %d", limit), verbose);
         logIfVerbose(String.format("Offset found: %d", offset), verbose);
         logIfVerbose(String.format("Timeout int found: %d", timeout), verbose);
@@ -160,7 +160,7 @@ public class HybridSearcher extends Searcher {
         // Post-process result list
         HitGroup processedHits =
                 postProcessResults(
-                        hitsForPostProcessing, query, rerankCountGlobal, limit, offset, verbose);
+                        hitsForPostProcessing, query, rerankDepthGlobal, limit, offset, verbose);
 
         return new Result(query, processedHits);
     }
@@ -297,7 +297,7 @@ public class HybridSearcher extends Searcher {
     HitGroup postProcessResults(
             HitGroup hitsForPostProcessing,
             Query query,
-            Integer rerankCountGlobal,
+            Integer rerankDepthGlobal,
             int limit,
             int offset,
             boolean verbose) {
@@ -309,11 +309,11 @@ public class HybridSearcher extends Searcher {
 
         int idx = 0;
         // If rerank count global is not set, rerank all hits
-        if (rerankCountGlobal == null) {
-            rerankCountGlobal = hitsForPostProcessing.size();
+        if (rerankDepthGlobal == null) {
+            rerankDepthGlobal = hitsForPostProcessing.size();
         }
         for (Hit hit : hitsForPostProcessing) {
-            if (idx < rerankCountGlobal) {
+            if (idx < rerankDepthGlobal) {
                 resultToRerank.add(hit);
             } else if (idx < limit) {
                 // Total hits to return caps out at limit
@@ -355,7 +355,7 @@ public class HybridSearcher extends Searcher {
         logIfVerbose("Reranked result list (SORTED): ", verbose);
         logHitGroup(resultToRerank, verbose);
 
-        if (limit > rerankCountGlobal) {
+        if (limit > rerankDepthGlobal) {
             // Add excess hits to the end of reranked results then sort
             logIfVerbose(
                     String.format(

@@ -83,8 +83,8 @@ class HybridSearcherTest {
     @Nested
     class ValidationTest {
         @Ignore
-        void rerankCountGlobalSetToLimit() {
-            // Ensure rerankCountGlobal defaults to limit (hits) if not set
+        void rerankDepthGlobalSetToLimit() {
+            // Ensure rerankDepthGlobal defaults to limit (hits) if not set
             Query query = new Query("search/?query=test");
             query.properties().set("marqo__hybrid.retrievalMethod", "disjunction");
             query.properties().set("marqo__hybrid.rankingMethod", "rrf");
@@ -97,7 +97,7 @@ class HybridSearcherTest {
                     Execution.Context.createContextStub((SearchChainRegistry) null);
             Execution execution = new Execution(searchChain, context);
 
-            // TODO: Check if rerankCount is limit
+            // TODO: Check if rerankDepth is limit
         }
     }
 
@@ -286,7 +286,7 @@ class HybridSearcherTest {
     }
 
     // TODO: post processing test
-    // if rerankCountGlobal is null, rerank everything
+    // if rerankDepthGlobal is null, rerank everything
     // global score modifiers tests
     // pagination tests (use offset)
     // mult weights & add weights both dont exist, make sure apply global score mod is skipped

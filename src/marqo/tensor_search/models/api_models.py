@@ -40,7 +40,7 @@ class SearchQuery(BaseMarqoModel):
     searchMethod: SearchMethod = SearchMethod.TENSOR
     limit: int = 10
     offset: int = 0
-    rerankCount: Optional[int] = None
+    rerankDepth: Optional[int] = None
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
     showHighlights: bool = True
@@ -123,19 +123,19 @@ class SearchQuery(BaseMarqoModel):
         return values
 
     @root_validator(pre=False)
-    def validate_rerank_count(cls, values):
-        """Validate that rerank_count is only set for hybrid search - RRF. """
+    def validate_rerank_depth(cls, values):
+        """Validate that rerank_depth is only set for hybrid search - RRF. """
         hybrid_parameters = values.get('hybridParameters')
         search_method = values.get('searchMethod')
-        rerank_count = values.get('rerankCount')
+        rerank_depth = values.get('rerankDepth')
 
-        if rerank_count is not None:
+        if rerank_depth is not None:
             if search_method.upper() != SearchMethod.HYBRID:
-                raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search method.")
+                raise ValueError(f"'rerankDepth' is currently only supported for 'HYBRID' search method.")
             if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
-                raise ValueError(f"'rerankCount' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
-            if rerank_count < 0:
-                raise ValueError(f"rerankCount cannot be negative.")
+                raise ValueError(f"'rerankDepth' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
+            if rerank_depth < 0:
+                raise ValueError(f"rerankDepth cannot be negative.")
 
         return values
 
