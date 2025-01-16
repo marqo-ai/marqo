@@ -158,7 +158,7 @@ class TestSearchSemiStructured(MarqoTestCase):
     def test_vector_text_search_no_device(self):
         try:
             search_res = tensor_search._vector_text_search(
-                config=self.config, index_name=self.default_text_index.name,
+                config=self.config,
                 marqo_index=self.default_text_index,
                 result_count=5, query="some text...")
             raise AssertionError

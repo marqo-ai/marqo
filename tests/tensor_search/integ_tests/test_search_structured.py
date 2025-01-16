@@ -182,32 +182,6 @@ class TestSearchStructured(MarqoTestCase):
                 )
                 assert len(search_res['hits']) == 2
 
-    #
-    # def test_search_with_searchable_attributes_max_attributes_is_none(self):
-    #     # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
-    #     add_docs_caller(
-    #         config=self.config, index_name=self.default_text_index, docs=[
-    #             {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #             {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #         ], )
-    #     tensor_search.search(
-    #         config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
-    #         searchable_attributes=["other field"]
-    #     )
-    #
-    # @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
-    # def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
-    #     with self.assertRaises(InvalidArgError):
-    #         add_docs_caller(
-    #             config=self.config, index_name=self.default_text_index, docs=[
-    #                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #                 {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #             ], )
-    #         tensor_search.search(
-    #             config=self.config, index_name=self.default_text_index, text="Exact match hehehe"
-    #         )
-    #
-
     def test_vector_text_search_no_device(self):
         try:
             index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
