@@ -252,7 +252,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             elif isinstance(marqo_document[marqo_field_key], str):
                 lexical_field_name = f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{marqo_field_key}'
-                if lexical_field_name not in self.get_marqo_index().lexical_field_map:
+                lexical_field_map = self.get_marqo_index().lexical_field_map
+                if lexical_field_name not in lexical_field_map:
                     raise MarqoDocumentParsingError(f'{marqo_field_key} of type str does not exist in the original '
                                                     f'document. We do not support adding new lexical fields in '
                                                     f'partial updates')
@@ -270,23 +271,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if new_string_array: #Don't know what to do with this.
             vespa_fields[common.STRING_ARRAY] = {"assign": new_string_array}
 
-        # int_fields_changed = self._update_numeric_field(int, all_numeric_field_map, original_doc, vespa_fields) #Here we compare the int field changes
-        # float_fields_changed = self._update_numeric_field(float, all_numeric_field_map, original_doc, vespa_fields) #here we compare the float field changes
+        int_fields_changed = self._update_numeric_field(int, all_numeric_field_map, vespa_fields) #Here we compare the int field changes
+        float_fields_changed = self._update_numeric_field(float, all_numeric_field_map, vespa_fields) #here we compare the float field changes
         #
-        # if int_fields_changed or float_fields_changed: #Here we use int field changed or float field changed to determine if the score modifier should be updated.
-        #     # TODO: @Aditya to find out why do we update score modifiers anyway?
-        #     # TODO SCORE_MODIFIERS is a tensor, find out if it can be updated in the same way as a map, is it faster?
-        #     #   If not, we copied the replace logic from structured_vespa_index, should we rather use assign here?
-        #     # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-field
-        #     # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-add
-        #     # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-remove
-        #     # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-modify
-        #     vespa_fields[common.SCORE_MODIFIERS] = {
-        #         "modify": {
-        #             "operation": "replace",
-        #             "cells": all_numeric_field_map
-        #         }
-        #     }
+        if int_fields_changed or float_fields_changed: #Here we use int field changed or float field changed to determine if the score modifier should be updated.
+            # TODO: @Aditya to find out why do we update score modifiers anyway?
+            # TODO SCORE_MODIFIERS is a tensor, find out if it can be updated in the same way as a map, is it faster?
+            #   If not, we copied the replace logic from structured_vespa_index, should we rather use assign here?
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-field
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-add
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-remove
+            # https://docs.vespa.ai/en/reference/document-json-format.html#tensor-modify
+            vespa_fields[common.SCORE_MODIFIERS] = {
+                "modify": {
+                    "operation": "replace",
+                    "cells": all_numeric_field_map
+                }
+            }
 
         return {"id": vespa_id, "field_types": vespa_field_types,  "fields": vespa_fields}
 
@@ -295,20 +296,41 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     def _update_numeric_field(self, numeric_type, all_numeric_field_map, original_doc, vespa_fields) -> bool:
         field_name_prefix = common.INT_FIELDS if numeric_type == int else common.FLOAT_FIELDS
         original_fields = original_doc.fixed_fields.int_fields if numeric_type == int \
-            else original_doc.fixed_fields.float_fields
+            else original_doc.fixed_fields.float_fields #original fields nikal li
+        new_fields = {key: value for key, value in all_numeric_field_map.items() if isinstance(value, numeric_type)} #new_fields nikal li
+
+        changed = False
+
+        for k, v in new_fields.items(): # iterating over new fields
+            if k not in original_fields or original_fields[k] != v: #if the field is not in original fields or the value is different -> only then create assign statement
+                vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"assign": v}
+                changed = True #changed set to true
+
+        for k, v in original_fields.items(): #iterating over original fields
+            if k not in new_fields: # if the field is not in new fields -> remove the field
+                vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"remove": 0} #If the field not in new fields -> create remove statement.
+
+                changed = True
+
+        return changed
+
+    def _update_numeric_field(self, numeric_type, all_numeric_field_map, vespa_fields) -> bool:
+        field_name_prefix = common.INT_FIELDS if numeric_type == int else common.FLOAT_FIELDS
+        # original_fields = original_doc.fixed_fields.int_fields if numeric_type == int \
+        #     else original_doc.fixed_fields.float_fields
         new_fields = {key: value for key, value in all_numeric_field_map.items() if isinstance(value, numeric_type)}
 
         changed = False
 
         for k, v in new_fields.items():
-            if k not in original_fields or original_fields[k] != v:
-                vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"assign": v}
-                changed = True
+            # if k not in original_fields or original_fields[k] != v:
+            vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"assign": v}
+            changed = True
 
-        for k, v in original_fields.items():
-            if k not in new_fields:
-                vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"remove": 0}
-                changed = True
+        # for k, v in original_fields.items():
+        #     if k not in new_fields:
+        #         vespa_fields[f'{field_name_prefix}{{{k}}}'] = {"remove": 0}
+        #         changed = True
 
         return changed
 
