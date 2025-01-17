@@ -1,14 +1,13 @@
 """The API entrypoint for Tensor Search"""
 import json
-import orjson
-from typing import List, Dict
+from typing import List
 
 import pydantic
 import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 from marqo import config, marqo_docs
@@ -84,11 +83,6 @@ app.router.route_class = MarqoCustomRoute
 
 def get_config():
     return _config
-
-
-class ORJSONResponse(JSONResponse):
-    def render(self, content: Dict) -> bytes:
-        return orjson.dumps(content)
 
 
 @app.exception_handler(base_exceptions.MarqoError)
