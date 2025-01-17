@@ -80,12 +80,14 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: marqo-ai/marqo-base
+          ref: 'releases/2.13'
           path: marqo-base
 
       - name: Install dependencies
         run: |
-          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          pip install -r marqo-base/requirements.txt
           # override base requirements with marqo requirements, if needed: 
+          pip install -r marqo/requirements.txt
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 
