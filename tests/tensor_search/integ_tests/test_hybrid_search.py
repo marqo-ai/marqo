@@ -39,6 +39,11 @@ class TestHybridSearch(MarqoTestCase):
             normalize_embeddings=False
         )
 
+        semi_structured_text_index_2_14 = cls.unstructured_marqo_index_request(
+            model=Model(name='sentence-transformers/all-MiniLM-L6-v2'),
+            marqo_version='2.14.0'
+        )
+
         # Legacy UNSTRUCTURED indexes
         unstructured_default_text_index = cls.unstructured_marqo_index_request(
             model=Model(name='sentence-transformers/all-MiniLM-L6-v2'),
@@ -88,6 +93,8 @@ class TestHybridSearch(MarqoTestCase):
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
                 FieldRequest(name="text_field_3", type=FieldType.Text,
                              features=[FieldFeature.LexicalSearch, FieldFeature.Filter]),
+                FieldRequest(name="text_tensor_only", type=FieldType.Text, features=[]),
+                FieldRequest(name="text_lexical_only", type=FieldType.Text, features=[FieldFeature.LexicalSearch]),
                 FieldRequest(name="add_field_1", type=FieldType.Float,
                              features=[FieldFeature.ScoreModifier]),
                 FieldRequest(name="add_field_2", type=FieldType.Float,
@@ -97,7 +104,7 @@ class TestHybridSearch(MarqoTestCase):
                 FieldRequest(name="mult_field_2", type=FieldType.Float,
                              features=[FieldFeature.ScoreModifier]),
             ],
-            tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
+            tensor_fields=["text_field_1", "text_field_2", "text_field_3", "text_tensor_only"]
         )
 
         structured_index_with_no_model = cls.structured_marqo_index_request(
@@ -123,6 +130,12 @@ class TestHybridSearch(MarqoTestCase):
             tensor_fields=[]
         )
 
+        structured_text_index_2_14 = cls.structured_marqo_index_request(
+            marqo_version="2.14.0",
+            fields=[FieldRequest(name='text_field_1', type=FieldType.Text, features=[FieldFeature.LexicalSearch])],
+            tensor_fields=["text_field_1"]
+        )
+
         structured_index_one_tensor_field = cls.structured_marqo_index_request(
             fields=[
                 FieldRequest(name="text_field_1", type=FieldType.Text,
@@ -143,10 +156,12 @@ class TestHybridSearch(MarqoTestCase):
             structured_index_with_no_model,
             structured_index_empty,
             structured_index_2_9,
+            structured_text_index_2_14,
             structured_index_one_tensor_field,
             semi_structured_default_text_index,
             semi_structured_default_image_index,
             semi_structured_index_with_no_model,
+            semi_structured_text_index_2_14
         ])
 
         # Assign to objects so they can be used in tests
@@ -160,11 +175,13 @@ class TestHybridSearch(MarqoTestCase):
         cls.structured_index_with_no_model = cls.indexes[6]
         cls.structured_index_empty = cls.indexes[7]
         cls.structured_index_2_9 = cls.indexes[8]
-        cls.structured_index_one_tensor_field = cls.indexes[9]
+        cls.structured_text_index_2_14 = cls.indexes[9]
+        cls.structured_index_one_tensor_field = cls.indexes[10]
 
-        cls.semi_structured_default_text_index = cls.indexes[10]
-        cls.semi_structured_default_image_index = cls.indexes[11]
-        cls.semi_structured_index_with_no_model = cls.indexes[12]
+        cls.semi_structured_default_text_index = cls.indexes[11]
+        cls.semi_structured_default_image_index = cls.indexes[12]
+        cls.semi_structured_index_with_no_model = cls.indexes[13]
+        cls.semi_structured_text_index_2_14 = cls.indexes[14]
 
     def setUp(self) -> None:
         super().setUp()
@@ -230,6 +247,8 @@ class TestHybridSearch(MarqoTestCase):
                         index_name=index.name,
                         text="dogs",
                         search_method="HYBRID",
+                        rerank_depth=None if index == self.unstructured_default_text_index else 3,
+                        result_count=3,
                         hybrid_parameters=HybridParameters(
                             retrievalMethod="disjunction",
                             rankingMethod="rrf",
@@ -269,6 +288,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rankingMethod"], RankingMethod.RRF)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.alpha"], 0.6)
                 self.assertEqual(vespa_query_kwargs["marqo__hybrid.rrf_k"], 61)
+                self.assertEqual(vespa_query_kwargs["hits"], 3)
 
                 self.assertEqual(vespa_query_kwargs["ranking"], "hybrid_custom_searcher")
                 self.assertEqual(vespa_query_kwargs["marqo__ranking.lexical.lexical"], "bm25")
@@ -297,6 +317,8 @@ class TestHybridSearch(MarqoTestCase):
                                      {'marqo__lexical_text_field_1': 1, 'marqo__lexical_text_field_2': 1})
                     self.assertEqual(vespa_query_kwargs["query_features"]["marqo__fields_to_rank_tensor"],
                                      {'marqo__embeddings_text_field_2': 1, 'marqo__embeddings_text_field_3': 1})
+                    # global rerankDepth & score modifiers are not available for legacy unstructured
+                    self.assertEqual(vespa_query_kwargs["marqo__hybrid.rerankDepthGlobal"], 3)
 
                 elif isinstance(index, UnstructuredMarqoIndex):
                     self.assertIn("({targetHits:3, approximate:True, hnsw.exploreAdditionalHits:1997}"
@@ -578,7 +600,7 @@ class TestHybridSearch(MarqoTestCase):
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
                       self.unstructured_default_text_index]:
-            with self.subTest(index=index.name):
+            with self.subTest(index=type(index)):
                 # Add documents
                 add_docs_res = self.add_documents(
                     config=self.config,
@@ -745,15 +767,14 @@ class TestHybridSearch(MarqoTestCase):
                     # doc11 and doc13 has score 0, so their order is non-deterministic
                     self.assertSetEqual({'doc11', 'doc13'}, {hit["_id"] for hit in hybrid_res["hits"][1:]})
 
-    @pytest.mark.skip_for_multinode
-    def test_hybrid_search_score_modifiers(self):
+    def test_hybrid_search_score_modifiers_different_retrieval_and_ranking(self):
         """
-        Tests that score modifiers work as expected for all methods
+        Tests that score modifiers work as expected for tensor/lexical and lexical/tensor hybrid
         """
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
                       self.unstructured_default_text_index]:
-            with self.subTest(index=index.name):
+            with self.subTest(index=type(index)):
                 # Add documents
                 self.add_documents(
                     config=self.config,
@@ -840,59 +861,590 @@ class TestHybridSearch(MarqoTestCase):
                     self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
                     self.assertAlmostEqual(hybrid_res["hits"][-1]["_score"], base_lexical_score * -10 * 3)
 
-                with self.subTest("retrieval: disjunction, ranking: rrf"):
-                    hybrid_res = tensor_search.search(
+    def test_hybrid_search_all_score_modifiers_fusion(self):
+        """
+        Tests that all score modifiers tensor, lexical, and global, work as expected together.
+        They should all work independently of each other. tensor, lexical, and _score should all be modified
+        Tests all fusion methods (currently only RRF / Disjunction)
+        Does not test legacy unstructured index, as it does not support global score modifiers (2.15 onwards)
+        """
+
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=type(index)):
+                # Add documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc6", "text_field_1": "HELLO WORLD"},
+                            {"_id": "doc7", "text_field_1": "HELLO WORLD", "add_field_1": 1.0},  # third
+                            {"_id": "doc8", "text_field_1": "HELLO WORLD", "mult_field_1": 2.0},   # second highest score
+                            {"_id": "doc9", "text_field_1": "HELLO WORLD", "mult_field_1": 3.0},  # highest score
+                            {"_id": "doc10", "text_field_1": "HELLO WORLD", "mult_field_2": 3.0},    # lowest score
+                        ],
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                # Calculate unmodified RRF scores
+                hybrid_res_no_global_score_modifiers = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="HELLO WORLD",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        # Mult weight of 1000 used so it outweighs the add weight of 5
+                        scoreModifiersLexical={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1000},
+                                {"field_name": "mult_field_2", "weight": -1000}
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        },
+                        scoreModifiersTensor={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1000},
+                                {"field_name": "mult_field_2", "weight": -1000}
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        },
+                        verbose=True
+                    ),
+                    result_count=10
+                )
+
+                # RRF scores without global score modifiers
+                unmodified_rrf_scores = {}
+                for hit in hybrid_res_no_global_score_modifiers["hits"]:
+                    unmodified_rrf_scores[hit["_id"]] = hit["_score"]
+
+                hybrid_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="HELLO WORLD",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(
+                        multiply_score_by=[
+                            {"field_name": "mult_field_1", "weight": 1000},
+                            {"field_name": "mult_field_2", "weight": -1000}
+                        ],
+                        add_to_score=[
+                            {"field_name": "add_field_1", "weight": 5}
+                        ]
+                    ),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        # Mult weight of 1000 used so it outweighs the add weight of 5
+                        scoreModifiersLexical={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1000},
+                                {"field_name": "mult_field_2", "weight": -1000}
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        },
+                        scoreModifiersTensor={
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1000},
+                                {"field_name": "mult_field_2", "weight": -1000}
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        },
+                        verbose=True
+                    ),
+                    result_count=10
+                )
+                self.assertIn("hits", hybrid_res)
+
+                # Score without score modifiers
+                self.assertEqual(hybrid_res["hits"][3]["_id"], "doc6")  # (score)
+                base_lexical_score = hybrid_res["hits"][3]["_lexical_score"]
+                base_tensor_score = hybrid_res["hits"][3]["_tensor_score"]
+
+                self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
+                self.assertAlmostEqual(hybrid_res["hits"][0]["_lexical_score"], base_lexical_score * 1000 * 3)
+                self.assertAlmostEqual(hybrid_res["hits"][0]["_tensor_score"], base_tensor_score * 1000 * 3)
+                self.assertAlmostEqual(hybrid_res["hits"][0]["_score"], unmodified_rrf_scores["doc9"] * 1000 * 3)
+
+                self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # (score*10*2)
+                self.assertAlmostEqual(hybrid_res["hits"][1]["_lexical_score"], base_lexical_score * 1000 * 2)
+                self.assertAlmostEqual(hybrid_res["hits"][1]["_tensor_score"], base_tensor_score * 1000 * 2)
+                self.assertAlmostEqual(hybrid_res["hits"][1]["_score"], unmodified_rrf_scores["doc8"] * 1000 * 2)
+
+                self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
+                self.assertAlmostEqual(hybrid_res["hits"][2]["_lexical_score"], base_lexical_score + 5*1)
+                self.assertAlmostEqual(hybrid_res["hits"][2]["_tensor_score"], base_tensor_score + 5*1)
+                self.assertAlmostEqual(hybrid_res["hits"][2]["_score"], unmodified_rrf_scores["doc7"] + 5*1)
+
+                self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
+                self.assertAlmostEqual(hybrid_res["hits"][-1]["_lexical_score"], base_lexical_score * -1000 * 3)
+                self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -1000 * 3)
+                self.assertAlmostEqual(hybrid_res["hits"][-1]["_score"], unmodified_rrf_scores["doc10"] * -1000 * 3)
+
+    def test_hybrid_search_global_score_modifiers(self):
+        """
+        Tests that global score modifiers work as expected for RRF / Disjunction
+        Make sure scores of modified results are calculated correctly based on unmodified scores.
+        Ensures new result order reflects modified scores.
+        """
+
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=type(index)):
+                # Add documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc6", "text_field_1": "HELLO WORLD"},
+                            {"_id": "doc7", "text_field_1": "HELLO WORLD", "add_field_1": 1.0},  # third
+                            {"_id": "doc8", "text_field_1": "HELLO WORLD", "mult_field_1": 2.0},   # second highest score
+                            {"_id": "doc9", "text_field_1": "HELLO WORLD", "mult_field_1": 3.0},  # highest score
+                            {"_id": "doc10", "text_field_1": "HELLO WORLD", "mult_field_2": 3.0},    # lowest score
+                        ],
+                        tensor_fields=["text_field_1", "text_field_2", "text_field_3"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                unmodified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="HELLO WORLD",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=10
+                )
+
+                unmodified_scores = {}
+                for hit in unmodified_res["hits"]:
+                    unmodified_scores[hit["_id"]] = hit["_score"]
+
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="HELLO WORLD",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1000},
+                            {"field_name": "mult_field_2", "weight": -1000}
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 5}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=10
+                )
+
+                self.assertIn("hits", modified_res)
+
+                self.assertEqual(modified_res["hits"][0]["_id"], "doc9")  # highest score (score*1000*3)
+                self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc9"] * 1000 * 3)
+
+                self.assertEqual(modified_res["hits"][1]["_id"], "doc8")  # (score*1000*2)
+                self.assertAlmostEqual(modified_res["hits"][1]["_score"], unmodified_scores["doc8"] * 1000 * 2)
+
+                self.assertEqual(modified_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
+                self.assertAlmostEqual(modified_res["hits"][2]["_score"], unmodified_scores["doc7"] + 5*1)
+
+                self.assertEqual(modified_res["hits"][3]["_id"], "doc6")  # (score)
+                self.assertEqual(modified_res["hits"][3]["_score"], unmodified_scores["doc6"])
+
+                self.assertEqual(modified_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-1000*3)
+                self.assertAlmostEqual(modified_res["hits"][-1]["_score"], unmodified_scores["doc10"] * -1000 * 3)
+
+                # Show that we can use just 1 or the other (multiply or add)
+                with self.subTest("Only multiply_score_by"):
+                    modified_res = tensor_search.search(
                         config=self.config,
                         index_name=index.name,
                         text="HELLO WORLD",
                         search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1000},
+                                {"field_name": "mult_field_2", "weight": -1000}
+                            ],
+                        }),
                         hybrid_parameters=HybridParameters(
                             retrievalMethod=RetrievalMethod.Disjunction,
                             rankingMethod=RankingMethod.RRF,
-                            scoreModifiersLexical={
-                                "multiply_score_by": [
-                                    {"field_name": "mult_field_1", "weight": 10},
-                                    {"field_name": "mult_field_2", "weight": -10}
-                                ],
-                                "add_to_score": [
-                                    {"field_name": "add_field_1", "weight": 5}
-                                ]
-                            },
-                            scoreModifiersTensor={
-                                "multiply_score_by": [
-                                    {"field_name": "mult_field_1", "weight": 10},
-                                    {"field_name": "mult_field_2", "weight": -10}
-                                ],
-                                "add_to_score": [
-                                    {"field_name": "add_field_1", "weight": 5}
-                                ]
-                            },
                             verbose=True
                         ),
                         result_count=10
                     )
-                    self.assertIn("hits", hybrid_res)
 
-                    # Score without score modifiers
-                    self.assertEqual(hybrid_res["hits"][3]["_id"], "doc6")  # (score)
-                    base_lexical_score = hybrid_res["hits"][3]["_lexical_score"]
-                    base_tensor_score = hybrid_res["hits"][3]["_tensor_score"]
+                    self.assertEqual(modified_res["hits"][0]["_id"], "doc9")
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc9"] * 1000 * 3)
 
-                    self.assertEqual(hybrid_res["hits"][0]["_id"], "doc9")  # highest score (score*10*3)
-                    self.assertAlmostEqual(hybrid_res["hits"][0]["_lexical_score"], base_lexical_score * 10 * 3)
-                    self.assertEqual(hybrid_res["hits"][0]["_tensor_score"], base_tensor_score * 10 * 3)
+                    self.assertEqual(modified_res["hits"][0]["_id"], "doc9")  # highest score (score*1000*3)
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc9"] * 1000 * 3)
 
-                    self.assertEqual(hybrid_res["hits"][1]["_id"], "doc8")  # (score*10*2)
-                    self.assertAlmostEqual(hybrid_res["hits"][1]["_lexical_score"], base_lexical_score * 10 * 2)
-                    self.assertAlmostEqual(hybrid_res["hits"][1]["_tensor_score"], base_tensor_score * 10 * 2)
+                    self.assertEqual(modified_res["hits"][1]["_id"], "doc8")  # (score*1000*2)
+                    self.assertAlmostEqual(modified_res["hits"][1]["_score"], unmodified_scores["doc8"] * 1000 * 2)
 
-                    self.assertEqual(hybrid_res["hits"][2]["_id"], "doc7")  # (score + 5*1)
-                    self.assertAlmostEqual(hybrid_res["hits"][2]["_lexical_score"], base_lexical_score + 5*1)
-                    self.assertAlmostEqual(hybrid_res["hits"][2]["_tensor_score"], base_tensor_score + 5*1)
+                    # doc6 and doc7 have the same score, so their order is non-deterministic
+                    self.assertSetEqual({'doc6', 'doc7'}, {hit["_id"] for hit in modified_res["hits"][2:4]})
+                    for hits in modified_res["hits"][2:4]:
+                        self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
 
-                    self.assertEqual(hybrid_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-10*3)
-                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_lexical_score"], base_lexical_score * -10 * 3)
-                    self.assertAlmostEqual(hybrid_res["hits"][-1]["_tensor_score"], base_tensor_score * -10 * 3)
+                    self.assertEqual(modified_res["hits"][-1]["_id"], "doc10")  # lowest score (score*-1000*3)
+                    self.assertAlmostEqual(modified_res["hits"][-1]["_score"], unmodified_scores["doc10"] * -1000 * 3)
+
+                with self.subTest("Only add_to_score"):
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="HELLO WORLD",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 5}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=10
+                    )
+
+                    self.assertEqual(modified_res["hits"][0]["_id"], "doc7")
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["doc7"] + 5*1)
+                    for hits in modified_res["hits"][1:]:
+                        self.assertEqual(hits["_score"], unmodified_scores[hits["_id"]])
+
+
+    def test_hybrid_search_global_score_modifiers_with_rerank_depth(self):
+        """
+        Tests that global score modifiers work as expected for RRF / Disjunction with rerankDepth
+        Make sure scores of modified results are calculated correctly based on unmodified scores.
+        Return 'limit' results whenever possible. If rerankDepth < limit, add on the extra unranked results after reranking.
+        """
+
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=type(index)):
+                # Add documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "tensor1", "text_tensor_only": "dog", "add_field_1": 1.0, "mult_field_1": 1.0},    # tensor HIGH score, no lexical match
+                            {"_id": "tensor2", "text_tensor_only": "something completely unrelated. garbage.", "add_field_1": 2.0, "mult_field_1": 2.0},    # tensor LOW score, no lexical match
+                            {"_id": "lexical1", "text_lexical_only": "dogs dogs", "add_field_1": -2.0, "mult_field_1": -2.0},    # lexical HIGH score, no tensor
+                            {"_id": "lexical2", "text_lexical_only": "dogs", "add_field_1": -1.0, "mult_field_1": -1.0},  # lexical LOWER score, no tensor
+                            {"_id": "both1", "text_field_1": "dogs dogs", "add_field_1": 0.0001}     # both tensor and lexical, HIGHEST rank in each list.
+                        ],
+                        tensor_fields=["text_tensor_only", "text_field_1"] \
+                            if isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                unmodified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=5
+                )
+
+                unmodified_scores = {}
+                for hit in unmodified_res["hits"]:
+                    unmodified_scores[hit["_id"]] = hit["_score"]
+
+                # Order with score modifiers: tensor2, tensor1, both1, lexical2, lexical1
+                # Order without score modifiers: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
+                self.assertEqual(len(unmodified_res["hits"]), 5)
+                self.assertEqual("both1", unmodified_res["hits"][0]["_id"])
+                self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][1:3]]), {"tensor1", "lexical1"})
+                self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][3:5]]), {"tensor2", "lexical2"})
+
+                with self.subTest(f"Case 1: limit == rerankDepth == result.size()"):
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1},
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 1}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=5,
+                        rerank_depth=5
+                    )
+                    # Order with score modifiers: tensor2, tensor1, both1, lexical2, lexical1
+                    self.assertEqual(["tensor2", "tensor1", "both1", "lexical2", "lexical1"],
+                                     [hit["_id"] for hit in modified_res["hits"]])
+                    # Assert scores are all correctly modified
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], 2*unmodified_scores["tensor2"] + 2)
+                    self.assertAlmostEqual(modified_res["hits"][1]["_score"], 1*unmodified_scores["tensor1"] + 1)
+                    self.assertAlmostEqual(modified_res["hits"][2]["_score"], unmodified_scores["both1"] + 0.0001)
+                    self.assertAlmostEqual(modified_res["hits"][3]["_score"], -1*unmodified_scores["lexical2"] - 1)
+                    self.assertAlmostEqual(modified_res["hits"][4]["_score"], -2*unmodified_scores["lexical1"] - 2)
+
+                with self.subTest(f"Case 2: limit < rerankDepth < hits.size()"):
+                    # Rerank the top 3, then take the top 2 from there.
+                    # Original top 3: both1, lexical1, tensor1. Rerank --> tensor1, both1, lexical1
+                    # Top 2 after: tensor1, both1
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1},
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 1}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=2,
+                        rerank_depth=3
+                    )
+                    self.assertEqual(len(modified_res["hits"]), 2)
+                    self.assertEqual(["tensor1", "both1"], [hit["_id"] for hit in modified_res["hits"]])
+
+                with self.subTest(f"Case 3: limit == rerankDepth < hits.size()"):
+                    # Rerank the top 3, then only take the top 3.
+                    # Original top 2: both1, (lexical1 or tensor1). Rerank --> tensor1, both1, lexical1
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1},
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 1}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=3,
+                        rerank_depth=3
+                    )
+                    self.assertEqual(len(modified_res["hits"]), 3)
+                    self.assertEqual(["tensor1", "both1", "lexical1"], [hit["_id"] for hit in modified_res["hits"]])
+
+                with self.subTest(f"Case 4: limit < hits.size() < rerankDepth"):
+                    # Attempt to rerank top 10 (will only be able to do 5), then return 4.
+                    # Even though rerankDepth > 2*limit, we just rerank the highest number of results possible
+                    # Original top 5: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
+                    # Reranked top 5: tensor2, tensor1, both1, lexical2, lexical1
+                    # Top 4 after: tensor2, tensor1, both1, lexical2
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1},
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 1}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=4,
+                        rerank_depth=10
+                    )
+                    self.assertEqual(len(modified_res["hits"]), 4)
+                    self.assertEqual(["tensor2", "tensor1", "both1", "lexical2"], [hit["_id"] for hit in modified_res["hits"]])
+
+                with self.subTest(f"Case 5: rerankDepth < hits.size() < limit"):
+                    # Rerank the top 3, but attempt to return 10 (will only be able to do 5).
+                    # We can't control whether tensor1 or lexical1 (same rank in their respective lists) is first,
+                    #   since it's sorted alphabetically by randomized Vespa ID
+                    # Original top 3: both1, (tensor1 or lexical1), (tensor1 or lexical1)
+                    # Reranked top 3: tensor1, both1, lexical1
+                    # Top 5 after (remaining unranked 2 hits are added with original score):
+                    #       [tensor1, both1, tensor2, lexical2, lexical1] or
+                    #       [tensor1, both1, lexical2, tensor2, lexical1]
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1},
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 1}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=10,
+                        rerank_depth=3
+                    )
+                    self.assertEqual(len(modified_res["hits"]), 5)
+
+                    possible_results = [
+                        ["tensor1", "both1", "tensor2", "lexical2", "lexical1"],
+                        ["tensor1", "both1", "lexical2", "tensor2", "lexical1"]
+                    ]
+                    self.assertIn([hit["_id"] for hit in modified_res["hits"]], possible_results)
+
+                    # Check that last 2 hits do NOT have scores modified while the first 3 do
+                    for hit in modified_res["hits"]:
+                        if hit["_id"] == "tensor1":
+                            self.assertEqual(hit["_score"], 1*unmodified_scores[hit["_id"]] + 1)
+                        elif hit["_id"] == "both1":
+                            self.assertAlmostEqual(hit["_score"], unmodified_scores[hit["_id"]] + 0.0001)
+                        elif hit["_id"] in ["tensor2", "lexical2"]:
+                            self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
+                        elif hit["_id"] == "lexical1":
+                            self.assertEqual(hit["_score"], -2*unmodified_scores[hit["_id"]] - 2)
+
+                with self.subTest("Case 6: 2*limit < rerankDepth"):
+                    # We attempt to rerank more hits than what is possible to retrieve (tensor + lexical search)
+                    # Initial search will give us both1 in both tensor and lexical
+                    # Only 1 hit to rerank
+                    # Trim to just both1
+                    modified_res = tensor_search.search(
+                        config=self.config,
+                        index_name=index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(**{
+                            "multiply_score_by": [
+                                {"field_name": "mult_field_1", "weight": 1},
+                            ],
+                            "add_to_score": [
+                                {"field_name": "add_field_1", "weight": 1}
+                            ]
+                        }),
+                        hybrid_parameters=HybridParameters(
+                            retrievalMethod=RetrievalMethod.Disjunction,
+                            rankingMethod=RankingMethod.RRF,
+                            verbose=True
+                        ),
+                        result_count=1,
+                        rerank_depth=4
+                    )
+                    self.assertEqual(len(modified_res["hits"]), 1)
+                    self.assertEqual("both1", modified_res["hits"][0]["_id"])
+                    # Ensure score is modified
+                    self.assertAlmostEqual(modified_res["hits"][0]["_score"], unmodified_scores["both1"] + 0.0001)
+
+            with self.subTest("Case 7: rerankDepth == 0"):
+                # Result order and scores should be same as original search
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1},
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 1}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=5,
+                    rerank_depth=0
+                )
+                self.assertEqual(len(modified_res["hits"]), 5)
+                self.assertEqual(len(unmodified_res["hits"]), 5)
+                self.assertEqual("both1", unmodified_res["hits"][0]["_id"])
+                self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][1:3]]), {"tensor1", "lexical1"})
+                self.assertEqual(set([hit["_id"] for hit in unmodified_res["hits"][3:5]]), {"tensor2", "lexical2"})
+
+                for hit in modified_res["hits"]:
+                    self.assertEqual(hit["_score"], unmodified_scores[hit["_id"]])
+
+            with self.subTest("Case 8: No rerankDepth"):
+                # Set limit to 3 so all results are included, but since no rerankDepth, it will rerank everything
+                # Original top all: both1, (tensor1 or lexical1), (tensor1 or lexical1), (tensor2 or lexical2), (tensor2 or lexical2)
+                # Reranked top all: tensor2, tensor1, both1, lexical2, lexical1
+                # Top 3 after: tensor2, tensor1, both1
+                modified_res = tensor_search.search(
+                    config=self.config,
+                    index_name=index.name,
+                    text="dogs",
+                    search_method="HYBRID",
+                    score_modifiers=ScoreModifierLists(**{
+                        "multiply_score_by": [
+                            {"field_name": "mult_field_1", "weight": 1},
+                        ],
+                        "add_to_score": [
+                            {"field_name": "add_field_1", "weight": 1}
+                        ]
+                    }),
+                    hybrid_parameters=HybridParameters(
+                        retrievalMethod=RetrievalMethod.Disjunction,
+                        rankingMethod=RankingMethod.RRF,
+                        verbose=True
+                    ),
+                    result_count=3
+                )
+                self.assertEqual(len(modified_res["hits"]), 3)
+                self.assertEqual(["tensor2", "tensor1", "both1"], [hit["_id"] for hit in modified_res["hits"]])
+
 
     @pytest.mark.skip_for_multinode
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):
@@ -973,7 +1525,7 @@ class TestHybridSearch(MarqoTestCase):
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
                       self.unstructured_default_text_index]:
-            with self.subTest(index=index.name):
+            with self.subTest(index=type(index)):
                 # Add documents
                 self.add_documents(
                     config=self.config,
@@ -1027,7 +1579,7 @@ class TestHybridSearch(MarqoTestCase):
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
                       self.unstructured_default_text_index]:
-            with self.subTest(index=index.name):
+            with self.subTest(index=type(index)):
                 # Add documents
                 self.add_documents(
                     config=self.config,
@@ -1525,14 +2077,14 @@ class TestHybridSearch(MarqoTestCase):
                             )
                         self.assertIn(error_message, str(e.exception))
 
-    def test_hybrid_search_conflicting_parameters_fails(self):
+    def test_hybrid_search_searchable_attributes_fails(self):
         """
-        Ensure that searchable_attributes and score_modifiers cannot be set in hybrid search.
+        Ensure that searchable_attributes cannot be set in hybrid search.
         """
 
         for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index,
                       self.unstructured_default_text_index]:
-            with self.subTest(index=index.name):
+            with self.subTest(index=type(index)):
                 with self.subTest("searchable_attributes active"):
                     with self.assertRaises(ValueError) as e:
                         tensor_search.search(
@@ -1544,23 +2096,82 @@ class TestHybridSearch(MarqoTestCase):
                         )
                     self.assertIn("'searchableAttributes' cannot be used for hybrid", str(e.exception))
 
-                with self.subTest("score_modifiers active"):
-                    with self.assertRaises(ValueError) as e:
-                        tensor_search.search(
-                            config=self.config,
-                            index_name=index.name,
-                            text="dogs",
-                            search_method="HYBRID",
-                            score_modifiers=ScoreModifierLists(
-                                multiply_score_by=[
-                                    {"field_name": "mult_field_1", "weight": 1.0}
-                                ],
-                                add_to_score=[
-                                    {"field_name": "add_field_1", "weight": 1.0}
-                                ]
-                            ),
-                        )
-                    self.assertIn("'scoreModifiers' cannot be used for hybrid", str(e.exception))
+    def test_hybrid_search_score_modifiers_old_version_fails(self):
+        """
+        score_modifiers can only be set for hybrid Marqo 2.15.0 onward
+        """
+        # Legacy Index too old for root score_modifiers
+        for index in [self.unstructured_default_text_index, self.semi_structured_text_index_2_14,
+                      self.structured_text_index_2_14]:
+            with self.subTest(index=type(index)):
+                with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+                    tensor_search.search(
+                        config=self.config,
+                        index_name=self.unstructured_default_text_index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        score_modifiers=ScoreModifierLists(
+                            multiply_score_by=[
+                                {"field_name": "mult_field_1", "weight": 1.0}
+                            ],
+                            add_to_score=[
+                                {"field_name": "add_field_1", "weight": 1.0}
+                            ]
+                        ),
+                    )
+                self.assertIn("global score modifiers is only supported for "
+                              "Marqo indexes created with Marqo 2.15.0", str(e.exception))
+
+    def test_hybrid_search_rerank_depth_old_version_fails(self):
+        """
+        rerank_depth can only be set for hybrid Marqo 2.15.0 onward
+        """
+        # Legacy Index too old for root score_modifiers
+        for index in [self.unstructured_default_text_index, self.semi_structured_text_index_2_14,
+                      self.structured_text_index_2_14]:
+            with self.subTest(index=type(index)):
+                with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+                    res = tensor_search.search(
+                        config=self.config,
+                        index_name=self.unstructured_default_text_index.name,
+                        text="dogs",
+                        search_method="HYBRID",
+                        rerank_depth=5
+                    )
+                self.assertIn("'rerankDepth' search parameter is only supported for indexes created "
+                              "with Marqo version 2.15.0", str(e.exception))
+
+    def test_hybrid_search_score_modifiers_wrong_ranking_method_fails(self):
+        # Structured / semi-structured score modifiers but not RRF
+        with self.subTest("score_modifiers for structured/semi-structured but not RRF ranking"):
+            for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+                with self.subTest(index=type(index)):
+                    for retrieval_method, ranking_method in [
+                        (RetrievalMethod.Tensor, RankingMethod.Lexical),
+                        (RetrievalMethod.Lexical, RankingMethod.Tensor),
+                        (RetrievalMethod.Tensor, RankingMethod.Tensor),
+                        (RetrievalMethod.Lexical, RankingMethod.Lexical)
+                    ]:
+                        with self.assertRaises(ValueError) as e:
+                            tensor_search.search(
+                                config=self.config,
+                                index_name=index.name,
+                                text="dogs",
+                                search_method="HYBRID",
+                                hybrid_parameters=HybridParameters(
+                                    retrievalMethod=retrieval_method,
+                                    rankingMethod=ranking_method
+                                ),
+                                score_modifiers=ScoreModifierLists(
+                                    multiply_score_by=[
+                                        {"field_name": "mult_field_1", "weight": 1.0}
+                                    ],
+                                    add_to_score=[
+                                        {"field_name": "add_field_1", "weight": 1.0}
+                                    ]
+                                ),
+                            )
+                        self.assertIn("if 'rankingMethod' is 'RRF'", str(e.exception))
 
     def test_hybrid_search_structured_invalid_fields_fails(self):
         """
@@ -1845,3 +2456,29 @@ class TestHybridSearch(MarqoTestCase):
         # TODO: Use api.search() instead of tensor_search.search()
         # Covered in API tests
         pass
+
+    def test_correct_error_is_raised_if_rerank_depth_is_provided_on_old_marqo_version(self):
+        """
+        Tests that an error is raised if rerank_depth is provided on an old marqo version.
+        """
+
+        with self.assertRaises(core_exceptions.UnsupportedFeatureError) as e:
+            tensor_search.search(
+                config=self.config,
+                index_name=self.unstructured_default_text_index.name,
+                text="dogs",
+                search_method="HYBRID",
+                rerank_depth=3,
+                result_count=3
+            )
+
+        self.assertIn("Marqo version 2.15.0 or later", str(e.exception))
+
+        _ = tensor_search.search(
+            config=self.config,
+            index_name=self.unstructured_default_text_index.name,
+            text="dogs",
+            search_method="HYBRID",
+            # rerank_depth=3, # This should not raise an error
+            result_count=3
+        )

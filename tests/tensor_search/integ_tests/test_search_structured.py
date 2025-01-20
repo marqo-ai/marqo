@@ -22,7 +22,7 @@ from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
-
+from marqo.tensor_search import index_meta_cache
 
 class TestSearchStructured(MarqoTestCase):
 
@@ -176,59 +176,36 @@ class TestSearchStructured(MarqoTestCase):
                         ]
                     )
                 )
-
+                index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
                 search_res = tensor_search._vector_text_search(
-                    config=self.config, index_name=index_name,
-                    query=" efgh ", result_count=10, device="cpu"
+                    config=self.config, query=" efgh ", result_count=10, device="cpu", marqo_index=index_object
                 )
                 assert len(search_res['hits']) == 2
 
-    #
-    # def test_search_with_searchable_attributes_max_attributes_is_none(self):
-    #     # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
-    #     add_docs_caller(
-    #         config=self.config, index_name=self.default_text_index, docs=[
-    #             {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #             {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #         ], )
-    #     tensor_search.search(
-    #         config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
-    #         searchable_attributes=["other field"]
-    #     )
-    #
-    # @mock.patch.dict(os.environ, {**os.environ, **{'MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES': f"{sys.maxsize}"}})
-    # def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
-    #     with self.assertRaises(InvalidArgError):
-    #         add_docs_caller(
-    #             config=self.config, index_name=self.default_text_index, docs=[
-    #                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
-    #                 {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
-    #             ], )
-    #         tensor_search.search(
-    #             config=self.config, index_name=self.default_text_index, text="Exact match hehehe"
-    #         )
-    #
-
     def test_vector_text_search_no_device(self):
         try:
+            index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
             search_res = tensor_search._vector_text_search(
-                config=self.config, index_name=self.default_text_index,
+                config=self.config, marqo_index=index_object,
                 result_count=5, query="some text...")
             raise AssertionError
         except errors.InternalError:
             pass
 
     def test_vector_search_against_empty_index(self):
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index,
+            config=self.config,
+            marqo_index=index_object,
             result_count=5, query="some text...", device="cpu")
         assert {'hits': []} == search_res
 
     def test_vector_search_against_non_existent_index(self):
         try:
-            tensor_search._vector_text_search(
+            tensor_search.search(
                 config=self.config, index_name="some-non-existent-index",
-                result_count=5, query="some text...", device="cpu")
+                result_count=5, text="some text...", device="cpu",
+                search_method="TENSOR")
         except IndexNotFoundError as s:
             pass
 
@@ -250,9 +227,10 @@ class TestSearchStructured(MarqoTestCase):
                 ]
             )
         )
-
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index, query=query_text, device="cpu"
+            config=self.config, query=query_text, device="cpu",
+            marqo_index=index_object
         )
 
         assert len(res["hits"]) == 2
@@ -531,12 +509,15 @@ class TestSearchStructured(MarqoTestCase):
                 # Note: The tensor_fields parameter is kept as the original field name is maintained
             )
         )
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         for to_search in [1, 1.2, True, "blah"]:
+
             assert "hits" in tensor_search._lexical_search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
+                text=str(to_search), config=self.config, marqo_index=index_object
             )
             assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.default_text_index, device="cpu"
+                query=str(to_search), config=self.config, device="cpu",
+                marqo_index=index_object
             )
 
     def test_search_other_types_top_search(self):

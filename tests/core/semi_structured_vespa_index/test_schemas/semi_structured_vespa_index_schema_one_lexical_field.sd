@@ -5,6 +5,7 @@ schema marqo__test_00semi_00structured_00schema {
             attribute: fast-search
             rank: filter
         }
+
         field marqo__int_fields type map<string, long> {
             indexing: summary
             struct-field key { indexing : attribute
@@ -14,6 +15,7 @@ schema marqo__test_00semi_00structured_00schema {
                                attribute: fast-search
                                rank: filter }
         }
+
         field marqo__bool_fields type map<string, byte> {
             indexing: summary
             struct-field key { indexing : attribute
@@ -23,15 +25,18 @@ schema marqo__test_00semi_00structured_00schema {
                                   attribute: fast-search
                                   rank: filter }
         }
+
         field marqo__float_fields type map<string, double> {
             indexing: summary
             struct-field key { indexing : attribute
                                attribute: fast-search
                                rank: filter }
+
             struct-field value { indexing : attribute
                                attribute: fast-search
                                rank: filter }
         }
+
         field marqo__short_string_fields type map<string, string> {
             struct-field key { indexing : attribute
                                attribute: fast-search
@@ -40,17 +45,21 @@ schema marqo__test_00semi_00structured_00schema {
                                   attribute: fast-search
                                   rank: filter }
         }
+
         field marqo__string_array type array<string> {
             indexing: attribute | summary
             attribute: fast-search
             rank: filter
         }
+
         field marqo__score_modifiers type tensor<double>(p{}) {
             indexing: attribute | summary
         }
+
         field marqo__multimodal_params type map<string, string> {
             indexing: summary
         }
+
         field marqo__lexical_text_field type string {
             indexing: index | summary
             index: enable-bm25
@@ -59,6 +68,7 @@ schema marqo__test_00semi_00structured_00schema {
             indexing: attribute | summary
         }
     }
+
     fieldset default {
         fields: marqo__lexical_text_field
     }
@@ -71,26 +81,48 @@ schema marqo__test_00semi_00structured_00schema {
             query(marqo__add_weights_lexical) tensor<double>(p{})
             query(marqo__mult_weights_tensor) tensor<double>(p{})
             query(marqo__add_weights_tensor) tensor<double>(p{})
+            query(marqo__mult_weights_global) tensor<double>(p{})
+            query(marqo__add_weights_global) tensor<double>(p{})
+        }
+
+        function mult_modifier(mult_weights) {
+            expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod))
+        }
+        function add_modifier(add_weights) {
+            expression: reduce(add_weights * attribute(marqo__score_modifiers), sum)
         }
         function modify(score, mult_weights, add_weights) {
-            expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod)) * score + reduce(add_weights * attribute(marqo__score_modifiers), sum)
+            expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
         }
+        function global_mult_modifier() {
+            expression: mult_modifier(query(marqo__mult_weights_global))
+        }
+        function global_add_modifier() {
+            expression: add_modifier(query(marqo__add_weights_global))
+        }
+
         function lexical_score_sum() {
             expression: if (query(marqo__lexical_text_field) > 0, bm25(marqo__lexical_text_field), 0)
         }
+
         function lexical_score_avg() {
             expression: (if (query(marqo__lexical_text_field) > 0, bm25(marqo__lexical_text_field), 0)) / max(1, if (query(marqo__lexical_text_field) > 0, 1, 0))
         }
+
         function lexical_score_max() {
             expression: if (query(marqo__lexical_text_field) > 0, bm25(marqo__lexical_text_field), 0)
         }
+
         function lexical_score() {
             expression: if (query(marqo__bm25_aggregator) == 0, lexical_score_sum(), if (query(marqo__bm25_aggregator) == 1, lexical_score_avg(), lexical_score_max()))
         }
         function embedding_score() {
             expression: 0
         }
+
+        match-features: global_mult_modifier global_add_modifier
     }
+
     rank-profile bm25 inherits base_rank_profile {
         first-phase {
             expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(marqo__add_weights_lexical))
@@ -100,7 +132,11 @@ schema marqo__test_00semi_00structured_00schema {
         first-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
+
     }
+
+
+
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
         summary marqo__string_array type array<string> {}
@@ -109,6 +145,7 @@ schema marqo__test_00semi_00structured_00schema {
         summary marqo__float_fields type map<string, double> {}
         summary text_field type string {source: marqo__lexical_text_field}
     }
+
     document-summary all-vector-summary {
         summary marqo__id type string {}
         summary marqo__string_array type array<string> {}

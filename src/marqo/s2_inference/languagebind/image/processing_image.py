@@ -32,7 +32,12 @@ def get_image_transform(config):
 
 
 def load_and_transform_image(image_path, transform):
-    image = Image.open(image_path)
+    if isinstance(image_path, str):
+        image = Image.open(image_path)
+    elif isinstance(image_path, Image.Image):
+        image = image_path
+    else:
+        raise ValueError("image_path must be a string or a PIL Image")
     image_outputs = transform(image)
     return image_outputs
 

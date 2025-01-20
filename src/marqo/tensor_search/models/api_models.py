@@ -10,7 +10,7 @@ import pydantic
 from pydantic import BaseModel, root_validator, validator, Field
 
 from marqo.base_model import ImmutableStrictBaseModel
-from marqo.core.models.hybrid_parameters import HybridParameters
+from marqo.core.models.hybrid_parameters import HybridParameters, RetrievalMethod, RankingMethod
 from marqo.core.models.marqo_index import MarqoIndex
 from marqo.tensor_search import validation
 from marqo.tensor_search.enums import SearchMethod
@@ -40,6 +40,7 @@ class SearchQuery(BaseMarqoModel):
     searchMethod: SearchMethod = SearchMethod.TENSOR
     limit: int = 10
     offset: int = 0
+    rerankDepth: Optional[int] = None
     efSearch: Optional[int] = None
     approximate: Optional[bool] = None
     showHighlights: bool = True
@@ -119,6 +120,23 @@ class SearchQuery(BaseMarqoModel):
         if hybrid_parameters is not None and search_method.upper() != SearchMethod.HYBRID:
             raise ValueError(f"Hybrid parameters can only be provided for 'HYBRID' search. "
                              f"Search method is {search_method}.")
+        return values
+
+    @root_validator(pre=False)
+    def validate_rerank_depth(cls, values):
+        """Validate that rerank_depth is only set for hybrid search - RRF. """
+        hybrid_parameters = values.get('hybridParameters')
+        search_method = values.get('searchMethod')
+        rerank_depth = values.get('rerankDepth')
+
+        if rerank_depth is not None:
+            if search_method.upper() != SearchMethod.HYBRID:
+                raise ValueError(f"'rerankDepth' is currently only supported for 'HYBRID' search method.")
+            if hybrid_parameters is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
+                raise ValueError(f"'rerankDepth' is currently only supported for 'HYBRID' search with the 'RRF' rankingMethod.")
+            if rerank_depth < 0:
+                raise ValueError(f"rerankDepth cannot be negative.")
+
         return values
 
     @pydantic.validator('searchMethod')

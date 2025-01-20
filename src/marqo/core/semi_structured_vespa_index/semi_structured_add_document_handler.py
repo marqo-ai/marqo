@@ -40,16 +40,8 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         self.field_count_config = field_count_config
 
     def _handle_field(self, marqo_doc, field_name, field_content):
-        self._validate_field(field_name, field_content)
-        text_field_type = self._infer_field_type(
-            field_content,
-            media_download_headers=self.add_docs_params.media_download_headers
-        )
-        content = self.tensor_fields_container.collect(marqo_doc[MARQO_DOC_ID], field_name,
-                                                       field_content, text_field_type)
-        marqo_doc[field_name] = content
-
-        if isinstance(content, str):
+        super()._handle_field(marqo_doc, field_name, field_content)
+        if isinstance(marqo_doc[field_name], str):
             self._add_lexical_field_to_index(field_name)
 
     def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:

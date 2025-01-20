@@ -252,21 +252,26 @@ class StructuredVespaSchema(VespaSchema):
                                            for field in lexical_fields]) + ')')
         bm25_max_expression = self._generate_max_bm25_expression(list(lexical_fields))
         embedding_similarity_expression = self._generate_max_similarity_expression(tensor_fields)
-        score_modifier_expression = (
+
+        mult_modifier_expression = (
             f'if (count(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG})) == 0, '
             f'   1, reduce(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), prod)) '
             f'* if (count(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT})) == 0, '
             f'   1, reduce(mult_weights * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT}), prod)) '
-            f'* score '
-            f'+ reduce(add_weights * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), sum) '
+        ) if score_modifier_fields_names else '1'
+        add_modifier_expression = (
+            f'reduce(add_weights * attribute({common.FIELD_SCORE_MODIFIERS_DOUBLE_LONG}), sum) '
             f'+ reduce(add_weights * attribute({common.FIELD_SCORE_MODIFIERS_FLOAT}), sum)'
+        ) if score_modifier_fields_names else '0'
+        score_modifier_expression = (
+            'mult_modifier(mult_weights) * score + add_modifier(add_weights)'
         ) if score_modifier_fields_names else 'score'
 
-        embedding_match_features_expression = \
-            'match-features: ' + \
-            ' '.join([f'closest({field.embeddings_field_name})' for field in marqo_index.tensor_fields]) + \
-            ' ' + \
-            ' '.join([f'distance(field, {field.embeddings_field_name})' for field in marqo_index.tensor_fields])
+        embedding_match_features_expression = [f'match-features inherits {common.RANK_PROFILE_BASE} {{']
+        for field in marqo_index.tensor_fields:
+            embedding_match_features_expression.append(f'closest({field.embeddings_field_name})')
+            embedding_match_features_expression.append(f'distance(field, {field.embeddings_field_name})')
+        embedding_match_features_expression.append('}')
 
         # Base rank profile
         rank_profiles.append(f'rank-profile {common.RANK_PROFILE_BASE} inherits default {{')
@@ -282,11 +287,29 @@ class StructuredVespaSchema(VespaSchema):
         rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_LEXICAL}) tensor<double>(p{{}})')
         rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
         rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
+        rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
+        rank_profiles.append(f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
 
+        rank_profiles.append('}')
+
+        rank_profiles.append('function mult_modifier(mult_weights) {')
+        rank_profiles.append(f'   expression: {mult_modifier_expression}')
+        rank_profiles.append('}')
+
+        rank_profiles.append('function add_modifier(add_weights) {')
+        rank_profiles.append(f'   expression: {add_modifier_expression}')
         rank_profiles.append('}')
 
         rank_profiles.append('function modify(score, mult_weights, add_weights) {')
         rank_profiles.append(f'   expression: {score_modifier_expression}')
+        rank_profiles.append('}')
+
+        rank_profiles.append('function global_mult_modifier() {')
+        rank_profiles.append(f'   expression: mult_modifier(query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}))')
+        rank_profiles.append('}')
+
+        rank_profiles.append('function global_add_modifier() {')
+        rank_profiles.append(f'   expression: add_modifier(query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}))')
         rank_profiles.append('}')
 
         if lexical_fields:
@@ -310,6 +333,9 @@ class StructuredVespaSchema(VespaSchema):
             rank_profiles.append('function embedding_score() {')
             rank_profiles.append(f'expression: {embedding_similarity_expression}')
             rank_profiles.append('}')
+
+        # Global add and mult modifiers should be accessible in searcher
+        rank_profiles.append('match-features: global_mult_modifier global_add_modifier')
 
         rank_profiles.append('}')
 
@@ -335,7 +361,7 @@ class StructuredVespaSchema(VespaSchema):
                                  f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR})'
                                  f')')
             rank_profiles.append('}')
-            rank_profiles.append(embedding_match_features_expression)
+            rank_profiles.extend(embedding_match_features_expression)   # This is a multi-line list, so we extend
             rank_profiles.append('}')
 
         # Hybrid search
@@ -359,6 +385,10 @@ class StructuredVespaSchema(VespaSchema):
                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
             rank_profiles.append(
                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}) tensor<double>(p{{}})')
+            rank_profiles.append(
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
+            rank_profiles.append(
+                f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL}) tensor<double>(p{{}})')
 
             rank_profiles.append('}')
             rank_profiles.append('}')
@@ -384,7 +414,7 @@ class StructuredVespaSchema(VespaSchema):
                 f'query({constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR}))'
             )
             rank_profiles.append('}')
-            rank_profiles.append(embedding_match_features_expression)
+            rank_profiles.extend(embedding_match_features_expression)   # This is a multi-line list, so we extend
             rank_profiles.append('}')
 
             # HYBRID SEARCH TENSOR THEN LEXICAL

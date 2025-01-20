@@ -113,7 +113,7 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.to_version }}" ]; then
             VERSION="${{ github.event.inputs.to_version }}"
           else
-            VERSION=$(python tests/backwards_compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
+            VERSION=$(python tests/compatibility_tests/scripts/determine_to_version.py ${{ github.sha }})
           fi
           echo "to_version=${VERSION}" >> $GITHUB_OUTPUT
       # Step to generate the list of versions to test
@@ -121,7 +121,7 @@ jobs:
         id: generate-versions
         run: |
           # Run the Python script and capture its output
-          VERSION_LIST=$(python tests/backwards_compatibility_tests/scripts/generate_versions.py ${{ steps.get-to-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
+          VERSION_LIST=$(python tests/compatibility_tests/scripts/generate_versions.py ${{ steps.get-to-version.outputs.to_version }} ${{ env.MAX_VERSIONS_TO_TEST }})
           echo "list=${VERSION_LIST}" >> $GITHUB_OUTPUT
       # Step to display the versions to test
       - name: display versions
@@ -137,7 +137,7 @@ jobs:
 
   run-backwards-compatibility-execution-workflow:
     # Job to trigger execution workflows for backwards compatibility test for each version combination
-    name: Run all backwards compatibility tests execution workflows
+    name: ${{ matrix.from_version }} Run all backwards compatibility tests execution workflows
     needs: [orchestrate, check-if-image-exists, build-and-push-image]
     if: always() && (needs.orchestrate.result == 'success')
     strategy:
@@ -164,7 +164,7 @@ jobs:
 
   run-rollback-tests-execution-workflow:
     # Job to trigger execution workflows for rollback test for each version combination
-    name: Run all rollback tests execution workflows
+    name: ${{ matrix.from_version }} Run all rollback tests execution workflows
     needs: [ orchestrate, check-if-image-exists, build-and-push-image ]
     if: always() && (needs.orchestrate.result == 'success')
     strategy:

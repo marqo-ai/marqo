@@ -28,4 +28,4 @@ PATCH_MODELS = {
     'simple', 'overlap', 'fastercnn', 'frcnn', 'marqo-yolo', 'yolox', 'dino-v1', 'dino-v2', 'dino/v1', 'dino/v2'
 }
 
-PREPROCESS_IMAGE_MODEL_LIST = [ModelType.CLIP, ModelType.OpenCLIP]
+PREPROCESS_PRELOAD_MODELS = [ModelType.CLIP, ModelType.OpenCLIP, ModelType.LanguageBind]
