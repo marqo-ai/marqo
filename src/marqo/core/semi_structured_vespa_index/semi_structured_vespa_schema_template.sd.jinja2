@@ -115,10 +115,24 @@ schema {{ index.schema_name }} {
             query(marqo__add_weights_lexical) tensor<double>(p{})
             query(marqo__mult_weights_tensor) tensor<double>(p{})
             query(marqo__add_weights_tensor) tensor<double>(p{})
+            query(marqo__mult_weights_global) tensor<double>(p{})
+            query(marqo__add_weights_global) tensor<double>(p{})
         }
 
+        function mult_modifier(mult_weights) {
+            expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod))
+        }
+        function add_modifier(add_weights) {
+            expression: reduce(add_weights * attribute(marqo__score_modifiers), sum)
+        }
         function modify(score, mult_weights, add_weights) {
-            expression: if (count(mult_weights * attribute(marqo__score_modifiers)) == 0,   1, reduce(mult_weights * attribute(marqo__score_modifiers), prod)) * score + reduce(add_weights * attribute(marqo__score_modifiers), sum)
+            expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
+        }
+        function global_mult_modifier() {
+            expression: mult_modifier(query(marqo__mult_weights_global))
+        }
+        function global_add_modifier() {
+            expression: add_modifier(query(marqo__add_weights_global))
         }
 
         {% macro max_score(score_macro, fields) -%}
@@ -171,6 +185,8 @@ schema {{ index.schema_name }} {
         function embedding_score() {
             expression: {{ max_score(embedding_score, index.tensor_fields) }}
         }
+
+        match-features: global_mult_modifier global_add_modifier
     }
 
     {% if index.lexical_fields -%}
@@ -187,9 +203,14 @@ schema {{ index.schema_name }} {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
         {% if index.tensor_fields -%}
-        match-features:
-        {%- for field in index.tensor_fields %} closest({{ field.embeddings_field_name }}){% endfor -%}
-        {%- for field in index.tensor_fields %} distance(field, {{ field.embeddings_field_name }}){% endfor %}
+        match-features inherits base_rank_profile {
+            {%- for field in index.tensor_fields %}
+            closest({{ field.embeddings_field_name }})
+            {%- endfor %}
+            {%- for field in index.tensor_fields %}
+            distance(field, {{ field.embeddings_field_name }})
+            {%- endfor %}
+        }
         {%- endif %}
     }
 
@@ -203,6 +224,8 @@ schema {{ index.schema_name }} {
             query(marqo__add_weights_lexical) tensor<double>(p{})
             query(marqo__mult_weights_tensor) tensor<double>(p{})
             query(marqo__add_weights_tensor) tensor<double>(p{})
+            query(marqo__mult_weights_global) tensor<double>(p{})
+            query(marqo__add_weights_global) tensor<double>(p{})
         }
     }
 
@@ -213,9 +236,14 @@ schema {{ index.schema_name }} {
         second-phase {
             expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
         }
-        match-features:
-        {%- for field in index.tensor_fields %} closest({{ field.embeddings_field_name }}){% endfor -%}
-        {%- for field in index.tensor_fields %} distance(field, {{ field.embeddings_field_name }}){% endfor -%}
+        match-features inherits base_rank_profile {
+            {%- for field in index.tensor_fields %}
+            closest({{ field.embeddings_field_name }})
+            {%- endfor %}
+            {%- for field in index.tensor_fields %}
+            distance(field, {{ field.embeddings_field_name }})
+            {%- endfor %}
+        }
     }
 
     rank-profile hybrid_embedding_similarity_then_bm25 inherits base_rank_profile {

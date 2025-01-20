@@ -159,6 +159,7 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
           export MARQO_MAX_CPU_MODEL_MEMORY=15
           export MARQO_MAX_CUDA_MODEL_MEMORY=15
+          export HF_HUB_ENABLE_HF_TRANSFER=1
           
           export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}

@@ -23,7 +23,7 @@ from tests.utils.transition import add_docs_caller
 from marqo.core.utils.prefix import determine_text_prefix
 from marqo.core.models.marqo_index import FieldType, UnstructuredMarqoIndex, TextPreProcessing, \
     ImagePreProcessing, Model, DistanceMetric, VectorNumericType, HnswConfig, TextSplitMethod
-
+from marqo.tensor_search import index_meta_cache
 
 @unittest.skip
 class TestVectorSearch(MarqoTestCase):
@@ -635,13 +635,14 @@ class TestVectorSearch(MarqoTestCase):
                 "a_bool": True,
                 "some_str": "blah"
             }])
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         for to_search in [1, 1.2, True, "blah"]:
             assert "hits" in tensor_search._lexical_search(
-                text=str(to_search), config=self.config, index_name=self.index_name_1,
-
+                text=str(to_search), config=self.config, marqo_index=index_object
             )
             assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.index_name_1, device="cpu"
+                query=str(to_search), config=self.config, device="cpu",
+                marqo_index=index_object
             )
 
     def test_search_other_types_top_search(self):

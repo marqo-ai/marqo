@@ -12,6 +12,7 @@ from transformers.models.clip.modeling_clip import CLIPMLP, CLIPAttention, CLIPT
     CLIPVisionModelWithProjection, CLIPTextModelWithProjection, CLIPOutput, clip_loss
 from transformers.utils import add_start_docstrings_to_model_forward, replace_return_docstrings
 
+from marqo.s2_inference.languagebind.common import _expand_mask
 from .configuration_video import LanguageBindVideoConfig, CLIPVisionConfig, CLIPTextConfig
 
 
@@ -597,11 +598,7 @@ class CLIPTextTransformer(nn.Module):
         # expand attention_mask
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            attention_mask = self.attn_mask_converter.to_4d(
-                attention_mask,
-                input_shape[-1],  # This is equivalent to the mask's sequence length
-                dtype=hidden_states.dtype
-            )
+            attention_mask = _expand_mask(attention_mask, hidden_states.dtype)
 
         encoder_outputs = self.encoder(
             inputs_embeds=hidden_states,

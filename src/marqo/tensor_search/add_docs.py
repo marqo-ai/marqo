@@ -22,7 +22,7 @@ from marqo.exceptions import InternalError
 from marqo.s2_inference import clip_utils
 from marqo.s2_inference.errors import UnsupportedModalityError, S2InferenceError, MediaMismatchError, MediaDownloadError, MediaExceedsMaxSizeError
 from marqo.s2_inference.models.model_type import ModelType
-from marqo.s2_inference.s2_inference import is_preprocess_image_model, load_multimodal_model_and_get_preprocessors, \
+from marqo.s2_inference.s2_inference import is_preprocessor_preload, load_multimodal_model_and_get_preprocessors, \
     infer_modality, Modality
 from marqo.tensor_search.utils import read_env_vars_and_defaults_ints
 from marqo.tensor_search import enums
@@ -84,6 +84,15 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
         metric_obj = RequestMetricsStore.for_request()
         RequestMetricsStore.set_in_request(metrics=metric_obj)
 
+    # For backward compatibility, we should accept both supportedModalities and supported_modalities
+    if marqo_index_model.properties.get("supported_modalities") and marqo_index_model.properties.get("supportedModalities"):
+        raise InvalidModelPropertiesError(
+            "Model properties must have either 'supported_modalities' or 'supportedModalities', not both"
+        )
+    else:
+        supported_modalities = marqo_index_model.properties.get('supported_modalities') or \
+                                marqo_index_model.properties.get('supportedModalities') or []
+
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
             for field in list(doc):
@@ -104,8 +113,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer): # Don't use infer modality in structured image pointers
 
                         if marqo_index_model.properties.get('type') in [ModelType.LanguageBind] \
-                            and marqo_index_model.properties.get('supported_modalities') is not None \
-                            and Modality.IMAGE not in marqo_index_model.properties.get('supported_modalities'):
+                            and supported_modalities is not None \
+                            and Modality.IMAGE not in supported_modalities:
 
                             media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index_model.name} does not support {inferred_modality}")
@@ -129,7 +138,12 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                             if not device or not isinstance(device, str):
                                 raise ValueError("Device must be provided for preprocessing images")
                             try:
-                                media_repo[doc[field]] = preprocessors.image(media_repo[doc[field]]).to(device)
+                                preprocessed_results = preprocessors.image(media_repo[doc[field]])
+                                if isinstance(preprocessed_results, torch.Tensor):
+                                    media_repo[doc[field]] = preprocessed_results.to(device)
+                                elif isinstance(preprocessed_results, dict):
+                                    media_repo[doc[field]] = {k: v.to(device) for k, v in preprocessed_results.items()}
+                                # media_repo[doc[field]] = preprocessors.image(media_repo[doc[field]]).to(device)
                             except OSError as e:
                                 if "image file is truncated" in str(e):
                                     media_repo[doc[field]] = e
@@ -145,7 +159,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 f"Model {marqo_index_model.name} does not support {inferred_modality}")
                             continue
                         
-                        if inferred_modality not in marqo_index_model.properties.get('supported_modalities'):
+                        if inferred_modality not in supported_modalities:
                             media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index_model.name} does not support {inferred_modality}")
                             continue
@@ -346,16 +360,16 @@ def process_batch(
     docs_per_thread = math.ceil(len(docs) / thread_count)
     copied = copy.deepcopy(docs)
 
-    model, preprocessors = load_multimodal_model_and_get_preprocessors(
-        model_name=model_name,
-        model_properties=model_properties,
-        device=device,
-        model_auth=model_auth,
-        normalize_embeddings=normalize_embeddings
-    )
-
-    if not is_preprocess_image_model(model_properties) or patch_method_exists:
-        preprocessors.image = None
+    if is_preprocessor_preload(model_properties) and not patch_method_exists:
+        _, preprocessors = load_multimodal_model_and_get_preprocessors(
+            model_name=model_name,
+            model_properties=model_properties,
+            device=device,
+            model_auth=model_auth,
+            normalize_embeddings=normalize_embeddings
+        )
+    else:
+        preprocessors = None
 
     media_repo = {}
     m = [RequestMetrics() for i in range(thread_count)]

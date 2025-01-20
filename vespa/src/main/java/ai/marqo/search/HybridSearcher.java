@@ -6,6 +6,8 @@ import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.result.ErrorMessage;
+import com.yahoo.search.result.FeatureData;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.AsyncExecution;
@@ -39,6 +41,8 @@ public class HybridSearcher extends Searcher {
     Logger logger = LoggerFactory.getLogger(HybridSearcher.class);
 
     private static String QUERY_INPUT_FIELDS_TO_RANK = "marqo__fields_to_rank";
+    private static String QUERY_INPUT_MULT_WEIGHTS_GLOBAL = "marqo__mult_weights_global";
+    private static String QUERY_INPUT_ADD_WEIGHTS_GLOBAL = "marqo__add_weights_global";
     private static String MARQO_SEARCH_METHOD_LEXICAL = "lexical";
     private static String MARQO_SEARCH_METHOD_TENSOR = "tensor";
     private List<String> STANDARD_SEARCH_TYPES = new ArrayList<>();
@@ -54,7 +58,6 @@ public class HybridSearcher extends Searcher {
         // Ranking methods: rrf, normalize_linear, tensor, lexical
         STANDARD_SEARCH_TYPES.add(MARQO_SEARCH_METHOD_LEXICAL);
         STANDARD_SEARCH_TYPES.add(MARQO_SEARCH_METHOD_TENSOR);
-
         boolean verbose = query.properties().getBoolean("marqo__hybrid.verbose", false);
 
         logIfVerbose("Starting Hybrid Search script.", verbose);
@@ -64,6 +67,10 @@ public class HybridSearcher extends Searcher {
 
         Integer rrf_k = query.properties().getInteger("marqo__hybrid.rrf_k", 60);
         Double alpha = query.properties().getDouble("marqo__hybrid.alpha", 0.5);
+        Integer rerankDepthGlobal =
+                query.properties().getInteger("marqo__hybrid.rerankDepthGlobal", null);
+        Integer limit = query.properties().getInteger("hits", null);
+        Integer offset = query.properties().getInteger("offset", 0);
         Integer timeout = query.properties().getInteger("timeout", 1000);
 
         // Log fetched variables
@@ -71,11 +78,20 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("Ranking method found: %s", rankingMethod), verbose);
         logIfVerbose(String.format("alpha found: %.2f", alpha), verbose);
         logIfVerbose(String.format("RRF k found: %d", rrf_k), verbose);
+        logIfVerbose(String.format("Rerank count global found: %d", rerankDepthGlobal), verbose);
+        logIfVerbose(String.format("Limit found: %d", limit), verbose);
+        logIfVerbose(String.format("Offset found: %d", offset), verbose);
         logIfVerbose(String.format("Timeout int found: %d", timeout), verbose);
 
         logIfVerbose(String.format("Base Query is: "), verbose);
         logIfVerbose(query.toDetailString(), verbose);
 
+        // Validation for limit and rerank count
+        if (limit == null) {
+            throw new RuntimeException("Query limit cannot be null.");
+        }
+
+        HitGroup hitsForPostProcessing;
         if (retrievalMethod.equals("disjunction")) {
             Result resultLexical, resultTensor;
             Query queryLexical =
@@ -105,6 +121,8 @@ public class HybridSearcher extends Searcher {
                                 + e.toString());
             }
 
+            raiseErrorIfPresent(resultLexical, resultTensor);
+
             logIfVerbose(
                     "LEXICAL RESULTS: "
                             + resultLexical.toString()
@@ -114,11 +132,8 @@ public class HybridSearcher extends Searcher {
 
             // Execute fusion ranking on 2 results.
             if (rankingMethod.equals("rrf")) {
-                HitGroup fusedHitList =
+                hitsForPostProcessing =
                         rrf(resultTensor.hits(), resultLexical.hits(), rrf_k, alpha, verbose);
-                logIfVerbose("RRF Fused Hit Group", verbose);
-                logHitGroup(fusedHitList, verbose);
-                return new Result(query, fusedHitList);
             } else {
                 throw new RuntimeException(
                         "For retrievalMethod='disjunction', rankingMethod must be 'rrf'.");
@@ -129,9 +144,9 @@ public class HybridSearcher extends Searcher {
                 Query combinedQuery =
                         createSubQuery(query, retrievalMethod, rankingMethod, verbose);
                 Result result = execution.search(combinedQuery);
-                logIfVerbose("Results: ", verbose);
-                logHitGroup(result.hits(), verbose);
-                return result;
+                hitsForPostProcessing = result.hits();
+                logIfVerbose("Unprocessed results: ", verbose);
+                logHitGroup(hitsForPostProcessing, verbose);
             } else {
                 throw new RuntimeException(
                         "If retrievalMethod is 'lexical' or 'tensor', rankingMethod can only be"
@@ -141,6 +156,13 @@ public class HybridSearcher extends Searcher {
             throw new RuntimeException(
                     "retrievalMethod can only be 'disjunction', 'lexical', or 'tensor'.");
         }
+
+        // Post-process result list
+        HitGroup processedHits =
+                postProcessResults(
+                        hitsForPostProcessing, query, rerankDepthGlobal, limit, offset, verbose);
+
+        return new Result(query, processedHits);
     }
 
     /**
@@ -168,7 +190,6 @@ public class HybridSearcher extends Searcher {
         logIfVerbose(String.format("k is %d", k), verbose);
 
         // Iterate through tensor hits list
-
         int rank = 1;
         if (alpha > 0.0) {
             logIfVerbose(
@@ -267,21 +288,112 @@ public class HybridSearcher extends Searcher {
             }
         }
 
-        // Sort and trim results.
-        logIfVerbose("Combined list (UNSORTED)", verbose);
-        logHitGroup(result, verbose);
-
-        result.sort();
-        logIfVerbose("Combined list (SORTED)", verbose);
-        logHitGroup(result, verbose);
-
-        // Only return top hits (max length)
-        Integer finalLength = Math.max(hitsTensor.size(), hitsLexical.size());
-        result.trim(0, finalLength);
-        logIfVerbose("Combined list (TRIMMED)", verbose);
-        logHitGroup(result, verbose);
-
         return result;
+    }
+
+    /**
+     * Post-processes the result list, applying global score modifiers and reranking.
+     */
+    HitGroup postProcessResults(
+            HitGroup hitsForPostProcessing,
+            Query query,
+            Integer rerankDepthGlobal,
+            int limit,
+            int offset,
+            boolean verbose) {
+        // Split original hits into 2 lists: result to rerank and excess hits
+        // Excess hits will not be reranked, and will be added back after reranking the other
+        // results
+        HitGroup resultToRerank = new HitGroup();
+        HitGroup excessHits = new HitGroup();
+
+        int idx = 0;
+        // If rerank count global is not set, rerank all hits
+        if (rerankDepthGlobal == null) {
+            rerankDepthGlobal = hitsForPostProcessing.size();
+        }
+        for (Hit hit : hitsForPostProcessing) {
+            if (idx < rerankDepthGlobal) {
+                resultToRerank.add(hit);
+            } else if (idx < limit) {
+                // Total hits to return caps out at limit
+                excessHits.add(hit);
+            } else {
+                // Ignore all hits after limit
+                break;
+            }
+            idx++;
+        }
+
+        logIfVerbose("Result list to rerank: ", verbose);
+        logHitGroup(resultToRerank, verbose);
+        if (excessHits.size() > 0) {
+            logIfVerbose("Excess hits (will not be rescored): ", verbose);
+            logHitGroup(excessHits, verbose);
+        }
+
+        // Apply global score modifiers and rerank
+        // Skip whole process if global modifier weight tensors don't exist in query
+        Tensor queryMultWeightsGlobal =
+                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_MULT_WEIGHTS_GLOBAL));
+        Tensor queryAddWeightsGlobal =
+                extractTensorRankFeature(query, addQueryWrapper(QUERY_INPUT_ADD_WEIGHTS_GLOBAL));
+
+        if ((queryMultWeightsGlobal != null && !queryMultWeightsGlobal.isEmpty())
+                || (queryAddWeightsGlobal != null && !queryAddWeightsGlobal.isEmpty())) {
+            logIfVerbose("Applying global score modifiers and reranking.", verbose);
+            resultToRerank = applyGlobalScoreModifiers(resultToRerank, verbose);
+        } else {
+            logIfVerbose("No weights found. Skipping applying global score modifiers.", verbose);
+        }
+
+        logIfVerbose("Rescored result list (UNSORTED): ", verbose);
+        logHitGroup(resultToRerank, verbose);
+
+        resultToRerank.sort();
+
+        logIfVerbose("Reranked result list (SORTED): ", verbose);
+        logHitGroup(resultToRerank, verbose);
+
+        if (limit > rerankDepthGlobal) {
+            // Add excess hits to the end of reranked results then sort
+            logIfVerbose(
+                    String.format(
+                            "Adding %d excess hits to the end of reranked results and sorting.",
+                            excessHits.size()),
+                    verbose);
+            resultToRerank.addAll(excessHits.asList());
+        }
+
+        // Paginate and/or trim
+        // Result list should always have limit length (if possible)
+        logIfVerbose(
+                String.format("Trimming result list. " + "limit: %d, offset: %d", limit, offset),
+                verbose);
+        resultToRerank.trim(0, limit);
+
+        logIfVerbose("Final result list (EXCESS HITS ADDED/REMOVED): ", verbose);
+        logHitGroup(resultToRerank, verbose);
+
+        return resultToRerank;
+    }
+
+    void raiseErrorIfPresent(Result resultLexical, Result resultTensor) {
+        // Raise error if either result list has an error. Make sure error messages are combined
+        String tensorOrLexicalErrors = "";
+        ErrorMessage tensorError = resultTensor.hits().getError();
+        if (tensorError != null) {
+            tensorOrLexicalErrors += "Error in TENSOR search in RRF: " + tensorError;
+        }
+
+        ErrorMessage lexicalError = resultLexical.hits().getError();
+        if (lexicalError != null) {
+            tensorOrLexicalErrors += "Error in LEXICAL search in RRF: " + lexicalError;
+        }
+
+        if (!tensorOrLexicalErrors.isEmpty()) {
+            throw new RuntimeException(tensorOrLexicalErrors);
+        }
     }
 
     /**
@@ -419,21 +531,14 @@ public class HybridSearcher extends Searcher {
     }
 
     /**
-     * Extract a tensor rank feature, throwing an error if it does not exist
+     * Extract a tensor rank feature, returning null if it does not exist
      * @param query
      * @param featureName
      */
     Tensor extractTensorRankFeature(Query query, String featureName) {
         Optional<Tensor> optionalTensor = query.getRanking().getFeatures().getTensor(featureName);
         Tensor resultTensor;
-
-        if (optionalTensor.isPresent()) {
-            resultTensor = optionalTensor.get();
-        } else {
-            throw new RuntimeException("Rank Feature: " + featureName + " not found in query!");
-        }
-
-        return resultTensor;
+        return optionalTensor.orElse(null);
     }
 
     /**
@@ -458,5 +563,54 @@ public class HybridSearcher extends Searcher {
             throw new InternalException(
                     "Vespa doc ID could not be extracted from the full hit ID: " + fullPath + ".");
         }
+    }
+
+    /**
+     * Apply global score modifiers to the hit group. Modifies hit scores, does not add/remove hits.
+     * @param hits
+     * @param verbose
+     */
+    HitGroup applyGlobalScoreModifiers(HitGroup hits, boolean verbose) {
+        FeatureData hitMatchFeatures;
+        Double mult_modifier, add_modifier, original_score, modified_score;
+        if (hits.size() == 0) {
+            logIfVerbose("No hits to apply score modifiers to. Returning.", verbose);
+            return hits;
+        }
+
+        for (Hit hit : hits) {
+            logIfVerbose("Applying score modifiers to hit: " + hit.getId(), verbose);
+            // Extract the mult and add modifiers from match-features
+            hitMatchFeatures = (FeatureData) hit.getField("matchfeatures");
+            if (hitMatchFeatures != null) {
+                mult_modifier = hitMatchFeatures.getDouble("global_mult_modifier");
+                add_modifier = hitMatchFeatures.getDouble("global_add_modifier");
+
+                if (mult_modifier != null && add_modifier != null) {
+                    // Apply the modifiers to the hit's relevance
+                    original_score = hit.getRelevance().getScore();
+                    modified_score = original_score * mult_modifier + add_modifier;
+                    logIfVerbose(
+                            String.format(
+                                    "Original score: %.7f, mult modifier: %.5f, add modifier: %.5f,"
+                                            + " Modified score: %.7f",
+                                    original_score, mult_modifier, add_modifier, modified_score),
+                            verbose);
+                    hit.setRelevance(modified_score);
+                } else {
+                    throw new RuntimeException(
+                            "Failed to apply global score modifiers. Hit "
+                                    + hit.getId()
+                                    + " is missing either global_mult_modifier or"
+                                    + " global_add_modifier match-feature.");
+                }
+            } else {
+                throw new RuntimeException(
+                        "Failed to apply global score modifiers. Hit "
+                                + hit.getId()
+                                + " is missing matchfeatures.");
+            }
+        }
+        return hits;
     }
 }

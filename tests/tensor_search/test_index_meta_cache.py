@@ -153,9 +153,9 @@ class TestIndexMetaCache(MarqoTestCase):
         )
         # reset cache
         index_meta_cache.empty_cache()
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         search_res =tensor_search._lexical_search(
-            config=self.config, index_name=self.index_name_1, text="Marqo",
-            searchable_attributes=["some doc 1", "d-one"])
+            config=self.config, text="Marqo", searchable_attributes=["some doc 1", "d-one"], marqo_index=index_object)
         assert len(search_res['hits']) == 2
         assert d1 in [self.strip_marqo_fields(res) for res in search_res['hits']]
         assert d0 in [self.strip_marqo_fields(res) for res in search_res['hits']]

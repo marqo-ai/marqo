@@ -7,7 +7,7 @@ from pydantic import validator, root_validator
 from marqo.base_model import StrictBaseModel
 from marqo.core.models.score_modifier import ScoreModifier
 from marqo.core.search.search_filter import SearchFilter, MarqoFilterStringParser
-from marqo.core.models.hybrid_parameters import HybridParameters
+from marqo.core.models.hybrid_parameters import RankingMethod, HybridParameters
 
 
 class MarqoQuery(StrictBaseModel, ABC):
@@ -17,6 +17,7 @@ class MarqoQuery(StrictBaseModel, ABC):
     index_name: str
     limit: int
     offset: Optional[int] = None
+    rerank_depth: Optional[int] = None
     searchable_attributes: Optional[List[str]] = None
     attributes_to_retrieve: Optional[List[str]] = None
     filter: Optional[SearchFilter] = None
@@ -61,13 +62,16 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     # Core module will use these fields instead of the score_modifiers_lexical and score_modifiers_tensor inside the HybridParameters
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
+
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):
-        # score_modifiers cannot defined for hybrid search
-        if values.get("score_modifiers") is not None:
-            raise ValueError("'scoreModifiers' cannot be used for hybrid search. Instead, define the "
-                             "'scoreModifiersTensor' and/or 'scoreModifiersLexical' keys inside the "
-                             "'hybridParameters' dict parameter.")
+        # score_modifiers can only be set for hybrid search - RRF
+        hybrid_parameters = values.get("hybrid_parameters")
+        if values.get("score_modifiers") is not None and hybrid_parameters.rankingMethod != RankingMethod.RRF:
+            raise ValueError(f"'scoreModifiers' is only supported for hybrid search if 'rankingMethod' is 'RRF'. "
+                             f"For your 'rankingMethod': {hybrid_parameters.rankingMethod}, define the "
+                             f"'scoreModifiersTensor' and/or 'scoreModifiersLexical' keys inside the "
+                             f"'hybridParameters' dict parameter.")
 
         # searchable_attributes cannot be defined for hybrid search
         if values.get("searchable_attributes") is not None:

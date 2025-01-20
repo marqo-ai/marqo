@@ -6,7 +6,7 @@ import pytest
 from marqo.core.constants import MARQO_DOC_ID, MARQO_DOC_TENSORS, MARQO_DOC_CHUNKS, MARQO_DOC_EMBEDDINGS
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, MultiModalTensorFieldContent
 from marqo.core.exceptions import AddDocumentsError
-from marqo.core.models.marqo_index import FieldType
+from marqo.core.models.marqo_index import FieldType, Field
 
 
 @pytest.mark.unittest
@@ -40,6 +40,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
 
         self.assertEqual(0, len(self.container._tensor_field_map))
 
+    def _dummy_infer_field_type(self, field_type):
+        """A function that returns another function which always returns the field_type."""
+        return lambda field_name, field_content: field_type
+
     def test_collect_non_tensor_fields(self):
         test_cases = [
             (1, None),  # for unstructured, we don't infer type for non-text field
@@ -57,7 +61,9 @@ class TestTensorFieldsContainer(unittest.TestCase):
         ]
         for (field_content, field_type) in test_cases:
             with self.subTest(msg=f'field_content {field_content} of type {field_type}'):
-                content = self.container.collect('doc_id1', 'field1', field_content, field_type)
+                content = self.container.collect(
+                    'doc_id1', 'field1', field_content, self._dummy_infer_field_type(field_type)
+                )
                 self.assertEqual(field_content, content)
                 # verify that they won't be collected to tensor field maps
                 self.assertEqual(0, len(self.container._tensor_field_map))
@@ -66,7 +72,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         content = self.container.collect('doc_id1', 'custom_vector_field1', {
             'content': 'content1',
             'vector': [1.0, 2.0]
-        }, None)
+        }, self._dummy_infer_field_type(None))
 
         self.assertEqual('content1', content)
         self.assertIn('doc_id1', self.container._tensor_field_map)
@@ -112,7 +118,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
     def test_collect_tensor_field_with_string_type(self):
         for text_field_type in [FieldType.Text, FieldType.ImagePointer, FieldType.AudioPointer, FieldType.VideoPointer]:
             with self.subTest(msg=f'field_type {text_field_type}'):
-                content = self.container.collect('doc_id1', 'tensor_field1', 'content', text_field_type)
+                content = self.container.collect('doc_id1', 'tensor_field1', 'content',
+                                                 self._dummy_infer_field_type(text_field_type))
                 self.assertEqual('content', content)
                 self.assertIn('doc_id1', self.container._tensor_field_map)
                 self.assertIn('tensor_field1', self.container._tensor_field_map['doc_id1'])
@@ -134,16 +141,16 @@ class TestTensorFieldsContainer(unittest.TestCase):
 
         for (field_name, is_tensor_field, is_multimodal_subfield) in test_cases:
             with self.subTest(msg=f'{field_name}: is_tensor_field={is_tensor_field}, is_multimodal_subfield={is_multimodal_subfield}'):
-                self.container.collect('doc_id1', field_name, 'content', FieldType.Text)
+                self.container.collect('doc_id1', field_name, 'content', self._dummy_infer_field_type(FieldType.Text))
 
                 tensor_field_content = self.container._tensor_field_map['doc_id1'][field_name]
                 self.assertEqual(is_tensor_field, tensor_field_content.is_tensor_field)
                 self.assertEqual(is_multimodal_subfield, tensor_field_content.is_multimodal_subfield)
 
     def test_remove_doc(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'content', FieldType.Text)
-        self.container.collect('doc_id1', 'tensor_field2', 'content', FieldType.Text)
-        self.container.collect('doc_id2', 'tensor_field2', 'content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'content', self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'tensor_field2', 'content', self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id2', 'tensor_field2', 'content', self._dummy_infer_field_type(FieldType.Text))
 
         self.assertIn('doc_id1', self.container._tensor_field_map)
         self.assertIn('doc_id2', self.container._tensor_field_map)
@@ -161,8 +168,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual(('combo_field2', {'subfield1': 2.0, 'tensor_field2': 5.0}), fields[1])
 
     def test_collect_multimodal_fields_should_populate_subfields(self):
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
-        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', 
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', 
+                               self._dummy_infer_field_type(FieldType.Text))
 
         list(self.container.collect_multi_modal_fields('doc_id1', True))
 
@@ -185,7 +194,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
                           combo_field2.subfields)
 
     def test_collect_multimodal_fields_should_not_populate_subfields_not_existing(self):
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.Text))
 
         list(self.container.collect_multi_modal_fields('doc_id1', True))
 
@@ -197,7 +207,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
                           combo_field2.subfields)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_doc_id_does_not_match(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
         tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
 
         self.container.populate_tensor_from_existing_doc({
@@ -212,7 +223,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_should_populate_if_doc_id_matches(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', 
+                               self._dummy_infer_field_type(FieldType.Text))
         tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
 
         self.container.populate_tensor_from_existing_doc({
@@ -227,7 +239,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual([[1.0, 2.0]], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_content_changes(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'changed_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'changed_content', 
+                               self._dummy_infer_field_type(FieldType.Text))
         tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
 
         self.container.populate_tensor_from_existing_doc({
@@ -242,7 +255,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_field_does_not_exist(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', 
+                               self._dummy_infer_field_type(FieldType.Text))
         tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
 
         self.container.populate_tensor_from_existing_doc({
@@ -255,7 +269,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_embedding_does_not_exist(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', 
+                               self._dummy_infer_field_type(FieldType.Text))
         tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
 
         self.container.populate_tensor_from_existing_doc({
@@ -268,7 +283,8 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual([], tensor_field1.embeddings)
 
     def test_populate_tensor_from_existing_docs_will_not_populate_if_existing_field_is_multimodal_combo_field(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', 
+                               self._dummy_infer_field_type(FieldType.Text))
         tensor_field1 = self.container._tensor_field_map['doc_id1']['tensor_field1']
 
         self.container.populate_tensor_from_existing_doc({
@@ -285,7 +301,7 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.container.collect('doc_id1', 'custom_vector_field1', {
             'content': 'content1',
             'vector': [1.0, 2.0]
-        }, None)
+        }, self._dummy_infer_field_type(None))
         custom_vector_field1 = self.container._tensor_field_map['doc_id1']['custom_vector_field1']
 
         self.container.populate_tensor_from_existing_doc({
@@ -374,18 +390,20 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual([[1.0, 2.0]], combo_field2.embeddings)
 
     def _get_combo_field2(self):
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
-        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
         list(self.container.collect_multi_modal_fields('doc_id1', True))
         return self.container._tensor_field_map['doc_id1']['combo_field2']
 
     def test_traversing_tensor_fields_to_vectorise_should_return_all_fields(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.ImagePointer)
-        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', self._dummy_infer_field_type(FieldType.ImagePointer))
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', self._dummy_infer_field_type(FieldType.Text))
         list(self.container.collect_multi_modal_fields('doc_id1', True))
-        self.container.collect('doc_id2', 'tensor_field1', 'tensor_field1_content', FieldType.AudioPointer)
-        self.container.collect('doc_id2', 'tensor_field2', 'tensor_field2_content', FieldType.VideoPointer)
+        self.container.collect('doc_id2', 'tensor_field1', 'tensor_field1_content', self._dummy_infer_field_type(FieldType.AudioPointer))
+        self.container.collect('doc_id2', 'tensor_field2', 'tensor_field2_content', self._dummy_infer_field_type(FieldType.VideoPointer))
         list(self.container.collect_multi_modal_fields('doc_id2', True))
 
         fields = list(self.container.tensor_fields_to_vectorise(FieldType.Text, FieldType.ImagePointer,
@@ -397,8 +415,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertIn(('doc_id2', 'tensor_field2', self.container._tensor_field_map['doc_id2']['tensor_field2']), fields)
 
     def test_traversing_tensor_fields_to_vectorise_skips_resolved_fields(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
         list(self.container.collect_multi_modal_fields('doc_id1', True))
 
         # resolve tensor_field1
@@ -412,10 +432,14 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual('subfield1', field_name)
 
     def test_traversing_tensor_fields_to_vectorise_skips_removed_doc(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
-        self.container.collect('doc_id2', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id2', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id2', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id2', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.Text))
 
         fields = []
         for doc_id, field_name, _ in self.container.tensor_fields_to_vectorise(FieldType.Text):
@@ -429,8 +453,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertIn(('doc_id2', 'tensor_field2'), fields)
 
     def test_traversing_tensor_fields_to_vectorise_by_type(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.ImagePointer)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.ImagePointer))
 
         fields = list(self.container.tensor_fields_to_vectorise(FieldType.ImagePointer))
         self.assertEqual(1, len(fields))
@@ -439,9 +465,12 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertEqual('tensor_field2', field_name)
 
     def test_traversing_tensor_fields_to_vectorise_skips_subfields_for_resolved_multimodal_fields(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
-        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
         list(self.container.collect_multi_modal_fields('doc_id1', True))
 
         tensor_field2 = self.container._tensor_field_map['doc_id1']['tensor_field2']
@@ -460,9 +489,12 @@ class TestTensorFieldsContainer(unittest.TestCase):
         #   needs it is already resolved
 
     def test_get_tensor_field_content_for_persisting(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
-        self.container.collect('doc_id1', 'subfield1', 'subfield1_content', FieldType.Text)  # subfield is not persisted
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'subfield1', 'subfield1_content',
+                               self._dummy_infer_field_type(FieldType.Text))  # subfield is not persisted
         list(self.container.collect_multi_modal_fields('doc_id1', True))
 
         self.container._tensor_field_map['doc_id1']['tensor_field1'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
@@ -476,8 +508,10 @@ class TestTensorFieldsContainer(unittest.TestCase):
         self.assertIn('combo_field2', fields)
 
     def test_get_tensor_field_content_for_persisting_skips_multimodal_field_with_no_subfields(self):
-        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content', FieldType.Text)
-        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content', FieldType.Text)
+        self.container.collect('doc_id1', 'tensor_field1', 'tensor_field1_content',
+                               self._dummy_infer_field_type(FieldType.Text))
+        self.container.collect('doc_id1', 'tensor_field2', 'tensor_field2_content',
+                               self._dummy_infer_field_type(FieldType.Text))
         list(self.container.collect_multi_modal_fields('doc_id1', True))
 
         self.container._tensor_field_map['doc_id1']['tensor_field1'].populate_chunks_and_embeddings(['hello world'], [[1.0, 1.2]])
