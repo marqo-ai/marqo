@@ -1,7 +1,7 @@
 # Release 2.15.0
 
 ## New Features
-- Global Score Modifiers for Hybrid Search ([#1082](https://github.com/marqo-ai/marqo/pull/1082)). Introduce global score modifiers for hybrid search, allowing fine-tuned adjustments to RRF scores in combined result lists. This enhancement provides better control over returned results in hybrid search scenarios. Use the `rerankDepth` parameter to control the number of hits to rerank. For detailed usage, check [here](https://docs.marqo.ai/2.15/reference/api/search/search/#reranker).
+- Global Score Modifiers for Hybrid Search ([#1082](https://github.com/marqo-ai/marqo/pull/1082)). Introduce global score modifiers for hybrid search, allowing fine-tuned adjustments to RRF scores in combined result lists. This enhancement provides better control over returned results in hybrid search scenarios. Use the `rerankDepth` parameter to control the number of hits to rerank. For detailed usage, check [here](https://docs.marqo.ai/latest/reference/api/search/search/#rerank-depth).
 
 - Custom LanguageBind Model ([#1072](https://github.com/marqo-ai/marqo/pull/1072)). Marqo now supports loading custom LanguageBind models from S3 buckets, URLs, or HuggingFace model cards. Fine-tune your own LanguageBind model and integrate it with Marqo to achieve better in-domain results. For more details, see [here](https://docs.marqo.ai/2.15/models/marqo/bring-your-own-model/#bring-your-own-languagebind-models).
  
