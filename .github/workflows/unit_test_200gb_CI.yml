@@ -203,56 +203,14 @@ jobs:
           echo -e "\nDone waiting."
 
           # Zip up schemas, hosts, and services
+          # Deploy application with test schema, don't keep zip file
           sudo apt-get install zip -y
-          zip -r vespa_tester_app.zip . -x README.md .env .gitignore "*.yml"  # zip the whole directory except for the listed files
-
-          # Deploy application with test schema
-          curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
-    
-          # For single node: wait for vespa to start (document url):
-          if [[ "$VESPA_MULTINODE_SETUP" == "false" ]]; then
-            timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
-              (echo "Vespa (Document URL) did not start in time" && exit 1)
-            echo "Vespa document API is available. Local single node Vespa setup complete."
-            
-          elif [[ "$VESPA_MULTINODE_SETUP" == "true" ]]; then
-            # For multinode: wait for all vespa nodes to start
-            echo "Extracting URLs from vespa_local.py output..."
-            URL_LIST=$(echo "$START_SCRIPT_OUTPUT" | grep -Eo 'http://[^ ]+')
-      
-            if [[ -z "$URL_LIST" ]]; then
-                echo "Error: No URLs found in vespa_local.py output."
-                exit 1
-            fi
-      
-            echo "Found the following URLs to check:"
-            echo "$URL_LIST"
-      
-            # Total timeout in seconds (10 minutes)
-            TOTAL_TIMEOUT=600
-            INTERVAL=10
-            MAX_ATTEMPTS=$((TOTAL_TIMEOUT / INTERVAL))
+          zip -r - . -x README.md .env .gitignore "*.yml" | curl --header "Content-Type:application/zip" --data-binary @- http://localhost:19071/application/v2/tenant/default/prepareandactivate
           
-            for url in $URL_LIST; do
-                CURRENT_ATTEMPT=0
-                echo "Checking health of: $url"
-                while ! curl -f -s $url >/dev/null 2>&1; do
-                    if [[ $CURRENT_ATTEMPT -ge $MAX_ATTEMPTS ]]; then
-                        echo "Error: Timeout reached. Exiting."
-                        exit 1
-                    fi
-                    echo "$url is not yet ready. Waiting for $INTERVAL seconds..."
-                    sleep $INTERVAL
-                    CURRENT_ATTEMPT=$((CURRENT_ATTEMPT + 1))
-                done
-                echo "$url is ready."
-            done
-            echo "All API and content nodes are available. Local multinode Vespa setup complete."
-          fi
-
-          # Delete the zip file
-          rm vespa_tester_app.zip
-          echo "Deleted vespa_tester_app.zip"
+          # Check for config node convergence
+          timeout 10m bash -c 'until [ "$(curl -f -X GET $VESPA_CONFIG_URL/application/v2/tenant/default/application/default/environment/prod/region/default/instance/default/serviceconverge | jq -r ".converged")" = "true" ]; do echo "  Waiting for Vespa convergence to be true..."; sleep 10; done;' || \
+            (echo "Vespa did not converge in time" && exit 1)
+          echo "Vespa application has converged. Vespa setup complete!"
 
       - name: Run Unit Tests
         id: run_unit_tests

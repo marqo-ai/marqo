@@ -5,3 +5,7 @@ pytest-cov==6.0.0
 diff-cover==9.2.0
 pytest-md-report==0.6.2
 pytest-asyncio==0.23.8
+
+# For vespa_local setup
+docker==7.1.0
+PyYAML==6.0.2
