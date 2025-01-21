@@ -608,9 +608,5 @@ def liveness_check(marqo_config: config.Config = Depends(get_config)) -> JSONRes
     return JSONResponse(content={"status": "ok"}, status_code=200)
 
 
-def dummy_method():
-    print('to trigger new code test coverage failure')
-
-
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8882)
