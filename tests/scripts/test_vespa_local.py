@@ -1,4 +1,17 @@
-class TestVespaLocalMultiNode(unittest.TestCase):
+import io
+import math
+import os
+import tempfile
+import unittest
+import yaml
+import docker
+from xml.etree import ElementTree as ET
+from xml.dom import minidom
+from unittest.mock import patch, mock_open, call
+from tests.marqo_test import MarqoTestCase
+from scripts.vespa_local.vespa_local import VespaLocalSingleNode, VespaLocalMultiNode
+
+class TestVespaLocalMultiNode(MarqoTestCase):
 
     def setUp(self):
         # Create a temporary directory and switch to it
@@ -12,10 +25,20 @@ class TestVespaLocalMultiNode(unittest.TestCase):
         os.chdir(self.old_cwd)
         self.test_dir.cleanup()
 
+    def _read_file(self, path: str) -> str:
+        currentdir = os.path.dirname(os.path.abspath(__file__))
+        abspath = os.path.join(currentdir, path)
+
+        with open(abspath, 'r') as f:
+            file_content = f.read()
+
+        return file_content
+
     @patch("builtins.open", new_callable=mock_open)
     def test_generate_docker_compose(self, mock_file):
         number_of_shards = 2
         number_of_replicas = 1  # so total content nodes = 2* (1+1) = 4
+        VESPA_VERSION = '8.431.32'
 
         VespaLocalMultiNode.generate_docker_compose(number_of_shards, number_of_replicas, VESPA_VERSION)
 
@@ -37,13 +60,17 @@ class TestVespaLocalMultiNode(unittest.TestCase):
             self.assertIn(f'config-{i}', services)
             self.assertEqual(services[f'config-{i}']['hostname'], f'config-{i}.vespanet')
 
-        # Check one API node exists (we expect TOTAL_API_NODES = max(MINIMUM_API_NODES, ceil(4/4)) = 1)
+        # Check two API nodes exists (we expect TOTAL_API_NODES = max(MINIMUM_API_NODES, ceil(4/4)) = 2)
         self.assertIn('api-0', services)
+        self.assertIn('api-1', services)
         self.assertEqual(services['api-0']['hostname'], 'api-0.vespanet')
+        self.assertEqual(services['api-1']['hostname'], 'api-1.vespanet')
 
         # Check that content nodes exist.
         # With number_of_replicas =1 and shards =2, we expect 2 groups, each with 2 shards.
         self.assertIn('content-0-0', services)
+        self.assertIn('content-0-1', services)
+        self.assertIn('content-1-0', services)
         self.assertIn('content-1-1', services)
 
     @patch("builtins.open", new_callable=mock_open)
@@ -58,27 +85,10 @@ class TestVespaLocalMultiNode(unittest.TestCase):
         handle = mock_file()
         written_xml = "".join(call_arg[0][0] for call_arg in handle.write.call_args_list)
 
-        # Parse the XML and verify some expected elements.
-        root = ET.fromstring(written_xml)
-        self.assertEqual(root.tag, 'services')
-        # Check admin/configserver entries (should be 3)
-        admin = root.find('admin')
-        configservers = admin.find('configservers')
-        configserver_list = configservers.findall('configserver')
-        self.assertEqual(len(configserver_list), 3)
-        # Check that container nodes include the expected API nodes.
-        container = root.find('container')
-        nodes_elem = container.find('nodes')
-        node_list = nodes_elem.findall('node')
-        # With 4 total content nodes, TOTAL_API_NODES = max(MINIMUM_API_NODES, ceil(4/4)) = 1
-        self.assertGreaterEqual(len(node_list), 1)
-
-        # Check content groups
-        content = root.find('content')
-        group_parent = content.find('group')
-        groups = group_parent.findall('group')
-        # number_of_replicas + 1 groups expected
-        self.assertEqual(len(groups), number_of_replicas + 1)
+        # Check that written XML exactly matches the expected XML
+        expected_file_name = f"expected/services_{number_of_shards}_shard_{number_of_replicas}_replica.xml"
+        expected_xml = self._read_file(expected_file_name)
+        self.assertEqual(written_xml, expected_xml)
 
     @patch("builtins.open", new_callable=mock_open)
     def test_generate_hosts_xml(self, mock_file):
