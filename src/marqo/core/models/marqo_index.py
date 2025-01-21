@@ -98,6 +98,10 @@ class Field(ImmutableStrictBaseModel):
 
         return values
 
+# class StringArrayField(ImmutableStrictBaseModel):
+#     name: str
+#     type: FieldType
+#     string_array_field_name: Optional[str]
 
 class TensorField(ImmutableStrictBaseModel):
     """
@@ -309,6 +313,7 @@ class MarqoIndex(ImmutableBaseModel, ABC):
     @classmethod
     def parse_obj(cls, obj: Any) -> 'MarqoIndex':
         obj = cls._enforce_dict_if_root(obj)
+        # print("received data 1: ", obj)  # Add this line
         if not isinstance(obj, dict):
             try:
                 obj = dict(obj)
@@ -505,8 +510,10 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
+    string_array_fields: Optional[List[Field]]
 
     def __init__(self, **data):
+        # print("Received data:", data)  # Add this line
         super().__init__(**data)
 
     @classmethod

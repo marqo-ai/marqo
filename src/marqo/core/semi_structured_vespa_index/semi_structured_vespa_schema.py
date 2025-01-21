@@ -11,6 +11,7 @@ class SemiStructuredVespaSchema(VespaSchema):
     FIELD_INDEX_PREFIX = 'marqo__lexical_'
     FIELD_CHUNKS_PREFIX = 'marqo__chunks_'
     FIELD_EMBEDDING_PREFIX = 'marqo__embeddings_'
+    FIELD_STRING_ARRAY_PREFIX = 'marqo__string_array_'
 
     def __init__(self, index_request: UnstructuredMarqoIndexRequest):
         self._index_request = index_request
@@ -46,6 +47,7 @@ class SemiStructuredVespaSchema(VespaSchema):
             updated_at=self._index_request.updated_at,
             lexical_fields=[],
             tensor_fields=[],
+            string_array_fields=[],
             filter_string_max_length=self._index_request.filter_string_max_length,
             treat_urls_and_pointers_as_images=self._index_request.treat_urls_and_pointers_as_images,
             treat_urls_and_pointers_as_media=self._index_request.treat_urls_and_pointers_as_media,

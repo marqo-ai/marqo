@@ -659,8 +659,10 @@ class VespaClient:
 
     def get_text_content(self, content_base_url: str, *path: str) -> str:
         endpoint = f'{content_base_url}{"/".join(path)}'
+        # print("Here's the endpoint ", endpoint)
 
         response = self.http_client.get(endpoint)
+        # print("Here's the response ", response)
 
         self._raise_for_status(response)
 
@@ -842,12 +844,12 @@ class VespaClient:
                 # elif value == 'int_map' or value == 'float_map':
                 #     data["condition"] += f' and ({schema}.marqo__field_types{{\"{key}\"}}=="int_map" or {schema}.marqo__field_types{{\"{key}\"}}=="float_map")'
                 # else:
-                    data["condition"] += f' and (not {schema}.marqo__field_types{{\"{key}\"}} or {schema}.marqo__field_types{{\"{key}\"}}==\"{value}\")'
-                    data['fields']
+                    data["condition"] += (f' and (not {schema}.marqo__field_types{{\"{key}\"}} or {schema}.marqo__field_types{{\"{key}\"}}==\"{value}\")'
+                                          f' and (not ({schema}.marqo__field_types{{\"{key}\"}}=="tensor"))')
                 # data["condition"].extend(f'{schema}.marqo__field_types.{key}==\"{value}\"'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
-            except httpx.RequestError as e:
+            except httpx.RequestError  as e:
                 logger.error(e, exc_info=True)
                 return UpdateDocumentResponse(status=500, message="Network Error", id=doc_id, path_id=error_doc_path_id)
 

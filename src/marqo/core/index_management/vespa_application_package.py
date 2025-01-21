@@ -170,6 +170,7 @@ class IndexSettingStore:
     _HISTORY_VERSION_LIMIT = 3
 
     def __init__(self, index_settings_json: str, index_settings_history_json: str):
+        print(json.loads(index_settings_json).items())
         self._index_settings: Dict[str, MarqoIndex] = \
             {key: MarqoIndex.parse_obj(value) for key, value in json.loads(index_settings_json).items()}
 
@@ -435,9 +436,11 @@ class VespaApplicationFileStore(VespaApplicationStore):
         return os.path.join(self._app_root_path, *paths)
 
     def file_exists(self, *paths: str) -> bool:
+        # print("Checking if file exists", self._full_path(*paths))
         return os.path.exists(self._full_path(*paths))
 
     def read_text_file(self, *paths: str) -> Optional[str]:
+        # print("Reading text file", self._full_path(*paths))
         if not self.file_exists(*paths):
             return None
         with open(self._full_path(*paths), 'r') as file:
@@ -497,6 +500,7 @@ class ApplicationPackageDeploymentSessionStore(VespaApplicationStore):
         return content_url in self._all_contents
 
     def read_text_file(self, *paths: str) -> Optional[str]:
+        # print("Reading text file", self._content_base_url, *paths)
         if not self.file_exists(*paths):
             return None
         return self._vespa_client.get_text_content(self._content_base_url, *paths)

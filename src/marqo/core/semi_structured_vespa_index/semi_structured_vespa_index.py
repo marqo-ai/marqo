@@ -226,8 +226,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
             if isinstance(marqo_field_value, bool):
                 # Assign values to a map: https://docs.vespa.ai/en/reference/document-json-format.html#assign-map-field
-                string_field_name = f'{common.BOOL_FIELDS}{{{marqo_field_key}}}'
-                vespa_fields[string_field_name] = {"assign": int(marqo_field_value)}
+                vespa_document_bool_field_name = f'{common.BOOL_FIELDS}{{{marqo_field_key}}}'
+                vespa_fields[vespa_document_bool_field_name] = {"assign": int(marqo_field_value)}
                 vespa_field_types[marqo_field_key] = 'bool'
             elif isinstance(marqo_field_value, dict):
                 for key, value in marqo_field_value.items():
@@ -236,6 +236,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                         vespa_field_types[f'{marqo_field_key}.{key}'] = 'int_map'
                     elif isinstance(value, float):
                         vespa_field_types[f'{marqo_field_key}.{key}'] = 'float_map'
+                    else:
+                        raise MarqoDocumentParsingError(f'Unsupported field type {type(value)} for field {marqo_field_key} in doc {vespa_id}')
             elif isinstance(marqo_field_value, int):
                 all_numeric_field_map[marqo_field_key] = marqo_field_value
                 vespa_field_types[marqo_field_key] = 'int'
@@ -247,7 +249,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     raise MarqoDocumentParsingError('Only string array is supported')
 
                 # new_string_array = [value for value in new_string_array if not value.startswith(f'{marqo_field_key}::')]
-                new_string_array.extend([f'{marqo_field_key}::{value}' for value in marqo_document[marqo_field_key]])
+                new_string_array = marqo_document[marqo_field_key]
+                vespa_document_string_array_field_name = f'{common.STRING_ARRAY}_{marqo_field_key}'
+                vespa_fields[vespa_document_string_array_field_name] = {"assign": new_string_array}
                 vespa_field_types[marqo_field_key] = 'string_array'
 
             elif isinstance(marqo_document[marqo_field_key], str):
@@ -259,17 +263,17 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                                                     f'partial updates')
                 vespa_fields[lexical_field_name] = {"assign": marqo_field_value}
 
-                string_field_name = f'{common.SHORT_STRINGS_FIELDS}{{{marqo_field_key}}}'
+                vespa_document_bool_field_name = f'{common.SHORT_STRINGS_FIELDS}{{{marqo_field_key}}}'
                 if len(marqo_document[marqo_field_key]) <= self.get_marqo_index().filter_string_max_length:
-                    vespa_fields[string_field_name] = {"assign": marqo_document[marqo_field_key]}
+                    vespa_fields[vespa_document_bool_field_name] = {"assign": marqo_document[marqo_field_key]}
                 else:
-                    vespa_fields[string_field_name] = {"remove": 0}
+                    vespa_fields[vespa_document_bool_field_name] = {"remove": 0}
                 vespa_field_types[marqo_field_key] = 'string'
             else:
                 raise MarqoDocumentParsingError(f'Unsupported field type {type(marqo_field_value)} for field {marqo_field_key} in doc {vespa_id}')
 
-        if new_string_array: #Don't know what to do with this.
-            vespa_fields[common.STRING_ARRAY] = {"assign": new_string_array}
+        # if new_string_array: #Don't know what to do with this.
+        #     vespa_fields[common.STRING_ARRAY] = {"assign": new_string_array}
 
         int_fields_changed = self._update_numeric_field(int, all_numeric_field_map, vespa_fields) #Here we compare the int field changes
         float_fields_changed = self._update_numeric_field(float, all_numeric_field_map, vespa_fields) #here we compare the float field changes

@@ -86,6 +86,11 @@ schema {{ index.schema_name }} {
         }
         {% endfor -%}
 
+        {% for string_array_field in index.string_array_fields -%}
+        field {{ string_array_field.lexical_field_name }} type array<string> {
+        }
+        {% endfor -%}
+
         {% for field in index.tensor_fields -%}
         field {{ field.chunk_field_name }} type array<string> {
             indexing: summary
