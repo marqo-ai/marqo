@@ -27,7 +27,8 @@ from tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARAC
 
 
 class TestSearchSemiStructured(MarqoTestCase):
-
+    # Note: We should not use _vector_text_search or _lexical_search directly in tests as they do not fetch the updated
+    # index object.
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
@@ -64,11 +65,12 @@ class TestSearchSemiStructured(MarqoTestCase):
             image_index_with_random_model,
         ])
 
-        cls.default_text_index = default_text_index.name
-        cls.default_text_index_encoded_name = default_text_index_encoded_name.name
-        cls.default_image_index = default_image_index.name
-        cls.image_index_with_chunking = image_index_with_chunking.name
-        cls.image_index_with_random_model = image_index_with_random_model.name
+        cls.default_text_index = cls.indexes[0]
+        cls.default_text_index_encoded_name = cls.indexes[1]
+        cls.default_image_index = cls.indexes[2]
+        cls.image_index_with_chunking = cls.indexes[3]
+        cls.image_index_with_random_model = cls.indexes[4]
+
 
     def setUp(self) -> None:
         super().setUp()
@@ -90,11 +92,11 @@ class TestSearchSemiStructured(MarqoTestCase):
             (self.default_text_index, 'Standard index name'),
             (self.default_text_index_encoded_name, 'Index name requiring encoding'),
         ]
-        for index_name, desc in tests:
+        for index, desc in tests:
             with self.subTest(desc):
-                self.add_documents(config=self.config,
+                add_docs_res = self.add_documents(config=self.config,
                                    add_docs_params=AddDocsParams(
-                                                index_name=index_name,
+                                                index_name=index.name,
                                                 docs=[
                                                     {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
                                                      "_id": "5678", "finally": "some field efgh "},
@@ -105,9 +107,9 @@ class TestSearchSemiStructured(MarqoTestCase):
                                             )
                                    )
 
-                search_res = tensor_search._vector_text_search(
-                    config=self.config, index_name=index_name,
-                    query=" efgh ", result_count=10, device="cpu"
+                search_res = tensor_search.search(
+                    config=self.config, index_name=index.name,
+                    text=" efgh ", result_count=10, device="cpu", search_method=SearchMethod.TENSOR
                 )
                 assert len(search_res['hits']) == 2
 
@@ -115,12 +117,12 @@ class TestSearchSemiStructured(MarqoTestCase):
     # def test_search_with_searchable_attributes_max_attributes_is_none(self):
     #     # No patch needed, MARQO_MAX_SEARCHABLE_TENSOR_ATTRIBUTES is not set
     #     add_docs_caller(
-    #         config=self.config, index_name=self.default_text_index, docs=[
+    #         config=self.config, index_name=self.default_text_index.name, docs=[
     #             {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
     #             {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
     #         ], )
     #     tensor_search.search(
-    #         config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+    #         config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
     #         searchable_attributes=["other field"]
     #     )
     #
@@ -128,12 +130,12 @@ class TestSearchSemiStructured(MarqoTestCase):
     # def test_search_with_no_searchable_attributes_but_max_searchable_attributes_env_set(self):
     #     with self.assertRaises(InvalidArgError):
     #         add_docs_caller(
-    #             config=self.config, index_name=self.default_text_index, docs=[
+    #             config=self.config, index_name=self.default_text_index.name, docs=[
     #                 {"abc": "Exact match hehehe", "other field": "baaadd", "_id": "5678"},
     #                 {"abc": "random text", "other field": "Close match hehehe", "_id": "1234"},
     #             ], )
     #         tensor_search.search(
-    #             config=self.config, index_name=self.default_text_index, text="Exact match hehehe"
+    #             config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe"
     #         )
     #
 
@@ -156,23 +158,24 @@ class TestSearchSemiStructured(MarqoTestCase):
     def test_vector_text_search_no_device(self):
         try:
             search_res = tensor_search._vector_text_search(
-                config=self.config, index_name=self.default_text_index,
+                config=self.config,
+                marqo_index=self.default_text_index,
                 result_count=5, query="some text...")
             raise AssertionError
         except errors.InternalError:
             pass
 
     def test_vector_search_against_empty_index(self):
-        search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index,
-            result_count=5, query="some text...", device="cpu")
-        assert {'hits': []} == search_res
+        search_res = tensor_search.search(
+            config=self.config, index_name=self.default_text_index.name,
+            result_count=5, text="some text...", search_method=SearchMethod.TENSOR, device="cpu")
+        assert search_res["hits"] == []
 
     def test_vector_search_against_non_existent_index(self):
         try:
-            tensor_search._vector_text_search(
+            tensor_search.search(
                 config=self.config, index_name="some-non-existent-index",
-                result_count=5, query="some text...", device="cpu")
+                result_count=5, text="some text...", device="cpu", search_method=SearchMethod.TENSOR)
         except IndexNotFoundError as s:
             pass
 
@@ -184,7 +187,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"_id": "12345",
                      "Desc": "The Guardian is newspaper, read in the UK and other places around the world"},
@@ -194,8 +197,9 @@ class TestSearchSemiStructured(MarqoTestCase):
             )
         )
 
-        res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index, query=query_text, device="cpu"
+        res = tensor_search.search(
+            config=self.config, index_name=self.default_text_index.name, text=query_text, device="cpu",
+            search_method=SearchMethod.TENSOR
         )
 
         assert len(res["hits"]) == 2
@@ -205,7 +209,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index, docs=[
+                index_name=self.default_text_index.name, docs=[
                     {
                         'text': 'In addition to NiS collection fire assay for a five element PGM suite, the samples will undergo research quality analyses for a wide range of elements, including the large ion. , the rare earth elements, high field strength elements, sulphur and selenium.hey include 55 elements of the periodic system: O, Si, Al, Ti, B, C, all the alkali and alkaline-earth metals, the halogens, and many of the rare elements.',
                         'combined': 'In addition to NiS collection fire assay for a five element PGM suite, the samples will undergo research quality analyses for a wide range of elements, including the large ion. , the rare earth elements, high field strength elements, sulphur and selenium.hey include 55 elements of the periodic system: O, Si, Al, Ti, B, C, all the alkali and alkaline-earth metals, the halogens, and many of the rare elements.',
@@ -223,7 +227,7 @@ class TestSearchSemiStructured(MarqoTestCase):
 
         res = tensor_search.search(
             text="In addition to NiS collection fire assay for a five element",
-            config=self.config, index_name=self.default_text_index
+            config=self.config, index_name=self.default_text_index.name
         )
 
         self.assertEqual(2, len(res["hits"]))
@@ -235,7 +239,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "Exact match hehehe", "other_field": "baaadd",
                      "Cool Field 1": "res res res", "_id": "5678"},
@@ -247,7 +251,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         )
 
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text=q, result_count=50
+            config=self.config, index_name=self.default_text_index.name, text=q, result_count=50
         )
 
         assert "processingTimeMs" in search_res
@@ -264,7 +268,7 @@ class TestSearchSemiStructured(MarqoTestCase):
     def test_searchable_attributes_not_supported_in_unstructured_index(self):
         with self.assertRaises(errors.InvalidArgError) as ex:
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="",
+                config=self.config, index_name=self.default_text_index.name, text="",
                 searchable_attributes=["None"], result_count=50
             )
         self.assertIn("searchable_attributes is not supported", str(ex.exception))
@@ -272,7 +276,7 @@ class TestSearchSemiStructured(MarqoTestCase):
     def test_search_format_empty(self):
         """Is the result formatted correctly? - on an emtpy index?"""
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text=""
+            config=self.config, index_name=self.default_text_index.name, text=""
         )
         assert "processingTimeMs" in search_res
         assert search_res["processingTimeMs"] > 0
@@ -288,7 +292,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "Exact match hehehe", "other_field": "baaadd",
                      "Cool Field 1": "res res res", "_id": "5678"},
@@ -301,14 +305,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # too big
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
                 result_count=-1
             )
 
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # too small
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
                 result_count=1000000
             )
             raise AssertionError
@@ -316,14 +320,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         with self.assertRaises(errors.IllegalRequestedDocCount):
             # should not work with 0
             search_res = tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
                 result_count=0
             )
             raise AssertionError
 
         # should work with 1:
         search_res = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+            config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
             result_count=1
         )
         assert len(search_res['hits']) >= 1
@@ -332,7 +336,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234"}],
@@ -341,14 +345,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         )
 
         tensor_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text", highlights=True)
+            config=self.config, index_name=self.default_text_index.name, text="some text", highlights=True)
         self.assertEqual(2, len(tensor_highlights["hits"]))
 
         for hit in tensor_highlights["hits"]:
             assert "_highlights" in hit
 
         tensor_no_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text", highlights=False)
+            config=self.config, index_name=self.default_text_index.name, text="some text", highlights=False)
         self.assertEqual(2, len(tensor_highlights["hits"]))
         for hit in tensor_no_highlights["hits"]:
             assert "_highlights" not in hit
@@ -357,7 +361,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index, docs=[
+                index_name=self.default_text_index.name, docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234"}],
                 tensor_fields=[]
@@ -365,14 +369,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         )
 
         res = lexical_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text",
+            config=self.config, index_name=self.default_text_index.name, text="some text",
             search_method=SearchMethod.LEXICAL, highlights=True)
         assert len(lexical_highlights["hits"]) == 2
         for hit in lexical_highlights["hits"]:
             assert "_highlights" in hit
 
         lexical_no_highlights = tensor_search.search(
-            config=self.config, index_name=self.default_text_index, text="some text",
+            config=self.config, index_name=self.default_text_index.name, text="some text",
             search_method=SearchMethod.LEXICAL, highlights=False)
         assert len(lexical_no_highlights["hits"]) == 2
         for hit in lexical_no_highlights["hits"]:
@@ -383,7 +387,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_int": 144},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "my_int": 88},
@@ -394,7 +398,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
             with self.subTest(f"search_method={search_method}"):
                 s_res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="cool match",
+                    config=self.config, index_name=self.default_text_index.name, text="cool match",
                     search_method=search_method)
                 assert len(s_res["hits"]) > 0
 
@@ -402,7 +406,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -412,21 +416,21 @@ class TestSearchSemiStructured(MarqoTestCase):
         )
 
         res_exists = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:tag1")
+            index_name=self.default_text_index.name, config=self.config, text="", filter="my_list:tag1")
 
         res_not_exists = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:tag55")
+            index_name=self.default_text_index.name, config=self.config, text="", filter="my_list:tag55")
 
         res_other = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_string:b")
+            index_name=self.default_text_index.name, config=self.config, text="", filter="my_string:b")
 
         # strings in lists are converted into keyword, which aren't filterable on a token basis.
         # Because the list member is "tag2 some" we can only exact match (incl. the space).
         # "tag2" by itself doesn't work, only "(tag2 some)"
         res_should_only_match_keyword_bad = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:tag2")
+            index_name=self.default_text_index.name, config=self.config, text="", filter="my_list:tag2")
         res_should_only_match_keyword_good = tensor_search.search(
-            index_name=self.default_text_index, config=self.config, text="", filter="my_list:(tag2 some)")
+            index_name=self.default_text_index.name, config=self.config, text="", filter="my_list:(tag2 some)")
 
         assert res_exists["hits"][0]["_id"] == "1235"
         assert res_exists["hits"][0]["_highlights"][0] == {"abc": "some text"}
@@ -444,7 +448,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -464,7 +468,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             with self.subTest(
                     f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                    index_name=self.default_text_index, config=self.config, text="some",
+                    index_name=self.default_text_index.name, config=self.config, text="some",
                     search_method=SearchMethod.LEXICAL, filter=filter_string
                 )
                 self.assertEqual(expected_hits, len(res["hits"]))
@@ -477,7 +481,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_image_index,
+                index_name=self.default_image_index.name,
                 docs=[
                     {"img": hippo_img, "abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
                     {"img": hippo_img, "abc": "some text", "other_field": "Close match hehehe", "_id": "1234",
@@ -497,7 +501,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             with self.subTest(
                     f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                    index_name=self.default_image_index, config=self.config, text="some",
+                    index_name=self.default_image_index.name, config=self.config, text="some",
                     search_method=SearchMethod.TENSOR, filter=filter_string
                 )
 
@@ -510,7 +514,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         res = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -537,7 +541,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             with self.subTest(
                     f"filter_string={filter_string}, expected_hits={expected_hits}, expected_id={expected_id}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text", result_count=3,
+                    config=self.config, index_name=self.default_text_index.name, text="some text", result_count=3,
                     filter=filter_string, verbose=0
                 )
 
@@ -556,7 +560,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=documents,
                 tensor_fields=["text_field_1", "text_field_2", "text_field_3"]
             )
@@ -580,7 +584,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                         f"search_method = {search_method}, filter_string={filter_string}, "
                         f"expected_hits={expected_hits}, expected_id={expected_id}")):
                     res = tensor_search.search(
-                        index_name=self.default_text_index, config=self.config, text="search me",
+                        index_name=self.default_text_index.name, config=self.config, text="search me",
                         search_method=search_method, filter=filter_string
                     )
                     self.assertEqual(expected_hits, len(res["hits"]))
@@ -595,7 +599,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -616,7 +620,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         for filter_string, expected_hits, expected_ids in test_parameters:
             with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text='',
+                    config=self.config, index_name=self.default_text_index.name, text='',
                     filter=filter_string, verbose=0
                 )
 
@@ -629,7 +633,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678", "my_string": "b"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "an_int": 2},
@@ -650,7 +654,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             with self.subTest(f"filter_string={filter_string}"):
                 with self.assertRaises(core_exceptions.FilterStringParsingError):
                     tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, text="some text",
+                        config=self.config, index_name=self.default_text_index.name, text="some text",
                         result_count=3, filter=filter_string, verbose=0
                     )
 
@@ -666,7 +670,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         @mock.patch("marqo.s2_inference.s2_inference.vectorise", mock_vectorise)
         def run():
             tensor_search.search(
-                config=self.config, index_name=self.default_text_index, text="some text",
+                config=self.config, index_name=self.default_text_index.name, text="some text",
                 search_method=SearchMethod.TENSOR, highlights=True, device="cuda:123")
             return True
 
@@ -679,7 +683,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[{
                     "an_int": 1,
                     "a_float": 1.2,
@@ -690,13 +694,17 @@ class TestSearchSemiStructured(MarqoTestCase):
             )
         )
         for to_search in [1, 1.2, True, "blah"]:
-            assert "hits" in tensor_search._lexical_search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
-
+            lexical_res = tensor_search.search(
+                text=str(to_search), config=self.config, index_name=self.default_text_index.name,
+                search_method=SearchMethod.LEXICAL
             )
-            assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.default_text_index, device="cpu"
+            assert "hits" in lexical_res
+            tensor_res = tensor_search.search(
+                text=str(to_search), config=self.config, index_name=self.default_text_index.name,
+                search_method=SearchMethod.TENSOR
             )
+            assert "hits" in tensor_res
+            assert len(tensor_res["hits"]) > 0
 
     def test_search_other_types_top_search(self):
         docs = [{
@@ -709,7 +717,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=docs,
                 tensor_fields=["some_str"]
             )
@@ -717,12 +725,12 @@ class TestSearchSemiStructured(MarqoTestCase):
 
         for field, to_search in docs[0].items():
             assert "hits" in tensor_search.search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
+                text=str(to_search), config=self.config, index_name=self.default_text_index.name,
                 search_method=SearchMethod.TENSOR, filter=f"{field}:{to_search}"
             )
 
             assert "hits" in tensor_search.search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
+                text=str(to_search), config=self.config, index_name=self.default_text_index.name,
                 search_method=SearchMethod.LEXICAL, filter=f"{field}:{to_search}"
             )
 
@@ -731,7 +739,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {
                         "doc_title": "The captain bravely lead her followers into battle."
@@ -780,7 +788,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         for filter_string, expected_hits, expected_id in test_parameters:
             with self.subTest(f"filter_string={filter_string}, expected_hits={expected_hits}"):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text",
+                    config=self.config, index_name=self.default_text_index.name, text="some text",
                     result_count=3, filter=filter_string, search_method=SearchMethod.LEXICAL
                 )
 
@@ -797,7 +805,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=[
                     {"abc": "some text", "other_field": "baaadd", "_id": "5678", "status": "active"},
                     {"abc": "some text", "other_field": "Close match hehehe", "_id": "1234", "status": "inactive"},
@@ -812,7 +820,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             ("filter on id 1234", "_id:1234", 1, ["1234"]),
             ("AND filter", "_id:5678 AND status:active", 1, ["5678"]),
             ("OR filter", "_id:5678 OR _id:1234", 2, ["5678", "1234"]),
-            ("Complex filter", "_id:5678 OR (abc:some\ text AND status:inactive)", 2, ["5678", "1234"]),
+            ("Complex filter", r"_id:5678 OR (abc:some\ text AND status:inactive)", 2, ["5678", "1234"]),
             ("Non-ID field filter", "status:active", 2, ["5678", "9012"]),
             ("No result filter", "_id:0000", 0, [])
         ]
@@ -820,7 +828,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         for name, filter_query, expected_count, expected_ids in test_cases:
             with self.subTest(name=name):
                 res = tensor_search.search(
-                    config=self.config, index_name=self.default_text_index, text="some text",
+                    config=self.config, index_name=self.default_text_index.name, text="some text",
                     filter=filter_query
                 )
                 self.assertEqual(expected_count, len(res["hits"]))
@@ -856,7 +864,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=docs,
                 tensor_fields=["field_1", "field_2"]
             )
@@ -867,7 +875,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 with self.subTest(
                         f"search_method = {search_method}, searchable_attributes={searchable_attributes}, expected_fields = {expected_fields}"):
                     res = tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
+                        config=self.config, index_name=self.default_text_index.name, text="Exact match hehehe",
                         attributes_to_retrieve=searchable_attributes, search_method=search_method
                     )
 
@@ -885,13 +893,13 @@ class TestSearchSemiStructured(MarqoTestCase):
             res = self.add_documents(
                 config=self.config,
                 add_docs_params=AddDocsParams(
-                    index_name=self.default_text_index,
+                    index_name=self.default_text_index.name,
                     docs=[{"Title": "a test of" + (" ".join(random.choices(population=vocab, k=2)))}
                           for _ in range(batch_size)],
                     tensor_fields=["Title"]
                 )
             )
-        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.default_text_index).
+        self.assertEqual(128, self.monitoring.get_index_stats_by_name(self.default_text_index.name).
                          number_of_documents)
         search_text = "a test of"
 
@@ -903,7 +911,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                         half_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.default_text_index,
+                            index_name=self.default_text_index.name,
                             text=search_text,
                             result_count=max_doc // 2
                         )
@@ -913,7 +921,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                         limit_search = tensor_search.search(
                             search_method=search_method,
                             config=self.config,
-                            index_name=self.default_text_index,
+                            index_name=self.default_text_index.name,
                             text=search_text,
                             result_count=max_doc
                         )
@@ -924,7 +932,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                             oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.default_text_index,
+                                index_name=self.default_text_index.name,
                                 text=search_text,
                                 result_count=max_doc + 1
                             )
@@ -933,7 +941,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                             very_oversized_search = tensor_search.search(
                                 search_method=search_method,
                                 config=self.config,
-                                index_name=self.default_text_index,
+                                index_name=self.default_text_index.name,
                                 text=search_text,
                                 result_count=(max_doc + 1) * 2
                             )
@@ -948,7 +956,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 with self.assertRaises(errors.IllegalRequestedDocCount):
                     tensor_search.search(
                         config=self.config,
-                        index_name=self.default_text_index,
+                        index_name=self.default_text_index.name,
                         text="",
                         result_count=limit
                     )
@@ -968,13 +976,13 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_image_index,
+                index_name=self.default_image_index.name,
                 docs=docs,
                 tensor_fields=["image_field"]
             )
         )
         res = tensor_search.search(
-            config=self.config, index_name=self.default_image_index,
+            config=self.config, index_name=self.default_image_index.name,
             text="A hippo in the water", result_count=3,
         )
         assert len(res['hits']) == 2
@@ -993,7 +1001,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=docs,
                 tensor_fields=["field_a"]
             )
@@ -1009,7 +1017,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             with self.subTest(f"query={query}, expected_ordering={expected_ordering}"):
                 res = tensor_search.search(
                     text=query,
-                    index_name=self.default_text_index,
+                    index_name=self.default_text_index.name,
                     result_count=5,
                     config=self.config,
                     search_method=SearchMethod.TENSOR)
@@ -1031,7 +1039,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_image_index,
+                index_name=self.default_image_index.name,
                 docs=docs,
                 tensor_fields=["loc a", "loc b"]
             )
@@ -1055,7 +1063,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             with self.subTest(f"query={query}, expected_ordering={expected_ordering}"):
                 res = tensor_search.search(
                     text=query,
-                    index_name=self.default_image_index,
+                    index_name=self.default_image_index.name,
                     result_count=5,
                     config=self.config,
                     search_method=SearchMethod.TENSOR)
@@ -1077,7 +1085,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_image_index,
+                index_name=self.default_image_index.name,
                 docs=docs,
                 tensor_fields=["loc", "field_a"]
             )
@@ -1090,7 +1098,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 with self.assertRaises((ValidationError, errors.InvalidArgError)) as e:
                     tensor_search.search(
                         text=q,
-                        index_name=self.default_image_index,
+                        index_name=self.default_image_index.name,
                         result_count=5,
                         config=self.config,
                         search_method=SearchMethod.TENSOR)
@@ -1108,7 +1116,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_image_index,
+                index_name=self.default_image_index.name,
                 docs=docs,
                 tensor_fields=["loc", "field_a"]
             )
@@ -1119,7 +1127,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             with self.subTest(f"query={alright_queries}"):
                 tensor_search.search(
                     text=q,
-                    index_name=self.default_image_index,
+                    index_name=self.default_image_index.name,
                     result_count=5,
                     config=self.config,
                     search_method=SearchMethod.TENSOR)
@@ -1134,7 +1142,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=docs,
                 tensor_fields=["loc", "field_a"]
             )
@@ -1145,7 +1153,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 with self.assertRaises(errors.InvalidArgError):
                     tensor_search.search(
                         text={'something': 1},
-                        index_name=self.default_text_index,
+                        index_name=self.default_text_index.name,
                         result_count=5,
                         config=self.config,
                         search_method=bad_method)
@@ -1169,14 +1177,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         res = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_image_index,
+                index_name=self.default_image_index.name,
                 docs=docs,
                 tensor_fields=["loc", "field_a"]
             )
         )
         res = tensor_search.search(
             text=hippo_image,
-            index_name=self.default_image_index,
+            index_name=self.default_image_index.name,
             result_count=5,
             config=self.config,
             search_method=SearchMethod.TENSOR)
@@ -1198,14 +1206,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=docs,
                 tensor_fields=[]
             )
         )
         lexical_search_result = tensor_search.search(
             text="some text",
-            index_name=self.default_text_index,
+            index_name=self.default_text_index.name,
             config=self.config,
             search_method=SearchMethod.LEXICAL,
         )
@@ -1224,14 +1232,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=docs,
                 tensor_fields=["text_field_1", "text_field_2"]
             )
         )
         tensor_search_result = tensor_search.search(
             text="some text",
-            index_name=self.default_text_index,
+            index_name=self.default_text_index.name,
             config=self.config,
             search_method=SearchMethod.TENSOR
         )
@@ -1262,14 +1270,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=valid_documents,
                 tensor_fields=["search_field"]
             )
         )
 
         self.assertEqual(len(valid_documents),
-                         self.monitoring.get_index_stats_by_name(self.default_text_index).number_of_documents)
+                         self.monitoring.get_index_stats_by_name(self.default_text_index.name).number_of_documents)
 
         for document in valid_documents:
             for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
@@ -1281,7 +1289,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                                   f"expected_document_ids = {expected_document_ids}, "
                                   f"search_method = {search_method}"):
                     res = tensor_search.search(
-                        config=self.config, index_name=self.default_text_index, text="some text",
+                        config=self.config, index_name=self.default_text_index.name, text="some text",
                         filter=filter_string, search_method=SearchMethod.LEXICAL
                     )
                     self.assertEqual(1, len(res["hits"]))
@@ -1294,14 +1302,14 @@ class TestSearchSemiStructured(MarqoTestCase):
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
-                index_name=self.default_text_index,
+                index_name=self.default_text_index.name,
                 docs=docs,
                 tensor_fields=["text_field"]
             )
         )
         tensor_search_result = tensor_search.search(
             text="some text",
-            index_name=self.default_text_index,
+            index_name=self.default_text_index.name,
             config=self.config,
             search_method=SearchMethod.TENSOR,
         )
@@ -1338,11 +1346,11 @@ class TestSearchSemiStructured(MarqoTestCase):
 
         for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
             with self.subTest(msg):
-                self.clear_index_by_name(self.default_text_index)
+                self.clear_index_by_index_name(self.default_text_index.name)
                 self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
-                        index_name=self.default_text_index,
+                        index_name=self.default_text_index.name,
                         docs=[document],
                         tensor_fields=["text_field"]
                     )
@@ -1350,7 +1358,7 @@ class TestSearchSemiStructured(MarqoTestCase):
 
                 search_result = tensor_search.search(
                     text="some text",
-                    index_name=self.default_text_index,
+                    index_name=self.default_text_index.name,
                     config=self.config,
                     search_method=SearchMethod.TENSOR,
                 )
@@ -1359,7 +1367,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 self.assertEqual(document, self.strip_marqo_fields(search_result['hits'][0], strip_id=False))
 
     def test_tensor_search_query_can_be_none(self):
-        res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+        res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index.name,
                                    context=SearchContext(
                                        **{"tensor": [{"vector": [1, ] * 384, "weight": 1},
                                                      {"vector": [2, ] * 384, "weight": 2}]}))
@@ -1379,7 +1387,7 @@ class TestSearchSemiStructured(MarqoTestCase):
         for query, context, msg in test_case:
             with self.subTest(msg):
                 with self.assertRaises(InvalidArgError):
-                    res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index,
+                    res = tensor_search.search(text=None, config=self.config, index_name=self.default_text_index.name,
                                                search_method=SearchMethod.LEXICAL)
                     
     def test_special_characters_in_map_score_modifiers(self):
@@ -1402,7 +1410,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 add_result = self.add_documents(
                     config=self.config,
                     add_docs_params=AddDocsParams(
-                        index_name=self.default_text_index,
+                        index_name=self.default_text_index.name,
                         docs=docs,
                         tensor_fields=["text_field_1"]
                     )
@@ -1414,7 +1422,7 @@ class TestSearchSemiStructured(MarqoTestCase):
 
                 res = tensor_search.search(
                     config=self.config,
-                    index_name=self.default_text_index,
+                    index_name=self.default_text_index.name,
                     text="",
                     score_modifiers=score_modifiers,
                 )
@@ -1437,7 +1445,7 @@ class TestSearchSemiStructured(MarqoTestCase):
                 # Clear the index after each test
                 delete_result = tensor_search.delete_documents(
                     config=self.config,
-                    index_name=self.default_text_index,
+                    index_name=self.default_text_index.name,
                     doc_ids=["1_map"]
                 )
 

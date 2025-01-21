@@ -1457,7 +1457,7 @@ def rerank_query(query: BulkSearchQueryEntity, result: Dict[str, Any], reranker:
 
 
 def search(config: Config, index_name: str, text: Optional[Union[str, dict, CustomVectorQuery]],
-           result_count: int = 3, offset: int = 0,
+           result_count: int = 3, offset: int = 0, rerank_depth: Optional[int] = None,
            highlights: bool = True, ef_search: Optional[int] = None,
            approximate: Optional[bool] = None,
            search_method: Union[str, SearchMethod, None] = SearchMethod.TENSOR,
@@ -1487,6 +1487,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         text:
         result_count:
         offset:
+        rerank_depth:
         search_method:
         searchable_attributes:
         verbose:
@@ -1566,6 +1567,17 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
     else:
         selected_device = device
 
+    # Fetch marqo index to pass to search method
+    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
+    marqo_index_version = marqo_index.parsed_marqo_version()
+    if rerank_depth is not None \
+            and marqo_index_version < constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION:
+        raise core_exceptions.UnsupportedFeatureError(
+            f"The 'rerankDepth' search parameter is only supported for indexes created with Marqo version "
+            f"{str(constants.MARQO_RERANK_DEPTH_MINIMUM_VERSION)} or later. "
+            f"This index was created with Marqo {marqo_index_version}."
+        )
+
     if search_method.upper() in {SearchMethod.TENSOR, SearchMethod.HYBRID}:
         # Default approximate and efSearch -- we can't set these at API-level since they're not a valid args
         # for lexical search
@@ -1580,7 +1592,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
 
         if search_method.upper() == SearchMethod.TENSOR:
             search_result = _vector_text_search(
-                config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
+                config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
@@ -1591,7 +1603,8 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             # TODO: Deal with circular import when all modules are refactored out.
             from marqo.core.search.hybrid_search import HybridSearch
             search_result = HybridSearch().search(
-                config=config, index_name=index_name, query=text, result_count=result_count, offset=offset,
+                config=config, marqo_index=marqo_index, query=text, result_count=result_count, offset=offset,
+                rerank_depth=rerank_depth,
                 ef_search=ef_search, approximate=approximate, searchable_attributes=searchable_attributes,
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
@@ -1609,7 +1622,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 f"approximate is not a valid argument for lexical search")
 
         search_result = _lexical_search(
-            config=config, index_name=index_name, text=text, result_count=result_count, offset=offset,
+            config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
             score_modifiers=score_modifiers
@@ -1649,7 +1662,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
 
 
 def _lexical_search(
-        config: Config, index_name: str, text: str, result_count: int = 3, offset: int = 0,
+        config: Config, marqo_index: MarqoIndex, text: str, result_count: int = 3, offset: int = 0,
         searchable_attributes: Sequence[str] = None, verbose: int = 0, filter_string: str = None,
         highlights: bool = True, attributes_to_retrieve: Optional[List[str]] = None, expose_facets: bool = False,
         score_modifiers: Optional[ScoreModifierLists] = None):
@@ -1657,7 +1670,7 @@ def _lexical_search(
 
     Args:
         config:
-        index_name:
+        marqo_index: index object fetched by calling function
         text:
         result_count:
         offset:
@@ -1678,10 +1691,10 @@ def _lexical_search(
             f"Query arg must be of type str! text arg is of type {type(text)}. "
             f"Query arg: {text}")
 
-    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
-
     # SEARCH TIMER-LOGGER (pre-processing)
     RequestMetricsStore.for_request().start("search.lexical.processing_before_vespa")
+
+    index_name = marqo_index.name
 
     # Parse text into required and optional terms.
     (required_terms, optional_terms) = utils.parse_lexical_query(text)
@@ -2103,7 +2116,8 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vector_text_search(
-        config: Config, index_name: str, query: Optional[Union[str, dict, CustomVectorQuery]], result_count: int = 5,
+        config: Config, marqo_index: MarqoIndex,
+        query: Optional[Union[str, dict, CustomVectorQuery]], result_count: int = 5,
         offset: int = 0,
         ef_search: Optional[int] = None, approximate: bool = True,
         searchable_attributes: Iterable[str] = None, filter_string: str = None, device: str = None,
@@ -2115,7 +2129,7 @@ def _vector_text_search(
     
     Args:
         config:
-        index_name:
+        marqo_index: index object fetched by calling function
         query: either a string query (which can be a URL or natural language text), a dict of
             <query string>:<weight float> pairs, or None with a context
         result_count:
@@ -2157,7 +2171,7 @@ def _vector_text_search(
 
     RequestMetricsStore.for_request().start("search.vector.processing_before_vespa")
 
-    marqo_index = index_meta_cache.get_index(index_management=config.index_management, index_name=index_name)
+    index_name = marqo_index.name
 
     # Determine the text query prefix
     text_query_prefix = marqo_index.model.get_text_query_prefix(text_query_prefix)

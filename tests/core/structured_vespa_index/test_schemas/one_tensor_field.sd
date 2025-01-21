@@ -76,15 +76,29 @@ query(marqo__mult_weights_lexical) tensor<double>(p{})
 query(marqo__add_weights_lexical) tensor<double>(p{})
 query(marqo__mult_weights_tensor) tensor<double>(p{})
 query(marqo__add_weights_tensor) tensor<double>(p{})
+query(marqo__mult_weights_global) tensor<double>(p{})
+query(marqo__add_weights_global) tensor<double>(p{})
+}
+function mult_modifier(mult_weights) {
+   expression: if (count(mult_weights * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(mult_weights * attribute(marqo__score_modifiers_double_long), prod)) * if (count(mult_weights * attribute(marqo__score_modifiers_float)) == 0,    1, reduce(mult_weights * attribute(marqo__score_modifiers_float), prod))
+}
+function add_modifier(add_weights) {
+   expression: reduce(add_weights * attribute(marqo__score_modifiers_double_long), sum) + reduce(add_weights * attribute(marqo__score_modifiers_float), sum)
 }
 function modify(score, mult_weights, add_weights) {
-   expression: if (count(mult_weights * attribute(marqo__score_modifiers_double_long)) == 0,    1, reduce(mult_weights * attribute(marqo__score_modifiers_double_long), prod)) * if (count(mult_weights * attribute(marqo__score_modifiers_float)) == 0,    1, reduce(mult_weights * attribute(marqo__score_modifiers_float), prod)) * score + reduce(add_weights * attribute(marqo__score_modifiers_double_long), sum) + reduce(add_weights * attribute(marqo__score_modifiers_float), sum)
+   expression: mult_modifier(mult_weights) * score + add_modifier(add_weights)
+}
+function global_mult_modifier() {
+   expression: mult_modifier(query(marqo__mult_weights_global))
+}
+function global_add_modifier() {
+   expression: add_modifier(query(marqo__add_weights_global))
 }
 function lexical_score_sum() {
 expression: if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0) + if (query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0)
 }
 function lexical_score_avg() {
-expression: (if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0) + if (query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0)) / max(1, if (query(marqo__lexical_title) > 0, 1, 0) + if(query(marqo__lexical_category) > 0, 1, 0))
+expression: (if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0) + if (query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0)) / max(1, if (query(marqo__lexical_title) > 0, 1, 0) + if (query(marqo__lexical_category) > 0, 1, 0))
 }
 function lexical_score_max() {
 expression: max(if(query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0), if(query(marqo__lexical_category) > 0, bm25(marqo__lexical_category), 0))
@@ -95,6 +109,7 @@ expression: if (query(marqo__bm25_aggregator) == 0, lexical_score_sum(), if (que
 function embedding_score() {
 expression: if(query(marqo__embeddings_title) > 0, closeness(field, marqo__embeddings_title), 0)
 }
+match-features: global_mult_modifier global_add_modifier
 }
 rank-profile bm25 inherits base_rank_profile {
 first-phase {
@@ -104,7 +119,10 @@ rank-profile embedding_similarity inherits base_rank_profile {
 first-phase {
 expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
 }
-match-features: closest(marqo__embeddings_title) distance(field, marqo__embeddings_title)
+match-features inherits base_rank_profile {
+closest(marqo__embeddings_title)
+distance(field, marqo__embeddings_title)
+}
 }
 rank-profile hybrid_custom_searcher inherits default {
 inputs {
@@ -115,6 +133,8 @@ query(marqo__mult_weights_lexical) tensor<double>(p{})
 query(marqo__add_weights_lexical) tensor<double>(p{})
 query(marqo__mult_weights_tensor) tensor<double>(p{})
 query(marqo__add_weights_tensor) tensor<double>(p{})
+query(marqo__mult_weights_global) tensor<double>(p{})
+query(marqo__add_weights_global) tensor<double>(p{})
 }
 }
 rank-profile hybrid_bm25_then_embedding_similarity inherits base_rank_profile {
@@ -124,7 +144,10 @@ expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(ma
 second-phase {
 expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
 }
-match-features: closest(marqo__embeddings_title) distance(field, marqo__embeddings_title)
+match-features inherits base_rank_profile {
+closest(marqo__embeddings_title)
+distance(field, marqo__embeddings_title)
+}
 }
 rank-profile hybrid_embedding_similarity_then_bm25 inherits base_rank_profile {
 first-phase {

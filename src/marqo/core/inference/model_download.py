@@ -1,18 +1,20 @@
 import os
+import tarfile
 import urllib
+import zipfile
 from typing import Union, Optional
 from urllib.error import HTTPError
 
 from tqdm import tqdm
 
 from marqo.core.exceptions import InternalError
-from marqo.s2_inference.configs import ModelCache
-from marqo.s2_inference.errors import ModelDownloadError, InvalidModelPropertiesError
 from marqo.core.inference.download_model_from_hf import download_model_from_hf
 from marqo.core.inference.download_model_from_s3 import (
     get_presigned_s3_url, get_s3_model_cache_filename, check_s3_model_already_exists,
     get_s3_model_absolute_cache_path
 )
+from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.errors import ModelDownloadError, InvalidModelPropertiesError
 from marqo.tensor_search.models.external_apis.s3 import S3Auth, S3Location
 from marqo.tensor_search.models.private_models import ModelAuth, ModelLocation
 
@@ -141,3 +143,66 @@ def download_pretrained_from_url(
                 loop.update(len(buffer))
 
     return download_target
+
+
+def extract_zip_file(path: str) -> str:
+    """
+    This function extracts a compressed file to a new directory with the same name as the file. The directory is
+    normally used to load the model.
+    """
+    if os.path.isfile(path):
+        # if it's a file, check if it's a compressed file
+        base, ext = os.path.splitext(path)
+        if ext in ['.bin', '.pt']:
+            raise InvalidModelPropertiesError(
+                f"Marqo does not support loading Hugging Face SBERT models from the provided single `{ext}` file. "
+                "Please try to wrap the model in a Hugging Face archive file and try again. ")
+
+        try:
+            # create a new directory with the same name as the file
+            new_dir = base
+            os.makedirs(new_dir, exist_ok=True)
+
+            # extract the compressed file
+            # If the target directory already exists, it will be overwritten by default without warning.
+            if ext == '.zip':
+                with zipfile.ZipFile(path, 'r') as zip_ref:
+                    zip_ref.extractall(new_dir)
+            else:
+                with tarfile.open(path, 'r') as tar_ref:
+                    tar_ref.extractall(new_dir)
+            # return the path to the new directory
+            return new_dir
+        except (tarfile.ReadError, zipfile.BadZipfile):
+            try:
+                os.remove(path)
+            except Exception as remove_e:
+                raise RuntimeError(
+                    f"Marqo encountered an error while attempting to delete a corrupted file `{path}`. "
+                    f"Please report this issue on Marqo's Github Repo and replace the problematic Marqo instance with "
+                    f"a new one. \n "
+                    f"Error message: `{str(remove_e)}`"
+                )
+            raise InvalidModelPropertiesError(
+                f'Marqo encountered an error while extracting the compressed model archive from `{path}`.\n '
+                f'This is probably because the file is corrupted or the extension `{ext}` is not supported. '
+                f'Marqo has removed the corrupted file from the disk.'
+                f'Please ensure that the file is a valid compressed file and try again.')
+
+        # will this error really happen?
+        except PermissionError:
+            raise InvalidModelPropertiesError(
+                f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
+                f'This is probably because the Marqo does not have the permission to write to the directory. '
+                f'Please check the access permission of Marqo and try again.')
+
+        except Exception as e:
+            raise RuntimeError(
+                f'Marqo encountered an error while extracting the compressed model archive from `{path}`. '
+                f'The original error message is `{str(e)}`')
+
+    else:
+        raise InternalError(
+            f"The provided path does not exist. {path}"
+        )
+

@@ -197,7 +197,7 @@ def read_env_vars_and_defaults_ints(var: str) -> Optional[int]:
 
 
 def parse_lexical_query(text: str) -> Tuple[List[str], List[str]]:
-    """
+    r"""
     Find required terms enclosed within double quotes.
 
     All other terms go into blob, split by whitespace. blob starts as a string then splits into

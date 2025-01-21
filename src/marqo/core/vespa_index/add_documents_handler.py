@@ -197,6 +197,13 @@ class AddDocumentsHandler(ABC):
         pass
 
     @abstractmethod
+    def _infer_field_type(self, field_name: str, field_content: Any) -> FieldType:
+        """
+        This method infers the field type of a field based on the field name and content.
+        """
+        pass
+
+    @abstractmethod
     def _handle_multi_modal_fields(self, marqo_doc: Dict[str, Any]) -> None:
         """
         This method collect the information for multimodal combo fields in a Marqo doc.

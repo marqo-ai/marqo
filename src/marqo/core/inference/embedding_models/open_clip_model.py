@@ -33,7 +33,7 @@ class OPEN_CLIP(AbstractCLIPModel):
             model_auth: Optional[ModelAuth] = None,
     ) -> None:
 
-        super().__init__(device, model_properties, model_auth)
+        super().__init__(device=device, model_properties=model_properties, model_auth=model_auth)
 
         self.model_properties = self._build_model_properties(model_properties)
         self.preprocess_config = None

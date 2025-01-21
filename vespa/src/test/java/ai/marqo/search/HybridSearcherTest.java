@@ -18,6 +18,7 @@ import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
 import java.util.List;
 import java.util.Map;
+import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 class HybridSearcherTest {
-
     private HybridSearcher hybridSearcher;
 
     private Searcher downstreamSearcher;
@@ -81,6 +81,27 @@ class HybridSearcherTest {
     }
 
     @Nested
+    class ValidationTest {
+        @Ignore
+        void rerankDepthGlobalSetToLimit() {
+            // Ensure rerankDepthGlobal defaults to limit (hits) if not set
+            Query query = new Query("search/?query=test");
+            query.properties().set("marqo__hybrid.retrievalMethod", "disjunction");
+            query.properties().set("marqo__hybrid.rankingMethod", "rrf");
+            query.properties().set("marqo__hybrid.rrf_k", 60);
+            query.properties().set("marqo__hybrid.alpha", 0.5);
+            query.properties().set("hits", 20);
+
+            Chain<Searcher> searchChain = new Chain<>(hybridSearcher, downstreamSearcher);
+            Execution.Context context =
+                    Execution.Context.createContextStub((SearchChainRegistry) null);
+            Execution execution = new Execution(searchChain, context);
+
+            // TODO: Check if rerankDepth is limit
+        }
+    }
+
+    @Nested
     class RRFTest {
         @Test
         void shouldFuseWithDefaultParameters() {
@@ -127,7 +148,9 @@ class HybridSearcherTest {
             HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
 
             // Check that the result size is correct
-            assertThat(result.asList()).hasSize(6);
+            // RRF function returns all interleaved hits. Pagination, trimming, reranking, are done
+            // in post-processing
+            assertThat(result.asList()).hasSize(9);
 
             // Check that result order and scores are correct
             assertThat(result.asList())
@@ -144,7 +167,10 @@ class HybridSearcherTest {
                             new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/0/tensor1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/0/lexical2", alpha * (1.0 / (2 + k))),
-                            new Hit("index:test/0/tensor2", alpha * (1.0 / (2 + k))));
+                            new Hit("index:test/0/tensor2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/0/lexical3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/0/tensor3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/0/tensor4", alpha * (1.0 / (4 + k))));
 
             assertThat(result.get(0).fields())
                     .containsAllEntriesOf(
@@ -168,6 +194,12 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+            assertThat(result.get(6).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.5));
+            assertThat(result.get(7).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
+            assertThat(result.get(8).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.5));
         }
 
         @Test
@@ -198,7 +230,7 @@ class HybridSearcherTest {
             HitGroup result = hybridSearcher.rrf(hitsTensor, hitsLexical, k, alpha, verbose);
 
             // Check that the result size is correct
-            assertThat(result.asList()).hasSize(6);
+            assertThat(result.asList()).hasSize(9);
 
             // Check that result order and scores are correct
             // If results have the same score, they will be sorted by alphabetical hit ID.
@@ -217,7 +249,10 @@ class HybridSearcherTest {
                             new Hit("index:test/0/lexical1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/5/tensor1", alpha * (1.0 / (1 + k))),
                             new Hit("index:test/1/lexical2", alpha * (1.0 / (2 + k))),
-                            new Hit("index:test/6/tensor2", alpha * (1.0 / (2 + k))));
+                            new Hit("index:test/6/tensor2", alpha * (1.0 / (2 + k))),
+                            new Hit("index:test/2/lexical3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/7/tensor3", alpha * (1.0 / (3 + k))),
+                            new Hit("index:test/8/tensor4", alpha * (1.0 / (4 + k))));
 
             assertThat(result.get(0).fields())
                     .containsAllEntriesOf(
@@ -241,8 +276,23 @@ class HybridSearcherTest {
                     .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.7));
             assertThat(result.get(5).fields())
                     .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.8));
+            assertThat(result.get(6).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_lexical_score", 0.5));
+            assertThat(result.get(7).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.6));
+            assertThat(result.get(8).fields())
+                    .containsAllEntriesOf(Map.of("marqo__raw_tensor_score", 0.5));
         }
     }
+
+    // TODO: post processing test
+    // if rerankDepthGlobal is null, rerank everything
+    // global score modifiers tests
+    // pagination tests (use offset)
+    // mult weights & add weights both dont exist, make sure apply global score mod is skipped
+    // mult weights & add weights both empty, make sure apply global score mod is skipped
+    // mult weights exist but not add weights, & vice versa
+    // empty mult weights or empty add weights
 
     @Nested
     class IdExtractorTest {

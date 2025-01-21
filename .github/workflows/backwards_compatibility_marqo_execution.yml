@@ -111,7 +111,7 @@ jobs:
       # Step to install dependencies from requirements.txt
       - name: Install Dependencies
         run: |
-          pip install -r tests/backwards_compatibility_tests/requirements.txt
+          pip install -r tests/compatibility_tests/requirements.txt
 
       # Step to configure AWS credentials
       - name: Configure AWS credentials
@@ -136,7 +136,7 @@ jobs:
           MODE: ${{ inputs.mode || github.event.inputs.mode }}
         run: |
             export PYTHONPATH=${{ github.workspace }}:$PYTHONPATH
-            python tests/backwards_compatibility_tests/compatibility_test_runner.py \
+            python tests/compatibility_tests/compatibility_test_runner.py \
             --mode "$MODE" \
             --from_version "$FROM_VERSION" \
             --to_version "$TO_VERSION" \

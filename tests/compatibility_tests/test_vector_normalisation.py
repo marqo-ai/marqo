@@ -1,8 +1,8 @@
+import traceback
+
 import pytest
 
-from base_compatibility_test_case import BaseCompatibilityTestCase
-from marqo_test import MarqoTestCase
-import marqo
+from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
 
 
 @pytest.mark.marqo_version('2.13.0')
@@ -15,8 +15,8 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     index_metadata = {
                 "indexName": text_index_with_normalize_embeddings_true,
                 "type": "structured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
                 "normalizeEmbeddings": True,
+                "model": "sentence-transformers/all-MiniLM-L6-v2",
                 "allFields": [
                     {"name": "title", "type": "text"},
                     {"name": "content", "type": "text"},
@@ -41,13 +41,18 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
     # prepare method of this class
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.indexes_to_delete = [cls.text_index_with_normalize_embeddings_true]
+        cls.indexes_to_delete = cls.indexes_to_test_on
         super().tearDownClass()
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.indexes_to_delete = cls.indexes_to_test_on
+        super().setUpClass()
 
     def prepare(self):
         # Create structured and unstructured indexes and add some documents, set normalise embeddings to true
         # Add documents
-        self.logger.info(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
+        self.logger.debug(f"Creating indexes {self.text_index_with_normalize_embeddings_true}")
         self.create_indexes([self.index_metadata])
 
         try:
@@ -72,26 +77,35 @@ class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
             self.save_results_to_file(result)
             self.logger.debug(f'Ran prepare mode test for {self.text_index_with_normalize_embeddings_true} inside test class {self.__class__.__name__}')
         except Exception as e:
-            self.logger.error(f"Exception occurred while adding documents {e}")
-            raise e
+            self.logger.error(f"Exception occurred while adding documents / getting documents to / from index {self.text_index_with_normalize_embeddings_true}. When the corresponding test runs, it is expected to fail."
+                              f"Exception traceback was: {traceback.format_exc()}")
 
     def test_custom_vector_doc_in_normalized_embedding_true(self):
         # This runs on to_version
-        get_indexes = self.client.get_indexes()
-        self.logger.debug(f"Got these indexes {get_indexes}")
+        test_failures = [] #this stores the failures in the subtests. These failures could be assertion errors or any other types of exceptions
+
+
         result_from_prepare_mode = self.load_results_from_file()
         for index_name in self.indexes_to_test_on:
-            self.logger.debug(f"Processing index: {index_name}")
-            try:
-                doc_res_normalized = self.client.index(index_name).get_document(
-                document_id="doc1",
-                expose_facets=True)
-                self.assertEqual(doc_res_normalized["custom_vector_field_1"], "custom vector text")
-                self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
-                self._compare_results(result_from_prepare_mode, doc_res_normalized)
-            except Exception as e:
-                self.logger.error(f"Got an exception while trying to query index: {e}")
-
+            with self.subTest(index=index_name):
+                self.logger.debug(f"Processing index: {index_name}")
+                try:
+                    with self.subTest(index=index_name):
+                        doc_res_normalized = self.client.index(index_name).get_document(
+                        document_id="doc1",
+                        expose_facets=True)
+                        self.assertEqual(doc_res_normalized["custom_vector_field_1"], "custom vector text")
+                        self.assertEqual(doc_res_normalized['_tensor_facets'][0]["custom_vector_field_1"], "custom vector text")
+                        self._compare_results(result_from_prepare_mode, doc_res_normalized)
+                except Exception as e:
+                    test_failures.append((index_name, traceback.format_exc()))
+        # After all subtests, raise a comprehensive failure if any occurred
+        if test_failures:
+            failure_message = "\n".join([
+                f"Failure in index {idx}: {error}"
+                for idx, error in test_failures
+            ])
+            self.fail(f"Some subtests failed:\n{failure_message}")
 
     def _compare_results(self, expected_result, actual_result):
         """Compare two search results and assert if they match."""

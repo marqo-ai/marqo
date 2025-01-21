@@ -1,3 +1,55 @@
+# Release 2.14.1
+
+## New features
+
+- Add support for [hf_transfer](https://github.com/huggingface/hf_transfer) to accelerate the downloading speed of HuggingFace models by 10 to 30 times. See [here](https://docs.marqo.ai/latest/other-resources/guides/advanced-usage/configuration/#third-party-environment-variables) for details about how to enable it ([#1066](https://github.com/marqo-ai/marqo/pull/1066)).
+- Add `/healthz` endpoint for Marqo container liveness checks, which performs a status check for CUDA devices and returns a 500 error if any existing CUDA devices become unavailable or run out of memory ([#1068](https://github.com/marqo-ai/marqo/pull/1068)). 
+
+## Bug fixes and minor changes
+
+- Fix a bug where numeric map fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created prior to Marqo 2.13 ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
+- Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
+- Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1079)).
+
+# Release 2.13.4
+
+## Bug fixes and minor changes
+
+- Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1075)). 
+
+# Release 2.13.3
+
+## Bug fixes and minor changes
+
+- Fix a bug where numeric map fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created prior to Marqo 2.13 ([#1062](https://github.com/marqo-ai/marqo/pull/1062)).
+- Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1062)).
+
+# Release 2.14.0 
+
+## New features
+
+- FFmpeg-CUDA Support ([#1030](https://github.com/marqo-ai/marqo/pull/1030)).   Add GPU acceleration for video decoding by integrating FFmpeg with CUDA support.
+This feature significantly improves video processing performance, making video handling up to 5 times faster. Check [here](https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/#marqo-video-gpu-acceleration-configuration) for guidance and requirements.
+
+- Video and audio file size limits ([#1012](https://github.com/marqo-ai/marqo/pull/1012)). Introduce configurable size limits for video and audio files in the add_documents, search, and embed endpoints. This enhancement allows users to manage and optimize resource usage effectively, ensuring smoother processing of multimedia content. Check [here](https://docs.marqo.ai/2.14/other-resources/guides/advanced-usage/configuration/#configuring-usage-limits) for more details. 
+
+- Upgrade to Python 3.9 ([#1006](https://github.com/marqo-ai/marqo/pull/1006)).
+Upgrade the Marqo Docker image to use Python 3.9. With Python 3.8 reaching its End of Life (EOL), we have upgraded our platform to Python 3.9 to maintain security, compatibility, and access to ongoing support.
+
+
+## Bug fixes and minor changes
+
+- Move NLTK resource downloads to Marqo's startup process and remove the unsafe punkt package. This avoids potential code start issues and enhances security ([#1040](https://github.com/marqo-ai/marqo/pull/1040)).
+
+- Fix model serialization in OpenAPI specifications. This community-contributed PR resolves issues with OpenAPI spec generation and SwaggerUI by fixing incorrect type hints in the API definition, ensuring accurate model serialization and improving API documentation accessibility ([#986](https://github.com/marqo-ai/marqo/pull/986)). 
+
+- Add brief description for each endpoint in the OpenAPI specifications. This improves API documentation clarity for users ([#1042](https://github.com/marqo-ai/marqo/pull/1042)).
+
+## Contributor shout-out
+- Shoutouts to our valuable 4.7k stargazers!
+- Thanks a lot for the heated discussion and suggestions in our community. We love to hear your thoughts and requests. Join our [Slack channel](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and [forum](https://community.marqo.ai/) now.
+- Special thanks to community contributor [@gabauer](https://github.com/gabauer) for their impactful PR, helping improve Marqo for everyone!
+
 # Release 2.13.2
 
 ## Bug fixes and minor changes
