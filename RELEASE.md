@@ -1,5 +1,7 @@
 # Release 2.15.0
 
+## test
+
 ## New Features
 - Global Score Modifiers for Hybrid Search ([#1082](https://github.com/marqo-ai/marqo/pull/1082)). Introduce global score modifiers for hybrid search, allowing fine-tuned adjustments to RRF scores in combined result lists. This enhancement provides better control over returned results in hybrid search scenarios. Use the `rerankDepth` parameter to control the number of hits to rerank. For detailed usage, check [here](https://docs.marqo.ai/latest/reference/api/search/search/#rerank-depth).
 
