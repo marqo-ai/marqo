@@ -43,7 +43,7 @@ def throttle(request_type: str):
                 RequestType.PARTIAL_UPDATE: utils.read_env_vars_and_defaults(EnvVars.MARQO_MAX_CONCURRENT_PARTIAL_UPDATE)
             }
             
-            set_key = f"set:{request_type}"
+            set_key = f"set:{os.getpid()}-{request_type}"
             thread_name = f"thread:{uuid.uuid4()}"
 
             t0 = time.time()
