@@ -73,6 +73,7 @@ jobs:
             echo "DOC_ONLY=true"
             echo "doc_only=true" >> $GITHUB_ENV
             echo "::set-output name=doc_only::true"
+          fi
 
   Test-Marqo:
     name: Run Unit Tests
