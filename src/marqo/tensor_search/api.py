@@ -1,9 +1,9 @@
 """The API entrypoint for Tensor Search"""
 import json
+import os
 from typing import List
 
 import pydantic
-import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -15,6 +15,7 @@ from marqo import exceptions as base_exceptions
 from marqo import version
 from marqo.api import exceptions as api_exceptions
 from marqo.api.exceptions import InvalidArgError, UnprocessableEntityError
+from marqo.api.models.add_docs_objects import AddDocsBodyParams
 from marqo.api.models.embed_request import EmbedRequest
 from marqo.api.models.health_response import HealthResponse
 from marqo.api.models.recommend_query import RecommendQuery
@@ -26,8 +27,8 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
-from marqo.tensor_search.enums import RequestType, EnvVars
-from marqo.api.models.add_docs_objects import AddDocsBodyParams
+from marqo.tensor_search.enums import RequestType
+from marqo.tensor_search.main import get_config
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
 from marqo.tensor_search.on_start_script import on_start
@@ -36,42 +37,12 @@ from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
-from marqo.vespa.vespa_client import VespaClient
-from marqo.vespa.zookeeper_client import ZookeeperClient
 
 logger = get_logger(__name__)
 
 
-def generate_config() -> config.Config:
-    vespa_client = VespaClient(
-        config_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONFIG_URL),
-        query_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_QUERY_URL),
-        document_url=utils.read_env_vars_and_defaults(EnvVars.VESPA_DOCUMENT_URL),
-        pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_POOL_SIZE),
-        content_cluster_name=utils.read_env_vars_and_defaults(EnvVars.VESPA_CONTENT_CLUSTER_NAME),
-        default_search_timeout_ms=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_SEARCH_TIMEOUT_MS),
-        feed_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_FEED_POOL_SIZE),
-        get_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_GET_POOL_SIZE),
-        delete_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_DELETE_POOL_SIZE),
-        partial_update_pool_size=utils.read_env_vars_and_defaults_ints(EnvVars.VESPA_PARTIAL_UPDATE_POOL_SIZE),
-    )
-
-    # Zookeeper is only instantiated if the hosts are provided
-    zookeeper_client = ZookeeperClient(
-        zookeeper_connection_timeout=utils.read_env_vars_and_defaults_ints(EnvVars.ZOOKEEPER_CONNECTION_TIMEOUT),
-        hosts=utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS)
-    ) if utils.read_env_vars_and_defaults(EnvVars.ZOOKEEPER_HOSTS) else None
-
-    # Determine default device
-    default_device = utils.read_env_vars_and_defaults(EnvVars.MARQO_BEST_AVAILABLE_DEVICE)
-
-    return config.Config(vespa_client, zookeeper_client, default_device)
-
-
-_config = generate_config()
-
-if __name__ in ["__main__", "api"]:
-    on_start(_config)
+logger.info(f'{os.getpid()}: {__name__} on_start')
+on_start(get_config(), 'api')
 
 app = FastAPI(
     title="Marqo",
@@ -79,10 +50,6 @@ app = FastAPI(
 )
 app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
-
-
-def get_config():
-    return _config
 
 
 @app.exception_handler(base_exceptions.MarqoError)
@@ -516,101 +483,3 @@ def rollback_vespa_app_to_current_version(marqo_config: config.Config = Depends(
     )
 
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8882)
-
-# try these curl commands:
-
-# ADD DOCS:
-"""
-curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/documents?refresh=true&device=cpu' -H 'Content-type:application/json' -d '
-[ 
-    {
-        "Title": "Honey is a delectable food stuff", 
-        "Desc" : "some boring description",
-        "_id": "honey_facts_119"
-    }, {
-        "Title": "Space exploration",
-        "Desc": "mooooon! Space!!!!",
-        "_id": "moon_fact_145"
-    }
-]'
-"""
-
-# SEARCH DOCS
-"""
-curl -XPOST  'http://localhost:8882/indexes/my-irst-ix/search?device=cuda0' -H 'Content-type:application/json' -d '{
-    "q": "what do bears eat?",
-    "searchableAttributes": ["Title", "Desc", "other"],
-    "limit": 3,    
-    "searchMethod": "TENSOR",
-    "showHighlights": true,
-    "filter": "Desc:(some boring description)",
-    "attributesToRetrieve": ["Title"]
-}'
-"""
-
-# CREATE CUSTOM IMAGE INDEX:
-"""
-curl -XPOST http://localhost:8882/indexes/my-multimodal-index -H 'Content-type:application/json' -d '{
-    "index_defaults": {
-      "treat_urls_and_pointers_as_images":true,    
-      "model":"ViT-B/32"
-    },
-    "number_of_shards": 3
-}'
-"""
-
-# GET DOCUMENT BY ID:
-"""
-curl -XGET http://localhost:8882/indexes/my-irst-ix/documents/honey_facts_119
-"""
-
-# GET index stats
-"""
-curl -XGET http://localhost:8882/indexes/my-irst-ix/stats
-"""
-
-# GET index settings
-"""
-curl -XGET http://localhost:8882/indexes/my-irst-ix/settings
-"""
-# POST refresh index
-"""
-curl -XPOST  http://localhost:8882/indexes/my-irst-ix/refresh
-"""
-
-# DELETE docs
-"""
-curl -XPOST  http://localhost:8882/indexes/my-irst-ix/documents/delete-batch -H 'Content-type:application/json' -d '[
-    "honey_facts_119", "moon_fact_145"
-]'
-"""
-
-# DELETE index
-"""
-curl -XDELETE http://localhost:8882/indexes/my-irst-ix
-"""
-
-# check cpu info
-"""
-curl -XGET http://localhost:8882/device/cpu
-"""
-
-# check cuda info
-"""
-curl -XGET http://localhost:8882/device/cuda
-"""
-
-# check the loaded models
-"""
-curl -XGET http://localhost:8882/models
-"""
-
-# eject a model
-"""
-curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cuda'
-curl -X DELETE 'http://localhost:8882/models?model_name=ViT-L/14&model_device=cpu'
-curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cuda' 
-curl -X DELETE 'http://localhost:8882/models?model_name=hf/all_datasets_v4_MiniLM-L6&model_device=cpu' 
-"""

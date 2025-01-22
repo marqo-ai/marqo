@@ -20,26 +20,32 @@ from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
 
-
-
 logger = get_logger(__name__)
 
 
-def on_start(config: config.Config):
-    to_run_on_start = (
-        BootstrapVespa(config),
-        PopulateCache(config),
-        DownloadStartText(),
-        CUDAAvailable(),
-        SetBestAvailableDevice(),
-        CacheModels(),
-        InitializeRedis("localhost", 6379),
-        CachePatchModels(),
-        DownloadFinishText(),
-        PrintVersion(),
-        MarqoWelcome(),
-        MarqoPhrase(),
-    )
+def on_start(config: config.Config, mode: str):
+    if mode == 'main':
+        to_run_on_start = (
+            BootstrapVespa(config),
+            PrintVersion(),
+        )
+    elif mode == 'api':
+        to_run_on_start = (
+            PopulateCache(config),
+            InitializeRedis("localhost", 6379),
+        )
+    elif mode == 'inference':
+        to_run_on_start = (
+            DownloadStartText(),
+            CUDAAvailable(),
+            SetBestAvailableDevice(),
+            CacheModels(),
+            CachePatchModels(),
+            DownloadFinishText(),
+            MarqoPhrase(),
+        )
+    else:
+        raise ValueError(f'Unknown mode: {mode}')
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()

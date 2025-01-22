@@ -4,7 +4,7 @@ from marqo.api.exceptions import EnvVarError
 from marqo import marqo_docs
 
 def get_logger(name):
-    logging.basicConfig()
+    # logging.basicConfig()
     logger = logging.getLogger(name)
 
     log_level = read_env_vars_and_defaults("MARQO_LOG_LEVEL").lower()

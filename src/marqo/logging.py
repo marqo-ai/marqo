@@ -4,9 +4,17 @@ from marqo import marqo_docs
 from marqo.api.exceptions import EnvVarError
 from marqo.tensor_search.utils import read_env_vars_and_defaults
 
+# TODO keep the previous logging format, just add PID
+log_format = '%(asctime)s - %(name)s - %(levelname)s - PID %(process)d - %(message)s'
+
+
+logging.basicConfig(
+    format=log_format,
+    level=logging.WARNING
+)
+
 
 def get_logger(name):
-    logging.basicConfig()
     logger = logging.getLogger(name)
 
     log_level = read_env_vars_and_defaults("MARQO_LOG_LEVEL").lower()
