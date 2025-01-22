@@ -205,7 +205,7 @@ jobs:
           # Zip up schemas, hosts, and services
           # Deploy application with test schema, don't keep zip file
           sudo apt-get install zip -y
-          zip -r - . -x README.md .env .gitignore "*.yml" | curl --header "Content-Type:application/zip" --data-binary @- http://localhost:19071/application/v2/tenant/default/prepareandactivate
+          zip -r - . -x README.md .env .gitignore "*.yml" __init__.py | curl --header "Content-Type:application/zip" --data-binary @- http://localhost:19071/application/v2/tenant/default/prepareandactivate
           
           # Check for config node convergence
           timeout 10m bash -c 'until [ "$(curl -f -X GET $VESPA_CONFIG_URL/application/v2/tenant/default/application/default/environment/prod/region/default/instance/default/serviceconverge | jq -r ".converged")" = "true" ]; do echo "  Waiting for Vespa convergence to be true..."; sleep 10; done;' || \
