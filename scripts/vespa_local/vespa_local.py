@@ -392,9 +392,17 @@ def container_exists(container_name):
 # Callable functions from workflows or CLI
 # These functions will call the appropriate methods from single/multi node vespa setups.
 def start(args):
+    # Validation for number of shards and replicas
+    if args.Shards < 1:
+        raise ValueError("Number of shards must be at least 1.")
+    if args.Replicas < 0:
+        raise ValueError("Number of replicas must be at least 0.")
+
     if args.Shards > 1 or args.Replicas > 0:
+        print(f"Starting Multi Node Vespa setup with {args.Shards} shards and {args.Replicas} replicas.")
         VespaLocalMultiNode.start(args.Shards, args.Replicas)
     else:
+        print("Starting Single Node Vespa setup.")
         VespaLocalSingleNode.start()
 
 def restart(args):
