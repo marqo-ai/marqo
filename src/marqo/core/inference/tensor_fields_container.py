@@ -17,6 +17,7 @@ from marqo.s2_inference import s2_inference
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
+from marqo.tensor_search import vectoriser
 
 # TODO remove these deps
 from marqo.tensor_search.telemetry import RequestMetricsStore
@@ -143,7 +144,7 @@ class Vectoriser(ABC):
     def _s2inference_vectorise(self, content_chunks: List[ContentChunkType],
                                modality: Modality, model_config: ModelConfig):
         try:
-            return s2_inference.vectorise(
+            return vectoriser.vectorise(
                 model_name=model_config.model_name,
                 model_properties=model_config.model_properties,
                 content=content_chunks,

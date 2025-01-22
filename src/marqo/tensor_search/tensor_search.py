@@ -75,7 +75,7 @@ from marqo.s2_inference.clip_utils import _is_image, validate_url
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
 from marqo.s2_inference.reranking import rerank
-from marqo.tensor_search import delete_docs
+from marqo.tensor_search import delete_docs, vectoriser
 from marqo.tensor_search import enums
 from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import utils, validation, add_docs
@@ -92,6 +92,7 @@ from marqo.tensor_search.models.search import Qidx, JHash, SearchContext, Vector
     SearchContextTensor, QueryContentCollector, QueryContent
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.tensor_search.tensor_search_logging import get_logger
+from marqo.tensor_search.vectoriser import RemoteVectoriser
 from marqo.vespa.exceptions import VespaStatusError
 from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
@@ -1908,7 +1909,7 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     v.content[0] if isinstance(v.content, list) else v.content,
                     media_download_headers=v.media_download_headers
                 )
-                vectors = s2_inference.vectorise(
+                vectors = vectoriser.vectorise(
                     model_name=v.model_name, model_properties=v.model_properties,
                     content=v.content, device=v.device,
                     normalize_embeddings=v.normalize_embeddings,
