@@ -170,7 +170,7 @@ jobs:
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
           pytest --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests \
-            --durations=100 --cov=src --cov-branch --cov-context=test \
+            --durations=100 --cov=src --cov-branch --cov-context=test --cov-fail-under=69 \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests | tee pytest_output.txt
@@ -185,7 +185,7 @@ jobs:
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
             diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
-              --compare-branch $BASE_BRANCH
+              --compare-branch $BASE_BRANCH --fail-under=95
           else
             echo "Skipping diff-cover on Push events"
             echo "Skipped diff-cover on Push events" > marqo/diff_cov.md
