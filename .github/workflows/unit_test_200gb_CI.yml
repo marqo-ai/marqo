@@ -76,7 +76,7 @@ jobs:
 
   Test-Marqo:
     name: Run Unit Tests
-    needs: Start-Runner # required to start the main job when the runner is ready
+    needs: Check-Changes # required to start the main job when the runner is ready
     if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
