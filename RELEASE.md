@@ -1,3 +1,21 @@
+# Release 2.15.0
+
+## New Features
+- Global Score Modifiers for Hybrid Search ([#1082](https://github.com/marqo-ai/marqo/pull/1082)). Introduce global score modifiers for hybrid search, allowing fine-tuned adjustments to RRF scores in combined result lists. This enhancement provides better control over returned results in hybrid search scenarios. Use the `rerankDepth` parameter to control the number of hits to rerank. For detailed usage, check [here](https://docs.marqo.ai/latest/reference/api/search/search/#rerank-depth).
+
+- Custom LanguageBind Model ([#1072](https://github.com/marqo-ai/marqo/pull/1072)). Marqo now supports loading custom LanguageBind models from S3 buckets, URLs, or HuggingFace model cards. Fine-tune your own LanguageBind model and integrate it with Marqo to achieve better in-domain results. For more details, see [here](https://docs.marqo.ai/2.15/models/marqo/bring-your-own-model/#bring-your-own-languagebind-models).
+ 
+- Add Marqtune models to the model registry ([#1063](https://github.com/marqo-ai/marqo/pull/1063)). Marqtune models have been added to the model registry, with some models renamed to align with the Marqtune naming convention. This update improves consistency and makes it easier to identify models Marqo and Marqtune. The changes are fully backwards compatible.
+
+## Bug Fixes and Minor Changes
+- Fix a bug where Marqo incorrectly inferred the modality of a field, even when the field is not a tensor field in an unstructured index ([#1086](https://github.com/marqo-ai/marqo/pull/1086)).
+- Resolve an issue where Languagebind models could only handle a single video or audio in a weighted search query. You can now provide multiple videos and audios in a weighted query seamlessly.([#1072](https://github.com/marqo-ai/marqo/pull/1072)).
+- Improve memory usage when indexing image documents with LanguageBind models, enabling more efficient handling of image data. ([#1072](https://github.com/marqo-ai/marqo/pull/1072)).
+
+## Contributor Shout-Outs
+- A huge thanks to our 4.7k stargazers for your continued support!  
+- Thanks a lot for the discussion and suggestions in our community. Join us on [Slack](https://join.slack.com/t/marqo-community/shared_invite/zt-2jm456s90-1pFxdE5kDQt5imqddXUIcw) and our [forum](https://community.marqo.ai/) today!
+
 # Release 2.14.1
 
 ## New features
