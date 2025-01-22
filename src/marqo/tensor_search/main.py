@@ -1,10 +1,13 @@
+import contextlib
 import multiprocessing
+import os
 
 import uvicorn
 
 from marqo import config
+from marqo.api.configs import default_env_vars
 from marqo.tensor_search import utils
-from marqo.tensor_search.on_start_script import on_start
+from marqo.tensor_search.on_start_script import on_start, StartMode
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.tensor_search.enums import EnvVars
@@ -43,19 +46,39 @@ def get_config():
     return _config
 
 
-def run_inf_app():
-    uvicorn.run("inf_api:inf_app", host="localhost", port=8881)
+def run_api_serer():
+    api_worker_count = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_WORKER_COUNT)
+    if api_worker_count < 1:
+        api_worker_count = os.cpu_count() - 1
+
+    uvicorn.run("api:app", host="localhost", port=8882, workers=api_worker_count)
 
 
-def run_api():
-    uvicorn.run("api:app", host="localhost", port=8882, workers=2)
+def run_inf_app(worker_count: int):
+    uvicorn.run("inf_api:inf_app", host="localhost", port=8881, workers=worker_count)
+
+
+@contextlib.contextmanager
+def maybe_run_inference_server():
+    will_run_remote_inference = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE) == 'TRUE'
+    remote_inference_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
+    remote_inference_worker_count = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_WORKER_COUNT)
+
+    if will_run_remote_inference and remote_inference_url == default_env_vars()[EnvVars.MARQO_REMOTE_INFERENCE_URL]:
+        p = multiprocessing.Process(target=run_inf_app, args=[remote_inference_worker_count], name='marqo-inference')
+        p.start()
+
+        try:
+            yield
+        finally:
+            p.join()
+
+    else:
+        yield
 
 
 if __name__ == "__main__":
-    on_start(_config, 'main')
-    p = multiprocessing.Process(target=run_inf_app, name='marqo-inference')
-    p.start()
+    on_start(_config, StartMode.BOOTSTRAP)
 
-    run_api()
-
-    p.join()
+    with maybe_run_inference_server():
+        run_api_serer()

@@ -19,33 +19,45 @@ from marqo.tensor_search import index_meta_cache, utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.tensor_search_logging import get_logger
 from marqo import marqo_docs
+from enum import IntFlag, auto
 
 logger = get_logger(__name__)
 
 
-def on_start(config: config.Config, mode: str):
-    if mode == 'main':
-        to_run_on_start = (
+class StartMode(IntFlag):
+    BOOTSTRAP = auto()
+    API = auto()
+    INFERENCE = auto()
+
+
+def on_start(config: config.Config, mode: StartMode):
+    to_run_on_start = []
+    if mode & StartMode.BOOTSTRAP:
+        to_run_on_start.extend([
             BootstrapVespa(config),
             PrintVersion(),
-        )
-    elif mode == 'api':
-        to_run_on_start = (
+            # TODO find a better place to print banners
+            MarqoPhrase(),
+            MarqoWelcome(),
+        ])
+
+    if mode & StartMode.API:
+        to_run_on_start.extend([
             PopulateCache(config),
             InitializeRedis("localhost", 6379),
-        )
-    elif mode == 'inference':
-        to_run_on_start = (
+        ])
+
+    if mode & StartMode.INFERENCE:
+        to_run_on_start.extend([
             DownloadStartText(),
             CUDAAvailable(),
             SetBestAvailableDevice(),
             CacheModels(),
             CachePatchModels(),
             DownloadFinishText(),
-            MarqoPhrase(),
-        )
-    else:
-        raise ValueError(f'Unknown mode: {mode}')
+            # TODO remove download texts
+            # TODO improve device init logic
+        ])
 
     for thing_to_start in to_run_on_start:
         thing_to_start.run()

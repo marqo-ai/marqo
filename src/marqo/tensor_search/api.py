@@ -27,11 +27,11 @@ from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.monitoring import memory_profiler
 from marqo.logging import get_logger
 from marqo.tensor_search import tensor_search, utils
-from marqo.tensor_search.enums import RequestType
+from marqo.tensor_search.enums import RequestType, EnvVars
 from marqo.tensor_search.main import get_config
 from marqo.tensor_search.models.api_models import SearchQuery
 from marqo.tensor_search.models.index_settings import IndexSettings, IndexSettingsWithName
-from marqo.tensor_search.on_start_script import on_start
+from marqo.tensor_search.on_start_script import on_start, StartMode
 from marqo.tensor_search.telemetry import RequestMetricsStore, TelemetryMiddleware
 from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
@@ -42,7 +42,9 @@ logger = get_logger(__name__)
 
 
 logger.info(f'{os.getpid()}: {__name__} on_start')
-on_start(get_config(), 'api')
+will_run_remote_inference = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE) == 'TRUE'
+start_mode = StartMode.API if will_run_remote_inference else (StartMode.API | StartMode.INFERENCE)
+on_start(get_config(), start_mode)
 
 app = FastAPI(
     title="Marqo",

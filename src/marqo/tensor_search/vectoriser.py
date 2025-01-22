@@ -3,7 +3,10 @@ from typing import List, Union, Protocol
 import httpx
 from orjson import orjson
 
+from marqo.s2_inference import s2_inference
 from marqo.s2_inference.multimodal_model_load import Modality
+from marqo.tensor_search import utils
+from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.inf_request import VectoriseRequest
 
 
@@ -54,10 +57,18 @@ class RemoteVectoriser:
         return orjson.loads(resp.text)
 
 
-inference_server = RemoteVectoriser()
+running_remote_inference = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE) == 'TRUE'
+remote_inference_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
+if running_remote_inference:
+    inference_server = RemoteVectoriser(inf_url=remote_inference_url)
+# TODO compose Vectoriser Protocol
 
 
 def vectorise(model_name: str, content: Union[str, List[str]], device: str = None,
               normalize_embeddings: bool = True, modality: Modality = Modality.TEXT, **kwargs) -> List[List[float]]:
-    # TODO switch vectoriser based on configuration
-    return inference_server.vectorise(model_name, content, normalize_embeddings, modality, device)
+    if running_remote_inference:
+        return inference_server.vectorise(model_name, content, normalize_embeddings, modality, device)
+    else:
+        return s2_inference.vectorise(model_name, content, device=device, normalize_embeddings=normalize_embeddings,
+                                      modality=modality, **kwargs)
+

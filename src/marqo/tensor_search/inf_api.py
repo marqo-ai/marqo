@@ -7,13 +7,13 @@ from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
 from marqo.tensor_search.main import get_config
 from marqo.tensor_search.models.inf_request import VectoriseRequest
-from marqo.tensor_search.on_start_script import on_start
+from marqo.tensor_search.on_start_script import on_start, StartMode
 
 logger = get_logger(__name__)
 
 
 logger.info(f'{os.getpid()}: {__name__} on_start')
-on_start(get_config(), 'inference')
+on_start(get_config(), StartMode.INFERENCE)
 
 inf_app = FastAPI(
     title="Marqo Inference"
