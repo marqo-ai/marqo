@@ -46,7 +46,7 @@ jobs:
           echo "Head commit: $HEAD_COMMIT"
 
           # Perform the diff to check for non-documentation changes
-          if git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md|yml)$'; then
+          if git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$'; then
             echo "doc_only=false" >> $GITHUB_ENV
             echo "doc_only=false" >> $GITHUB_OUTPUT
           else
