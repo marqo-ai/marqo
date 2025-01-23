@@ -33,7 +33,6 @@ jobs:
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             echo "doc_only=false" >> $GITHUB_ENV
             echo "doc_only=false" >> $GITHUB_OUTPUT
-            exit 0
           fi
 
       - name: Checkout marqo repo
