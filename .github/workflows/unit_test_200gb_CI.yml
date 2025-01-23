@@ -70,6 +70,7 @@ jobs:
         id: set-output
         run: |
           cd marqo
+          set -x
           git fetch --depth=1 origin ${{ github.base_ref }}
           if git diff --name-only ${{ github.base_ref }} ${{ github.head_ref }} | grep -vE '\.(md)$'; then
             echo "DOC_ONLY=false"
