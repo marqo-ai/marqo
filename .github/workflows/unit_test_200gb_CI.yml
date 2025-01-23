@@ -30,6 +30,7 @@ jobs:
     steps:
       - name: Check event trigger
         run: |
+          set -x
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             echo "doc_only=false" >> $GITHUB_ENV
             echo "doc_only=false" >> $GITHUB_OUTPUT
