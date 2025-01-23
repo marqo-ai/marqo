@@ -1795,7 +1795,8 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
         marqo_doc = vespa_index.to_marqo_document(doc.dict(), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
 
-        if marqo_index.type == IndexType.Unstructured and attributes_to_retrieve is not None:
+        if (marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured] and
+                attributes_to_retrieve is not None):
             # For an unstructured index, we do the attributes_to_retrieve after search
             marqo_doc = unstructured_index_attributes_to_retrieve(marqo_doc, attributes_to_retrieve)
 
@@ -1811,7 +1812,11 @@ def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attribu
     str, Any]:
     # attributes_to_retrieve should already be validated at the start of search
     attributes_to_retrieve = list(set(attributes_to_retrieve).union({"_id", "_score", "_highlights"}))
-    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve}
+    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve or
+            # Please note that numeric map fields are flattened for unstructured or semi-structured indexes.
+            # Therefore, when filtering on attributes_to_retrieve, we need to also include flattened map fields
+            # with the specified attributes as prefixes. We keep this behaviour only for compatibility reasons.
+            any([k.startswith(attribute + ".") for attribute in attributes_to_retrieve])}
 
 
 def assign_query_to_vector_job(
