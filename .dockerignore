@@ -141,3 +141,5 @@ tests/cache/
 cache/
 
 __pycache__/
+
+src/marqo/cache/

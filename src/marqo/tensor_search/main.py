@@ -51,10 +51,13 @@ def run_api_serer():
     if api_worker_count < 1:
         api_worker_count = os.cpu_count() - 1
 
-    uvicorn.run("api:app", host="localhost", port=8882, workers=api_worker_count)
+    # bind to 0.0.0.0 to expose this port in container
+    uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count)
 
 
 def run_inf_app(worker_count: int):
+    # bind to localhost only so it is not visible outside the container
+    # TODO We will need to make sure the inference server has bootstrapped (warmed up) before start serving request
     uvicorn.run("inf_api:inf_app", host="localhost", port=8881, workers=worker_count)
 
 
