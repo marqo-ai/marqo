@@ -266,7 +266,7 @@ jobs:
       - Test-Marqo # required to wait when the main job is done
       - Check-Changes
     runs-on: ubuntu-latest
-    if: ${{ steps.start-ec2-runner.outputs.label }} # Only stop the runner if it was started
+    if: ${{ needs.start-runner.outputs.label }} # Only stop the runner if it was started
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
