@@ -28,6 +28,14 @@ jobs:
     outputs:
       doc_only: ${{ steps.set-output.outputs.doc_only }}
     steps:
+      - name: Check event trigger
+        run:
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "doc_only=false" >> $GITHUB_ENV
+            echo "doc_only=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
@@ -41,17 +49,13 @@ jobs:
           set -x
           
           # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
+          # Manual dispatched runs are tested in a previous step
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             BASE_COMMIT=${{ github.event.pull_request.base.sha }}
             HEAD_COMMIT=${{ github.event.pull_request.head.sha }}
           elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             BASE_COMMIT=${{ github.event.before }}
             HEAD_COMMIT=${{ github.sha }}
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            # For manual dispatch, explicitly set doc_only
-            echo "doc_only=false" >> $GITHUB_ENV
-            echo "doc_only=false" >> $GITHUB_OUTPUT
-            exit 0
           else
             echo "Unsupported event: ${GITHUB_EVENT_NAME}"
             exit 1
