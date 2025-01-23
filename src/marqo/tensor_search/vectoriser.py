@@ -1,4 +1,4 @@
-from typing import List, Union, Protocol
+from typing import List, Union, Protocol, Optional
 
 import httpx
 from orjson import orjson
@@ -8,6 +8,7 @@ from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.inf_request import VectoriseRequest
+from marqo.tensor_search.models.private_models import ModelAuth
 
 
 class InferenceError(Exception):
@@ -34,16 +35,22 @@ class RemoteVectoriser:
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
 
-    def vectorise(self, model_name: str, content: Union[str, List[str]], normalize_embeddings: bool,
-                  modality: Modality = Modality.TEXT, device: str = None) -> List[List[float]]:
+    def vectorise(self, model_name: str, content: Union[str, List[str]],
+              model_properties: dict = None, device: str = None, normalize_embeddings: bool = True,
+              model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT,
+              media_download_headers: Optional[dict] = None, **kwargs) -> List[List[float]]:
         endpoint = f'{self.inf_url}/vectorise'
 
         request = VectoriseRequest(
             model_name=model_name,
+            model_properties=model_properties,
+            model_auth=model_auth,
             modality=modality,
             content=content,
             normalize_embeddings=normalize_embeddings,
             device=device,
+            enable_cache=enable_cache,
+            media_download_headers=media_download_headers,
             # TODO support other params
         )
 
@@ -64,11 +71,19 @@ if running_remote_inference:
 # TODO compose Vectoriser Protocol
 
 
-def vectorise(model_name: str, content: Union[str, List[str]], device: str = None,
-              normalize_embeddings: bool = True, modality: Modality = Modality.TEXT, **kwargs) -> List[List[float]]:
+def vectorise(model_name: str, content: Union[str, List[str]],
+              model_properties: dict = None,
+              device: str = None, normalize_embeddings: bool = True,
+              model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT,
+              media_download_headers: Optional[dict] = None, **kwargs) -> List[List[float]]:
     if running_remote_inference:
-        return inference_server.vectorise(model_name, content, normalize_embeddings, modality, device)
+        return inference_server.vectorise(model_name=model_name, content=content, model_properties=model_properties,
+                                      device=device, normalize_embeddings=normalize_embeddings, model_auth=model_auth,
+                                      enable_cache=enable_cache, modality=modality,
+                                      media_download_headers=media_download_headers, **kwargs)
     else:
-        return s2_inference.vectorise(model_name, content, device=device, normalize_embeddings=normalize_embeddings,
-                                      modality=modality, **kwargs)
+        return s2_inference.vectorise(model_name=model_name, content=content, model_properties=model_properties,
+                                      device=device, normalize_embeddings=normalize_embeddings, model_auth=model_auth,
+                                      enable_cache=enable_cache, modality=modality,
+                                      media_download_headers=media_download_headers, **kwargs)
 

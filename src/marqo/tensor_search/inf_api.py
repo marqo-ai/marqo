@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
@@ -23,12 +24,16 @@ inf_app = FastAPI(
 @inf_app.post("/vectorise")
 async def vectorise(request: VectoriseRequest):
     try:
-        result = s2_inference.vectorise(
+        result: List[List[float]] = s2_inference.vectorise(
             model_name=request.model_name,
+            model_properties=request.model_properties,
+            model_auth=request.model_auth,
             modality=request.modality,
             normalize_embeddings=request.normalize_embeddings,
             content=request.content,
-            device=request.device
+            device=request.device,
+            enable_cache=request.enable_cache,
+            media_download_headers=request.media_download_headers,
         )
 
         return ORJSONResponse(result)
