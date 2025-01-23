@@ -37,19 +37,20 @@ jobs:
           fi
 
       - name: Checkout marqo repo
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           path: marqo
 
       - name: Check for Documentation-Only Changes
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         id: set-output
         run: |
           cd marqo
           set -x
-          
+
           # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
-          # Manual dispatched runs are tested in a previous step
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             BASE_COMMIT=${{ github.event.pull_request.base.sha }}
             HEAD_COMMIT=${{ github.event.pull_request.head.sha }}
@@ -73,6 +74,7 @@ jobs:
             echo "doc_only=true" >> $GITHUB_ENV
             echo "doc_only=true" >> $GITHUB_OUTPUT
           fi
+
 
   Start-Runner:
     name: Start self-hosted EC2 runner
