@@ -81,13 +81,11 @@ jobs:
   
           # Perform the diff to check for non-documentation changes
           if git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$'; then
-            echo "DOC_ONLY=false"
             echo "doc_only=false" >> $GITHUB_ENV
-            echo "::set-output name=doc_only::false"
+            echo "doc_only=false" >> $GITHUB_OUTPUT
           else
-            echo "DOC_ONLY=true"
             echo "doc_only=true" >> $GITHUB_ENV
-            echo "::set-output name=doc_only::true"
+            echo "doc_only=true" >> $GITHUB_OUTPUT
           fi
 
   Test-Marqo:
