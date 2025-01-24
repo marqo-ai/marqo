@@ -285,7 +285,7 @@ jobs:
       - Test-Marqo # required to wait when the main job is done
     runs-on: ubuntu-latest
     if: |
-      always() && nees.Start-Runner.result == 'success'
+      always() && needs.Start-Runner.result == 'success'
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
