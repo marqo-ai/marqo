@@ -44,14 +44,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         # Verify attributes to retrieve, if defined
         if marqo_query.attributes_to_retrieve is not None:
+            if len(marqo_query.attributes_to_retrieve) > 0:
+                # Retrieve static fields content to extract non-string values from combined fields
+                marqo_query.attributes_to_retrieve.extend([
+                    common.STRING_ARRAY,
+                    common.INT_FIELDS,
+                    common.FLOAT_FIELDS,
+                    common.BOOL_FIELDS,
+                ])
+
             marqo_query.attributes_to_retrieve.append(common.VESPA_FIELD_ID)
+
             # add chunk field names for tensor fields
             marqo_query.attributes_to_retrieve.extend(
                 [self.get_marqo_index().tensor_field_map[att].chunk_field_name
                  for att in marqo_query.attributes_to_retrieve
                  if att in self.get_marqo_index().tensor_field_map]
             )
-
         # Hybrid must be checked first since it is a subclass of Tensor and Lexical
         if isinstance(marqo_query, MarqoHybridQuery):
             return StructuredVespaIndex._to_vespa_hybrid_query(self, marqo_query)

@@ -77,10 +77,19 @@ class TestSearchStructured(MarqoTestCase):
                              features=[FieldFeature.ScoreModifier]),
                 FieldRequest(name="score_mods_long", type=FieldType.Long,
                              features=[FieldFeature.ScoreModifier]),
+                FieldRequest(name="int_array", type=FieldType.ArrayInt),
+                FieldRequest(name="float_array", type=FieldType.ArrayFloat),
+                FieldRequest(name="long_array", type=FieldType.ArrayLong),
+                FieldRequest(name="double_array", type=FieldType.ArrayDouble),
+                FieldRequest(name="multimodal_combo_field", type=FieldType.MultimodalCombination, dependent_fields={
+                    "text_field_1": 1.0, "text_field_2": 2.0
+                }),
+                FieldRequest(name="custom_vector_field", type=FieldType.CustomVector)
             ],
 
             tensor_fields=["text_field_1", "text_field_2", "text_field_3",
-                           "text_field_4", "text_field_5", "text_field_6"]
+                           "text_field_4", "text_field_5", "text_field_6",
+                           "multimodal_combo_field", "custom_vector_field"]
         )
         default_text_index_encoded_name = cls.structured_marqo_index_request(
             name='a-b_' + str(uuid.uuid4()).replace('-', ''),
@@ -640,53 +649,76 @@ class TestSearchStructured(MarqoTestCase):
     #                 self.assertEqual(expected_ids, [hit["_id"] for hit in res["hits"]])
 
     def test_attributes_to_retrieve(self):
-        docs = [
-            {
-                "text_field_1": "Exact match hehehe",
-                "text_field_2": "baaadd",
-                "text_field_3": "res res res",
-                "text_field_4": "res res res haha",
-                "text_field_5": "check check haha",
-            }
-        ]
 
-        test_inputs = (
-            ([], {"_id", "_score", "_highlights"}),
-            (["text_field_1"], {"text_field_1", "_id", "_score", "_highlights"}),
-            (["text_field_1", "text_field_2"], {"text_field_1", "text_field_2", "_id", "_score", "_highlights"}),
-            (["text_field_1", "text_field_3"], {"text_field_1", "text_field_3", "_id", "_score", "_highlights"}),
-            (["text_field_1", "text_field_3", "text_field_4"],
-             {"text_field_1", "text_field_3", "text_field_4", "_id", "_score", "_highlights"}),
-            (["text_field_1", "text_field_3", "text_field_4", "text_field_5"],
-             {"text_field_1", "text_field_3", "text_field_4", "text_field_5", "_id", "_score", "_highlights"}),
-            (["text_field_1", "text_field_2", "text_field_3", "text_field_4", "text_field_5"],
-             {"text_field_1", "text_field_2", "text_field_3", "text_field_4", "text_field_5", "_id", "_score",
-              "_highlights"}),
-            # TODO Fix this subtest
-            # Not running this test case until we solve the bool issue
-            # (None, {"text_field_1", "text_field_2", "text_field_3", "text_field_4", "text_field_5", "_id", "_score",
-            #         "_highlights"}),
-        )
+        doc = {
+            "text_field_1": "Exact match hehehe",
+            "text_field_2": "This is a very long string." * 10,
+            "int_field_1": 123,
+            "float_field_1": 123.0,
+            "long_field_1": 1234,
+            "double_field_1": 1234.0,
+            "list_field_1": ["123", "123"],
+            "map_score_mods_int": {"a": 1, "b": 2},
+            "map_score_mods_float": {"c": 1.0, "d": 2.0},
+            "map_score_mods_long": {"a": 1, "b": 2},
+            "map_score_mods_double": {"c": 1.0, "d": 2.0},
+            "bool_field_1": True,
+            "bool_field_2": False,
+            "int_array": [1, 2, 3],
+            "long_array": [1, 2, 3, 4, 5],
+            "float_array": [1.0, 2.0, 3.0],
+            "double_array": [3.09, 2.09, 3.12],
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 384
+            },
+        }
 
-        self.add_documents(
+        res = self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
-                docs=docs,
-            )
+                docs=[doc],
+                mappings={
+                    "multimodal_combo_field": {
+                        "type": "multimodal_combination",
+                        "weights": {"text_field_1": 2.0, "text_field_2": 3.0}
+                    }
+                }
+            ),
         )
 
+        print(res)
+
+        # meta fields are always returned
+        meta_fields = {"_id", "_score", "_highlights"}
+
+        test_cases = ((
+            # attributes_to_retrieve, expected result excluding meta_fields
+            ([], set()),  # no field is selected
+            (["multimodal_combo_field"], set()),  # multimodal_combination fields cannot be selected
+            (None, doc.keys()),  # not provided
+            (list(doc.keys()), doc.keys()),  # all fields are selected
+        )
+            + tuple([([field], {field}) for field in doc.keys()])  # one field
+            + tuple((random_fields, set(random_fields)) for random_fields in
+                    [random.sample(doc.keys(), random.randint(2, len(doc))) for _ in range(10)]))  # random n(>1) fields, 10 times
+
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
-            for attributes_to_retrieve, expected_fields in test_inputs:
-                with self.subTest(
-                        f"search_method = {search_method}, attributes_to_retrieve={attributes_to_retrieve},"
-                        f" expected_fields = {expected_fields}"):
+            for attributes_to_retrieve, expected_fields in test_cases:
+                with self.subTest(f"search_method = {search_method}, attributes_to_retrieve={attributes_to_retrieve}, "
+                                  f"expected_fields = {expected_fields}"):
+
                     res = tensor_search.search(
                         config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
                         attributes_to_retrieve=attributes_to_retrieve, search_method=search_method
                     )
-
-                    self.assertEqual(expected_fields, set(res["hits"][0].keys()))
+                    self.assertSetEqual(expected_fields | meta_fields, set(res["hits"][0].keys()))
+                    for attribute in expected_fields:
+                        if attribute == "custom_vector_field":
+                            self.assertEqual(res["hits"][0][attribute], doc[attribute]["content"])
+                        else:
+                            self.assertEqual(res["hits"][0][attribute], doc[attribute])
 
     def test_limit_results(self):
         vocab_source = "https://www.mit.edu/~ecprice/wordlist.10000"
