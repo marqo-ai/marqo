@@ -1,9 +1,6 @@
 name: Test Patches Merged
 
 on:
-  pull_request:
-    branches:
-      - mainline
   push:
     branches:
       - mainline
