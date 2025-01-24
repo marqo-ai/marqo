@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - mainline
-  pull_request:
-    branches:
-      - mainline
   workflow_dispatch:
 
 jobs:
