@@ -50,9 +50,23 @@ query(marqo__mult_weights_lexical) tensor<double>(p{})
 query(marqo__add_weights_lexical) tensor<double>(p{})
 query(marqo__mult_weights_tensor) tensor<double>(p{})
 query(marqo__add_weights_tensor) tensor<double>(p{})
+query(marqo__mult_weights_global) tensor<double>(p{})
+query(marqo__add_weights_global) tensor<double>(p{})
+}
+function mult_modifier(mult_weights) {
+   expression: 1
+}
+function add_modifier(add_weights) {
+   expression: 0
 }
 function modify(score, mult_weights, add_weights) {
    expression: score
+}
+function global_mult_modifier() {
+   expression: mult_modifier(query(marqo__mult_weights_global))
+}
+function global_add_modifier() {
+   expression: add_modifier(query(marqo__add_weights_global))
 }
 function lexical_score_sum() {
 expression: if (query(marqo__lexical_title) > 0, bm25(marqo__lexical_title), 0)
@@ -69,6 +83,7 @@ expression: if (query(marqo__bm25_aggregator) == 0, lexical_score_sum(), if (que
 function embedding_score() {
 expression: max(if(query(marqo__embeddings_title) > 0, closeness(field, marqo__embeddings_title), 0), if(query(marqo__embeddings_description) > 0, closeness(field, marqo__embeddings_description), 0))
 }
+match-features: global_mult_modifier global_add_modifier
 }
 rank-profile bm25 inherits base_rank_profile {
 first-phase {
@@ -78,7 +93,12 @@ rank-profile embedding_similarity inherits base_rank_profile {
 first-phase {
 expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
 }
-match-features: closest(marqo__embeddings_title) closest(marqo__embeddings_description) distance(field, marqo__embeddings_title) distance(field, marqo__embeddings_description)
+match-features inherits base_rank_profile {
+closest(marqo__embeddings_title)
+distance(field, marqo__embeddings_title)
+closest(marqo__embeddings_description)
+distance(field, marqo__embeddings_description)
+}
 }
 rank-profile hybrid_custom_searcher inherits default {
 inputs {
@@ -89,6 +109,8 @@ query(marqo__mult_weights_lexical) tensor<double>(p{})
 query(marqo__add_weights_lexical) tensor<double>(p{})
 query(marqo__mult_weights_tensor) tensor<double>(p{})
 query(marqo__add_weights_tensor) tensor<double>(p{})
+query(marqo__mult_weights_global) tensor<double>(p{})
+query(marqo__add_weights_global) tensor<double>(p{})
 }
 }
 rank-profile hybrid_bm25_then_embedding_similarity inherits base_rank_profile {
@@ -98,7 +120,12 @@ expression: modify(lexical_score(), query(marqo__mult_weights_lexical), query(ma
 second-phase {
 expression: modify(embedding_score(), query(marqo__mult_weights_tensor), query(marqo__add_weights_tensor))
 }
-match-features: closest(marqo__embeddings_title) closest(marqo__embeddings_description) distance(field, marqo__embeddings_title) distance(field, marqo__embeddings_description)
+match-features inherits base_rank_profile {
+closest(marqo__embeddings_title)
+distance(field, marqo__embeddings_title)
+closest(marqo__embeddings_description)
+distance(field, marqo__embeddings_description)
+}
 }
 rank-profile hybrid_embedding_similarity_then_bm25 inherits base_rank_profile {
 first-phase {

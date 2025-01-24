@@ -1,30 +1,30 @@
 import copy
-import math
 import os
 import random
 import unittest
 import uuid
 from unittest import mock
 
+import math
 import requests
-from pydantic import ValidationError
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
+from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
 
 import marqo.core.exceptions as core_exceptions
 from marqo.api import exceptions as errors
 from marqo.api.exceptions import IndexNotFoundError
 from marqo.api.exceptions import InvalidArgError
-from marqo.vespa.exceptions import VespaStatusError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.s2_inference.s2_inference import get_model_properties_from_registry
+from marqo.tensor_search import index_meta_cache
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.enums import SearchMethod
-from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.tensor_search.models.search import SearchContext
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
-from marqo.vespa.models import QueryResult
 from marqo.tensor_search.models.api_models import ScoreModifierLists
-from integ_tests.tensor_search.integ_tests.common_test_constants import SPECIAL_CHARACTERS
+from marqo.tensor_search.models.search import SearchContext
+from marqo.vespa.exceptions import VespaStatusError
+from marqo.vespa.models import QueryResult
 
 
 class TestSearchUnstructured(MarqoTestCase):
@@ -109,20 +109,22 @@ class TestSearchUnstructured(MarqoTestCase):
             with self.subTest(desc):
                 self.add_documents(config=self.config,
                                    add_docs_params=AddDocsParams(
-                                                index_name=index_name,
-                                                docs=[
-                                                    {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
-                                                     "_id": "5678", "finally": "some field efgh "},
-                                                    {"abc": "shouldn't really match ", "other_field": "Nope.....",
-                                                     "_id": "1234", "finally": "Random text here efgh "},
-                                                ],
-                                                tensor_fields=["abc", "other_field", "finally"],
-                                            )
+                                       index_name=index_name,
+                                       docs=[
+                                           {"abc": "Exact match hehehe efgh ", "other_field": "baaadd efgh ",
+                                            "_id": "5678", "finally": "some field efgh "},
+                                           {"abc": "shouldn't really match ", "other_field": "Nope.....",
+                                            "_id": "1234", "finally": "Random text here efgh "},
+                                       ],
+                                       tensor_fields=["abc", "other_field", "finally"],
+                                   )
                                    )
 
+                index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
                 search_res = tensor_search._vector_text_search(
-                    config=self.config, index_name=index_name,
-                    query=" efgh ", result_count=10, device="cpu"
+                    config=self.config,
+                    query=" efgh ", result_count=10, device="cpu",
+                    marqo_index=index_object
                 )
                 assert len(search_res['hits']) == 2
 
@@ -170,24 +172,26 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_vector_text_search_no_device(self):
         try:
+            index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
             search_res = tensor_search._vector_text_search(
-                config=self.config, index_name=self.default_text_index,
+                config=self.config, marqo_index=index_object,
                 result_count=5, query="some text...")
             raise AssertionError
         except errors.InternalError:
             pass
 
     def test_vector_search_against_empty_index(self):
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         search_res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index,
+            config=self.config, marqo_index=index_object,
             result_count=5, query="some text...", device="cpu")
         assert {'hits': []} == search_res
 
     def test_vector_search_against_non_existent_index(self):
         try:
-            tensor_search._vector_text_search(
+            tensor_search.search(
                 config=self.config, index_name="some-non-existent-index",
-                result_count=5, query="some text...", device="cpu")
+                result_count=5, text="some text...", device="cpu", search_method=SearchMethod.TENSOR)
         except IndexNotFoundError as s:
             pass
 
@@ -209,8 +213,9 @@ class TestSearchUnstructured(MarqoTestCase):
             )
         )
 
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         res = tensor_search._vector_text_search(
-            config=self.config, index_name=self.default_text_index, query=query_text, device="cpu"
+            config=self.config, query=query_text, device="cpu", marqo_index=index_object
         )
 
         assert len(res["hits"]) == 2
@@ -704,13 +709,13 @@ class TestSearchUnstructured(MarqoTestCase):
                 tensor_fields=["some_str"]
             )
         )
+        index_object = index_meta_cache.get_index(self.index_management, self.default_text_index)
         for to_search in [1, 1.2, True, "blah"]:
             assert "hits" in tensor_search._lexical_search(
-                text=str(to_search), config=self.config, index_name=self.default_text_index,
-
+                text=str(to_search), config=self.config, marqo_index=index_object
             )
             assert "hits" in tensor_search._vector_text_search(
-                query=str(to_search), config=self.config, index_name=self.default_text_index, device="cpu"
+                query=str(to_search), config=self.config, device="cpu", marqo_index=index_object
             )
 
     def test_search_other_types_top_search(self):
@@ -1304,7 +1309,7 @@ class TestSearchUnstructured(MarqoTestCase):
 
     def test_search_with_content_double_colon(self):
         docs = [
-            {"_id": "1", "text_field": "::my_text"} # This should work properly
+            {"_id": "1", "text_field": "::my_text"}  # This should work properly
         ]
         self.add_documents(
             config=self.config,
@@ -1326,30 +1331,30 @@ class TestSearchUnstructured(MarqoTestCase):
     def test_search_returned_documents(self):
         """A test to ensure that the returned are not missing/adding any unexpected fields"""
         full_fields_document = ({
-            "_id": "full_fields",
-            "text_field": "some text",
-            "int_field": 1,
-            "float_field": 2.0,
-            "bool_field": True,
-            "list_field": ["a", "b","c"],
-            "string_bool_field": "True",
-            "string_int_field": "1",
-            "string_float_field": "1.2",
-            "string_list_field": "['a', 'b', 'c']"
-        }, "full-fields document")
+                                    "_id": "full_fields",
+                                    "text_field": "some text",
+                                    "int_field": 1,
+                                    "float_field": 2.0,
+                                    "bool_field": True,
+                                    "list_field": ["a", "b", "c"],
+                                    "string_bool_field": "True",
+                                    "string_int_field": "1",
+                                    "string_float_field": "1.2",
+                                    "string_list_field": "['a', 'b', 'c']"
+                                }, "full-fields document")
 
         partial_fields_document = ({
-            "_id": "partial_field",
-            "text_field": "some text",
-            "float_field": 1.0,
-            "bool_field": True,
-            "list_field": ["a", "b", "c"],
-        }, "partial-fields document")
+                                       "_id": "partial_field",
+                                       "text_field": "some text",
+                                       "float_field": 1.0,
+                                       "bool_field": True,
+                                       "list_field": ["a", "b", "c"],
+                                   }, "partial-fields document")
 
         no_field_documents = ({
-            "_id": "no_field",
-            "text_field": "some text"
-        }, "no-field document")
+                                  "_id": "no_field",
+                                  "text_field": "some text"
+                              }, "no-field document")
 
         for document, msg in [full_fields_document, partial_fields_document, no_field_documents]:
             with self.subTest(msg):
@@ -1415,7 +1420,8 @@ class TestSearchUnstructured(MarqoTestCase):
                               'relevance': 0.39966427718009545,
                               'source': 'content_default',
                               'fields': {
-                                  'matchfeatures': {'closest(marqo__embeddings)': {'type': 'tensor<float>(p{})', 'cells': {'1': 1.0}}},
+                                  'matchfeatures': {'closest(marqo__embeddings)': {'type': 'tensor<float>(p{})',
+                                                                                   'cells': {'1': 1.0}}},
                                   'sddocname': 'aa4f36de0c4f4433a8c31e4143b28029b',
                                   'marqo__id': '2',
                                   'marqo__strings': ['defgh', 'on the mat'],
@@ -1472,7 +1478,8 @@ class TestSearchUnstructured(MarqoTestCase):
                 )
 
                 score_modifiers = ScoreModifierLists(**{
-                    "add_to_score": [{"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
+                    "add_to_score": [
+                        {"field_name": f"map_score_mods_float.a{special_character}subsubfield", "weight": 2}],
                 })
 
                 res = tensor_search.search(

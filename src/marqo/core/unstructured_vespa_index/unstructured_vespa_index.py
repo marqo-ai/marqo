@@ -46,7 +46,7 @@ class UnstructuredVespaIndex(VespaIndex):
                                          'please create a new Marqo index. For more information, refer to the Create '
                                          f'Index API reference: {marqo_docs.create_index()}.')
 
-        if isinstance(marqo_query, MarqoHybridQuery):       # TODO: Rethink structure so order of checking doesn't matter
+        if isinstance(marqo_query, MarqoHybridQuery):  # TODO: Rethink structure so order of checking doesn't matter
             return self._to_vespa_hybrid_query(marqo_query)
         elif isinstance(marqo_query, MarqoTensorQuery):
             return self._to_vespa_tensor_query(marqo_query)
@@ -344,7 +344,8 @@ class UnstructuredVespaIndex(VespaIndex):
             'searchChain': 'marqo',
             'yql': 'PLACEHOLDER. WILL NOT BE USED IN HYBRID SEARCH.',
             'ranking': unstructured_common.RANK_PROFILE_HYBRID_CUSTOM_SEARCHER,
-            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,  # limits the number of results going to phase 2
+            'ranking.rerankCount': marqo_query.limit + marqo_query.offset,
+            # limits the number of results going to phase 2
 
             'model_restrict': self._marqo_index.schema_name,
             'hits': marqo_query.limit,

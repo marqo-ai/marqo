@@ -27,7 +27,7 @@ class TestSemiStructuredVespaSchema(MarqoTestCase):
             ('one_lexical_field', ['text_field'], [], 'semi_structured_vespa_index_schema_one_lexical_field.sd'),
             ('one_tensor_field', [], ['tensor_field'], 'semi_structured_vespa_index_schema_one_tensor_field.sd'),
             ('one_lexical_one_tensor_field', ['text_field'], ['tensor_field'], 'semi_structured_vespa_index_schema_one_lexical_one_tensor_field.sd'),
-            ('multiple_lexical_tensor_fields', ['text_field1', 'text_field2'], ['tensor_field1', 'tensor_field2'], 'semi_structured_vespa_index_schema_mutliple_lexical_tensor_fields.sd'),
+            ('multiple_lexical_tensor_fields', ['text_field1', 'text_field2'], ['tensor_field1', 'tensor_field2'], 'semi_structured_vespa_index_schema_multiple_lexical_tensor_fields.sd'),
         ]
 
         for test_case in test_cases:

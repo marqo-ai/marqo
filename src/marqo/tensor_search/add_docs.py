@@ -84,6 +84,15 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
         metric_obj = RequestMetricsStore.for_request()
         RequestMetricsStore.set_in_request(metrics=metric_obj)
 
+    # For backward compatibility, we should accept both supportedModalities and supported_modalities
+    if marqo_index_model.properties.get("supported_modalities") and marqo_index_model.properties.get("supportedModalities"):
+        raise InvalidModelPropertiesError(
+            "Model properties must have either 'supported_modalities' or 'supportedModalities', not both"
+        )
+    else:
+        supported_modalities = marqo_index_model.properties.get('supported_modalities') or \
+                                marqo_index_model.properties.get('supportedModalities') or []
+
     with metric_obj.time(f"{_id}.thread_time"):
         for doc in allocated_docs:
             for field in list(doc):
@@ -104,8 +113,8 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                         is_structured_index and media_field_types_mapping[field] == FieldType.ImagePointer): # Don't use infer modality in structured image pointers
 
                         if marqo_index_model.properties.get('type') in [ModelType.LanguageBind] \
-                            and marqo_index_model.properties.get('supported_modalities') is not None \
-                            and Modality.IMAGE not in marqo_index_model.properties.get('supported_modalities'):
+                            and supported_modalities is not None \
+                            and Modality.IMAGE not in supported_modalities:
 
                             media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index_model.name} does not support {inferred_modality}")
@@ -150,7 +159,7 @@ def threaded_download_and_preprocess_content(allocated_docs: List[dict],
                                 f"Model {marqo_index_model.name} does not support {inferred_modality}")
                             continue
                         
-                        if inferred_modality not in marqo_index_model.properties.get('supported_modalities'):
+                        if inferred_modality not in supported_modalities:
                             media_repo[doc[field]] = UnsupportedModalityError(
                                 f"Model {marqo_index_model.name} does not support {inferred_modality}")
                             continue

@@ -1139,10 +1139,44 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             treat_urls_and_pointers_as_media=True
         )
 
-        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index])
+        unstructured_custom_language_bind_index = cls.unstructured_marqo_index_request(
+            name="unstructured_image_index_custom" + str(uuid.uuid4()).replace('-', ''),
+            model=Model(
+                name="my-custom-language-bind-model",
+                properties={
+                    "dimensions": 768,
+                    "type": "languagebind",
+                    "supportedModalities": ["text", "audio", "video", "image"],
+                    "modelLocation": {
+                        "video": {
+                            "hf": {
+                                "repoId": "Marqo/LanguageBind_Video_V1.5_FT",
+                            },
+                        },
+                        "audio": {
+                            "hf": {
+                                "repoId": "Marqo/LanguageBind_Audio_FT",
+                            },
+                        },
+                        "image":{
+                            "hf": {
+                                "repoId": "Marqo/LanguageBind_Image",
+                            },
+                        }
+                    },
+                },
+                custom=True
+            ),
+            treat_urls_and_pointers_as_images = True,
+            treat_urls_and_pointers_as_media = True
+        )
+
+        cls.indexes = cls.create_indexes([structured_language_bind_index, unstructured_language_bind_index,
+                                          unstructured_custom_language_bind_index])
 
         cls.structured_language_bind_index_name = structured_language_bind_index.name
         cls.unstructured_language_bind_index_name = unstructured_language_bind_index.name
+        cls.unstructured_custom_language_bind_index_name= unstructured_custom_language_bind_index.name
 
         s2_inference.clear_loaded_models()
 
@@ -1347,3 +1381,51 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                         text=test_case,
                         search_method = "TENSOR"
                     )
+
+    def test_custom_languagebind_model(self):
+        """Test the custom languagebind model in add_documents and search end-to-end."""
+        docs = [
+            {
+                "_id": "1",
+                "text_field_1": "This is a test text",
+                "image_field_1": TestImageUrls.IMAGE1.value,
+                "audio_field_1": TestAudioUrls.AUDIO1.value,
+                "video_field_1": TestVideoUrls.VIDEO1.value
+            }
+        ]
+        with self.subTest("custom-languagebind-model-add-documents"):
+            res = tensor_search.add_documents(
+                self.config,
+                add_docs_params=AddDocsParams(
+                    index_name=self.unstructured_custom_language_bind_index_name,
+                    docs=docs,
+                    tensor_fields=["text_field_1", "image_field_1", "audio_field_1", "video_field_1"]
+                )
+            )
+
+            self.assertEqual(False, res.errors)
+            self.assertEqual(
+                1,
+                self.monitoring.get_index_stats_by_name(
+                    index_name=self.unstructured_custom_language_bind_index_name).number_of_documents)
+            self.assertGreaterEqual(
+                4,
+                self.monitoring.get_index_stats_by_name(
+                    index_name=self.unstructured_custom_language_bind_index_name).number_of_vectors
+            )
+
+        search_test_cases = [
+            ("This is a test text", "text"),
+            (TestImageUrls.IMAGE1.value, "image"),
+            (TestAudioUrls.AUDIO1.value, "audio"),
+            (TestVideoUrls.VIDEO1.value, "video")
+        ]
+
+        for query, modality in search_test_cases:
+            with self.subTest(f"custom-languagebind-model-search-{modality}"):
+                _ = tensor_search.search(
+                    config=self.config,
+                    index_name=self.unstructured_custom_language_bind_index_name,
+                    text=query,
+                    search_method = "TENSOR"
+                )

@@ -19,6 +19,7 @@ from marqo.core.models.score_modifier import ScoreModifierType, ScoreModifier
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.tensor_search.models.api_models import SearchQuery
+from marqo.core.models.hybrid_parameters import RankingMethod, RetrievalMethod, HybridParameters
 from pydantic import ValidationError
 import marqo.api.exceptions as api_exceptions
 

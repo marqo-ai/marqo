@@ -154,7 +154,7 @@ class VespaIndex(ABC):
 
         """
         Specifically for hybrid queries.
-        Returns a dictionary with 2 keys: 'lexical' and 'tensor'.
+        Returns a dictionary with 3 keys: 'lexical', 'tensor', and 'global'.
         Each key points to a dictionary containing the score modifiers for the respective field types.
 
         Example:
@@ -174,13 +174,21 @@ class VespaIndex(ABC):
                 'marqo__add_weights_tensor': {
                     'field7': 23, 'field8': 12
                 }
-            }
+            },
+            'global': {
+                'marqo__mult_weights_global': {
+                    'field9': 0.5, 'field10': 0.4
+                },
+                'marqo__add_weights_global': {
+                    'field11': 23, 'field12': 12
+                }
         }
         """
 
         result = {
             constants.MARQO_SEARCH_METHOD_LEXICAL: None,
-            constants.MARQO_SEARCH_METHOD_TENSOR: None
+            constants.MARQO_SEARCH_METHOD_TENSOR: None,
+            constants.MARQO_GLOBAL_SCORE_MODIFIERS: None
         }
 
         if hybrid_query.score_modifiers_lexical:
@@ -195,6 +203,14 @@ class VespaIndex(ABC):
             result[constants.MARQO_SEARCH_METHOD_TENSOR] = {
                 constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_TENSOR: mult_tensor,
                 constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_TENSOR: add_tensor
+            }
+
+        # Treat root level score modifiers as global. Currently only supported for RRF.
+        if hybrid_query.score_modifiers:
+            mult_tensor, add_tensor = self._convert_score_modifiers_to_tensors(hybrid_query.score_modifiers)
+            result[constants.MARQO_GLOBAL_SCORE_MODIFIERS] = {
+                constants.QUERY_INPUT_SCORE_MODIFIERS_MULT_WEIGHTS_GLOBAL: mult_tensor,
+                constants.QUERY_INPUT_SCORE_MODIFIERS_ADD_WEIGHTS_GLOBAL: add_tensor
             }
 
         return result
