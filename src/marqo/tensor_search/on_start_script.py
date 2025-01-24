@@ -45,6 +45,7 @@ def on_start(config: config.Config, mode: StartMode):
         to_run_on_start.extend([
             PopulateCache(config),
             InitializeRedis("localhost", 6379),
+            SetBestAvailableDevice(),
         ])
 
     if mode & StartMode.INFERENCE:

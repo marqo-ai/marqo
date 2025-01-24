@@ -68,8 +68,6 @@ def maybe_run_inference_server():
     remote_inference_worker_count = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_WORKER_COUNT)
 
     if will_run_remote_inference and remote_inference_url == default_env_vars()[EnvVars.MARQO_REMOTE_INFERENCE_URL]:
-        # To use CUDA with multiprocessing, we must use the 'spawn' start method
-        multiprocessing.set_start_method('spawn')
         p = multiprocessing.Process(target=run_inf_app, args=[remote_inference_worker_count], name='marqo-inference')
         p.start()
 
@@ -83,6 +81,9 @@ def maybe_run_inference_server():
 
 
 if __name__ == "__main__":
+    # To use CUDA with multiprocessing, we must use the 'spawn' start method
+    multiprocessing.set_start_method('spawn')
+
     on_start(_config, StartMode.BOOTSTRAP)
 
     with maybe_run_inference_server():

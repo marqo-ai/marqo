@@ -31,6 +31,7 @@ async def vectorise(request: VectoriseRequest):
             modality=request.modality,
             normalize_embeddings=request.normalize_embeddings,
             content=request.content,
+            # TODO unless device is set, the best available device should be used
             device=request.device,
             enable_cache=request.enable_cache,
             media_download_headers=request.media_download_headers,
