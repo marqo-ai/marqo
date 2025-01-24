@@ -283,7 +283,7 @@ jobs:
       - Start-Runner # required to get output from the start-runner job
       - Test-Marqo # required to wait when the main job is done
     runs-on: ubuntu-latest
-    if: ${{ always() }}
+    if: ${{ needs.Start-Runner.outputs.label != null }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
