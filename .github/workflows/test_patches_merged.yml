@@ -1,0 +1,45 @@
+name: Test Patches Merged
+
+on:
+  push:
+    branches:
+      - mainline
+  pull_request:
+    branches:
+      - mainline
+  workflow_dispatch:
+
+jobs:
+  verify-patches-merged:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Get current version
+        id: version
+        run: |
+          VERSION=$(python -c "import sys; sys.path.append('./src'); from marqo.version import __version__; print('.'.join(__version__.split('.')[:2]))")
+          PREV_MINOR=$(python -c "import sys; sys.path.append('./src'); from marqo.version import __version__; major, minor = map(int, __version__.split('.')[:2]); print(f'{major}.{minor-1}')")
+          echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "prev_minor=$PREV_MINOR" >> $GITHUB_OUTPUT
+
+      - name: Verify fast-forward merge possible
+        run: |
+          git fetch origin "releases/${{ steps.version.outputs.prev_minor }}"
+          MERGE_BASE=$(git merge-base origin/mainline "origin/releases/${{ steps.version.outputs.prev_minor }}")
+          RELEASE_HEAD=$(git rev-parse "origin/releases/${{ steps.version.outputs.prev_minor }}")
+          
+          if [ "$MERGE_BASE" = "$RELEASE_HEAD" ]; then
+            echo "✅ Release branch is fast-forward mergeable into mainline"
+          else
+            echo "❌ Release branch is not fast-forward mergeable into mainline"
+            exit 1
+          fi
