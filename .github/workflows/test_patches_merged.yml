@@ -1,6 +1,9 @@
 name: Test Patches Merged
 
 on:
+  pull_request:
+    branches:
+      - mainline
   push:
     branches:
       - mainline
@@ -30,6 +33,7 @@ jobs:
 
       - name: Verify fast-forward merge possible
         run: |
+          set -x
           # Try to fetch current version branch first
           if git fetch origin "releases/${{ steps.version.outputs.current_version }}" 2>/dev/null; then
             BRANCH_TO_CHECK="releases/${{ steps.version.outputs.current_version }}"
