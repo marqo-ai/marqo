@@ -2114,7 +2114,7 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vectorise_via_inference_server(content: Any) -> List[List[float]]:
-    url = "http://localhost:8686/infer"
+    url = "http://host.docker.internal:8686/infer"
     if isinstance(content, str):
         content = [content]
 
