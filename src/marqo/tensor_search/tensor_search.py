@@ -43,6 +43,7 @@ from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
 
 import numpy as np
 import psutil
+import requests
 from numpy import ndarray
 
 import marqo.core.unstructured_vespa_index.common as unstructured_common
@@ -1898,15 +1899,20 @@ def vectorise_jobs(jobs: List[VectorisedJobs]) -> Dict[JHash, Dict[str, List[flo
                     v.content[0] if isinstance(v.content, list) else v.content,
                     media_download_headers=v.media_download_headers
                 )
-                vectors = s2_inference.vectorise(
-                    model_name=v.model_name, model_properties=v.model_properties,
-                    content=v.content, device=v.device,
-                    normalize_embeddings=v.normalize_embeddings,
-                    media_download_headers=v.media_download_headers,
-                    model_auth=v.model_auth,
-                    enable_cache=True,
-                    modality=modality
-                )
+                if os.environ.get("MARQO_USE_INFERENCE_SERVER", "false").lower() == "true":
+                    vectors = _vectorise_via_inference_server(
+                        content=v.content
+                    )
+                else:
+                    vectors = s2_inference.vectorise(
+                        model_name=v.model_name, model_properties=v.model_properties,
+                        content=v.content, device=v.device,
+                        normalize_embeddings=v.normalize_embeddings,
+                        media_download_headers=v.media_download_headers,
+                        model_auth=v.model_auth,
+                        enable_cache=True,
+                        modality=modality
+                    )
                 result[v.groupby_key()] = dict(zip(v.content, vectors))
 
         # TODO: This is a temporary addition.
@@ -2105,6 +2111,22 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
         prefixed_queries, qidx_to_jobs, job_ptr_to_vectors, config, jobs
     )
     return qidx_to_vectors
+
+
+def _vectorise_via_inference_server(content: Any) -> List[List[float]]:
+    url = "http://localhost:8686/infer"
+    if isinstance(content, str):
+        content = [content]
+
+    data = {
+        "name": "ViT-B-32",
+        "pretrained": "laion2b_s34b_b79k",
+        "text": content
+    }
+
+    res = requests.post(url, json=data).json()
+    return res["textEmbeddings"]
+
 
 
 def _vector_text_search(
