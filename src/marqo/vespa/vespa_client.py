@@ -16,6 +16,7 @@ import orjson
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
+from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
 from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
@@ -240,13 +241,15 @@ class VespaClient:
         logger.debug(f'Query: {query}')
 
         try:
-            resp = self.http_client.post(f'{self.query_url}/search/', json=query)
+            with RequestMetricsStore.for_request().time("vespa.query.roundtrip"):
+                resp = self.http_client.post(f'{self.query_url}/search/', json=query)
         except httpx.HTTPError as e:
             raise VespaError(e) from e
 
         self._query_raise_for_status(resp)
 
-        return QueryResult(**orjson.loads(resp.text))
+        with RequestMetricsStore.for_request().time("vespa.query.construct_result"):
+            return QueryResult(**orjson.loads(resp.text))
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """

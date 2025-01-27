@@ -9,6 +9,7 @@ from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.models.inf_request import VectoriseRequest
 from marqo.tensor_search.models.private_models import ModelAuth
+from marqo.tensor_search.telemetry import RequestMetricsStore
 
 
 class InferenceError(Exception):
@@ -55,7 +56,8 @@ class RemoteVectoriser:
         )
 
         try:
-            resp = self.http_client.post(endpoint, json=request.dict())
+            with RequestMetricsStore.for_request().time("inference.roundtrip"):
+                resp = self.http_client.post(endpoint, json=request.dict())
         except httpx.HTTPError as e:
             raise InferenceError(e) from e
 
