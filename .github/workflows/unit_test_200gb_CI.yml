@@ -279,11 +279,12 @@ jobs:
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:
+      - Check-Changes # required to start the main job when the runner is ready
       - Start-Runner # required to get output from the start-runner job
       - Test-Marqo # required to wait when the main job is done
-      - Check-Changes
     runs-on: ubuntu-latest
-    if: ${{ needs.start-runner.outputs.label }} # Only stop the runner if it was started
+    if: |
+      always() && needs.Start-Runner.result == 'success'
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
