@@ -11,7 +11,7 @@ on:
         description: >
           The "py-marqo" branch this test is running against.
           This is optional. If left as the default value "mainline", we run the test based on the "mainline" branch of
-          py-marqo. Otherwise, the specified branch is tested. For example "prefix/test-xx". You can also use "marqo" and 
+          py-marqo. Otherwise, the specified branch is tested. For example "prefix/test-xx". You can also use "marqo" and
           it will use the latest pypi release.
       image_identifier:
         required: false
@@ -109,11 +109,11 @@ jobs:
           export TESTING_CONFIGURATION=CPU_LOCAL_MARQO
           export MARQO_API_TESTS_ROOT=$(pwd)
           export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          
+
           bash scripts/build_marqo.sh $MARQO_IMAGE_NAME
 
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
-          
+
           pytest tests/
 
   Stop-Runner:
