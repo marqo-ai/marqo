@@ -31,6 +31,12 @@ class TestDeviceManager(unittest.TestCase):
 
             return DeviceManager()
 
+    def _mem_stats(self, allocated: int, reserved: int) -> OrderedDict:
+        return OrderedDict({
+            "allocated_bytes.all.current": allocated,
+            "reserved_bytes.all.current": reserved
+        })
+
     def test_init_with_cpu(self):
         device_manager = self._device_manager_without_cuda()
 
@@ -79,22 +85,24 @@ class TestDeviceManager(unittest.TestCase):
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
                 mock.patch("torch.randn", side_effect=RuntimeError("CUDA error: out of memory")), \
-                mock.patch("torch.cuda.memory_stats", return_value=OrderedDict({"allocated.all.current": 900_000})):
+                mock.patch("torch.cuda.memory_stats", return_value=self._mem_stats(900_000, 950_000)):
             with self.assertRaises(CudaOutOfMemoryError) as err:
                 device_manager.cuda_device_health_check()
 
-            self.assertEqual(str(err.exception), "CUDA device cuda:0(Tesla T4) is out of memory: (900000/1000000)")
+            self.assertEqual(str(err.exception), "CUDA device cuda:0(Tesla T4) is out of memory "
+                                                 "(reserved: 950000, allocated: 900000, total: 1000000)")
 
     def test_cuda_health_check_should_fail_when_any_cuda_device_is_out_of_memory(self):
         device_manager = self._device_manager_with_multiple_cuda_devices(total_memory=1_000_000)
 
         with mock.patch("torch.cuda.is_available", return_value=True), \
                 mock.patch("torch.randn", side_effect=[torch.tensor([1, 2, 3]), RuntimeError("CUDA error: out of memory")]), \
-                mock.patch("torch.cuda.memory_stats", return_value=OrderedDict({"allocated.all.current": 900_000})):
+                mock.patch("torch.cuda.memory_stats", return_value=self._mem_stats(900_000, 950_000)):
             with self.assertRaises(CudaOutOfMemoryError) as err:
                 device_manager.cuda_device_health_check()
 
-            self.assertEqual(str(err.exception), "CUDA device cuda:1(Tesla H200) is out of memory: (900000/1000000)")
+            self.assertEqual(str(err.exception), "CUDA device cuda:1(Tesla H200) is out of memory "
+                                                 "(reserved: 950000, allocated: 900000, total: 1000000)")
 
     def test_cuda_health_check_should_check_if_all_cuda_devices_are_out_of_memory(self):
         device_manager = self._device_manager_with_multiple_cuda_devices(total_memory=1_000_000)
@@ -102,12 +110,14 @@ class TestDeviceManager(unittest.TestCase):
         with mock.patch("torch.cuda.is_available", return_value=True), \
                 mock.patch("torch.randn",
                            side_effect=[RuntimeError("CUDA error: out of memory"), RuntimeError("CUDA error: out of memory")]), \
-                mock.patch("torch.cuda.memory_stats", return_value=OrderedDict({"allocated.all.current": 900_000})):
+                mock.patch("torch.cuda.memory_stats", return_value=self._mem_stats(900_000, 950_000)):
             with self.assertRaises(CudaOutOfMemoryError) as err:
                 device_manager.cuda_device_health_check()
 
-            self.assertEqual(str(err.exception), "CUDA device cuda:0(Tesla T4) is out of memory: (900000/1000000);"
-                                                 "CUDA device cuda:1(Tesla H200) is out of memory: (900000/1000000)")
+            self.assertEqual(str(err.exception), "CUDA device cuda:0(Tesla T4) is out of memory "
+                                                 "(reserved: 950000, allocated: 900000, total: 1000000);"
+                                                 "CUDA device cuda:1(Tesla H200) is out of memory "
+                                                 "(reserved: 950000, allocated: 900000, total: 1000000)")
 
     def test_cuda_health_check_should_pass_and_log_error_message_when_cuda_calls_encounter_issue_other_than_oom(self):
         device_manager = self._device_manager_with_multiple_cuda_devices()

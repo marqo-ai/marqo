@@ -35,6 +35,8 @@ on:
     branches:
       - mainline
       - releases/*
+    paths-ignore:
+      - '**.md'
   pull_request:
     branches:
       - mainline
@@ -80,11 +82,60 @@ jobs:
             fi
           fi
 
+  Check-Changes:
+    runs-on: ubuntu-latest
+    outputs:
+      doc_only: ${{ steps.set-output.outputs.doc_only }}
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: marqo
+
+      - name: Check for Documentation-Only Changes
+        id: set-output
+        run: |
+          cd marqo
+          set -x
+          
+          # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            BASE_COMMIT=${{ github.event.pull_request.base.sha }}
+            HEAD_COMMIT=${{ github.event.pull_request.head.sha }}
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            BASE_COMMIT=${{ github.event.before }}
+            HEAD_COMMIT=${{ github.sha }}
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            # For manual dispatch, explicitly set doc_only
+            echo "doc_only=false" >> $GITHUB_ENV
+            echo "doc_only=false" >> $GITHUB_OUTPUT
+            exit 0
+          else
+            echo "Unsupported event: ${GITHUB_EVENT_NAME}"
+            exit 1
+          fi
+
+          # Debug: Print base and head commits
+          echo "Base commit: $BASE_COMMIT"
+          echo "Head commit: $HEAD_COMMIT"
+
+          # Perform the diff to check for non-documentation changes
+          if git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$'; then
+            echo "doc_only=false" >> $GITHUB_ENV
+            echo "doc_only=false" >> $GITHUB_OUTPUT
+          else
+            echo "doc_only=true" >> $GITHUB_ENV
+            echo "doc_only=true" >> $GITHUB_OUTPUT
+          fi
+
   Start-Runner:
     needs:
       - Determine-Vespa-Setup
+      - Check-Changes
     name: Start self-hosted EC2 runner
     runs-on: ubuntu-latest
+    if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     outputs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
       ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
@@ -119,8 +170,10 @@ jobs:
   Test-Marqo:
     name: Run Unit Tests
     needs:
-      - Start-Runner
+      - Check-Changes # required to start the main job when the runner is ready
+      - Start-Runner # required to get output from the start-runner job
       - Determine-Vespa-Setup
+    if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
     env:
@@ -284,10 +337,12 @@ jobs:
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:
+      - Check-Changes # required to start the main job when the runner is ready
       - Start-Runner # required to get output from the start-runner job
       - Test-Marqo # required to wait when the main job is done
     runs-on: ubuntu-latest
-    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    if: |
+      always() && needs.Start-Runner.result == 'success'
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1

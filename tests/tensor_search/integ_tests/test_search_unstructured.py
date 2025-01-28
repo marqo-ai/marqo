@@ -849,50 +849,97 @@ class TestSearchUnstructured(MarqoTestCase):
                     self.assertEqual(set(expected_ids), set([hit["_id"] for hit in res["hits"]]))
 
     def test_attributes_to_retrieve(self):
-        docs = [
-            {
-                "field_1": "Exact match hehehe",
-                "field_2": "baaadd",
-                "random_field": "res res res",
-                "random_lala": "res res res haha",
-                "marqomarqo": "check check haha",
+        doc = {
+            "short_string_field": "Exact match hehehe",
+            "long_string_field": "This is a very long string." * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "string_array": ["123", "123"],
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 384
             }
-        ]
-
-        test_inputs = (
-            (["void_field"], {"_id", "_score", "_highlights"}),
-            ([], {"_id", "_score", "_highlights"}),
-            (["field_1"], {"field_1", "_id", "_score", "_highlights"}),
-            (["field_1", "field_2"], {"field_1", "field_2", "_id", "_score", "_highlights"}),
-            (["field_1", "random_field"], {"field_1", "random_field", "_id", "_score", "_highlights"}),
-            (["field_1", "random_field", "random_lala"],
-             {"field_1", "random_field", "random_lala", "_id", "_score", "_highlights"}),
-            (["field_1", "random_field", "random_lala", "marqomarqo"],
-             {"field_1", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
-            (["field_1", "field_2", "random_field", "random_lala", "marqomarqo"],
-             {"field_1", "field_2", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
-            (None, {"field_1", "field_2", "random_field", "random_lala", "marqomarqo", "_id", "_score", "_highlights"}),
-        )
+        }
 
         self.add_documents(
             config=self.config,
             add_docs_params=AddDocsParams(
                 index_name=self.default_text_index,
-                docs=docs,
-                tensor_fields=["field_1", "field_2"]
+                docs=[doc],
+                tensor_fields=["short_string_field", "custom_vector_field", "multimodal_combo_field"],
+                mappings={
+                    "custom_vector_field": {"type": "custom_vector"},
+                    "multimodal_combo_field": {
+                        "type": "multimodal_combination",
+                        "weights": {"short_string_field": 1.0, "long_string_field": 2.0}
+                    }
+                }
             )
         )
 
+        # meta fields are always returned
+        meta_fields = {"_id", "_score", "_highlights"}
+        non_map_fields = {"short_string_field", "long_string_field", "int_field", "float_field", "bool_field",
+                          "bool_field2", "string_array", "custom_vector_field"}
+        map_fields_flattened = {"int_map.a", "int_map.b", "float_map.c", "float_map.d"}
+
+        test_cases = (
+            # attributes_to_retrieve, expected result excluding meta_fields
+            ([], set()),  # no field is selected
+            (["non_existent_field"], set()),  # non_existent field is provided
+            (["multimodal_combo_field"], set()),  # multimodal_combination fields cannot be selected
+
+            # None or all fields
+            (None, non_map_fields | map_fields_flattened),  # not provided
+            (list(doc.keys()), non_map_fields | map_fields_flattened),  # all fields are selected
+
+            # one field
+            (["short_string_field"], {"short_string_field"}),
+            (["long_string_field"], {"long_string_field"}),
+            (["int_field"], {"int_field"}),
+            (["float_field"], {"float_field"}),
+            (["string_array"], {"string_array"}),
+            (["int_map"], {"int_map.a", "int_map.b"}),
+            (["float_map"], {"float_map.c", "float_map.d"}),
+            (["bool_field"], {"bool_field"}),
+            (["custom_vector_field"], {"custom_vector_field"}),
+            # combination of short and long string fields
+            (["short_string_field", "long_string_field"], {"short_string_field", "long_string_field"}),
+            # combination of int and int map fields
+            (["int_field", "int_map"], {"int_field", "int_map.a", "int_map.b"}),
+            # combination of fload and fload map fields
+            (["float_field", "float_map"], {"float_field", "float_map.c", "float_map.d"}),
+            # multiple boolean fields
+            (["bool_field", "bool_field2"], {"bool_field", "bool_field2"}),
+            # combination of all types of fields include non-existent fields
+            (["short_string_field", "long_string_field", "int_map", "bool_field", "multimodal_combo_field",
+              "string_array", "custom_vector_field"],
+             {"short_string_field", "long_string_field", "int_map.a", "int_map.b", "bool_field", "string_array",
+              "custom_vector_field"})
+        )
+
         for search_method in [SearchMethod.LEXICAL, SearchMethod.TENSOR]:
-            for searchable_attributes, expected_fields in test_inputs:
-                with self.subTest(
-                        f"search_method = {search_method}, searchable_attributes={searchable_attributes}, expected_fields = {expected_fields}"):
+            for attributes_to_retrieve, expected_fields in test_cases:
+                with self.subTest(f"search_method = {search_method}, attributes_to_retrieve={attributes_to_retrieve}, "
+                                  f"expected_fields = {expected_fields}"):
+
                     res = tensor_search.search(
                         config=self.config, index_name=self.default_text_index, text="Exact match hehehe",
-                        attributes_to_retrieve=searchable_attributes, search_method=search_method
+                        attributes_to_retrieve=attributes_to_retrieve, search_method=search_method
                     )
-
-                    self.assertEqual(expected_fields, set(res["hits"][0].keys()))
+                    self.assertSetEqual(expected_fields | meta_fields, set(res["hits"][0].keys()))
+                    for attribute in expected_fields:
+                        if attribute == "custom_vector_field":
+                            self.assertEqual(res["hits"][0][attribute], doc[attribute]["content"])
+                        elif '.' in attribute:
+                            map_field_name, key = attribute.split('.', maxsplit=1)
+                            self.assertEqual(res["hits"][0][attribute], doc[map_field_name][key])
+                        else:
+                            self.assertEqual(res["hits"][0][attribute], doc[attribute])
 
     def test_limit_results(self):
         """"""
