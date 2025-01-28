@@ -87,6 +87,7 @@ def run_prepare_mode(version_to_test_against: str):
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     load_all_subclasses("tests.compatibility_tests")
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
+    errors = []
     for test_class in BaseCompatibilityTestCase.__subclasses__():
         logger.info(f"========================================================================================")
         markers = getattr(test_class, "pytestmark", [])
@@ -119,7 +120,11 @@ def run_prepare_mode(version_to_test_against: str):
                 logger.info(f"Skipping testcase {test_class.__name__} with version {marqo_version} as it is greater than {version_to_test_against}")
         except Exception as e:
             logger.error(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. The exception was {e}", exc_info=True)
+            errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
         logger.info(f"##################################################################################################")
+
+    if errors:
+        raise RuntimeError(f"Some errors occurred while running prepare mode on test cases: {errors}")
 
 def construct_pytest_arguments(version_to_test_against):
     pytest_args = [
@@ -132,7 +137,12 @@ def construct_pytest_arguments(version_to_test_against):
 
 def run_test_mode(version_to_test_against):
     pytest_args = construct_pytest_arguments(version_to_test_against)
-    pytest.main(pytest_args)
+    pytest_result = pytest.main(pytest_args)
+
+    if pytest_result == 0:
+        logger.info(f"Successfully ran test mode on all test cases")
+    elif pytest_result == 1:
+        raise RuntimeError(f"Failed to run test mode on some test cases. Check pyTest output for exactly which test cases failed")
 
 def trigger_rollback_endpoint(from_version: str):
     logger.info(f"Triggering rollback endpoint with from_version: {from_version}")
