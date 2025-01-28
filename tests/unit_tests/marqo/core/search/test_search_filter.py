@@ -1,5 +1,5 @@
 from marqo.core.search.search_filter import *
-from integ_tests.marqo_test import MarqoTestCase
+from unit_tests.marqo_test import MarqoTestCase
 
 
 class TestMarqoFilterStringParser(MarqoTestCase):
@@ -312,7 +312,8 @@ class TestMarqoFilterStringParser(MarqoTestCase):
             ('(', 'Unbalanced parentheses', 'unbalanced parenthesis'),
             (')', 'Unexpected )', 'unexpected )'),
             ('()', 'Empty expression', '()'),
-            ('a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5)) OR d:6', 'Unbalanced parentheses', 'imbalanced parentheses, not closed'),
+            ('a:1 AND (b:2 OR (c:3 AND (d:4 OR e:5)) OR d:6', 'Unbalanced parentheses',
+             'imbalanced parentheses, not closed'),
             ('a:1 AND b:2 OR (c:3 AND (d:4 OR e:5))) OR d:6', 'Unexpected )', 'imbalanced parentheses, not opened'),
 
             # In term tests
