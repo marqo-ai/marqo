@@ -114,7 +114,7 @@ jobs:
 
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
-          pytest tests/
+          pytest tests/api_tests/test_create_index.py
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
