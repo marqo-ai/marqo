@@ -82,20 +82,30 @@ class DeviceManager:
 
         oom_errors = []
         for device in self.cuda_devices:
+            memory_stats = None
             try:
                 cuda_device = torch.device(f'cuda:{device.id}')
                 memory_stats = torch.cuda.memory_stats(cuda_device)
                 logger.debug(f'CUDA device {device.full_name} with total memory {device.total_memory}. '
                              f'Memory stats: {str(memory_stats)}')
 
-                torch.randn(3, device=cuda_device)
+                # Marqo usually allocates 20MiB cuda memory at a time when processing media files. When OOM happens,
+                # there are usually a few MiB free in reserved memory. To consistently trigger OOM from this health
+                # check request, we try to create a tensor that won't fit in the reserved memory to always trigger
+                # another allocation. Please note this is not leaky since we don't store the reference to this tensor.
+                # Once it's out of scope, the memory it takes will be returned to reserved space. Our assumption is
+                # that this method will not be called too often or with high concurrency (only used by liveness check
+                # for now which run once every few seconds).
+                tensor_size = int(20 * 1024 * 1024 / 4)  # 20MiB, float32 (4 bytes)
+                torch.randn(tensor_size, device=cuda_device)
             except RuntimeError as e:
                 if 'out of memory' in str(e).lower():
-                    logger.error(f'CUDA device {device.full_name} is out of memory. Total memory: {device.total_memory}. '
-                                 f'Memory stats: {str(memory_stats)}')
-                    allocated_mem = memory_stats.get("allocated.all.current", None) if memory_stats else None
-                    oom_errors.append(f'CUDA device {device.full_name} is out of memory:'
-                                      f' ({allocated_mem}/{device.total_memory})')
+                    logger.error(f'CUDA device {device.full_name} is out of memory. Original error: {str(e)}. '
+                                 f'Memory stats: {str(memory_stats)}.')
+                    allocated_mem = memory_stats.get("allocated_bytes.all.current", None) if memory_stats else None
+                    reserved_mem = memory_stats.get("reserved_bytes.all.current", None) if memory_stats else None
+                    oom_errors.append(f'CUDA device {device.full_name} is out of memory (reserved: {reserved_mem}, '
+                                      f'allocated: {allocated_mem}, total: {device.total_memory})')
                 else:
                     # Log out a warning message when encounter other transient errors.
                     logger.error(f'Encountered issue inspecting CUDA device {device.full_name}: {str(e)}')

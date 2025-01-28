@@ -200,6 +200,71 @@ class TestIndexSettingStore(unittest.TestCase):
                 """
         self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
 
+    def test_config_components_should_preserve_document_processing_nodes(self):
+        """
+        This test case tests that document-processing node in the `container` section is preserved when configuring
+        components since it is usually referenced in the `content` section, and we do not change content section.
+        """
+        xml = """<?xml version="1.0" encoding="utf-8" ?>
+                            <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                                <container id="default" version="1.0">
+                                    <document-api/>
+                                    <document-processing/>
+                                    <search/>
+                                    <nodes>
+                                        <node hostalias="node1"/>
+                                    </nodes>
+                                </container>
+                                <content id="content_default" version="1.0">
+                                    <documents>
+                                        <document type="marqo__existing_00index" mode="index"/>
+                                        <document-processing cluster="default"/>
+                                    </documents>
+                                </content>
+                            </services>
+                        """
+
+        service_xml = ServicesXml(xml)
+        service_xml.config_components()
+
+        # removed all random element and custom components from container element
+        # added searcher, handler and other custom components to container element
+        # kept nodes in container as is
+        # kept content element as is
+        expected_xml = """<?xml version="1.0" encoding="utf-8" ?>
+                            <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
+                                <container id="default" version="1.0">
+                                    <document-api/>
+                                    <document-processing/>
+                                    <search>
+                                        <chain id="marqo" inherits="vespa">
+                                            <searcher id="ai.marqo.search.HybridSearcher" bundle="marqo-custom-searchers"/>
+                                        </chain>
+                                    </search>
+                                    <nodes>
+                                        <node hostalias="node1"/>
+                                    </nodes>
+                                    <handler id="ai.marqo.index.IndexSettingRequestHandler" bundle="marqo-custom-searchers">
+                                        <binding>http://*/index-settings/*</binding>
+                                        <binding>http://*/index-settings</binding>
+                                    </handler>
+                                    <component id="ai.marqo.index.IndexSettings" bundle="marqo-custom-searchers">
+                                        <config name="ai.marqo.index.index-settings">
+                                            <indexSettingsFile>marqo_index_settings.json</indexSettingsFile>
+                                            <indexSettingsHistoryFile>marqo_index_settings_history.json</indexSettingsHistoryFile>
+                                        </config>
+                                    </component>
+                                </container>
+                                <content id="content_default" version="1.0">
+                                    <documents>
+                                        <document type="marqo__existing_00index" mode="index"/>
+                                        <document-processing cluster="default"/>
+                                    </documents>
+                                </content>
+                            </services>
+                        """
+        self._assertStringsEqualIgnoringWhitespace(expected_xml, service_xml.to_xml())
+
     def _assertStringsEqualIgnoringWhitespace(self, s1: str, s2: str):
         """Custom assertion to compare strings ignoring whitespace."""
 
