@@ -426,10 +426,12 @@ class TestUnstructuredSearch(MarqoTestCase):
                   "searchableAttributesTensor": ["title"]
             }
         )
-        # lexical returns 2 and 4, tensor returns 1 and 2, after rrf ranking, we return 2 results
-        self.assertEqual(len(search_res["hits"]), 2)
+        # lexical returns 2 and 4, tensor returns 1 and 2, after rrf ranking, we return 3 results (limit defaults to 10 in Marqo)
+        # 1 and 4 should have equal RRF score (interchangeable)
+        self.assertEqual(len(search_res["hits"]), 3)
         self.assertEqual(search_res["hits"][0]["_id"], "2")
-        self.assertEqual(search_res["hits"][1]["_id"], "1")
+        self.assertIn(search_res["hits"][1]["_id"], ["1", "4"])
+        self.assertIn(search_res["hits"][2]["_id"], ["1", "4"])
 
         # in batch 3, we reindex doc 1 but remove title as a tensor field
         docs_batch_3 = [

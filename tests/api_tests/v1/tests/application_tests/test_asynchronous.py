@@ -11,7 +11,7 @@ from tests import marqo_test
 sys.setswitchinterval(0.005)
 
 
-class TestAsync(marqo_test.MarqoTestCase):
+class TestAsync (marqo_test.MarqoTestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -56,8 +56,8 @@ class TestAsync(marqo_test.MarqoTestCase):
 
                 def significant_ingestion():
                     docs = [{"text_field_1": " ".join(random.choices(population=vocab, k=10)),
-                             "text_field_2": " ".join(random.choices(population=vocab, k=25)),
-                             } for _ in range(num_docs)]
+                                  "text_field_2": " ".join(random.choices(population=vocab, k=25)),
+                                  } for _ in range(num_docs)]
                     self.client.index(index_name).add_documents(documents=docs, client_batch_size=1,
                                                                 tensor_fields=tensor_fields)
 
@@ -74,3 +74,5 @@ class TestAsync(marqo_test.MarqoTestCase):
                     time.sleep(1)
 
                 assert self.client.index(index_name).get_stats()['numberOfDocuments'] == 501
+
+
