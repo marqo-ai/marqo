@@ -1,4 +1,4 @@
-from tests.unit_tests.tests.marqo_test import MarqoTestCase
+from unit_tests.marqo_test import MarqoTestCase
 
 
 class TestDummy(MarqoTestCase):
