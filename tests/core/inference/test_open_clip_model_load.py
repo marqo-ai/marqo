@@ -277,3 +277,15 @@ class TestOpenCLIPModelLoad(TestCase):
                 repo_location=ModelLocation(**model_properties["model_location"]),
                 auth=model_auth,
             )
+
+    def test_load_legacy_openai_clip_model(self):
+        """A test to ensure old OpenAI CLIP models (e.g., ViT-B/32) are loaded correctly."""
+        model_properties = {
+            "name": "ViT-B/32", # Legacy model name
+            "type": "open_clip",
+            "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9d"
+                   "a98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+            "dimensions": 512
+        }
+        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+        model.load()
