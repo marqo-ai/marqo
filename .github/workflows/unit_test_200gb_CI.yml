@@ -100,7 +100,7 @@ jobs:
           set -x
           
           # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request"  || "${GITHUB_EVENT_NAME}" == "pull_request_review"]]; then
             BASE_COMMIT=${{ github.event.pull_request.base.sha }}
             HEAD_COMMIT=${{ github.event.pull_request.head.sha }}
           elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
