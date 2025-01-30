@@ -283,8 +283,7 @@ class TestOpenCLIPModelLoad(TestCase):
         model_properties = {
             "name": "ViT-B/32", # Legacy model name
             "type": "open_clip",
-            "url": "https://openaipublic.azureedge.net/clip/models/40d365715913c9d"
-                   "a98579312b702a82c18be219cc2a73407c4526f58eba950af/ViT-B-32.pt",
+            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e32-46683a32.pt",
             "dimensions": 512
         }
         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
