@@ -505,6 +505,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
+    string_array_fields: Optional[List[Field]]
 
     def __init__(self, **data):
         super().__init__(**data)

@@ -5,6 +5,5 @@ from pydantic import BaseModel
 
 class VespaDocument(BaseModel):
     id: Optional[str]
-    create_timestamp: Optional[float]
-    field_types: Optional[Dict[str, str]]
+    field_types: Optional[Dict[str, str]] # A metadata field to store the type of each field in the document
     fields: Dict[str, Any]

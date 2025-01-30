@@ -6,25 +6,26 @@ from pydantic import Field
 
 from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants, constants
+from marqo.core.constants import MARQO_FIELD_TYPES
 from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError, InvalidFieldNameError, \
     InvalidTensorFieldError
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index import common
+from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 
 
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
-    create_timestamp: float = Field(default_factory=time.time, alias='marqo__create_timestamp')
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
-    string_arrays: List[str] = Field(default_factory=list, alias=common.STRING_ARRAY)
+    string_arrays: Dict[str, List[str]] = Field(default_factory=list, alias=common.STRING_ARRAY)
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=common.INT_FIELDS)
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
-    field_types: Dict[str, str] = Field(default_factory=dict, alias='marqo__field_types')
+    field_types: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_FIELD_TYPE)
 
 
 class SemiStructuredVespaDocument(MarqoBaseModel):
@@ -55,17 +56,51 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         fields = document.get(cls._VESPA_DOC_FIELDS, {})
         tensor_fields = {}
         text_fields = {}
-        for field_name in fields:
+        string_arrays_dict = {}
+
+        def process_field(field_name: str, fields: Dict) -> None:
+            """Helper function to process individual tensor fields, lexical fields and populate the appropriate dictionaries"""
             if field_name in marqo_index.tensor_subfield_map:
                 tensor_fields[field_name] = fields[field_name]
-            elif field_name in marqo_index.lexical_field_map:  # lexical fields are returned with prefixed name from get_by_ids
+            elif field_name in marqo_index.lexical_field_map:
+                # Lexical fields are returned with prefixed name from get_by_ids
                 text_field_name = marqo_index.lexical_field_map[field_name].name
                 text_fields[text_field_name] = fields[field_name]
-            elif field_name in marqo_index.field_map:   # lexical fields are returned with the original name from search
+            elif field_name in marqo_index.field_map:
+                # Lexical fields are returned with original name from search
                 text_fields[field_name] = fields[field_name]
 
+        if marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION:
+            for field_name in fields:
+                # Process tensor and text fields
+                process_field(field_name, fields)
+
+                # Handle string arrays separately
+                if common.STRING_ARRAY in field_name:
+                    string_field_key = field_name.replace(common.STRING_ARRAY, '')
+                    string_field_value = fields[field_name]
+                    
+                    if not (isinstance(string_field_value, list) and 
+                           all(isinstance(elem, str) for elem in string_field_value)):
+                        raise ValueError(
+                            f"Invalid value for string array field '{field_name}': {string_field_value}"
+                        )
+                    
+                    string_arrays_dict[string_field_key] = string_field_value
+
+            fixed_fields = SemiStructuredVespaDocumentFields(
+                **fields,
+                string_arrays=string_arrays_dict
+            )
+        else:
+            # For older versions, just process tensor and text fields
+            for field_name in fields:
+                process_field(field_name, fields)
+                
+            fixed_fields = SemiStructuredVespaDocumentFields(**fields)
+
         return cls(id=document[cls._VESPA_DOC_ID],
-                   fixed_fields=SemiStructuredVespaDocumentFields(**fields),
+                   fixed_fields=fixed_fields,
                    tensor_fields=tensor_fields,
                    text_fields=text_fields,
                    raw_tensor_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
@@ -90,11 +125,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         doc_id = document[index_constants.MARQO_DOC_ID]
         instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id))
 
-        if 'marqo__create_timestamp' in document:
-            instance.fixed_fields.create_timestamp = document['marqo__create_timestamp']
-
         for field_name, field_content in document.items():
-            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS, 'marqo__create_timestamp']:
+            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS]:
                 continue
             if isinstance(field_content, str):
                 if field_name not in marqo_index.field_map:
@@ -104,31 +136,33 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 instance.text_fields[field.lexical_field_name] = field_content
                 if len(field_content) <= marqo_index.filter_string_max_length:
                     instance.fixed_fields.short_string_fields[field_name] = field_content
-                instance.fixed_fields.field_types[field_name] = 'string'
+                instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.STRING.value
             elif isinstance(field_content, bool):
                 instance.fixed_fields.bool_fields[field_name] = int(field_content)
-                instance.fixed_fields.field_types[field_name] = 'bool'
+                instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.BOOL.value
             elif isinstance(field_content, list) and all(isinstance(elem, str) for elem in field_content):
-                instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
-                instance.fixed_fields.field_types[field_name] = 'string_array'
+                if instance.fixed_fields.string_arrays.get(field_name) is None:
+                    instance.fixed_fields.string_arrays[field_name] = []
+                instance.fixed_fields.string_arrays[field_name].extend(field_content)
+                instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.STRING_ARRAY.value
             elif isinstance(field_content, int):
                 instance.fixed_fields.int_fields[field_name] = field_content
                 instance.fixed_fields.score_modifiers_fields[field_name] = field_content
-                instance.fixed_fields.field_types[field_name] = 'int'
+                instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.INT.value
             elif isinstance(field_content, float):
                 instance.fixed_fields.float_fields[field_name] = field_content
                 instance.fixed_fields.score_modifiers_fields[field_name] = field_content
-                instance.fixed_fields.field_types[field_name] = 'float'
+                instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.FLOAT.value
             elif isinstance(field_content, dict):
                 for k, v in field_content.items():
                     if isinstance(v, int):
                         instance.fixed_fields.int_fields[f"{field_name}.{k}"] = v
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
-                        instance.fixed_fields.field_types[f"{field_name}.{k}"] = 'int_map'
+                        instance.fixed_fields.field_types[f"{field_name}.{k}"] = MarqoFieldTypes.INT_MAP.value
                     elif isinstance(v, float):
                         instance.fixed_fields.float_fields[f"{field_name}.{k}"] = float(v)
                         instance.fixed_fields.score_modifiers_fields[f"{field_name}.{k}"] = v
-                        instance.fixed_fields.field_types[f"{field_name}.{k}"] = 'float_map'
+                        instance.fixed_fields.field_types[f"{field_name}.{k}"] = MarqoFieldTypes.FLOAT_MAP.value
             else:
                 raise MarqoDocumentParsingError(
                     f"In document {doc_id}, field {field_name} has an "
@@ -139,6 +173,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             if constants.MARQO_DOC_TENSORS in document:
                 for marqo_tensor_field in document[constants.MARQO_DOC_TENSORS]:
                     marqo_tensor_value = document[constants.MARQO_DOC_TENSORS][marqo_tensor_field]
+                    instance.fixed_fields.field_types[marqo_tensor_field] = MarqoFieldTypes.TENSOR.value
 
                     cls._verify_marqo_tensor_field_name(marqo_tensor_field, marqo_index)
                     cls._verify_marqo_tensor_field(marqo_tensor_field, marqo_tensor_value)
@@ -164,30 +199,36 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         """Convert VespaDocumentObject to a Vespa document.
         Empty fields are removed from the document."""
         vespa_fields = {
-            **{k: v for k, v in self.fixed_fields.dict(exclude_none=True, by_alias=True).items() if v or v == 0},
+            **{k: v for k, v in self.fixed_fields.dict(exclude_none=True, by_alias=True).items() if k != 'marqo__string_array' and (v or v == 0)},
             **self.text_fields,
             **self.tensor_fields,
             common.FIELD_VECTOR_COUNT: self.vector_counts,
         }
+
+        for string_array in self.fixed_fields.string_arrays:
+            key, value = string_array.split("::", 1)
+            key = f'marqo__string_array_{key}'
+            if key not in vespa_fields:
+                vespa_fields[key] = []
+            vespa_fields[key].append(value)
 
         return {self._VESPA_DOC_ID: self.id, self._VESPA_DOC_FIELDS: vespa_fields}
 
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
         """Convert VespaDocumentObject to marqo document document structure."""
         marqo_document = {}
-        for string_array in self.fixed_fields.string_arrays:
-            key, value = string_array.split("::", 1)
-            if key not in marqo_document:
-                marqo_document[key] = []
-            marqo_document[key].append(value)
+        for string_array_key, string_array_value in self.fixed_fields.string_arrays.items():
+            if string_array_key not in marqo_document:
+                marqo_document[string_array_key] = string_array_value
+            else:
+                marqo_document[string_array_key].extend(string_array_value)
 
         # marqo_document.update(self.fixed_fields.short_string_fields)
         marqo_document.update(self.fixed_fields.int_fields)
         marqo_document.update(self.fixed_fields.float_fields)
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
-        marqo_document['marqo__create_timestamp'] = self.fixed_fields.create_timestamp
-        marqo_document['marqo__field_types'] = {k: v for k, v in self.fixed_fields.field_types.items()}
+        marqo_document[MARQO_FIELD_TYPES] = {k: v for k, v in self.fixed_fields.field_types.items()}
 
         # text fields
         for field_name, field_content in self.text_fields.items():

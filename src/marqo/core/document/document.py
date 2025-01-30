@@ -1,31 +1,29 @@
 from timeit import default_timer as timer
-from typing import Dict, List, Tuple, Optional, Collection, Union
+from typing import Dict, List, Tuple, Optional
+
+import semver
 
 import marqo.api.exceptions as api_exceptions
-from marqo.core.constants import MARQO_DOC_ID, MARQO_DOC_TENSORS
+from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
-from marqo.core.models.marqo_get_documents_by_id_response import MarqoGetDocumentsByIdsResponse, \
-    MarqoGetDocumentsByIdsItem
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
-    UnstructuredMarqoIndex, MarqoIndex
+    UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
     SemiStructuredAddDocumentsHandler, SemiStructuredFieldCountConfig
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
-from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.logging import get_logger
-from marqo.tensor_search import validation
-from marqo.tensor_search.enums import TensorField
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
 from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
+from marqo.version import get_version
 
 logger = get_logger(__name__)
 
@@ -90,7 +88,7 @@ class Document:
         return self.partial_update_documents(partial_documents, marqo_index)
 
     def partial_update_documents(self, partial_documents: List[Dict], marqo_index) \
-            -> MarqoUpdateDocumentsResponse: # partial_documents is the one you have given in request
+            -> MarqoUpdateDocumentsResponse:
         """Partially update documents in the given index by marqo_index object.
 
         The partial_documents without _id will error out and the error will be returned in the response without
@@ -101,7 +99,7 @@ class Document:
         If the document does not exist, this document will error out and the error will be returned in the response.
 
         Args:
-            partial_documents: A list of documents to partially update
+            partial_documents: A list of documents to partially update received in the request
             marqo_index: The index object to partially update documents in
 
         Raises:
@@ -113,8 +111,12 @@ class Document:
         if marqo_index.type in [IndexType.Unstructured]:
             raise UnsupportedFeatureError("Partial document update is not supported for unstructured indexes. "
                                           "Please use add_documents with use_existing_tensor=True instead")
-        elif marqo_index.type in [IndexType.Structured, IndexType.SemiStructured]:
+        elif marqo_index.type is IndexType.Structured:
             pass
+        elif marqo_index.typer is IndexType.SemiStructured:
+            if marqo_index.parsed_marqo_version() > semver.VersionInfo.parse(get_version()): # Partial updates for semi-structured indexes are only supported for Marqo version >= 2.16.0
+                raise UnsupportedFeatureError("Partial document update is not supported for this index version. "
+                                          "Please upgrade the index version, or create a new index to use this feature.")
         else:
             raise ValueError(f"Invalid index type: {marqo_index.type}")
 

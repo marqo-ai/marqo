@@ -13,7 +13,7 @@ class TestPartialUpdate(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured_6')
+        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured_10')
         cls.create_indexes([semi_structured_index_request])
         cls.index = cls.indexes[0]
         # cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
@@ -100,15 +100,11 @@ class TestPartialUpdate(MarqoTestCase):
         self._assert_fields_unchanged(doc, ['update_field_that_doesnt_exist'])
 
         #TODO: This shouldn't work - don't implement it
-    def test_partial_update_should_update_int_field_to_float(self):
+
+    def test_partial_update_should_not_update_int_field_to_float(self):
         # So something like - let it update if the request says it's int - let it update if it is either int or a float.
         res = self.config.document.partial_update_documents([{'_id': '1', 'int_field': 1.0}], self.index)
-        self.assertFalse(res.errors)
-
-        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
-        print(doc)
-        self.assertEqual(1.0, doc['int_field'])
-        self._assert_fields_unchanged(doc, ['int_field'])
+        self.assertTrue(res.errors)
 
     def test_partial_update_should_update_float_field_to_float(self):
         res = self.config.document.partial_update_documents([{'_id': '1', 'float_field': 500.0}], self.index)
@@ -158,6 +154,7 @@ class TestPartialUpdate(MarqoTestCase):
         # doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
         # print(doc)
         res = self.config.document.partial_update_documents([{'_id': '1', 'string_array': ["ccc"]}], self.index)
+        print(res)
         self.assertFalse(res.errors)
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
@@ -280,8 +277,8 @@ class TestPartialUpdate(MarqoTestCase):
         print(res)
         self.assertTrue(res.errors)
 
-    @pytest.mark.xfail(raises=InvalidFieldNameError, reason = "Field name must not start with marqo__")
     def test_partial_update_invalid_field_name(self):
-        res = self.config.document.partial_update_documents([{'_id': '1', 'marqo__': 1}], self.index)
-        print(res)
-        self.assertTrue(res.errors)
+        with pytest.raises(InvalidFieldNameError):
+            res = self.config.document.partial_update_documents([{'_id': '1', 'marqo__': 1}], self.index)
+            print(res)
+            self.assertTrue(res.errors)

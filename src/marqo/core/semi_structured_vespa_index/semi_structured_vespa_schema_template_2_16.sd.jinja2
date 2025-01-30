@@ -6,6 +6,16 @@ schema {{ index.schema_name }} {
             attribute: fast-search
             rank: filter
         }
+
+        field marqo__field_types type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
         {# Reserved fields for bool, int and float fields -#}
         field marqo__int_fields type map<string, long> {
             indexing: summary
@@ -67,6 +77,11 @@ schema {{ index.schema_name }} {
         field {{ lexical_field.lexical_field_name }} type string {
             indexing: index | summary
             index: enable-bm25
+        }
+        {% endfor -%}
+
+        {% for string_array_field in index.string_array_fields -%}
+        field {{ string_array_field.lexical_field_name }} type array<string> {
         }
         {% endfor -%}
 
@@ -254,6 +269,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
@@ -268,6 +284,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__string_array type array<string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}

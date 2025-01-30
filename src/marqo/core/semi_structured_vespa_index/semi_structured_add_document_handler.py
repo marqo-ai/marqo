@@ -43,6 +43,9 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         super()._handle_field(marqo_doc, field_name, field_content)
         if isinstance(marqo_doc[field_name], str):
             self._add_lexical_field_to_index(field_name)
+        if isinstance(field_content, list) and all(isinstance(individual_elements, str) for individual_elements in field_content):
+            self._add_string_array_field_to_index(field_name)
+
 
     def _to_vespa_doc(self, doc: Dict[str, Any]) -> VespaDocument:
         doc_tensor_fields = self.tensor_fields_container.get_tensor_field_content(doc[MARQO_DOC_ID])
@@ -86,6 +89,15 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             Field(name=field_name, type=FieldType.Text,
                   features=[FieldFeature.LexicalSearch],
                   lexical_field_name=f'{SemiStructuredVespaSchema.FIELD_INDEX_PREFIX}{field_name}')
+        )
+        self.marqo_index.clear_cache()
+        self.should_update_index = True
+
+    def _add_string_array_field_to_index(self, field_name):
+        logger.debug(f'Adding string array field {field_name} to index {self.marqo_index.name}')
+
+        self.marqo_index.string_array_fields.append(
+            Field(name = field_name, type = FieldType.ArrayText, lexical_field_name = f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}', features=[FieldFeature.LexicalSearch],) # TODO: Define features for this class
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True

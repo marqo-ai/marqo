@@ -1,9 +1,4 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
-
-from marqo.core import constants
-from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery, MarqoIndex
-from marqo.core.models.marqo_index import StructuredMarqoIndex, UnstructuredMarqoIndex
+from marqo.core.models import MarqoQuery, MarqoHybridQuery, MarqoTensorQuery, MarqoLexicalQuery
 from marqo.core.models.score_modifier import ScoreModifier, ScoreModifierType
 from marqo.core.models.marqo_index import *
 from marqo.exceptions import InternalError
