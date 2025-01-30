@@ -223,9 +223,12 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             else:
                 marqo_document[string_array_key].extend(string_array_value)
 
-        # marqo_document.update(self.fixed_fields.short_string_fields)
+        # Add int and float fields back
+        # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert
+        # them back to the format when they are indexed. We will keep the behaviour as is to avoid breaking changes.
         marqo_document.update(self.fixed_fields.int_fields)
         marqo_document.update(self.fixed_fields.float_fields)
+
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
         marqo_document[MARQO_FIELD_TYPES] = {k: v for k, v in self.fixed_fields.field_types.items()}
