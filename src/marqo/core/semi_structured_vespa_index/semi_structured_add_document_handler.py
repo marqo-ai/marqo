@@ -9,6 +9,7 @@ from marqo.core.exceptions import TooManyFieldsError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField
+from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
@@ -40,10 +41,27 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         self.field_count_config = field_count_config
 
     def _handle_field(self, marqo_doc, field_name, field_content):
+        """Handle a field in a Marqo document by processing it and updating the index schema if needed.
+        
+        Args:
+            marqo_doc: The Marqo document being processed
+            field_name: Name of the field
+            field_content: Content of the field
+        """
+        # Process field using parent class handler
         super()._handle_field(marqo_doc, field_name, field_content)
+
+        # Add lexical field if content is a string
         if isinstance(marqo_doc[field_name], str):
             self._add_lexical_field_to_index(field_name)
-        if isinstance(field_content, list) and all(isinstance(individual_elements, str) for individual_elements in field_content):
+
+        # Add string array field if content is list of strings and index version supports it
+        is_string_array = (
+            isinstance(field_content, list) and 
+            all(isinstance(elem, str) for elem in field_content)
+        )
+        if (is_string_array and 
+            self.marqo_index.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION):
             self._add_string_array_field_to_index(field_name)
 
 

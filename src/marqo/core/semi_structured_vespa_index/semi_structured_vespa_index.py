@@ -32,8 +32,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             raise TypeError('Wrong type of marqo index')
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+        index_supports_partial_updates = self.get_marqo_index().marqo_version >= SemiStructuredVespaSchema.MARQO_TRUE_PARTIAL_UPDATES_VERSION
         return (SemiStructuredVespaDocument.from_marqo_document(
-            marqo_document, marqo_index=self.get_marqo_index())).to_vespa_document()
+            marqo_document, marqo_index=self.get_marqo_index())).to_vespa_document(index_supports_partial_updates)
 
     def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
         vespa_doc = SemiStructuredVespaDocument.from_vespa_document(vespa_document, marqo_index=self.get_marqo_index())
