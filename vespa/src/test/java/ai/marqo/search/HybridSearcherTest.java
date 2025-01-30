@@ -10,6 +10,7 @@ import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.Chain;
 import com.yahoo.search.*;
 import com.yahoo.search.query.ranking.RankFeatures;
+import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.*;
@@ -378,5 +379,71 @@ class HybridSearcherTest {
                 .getFeatures()
                 .put("query(marqo__fields_to_rank_tensor)", fieldsToRankTensor);
         return query;
+    }
+
+    @Nested
+    class RaiseErrorIfPresentTest {
+        @Test
+        void shouldRaiseErrorIfLexicalResultHasError() {
+            Result resultLexical =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example lexical error"));
+            Result resultTensor = new Result(new Query());
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> {
+                                hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
+                            });
+            assertThat(exception.getMessage()).contains("Error in LEXICAL search in RRF:");
+            assertThat(exception.getMessage()).contains("Example lexical error");
+        }
+
+        @Test
+        void shouldRaiseErrorIfTensorResultHasError() {
+            Result resultLexical = new Result(new Query());
+            Result resultTensor =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example tensor error"));
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> {
+                                hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
+                            });
+            assertThat(exception.getMessage()).contains("Error in TENSOR search in RRF:");
+            assertThat(exception.getMessage()).contains("Example tensor error");
+        }
+
+        @Test
+        void shouldRaiseErrorIfBothResultsHaveError() {
+            Result resultLexical =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example lexical error"));
+            Result resultTensor =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example tensor error"));
+            RuntimeException exception =
+                    assertThrows(
+                            RuntimeException.class,
+                            () -> {
+                                hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
+                            });
+            assertThat(exception.getMessage()).contains("Error in TENSOR search in RRF:");
+            assertThat(exception.getMessage()).contains("Example tensor error");
+            assertThat(exception.getMessage()).contains("\nError in LEXICAL search in RRF:");
+            assertThat(exception.getMessage()).contains("Example lexical error");
+        }
+
+        @Test
+        void shouldNotRaiseErrorIfNeitherResultHasError() {
+            Result resultLexical = new Result(new Query());
+            Result resultTensor = new Result(new Query());
+            hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
+        }
     }
 }

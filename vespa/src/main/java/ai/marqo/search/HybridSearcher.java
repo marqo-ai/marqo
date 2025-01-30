@@ -6,6 +6,7 @@ import com.yahoo.component.chain.dependencies.Provides;
 import com.yahoo.search.Query;
 import com.yahoo.search.Result;
 import com.yahoo.search.Searcher;
+import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.AsyncExecution;
@@ -104,6 +105,8 @@ public class HybridSearcher extends Searcher {
                                         timeout)
                                 + e.toString());
             }
+
+            raiseErrorIfPresent(resultLexical, resultTensor);
 
             logIfVerbose(
                     "LEXICAL RESULTS: "
@@ -282,6 +285,24 @@ public class HybridSearcher extends Searcher {
         logHitGroup(result, verbose);
 
         return result;
+    }
+
+    void raiseErrorIfPresent(Result resultLexical, Result resultTensor) {
+        // Raise error if either result list has an error. Make sure error messages are combined
+        String tensorOrLexicalErrors = "";
+        ErrorMessage tensorError = resultTensor.hits().getError();
+        if (tensorError != null) {
+            tensorOrLexicalErrors += "Error in TENSOR search in RRF: " + tensorError + "\n";
+        }
+
+        ErrorMessage lexicalError = resultLexical.hits().getError();
+        if (lexicalError != null) {
+            tensorOrLexicalErrors += "Error in LEXICAL search in RRF: " + lexicalError;
+        }
+
+        if (!tensorOrLexicalErrors.isEmpty()) {
+            throw new RuntimeException(tensorOrLexicalErrors);
+        }
     }
 
     /**
