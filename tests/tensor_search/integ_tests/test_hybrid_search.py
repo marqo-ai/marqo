@@ -14,6 +14,7 @@ from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
+from fastapi.responses import JSONResponse, ORJSONResponse
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -361,6 +362,12 @@ class TestHybridSearch(MarqoTestCase):
                              sample_vector)
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, with context, with content"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -398,6 +405,12 @@ class TestHybridSearch(MarqoTestCase):
                              [i*1.5 for i in sample_vector])    # Should average the query & context vectors
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -431,6 +444,12 @@ class TestHybridSearch(MarqoTestCase):
             self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
                              sample_vector)
             self.assertIn("hits", res)
+
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
 
     def test_hybrid_search_semi_structured_with_custom_vector_query(self):
         """
@@ -495,6 +514,12 @@ class TestHybridSearch(MarqoTestCase):
                              sample_vector)
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, with context, with content"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -532,6 +557,12 @@ class TestHybridSearch(MarqoTestCase):
                              [i*1.5 for i in sample_vector])    # Should average the query & context vectors
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -564,6 +595,12 @@ class TestHybridSearch(MarqoTestCase):
             self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
                              sample_vector)
             self.assertIn("hits", res)
+
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
 
     def test_hybrid_search_disjunction_rrf_zero_alpha_same_as_lexical(self):
         """
