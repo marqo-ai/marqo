@@ -837,14 +837,8 @@ class VespaClient:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
             data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
             for key, value in types.items():
-                # if value == 'int' or value == 'float':
-                #     data["condition"] += f' and ({schema}.marqo__field_types{{\"{key}\"}}=="int" or {schema}.marqo__field_types{{\"{key}\"}}=="float")'
-                # elif value == 'int_map' or value == 'float_map':
-                #     data["condition"] += f' and ({schema}.marqo__field_types{{\"{key}\"}}=="int_map" or {schema}.marqo__field_types{{\"{key}\"}}=="float_map")'
-                # else:
-                    data["condition"] += (f' and (not {schema}.marqo__field_types{{\"{key}\"}} or {schema}.marqo__field_types{{\"{key}\"}}==\"{value}\")'
-                                          f' and (not ({schema}.marqo__field_types{{\"{key}\"}}=="tensor"))')
-                # data["condition"].extend(f'{schema}.marqo__field_types.{key}==\"{value}\"'
+                data["condition"] += (f' and (not {schema}.marqo__field_types{{\"{key}\"}} or {schema}.marqo__field_types{{\"{key}\"}}==\"{value}\")'
+                                      f' and (not ({schema}.marqo__field_types{{\"{key}\"}}=="tensor"))')
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
             except httpx.RequestError as e:
