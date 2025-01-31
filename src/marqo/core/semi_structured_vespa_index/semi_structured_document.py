@@ -18,7 +18,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
-    string_arrays: Union[Dict[str, List[str]], List[str]] = Field(default_factory=dict, alias=common.STRING_ARRAY)
+    string_arrays: Union[Dict[str, List[str]], List[str]] = Field(alias=common.STRING_ARRAY)
     int_fields: Dict[str, int] = Field(default_factory=dict, alias=common.INT_FIELDS)
     bool_fields: Dict[str, int] = Field(default_factory=dict, alias=common.BOOL_FIELDS)
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
@@ -69,7 +69,9 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 # Lexical fields are returned with original name from search
                 text_fields[field_name] = fields[field_name]
 
-        if marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION:
+        index_supports_partial_updates = marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
+
+        if index_supports_partial_updates:
             for field_name in fields:
                 # Process tensor and text fields
                 process_field(field_name, fields)
@@ -192,7 +194,14 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             instance.fixed_fields.string_arrays[field_name].extend(field_content)
             instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.STRING_ARRAY.value
         else:
-            instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
+            new_array = [f"{field_name}::{element}" for element in field_content]
+            existing_string_array = instance.fixed_fields.string_arrays if isinstance(instance.fixed_fields.string_arrays, list) else []
+            new_array = existing_string_array + new_array
+            instance.fixed_fields = SemiStructuredVespaDocumentFields(
+                **{k: v for k, v in instance.fixed_fields.dict().items() if k != 'string_arrays'},
+                string_arrays=new_array
+            )
+
     @classmethod
     def _handle_numeric_field(cls, field_name, field_content, instance, index_supports_partial_updates):
         if isinstance(field_content, int):

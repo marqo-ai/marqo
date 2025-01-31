@@ -282,3 +282,9 @@ class TestPartialUpdate(MarqoTestCase):
             res = self.config.document.partial_update_documents([{'_id': '1', 'marqo__': 1}], self.index)
             print(res)
             self.assertTrue(res.errors)
+
+    def test_partial_update_sort_of_backwards_compatibility_test(self):
+        res = self.config.document.partial_update_documents([{'_id': '1', 'string_array': ["ccc"]}], self.index)
+        print(res)
+
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
