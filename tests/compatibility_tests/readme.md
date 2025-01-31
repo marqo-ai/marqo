@@ -9,3 +9,4 @@ Steps to start running backwards compatibility tests on your local machine:
 6. For rollback just pass the mode as rollback
 7. All the folders here are API folders and the tests are written in the respective API folders corresponding to the API they test.
 8. When developing, if you create a subfolder inside an API folder, make sure to declare it as a package by creating an empty __init__.py file inside the subfolder.
+9. When writing tests, make sure to create an index with a unique name, such that it does not conflict with other tests that are running at the same time.
