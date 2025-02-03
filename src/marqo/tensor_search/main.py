@@ -11,6 +11,23 @@ from marqo.tensor_search.on_start_script import on_start, StartMode
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
 from marqo.tensor_search.enums import EnvVars
+from gunicorn.app.wsgiapp import WSGIApplication
+
+
+class StandaloneApplication(WSGIApplication):
+    def __init__(self, app_uri, options=None):
+        self.options = options or {}
+        self.app_uri = app_uri
+        super().__init__()
+
+    def load_config(self):
+        config = {
+            key: value
+            for key, value in self.options.items()
+            if key in self.cfg.settings and value is not None
+        }
+        for key, value in config.items():
+            self.cfg.set(key.lower(), value)
 
 
 def generate_config() -> config.Config:
@@ -46,20 +63,40 @@ def get_config():
     return _config
 
 
+run_gunicorn = os.environ.get('MARQO_RUN_GUNICORN', 'FALSE') == 'TRUE'
+
+
 def run_api_serer():
     api_worker_count = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_API_WORKER_COUNT)
     if api_worker_count < 1:
         api_worker_count = os.cpu_count() - 1
 
-    log_config = uvicorn.config.LOGGING_CONFIG
-    log_config["formatters"]["access"]["fmt"] = "%(asctime)s - %(levelname)s - PID: %(process)d - X-Request-PID: %(request_pid)s - %(message)s"
-    # bind to 0.0.0.0 to expose this port in container
-    uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count, log_config=log_config)
+    if run_gunicorn:
+        options = {
+            "bind": "0.0.0.0:8882",
+            "workers": api_worker_count,
+            "worker_class": "uvicorn.workers.UvicornWorker",
+        }
+        StandaloneApplication("api:app", options).run()
+    else:
+        log_config = uvicorn.config.LOGGING_CONFIG
+        log_config["formatters"]["access"]["fmt"] = "%(asctime)s - %(levelname)s - PID: %(process)d - X-Request-PID: %(request_pid)s - %(message)s"
+        # bind to 0.0.0.0 to expose this port in container
+        uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count, log_config=log_config)
 
 
 def run_inf_app(worker_count: int):
     # bind to localhost only so it is not visible outside the container
     # TODO We will need to make sure the inference server has bootstrapped (warmed up) before start serving request
+
+    # if run_gunicorn:
+    #     options = {
+    #         "bind": "localhost:8881",
+    #         "workers": worker_count,
+    #         "worker_class": "uvicorn.workers.UvicornWorker",
+    #     }
+    #     StandaloneApplication("inf_api:inf_app", options).run()
+    # else:
     uvicorn.run("inf_api:inf_app", host="localhost", port=8881, workers=worker_count)
 
 
