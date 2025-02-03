@@ -19,6 +19,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.tensor_search.models.api_models import SearchQuery
 from pydantic import ValidationError
 import marqo.api.exceptions as api_exceptions
+from marqo.vespa import exceptions as vespa_exceptions
 
 
 class TestSearch(MarqoTestCase):
@@ -1047,3 +1048,35 @@ class TestSearch(MarqoTestCase):
                             text=query, config=self.config, index_name=index_name.name,
                         )
                     self.assertIn("Error vectorising content", str(e.exception))
+
+
+    def test_lexical_error_raises_proper_hybrid_error(self):
+        """
+        Ensure that the proper error is raised when a lexical search fails in a hybrid search.
+        The double backslash error is a known 500 in lexical search (400 in vespa), so using
+        the same query in hybrid search should give the same error code and message.
+        """
+
+        # TODO: remove when double backslash error is fixed
+        for index in [self.unstructured_default_text_index, self.structured_default_text_index]:
+            with self.subTest(index=index.type):
+
+                # Adding documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc1", "text_field_1": "some text"}
+                        ],
+                        tensor_fields=["text_field_1"] if \
+                            isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(vespa_exceptions.VespaStatusError) as e:
+                    tensor_search.search(
+                        text='\\\\"hi\\\\"', config=self.config, index_name=index.name,
+                        search_method=SearchMethod.HYBRID
+                    )
+                self.assertIn("Could not create query from YQL", str(e.exception))

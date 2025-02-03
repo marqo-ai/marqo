@@ -17,8 +17,11 @@ import com.yahoo.search.searchchain.*;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
+
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -382,7 +385,7 @@ class HybridSearcherTest {
     }
 
     @Nested
-    class RaiseErrorIfPresentTest {
+    class CollectErrorsFromResultsTest {
         @Test
         void shouldRaiseErrorIfLexicalResultHasError() {
             Result resultLexical =
@@ -390,14 +393,10 @@ class HybridSearcherTest {
                             new Query(),
                             ErrorMessage.createInternalServerError("Example lexical error"));
             Result resultTensor = new Result(new Query());
-            RuntimeException exception =
-                    assertThrows(
-                            RuntimeException.class,
-                            () -> {
-                                hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
-                            });
-            assertThat(exception.getMessage()).contains("Error in LEXICAL search in RRF:");
-            assertThat(exception.getMessage()).contains("Example lexical error");
+            HitGroup combinedErrors = hybridSearcher.collectErrorsFromResults(
+                    resultLexical, resultTensor);
+
+            assertThat(combinedErrors.getError().getDetailedMessage()).contains("Example lexical error");
         }
 
         @Test
@@ -407,14 +406,10 @@ class HybridSearcherTest {
                     new Result(
                             new Query(),
                             ErrorMessage.createInternalServerError("Example tensor error"));
-            RuntimeException exception =
-                    assertThrows(
-                            RuntimeException.class,
-                            () -> {
-                                hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
-                            });
-            assertThat(exception.getMessage()).contains("Error in TENSOR search in RRF:");
-            assertThat(exception.getMessage()).contains("Example tensor error");
+            HitGroup combinedErrors = hybridSearcher.collectErrorsFromResults(
+                    resultLexical, resultTensor);
+
+            assertThat(combinedErrors.getError().getDetailedMessage()).contains("Example tensor error");
         }
 
         @Test
@@ -427,23 +422,20 @@ class HybridSearcherTest {
                     new Result(
                             new Query(),
                             ErrorMessage.createInternalServerError("Example tensor error"));
-            RuntimeException exception =
-                    assertThrows(
-                            RuntimeException.class,
-                            () -> {
-                                hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
-                            });
-            assertThat(exception.getMessage()).contains("Error in TENSOR search in RRF:");
-            assertThat(exception.getMessage()).contains("Example tensor error");
-            assertThat(exception.getMessage()).contains("\nError in LEXICAL search in RRF:");
-            assertThat(exception.getMessage()).contains("Example lexical error");
+            HitGroup combinedErrors = hybridSearcher.collectErrorsFromResults(
+                    resultLexical, resultTensor);
+
+            Iterator<ErrorMessage> iterator = combinedErrors.getErrorHit().errors().iterator();
+            assertThat(iterator.next().getDetailedMessage()).contains("Example tensor error");
+            assertThat(iterator.next().getDetailedMessage()).contains("Example lexical error");
         }
 
         @Test
         void shouldNotRaiseErrorIfNeitherResultHasError() {
             Result resultLexical = new Result(new Query());
             Result resultTensor = new Result(new Query());
-            hybridSearcher.raiseErrorIfPresent(resultLexical, resultTensor);
+            HitGroup combinedErrors = hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+            assertThat(combinedErrors.getError()).isNull();
         }
     }
 }
