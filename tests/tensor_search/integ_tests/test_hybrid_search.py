@@ -5,6 +5,7 @@ from unittest import mock
 import numpy as np
 
 import marqo.core.exceptions as core_exceptions
+import marqo.vespa.exceptions as vespa_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import *
@@ -15,7 +16,9 @@ from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
 from tests.marqo_test import MarqoTestCase, TestImageUrls
 from fastapi.responses import JSONResponse, ORJSONResponse
-
+from marqo.tensor_search.enums import SearchMethod
+import httpx
+import json
 
 class TestHybridSearch(MarqoTestCase):
     """
@@ -1840,6 +1843,89 @@ class TestHybridSearch(MarqoTestCase):
             )
         self.assertIn("does not support `searchableAttributesTensor` or `searchableAttributesLexical`",
                       str(e.exception))
+
+    def test_lexical_error_raises_correct_hybrid_error(self):
+        """
+        Ensure that the proper error is raised when a lexical search fails in a hybrid search.
+        The double backslash error is a known 500 in lexical search (400 in vespa), so using
+        the same query in hybrid search should give the same error code and message.
+        """
+
+        # TODO: remove when double backslash error is fixed
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+
+                # Adding documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc1", "text_field_1": "some text"}
+                        ],
+                        tensor_fields=["text_field_1"] if \
+                            isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(vespa_exceptions.VespaStatusError) as e:
+                    tensor_search.search(
+                        text='\\\\"hi\\\\"', config=self.config, index_name=index.name,
+                        search_method=SearchMethod.HYBRID
+                    )
+                self.assertIn("Could not create query from YQL", str(e.exception))
+
+    def test_hybrid_with_two_errors_returns_both(self):
+        """
+        If vespa query to the hybrid searcher returns a result with 2 errors, both should be in the error message.
+        If vespa error is 504 and first error has 12 vespa code, the error should be a VespaTimeoutError.
+        """
+
+        # Mock Vespa result with 2 errors
+        result_dict = {
+            'root': {
+                'relevance': 1.0,
+                'fields': {'totalCount': 0},
+                'errors': [
+                    {
+                        'code': 12,
+                        'summary': 'Timed out',
+                        'source': 'content_default',
+                        'message': "Error in execution of chain 'content_default': Chain timed out."
+                    },
+                    {
+                        'code': 4,
+                        'summary': 'Invalid query parameter',
+                        'message': 'Could not create query from YQL.'
+                    }
+                ]
+            }
+        }
+
+        mock_vespa_result = httpx.Response(
+            status_code=504,
+            content=json.dumps(result_dict),
+            request=httpx.Request("GET", "http://localhost:8080/test-url/")
+        )
+
+
+        with unittest.mock.patch("httpx.Client.post") as mock_query:
+            mock_query.return_value = mock_vespa_result
+
+            for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+                with self.subTest(index=type(index)):
+                    with self.assertRaises(vespa_exceptions.VespaTimeoutError) as e:
+                        tensor_search.search(
+                            text='dogs', config=self.config, index_name=index.name,
+                            search_method=SearchMethod.HYBRID
+                        )
+                    self.assertIn("Timed out", str(e.exception))
+                    self.assertIn("Error in execution of chain 'content_default': Chain timed out", str(e.exception))
+                    self.assertIn("Invalid query parameter", str(e.exception))
+                    self.assertIn("Could not create query from YQL", str(e.exception))
+
+
+
 
     def test_hybrid_search_unstructured_with_2_10_fails(self):
         """
