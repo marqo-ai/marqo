@@ -51,8 +51,10 @@ def run_api_serer():
     if api_worker_count < 1:
         api_worker_count = os.cpu_count() - 1
 
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["access"]["fmt"] = "%(asctime)s - %(levelname)s - PID: %(process)d - X-Request-PID: %(request_pid)s - %(message)s"
     # bind to 0.0.0.0 to expose this port in container
-    uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count)
+    uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count, log_config=log_config)
 
 
 def run_inf_app(worker_count: int):

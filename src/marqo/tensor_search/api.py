@@ -37,6 +37,7 @@ from marqo.tensor_search.throttling.redis_throttle import throttle
 from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = get_logger(__name__)
 
@@ -46,11 +47,23 @@ will_run_remote_inference = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOT
 start_mode = StartMode.API if will_run_remote_inference else (StartMode.API | StartMode.INFERENCE)
 on_start(get_config(), start_mode)
 
+
+# Middleware to capture a specific header (e.g., 'X-Request-ID')
+class CustomHeaderLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Extract the custom header, for example, 'X-Request-ID'
+        request_pid = request.headers.get('X-Request-PID', 'na')
+        request.state.request_pid = request_pid
+        response = await call_next(request)
+        return response
+
+
 app = FastAPI(
     title="Marqo",
     version=version.get_version()
 )
 app.add_middleware(TelemetryMiddleware)
+app.add_middleware(CustomHeaderLoggingMiddleware)
 app.router.route_class = MarqoCustomRoute
 
 
