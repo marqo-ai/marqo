@@ -1,4 +1,8 @@
+# marqo client:
+urllib3
+requests
+# testing
 pillow
 numpy
 pytest
-flake8
+requests
