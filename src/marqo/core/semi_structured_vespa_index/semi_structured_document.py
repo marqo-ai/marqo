@@ -116,7 +116,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
         """Instantiate an SemiStructuredVespaDocument from a valid Marqo document for feeding to Vespa"""
-
+        index_stores_string_arrays_as_list = marqo_index.parsed_marqo_version() < common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
         if index_constants.MARQO_DOC_ID not in document:
             # Please note we still use unstructured in the error message since it will be exposed to user
             raise MarqoDocumentParsingError(
@@ -124,7 +124,10 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 f"This should be assigned for a valid document")
 
         doc_id = document[index_constants.MARQO_DOC_ID]
-        instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id))
+        if index_stores_string_arrays_as_list:
+            instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id, marqo__string_array=[]))
+        else:
+            instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id, string_arrays={}))
         index_supports_partial_updates = (marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION)
         # Process regular fields
         cls._process_regular_fields(document, instance, marqo_index, doc_id, index_supports_partial_updates)
@@ -189,9 +192,12 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     @classmethod
     def _handle_string_array_field(cls, field_name, field_content, instance, index_supports_partial_updates):
         if index_supports_partial_updates:
-            if instance.fixed_fields.string_arrays.get(field_name) is None:
-                instance.fixed_fields.string_arrays[field_name] = []
-            instance.fixed_fields.string_arrays[field_name].extend(field_content)
+            if isinstance(instance.fixed_fields.string_arrays, list):
+                instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
+            else:
+                if instance.fixed_fields.string_arrays.get(field_name) is None:
+                    instance.fixed_fields.string_arrays[field_name] = []
+                instance.fixed_fields.string_arrays[field_name].extend(field_content)
             instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.STRING_ARRAY.value
         else:
             new_array = [f"{field_name}::{element}" for element in field_content]

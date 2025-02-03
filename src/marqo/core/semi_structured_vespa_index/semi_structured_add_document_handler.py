@@ -61,7 +61,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
             all(isinstance(elem, str) for elem in field_content)
         )
         if (is_string_array and 
-            self.marqo_index.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION):
+            self.marqo_index.parsed_marqo_version() >= SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION): #This is required so that we can update schema on the fly
             self._add_string_array_field_to_index(field_name)
 
 
@@ -77,6 +77,7 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         if processed_tensor_fields:
             doc[constants.MARQO_DOC_TENSORS] = processed_tensor_fields
 
+        # doc here is Dict[str, Any], which will be converted to a VespaDocument
         return VespaDocument(**self.vespa_index.to_vespa_document(marqo_document=doc))
 
     def _pre_persist_to_vespa(self):
@@ -112,6 +113,9 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         self.should_update_index = True
 
     def _add_string_array_field_to_index(self, field_name):
+        if field_name in self.marqo_index.field_map:
+            return
+
         logger.debug(f'Adding string array field {field_name} to index {self.marqo_index.name}')
 
         self.marqo_index.string_array_fields.append(

@@ -26,6 +26,25 @@ class TestPartialUpdate(MarqoTestCase):
         super().setUp()
         self.doc = {
             '_id': '1',
+            # 'tensor_field': 'title',
+            # 'tensor_subfield': 'description',
+            # "short_string_field": "shortstring",
+            # "long_string_field": "Thisisaverylongstring" * 10,
+            # "int_field": 123,
+            # "float_field": 123.0,
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+            # "int_map": {"a": 1, "b": 2},
+            # "float_map": {"c": 1.0, "d": 2.0},
+            # "bool_field": True,
+            # "bool_field2": False,
+            # "custom_vector_field": {
+            #     "content": "abcd",
+            #     "vector": [1.0] * 32
+            # }
+        }
+        self.doc2 = {
+            '_id': '2',
             'tensor_field': 'title',
             'tensor_subfield': 'description',
             "short_string_field": "shortstring",
@@ -43,9 +62,26 @@ class TestPartialUpdate(MarqoTestCase):
                 "vector": [1.0] * 32
             }
         }
+        self.doc3 = {
+            '_id': '3',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            }
+        }
         self.add_documents(self.config, add_docs_params=AddDocsParams(
             index_name=self.index.name,
-            docs=[self.doc],
+            docs=[self.doc, self.doc2, self.doc3],
             tensor_fields=['tensor_field', 'custom_vector_field', 'multimodal_combo_field'],
             mappings = {
                 "custom_vector_field": {"type": "custom_vector"},
@@ -73,22 +109,29 @@ class TestPartialUpdate(MarqoTestCase):
     def test_partial_update_should_update_bool_field(self):
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
         print("Printing the document", doc)
-        res = self.config.document.partial_update_documents([{'_id': '1', 'bool_field': False}], self.index)
-        print(res)
-        self.assertFalse(res.errors)
+        for doc in [self.doc, self.doc2, self.doc3]:
+            id = doc['_id']
+            res = self.config.document.partial_update_documents([{'_id': id, 'bool_field': False}], self.index)
+            print(res)
+            self.assertFalse(res.errors)
 
-        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
-        print(doc)
-        self.assertFalse(doc['bool_field'])
-        self._assert_fields_unchanged(doc, ['bool_field'])
+        for doc in [self.doc, self.doc2, self.doc3]:
+            id = doc['_id']
+            doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
+            print(doc)
+            self.assertFalse(doc['bool_field'])
+            self._assert_fields_unchanged(doc, ['bool_field'])
 
     def test_partial_update_should_update_int_field_to_int(self):
-        res = self.config.document.partial_update_documents([{'_id': '1', 'int_field': 500}], self.index)
-        self.assertFalse(res.errors)
+        for doc in [self.doc, self.doc2, self.doc3]:
+            res = self.config.document.partial_update_documents([{'_id': doc['_id'], 'int_field': 500}], self.index)
+            self.assertFalse(res.errors)
 
-        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
-        self.assertEqual(500, doc['int_field'])
-        self._assert_fields_unchanged(doc, ['int_field'])
+        for doc in [self.doc, self.doc2, self.doc3]:
+            id = doc['_id']
+            doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
+            self.assertEqual(500, doc['int_field'])
+            self._assert_fields_unchanged(doc, ['int_field'])
 
     #TODO: I Haven't implemented that thing where the metadata map will also be updated for this field. something like update_field_that_doesnt_exist <-> int
     def test_partial_update_should_not_non_existent_field(self): #This now works

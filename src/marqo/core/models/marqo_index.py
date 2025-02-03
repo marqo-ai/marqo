@@ -505,7 +505,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
-    string_array_fields: Optional[List[Field]]
+    string_array_fields: Optional[List[Field]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -520,8 +520,12 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         A map from field name to the field.
         """
         return self._cache_or_get('field_map',
-                                  lambda: {field.name: field for field in self.lexical_fields}
-                                  )
+                              lambda: {field.name: field for field in self.lexical_fields} | {field.name: field for field in self.string_array_fields})
+    @property
+    def string_array_field_map(self):
+        return self._cache_or_get('string_array_field_map',
+                                  lambda : { field.lexical_field_name: field for field in self.string_array_fields})
+
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:
