@@ -26,6 +26,7 @@ docker run -d --name marqo -p 8882:8882 --add-host host.docker.internal:host-gat
     -e VESPA_DOCUMENT_URL="http://host.docker.internal:8080" \
     -e VESPA_QUERY_URL="http://host.docker.internal:8080" \
     -e ZOOKEEPER_HOSTS="host.docker.internal:2181" \
+    -e MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0 \
     -e MARQO_MODELS_TO_PRELOAD='[]' \
     ${@:+"$@"} "$MARQO_DOCKER_IMAGE" --memory=8g
 set +x
