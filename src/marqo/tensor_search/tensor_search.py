@@ -1635,7 +1635,11 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         except Exception as e:
             raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
-    search_result["query"] = text
+    if isinstance(text, CustomVectorQuery):
+        search_result["query"] = text.dict()    # Make object JSON serializable
+    else:
+        search_result["query"] = text
+
     search_result["limit"] = result_count
     search_result["offset"] = offset
 
