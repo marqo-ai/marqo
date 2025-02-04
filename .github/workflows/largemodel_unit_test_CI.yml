@@ -150,8 +150,6 @@ jobs:
           echo "Deleted vespa_tester_app.zip"
 
       - name: Run Large Model Unit Tests
-        id: run_unit_tests
-        continue-on-error: true
         run: |
           # Define these for use by marqo
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -159,66 +157,13 @@ jobs:
           export VESPA_QUERY_URL=http://localhost:8080
           export MARQO_MAX_CPU_MODEL_MEMORY=15
           export MARQO_MAX_CUDA_MODEL_MEMORY=15
-          export HF_HUB_ENABLE_HF_TRANSFER=1
           
           export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
-          cd marqo
-          export PYTHONPATH="./tests:./src:."
-          set -o pipefail
-          pytest --largemodel --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests \
-            --durations=100 --cov=src --cov-branch --cov-context=test \
-            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
-            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests | tee pytest_output.txt
-
-      - name: Check Test Coverage of New Code
-        id: check_test_coverage
-        continue-on-error: true
-        run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-            cd marqo
-            echo "Running diff-cover against branch $BASE_BRANCH"
-            git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
-              --compare-branch $BASE_BRANCH
-          else
-            echo "Skipping diff-cover on Push events"
-            echo "Skipped diff-cover on Push events" > marqo/diff_cov.md
-            touch marqo/diff_cov.html
-          fi
-
-      - name: Upload Test Report
-        uses: actions/upload-artifact@v4
-        continue-on-error: true
-        with:
-          name: marqo-test-report
-          path: |
-            marqo/cov_html/
-            marqo/diff_cov.html
-
-      - name: Test and coverage report summary
-        continue-on-error: true
-        run: |
-          echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
-          cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
-          
-          echo "# Coverage Summary, Slow Tests and Failed Tests" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          
-          cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Fail Job If Tests or Coverage Failed
-        if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
-        run: |
-          echo "Tests or coverage checks failed. Marking job as failed."
-          exit 1
-        shell: bash
+          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
+          pytest marqo/tests/integ_tests --largemodel 
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner

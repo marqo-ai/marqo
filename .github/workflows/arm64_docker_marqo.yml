@@ -10,22 +10,15 @@ on:
         description: >
           The "py-marqo" branch this test is running against.
           This is optional. If left as the default value "mainline", we run the test based on the "mainline" branch of
-          py-marqo. Otherwise, the specified branch is tested. For example "li/test-xx". You can also use "marqo" and 
+          py-marqo. Otherwise, the specified branch is tested. For example "prefix/test-xx". You can also use "marqo" and 
           it will use the latest pypi release.
-      api_tests_branch:
-        required: false
-        default: mainline
-        description: >
-          The "api-tests" branch this test is running against.
-          This is optional. If left as the default value "mainline", we run the api tests based at branch
-          "mainline". Otherwise, the specified branch is tested. For example "li/test-xx"
-      image_to_test:
+      image_identifier:
         required: false
         # This is the name of the docker image that is built by the build script:
         default: marqo_docker_0
         description: >
           This is optional. If left as the default value "marqo_docker_0", the docker image built from this branch is tested.
-          Otherwise, the specified docker image is tested. For example "marqoai/marqo:test"
+          Otherwise, the specified Docker image is tested. For example "marqoai/marqo:test"
   push:
     branches:
       - mainline
@@ -74,62 +67,46 @@ jobs:
     name: Run ARM64 Docker Maqo API Tests
     needs: Start-Runner # required to start the main job when the runner is ready
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
-                
-    environment: marqo-test-suite 
+    defaults:
+      run:
+        working-directory: tests/api_tests/v1
+    environment: marqo-test-suite
     
     steps:
-       
+
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.9
-        run:  |
+        run: |
           apt-get -y update
           apt-get -y install python3.9
           apt-get -y install pip
-  
-      - name: Install Dependencies
-        run: |
-          #pip install -r requirements.txt
-          pip install tox==3.26
-          pip install flake8
-      
-      # TODO: linting here
-  
-      - name: Checkout marqo-api-tests repo
-        uses: actions/checkout@v3
-        with:
-          repository: marqo-ai/marqo-api-tests
-          ref: ${{ github.event.inputs.api_tests_branch }}
 
-      - name: Set MQ_PY_MARQO_BRANCH variable
-        run: |
-          if [[ "${{ inputs.py_marqo_branch }}" == "marqo" ]]; then
-            echo "MQ_PY_MARQO_BRANCH=marqo" >> $GITHUB_ENV
-          elif [[ "${{ inputs.py_marqo_branch }}" == "" ]]; then
-            echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@mainline" >> $GITHUB_ENV
-          else
-            echo "MQ_PY_MARQO_BRANCH=git+https://github.com/marqo-ai/py-marqo.git@${{ inputs.py_marqo_branch }}" >> $GITHUB_ENV
-          fi
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install py-marqo
+        run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-          
-      - name: Set up Environment
-        run: |
-          # Set up conf file
-          echo 'export MARQO_API_TESTS_ROOT="${{ github.workspace }}"' >> conf
-          
+
       - name: Run Integration Tests - ARM64 Docker Marqo
         run: |
-          export MQ_API_TEST_BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
-          echo "$MQ_API_TEST_BRANCH"
-          CUSTOM_TEST_IMG="${{ github.event.inputs.image_to_test }}"
-          export MQ_API_TEST_IMG=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
-          tox -e py3-docker_marqo
-  
+          CUSTOM_TEST_IMG="${{ github.event.inputs.image_identifier }}"
+          export TESTING_CONFIGURATION=CPU_DOCKER_MARQO
+          export MARQO_API_TESTS_ROOT=$(pwd)
+          export MARQO_IMAGE_NAME=${CUSTOM_TEST_IMG:-"marqo_docker_0"}
+          
+          bash scripts/build_marqo.sh $MARQO_IMAGE_NAME
+
+          bash scripts/start_docker_marqo.sh $MARQO_IMAGE_NAME
+          
+          pytest tests/
+
   Stop-Runner:
     name: Stop self-hosted EC2 runner
     needs:

@@ -16,7 +16,7 @@ on:
       - releases/*
 
 concurrency:
-  group: unit-tests-${{ github.ref }}
+  group: integ-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -118,7 +118,6 @@ jobs:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
           path: marqo
 
       - name: Set up Python 3.9
@@ -172,63 +171,28 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: |
-          # Define these for checking if Vespa is ready
-          export VESPA_CONFIG_URL=http://localhost:19071
-          export VESPA_DOCUMENT_URL=http://localhost:8080
-          export VESPA_QUERY_URL=http://localhost:8080
-
-          cd marqo/scripts/vespa_local
-          set -x
-          python vespa_local.py start
-          set +x
-
-          echo "Waiting for Vespa to start"
-          for i in {1..20}; do
-              echo -ne "Waiting... $i seconds\r"
-              sleep 1
-          done
-          echo -e "\nDone waiting."
-
-          # Zip up schemas and services
-          sudo apt-get install zip -y
-          zip -r vespa_tester_app.zip services.xml schemas
-
-          # Deploy application with test schema
-          curl --header "Content-Type:application/zip" --data-binary @vespa_tester_app.zip http://localhost:19071/application/v2/tenant/default/prepareandactivate
-
-          # wait for vespa to start (document url):
-          timeout 10m bash -c 'until curl -f -X GET $VESPA_DOCUMENT_URL >/dev/null 2>&1; do echo "  Waiting for Vespa document API to be available..."; sleep 10; done;' || \
-            (echo "Vespa (Document URL) did not start in time" && exit 1)
-
-          echo "Vespa document API is available. Local Vespa setup complete."
-
-          # Delete the zip file
-          rm vespa_tester_app.zip
-          echo "Deleted vespa_tester_app.zip"
+        run: python marqo/tests/api_tests/v1/scripts/start_vespa.py
 
       - name: Run Unit Tests
-        id: run_unit_tests
-        continue-on-error: true
         run: |
           # Define these for use by marqo
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
-          export MARQO_ENABLE_THROTTLING=FALSE
 
           export PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID=${{ secrets.PRIVATE_MODEL_TESTS_AWS_ACCESS_KEY_ID }}
           export PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY=${{ secrets.PRIVATE_MODEL_TESTS_AWS_SECRET_ACCESS_KEY }}
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
 
           cd marqo
-          export PYTHONPATH="./tests:./src:."
+
+          export PYTHONPATH="./src"
           set -o pipefail
-          pytest --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests \
+          pytest --ignore=tests/integ_tests/test_documentation.py \
             --durations=100 --cov=src --cov-branch --cov-context=test --cov-fail-under=69 \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests | tee pytest_output.txt
+            tests/integ_tests/ | tee pytest_output.txt
 
       - name: Check Test Coverage of New Code
         id: check_test_coverage
@@ -249,32 +213,9 @@ jobs:
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: marqo-test-report
-          path: |
-            marqo/cov_html/
-            marqo/diff_cov.html
-
-      - name: Test and coverage report summary
-        continue-on-error: true
-        run: |
-          echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
-          cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
-          
-          echo "# Coverage Summary, Slow Tests and Failed Tests" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          
-          cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
-
-      - name: Fail Job If Tests or Coverage Failed
-        if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
-        run: |
-          echo "Tests or coverage checks failed. Marking job as failed."
-          exit 1
-        shell: bash
+          path: marqo/cov_html/
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
