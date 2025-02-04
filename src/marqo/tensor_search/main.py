@@ -2,6 +2,7 @@ import contextlib
 import multiprocessing
 import os
 
+import granian
 import uvicorn
 
 from marqo import config
@@ -63,7 +64,7 @@ def get_config():
     return _config
 
 
-run_gunicorn = os.environ.get('MARQO_RUN_GUNICORN', 'FALSE') == 'TRUE'
+asgi_server = os.environ.get('MARQO_ASGI_SERVER', 'uvicorn')
 
 
 def run_api_serer():
@@ -71,19 +72,36 @@ def run_api_serer():
     if api_worker_count < 1:
         api_worker_count = os.cpu_count() - 1
 
-    if run_gunicorn:
-        options = {
-            "bind": "0.0.0.0:8882",
-            "workers": api_worker_count,
-            "worker_class": "uvicorn.workers.UvicornWorker",
-        }
-        StandaloneApplication("api:app", options).run()
-    else:
+    if asgi_server == 'uvicorn':
         log_config = uvicorn.config.LOGGING_CONFIG
-        log_config["formatters"]["access"]["fmt"] = "%(asctime)s - %(levelname)s - PID: %(process)d - X-Request-PID: %(request_pid)s - %(message)s"
+        log_config["formatters"]["access"][
+            "fmt"] = "%(asctime)s - %(levelname)s - PID: %(process)d - X-Request-PID: %(request_pid)s - %(message)s"
         # bind to 0.0.0.0 to expose this port in container
         uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count, log_config=log_config)
 
+    elif asgi_server == 'gunicorn':
+        # options = {
+        #     "bind": "0.0.0.0:8882",
+        #     "workers": api_worker_count,
+        #     "worker_class": "uvicorn.workers.UvicornWorker",
+        #     "accesslog": "-",
+        #     # "access_log_format": '%(t)s %(h)s %(l)s %(u)s PID: %(p)d X-Request-PID: %({x-request-pid}i)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+        # }
+        #
+        # StandaloneApplication("api:app", options).run()
+        pass
+    elif asgi_server == 'granian':
+        server = granian.Granian(
+            target='api:app',
+            address='0.0.0.0',
+            port=8882,
+            interface='asgi',
+            workers=api_worker_count,
+            log_access=True,
+            respawn_failed_workers=True,
+
+        )
+        server.serve()
 
 def run_inf_app(worker_count: int):
     # bind to localhost only so it is not visible outside the container

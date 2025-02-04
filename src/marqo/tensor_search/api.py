@@ -1,6 +1,7 @@
 """The API entrypoint for Tensor Search"""
 import json
 import os
+from contextlib import asynccontextmanager
 from typing import List
 
 import pydantic
@@ -38,6 +39,7 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from starlette.middleware.base import BaseHTTPMiddleware
+import logging
 
 logger = get_logger(__name__)
 
@@ -60,7 +62,7 @@ class CustomHeaderLoggingMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI(
     title="Marqo",
-    version=version.get_version()
+    version=version.get_version(),
 )
 app.add_middleware(TelemetryMiddleware)
 app.add_middleware(CustomHeaderLoggingMiddleware)
