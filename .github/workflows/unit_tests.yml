@@ -1,0 +1,62 @@
+name: Run unit tests
+# runs unit tests on standard machine
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches:
+      - mainline
+      - releases/*
+  pull_request:
+    branches:
+      - mainline
+      - releases/*
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  Test-Marqo:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+    environment: marqo-test-suite
+    steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.9"
+          cache: "pip"
+
+      - name: Checkout marqo-base for requirements
+        uses: actions/checkout@v3
+        with:
+          repository: marqo-ai/marqo-base
+          path: marqo-base
+
+      - name: Install dependencies
+        run: |
+          pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
+          # override base requirements with marqo requirements, if needed:
+          pip install -r marqo/requirements.dev.txt
+
+      - name: Run Unit Tests
+        run: |
+          cd marqo
+          export PYTHONPATH="./src"
+          pytest tests/unit_tests/ --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info
+
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-test-report
+          path: marqo/cov_html/

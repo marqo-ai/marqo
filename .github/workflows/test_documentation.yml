@@ -40,5 +40,5 @@ jobs:
 
       - name: Run Documentation Tests
         run: |
-          export PYTHONPATH="./marqo/tests:./marqo/src:./marqo"
-          pytest marqo/tests/test_documentation.py
+          export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src:./marqo"
+          pytest marqo/tests/integ_tests/test_documentation.py
