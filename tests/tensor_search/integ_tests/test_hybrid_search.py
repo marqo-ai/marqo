@@ -1908,7 +1908,7 @@ class TestHybridSearch(MarqoTestCase):
                 504,    # HTTP 504
                 False,  # Not a timeout, since 2nd error is not timeout
             ),
-            # HTTP 504, second is Vespa 12
+            # HTTP 400, second is Vespa 12
             (
                 {
                     'root': {
@@ -1929,7 +1929,7 @@ class TestHybridSearch(MarqoTestCase):
                         ]
                     }
                 },
-                500,  # HTTP 500
+                400,  # HTTP 400
                 False,  # Not a timeout, since 1st error is not timeout
             ),
             # HTTP 504, both Vespa errors 12
@@ -1957,7 +1957,7 @@ class TestHybridSearch(MarqoTestCase):
                 504,    # HTTP 504
                 True    # Timeout, since both errors are timeout
             ),
-            # HTTP 400, both Vespa errors 12
+            # HTTP 400, both Vespa errors 12 but not timeout
             (
                 {
                     'root': {
@@ -1966,15 +1966,15 @@ class TestHybridSearch(MarqoTestCase):
                         'errors': [
                             {
                                 'code': 12,
-                                'summary': 'Timed out',
+                                'summary': 'Some other error',
                                 'source': 'content_default',
-                                'message': "Error in execution of chain 'content_default': Chain timed out."
+                                'message': 'Some error message'
                             },
                             {
                                 'code': 12,
-                                'summary': 'Timed out',
+                                'summary': 'Some other error',
                                 'source': 'content_default',
-                                'message': "Error in execution of chain 'content_default': Chain timed out."
+                                'message': 'Some error message'
                             }
                         ]
                     }
@@ -2035,9 +2035,6 @@ class TestHybridSearch(MarqoTestCase):
                                 # All error messages should be in final exception
                                 self.assertIn(error["message"], str(e.exception))
                                 self.assertIn(error["summary"], str(e.exception))
-
-
-
 
     def test_hybrid_search_unstructured_with_2_10_fails(self):
         """
