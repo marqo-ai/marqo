@@ -19,7 +19,6 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
 from pydantic import ValidationError
 import marqo.api.exceptions as api_exceptions
-from marqo.vespa import exceptions as vespa_exceptions
 from fastapi.responses import JSONResponse, ORJSONResponse
 
 
