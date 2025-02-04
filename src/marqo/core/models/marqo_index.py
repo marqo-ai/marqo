@@ -519,8 +519,21 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
         A map from field name to the field.
         """
-        return self._cache_or_get('field_map',
-                              lambda: {field.name: field for field in self.lexical_fields} | {field.name: field for field in self.string_array_fields})
+
+        def create_map():
+            lexical_map = {}
+            string_array_map = {}
+
+            if self.lexical_fields is not None:
+                lexical_map = {field.name: field for field in self.lexical_fields}
+
+            if self.string_array_fields is not None:
+                string_array_map = {field.name: field for field in self.string_array_fields}
+
+            return lexical_map | string_array_map
+
+        return self._cache_or_get('field_map', create_map)
+
     @property
     def string_array_field_map(self):
         return self._cache_or_get('string_array_field_map',
