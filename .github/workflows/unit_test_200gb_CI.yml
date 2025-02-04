@@ -213,9 +213,32 @@ jobs:
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: marqo-test-report
-          path: marqo/cov_html/
+          path: |
+            marqo/cov_html/
+            marqo/diff_cov.html
+
+      - name: Test and coverage report summary
+        continue-on-error: true
+        run: |
+          echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
+          cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
+          
+          echo "# Coverage Summary, Slow Tests and Failed Tests" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail Job If Tests or Coverage Failed
+        if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
+        run: |
+          echo "Tests or coverage checks failed. Marking job as failed."
+          exit 1
+        shell: bash
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
