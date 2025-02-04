@@ -25,7 +25,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
     }
 
     unstructured_index_metadata = {
-        "indexName": "test_search_api_unstructured_index_score_modifiers",
+        "indexName": "test_search_api_unstructured_index_score_modifiers_2_15",
         "type": "unstructured",
         "model": "open_clip/ViT-B-32/laion2b_s34b_b79k"
     }

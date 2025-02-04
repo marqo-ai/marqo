@@ -58,13 +58,15 @@ def run_tests_in_mode(mode: Mode, from_version: str):
     logger.info(f"Running tests in '{mode}' mode with from_version: {from_version}")
 
     if mode == Mode.PREPARE:
-        run_prepare_mode(from_version)
+        return run_prepare_mode(from_version)
     elif mode == Mode.TEST:
         run_test_mode(from_version)
 
 def run_full_test_suite(from_version: str, to_version: str):
     logger.info(f"Running full test suite with from_version: {from_version}, to_version: {to_version}")
-    run_prepare_mode(from_version)
+    errors = run_prepare_mode(from_version)
+    if errors:
+        logger.error(f"Errors encountered while running prepare mode on from_version: {from_version}: ", errors)
     run_test_mode(from_version)
     logger.info(
         "Finished tests across versions as part of Rollback test's full tests suite. THIS MARKS THE END OF ROLLBACK TESTS ACROSS TWO CONTAINERS WITH DIFFERENT VERSIONS")
@@ -78,7 +80,9 @@ def full_test_run(marqo_version: str):
     """
     logger.info(f"Running full_test_run with version: {marqo_version}. THIS WILL RUN PREPARE METHOD AND TEST METHODS ON THE SAME {marqo_version} VERSION CONTAINER")
     #Step 1: Run tests in prepare mode
-    run_prepare_mode(marqo_version)
+    errors = run_prepare_mode(marqo_version)
+    if errors:
+        logger.error(f"Errors encountered while running prepare mode on version: {marqo_version}: ", errors)
     #Step 2: Run tests in test mode
     run_test_mode(marqo_version)
 
@@ -123,8 +127,7 @@ def run_prepare_mode(version_to_test_against: str):
             errors.append(f"Failed to run prepare mode on testcase: {test_class.__name__} with version: {marqo_version}, when test mode runs on this test case, it is expected to fail. Search the class name in the logs to find the exact error.")
         logger.info(f"##################################################################################################")
 
-    if errors:
-        raise RuntimeError(f"Some errors occurred while running prepare mode on test cases: {errors}")
+    return errors
 
 def construct_pytest_arguments(version_to_test_against):
     pytest_args = [
@@ -183,9 +186,12 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         logger.info(f"Started Marqo container {from_version}")
 
         try:
-            run_tests_in_mode(Mode.PREPARE, from_version)
+            errors = run_tests_in_mode(Mode.PREPARE, from_version)
         except Exception as e:
             raise RuntimeError(f"Error running tests in 'prepare' mode across versions on from_version: {from_version}") from e
+
+        if errors:
+            logger.error("Error running tests in 'prepare' mode across versions on from_version: {from_version}: ", errors)
         # Step 2: Stop from_version container (but don't remove it)
         docker_manager.stop_marqo_container(from_version)
 
@@ -239,9 +245,12 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
 
         # Run tests in prepare mode
         try:
-            run_tests_in_mode(Mode.PREPARE, from_version)
+            errors = run_tests_in_mode(Mode.PREPARE, from_version)
         except Exception as e:
             raise RuntimeError(f"Error while running tests across versions in 'prepare' mode.") from e
+
+        if errors:
+            logger.error(f"Error while running tests across versions in 'prepare' mode: ", errors)
 
         # Step 2: Stop Marqo from_version container started in Step #1.
         docker_manager.stop_marqo_container(from_version)
