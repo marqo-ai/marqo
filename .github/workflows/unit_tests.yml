@@ -22,11 +22,11 @@ permissions:
 
 jobs:
   Test-Marqo:
-    name: Run Unit Tests
+    name: Run unit tests
     runs-on: ubuntu-latest
     environment: marqo-test-suite
     steps:
-      - name: Checkout marqo repo
+      - name: Check out marqo repo
         uses: actions/checkout@v3
         with:
           path: marqo
@@ -50,7 +50,7 @@ jobs:
           # override base requirements with marqo requirements, if needed:
           pip install -r marqo/requirements.dev.txt
 
-      - name: Run Unit Tests
+      - name: Run unit tests
         run: |
           cd marqo
           export PYTHONPATH="./src"
@@ -66,8 +66,14 @@ jobs:
           diff-cover cov.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=95 \
             --html-report diff_cov.html --markdown-report diff_cov.md
 
-      - name: Upload Test Report
+      - name: Upload test report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report
           path: marqo/cov_html/
+
+      - name: Upload diff coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-diff-coverage-report
+          path: marqo/diff_cov.html
