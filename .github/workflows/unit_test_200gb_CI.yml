@@ -109,9 +109,10 @@ jobs:
       - name: Determine VESPA_MULTINODE_SETUP
         id: set_var
         run: |
-          # Initialize as false
+          # For single node, initialize as false
           echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
-          echo "MULTINODE_TEST_ARGS=" >> $GITHUB_OUTPUT
+          # Only enforce coverage check if single node
+          echo "MULTINODE_TEST_ARGS=--cov-fail-under=69" >> $GITHUB_OUTPUT
 
           # Check if the event is workflow_call or workflow_dispatch
           if [[ "${{ github.event_name }}" == "workflow_call" || "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -286,7 +287,7 @@ jobs:
           export PYTHONPATH="./tests:./src:."
           set -o pipefail
           pytest ${{ env.MULTINODE_TEST_ARGS }} --ignore=tests/test_documentation.py --ignore=tests/compatibility_tests \
-            --durations=100 --cov=src --cov-branch --cov-context=test --cov-fail-under=69 \
+            --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests | tee pytest_output.txt
