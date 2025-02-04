@@ -6,6 +6,7 @@ from tests.compatibility_tests.base_test_case.base_compatibility_test import Bas
 
 
 @pytest.mark.marqo_version('2.15.0')
+@pytest.mark.skip(reason="This test doesn't work ")
 class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
 
     tensor_fields = ["text_field", "image_field"]

@@ -16,7 +16,7 @@ class TestDeleteDocuments(BaseCompatibilityTestCase):
             {"name": "Genre", "type": "text"},
             {"name": "Description", "type": "text"}
         ],
-        "tensorFields": ["title", "content"],
+        "tensorFields": ["title", "Description"],
         },
         {
             "indexName": unstructured_index_name,
