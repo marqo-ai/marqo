@@ -518,14 +518,37 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     def field_map(self) -> Dict[str, Field]:
         """
         A map from field name to the field.
+        If one of lexical_fields or string_array_fields is None, returns the map from the non-None field list.
+        If both are None, returns an empty dict.
         """
-        return self._cache_or_get('field_map',
-                              lambda: {field.name: field for field in self.lexical_fields} | {field.name: field for field in self.string_array_fields})
+
+        def create_map():
+            lexical_map = {}
+            string_array_map = {}
+
+            if self.lexical_fields is not None:
+                lexical_map = {field.name: field for field in self.lexical_fields}
+
+            if self.string_array_fields is not None:
+                string_array_map = {field.name: field for field in self.string_array_fields}
+
+            return lexical_map | string_array_map
+
+        return self._cache_or_get('field_map', create_map)
+
     @property
     def string_array_field_map(self):
-        return self._cache_or_get('string_array_field_map',
-                                  lambda : { field.lexical_field_name: field for field in self.string_array_fields})
+        """
+        A map from lexical field name to string array field.
+        Returns an empty dict if string_array_fields is None.
+        """
 
+        def create_map():
+            if self.string_array_fields is not None:
+                return {field.lexical_field_name: field for field in self.string_array_fields}
+            return {}
+
+        return self._cache_or_get('string_array_field_map', create_map)
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:
