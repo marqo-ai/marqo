@@ -30,6 +30,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: marqo
+          fetch-depth: 0  # Needed for diff coverage
 
       - name: Set up Python 3.9
         uses: actions/setup-python@v3
@@ -53,7 +54,17 @@ jobs:
         run: |
           cd marqo
           export PYTHONPATH="./src"
-          pytest tests/unit_tests/ --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info
+          pytest --durations=100 --cov=src --cov-branch --cov-context=test \
+            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+            tests/unit_tests/
+
+      - name: Check new code coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          cd marqo
+          diff-cover cov.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=95 \
+            --html-report diff_cov.html --markdown-report diff_cov.md
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
