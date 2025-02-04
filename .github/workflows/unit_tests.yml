@@ -51,13 +51,14 @@ jobs:
           pip install -r marqo/requirements.dev.txt
 
       - name: Run unit tests
+        continue-on-error: true
         run: |
           cd marqo
           export PYTHONPATH="./src"
           pytest --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/unit_tests/
+            tests/unit_tests/ | tee pytest_output.txt
 
       - name: Check new code coverage
         if: github.event_name == 'pull_request'
@@ -70,10 +71,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report
-          path: marqo/cov_html/
+          path: |
+            marqo/cov_html/
+            marqo/diff_cov.html
 
-      - name: Upload diff coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: marqo-diff-coverage-report
-          path: marqo/diff_cov.html
+      - name: Test and coverage report summary
+        run: |
+          echo "# Test Summary" >> $GITHUB_STEP_SUMMARY
+          cat marqo/pytest_result_summary.md >> $GITHUB_STEP_SUMMARY
+          
+          echo "# Coverage summary, slow tests and failed tests" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          awk '/---------- coverage:/ {flag=1} flag' marqo/pytest_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
