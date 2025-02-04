@@ -1046,6 +1046,7 @@ class VespaClient:
                             raise VespaStatusError(message=resp.text, cause=e) from e
                     # Raise 504 if all errors are timeout
                     raise VespaTimeoutError(message=resp.text, cause=e) from e
+                raise e
             except VespaStatusError:
                 raise
             except Exception:
