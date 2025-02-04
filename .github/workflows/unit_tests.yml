@@ -51,6 +51,7 @@ jobs:
           pip install -r marqo/requirements.dev.txt
 
       - name: Run unit tests
+        id: run_unit_tests
         continue-on-error: true
         run: |
           cd marqo
@@ -61,6 +62,7 @@ jobs:
             tests/unit_tests/ | tee pytest_output.txt
 
       - name: Check new code coverage
+        id: check_test_coverage
         if: github.event_name == 'pull_request'
         run: |
           cd marqo
@@ -86,3 +88,10 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
           
           cat marqo/diff_cov.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if tests or coverage failed
+        if: ${{ steps.run_unit_tests.outcome == 'failure' || steps.check_test_coverage.outcome == 'failure' }}
+        run: |
+          echo "Tests or coverage checks failed. Marking job as failed."
+          exit 1
+        shell: bash
