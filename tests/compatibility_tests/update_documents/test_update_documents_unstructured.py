@@ -88,10 +88,7 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
         for index in self.indexes_to_test_on:
             index_name = index['indexName']
             with self.subTest(indexName=index_name):
-                if index.get("type") is not None and index.get('type') == 'structured':
-                    self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs)
-                else:
-                    self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs, mappings = self.mappings, tensor_fields = self.tensor_fields)
+                self.client.index(index_name = index['indexName']).add_documents(documents = self.text_docs, mappings = self.mappings, tensor_fields = self.tensor_fields)
 
 
         all_results = {}

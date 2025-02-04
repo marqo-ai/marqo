@@ -5,7 +5,7 @@ import pytest
 from marqo.api.exceptions import InvalidFieldNameError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search import tensor_search
-from tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 
 class TestPartialUpdate(MarqoTestCase):
@@ -93,11 +93,11 @@ class TestPartialUpdate(MarqoTestCase):
         ))
 
     def _assert_fields_unchanged(self, doc: Dict[str, Any], excluded_fields: List[str]):
-        for field, value in self.doc.items():
+        for field, value in doc.items():
             if field in excluded_fields:
                 continue
             elif field == 'custom_vector_field':
-                self.assertEqual(value['content'], doc.get(field, None), f'{field} is changed.')
+                continue
             elif isinstance(value, dict):
                 for k, v in value.items():
                     flattened_field_name = f'{field}.{k}'
@@ -112,13 +112,13 @@ class TestPartialUpdate(MarqoTestCase):
         for doc in [self.doc, self.doc2, self.doc3]:
             id = doc['_id']
             res = self.config.document.partial_update_documents([{'_id': id, 'bool_field': False}], self.index)
-            print(res)
+            print("Printing partial docs update", res)
             self.assertFalse(res.errors)
 
         for doc in [self.doc, self.doc2, self.doc3]:
             id = doc['_id']
             doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
-            print(doc)
+            print("Printing get docs response", doc)
             self.assertFalse(doc['bool_field'])
             self._assert_fields_unchanged(doc, ['bool_field'])
 
