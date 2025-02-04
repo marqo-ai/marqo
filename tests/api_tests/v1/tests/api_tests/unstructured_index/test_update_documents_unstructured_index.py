@@ -22,7 +22,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             {
                 "indexName": cls.text_index_name,
                 "type": "unstructured",
-                "model": "sentence-transformers/all-MiniLM-L6-v2",
+                "model": "random/small",
                 "normalizeEmbeddings": False,
             }
         ])
