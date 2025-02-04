@@ -2,10 +2,10 @@ import uuid
 
 from marqo.client import Client
 
-from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase
 
 
-class TestUpdateDocuments(MarqoTestCase):
+class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
     """
     Support for partial updates for unstructured indexes was added in 2.16.0.
     """

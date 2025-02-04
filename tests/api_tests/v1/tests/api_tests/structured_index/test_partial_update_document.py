@@ -8,7 +8,7 @@ import requests
 from marqo.client import Client
 from marqo.errors import MarqoWebError
 
-from tests.api_tests.v1.tests.marqo_test import MarqoTestCase
+from tests.marqo_test import MarqoTestCase
 
 
 class TestStructuredUpdateDocuments(MarqoTestCase):
