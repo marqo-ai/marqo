@@ -56,6 +56,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         tensor_fields = {}
         text_fields = {}
         string_arrays_dict = {}
+        string_arrays_list = []
 
         def process_field(field_name: str, fields: Dict) -> None:
             """Helper function to process individual tensor fields, lexical fields and populate the appropriate dictionaries"""
@@ -98,7 +99,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
             for field_name in fields:
                 process_field(field_name, fields)
                 
-            fixed_fields = SemiStructuredVespaDocumentFields(**fields)
+            fixed_fields = SemiStructuredVespaDocumentFields(**fields, string_arrays = string_arrays_list)
 
         return cls(id=document[cls._VESPA_DOC_ID],
                    fixed_fields=fixed_fields,
@@ -270,11 +271,14 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         }
 
         if index_supports_partial_updates:
-            for string_array_key, string_array_value in self.fixed_fields.string_arrays.items():
-                key = f'marqo__string_array_{string_array_key}'
-                if key not in vespa_fields:
-                    vespa_fields[key] = []
-                vespa_fields[key].extend(string_array_value)
+            if isinstance(self.fixed_fields.string_arrays, dict):
+                for string_array_key, string_array_value in self.fixed_fields.string_arrays.items():
+                    key = f'marqo__string_array_{string_array_key}'
+                    if key not in vespa_fields:
+                        vespa_fields[key] = []
+                    vespa_fields[key].extend(string_array_value)
+            else:
+                vespa_fields[common.STRING_ARRAY] = self.fixed_fields.string_arrays
         else:
             vespa_fields[common.STRING_ARRAY] = self.fixed_fields.string_arrays
 
@@ -283,11 +287,12 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
         """Convert VespaDocumentObject to marqo document document structure."""
         marqo_document = {}
-        for string_array_key, string_array_value in self.fixed_fields.string_arrays.items():
-            if string_array_key not in marqo_document:
-                marqo_document[string_array_key] = string_array_value
-            else:
-                marqo_document[string_array_key].extend(string_array_value)
+        if self.fixed_fields.string_arrays and not isinstance(self.fixed_fields.string_arrays, list):
+            for string_array_key, string_array_value in self.fixed_fields.string_arrays.items():
+                if string_array_key not in marqo_document:
+                    marqo_document[string_array_key] = string_array_value
+                else:
+                    marqo_document[string_array_key].extend(string_array_value)
 
         # Add int and float fields back
         # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert

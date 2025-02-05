@@ -836,9 +836,10 @@ class VespaClient:
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
             data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
-            for key, value in types.items():
-                data["condition"] += (f' and (not {schema}.marqo__field_types{{\"{key}\"}} or {schema}.marqo__field_types{{\"{key}\"}}==\"{value}\")'
-                                      f' and (not ({schema}.marqo__field_types{{\"{key}\"}}=="tensor"))')
+            if types is not None: # Types will be none for structured index as we are not storing types at the time of Add docs.
+                for key, value in types.items():
+                    data["condition"] += (f' and (not {schema}.marqo__field_types{{\"{key}\"}} or {schema}.marqo__field_types{{\"{key}\"}}==\"{value}\")'
+                                          f' and (not ({schema}.marqo__field_types{{\"{key}\"}}=="tensor"))')
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
             except httpx.RequestError as e:
