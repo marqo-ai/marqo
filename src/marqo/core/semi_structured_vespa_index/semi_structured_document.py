@@ -126,7 +126,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         doc_id = document[index_constants.MARQO_DOC_ID]
         if index_stores_string_arrays_as_list:
-            instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id, marqo__string_array=[]))
+            instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id, string_arrays=[]))
         else:
             instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id, string_arrays={}))
         index_supports_partial_updates = (marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION)
@@ -287,12 +287,19 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
         """Convert VespaDocumentObject to marqo document document structure."""
         marqo_document = {}
-        if self.fixed_fields.string_arrays and not isinstance(self.fixed_fields.string_arrays, list):
-            for string_array_key, string_array_value in self.fixed_fields.string_arrays.items():
-                if string_array_key not in marqo_document:
-                    marqo_document[string_array_key] = string_array_value
-                else:
-                    marqo_document[string_array_key].extend(string_array_value)
+        if self.fixed_fields.string_arrays:
+            if isinstance(self.fixed_fields.string_arrays, dict):
+                for string_array_key, string_array_value in self.fixed_fields.string_arrays.items(): # String_array_key will be string in this case, and string_array_value will be a list of strings in this case
+                    if string_array_key not in marqo_document:
+                        marqo_document[string_array_key] = string_array_value
+                    else:
+                        marqo_document[string_array_key].extend(string_array_value)
+            elif isinstance(self.fixed_fields.string_arrays, list):
+                for string_array in self.fixed_fields.string_arrays:
+                    string_array_key, string_array_value = string_array.split("::", 1) # String_array_key will be string in this case, and string_array_value will be a single string in this case.
+                    if string_array_key not in marqo_document:
+                        marqo_document[string_array_key] = []
+                    marqo_document[string_array_key].append(string_array_value)
 
         # Add int and float fields back
         # Please note that int-map and float-map fields are flattened in the result. The correct behaviour is to convert

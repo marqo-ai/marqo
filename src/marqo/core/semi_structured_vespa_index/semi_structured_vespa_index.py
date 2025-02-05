@@ -33,7 +33,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         print("aditya printing index version", self._marqo_index_version)
-        index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.MARQO_TRUE_PARTIAL_UPDATES_VERSION
+        index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
         print("does index support partial updates? ", index_supports_partial_updates)
         return (SemiStructuredVespaDocument.from_marqo_document(
             marqo_document, marqo_index=self.get_marqo_index())).to_vespa_document(index_supports_partial_updates)
