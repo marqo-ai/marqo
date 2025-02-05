@@ -10,12 +10,14 @@ import com.sun.jdi.InternalException;
 import com.yahoo.component.chain.Chain;
 import com.yahoo.search.*;
 import com.yahoo.search.query.ranking.RankFeatures;
+import com.yahoo.search.result.ErrorMessage;
 import com.yahoo.search.result.Hit;
 import com.yahoo.search.result.HitGroup;
 import com.yahoo.search.searchchain.*;
 import com.yahoo.tensor.Tensor;
 import com.yahoo.tensor.TensorAddress;
 import com.yahoo.tensor.TensorType;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.junit.Ignore;
@@ -428,5 +430,63 @@ class HybridSearcherTest {
                 .getFeatures()
                 .put("query(marqo__fields_to_rank_tensor)", fieldsToRankTensor);
         return query;
+    }
+
+    @Nested
+    class CollectErrorsFromResultsTest {
+        @Test
+        void shouldRaiseErrorIfLexicalResultHasError() {
+            Result resultLexical =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example lexical error"));
+            Result resultTensor = new Result(new Query());
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+
+            assertThat(combinedErrors.getError().getDetailedMessage())
+                    .contains("Example lexical error");
+        }
+
+        @Test
+        void shouldRaiseErrorIfTensorResultHasError() {
+            Result resultLexical = new Result(new Query());
+            Result resultTensor =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example tensor error"));
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+
+            assertThat(combinedErrors.getError().getDetailedMessage())
+                    .contains("Example tensor error");
+        }
+
+        @Test
+        void shouldRaiseErrorIfBothResultsHaveError() {
+            Result resultLexical =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example lexical error"));
+            Result resultTensor =
+                    new Result(
+                            new Query(),
+                            ErrorMessage.createInternalServerError("Example tensor error"));
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+
+            Iterator<ErrorMessage> iterator = combinedErrors.getErrorHit().errors().iterator();
+            assertThat(iterator.next().getDetailedMessage()).contains("Example tensor error");
+            assertThat(iterator.next().getDetailedMessage()).contains("Example lexical error");
+        }
+
+        @Test
+        void shouldNotRaiseErrorIfNeitherResultHasError() {
+            Result resultLexical = new Result(new Query());
+            Result resultTensor = new Result(new Query());
+            HitGroup combinedErrors =
+                    hybridSearcher.collectErrorsFromResults(resultLexical, resultTensor);
+            assertThat(combinedErrors.getError()).isNull();
+        }
     }
 }

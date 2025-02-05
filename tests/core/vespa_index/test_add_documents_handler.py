@@ -9,6 +9,8 @@ from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, Mar
     InternalError
 from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
 from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
+from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
+from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError, InternalError
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import \
@@ -17,6 +19,7 @@ from marqo.core.vespa_index.add_documents_handler import AddDocumentsResponseCol
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import S2InferenceError
 from marqo.s2_inference.types import Modality
+from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
 from tests.marqo_test import MarqoTestCase
@@ -354,9 +357,7 @@ class TestAddDocumentHandler(MarqoTestCase):
         ]
         for url, test_case in test_cases:
             with self.subTest(msg=test_case):
-                with (patch(
-                        "marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality") as
-                      mock_infer_modality):
+                with patch("marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality") as mock_infer_modality:
                     self.assertEqual(
                         FieldType.Text, unstructured_add_documents_handler.
                         _infer_field_type(field_name="dummy_field_name", field_content=url)
@@ -466,8 +467,8 @@ class TestAddDocumentHandler(MarqoTestCase):
 
         for field_name, msg, called in test_cases:
             with self.subTest(f"{field_name} - {msg}"):
-                with (patch("marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality",
-                            return_value=Modality.TEXT) as mock_infer_modality):
+                with patch("marqo.core.unstructured_vespa_index.unstructured_add_document_handler.infer_modality",
+                           return_value=Modality.TEXT) as mock_infer_modality:
                     _ = unstructured_add_documents_handler._handle_field(
                         test_doc, field_name=field_name,
                         field_content=test_doc[field_name]

@@ -32,14 +32,13 @@ Notes on search behaviour with caching and searchable attributes:
 """
 import copy
 import json
-import traceback
 import typing
 import uuid
 import os
 from collections import defaultdict
 from contextlib import ExitStack
 from timeit import default_timer as timer
-from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple
+from typing import List, Optional, Union, Iterable, Sequence, Dict, Any, Tuple, Set
 
 import numpy as np
 import psutil
@@ -1650,7 +1649,11 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         except Exception as e:
             raise api_exceptions.BadRequestError(f"reranking failure due to {str(e)}")
 
-    search_result["query"] = text
+    if isinstance(text, CustomVectorQuery):
+        search_result["query"] = text.dict()    # Make object JSON serializable
+    else:
+        search_result["query"] = text
+
     search_result["limit"] = result_count
     search_result["offset"] = offset
 
@@ -1789,16 +1792,26 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     """
     Convert a VespaQueryResponse to a Marqo search response
     """
+
+    if (marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured] and
+            attributes_to_retrieve is not None):
+        # Unstructured index and Semi-structured index stores fixed fields (numeric, boolean, string arrays, etc.) in
+        # combined field. It needs to select attributes after converting vespa doc to marqo doc if
+        # attributes_to_retrieve is specified
+        metadata_fields_to_retrieve = {"_id", "_score", "_highlights"}
+        attributes_to_retrieve_set = set(attributes_to_retrieve).union(metadata_fields_to_retrieve)
+    else:
+        # If this set is None, we will return the marqo_doc as is.
+        attributes_to_retrieve_set = None
+
     vespa_index = vespa_index_factory(marqo_index)
     hits = []
     for doc in response.hits:
-        marqo_doc = vespa_index.to_marqo_document(doc.dict(), return_highlights=highlights)
+        marqo_doc = vespa_index.to_marqo_document(dict(doc), return_highlights=highlights)
         marqo_doc['_score'] = doc.relevance
 
-        if (marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured] and
-                attributes_to_retrieve is not None):
-            # For an unstructured index, we do the attributes_to_retrieve after search
-            marqo_doc = unstructured_index_attributes_to_retrieve(marqo_doc, attributes_to_retrieve)
+        if attributes_to_retrieve_set is not None:
+            marqo_doc = select_attributes(marqo_doc, attributes_to_retrieve_set)
 
         # Delete chunk data
         if constants.MARQO_DOC_TENSORS in marqo_doc:
@@ -1808,16 +1821,18 @@ def gather_documents_from_response(response: QueryResult, marqo_index: MarqoInde
     return {'hits': hits}
 
 
-def unstructured_index_attributes_to_retrieve(marqo_doc: Dict[str, Any], attributes_to_retrieve: List[str]) -> Dict[
-    str, Any]:
-    # attributes_to_retrieve should already be validated at the start of search
-    attributes_to_retrieve = list(set(attributes_to_retrieve).union({"_id", "_score", "_highlights"}))
-    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve or
-            # Please note that numeric map fields are flattened for unstructured or semi-structured indexes.
-            # Therefore, when filtering on attributes_to_retrieve, we need to also include flattened map fields
-            # with the specified attributes as prefixes. We keep this behaviour only for compatibility reasons.
-            any([k.startswith(attribute + ".") for attribute in attributes_to_retrieve])}
+def select_attributes(marqo_doc: Dict[str, Any], attributes_to_retrieve_set: Set[str]) -> Dict[str, Any]:
+    """
+    Unstructured index and Semi-structured index retrieve all fixed fields (numeric, boolean, string arrays, etc.)
+    from Vespa when attributes_to_retrieve is specified. After converting the Vespa doc to Marqo doc, it needs to
+    filter out attributes not in the attributes_to_retrieve list.
 
+    Please note that numeric map fields are flattened for unstructured or semi-structured indexes.
+    Therefore, when filtering on attributes_to_retrieve, we need to also include flattened map fields
+    with the specified attributes as prefixes. We keep this behaviour only for compatibility reasons.
+    """
+    return {k: v for k, v in marqo_doc.items() if k in attributes_to_retrieve_set or
+            '.' in k and k.split('.', maxsplit=1)[0] in attributes_to_retrieve_set}
 
 def assign_query_to_vector_job(
         q: BulkSearchQueryEntity, jobs: Dict[JHash, VectorisedJobs],
