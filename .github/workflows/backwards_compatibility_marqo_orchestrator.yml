@@ -143,6 +143,8 @@ jobs:
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
+      max-parallel: 5
+      fail-fast: false
     uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
     secrets: inherit
     permissions:
@@ -170,6 +172,8 @@ jobs:
     strategy:
       matrix:
         from_version: ${{ fromJson(needs.orchestrate.outputs.list) }}
+      max-parallel: 5
+      fail-fast: false
     uses: ./.github/workflows/backwards_compatibility_marqo_execution.yml
     secrets: inherit
     permissions:
