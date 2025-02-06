@@ -55,7 +55,7 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
         '_id': '1',
         'bool_field': False,
         'update_field_that_doesnt_exist': 500,
-        'int_field': 1.0,
+        'int_field': 1,
         'float_field': 500.0,
         'int_map': {
             'a': 2,  # update int to int
