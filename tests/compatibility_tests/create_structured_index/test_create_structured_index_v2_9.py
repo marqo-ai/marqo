@@ -78,7 +78,9 @@ class TestCreateStructuredIndexv2_9(BaseCompatibilityTestCase):
         if errors:
             formatted_errors = [f"Index: {index_name}, Error: {error}" for index_name, error in errors]
             self.logger.error("\n".join(formatted_errors))  # Fail the prepare method with all collected errors
-        self.save_results_to_file(all_results)
+
+        if not errors:
+            self.save_results_to_file(all_results)
 
     def test_expected_settings(self):
         expected_settings = self.load_results_from_file()

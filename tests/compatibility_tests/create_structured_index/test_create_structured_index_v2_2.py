@@ -79,7 +79,8 @@ class TestCreateStructuredIndexv2_2(BaseCompatibilityTestCase):
             ]
             self.logger.error("\n".join(formatted_errors))
 
-        self.save_results_to_file(all_results)
+        if not errors:
+            self.save_results_to_file(all_results)
 
     def test_expected_settings(self):
         expected_settings = self.load_results_from_file()
