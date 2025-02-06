@@ -441,7 +441,7 @@ class DockerManager:
 
                 # Remove the volume
                 volume.remove(force=True)
-                self.logger.info(f"Successfully removed volume {volume_name}")
+                self.logger.debug(f"Successfully removed volume {volume_name}")
                 self.volumes_to_cleanup.remove(volume_name)
             except NotFound:
                 self.logger.warning(f"Warning: Volume {volume_name} not found. It may already have been removed.")

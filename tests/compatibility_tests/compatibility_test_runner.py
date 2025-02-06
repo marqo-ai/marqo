@@ -31,6 +31,10 @@ logger = get_logger(__name__)
 
 docker_manager = DockerManager()
 
+_imported_modules = set()  # Track imported module names
+
+
+
 def load_all_subclasses(package_name):
     """
     Dynamically load all subclasses within a specified package,
@@ -44,8 +48,11 @@ def load_all_subclasses(package_name):
         logger.debug(f"Processing this {name}, {is_pkg}")
         if is_pkg:
             continue
+        if name in _imported_modules:
+            continue
         try:
             importlib.import_module(name)
+            _imported_modules.add(name) # Add it to the set of imported modules.
             logger.debug(f"Imported module with name {name}")
         except ImportError as e:
             logger.error(f"Could not import module with {name}")
@@ -82,7 +89,7 @@ def full_test_run(marqo_version: str):
     #Step 1: Run tests in prepare mode
     errors = run_prepare_mode(marqo_version)
     if errors:
-        logger.error(f"Errors encountered while running prepare mode on version: {marqo_version}: ", errors)
+        logger.error(f"Encountered errors while running prepare mode inside a FULL TEST RUN: {marqo_version}: ", errors)
     #Step 2: Run tests in test mode
     run_test_mode(marqo_version)
 
@@ -145,7 +152,7 @@ def run_test_mode(version_to_test_against):
     if pytest_result == 0:
         logger.info(f"Successfully ran test mode on all test cases")
     elif pytest_result == 1:
-        raise RuntimeError(f"Failed to run test mode on some test cases. Check pyTest output for exactly which test cases failed")
+        raise RuntimeError(f"PyTest returned code 1 which means some tests failed. Check PyTest output for exactly which test cases failed")
 
 def trigger_rollback_endpoint(from_version: str):
     logger.info(f"Triggering rollback endpoint with from_version: {from_version}")
