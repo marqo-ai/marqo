@@ -77,7 +77,8 @@ def run_api_serer():
         log_config["formatters"]["access"][
             "fmt"] = "%(asctime)s - %(levelname)s - PID: %(process)d - X-Request-PID: %(request_pid)s - %(message)s"
         # bind to 0.0.0.0 to expose this port in container
-        uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count, log_config=log_config)
+        uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count, log_config=log_config,
+                    socket_load_balance=True)
 
     elif asgi_server == 'gunicorn':
         # options = {
@@ -99,7 +100,7 @@ def run_api_serer():
             workers=api_worker_count,
             log_access=True,
             respawn_failed_workers=True,
-
+            backpressure=1
         )
         server.serve()
 
