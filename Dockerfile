@@ -8,6 +8,8 @@ RUN mvn clean package
 # Stage 2: Base image for Python setup
 FROM marqoai/marqo-base:36 as base_image
 
+RUN dnf install -y git
+
 # Allow mounting volume containing data and configs for vespa
 VOLUME /opt/vespa/var
 # Allow mounting volume to expose vespa logs
