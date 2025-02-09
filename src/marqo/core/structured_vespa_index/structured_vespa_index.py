@@ -375,11 +375,17 @@ class StructuredVespaIndex(VespaIndex):
                 else:
                     root_modifier_field = modifier.field
                 if root_modifier_field not in self._marqo_index.score_modifier_fields_names:
-                    raise InvalidFieldNameError(
-                        f'Index {self._marqo_index.name} has no score modifier field {modifier.field}. '
-                        f'Available score modifier fields are: '
-                        f'{", ".join(self._marqo_index.score_modifier_fields_names)}'
-                    )
+                    available_fields = self._marqo_index.score_modifier_fields_names
+                    if not available_fields:
+                        raise InvalidFieldNameError(
+                            f'Index {self._marqo_index.name} has no score modifier field {modifier.field}. '
+                            f'No score modifier fields are defined for this index.'
+                        )
+                    else:
+                        raise InvalidFieldNameError(
+                            f'Index {self._marqo_index.name} has no score modifier field {modifier.field}. '
+                            f'Available score modifier fields are: {", ".join(available_fields)}'
+                        )
 
         # Hybrid must be checked first since it is a subclass of Tensor and Lexical
         if isinstance(marqo_query, MarqoHybridQuery):
