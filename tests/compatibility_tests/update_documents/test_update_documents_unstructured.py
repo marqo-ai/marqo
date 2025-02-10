@@ -59,12 +59,9 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
         'float_field': 500.0,
         'int_map': {
             'a': 2,  # update int to int
-            # 'a': 2.0,  # TODO: update int to float THis shouldn't work anyway.
-            # 'c': 3,  # add new int value #TODO: This shouldn't work anyway - because it will look for this field's type in the metadata and won't find it so pre-condition will fail.
-            # 'd': 4.0  # add new float value #TODO: This shouldn't work either.
         },
         'float_map': {
-            'c': 3.0,  # update float to int #TODO: This should work.
+            'c': 3.0,  # update float to int
         },
         'string_array': ["ccc"]
         }]
@@ -142,9 +139,6 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
         'float_field': 500.0,
         'int_map': {
             'a': 2,  # update int to int
-            # 'a': 2.0,  # TODO: update int to float THis shouldn't work anyway.
-            # 'c': 3,  # add new int value #TODO: This shouldn't work anyway - because it will look for this field's type in the metadata and won't find it so pre-condition will fail.
-            # 'd': 4.0  # add new float value #TODO: This shouldn't work either.
         },
         'float_map': {
             'c': 3.0,  # update float to int #TODO: This should work.
