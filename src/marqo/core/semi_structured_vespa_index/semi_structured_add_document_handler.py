@@ -8,7 +8,8 @@ from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.exceptions import TooManyFieldsError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.index_management.index_management import IndexManagement
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, Field, FieldType, FieldFeature, TensorField, \
+    StringArrayField
 from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_index import SemiStructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
@@ -113,13 +114,13 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
         self.should_update_index = True
 
     def _add_string_array_field_to_index(self, field_name):
-        if field_name in self.marqo_index.field_map:
+        if field_name in self.marqo_index.name_to_string_array_field_map:
             return
 
         logger.debug(f'Adding string array field {field_name} to index {self.marqo_index.name}')
 
         self.marqo_index.string_array_fields.append(
-            Field(name = field_name, type = FieldType.ArrayText, lexical_field_name = f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}', features=[FieldFeature.LexicalSearch],) # TODO: Define features for this class
+            StringArrayField(name = field_name, type = FieldType.ArrayText, string_array_field_name = f'{SemiStructuredVespaSchema.FIELD_STRING_ARRAY_PREFIX}{field_name}', features=[FieldFeature.Filter])
         )
         self.marqo_index.clear_cache()
         self.should_update_index = True

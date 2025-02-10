@@ -232,7 +232,7 @@ class IndexManagement:
 
             if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
                     is_subset(marqo_index.field_map, existing_index.field_map) and
-                        is_subset(marqo_index.string_array_field_map, existing_index.string_array_field_map)):
+                        is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
                 logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
                 return
 

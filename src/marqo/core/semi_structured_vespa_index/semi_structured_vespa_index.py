@@ -6,15 +6,17 @@ from marqo.core.exceptions import MarqoDocumentParsingError
 from marqo.core.models import MarqoQuery
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, MarqoHybridQuery
+from marqo.core.search import search_filter
 from marqo.core.semi_structured_vespa_index import common
+from marqo.core.semi_structured_vespa_index.common import VESPA_FIELD_ID, BOOL_FIELDS, SHORT_STRINGS_FIELDS, \
+    STRING_ARRAY, INT_FIELDS, FLOAT_FIELDS
 from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
 from marqo.core.unstructured_vespa_index.unstructured_vespa_index import UnstructuredVespaIndex
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
-from marqo.exceptions import InternalError
-
+from marqo.exceptions import InternalError, InvalidArgumentError
 
 
 class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
@@ -56,7 +58,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if len(marqo_query.attributes_to_retrieve) > 0:
                 # Retrieve static fields content to extract non-string values from combined fields
                 marqo_query.attributes_to_retrieve.extend([
-                    common.STRING_ARRAY,
                     common.INT_FIELDS,
                     common.FLOAT_FIELDS,
                     common.BOOL_FIELDS,
@@ -81,10 +82,106 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
 
-    @classmethod
-    def _get_filter_term(cls, marqo_query: MarqoQuery) -> Optional[str]:
+
+    def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term
-        return UnstructuredVespaIndex._get_filter_term(marqo_query)
+        def escape(s: str) -> str:
+            return s.replace('\\', '\\\\').replace('"', '\\"')
+
+        def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
+            filter_parts = []
+            index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
+
+            # Filter on `_id`
+            if node.field == MARQO_DOC_ID:
+                return f'({VESPA_FIELD_ID} contains "{escape(node.value)}")'
+
+            # Bool Filter
+            if node.value.lower() in self._FILTER_STRING_BOOL_VALUES:
+                filter_value = int(True if node.value.lower() == "true" else False)
+                bool_filter_string = (f'({BOOL_FIELDS} contains '
+                                      f'sameElement(key contains "{node.field}", value = {filter_value}))')
+                filter_parts.append(bool_filter_string)
+
+            # Short String Filter
+            short_string_filter_string = (f'({SHORT_STRINGS_FIELDS} '
+                                          f'contains sameElement(key contains "{node.field}", '
+                                          f'value contains "{escape(node.value)}"))')
+            filter_parts.append(short_string_filter_string)
+
+            # String Array Filter
+            if index_supports_partial_updates:
+                if node.field in self.get_marqo_index().name_to_string_array_field_map:
+                    string_array_field_name = f'{STRING_ARRAY}_{node.field}'
+                    string_array_filter_string = (f'({string_array_field_name} contains '
+                                                  f'"{escape(node.value)}")')
+                    filter_parts.append(string_array_filter_string)
+            else:
+                string_array_filter_string = (f'({STRING_ARRAY} contains '
+                                              f'"{node.field}::{escape(node.value)}")')
+                filter_parts.append(string_array_filter_string)
+
+            # Numeric Filter
+            numeric_filter_string = ""
+            try:
+                numeric_value = int(node.value)
+                numeric_filter_string = (
+                    f'({INT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value})) '
+                    f'OR ({FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))')
+            except ValueError:
+                try:
+                    numeric_value = float(node.value)
+                    numeric_filter_string = f'({FLOAT_FIELDS} contains sameElement(key contains "{node.field}", value = {numeric_value}))'
+                except ValueError:
+                    pass
+
+            if numeric_filter_string:
+                filter_parts.append(numeric_filter_string)
+
+            # Final Filter String
+            final_filter_string = f"({' OR '.join(filter_parts)})"
+            return final_filter_string
+
+        def generate_range_filter_string(node: search_filter.RangeTerm) -> str:
+            lower = f'value >= {node.lower}' if node.lower is not None else ""
+            higher = f'value <= {node.upper}' if node.upper is not None else ""
+            bound = f'{lower}, {higher}' if lower and higher else f'{lower}{higher}'
+            if not bound:
+                raise InternalError('RangeTerm has no lower or upper bound')
+
+            float_field_string = (f'({FLOAT_FIELDS} contains '
+                                  f'sameElement(key contains "{node.field}", {bound}))')
+
+            int_field_string = (f'({INT_FIELDS} contains '
+                                f'sameElement(key contains "{node.field}", {bound}))')
+
+            return f'({float_field_string} OR {int_field_string})'
+
+        def tree_to_filter_string(node: search_filter.Node) -> str:
+            if isinstance(node, search_filter.Operator):
+                if isinstance(node, search_filter.And):
+                    operator = 'AND'
+                elif isinstance(node, search_filter.Or):
+                    operator = 'OR'
+                else:
+                    raise InternalError(f'Unknown operator type {type(node)}')
+                return f'({tree_to_filter_string(node.left)} {operator} {tree_to_filter_string(node.right)})'
+            elif isinstance(node, search_filter.Modifier):
+                if isinstance(node, search_filter.Not):
+                    return f'!({tree_to_filter_string(node.modified)})'
+                else:
+                    raise InternalError(f'Unknown modifier type {type(node)}')
+            elif isinstance(node, search_filter.Term):
+                if isinstance(node, search_filter.EqualityTerm):
+                    return generate_equality_filter_string(node)
+                elif isinstance(node, search_filter.RangeTerm):
+                    return generate_range_filter_string(node)
+                elif isinstance(node, search_filter.InTerm):
+                    raise InvalidArgumentError("The 'IN' filter keyword is not yet supported for unstructured indexes")
+            raise InternalError(f'Unknown node type {type(node)}')
+
+        if marqo_query.filter is not None:
+            return tree_to_filter_string(marqo_query.filter.root)
 
     def _extract_document_id(self, document: Dict[str, Any]) -> str:
         """Extract and validate document ID."""

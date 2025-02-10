@@ -75,7 +75,7 @@ schema {{ index.schema_name }} {
         {% endfor -%}
 
         {% for string_array_field in index.string_array_fields -%}
-        field {{ string_array_field.lexical_field_name }} type array<string> {
+        field {{ string_array_field.string_array_field_name }} type array<string> {
         }
         {% endfor -%}
 
@@ -268,7 +268,7 @@ schema {{ index.schema_name }} {
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
         {% for string_array_field in index.string_array_fields -%}
-        summary {{ string_array_field.name }} type array<string> {source: {{ string_array_field.lexical_field_name }}}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
         {% endfor -%}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
@@ -285,7 +285,7 @@ schema {{ index.schema_name }} {
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
         {% for string_array_field in index.string_array_fields -%}
-        summary {{ string_array_field.name }} type array<string> {source: {{ string_array_field.lexical_field_name }}}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
         {% endfor -%}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}

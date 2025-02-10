@@ -98,6 +98,12 @@ class Field(ImmutableStrictBaseModel):
 
         return values
 
+class StringArrayField(ImmutableStrictBaseModel):
+    name: str
+    type: FieldType
+    string_array_field_name: Optional[str]
+    features: List[FieldFeature] = []
+
 
 class TensorField(ImmutableStrictBaseModel):
     """
@@ -505,7 +511,7 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     type: IndexType = IndexType.SemiStructured
     lexical_fields: List[Field]
     tensor_fields: List[TensorField]
-    string_array_fields: Optional[List[Field]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
+    string_array_fields: Optional[List[StringArrayField]] # This is required so that when saving a document containing string array fields, we can make changes to the schema on the fly. Ref: https://github.com/marqo-ai/marqo/blob/cfea70adea7039d1586c94e36adae8e66cabe306/src/marqo/core/semi_structured_vespa_index/semi_structured_vespa_schema_template_2_16.sd.jinja2#L83
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -518,37 +524,33 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
     def field_map(self) -> Dict[str, Field]:
         """
         A map from field name to the field.
-        If one of lexical_fields or string_array_fields is None, returns the map from the non-None field list.
-        If both are None, returns an empty dict.
         """
-
-        def create_map():
-            lexical_map = {}
-            string_array_map = {}
-
-            if self.lexical_fields is not None:
-                lexical_map = {field.name: field for field in self.lexical_fields}
-
-            if self.string_array_fields is not None:
-                string_array_map = {field.name: field for field in self.string_array_fields}
-
-            return lexical_map | string_array_map
-
-        return self._cache_or_get('field_map', create_map)
+        return self._cache_or_get('field_map',
+                                  lambda: {field.name: field for field in self.lexical_fields})
 
     @property
-    def string_array_field_map(self):
+    def name_to_string_array_field_map(self):
         """
-        A map from lexical field name to string array field.
+        A map from a StringArrayField object's " "name" property to corresponding StringArrayField object.
+        "Name" is the name of the StringArrayField object, which is passed by the user. It does not start with marqo__string_array prefix.
+
         Returns an empty dict if string_array_fields is None.
         """
 
-        def create_map():
-            if self.string_array_fields is not None:
-                return {field.lexical_field_name: field for field in self.string_array_fields}
-            return {}
+        return self._cache_or_get('name_to_string_array_field_map',
+                                  lambda : {field.name: field for field in self.string_array_fields})
 
-        return self._cache_or_get('string_array_field_map', create_map)
+    @property
+    def string_array_field_name_to_string_array_field_map(self):
+        """
+        A map from a StringArrayField object's "string_array_field_name" property to corresponding StringArrayField object.
+        A "string_array_field_name" is that name of a StringArrayField object, which is used in the index schema, and it starts with marqo__string_array prefix.
+
+        Returns an empty dict if string_array_fields is None.
+        """
+
+        return self._cache_or_get('string_array_field_map',
+                                  lambda : {field.string_array_field_name: field for field in self.string_array_fields})
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:

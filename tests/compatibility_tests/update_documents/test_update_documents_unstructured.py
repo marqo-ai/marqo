@@ -113,12 +113,17 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
                         self.partial_update_test_cases
                     )
                 self.logger.debug(f"Printing result {result}")
-                assert result["index_name"] == self.unstructured_index_name
-                assert result["errors"] == False
-                self._assert_updates_have_happened(result, self.partial_update_test_cases)
 
             except Exception as e:
                 test_failures.append((index_name, traceback.format_exc()))
+
+            assert result["index_name"] == self.unstructured_index_name
+            assert result["errors"] == False
+
+            for test_cases in self.partial_update_test_cases:
+                doc_id = test_cases['_id']
+                get_docs_result = self.client.index(index).get_document(document_id = doc_id)
+                self._assert_updates_have_happened(get_docs_result, test_cases)
 
         if test_failures:
             failure_message = "\n".join([
@@ -127,15 +132,40 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
 
-    def _assert_updates_have_happened(self, result, partial_update_test_cases):
-        for test_case in partial_update_test_cases:
-            for field in test_case:
-                if field == "_id":
-                    continue
-                found = False
-                for item in result["results"]:
-                    if field in item:
-                        assert item[field] == test_case[field], f"Mismatch for field {field}: {item[field]} != {test_case[field]}"
-                        found = True
-                        break
-                assert found, f"Field {field} not found in result"
+    def _assert_updates_have_happened(self, result, partial_update_test_case):
+        """
+        {
+        '_id': '1',
+        'bool_field': False,
+        'update_field_that_doesnt_exist': 500,
+        'int_field': 1,
+        'float_field': 500.0,
+        'int_map': {
+            'a': 2,  # update int to int
+            # 'a': 2.0,  # TODO: update int to float THis shouldn't work anyway.
+            # 'c': 3,  # add new int value #TODO: This shouldn't work anyway - because it will look for this field's type in the metadata and won't find it so pre-condition will fail.
+            # 'd': 4.0  # add new float value #TODO: This shouldn't work either.
+        },
+        'float_map': {
+            'c': 3.0,  # update float to int #TODO: This should work.
+        },
+        'string_array': ["ccc"]
+        }
+        Args:
+            result:
+            partial_update_test_cases:
+
+        Returns:
+
+        """
+        for field in partial_update_test_case:
+            if field == "_id":
+                continue
+            if isinstance(field, dict):
+                for key, value in field.items():
+                    key_in_result = key + '.' + value
+                    if result.get(key_in_result) != partial_update_test_case.get(field).get(key):
+                        self.fail(f"Field {key_in_result} does not match expected value {partial_update_test_case.get(field).get(key)}")
+
+            if result.get(field) != partial_update_test_case.get(field):
+                self.fail(f"Field {field} does not match expected value {partial_update_test_case.get(field)}")
