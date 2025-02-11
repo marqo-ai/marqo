@@ -169,9 +169,6 @@ class TestPartialUpdate(MarqoTestCase):
     def test_partial_update_should_allow_changing_numeric_types_in_map(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {
             'a': 2,  # update int to int
-            # 'a': 2.0,  # TODO: update int to float THis shouldn't work anyway.
-            # 'c': 3,  # add new int value #TODO: This shouldn't work anyway - because it will look for this field's type in the metadata and won't find it so pre-condition will fail.
-            # 'd': 4.0  # add new float value #TODO: This shouldn't work either.
         }, 'float_map': {
             'c': 3.0,  # update float to int #TODO: This should work.
         }}], self.index)
@@ -181,10 +178,7 @@ class TestPartialUpdate(MarqoTestCase):
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
         print(doc)
         self.assertEqual(2.0, doc['int_map.a'])
-        # self.assertNotIn('int_map.b', doc)  # [Update: No it cannot be deleted because since you don't fetch the docuemnt - you don't know whether a field has been added or removed, the best guess is that field has been updated so we create a assign statement as opposed to remove statement etc) b will be deleted, as it's not in the partial_update_documents call. This seems like we make updates at a field level, not at things defined in the field. So if I wanna update int_map entire int_map will be updated together, I cannot go and change int_map.get('a') to something else just. I will have to specific int_map {'a': 2.0, 'b': 3} such that b is not deleted in the process.
         self.assertEqual(3.0, doc['float_map.c'])
-        # self.assertEqual(4.0, doc['int_map.d'])
-        # self._assert_fields_unchanged(doc, ['int_map'])
 
     #note: This scenario will not work. I mean if the original document has something like {marqo__string_array:
     # [ 'string_array::aaa', 'string_array:bbb', 'string_array2::123', 'string_array2::456' ]} and you try to update it to
@@ -193,8 +187,7 @@ class TestPartialUpdate(MarqoTestCase):
     # just change all of it to {marqo__string_array: [ 'string_array::ccc' ]}, thus losing the information stored under string_array2::123, or string_array2::456.
     # This is because you can just update the entire Marqo__string_array field together, you cannot update individual elements of the array.
     def test_partial_update_should_update_string_array(self):
-        # doc = tensor_search.get_document_by_id(self.config, self.index.name, '12)
-        # print(doc)
+
         res = self.config.document.partial_update_documents([{'_id': '2', 'string_array': ["ccc"]}], self.index)
         print(res)
         self.assertFalse(res.errors)

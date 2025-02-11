@@ -34,9 +34,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             raise TypeError('Wrong type of marqo index')
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
-        print("aditya printing index version", self._marqo_index_version)
         index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
-        print("does index support partial updates? ", index_supports_partial_updates)
         return (SemiStructuredVespaDocument.from_marqo_document(
             marqo_document, marqo_index=self.get_marqo_index())).to_vespa_document(index_supports_partial_updates)
 
@@ -54,14 +52,23 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         # Verify attributes to retrieve, if defined
+        index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
         if marqo_query.attributes_to_retrieve is not None:
             if len(marqo_query.attributes_to_retrieve) > 0:
-                # Retrieve static fields content to extract non-string values from combined fields
-                marqo_query.attributes_to_retrieve.extend([
-                    common.INT_FIELDS,
-                    common.FLOAT_FIELDS,
-                    common.BOOL_FIELDS,
-                ])
+                if index_supports_partial_updates:
+                    # Retrieve static fields content to extract non-string values from combined fields
+                    marqo_query.attributes_to_retrieve.extend([
+                        common.INT_FIELDS,
+                        common.FLOAT_FIELDS,
+                        common.BOOL_FIELDS,
+                    ])
+                else:
+                    marqo_query.attributes_to_retrieve.extend([
+                        common.STRING_ARRAY,
+                        common.INT_FIELDS,
+                        common.FLOAT_FIELDS,
+                        common.BOOL_FIELDS,
+                    ])
 
             marqo_query.attributes_to_retrieve.append(common.VESPA_FIELD_ID)
 
@@ -191,7 +198,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         self._verify_id_field(doc_id)
         return doc_id
 
-    def to_vespa_partial_document(self, marqo_document: Dict[str, Any], original_vespa_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
         """Convert a Marqo document to Vespa partial document format for updates.
 
         This method transforms a Marqo document into the format required by Vespa for partial document updates.
@@ -200,8 +207,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         Args:
             marqo_document: A dictionary containing the Marqo document to be converted. Must contain an '_id' field.
-            original_vespa_document: Optional dictionary containing the original Vespa document. Not used in current
-                implementation but maintained for interface compatibility.
 
         Returns:
             Dict[str, Any]: A dictionary containing the Vespa partial document format with:
@@ -421,7 +426,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         Raises:
             MarqoDocumentParsingError: If any element in the array is not a string
         """
-        if not all(isinstance(v, str) for v in value):
+        if not all(isinstance(v, str) for v in value) or self.get_marqo_index().name_to_string_array_field_map.get(field_name) is None:
             raise MarqoDocumentParsingError('Only string arrays are supported')
         field_types[field_name] = MarqoFieldTypes.STRING_ARRAY.value # setting field types for later creating pre-conditions
         self._create_update_statement_for_updating_field(fields, field_name, value) # To create update statement for updating the actual field 
@@ -484,7 +489,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         Example:
             If field_key is "title" and field_types["title"] is "string", this will add:
-            {"__field_type__$title": {"assign": "string"}} to update_statement_fields
+            {"marqo__field_type{title}": {"assign": "string"}} to update_statement_fields
         """
         update_field_type_metadata_key = f'{common.VESPA_DOC_FIELD_TYPE}{{{field_key}}}'
         update_statement_fields[update_field_type_metadata_key] = {"assign": field_types[field_key]}
@@ -550,6 +555,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         fields[common.SCORE_MODIFIERS] = {
             "modify": {
                 "operation": "replace",
+                "create": True,
                 "cells": numeric_fields
             }
         }

@@ -9,7 +9,7 @@ from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsin
     InvalidTensorFieldError
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index import common
-from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPE
+from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPE, STRING_ARRAY
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 
 
@@ -38,7 +38,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     tensor_fields: dict = Field(default_factory=dict)
     vector_counts: int = Field(default=0, alias=common.FIELD_VECTOR_COUNT)
     match_features: Dict[str, Any] = Field(default_factory=dict, alias=common.VESPA_DOC_MATCH_FEATURES)
-    string_array_fields: Dict[str, List[str]] = Field(default_factory=dict, alias=common.STRING_ARRAY)
+    string_array_fields: Dict[str, List[str]] = Field(default_factory=dict)
 
     # For hybrid search
     raw_tensor_score: float = None
@@ -123,11 +123,6 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 # Later when converting SemiStructuredVespaDocument object to Marqo document (which is a dictionary of fields to be returned to the user), we will process this list & convert it
                 # to a dictionary by splitting the list element by '::', making the prefix before '::' as the key and suffix after '::' as the value.
                 if field_name == common.STRING_ARRAY:
-                    if not (isinstance(fields[field_name], list) and # Checking that all the elements in the list are strings
-                            all(isinstance(elem, str) for elem in fields[field_name])):
-                        raise ValueError(
-                            f"Invalid value for string array field '{field_name}': {fields[field_name]}"
-                        )
                     string_arrays_list = fields[field_name]
             fixed_fields = SemiStructuredVespaDocumentFields.construct(
                 marqo__id=cls.extract_field(fields, common.VESPA_FIELD_ID, None),
@@ -156,7 +151,30 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
     @classmethod
     def from_marqo_document(cls, document: Dict, marqo_index: SemiStructuredMarqoIndex) -> "SemiStructuredVespaDocument":
-        """Instantiate an SemiStructuredVespaDocument from a valid Marqo document for feeding to Vespa"""
+        """
+        Creates a SemiStructuredVespaDocument object from a Marqo document.
+
+        Args:
+            document (Dict): A dictionary representing a valid Marqo document. Must contain a '_id' field
+                and can include various field types like strings, booleans, numbers, arrays and tensors.
+            marqo_index (SemiStructuredMarqoIndex): The Marqo index object that this document belongs to.
+                Used to determine index capabilities and settings.
+
+        Returns:
+            SemiStructuredVespaDocument: A new instance containing the document data structured for Vespa.
+
+        Raises:
+            MarqoDocumentParsingError: If the document is missing required fields or contains invalid data.
+
+        Example:
+            doc = {
+                "_id": "doc1",
+                "title": "Sample Document",
+                "tags": ["tag1", "tag2"],
+                "rating": 4.5
+            }
+            vespa_doc = SemiStructuredVespaDocument.from_marqo_document(doc, index)
+        """
         index_supports_partial_updates = (marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION)
         if index_constants.MARQO_DOC_ID not in document:
             # Please note we still use unstructured in the error message since it will be exposed to user
@@ -230,10 +248,10 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     @classmethod
     def _handle_string_array_field(cls, field_name: str, field_content: List[str], instance, index_supports_partial_updates: bool):
         if index_supports_partial_updates:
-            if instance.string_array_fields.get(field_name) is None:
-                instance.string_array_fields[field_name] = []
-            instance.string_array_fields[field_name].extend(field_content)
+            instance.string_array_fields[field_name] = field_content
             instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.STRING_ARRAY.value
+        else: 
+            instance.fixed_fields.string_arrays.extend([f"{field_name}::{element}" for element in field_content])
 
     @classmethod
     def _handle_numeric_field(cls, field_name: str, field_content: Union[int, float], instance, index_supports_partial_updates: bool):
@@ -274,6 +292,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 cls._verify_marqo_tensor_field_name(marqo_tensor_field, marqo_index)
                 cls._verify_marqo_tensor_field(marqo_tensor_field, tensor_value)
 
+                # If chunking an image, chunks will be a list of tuples, hence the str(c)
                 chunks = [str(c) for c in tensor_value[constants.MARQO_DOC_CHUNKS]]
                 embeddings = tensor_value[constants.MARQO_DOC_EMBEDDINGS]
                 vector_count += len(embeddings)
@@ -288,8 +307,18 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
     def to_vespa_document(self, index_supports_partial_updates: bool) -> Dict[str, Any]:
         """
-        Convert SemiStructuredVespaDocument object to a Vespa document.
-        Empty fields are removed from the document.
+        Converts this SemiStructuredVespaDocument object to a Vespa document format.
+        
+        @param index_supports_partial_updates: Boolean flag indicating if the index supports partial updates
+        @return: Dictionary containing the Vespa document representation with document ID and fields
+        
+        The returned document will have empty fields removed. The document structure follows Vespa's 
+        expected format with a document ID and fields dictionary containing:
+        - Fixed fields (integers, floats, booleans etc)
+        - Text fields
+        - Tensor fields 
+        - Vector count
+        - String arrays (handled differently based on partial update support)
         """
         vespa_fields = {
             **{k: v for k, v in self.fixed_fields.dict(exclude_none=True, by_alias=True).items() if v or v == 0},
@@ -301,10 +330,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         if index_supports_partial_updates:
             if self.string_array_fields is not None:
                 for string_array_key, string_array_value in self.string_array_fields.items():
-                    key = f'marqo__string_array_{string_array_key}'
-                    if key not in vespa_fields:
-                        vespa_fields[key] = []
-                    vespa_fields[key].extend(string_array_value)
+                    key = f'{STRING_ARRAY}_{string_array_key}'
+                    vespa_fields[key] = string_array_value
         else:
             vespa_fields[common.STRING_ARRAY] = self.fixed_fields.string_arrays
 
@@ -312,17 +339,26 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
     def to_marqo_document(self, marqo_index: SemiStructuredMarqoIndex) -> Dict[str, Any]:
         """
-        Convert SemiStructuredVespaDocument object to marqo document document structure.
+        Convert SemiStructuredVespaDocument object to marqo document structure.
+
+        Args:
+            marqo_index: The SemiStructuredMarqoIndex instance containing index configuration
+
+        Returns:
+            Dict[str, Any]: A dictionary representing the marqo document format containing:
+                - String array fields (handled differently for pre/post 2.16 indexes)
+                - Integer and float fields
+                - Boolean fields 
+                - Document ID
+                - Text fields
+                - Tensor fields with chunks and embeddings
         """
         marqo_document = {}
         index_supports_partial_updates = marqo_index.parsed_marqo_version() >= common.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 
-        if index_supports_partial_updates:
-            if self.string_array_fields: # Post 2.16 indexes will have string arrays stored as a dictionary in a field called string_array_fields in the SemiStructuredVespaDocument object
-                for string_array_key, string_array_value in self.string_array_fields.items():
-                    if string_array_key not in marqo_document:
-                        marqo_document[string_array_key] = []
-                    marqo_document[string_array_key].extend(string_array_value)
+        if index_supports_partial_updates and self.string_array_fields:
+            # self.string_array_fields is a dictionary, Post 2.16 indexes will have string arrays stored as a map of string to list of strings.
+            marqo_document.update(self.string_array_fields)
         else: # Pre 2.16 indexes will have string arrays stored as a list of strings in the SemiStructuredVespaDocumentsFields object under a field called "string_arrays".
             for string_array in self.fixed_fields.string_arrays:
                 string_array_key, string_array_value = string_array.split("::", 1) # String_array_key will be string in this case, and string_array_value will be a single string in this case.

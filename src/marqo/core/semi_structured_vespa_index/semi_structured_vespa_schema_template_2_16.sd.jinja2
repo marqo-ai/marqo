@@ -1,4 +1,4 @@
-{# semi_structured_vespa_schema_template.sd.jinja2 -#}
+{# semi_structured_vespa_schema_template_2_16.sd.jinja2 -#}
 schema {{ index.schema_name }} {
     document {
         field marqo__id type string {
@@ -76,6 +76,9 @@ schema {{ index.schema_name }} {
 
         {% for string_array_field in index.string_array_fields -%}
         field {{ string_array_field.string_array_field_name }} type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
         }
         {% endfor -%}
 

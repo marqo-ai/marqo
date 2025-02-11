@@ -89,14 +89,15 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         get_docs_response = self.client.index(self.text_index_name).get_document(document_id = '1')
 
-        assert get_docs_response['results'][0]['bool_field'] == False
-        assert get_docs_response['results'][0]['int_field'] == 1.0
-        assert get_docs_response['results'][0]['float_field'] == 500.0
-        assert get_docs_response['results'][0]['int_map']['a'] == 2
-        assert get_docs_response['results'][0]['float_map']['c'] == 3.0
-        assert get_docs_response['results'][0]['string_array'] == ["ccc"]
-        assert get_docs_response['results'][0]['update_field_that_doesnt_exist'] == 500
-        assert get_docs_response['results'][0]['string_array2'] == ["123", "456"]
+        assert get_docs_response['bool_field'] == False
+        assert get_docs_response['int_field'] == 1
+        assert get_docs_response['float_field'] == 500.0
+        assert get_docs_response['int_map.a'] == 2
+        assert get_docs_response['int_map.b'] == 2
+        assert get_docs_response['float_map.c'] == 3.0
+        assert get_docs_response['string_array'] == ["ccc"]
+        assert get_docs_response['update_field_that_doesnt_exist'] == 500
+        assert get_docs_response['string_array2'] == ["123", "456"]
 
     def test_update_document_with_ids_change_field_type(self):
         text_docs = [{

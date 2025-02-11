@@ -564,7 +564,7 @@ class TestUpdate(MarqoTestCase):
             index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
 
         self.assertEqual(True, r["errors"])
-        self.assertIn("Document does not exist in the index", r["items"][0]["error"])
+        self.assertIn("Condition check failed when updating document", r["items"][0]["error"])
         self.assertEqual(404, r["items"][0]["status"])
         self.assertEqual(0, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
@@ -805,18 +805,6 @@ class TestUpdate(MarqoTestCase):
             r = update_documents(body=UpdateDocumentsBodyParams(documents=[{"_id": "1"}] * 129),
                                  index_name=self.structured_index_name, marqo_config=self.config)
 
-    def test_proper_error_is_raised_for_unstructured_index(self):
-        updated_doc = {
-            "text_field_tensor": "I can't be updated",
-            "_id": "1"
-        }
-        with self.assertRaises(UnsupportedFeatureError) as cm:
-            r = self.config.document.partial_update_documents_by_index_name(
-                partial_documents=[updated_doc],
-                index_name=self.test_unstructured_index_name).dict(exclude_none=True, by_alias=True)
-
-        self.assertIn("is not supported for unstructured indexes", str(cm.exception))
-
     def test_duplicate_ids_in_one_batch(self):
         """Test the behaviour when there are duplicate ids in a single batch.
 
@@ -860,7 +848,7 @@ class TestUpdate(MarqoTestCase):
             ([{"_id": "1", "text_field": "updated text field"}], False, 200, "1"),  # A valid doc
             ([{"text_field": "updated text field"}], True, 400, ""),  # An invalid doc without _id
             ([{"text_field": ["1", "1"], "_id": "1"}], True, 400, "1"),  # An invalid doc with wrong field type
-            ([{"text_field": "updated text field", "_id": "2"}], True, 404, "2")  # An invalid doc with non-existent _id
+            ([{"text_field": "updated text field", "_id": "2"}], True, 412, "2")  # An invalid doc with non-existent _id
         ]
         for update_docs, expected_error, expected_status, expected_id in test_cases:
             with self.subTest(f"{update_docs} - {expected_error} - {expected_status} - {expected_id}"):
