@@ -5,7 +5,7 @@ import pytest
 from marqo.api.exceptions import InvalidFieldNameError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search import tensor_search
-from tests.integ_tests.marqo_test import MarqoTestCase
+from integ_tests.marqo_test import MarqoTestCase
 
 class TestPartialUpdate(MarqoTestCase):
     @classmethod
