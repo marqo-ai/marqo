@@ -29,6 +29,20 @@
 - Fix a bug where numeric fields, numeric map fields, boolean fields and string array fields are not returned when searching with `attributes_to_retrieve` parameter for unstructured indexes created with Marqo 2.13 or later ([#1062](https://github.com/marqo-ai/marqo/pull/1064)).
 - Fix a bug where `document-processing` element is removed from the `services.xml` config file when bootstrapping the vector store ([#1075](https://github.com/marqo-ai/marqo/pull/1079)).
 
+# Release 2.13.6
+
+## Bug fixes and minor changes
+
+- Improved error messages for hybrid search ([#1108](https://github.com/marqo-ai/marqo/pull/1108)). Errors that occur in the tensor or lexical search portion of hybrid search are now correctly raised instead of becoming generic 500 errors.
+- Add missing support for legacy OpenAI CLIP models ([#1107](https://github.com/marqo-ai/marqo/pull/1107)). This fix allows old OpenAI CLIP models (eg. ViT-B/32) to be loaded properly.
+- Bug fix for searches using `CustomVectorQuery`. Searches of this query type will no longer fail due to result not being JSON-serializable ([#1109](https://github.com/marqo-ai/marqo/pull/1109)).
+  
+# Release 2.13.5
+
+## Bug fixes and minor changes
+
+- Improve performance of processing large search responses ([#1091](https://github.com/marqo-ai/marqo/pull/1091)). Optimizations include: removing unnecessary validation, utilizing orjson for faster JSON serialization, and optimizing post-search field selection (for unstructured indexes).
+
 # Release 2.13.4
 
 ## Bug fixes and minor changes
