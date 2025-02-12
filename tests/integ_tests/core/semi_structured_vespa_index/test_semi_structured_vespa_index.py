@@ -31,7 +31,7 @@ class TestSemiStructuredVespaIndexToVespaQuery(unittest.TestCase):
                 query = vespa_index.to_vespa_query(marqo_query)
                 fields = self._extract_fields_from_yql(query['yql'])
 
-                self.assertSetEqual({VESPA_FIELD_ID, 'title', 'marqo__chunks_title', STRING_ARRAY,
+                self.assertSetEqual({VESPA_FIELD_ID, 'title', 'marqo__chunks_title',
                                      BOOL_FIELDS, INT_FIELDS, FLOAT_FIELDS}, fields)
 
     def test_to_vespa_query_should_not_include_static_fields_when_attributes_to_retrieve_is_empty(self):

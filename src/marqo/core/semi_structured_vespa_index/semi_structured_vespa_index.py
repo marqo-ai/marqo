@@ -62,6 +62,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                         common.FLOAT_FIELDS,
                         common.BOOL_FIELDS,
                     ])
+                    string_array_attributes_to_retrieve = self._get_string_array_attributes_to_retrieve()
+                    marqo_query.attributes_to_retrieve.extend(string_array_attributes_to_retrieve)
                 else:
                     marqo_query.attributes_to_retrieve.extend([
                         common.STRING_ARRAY,
@@ -89,6 +91,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         else:
             raise InternalError(f'Unknown query type {type(marqo_query)}')
 
+    def _get_string_array_attributes_to_retrieve(self) -> List[str]:
+        return list(self.get_marqo_index().string_array_field_name_to_string_array_field_map.keys())
 
     def _get_filter_term(self, marqo_query: MarqoQuery) -> Optional[str]:
         # Reuse logic in UnstructuredVespaIndex to create filter term

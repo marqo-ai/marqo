@@ -154,4 +154,4 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         assert update_docs_response["errors"] == True
 
         assert update_docs_response['items'][0]['status'] == 412
-        assert update_docs_response['items'][0]['message'] == "Condition check failed when updating document"
+        assert update_docs_response['items'][0]['message'] == "Condition check failed when updating documents"

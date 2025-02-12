@@ -5,14 +5,14 @@ import pytest
 from marqo.api.exceptions import InvalidFieldNameError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.tensor_search import tensor_search
-from integ_tests.marqo_test import MarqoTestCase
+from tests.integ_tests.marqo_test import MarqoTestCase
 
 class TestPartialUpdate(MarqoTestCase):
     @classmethod
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured_10')
+        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured_12')
         cls.create_indexes([semi_structured_index_request])
         cls.index = cls.indexes[0]
         # cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
@@ -25,22 +25,8 @@ class TestPartialUpdate(MarqoTestCase):
         super().setUp()
         self.doc = {
             '_id': '1',
-            # 'tensor_field': 'title',
-            # 'tensor_subfield': 'description',
-            # "short_string_field": "shortstring",
-            # "long_string_field": "Thisisaverylongstring" * 10,
-            # "int_field": 123,
-            # "float_field": 123.0,
             "string_array": ["aaa", "bbb"],
             "string_array2": ["123", "456"],
-            # "int_map": {"a": 1, "b": 2},
-            # "float_map": {"c": 1.0, "d": 2.0},
-            # "bool_field": True,
-            # "bool_field2": False,
-            # "custom_vector_field": {
-            #     "content": "abcd",
-            #     "vector": [1.0] * 32
-            # }
         }
         self.doc2 = {
             '_id': '2',
@@ -107,17 +93,14 @@ class TestPartialUpdate(MarqoTestCase):
     # Test update single field
     def test_partial_update_should_update_bool_field(self):
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        print("Printing the document", doc)
         for doc in [self.doc, self.doc2, self.doc3]:
             id = doc['_id']
             res = self.config.document.partial_update_documents([{'_id': id, 'bool_field': False}], self.index)
-            print("Printing partial docs update", res)
             self.assertFalse(res.errors)
 
         for doc in [self.doc, self.doc2, self.doc3]:
             id = doc['_id']
             doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
-            print("Printing get docs response", doc)
             self.assertFalse(doc['bool_field'])
             self._assert_fields_unchanged(doc, ['bool_field'])
 
@@ -132,19 +115,13 @@ class TestPartialUpdate(MarqoTestCase):
             self.assertEqual(500, doc['int_field'])
             self._assert_fields_unchanged(doc, ['int_field'])
 
-    #TODO: I Haven't implemented that thing where the metadata map will also be updated for this field. something like update_field_that_doesnt_exist <-> int
     def test_partial_update_should_not_non_existent_field(self): #This now works
         res = self.config.document.partial_update_documents([{'_id': '2', 'update_field_that_doesnt_exist': 500}], self.index)
-        # self.assertFalse(res.errors)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        print(doc)
         self.assertEqual(500, doc['update_field_that_doesnt_exist'])
         self._assert_fields_unchanged(doc, ['update_field_that_doesnt_exist'])
 
-        #TODO: This shouldn't work - don't implement it
-
     def test_partial_update_should_not_update_int_field_to_float(self):
-        # So something like - let it update if the request says it's int - let it update if it is either int or a float.
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': 1.0}], self.index)
         self.assertTrue(res.errors)
 
@@ -152,68 +129,77 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{'_id': '2', 'float_field': 500.0}], self.index)
         self.assertFalse(res.errors)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        print(doc)
         self.assertEqual(500.0, doc['float_field'])
         self._assert_fields_unchanged(doc, ['float_field'])
         pass
 
     def test_partial_update_should_update_int_map(self):
-        # res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {}])
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {'a': 2, 'b': 3}}], self.index)
+        self.assertFalse(res.errors)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(doc['int_map.a'], 2)
+        self.assertEqual(doc['int_map.b'], 3)
+        self._assert_fields_unchanged(doc, ['int_map'])
+
 
     def test_partial_update_should_update_float_map(self):
-        pass
+        res = self.config.document.partial_update_documents([{'_id': '2', 'float_map': {'c': 2.0, 'd': 3.0}}],
+                                                            self.index)
+        self.assertFalse(res.errors)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(doc['float_map.c'], 2.0)
+        self.assertEqual(doc['float_map.d'], 3.0)
+        self._assert_fields_unchanged(doc, ['float_map'])
 
-    # @pytest.mark.skip(reason="This feature is not implemented yet.")
-    # Details: This is only update - purely only update, no removal or addition happens. If you pass int_map : {'a': 2} it will only update a and not change other values in the int_map
+
     def test_partial_update_should_allow_changing_numeric_types_in_map(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {
             'a': 2,  # update int to int
         }, 'float_map': {
-            'c': 3.0,  # update float to int #TODO: This should work.
+            'c': 3.0,  # update float to int
         }}], self.index)
-        print(res)
         self.assertFalse(res.errors)
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        print(doc)
-        self.assertEqual(2.0, doc['int_map.a'])
-        self.assertEqual(3.0, doc['float_map.c'])
+        self.assertEqual(doc['int_map.a'], 2)
+        self.assertEqual(doc['float_map.c'], 3.0)
 
-    #note: This scenario will not work. I mean if the original document has something like {marqo__string_array:
-    # [ 'string_array::aaa', 'string_array:bbb', 'string_array2::123', 'string_array2::456' ]} and you try to update it to
-    # {marqo__string_array: [ 'string_array::ccc' ]} it will not work. It will only work if you update the entire field.
-    # So if you update the entire field to {marqo__string_array: [ 'string_array::ccc' ]} it will not work - as in it will
-    # just change all of it to {marqo__string_array: [ 'string_array::ccc' ]}, thus losing the information stored under string_array2::123, or string_array2::456.
-    # This is because you can just update the entire Marqo__string_array field together, you cannot update individual elements of the array.
     def test_partial_update_should_update_string_array(self):
 
-        res = self.config.document.partial_update_documents([{'_id': '2', 'string_array': ["ccc"]}], self.index)
-        print(res)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'string_array': ["ccc"]}], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        print(doc)
         self.assertEqual(["ccc"], doc['string_array'])
         self._assert_fields_unchanged(doc, ['string_array'])
 
     def test_partial_update_should_update_short_string(self):
-        pass
+        index = self.config.index_management.get_index(self.index.name)
+        res = self.config.document.partial_update_documents(
+            [{'_id': '2', 'short_string_field': 'updated_short_string'}], index)
+        self.assertFalse(res.errors)
+
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual('updated_short_string', doc['short_string_field'])
+        self._assert_fields_unchanged(doc, ['short_string_field'])
 
     def test_partial_update_should_update_long_string(self):
-        pass
+        index = self.config.index_management.get_index(self.index.name)
+        res = self.config.document.partial_update_documents(
+            [{'_id': '2', 'long_string_field': 'updated_long_string' * 10}], index)
+        self.assertFalse(res.errors)
 
-    #TODO: looks like this is Unimplemented -
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual('updated_long_string' * 10, doc['long_string_field'])
+        self._assert_fields_unchanged(doc, ['long_string_field'])
+
     def test_partial_update_should_update_long_string_to_short_string(self):
         res = tensor_search.search(self.config, self.index.name, text='*',
                                    filter=f'long_string_field:{self.doc2["long_string_field"]}') #Note: Not all testing documents defined above contain short_string_field key, so when you change to run all the tests by running a for loop make sure to take a look here
         self.assertEqual(0, len(res['hits']))
-        print(res)
-        # note: But what is curious is that when I switch to Yihan's branch - it works. The test case is almost the same over there.
         index = self.config.index_management.get_index(self.index.name)
 
         res = self.config.document.partial_update_documents([{'_id': '2', 'long_string_field': 'short'}], index)
-        print(res)
         self.assertFalse(res.errors)
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
@@ -226,14 +212,11 @@ class TestPartialUpdate(MarqoTestCase):
     def test_partial_update_should_update_short_string_to_long_string(self):
         res = tensor_search.search(self.config, self.index.name, text='*',
                                    filter=f'short_string_field:{self.doc2["short_string_field"]}') #Note: Not all testing documents defined above contain short_string_field key, so when you change to run all the tests by running a for loop make sure to take a look here
-        print(res)
         self.assertEqual(2, len(res['hits']))
-        # note: But what is curious is that when I switch to Yihan's branch - it works. The test case is almost the same over there.
 
         index = self.config.index_management.get_index(self.index.name)
 
         res = self.config.document.partial_update_documents([{'_id': '2', 'short_string_field': 'verylongstring'*10}], index)
-        print(res)
         self.assertFalse(res.errors)
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
@@ -245,30 +228,28 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(0, len(res['hits']))
 
     def test_partial_update_should_update_score_modifiers(self):
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {
+            'a': 2,  # update int to int
+        }, 'float_map': {
+            'c': 3.0,  # update float to int
+        }}], self.index)
+        self.assertFalse(res.errors)
+        res = self.config.vespa_client.get_document('2', self.config.index_management.get_index(self.index.name).schema_name)
+        doc = res.document.dict().get('fields')
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.a'], 2.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.b'], 2.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 3.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.d'], 2.0)
 
-        pass
 
     # Test update multiple fields
     def test_partial_update_should_update_multiple_fields(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': 500, 'bool_field': False, 'float_field': 500.0}], self.index)
         self.assertFalse(res.errors)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        print(doc)
 
-    # Test remove field
-    # This feature itself is unimplemented. #TODO: This is not possible if we go with the metadata map approach
-    @pytest.mark.skip(reason = "This is not possible if we go with the metadata map approach")
-    def test_partial_update_should_remove_field_if_set_to_none(self):
-        res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': None}], self.index)
-        print(res)
-        # self.assertFalse(res.errors)
-        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        print(doc)
-        # self.assertNotIn('int_field', doc)
-
-    # Test add new fields
-    # @pytest.mark.skip(reason="This feature is not implemented yet.")
-    # Note: this is already implemented somewhere above
     def test_partial_update_should_add_new_fields(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'new_field': 500}], self.index)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
@@ -277,48 +258,39 @@ class TestPartialUpdate(MarqoTestCase):
     # Reject any tensor field change
     def test_partial_update_should_reject_tensor_field(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'tensor_field': 'new_title'}], self.index)
-        print(res)
         self.assertTrue(res.errors)
 
     def test_partial_update_should_reject_tensor_subfield(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'tensor_subfield': 'new_description'}], self.index)
-        print(res)
         self.assertTrue(res.errors)
 
-    def test_partial_update_should_reject_custom_vector_field(self): #TODO: This isn't working for some reason - need to debug
+    def test_partial_update_should_reject_custom_vector_field(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'custom_vector_field': {
             "content": "efgh",
             "vector": [1.0] * 32
         }}], self.index)
-        print(res)
         self.assertTrue(res.errors)
 
-    def test_partial_update_should_reject_multimodal_combo_field(self): #TODO: Not working - need to debug
+    def test_partial_update_should_reject_multimodal_combo_field(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'multimodal_combo_field': {
             "tensor_field": "new_title",
             "tensor_subfield": "new_description"
         }}], self.index)
-        print(res)
         self.assertTrue(res.errors)
 
     def test_partial_update_should_reject_numeric_array_field_type(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_array': [1, 2, 3]}], self.index)
-        print(res)
         self.assertTrue(res.errors)
 
     def test_partial_update_should_reject_new_lexical_field(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'new_lexical_field': 'some string that signifies new lexical field'}], self.index)
-        print(res)
         self.assertTrue(res.errors)
 
     def test_partial_update_invalid_field_name(self):
         with pytest.raises(InvalidFieldNameError):
             res = self.config.document.partial_update_documents([{'_id': '2', 'marqo__': 1}], self.index)
-            print(res)
             self.assertTrue(res.errors)
 
     def test_partial_update_sort_of_backwards_compatibility_test(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'string_array': ["ccc"]}], self.index)
-        print(res)
-
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
