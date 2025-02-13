@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 from marqo import config, marqo_docs
@@ -321,7 +321,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
     [Search API document](https://docs.marqo.ai/latest/reference/api/search/search/) for details.
     """
     with RequestMetricsStore.for_request().time(f"POST /indexes/{index_name}/search"):
-        return tensor_search.search(
+        result = tensor_search.search(
             config=marqo_config, text=search_query.q,
             index_name=index_name, highlights=search_query.showHighlights,
             searchable_attributes=search_query.searchableAttributes,
@@ -339,6 +339,7 @@ def search(search_query: SearchQuery, index_name: str, device: str = Depends(api
             text_query_prefix=search_query.textQueryPrefix,
             hybrid_parameters=search_query.hybridParameters
         )
+        return ORJSONResponse(result)
 
 
 @app.post("/indexes/{index_name}/recommend")
