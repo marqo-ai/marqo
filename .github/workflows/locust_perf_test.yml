@@ -128,7 +128,7 @@ jobs:
 
       - name: Start local Marqo container
         if: github.event.inputs.marqo_host == 'http://localhost:8882'
-        run: ./.github/scripts/start_docker_marqo.sh ${{ github.event.inputs.image_to_test }} -e MARQO_MODELS_TO_PRELOAD='["${{ github.event.inputs.index_model_name }}"]'
+        run: ./tests/api_tests/v1/scripts/start_docker_marqo.sh ${{ github.event.inputs.image_to_test }} -e MARQO_MODELS_TO_PRELOAD='["${{ github.event.inputs.index_model_name }}"]'
 
       - name: Install Perf Tests Dependencies
         run: |
