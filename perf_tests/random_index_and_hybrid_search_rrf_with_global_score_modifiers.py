@@ -12,13 +12,13 @@ from common.marqo_locust_http_user import MarqoLocustHttpUser
 
 """
 Performance test on Hybrid RRF search.
-Does NOT use global score modifiers in search, but adds it to documents.
+Uses global score modifiers in search.
 """
 
 INDEX_NAME = os.getenv('MARQO_INDEX_NAME', 'locust-test')
 
 
-class AddDocToUnstructuredIndexUser(MarqoLocustHttpUser):
+class AddDocToStructuredIndexUser(MarqoLocustHttpUser):
     fixed_count = 1
     wait_time = between(1, 2)
     s = RandomSentence()
@@ -70,6 +70,7 @@ def on_test_start(environment: Environment, **kwargs):
         marqo_client.create_index(
             INDEX_NAME,
             settings_dict={
+                "type": "structured",
                 "model": os.getenv('MARQO_INDEX_MODEL_NAME', 'hf/e5-base-v2'),
                 "allFields": [
                     {"name": "title", "type": "text", "features": ["lexical_search"]},
