@@ -6,7 +6,7 @@ import pycurl
 import pytest
 import torch
 from fastapi.responses import ORJSONResponse
-from tests.marqo_test import MarqoTestCase, TestImageUrls
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
