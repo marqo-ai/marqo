@@ -1,5 +1,5 @@
 name: Locust Performance Test
-run-name: ${{ inputs.test_suite }} on image ${{ image_to_test }} run on ${{ inputs.marqo_host }} with ${{ inputs.number_of_users }} users
+run-name: ${{ inputs.test_suite }} on image ${{ inputs.image_to_test }} run on ${{ inputs.marqo_host }} with ${{ inputs.number_of_users }} users
 # runs Locust performance tests on local Marqo container or Marqo Cloud
 
 on:
