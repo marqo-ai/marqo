@@ -23,9 +23,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
     """
     An implementation of VespaIndex for SemiStructured indexes.
     """
+    index_supports_partial_updates: bool = False
 
     def __init__(self, marqo_index: SemiStructuredMarqoIndex):
         super().__init__(marqo_index)
+        self.index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 
     def get_marqo_index(self) -> SemiStructuredMarqoIndex:
         if isinstance(self._marqo_index, SemiStructuredMarqoIndex):
@@ -34,9 +36,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             raise TypeError('Wrong type of marqo index')
 
     def to_vespa_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
-        index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
         return (SemiStructuredVespaDocument.from_marqo_document(
-            marqo_document, marqo_index=self.get_marqo_index())).to_vespa_document(index_supports_partial_updates)
+            marqo_document, marqo_index=self.get_marqo_index())).to_vespa_document()
 
     def to_marqo_document(self, vespa_document: Dict[str, Any], return_highlights: bool = False) -> Dict[str, Any]:
         vespa_doc = SemiStructuredVespaDocument.from_vespa_document(vespa_document, marqo_index=self.get_marqo_index())
@@ -52,10 +53,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
     def to_vespa_query(self, marqo_query: MarqoQuery) -> Dict[str, Any]:
         # Verify attributes to retrieve, if defined
-        index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
         if marqo_query.attributes_to_retrieve is not None:
             if len(marqo_query.attributes_to_retrieve) > 0:
-                if index_supports_partial_updates:
+                if self.index_supports_partial_updates:
                     # Retrieve static fields content to extract non-string values from combined fields
                     marqo_query.attributes_to_retrieve.extend([
                         common.INT_FIELDS,
@@ -101,7 +101,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         def generate_equality_filter_string(node: search_filter.EqualityTerm) -> str:
             filter_parts = []
-            index_supports_partial_updates = self._marqo_index_version >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
 
             # Filter on `_id`
             if node.field == MARQO_DOC_ID:
@@ -121,7 +120,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             filter_parts.append(short_string_filter_string)
 
             # String Array Filter
-            if index_supports_partial_updates:
+            if self.index_supports_partial_updates:
                 if node.field in self.get_marqo_index().name_to_string_array_field_map:
                     string_array_field_name = f'{STRING_ARRAY}_{node.field}'
                     string_array_filter_string = (f'({string_array_field_name} contains '
