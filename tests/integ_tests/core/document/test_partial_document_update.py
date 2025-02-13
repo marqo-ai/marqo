@@ -564,8 +564,8 @@ class TestUpdate(MarqoTestCase):
             index_name=self.structured_index_name).dict(exclude_none=True, by_alias=True)
 
         self.assertEqual(True, r["errors"])
-        self.assertIn("Condition check failed when updating document", r["items"][0]["error"])
-        self.assertEqual(404, r["items"][0]["status"])
+        self.assertEqual("Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again", r["items"][0]["error"])
+        self.assertEqual(400, r["items"][0]["status"])
         self.assertEqual(0, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
     def test_update_a_document_without_id(self):

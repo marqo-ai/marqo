@@ -153,5 +153,5 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         assert update_docs_response["errors"] == True
 
-        assert update_docs_response['items'][0]['status'] == 412
-        assert update_docs_response['items'][0]['message'] == "Condition check failed when updating documents"
+        assert update_docs_response['items'][0]['status'] == 400
+        assert update_docs_response['items'][0]['message'] == "Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again"
