@@ -1,5 +1,5 @@
-name: locust_performance_tests
-run-name: Locust test suite ${{ inputs.test_suite }} run on ${{ inputs.marqo_host }} with ${{ inputs.number_of_users }} users
+name: Locust Performance Test
+run-name: ${{ inputs.test_suite }} on image ${{ image_to_test }} run on ${{ inputs.marqo_host }} with ${{ inputs.number_of_users }} users
 # runs Locust performance tests on local Marqo container or Marqo Cloud
 
 on:
@@ -11,6 +11,7 @@ on:
         options:
           - random_index_and_tensor_search.py
           - random_index_and_hybrid_search_rrf.py
+          - random_index_and_hybrid_search_rrf_with_global_score_modifiers.py
         description: >
           Location of the locustfile that contains the test suite. This works as the entrypoint
 
