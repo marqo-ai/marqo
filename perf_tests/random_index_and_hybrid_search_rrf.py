@@ -21,11 +21,11 @@ INDEX_NAME = os.getenv('MARQO_INDEX_NAME', 'locust-test')
 class AddDocToStructuredIndexUser(MarqoLocustHttpUser):
     fixed_count = 1
     wait_time = between(1, 2)
-    s = "this is a random sentence."
 
     @task
     def add_docs(self):
         # Generate random documents batch (5-10 docs) with random length description of 1-5 sentences
+        s = "this is a random sentence."
         random_docs = [{
             'title': s,
             'description': ' '.join([s for j in range(i)]),
