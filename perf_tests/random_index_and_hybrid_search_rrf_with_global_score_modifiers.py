@@ -28,10 +28,10 @@ class AddDocToStructuredIndexUser(MarqoLocustHttpUser):
         # Generate random documents batch (5-10 docs) with random length description of 1-5 sentences
         random_docs = [{
             'title': self.s.sentence(),
-            'description': ' '.join([self.s.sentence() for j in range(random.randint(1, 5))]),
+            'description': ' '.join([self.s.sentence() for j in range(5)]),
             'mult_field': random.randint(1, 10),
             'add_field': random.randint(1, 10)
-        } for i in range(random.randint(5, 10))]
+        } for i in range(10)]
 
         self.client.index(INDEX_NAME).add_documents(documents=random_docs)
 
@@ -44,7 +44,7 @@ class SearchUser(MarqoLocustHttpUser):
     def search(self):
         # Random search query to retrieve first 20 results
         self.client.index(INDEX_NAME).search(
-            q=' '.join(self.w.random_words(amount=random.randint(1, 5))),
+            q=' '.join(self.w.random_words(amount=5)),
             search_method='HYBRID',
             hybrid_parameters={
                 'retrievalMethod': 'disjunction',
@@ -102,4 +102,4 @@ def on_test_stop(environment, **kwargs):
 
 
 if __name__ == "__main__":
-    run_single_user(AddDocToUnstructuredIndexUser)
+    run_single_user(AddDocToStructuredIndexUser)
