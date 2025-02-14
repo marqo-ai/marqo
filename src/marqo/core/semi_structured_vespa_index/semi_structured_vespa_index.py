@@ -430,7 +430,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             MarqoDocumentParsingError: If any element in the array is not a string
         """
         if not all(isinstance(v, str) for v in value) or self.get_marqo_index().name_to_string_array_field_map.get(field_name) is None:
-            raise MarqoDocumentParsingError('Only string arrays are supported')
+            raise MarqoDocumentParsingError('Unstructured index updates only support updating existing string array fields')
         field_types[field_name] = MarqoFieldTypes.STRING_ARRAY.value # setting field types for later creating pre-conditions
         self._create_update_statement_for_updating_field(fields, field_name, value) # To create update statement for updating the actual field 
         self._create_update_statement_for_updating_field_type_metadata(fields, field_types, field_name) # To create update statement for updating 'field type' metadata

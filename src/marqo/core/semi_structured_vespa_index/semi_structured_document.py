@@ -292,7 +292,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 if instance.index_supports_partial_updates:
                     instance.fixed_fields.field_types[marqo_tensor_field] = MarqoFieldTypes.TENSOR.value # Set field_types as tensor for tensor fields
 
-                    if document.get('multimodal_params').get(marqo_tensor_field) is not None: # Set field_types as tensor for sub-fields of multimodal combo fields
+                    multimodal_params = document.get('multimodal_params')
+                    if multimodal_params is not None and multimodal_params.get(marqo_tensor_field) is not None: # Set field_types as tensor for sub-fields of multimodal combo fields
                         try:
                             multimodal_params = json.loads(document.get('multimodal_params').get(marqo_tensor_field))
                             multimodal_combo_sub_fields = multimodal_params.get('weights').keys()
