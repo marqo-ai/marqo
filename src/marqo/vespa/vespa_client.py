@@ -11,13 +11,14 @@ from urllib.parse import urlparse
 
 import httpcore
 import httpx
+import orjson
 
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
-from marqo.vespa.models import VespaDocument, QueryResult, FeedBatchDocumentResponse, FeedBatchResponse, \
+from marqo.vespa.models import VespaDocument, QueryResult, Error, FeedBatchDocumentResponse, FeedBatchResponse, \
     FeedDocumentResponse, UpdateDocumentsBatchResponse, UpdateDocumentResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.application_metrics import ApplicationMetrics
 from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, DeleteBatchDocumentResponse, \
@@ -245,7 +246,7 @@ class VespaClient:
 
         self._query_raise_for_status(resp)
 
-        return QueryResult(**resp.json())
+        return QueryResult(**orjson.loads(resp.text))
 
     def feed_document(self, document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """
@@ -1008,9 +1009,26 @@ class VespaClient:
 
             self._raise_for_status(resp)
 
+    @classmethod
+    def _is_timeout_error(cls, error: Error, resp: httpx.Response) -> bool:
+        """
+        Check if the query error is a timeout error.
+        """
+
+        if error.code == 8 and error.message == "Search request soft doomed during query setup and initialization.":
+            logger.warn('Detected soft doomed query')
+            return True
+        if error.code == 12 and resp.status_code == 504:
+            return True
+
+        return False
+
     def _query_raise_for_status(self, resp: httpx.Response) -> None:
         """
         Query API specific raise for status method.
+        If multiple errors:
+            If all errors are timeout, raise VespaTimeoutError (504).
+            If even one error is not timeout, raise VespaStatusError (500).
         """
         # See error codes here https://github.com/vespa-engine/vespa/blob/master/container-core/src/main/java/com/yahoo/container/protect/Error.java
         try:
@@ -1022,18 +1040,12 @@ class VespaClient:
                         result.root.errors is not None
                         and len(result.root.errors) > 0
                 ):
-                    if resp.status_code == 504 and result.root.errors[0].code == 12:
-                        raise VespaTimeoutError(message=resp.text, cause=e) from e
-                    elif (
-                            result.root.errors[0].code == 8
-                            and result.root.errors[
-                                0].message == "Search request soft doomed during query setup and initialization."
-                    ):
-                        # The soft doom error is a bug in certain Vespa versions. Newer versions should always return
-                        # a code 12 for timeouts
-                        logger.warning('Detected soft doomed query')
-                        raise VespaTimeoutError(message=resp.text, cause=e) from e
-
+                    for error in result.root.errors:
+                        if not self._is_timeout_error(error, resp):
+                            # Raise 500 if any error is not timeout
+                            raise VespaStatusError(message=resp.text, cause=e) from e
+                    # Raise 504 if all errors are timeout
+                    raise VespaTimeoutError(message=resp.text, cause=e) from e
                 raise e
             except VespaStatusError:
                 raise

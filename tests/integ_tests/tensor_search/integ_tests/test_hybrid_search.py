@@ -1,19 +1,24 @@
+import json
 import os
 import unittest
 from unittest import mock
 
+import httpx
 import numpy as np
+from fastapi.responses import ORJSONResponse
+from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import marqo.core.exceptions as core_exceptions
+import marqo.vespa.exceptions as vespa_exceptions
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, HybridParameters
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
+from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -383,6 +388,12 @@ class TestHybridSearch(MarqoTestCase):
                              sample_vector)
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, with context, with content"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -420,6 +431,12 @@ class TestHybridSearch(MarqoTestCase):
                              [i*1.5 for i in sample_vector])    # Should average the query & context vectors
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -453,6 +470,12 @@ class TestHybridSearch(MarqoTestCase):
             self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
                              sample_vector)
             self.assertIn("hits", res)
+
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
 
     def test_hybrid_search_semi_structured_with_custom_vector_query(self):
         """
@@ -517,6 +540,12 @@ class TestHybridSearch(MarqoTestCase):
                              sample_vector)
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, with context, with content"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -554,6 +583,12 @@ class TestHybridSearch(MarqoTestCase):
                              [i*1.5 for i in sample_vector])    # Should average the query & context vectors
             self.assertIn("hits", res)
 
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
+
         with self.subTest("Custom vector query, no content, no context, tensor/tensor"):
             @unittest.mock.patch("marqo.vespa.vespa_client.VespaClient.query", mock_vespa_client_query)
             def run():
@@ -586,6 +621,12 @@ class TestHybridSearch(MarqoTestCase):
             self.assertEqual(vespa_query_kwargs["query_features"]["marqo__query_embedding"],
                              sample_vector)
             self.assertIn("hits", res)
+
+            # Result should be JSON serializable
+            try:
+                ORJSONResponse(res)
+            except TypeError as e:
+                self.fail(f"Result is not JSON serializable: {e}")
 
     def test_hybrid_search_disjunction_rrf_zero_alpha_same_as_lexical(self):
         """
@@ -2415,6 +2456,198 @@ class TestHybridSearch(MarqoTestCase):
             )
         self.assertIn("does not support `searchableAttributesTensor` or `searchableAttributesLexical`",
                       str(e.exception))
+
+    def test_lexical_error_raises_correct_hybrid_error(self):
+        """
+        Ensure that the proper error is raised when a lexical search fails in a hybrid search.
+        The double backslash error is a known 500 in lexical search (400 in vespa), so using
+        the same query in hybrid search should give the same error code and message.
+        """
+
+        # TODO: remove when double backslash error is fixed
+        for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+            with self.subTest(index=index.type):
+
+                # Adding documents
+                self.add_documents(
+                    config=self.config,
+                    add_docs_params=AddDocsParams(
+                        index_name=index.name,
+                        docs=[
+                            {"_id": "doc1", "text_field_1": "some text"}
+                        ],
+                        tensor_fields=["text_field_1"] if \
+                            isinstance(index, UnstructuredMarqoIndex) else None
+                    )
+                )
+
+                with self.assertRaises(vespa_exceptions.VespaStatusError) as e:
+                    tensor_search.search(
+                        text='\\\\"hi\\\\"', config=self.config, index_name=index.name,
+                        search_method=SearchMethod.HYBRID
+                    )
+                self.assertIn("Could not create query from YQL", str(e.exception))
+
+    def test_hybrid_with_two_errors_returns_both(self):
+        """
+        If vespa query to the hybrid searcher returns a result with 2 errors, both should be in the error message.
+        If all errors are timeout, raise VespaTimeoutError (504).
+        If even one error is not timeout, raise VespaStatusError (500).
+        """
+
+        # Mock Vespa result with 2 errors
+        test_cases = [
+            # HTTP 504, first is Vespa 12
+            (
+                {
+                    'root': {
+                        'relevance': 1.0,
+                        'fields': {'totalCount': 0},
+                        'errors': [
+                            {
+                                'code': 12,
+                                'summary': 'Timed out',
+                                'source': 'content_default',
+                                'message': "Error in execution of chain 'content_default': Chain timed out."
+                            },
+                            {
+                                'code': 4,
+                                'summary': 'Invalid query parameter',
+                                'message': 'Could not create query from YQL.'
+                            }
+                        ]
+                    }
+                },
+                504,    # HTTP 504
+                False,  # Not a timeout, since 2nd error is not timeout
+            ),
+            # HTTP 400, second is Vespa 12
+            (
+                {
+                    'root': {
+                        'relevance': 1.0,
+                        'fields': {'totalCount': 0},
+                        'errors': [
+                            {
+                                'code': 4,
+                                'summary': 'Invalid query parameter',
+                                'message': 'Could not create query from YQL.'
+                            },
+                            {
+                                'code': 12,
+                                'summary': 'Timed out',
+                                'source': 'content_default',
+                                'message': "Error in execution of chain 'content_default': Chain timed out."
+                            }
+                        ]
+                    }
+                },
+                400,  # HTTP 400
+                False,  # Not a timeout, since 1st error is not timeout
+            ),
+            # HTTP 504, both Vespa errors 12
+            (
+                {
+                    'root': {
+                        'relevance': 1.0,
+                        'fields': {'totalCount': 0},
+                        'errors': [
+                            {
+                                'code': 12,
+                                'summary': 'Timed out',
+                                'source': 'content_default',
+                                'message': "Error in execution of chain 'content_default': Chain timed out."
+                            },
+                            {
+                                'code': 12,
+                                'summary': 'Timed out',
+                                'source': 'content_default',
+                                'message': "Error in execution of chain 'content_default': Chain timed out."
+                            }
+                        ]
+                    }
+                },
+                504,    # HTTP 504
+                True    # Timeout, since both errors are timeout
+            ),
+            # HTTP 400, both Vespa errors 12 but not timeout
+            (
+                {
+                    'root': {
+                        'relevance': 1.0,
+                        'fields': {'totalCount': 0},
+                        'errors': [
+                            {
+                                'code': 12,
+                                'summary': 'Some other error',
+                                'source': 'content_default',
+                                'message': 'Some error message'
+                            },
+                            {
+                                'code': 12,
+                                'summary': 'Some other error',
+                                'source': 'content_default',
+                                'message': 'Some error message'
+                            }
+                        ]
+                    }
+                },
+                400,    # HTTP 400
+                False    # Not a timeout, since not 504 error code
+            ),
+            # HTTP 504, first 12, second soft doom
+            (
+                {
+                    'root': {
+                        'relevance': 1.0,
+                        'fields': {'totalCount': 0},
+                        'errors': [
+                            {
+                                'code': 12,
+                                'summary': 'Timed out',
+                                'source': 'content_default',
+                                'message': "Error in execution of chain 'content_default': Chain timed out."
+                            },
+                            {
+                                'code': 8,
+                                'summary': 'Soft doom',
+                                'message': 'Search request soft doomed during query setup and initialization.'
+                            }
+                        ]
+                    }
+                },
+                504,    # HTTP 504
+                True    # Timeout, since both errors are timeout
+            )
+        ]
+
+        for result_dict, vespa_httpx_code, should_be_timeout in test_cases:
+            with self.subTest(result_dict=result_dict, vespa_httpx_code=vespa_httpx_code,
+                              should_be_timeout=should_be_timeout):
+                # If should_be_timeout, raise a VespaTimeoutError (504), else raise a VespaStatusError (500)
+                mock_vespa_result = httpx.Response(
+                    status_code=vespa_httpx_code,
+                    content=json.dumps(result_dict),
+                    request=httpx.Request("POST", "http://localhost:8080/test-url/")
+                )
+
+                with unittest.mock.patch("httpx.Client.post") as mock_query:
+                    mock_query.return_value = mock_vespa_result
+
+                    for index in [self.structured_text_index_score_modifiers, self.semi_structured_default_text_index]:
+                        with self.subTest(index=type(index)):
+                            with self.assertRaises(vespa_exceptions.VespaStatusError) as e:
+                                tensor_search.search(
+                                    text='dogs', config=self.config, index_name=index.name,
+                                    search_method=SearchMethod.HYBRID
+                                )
+                            self.assertEqual(should_be_timeout,
+                                             isinstance(e.exception, vespa_exceptions.VespaTimeoutError))
+
+                            for error in result_dict["root"]["errors"]:
+                                # All error messages should be in final exception
+                                self.assertIn(error["message"], str(e.exception))
+                                self.assertIn(error["summary"], str(e.exception))
 
     def test_hybrid_search_unstructured_with_2_10_fails(self):
         """
