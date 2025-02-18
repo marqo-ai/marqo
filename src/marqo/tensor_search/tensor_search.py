@@ -2132,7 +2132,7 @@ def _vectorise_via_inference_server(content: Any) -> List[List[float]]:
         if isinstance(content, list):
             content = content[0]
         res = requests.post(url, json=content).json()
-        return res
+        return [res,]
     else:
         raise Exception("MARQO_INFERENCE_SERVER is not set to a valid value")
 
