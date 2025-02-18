@@ -275,3 +275,14 @@ class TestOpenCLIPModelLoad(TestCase):
                 repo_location=ModelLocation(**model_properties["model_location"]),
                 auth=model_auth,
             )
+
+    def test_load_legacy_openai_clip_model(self):
+        """A test to ensure old OpenAI CLIP models (e.g., ViT-B/32) are loaded correctly."""
+        model_properties = {
+            "name": "ViT-B/32", # Old OpenAI CLIP model name
+            "type": "open_clip",
+            "url": "https://github.com/mlfoundations/open_clip/releases/download/v0.2-weights/vit_b_32-quickgelu-laion400m_e32-46683a32.pt",
+            "dimensions": 512
+        }
+        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+        model.load()

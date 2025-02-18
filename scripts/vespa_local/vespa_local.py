@@ -8,7 +8,7 @@ from xml.dom import minidom
 import math
 import argparse
 
-VESPA_VERSION=os.getenv('VESPA_VERSION', '8.431.32')  # default version baked into marqo-base:44
+VESPA_VERSION=os.getenv('VESPA_VERSION', '8.472.109')  # Vespa version to use as marqo-base:49
 MINIMUM_API_NODES = 2
 
 class VespaLocalSingleNode:

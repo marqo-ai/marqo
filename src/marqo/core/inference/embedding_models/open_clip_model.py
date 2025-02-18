@@ -210,7 +210,8 @@ class OPEN_CLIP(AbstractCLIPModel):
 
     def _load_tokenizer_from_checkpoint(self) -> Callable:
         if not self.model_properties.tokenizer:
-            return open_clip.get_tokenizer(self.model_properties.name)
+            # Replace '/'with '-' to support old clip model name style
+            return open_clip.get_tokenizer(self.model_properties.name.replace("/", "-"))
         else:
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(self.model_properties.tokenizer)

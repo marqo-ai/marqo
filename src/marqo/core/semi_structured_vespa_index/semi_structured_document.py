@@ -62,7 +62,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 text_fields[field_name] = fields[field_name]
 
         return cls(id=document[cls._VESPA_DOC_ID],
-                   fixed_fields=SemiStructuredVespaDocumentFields(**fields),
+                   fixed_fields=SemiStructuredVespaDocumentFields.construct(**fields),
                    tensor_fields=tensor_fields,
                    text_fields=text_fields,
                    raw_tensor_score=cls.extract_field(fields, common.VESPA_DOC_HYBRID_RAW_TENSOR_SCORE, None),
