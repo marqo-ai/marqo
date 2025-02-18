@@ -2114,18 +2114,27 @@ def run_vectorise_pipeline(config: Config, queries: List[BulkSearchQueryEntity],
 
 
 def _vectorise_via_inference_server(content: Any) -> List[List[float]]:
-    url = "http://host.docker.internal:8686/infer"
-    if isinstance(content, str):
-        content = [content]
+    if os.environ.get("MARQO_INFERENCE_SERVER").lower() == "triton":
+        url = "http://host.docker.internal:8686/infer"
+        if isinstance(content, str):
+            content = [content]
 
-    data = {
-        "name": "ViT-B-32",
-        "pretrained": "laion2b_s34b_b79k",
-        "text": content
-    }
+        data = {
+            "name": "ViT-B-32",
+            "pretrained": "laion2b_s34b_b79k",
+            "text": content
+        }
 
-    res = requests.post(url, json=data).json()
-    return res["textEmbeddings"]
+        res = requests.post(url, json=data).json()
+        return res["textEmbeddings"]
+    elif os.environ.get("MARQO_INFERENCE_SERVER").lower() == "rayserve":
+        url = "http://127.0.0.1:8000/"
+        if isinstance(content, list):
+            content = content[0]
+        res = requests.post(url, json=content).json()
+        return res
+    else:
+        raise Exception("MARQO_INFERENCE_SERVER is not set to a valid value")
 
 
 
