@@ -2128,7 +2128,7 @@ def _vectorise_via_inference_server(content: Any) -> List[List[float]]:
         res = requests.post(url, json=data).json()
         return res["textEmbeddings"]
     elif os.environ.get("MARQO_INFERENCE_SERVER").lower() == "rayserve":
-        url = "http://127.0.0.1:8000/"
+        url = "http://host.docker.internal:8000/"
         if isinstance(content, list):
             content = content[0]
         res = requests.post(url, json=content).json()
