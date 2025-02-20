@@ -8,7 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Start single node vespa
-python3 "$SCRIPT_DIR/../../../scripts/vespa_local/vespa_local.py full-start"
+python3 "$SCRIPT_DIR/../../../../../marqo/scripts/vespa_local/vespa_local.py full-start"
 MARQO_DOCKER_IMAGE="$1"
 shift
 
