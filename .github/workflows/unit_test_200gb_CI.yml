@@ -129,7 +129,7 @@ jobs:
               echo "Using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
               echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
               # If multinode vespa, ignore unrelated tests to save time
-              echo "MULTINODE_TEST_ARGS=--multinode --ignore=tests/core/index_management/test_index_management.py --ignore=tests/core/inference --ignore=tests/processing --ignore=tests/s2_inference" >> $GITHUB_OUTPUT
+              echo "MULTINODE_TEST_ARGS=--multinode --ignore=tests/integ_tests/core/index_management/test_index_management.py --ignore=tests/integ_tests/core/inference --ignore=tests/integ_tests/processing --ignore=tests/integ_tests/s2_inference" >> $GITHUB_OUTPUT
             fi
           fi
 
@@ -257,7 +257,7 @@ jobs:
 
           export PYTHONPATH="./src"
           set -o pipefail
-          pytest ${{ env.MULTINODE_TEST_ARGS }} --ignore=tests/test_documentation.py \
+          pytest ${{ env.MULTINODE_TEST_ARGS }} --ignore=tests/integ_tests/test_documentation.py \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
