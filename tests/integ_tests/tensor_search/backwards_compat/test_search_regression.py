@@ -1,6 +1,7 @@
 import os
 import uuid
 from unittest import mock
+import pytest
 
 import marqo.core.exceptions as core_exceptions
 from marqo.core.models.marqo_index import *

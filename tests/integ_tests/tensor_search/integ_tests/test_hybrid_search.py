@@ -19,6 +19,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
+import pytest
 
 
 class TestHybridSearch(MarqoTestCase):
