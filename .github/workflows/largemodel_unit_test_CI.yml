@@ -113,7 +113,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: python marqo/scripts/vespa_local/vespa_local.py full-start
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
       - name: Run Large Model Unit Tests
         run: |
