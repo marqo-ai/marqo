@@ -8,7 +8,7 @@ import docker
 from xml.etree import ElementTree as ET
 from xml.dom import minidom
 from unittest.mock import patch, mock_open, call
-from tests.marqo_test import MarqoTestCase
+from tests.unit_tests.marqo_test import MarqoTestCase
 from scripts.vespa_local.vespa_local import VespaLocalSingleNode, VespaLocalMultiNode
 import builtins
 
@@ -19,8 +19,6 @@ class TestVespaLocal(MarqoTestCase):
         self.test_dir = tempfile.TemporaryDirectory()
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir.name)
-        # Ensure multinode directory exists for file writes.
-        os.makedirs("multinode", exist_ok=True)
 
         # Create a dedicated mock for write operations.
         self.write_mock = mock_open()
@@ -65,10 +63,11 @@ class TestVespaLocalMultiNode(TestVespaLocal):
         patched_open.side_effect = self.custom_open
         for number_of_shards, number_of_replicas in self.test_cases:
             with self.subTest(number_of_shards=number_of_shards, number_of_replicas=number_of_replicas):
-                VespaLocalMultiNode.generate_docker_compose(number_of_shards, number_of_replicas, VESPA_VERSION)
+                test_vespa_local = VespaLocalMultiNode(number_of_shards, number_of_replicas)
+                test_vespa_local.generate_docker_compose(VESPA_VERSION)
 
                 # Verify that docker-compose.yml is written
-                patched_open.assert_any_call('multinode/docker-compose.yml', 'w')
+                patched_open.assert_any_call('docker-compose.yml', 'w')
 
                 handle = self.write_mock()
                 written_yml = "".join([call_arg[0][0] for call_arg in handle.write.call_args_list])
@@ -81,73 +80,68 @@ class TestVespaLocalMultiNode(TestVespaLocal):
                 # Reset call_args_list to avoid tests failing due to previous calls
                 self.write_mock.reset_mock()
 
-    @patch("builtins.open", side_effect=lambda path, mode, *args, **kwargs: None)
-    def test_generate_services_xml(self, patched_open):
-        # Patch file write (to check content) but use original open for reading.
-        patched_open.side_effect = self.custom_open
-
+    def test_generate_services_xml(self):
         for number_of_shards, number_of_replicas in self.test_cases:
             with (self.subTest(number_of_shards=number_of_shards, number_of_replicas=number_of_replicas)):
-                VespaLocalMultiNode.generate_services_xml(number_of_shards, number_of_replicas)
-
-                # Verify that services.xml is written
-                patched_open.assert_any_call('multinode/services.xml', 'w')
-
-                handle = self.write_mock()
-                written_xml = "".join([call_arg[0][0] for call_arg in handle.write.call_args_list])
+                test_vespa_local = VespaLocalMultiNode(number_of_shards, number_of_replicas)
+                actual_services_xml_content = test_vespa_local.get_services_xml_content()
 
                 # Check that written XML exactly matches the expected XML
                 expected_file_name = f"expected/services_{number_of_shards}_shard_{number_of_replicas}_replica.xml"
                 expected_xml = self._read_file(expected_file_name)
-                self.assertEqual(written_xml, expected_xml)
+                self.assertEqual(actual_services_xml_content, expected_xml)
 
-                # Reset call_args_list to avoid tests failing due to previous calls
-                self.write_mock.reset_mock()
-
-    @patch("builtins.open", side_effect=lambda path, mode, *args, **kwargs: None)
-    def test_generate_hosts_xml(self, patched_open):
-        # Patch file write (to check content) but use original open for reading.
-        patched_open.side_effect = self.custom_open
+    def test_generate_hosts_xml(self):
         for number_of_shards, number_of_replicas in self.test_cases:
-            with self.subTest(number_of_shards=number_of_shards, number_of_replicas=number_of_replicas):
-                VespaLocalMultiNode.generate_hosts_xml(number_of_shards, number_of_replicas)
-
-                # Verify that hosts.xml is written
-                patched_open.assert_any_call('multinode/hosts.xml', 'w')
-
-                handle = self.write_mock()
-                written_xml = "".join([call_arg[0][0] for call_arg in handle.write.call_args_list])
+            with (self.subTest(number_of_shards=number_of_shards, number_of_replicas=number_of_replicas)):
+                test_vespa_local = VespaLocalMultiNode(number_of_shards, number_of_replicas)
+                actual_hosts_xml_content = test_vespa_local.get_hosts_xml_content()
 
                 # Check that written XML exactly matches the expected XML
                 expected_file_name = f"expected/hosts_{number_of_shards}_shard_{number_of_replicas}_replica.xml"
                 expected_xml = self._read_file(expected_file_name)
-                self.assertEqual(written_xml, expected_xml)
-
-                # Reset call_args_list to avoid tests failing due to previous calls
-                self.write_mock.reset_mock()
+                self.assertEqual(actual_hosts_xml_content, expected_xml)
     @patch("os.system")
     @patch("builtins.open")
     def test_start(self, mock_open, mock_system):
         for number_of_shards, number_of_replicas in self.test_cases:
             with self.subTest(number_of_shards=number_of_shards, number_of_replicas=number_of_replicas):
-                VespaLocalMultiNode.start(number_of_shards, number_of_replicas)
+                test_vespa_local = VespaLocalMultiNode(number_of_shards, number_of_replicas)
+                test_vespa_local.start()
 
                 # Check that os.system was called to copy and bring up docker compose.
                 expected_calls = [
-                    call("cp multinode/docker-compose.yml docker-compose.yml"),
                     call("docker compose down 2>/dev/null || true"),
                     call("docker compose up -d"),
-                    call("cp multinode/services.xml services.xml"),
-                    call("cp multinode/hosts.xml hosts.xml")
                 ]
                 mock_system.assert_has_calls(expected_calls, any_order=True)
 
+    def test_generate_application_package_files_multi_node(self):
+        for number_of_shards, number_of_replicas in self.test_cases:
+            with self.subTest(number_of_shards=number_of_shards, number_of_replicas=number_of_replicas):
+                test_vespa_local = VespaLocalMultiNode(number_of_shards, number_of_replicas)
+                test_vespa_local.generate_application_package_files()
+                self.assertTrue(os.path.isdir("vespa_dummy_application_package"))
+                schema_file = os.path.join("vespa_dummy_application_package", "schemas", "test_vespa_client.sd")
+                self.assertTrue(os.path.isfile(schema_file))
+                with open(schema_file, "r") as f:
+                    content = f.read()
+                self.assertIn("schema test_vespa_client", content)
+                services_file = os.path.join("vespa_dummy_application_package", "services.xml")
+                hosts_file = os.path.join("vespa_dummy_application_package", "hosts.xml")
+                self.assertTrue(os.path.isfile(services_file))
+                self.assertTrue(os.path.isfile(hosts_file))
+
 
 class TestVespaLocalSingleNode(TestVespaLocal):
+    def setUp(self):
+        super().setUp()
+        self.test_vespa_local = VespaLocalSingleNode()
+
     @patch("os.system")
     @patch("builtins.open")
     def test_start(self, mock_open, mock_system):
-        VespaLocalSingleNode.start()
+        self.test_vespa_local.start()
 
         # Check that os.system was called to copy and bring up docker compose.
         expected_calls = [
@@ -156,9 +150,17 @@ class TestVespaLocalSingleNode(TestVespaLocal):
                   "--name vespa "
                   "--hostname vespa-container "
                   "--publish 8080:8080 --publish 19071:19071 --publish 2181:2181 --publish 127.0.0.1:5005:5005 "
-                  f"vespaengine/vespa:8.431.32"),
-            call("cp singlenode/services.xml services.xml"),
-            call("rm -f hosts.xml")
+                  f"vespaengine/vespa:8.472.109"),
         ]
         mock_system.assert_has_calls(expected_calls, any_order=True)
 
+    def test_generate_application_package_files_single_node(self):
+        self.test_vespa_local.generate_application_package_files()
+        self.assertTrue(os.path.isdir("vespa_dummy_application_package"))
+        schema_file = os.path.join("vespa_dummy_application_package", "schemas", "test_vespa_client.sd")
+        self.assertTrue(os.path.isfile(schema_file))
+        with open(schema_file, "r") as f:
+            content = f.read()
+        self.assertIn("schema test_vespa_client", content)
+        services_file = os.path.join("vespa_dummy_application_package", "services.xml")
+        self.assertTrue(os.path.isfile(services_file))
