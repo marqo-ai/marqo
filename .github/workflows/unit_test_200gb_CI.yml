@@ -240,7 +240,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: python marqo/tests/api_tests/v1/scripts/start_vespa.py
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start
 
       - name: Run Unit Tests
         run: |
