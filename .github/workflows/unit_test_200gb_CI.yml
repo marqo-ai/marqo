@@ -255,7 +255,7 @@ jobs:
 
           cd marqo
 
-          export PYTHONPATH="./src"
+          export PYTHONPATH="./src:."
           set -o pipefail
           pytest ${{ env.MULTINODE_TEST_ARGS }} --ignore=tests/integ_tests/test_documentation.py \
             --durations=100 --cov=src --cov-branch --cov-context=test \
