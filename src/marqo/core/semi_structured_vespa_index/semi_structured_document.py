@@ -389,9 +389,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
-        marqo_document[index_constants.MARQO_CREATE_TIMESTAMP] = self.fixed_fields.create_timestamp
-        # Note: We are not adding field types to the document because it's a field for internal Marqo use only.
-        # marqo_document[MARQO_FIELD_TYPES] = {k: v for k, v in self.fixed_fields.field_types.items()}
+        # Note: We are not adding field_types & create_timestamp to the document because
+        #  it's a field for internal Marqo use only.
 
         # text fields
         for field_name, field_content in self.text_fields.items():

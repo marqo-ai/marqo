@@ -130,7 +130,7 @@ class Document:
         partial_documents, doc_ids, documents_that_contain_maps = self.process_documents(partial_documents, unsuccessful_docs)
         existing_vespa_documents = {}
 
-        if documents_that_contain_maps:
+        if marqo_index.type is IndexType.SemiStructured and documents_that_contain_maps: # Only retrieve the document back if the partial update request contains maps and the index is semi-structured
             get_batch_response = self.vespa_client.get_batch_with_specific_fields(list(documents_that_contain_maps), ['marqo__id', 'marqo__int_fields', 'marqo__float_fields', 'marqo__field_types'], marqo_index.schema_name)
             responses = get_batch_response.responses
             for resp in responses:
