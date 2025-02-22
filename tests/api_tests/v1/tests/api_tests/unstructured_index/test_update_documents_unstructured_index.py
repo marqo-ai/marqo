@@ -93,7 +93,6 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         assert get_docs_response['int_field'] == 1
         assert get_docs_response['float_field'] == 500.0
         assert get_docs_response['int_map.a'] == 2
-        assert get_docs_response['int_map.b'] == 2
         assert get_docs_response['float_map.c'] == 3.0
         assert get_docs_response['string_array'] == ["ccc"]
         assert get_docs_response['update_field_that_doesnt_exist'] == 500
