@@ -150,7 +150,7 @@ class TestPartialUpdate(MarqoTestCase):
           }
         }], self.index)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        self.assertEqual(doc['int_map.b'], 2)
+        self.assertEqual(doc['int_map.d'], 2)
 
 
     def test_partial_update_should_update_float_map(self):

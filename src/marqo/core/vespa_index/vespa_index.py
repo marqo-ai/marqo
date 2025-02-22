@@ -85,6 +85,7 @@ class VespaIndex(ABC):
         the fields that are require to be updated.
 
         Args:
+            existing_vespa_document: An optional existing Vespa document to construct the partial update from
             marqo_partial_document: The marqo_partial_document to convert
 
         Returns:

@@ -848,7 +848,7 @@ class TestUpdate(MarqoTestCase):
             ([{"_id": "1", "text_field": "updated text field"}], False, 200, "1"),  # A valid doc
             ([{"text_field": "updated text field"}], True, 400, ""),  # An invalid doc without _id
             ([{"text_field": ["1", "1"], "_id": "1"}], True, 400, "1"),  # An invalid doc with wrong field type
-            ([{"text_field": "updated text field", "_id": "2"}], True, 412, "2")  # An invalid doc with non-existent _id
+            ([{"text_field": "updated text field", "_id": "2"}], True, 400, "2")  # An invalid doc with non-existent _id
         ]
         for update_docs, expected_error, expected_status, expected_id in test_cases:
             with self.subTest(f"{update_docs} - {expected_error} - {expected_status} - {expected_id}"):

@@ -6,7 +6,7 @@ import semver
 import marqo.api.exceptions as api_exceptions
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError
+from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError, MarqoDocumentParsingError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
@@ -127,7 +127,7 @@ class Document:
         unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]] = []
 
         # Remove duplicated documents based on _id
-        partial_documents, doc_ids, documents_that_contain_maps = self.process_documents(partial_documents)
+        partial_documents, doc_ids, documents_that_contain_maps = self.process_documents(partial_documents, unsuccessful_docs)
         existing_vespa_documents = {}
 
         if documents_that_contain_maps:
@@ -190,13 +190,14 @@ class Document:
         return MarqoUpdateDocumentsResponse(errors=errors, index_name=index_name, items=items,
                                             processingTimeMs=(timer() - start_time) * 1000)
 
-    def process_documents(self, documents: List[Dict]) -> Tuple[List, set, set]:
+    def process_documents(self, documents: List[Dict], unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]]) -> Tuple[List, set, set]:
         """Process documents to remove duplicates and identify documents containing maps.
         
         This method combines duplicate removal and map detection into a single pass through
         the documents for better efficiency.
 
         Args:
+            unsuccessful_docs:
             documents: List of document dictionaries to process
             
         Returns:
@@ -226,18 +227,29 @@ class Document:
                     continue
                 
                 # Check for dictionary values while processing doc
-                for value in doc.values():
-                    if isinstance(value, dict):
-                        documents_with_maps.add(doc_id)
+                for field_name, field_value in doc.items():
+                    if isinstance(field_value, dict):
+                        for key, val in field_value.items():
+                            if isinstance(val, (int, float)):
+                                documents_with_maps.add(doc_id)
+                                break
+                            else:
+                                raise MarqoDocumentParsingError(
+                                    f'Unsupported field type {type(val)} for field {field_name} in doc {doc_id}'
+                                )
                         break
-                        
                 doc_ids.add(doc_id)
                 docs.append(doc)
                 
             except TypeError as e:
                 logger.debug(f'Could not hash document ID {doc_id}: {e}')
                 docs.append(doc)
-                
+
+            except MarqoDocumentParsingError as e:
+                unsuccessful_docs.append((i, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''),
+                                                                      error=e.message,
+                                                                      status=int(api_exceptions.InvalidArgError.status_code))))
+
         # Reverse to preserve original order
         docs.reverse()
         return docs, doc_ids, documents_with_maps
