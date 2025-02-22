@@ -21,7 +21,7 @@ import sys
 
 import requests
 
-VESPA_VERSION=os.getenv('VESPA_VERSION', '8.431.32')
+VESPA_VERSION=os.getenv('VESPA_VERSION', '8.472.109')
 
 
 def start_vespa() -> None:
