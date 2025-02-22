@@ -538,7 +538,8 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
         """
 
         return self._cache_or_get('name_to_string_array_field_map',
-                                  lambda : {field.name: field for field in self.string_array_fields})
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.name: field for field in self.string_array_fields})
 
     @property
     def string_array_field_name_to_string_array_field_map(self):
@@ -548,9 +549,9 @@ class SemiStructuredMarqoIndex(UnstructuredMarqoIndex):
 
         Returns an empty dict if string_array_fields is None.
         """
-
         return self._cache_or_get('string_array_field_map',
-                                  lambda : {field.string_array_field_name: field for field in self.string_array_fields})
+                                  lambda : {} if self.string_array_fields is None 
+                                  else {field.string_array_field_name: field for field in self.string_array_fields})
 
     @property
     def lexical_field_map(self) -> Dict[str, Field]:

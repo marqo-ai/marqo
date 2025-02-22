@@ -1,4 +1,5 @@
 import json
+import time
 from typing import List, Dict, Any, Union
 
 from pydantic import Field
@@ -16,6 +17,7 @@ from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldT
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
+    create_timestamp: float = Field(default_factory=time.time, alias=common.VESPA_DOC_CREATE_TIMESTAMP)
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=common.STRING_ARRAY) # Indexes created pre marqo version 2.16 will have string arrays stored as a list of strings
@@ -187,6 +189,9 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         doc_id = document[index_constants.MARQO_DOC_ID]
         instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id), index_supports_partial_updates=index_supports_partial_updates)
+
+        if common.VESPA_DOC_CREATE_TIMESTAMP in document:
+            instance.fixed_fields.create_timestamp = document[common.VESPA_DOC_CREATE_TIMESTAMP]
         # Process regular fields
         cls._process_regular_fields(document, instance, marqo_index, doc_id)
 
@@ -203,7 +208,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     def _process_regular_fields(cls, document: dict, instance, marqo_index: SemiStructuredMarqoIndex, doc_id: str):
         """Process non-tensor fields in the document"""
         for field_name, field_content in document.items():
-            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS]:
+            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS, constants.MARQO_CREATE_TIMESTAMP]:
                 continue
             try:
                 cls._handle_field_content(field_name, field_content, instance, marqo_index)
@@ -384,6 +389,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
+        marqo_document[index_constants.MARQO_CREATE_TIMESTAMP] = self.fixed_fields.create_timestamp
         # Note: We are not adding field types to the document because it's a field for internal Marqo use only.
         # marqo_document[MARQO_FIELD_TYPES] = {k: v for k, v in self.fixed_fields.field_types.items()}
 

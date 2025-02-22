@@ -7,6 +7,12 @@ schema {{ index.schema_name }} {
             rank: filter
         }
 
+        field marqo__create_timestamp type double {
+                    indexing: attribute | summary
+                    attribute: fast-search
+                    rank: filter
+                }
+
         field marqo__field_types type map<string, string> {
             struct-field key { indexing : attribute
                                attribute: fast-search
@@ -266,6 +272,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
+        summary marqo__create_timestamp type double {}
         summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
@@ -283,6 +290,7 @@ schema {{ index.schema_name }} {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
+        summary marqo__create_timestamp type double {}
         summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}

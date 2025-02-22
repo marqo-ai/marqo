@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, List, Optional, Union, cast
+from typing import Dict, Any, List, Optional, Type, Union, cast
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
 from marqo.core.exceptions import MarqoDocumentParsingError
@@ -201,7 +201,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         self._verify_id_field(doc_id)
         return doc_id
 
-    def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any], existing_vespa_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Convert a Marqo document to Vespa partial document format for updates.
 
         This method transforms a Marqo document into the format required by Vespa for partial document updates.
@@ -210,48 +210,113 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         Args:
             marqo_document: A dictionary containing the Marqo document to be converted. Must contain an '_id' field.
+            existing_vespa_document: Optional existing Vespa document to be compared against while creating the update statement
 
         Returns:
-            Dict[str, Any]: A dictionary containing the Vespa partial document format with:
-                - 'id': The document ID
-                - 'field_types': Mapping of field names to their types
-                - 'fields': The actual field values
+            Dict containing the Vespa partial document format with:
+            - 'id': Document ID
+            - 'field_types': Field name to type mapping
+            - 'fields': Field values
+            - 'create_timestamp': Original document timestamp if it exists
 
         Raises:
-            MarqoDocumentParsingError: If the '_id' field is missing from the document
+            MarqoDocumentParsingError: If '_id' field is missing
             InvalidFieldNameError: If any field name is invalid
         """
-        # Validate and extract document ID
         doc_id = self._extract_document_id(marqo_document)
         
-        # Initialize result
-        fields = {}
-        field_types = {}
+        # Convert existing document if provided
+        original_doc = None
+        if existing_vespa_document:
+            original_doc = SemiStructuredVespaDocument.from_vespa_document(
+                existing_vespa_document, 
+                marqo_index=self.get_marqo_index()
+            )
+
+        # Initialize tracking dictionaries
+        vespa_fields = {}
+        vespa_field_types = {}
 
         # Initialize dictionary to be later used for updating score modifiers. 
         numeric_fields = {}
+
+        numeric_field_map: Dict[str, Any] = dict() # This map is used to store the numeric fields in the document. It is used to update the numeric fields & score modifiers later
+        if original_doc:
+            numeric_field_map.update(original_doc.fixed_fields.int_fields)
+            numeric_field_map.update(original_doc.fixed_fields.float_fields)
 
         # Process each field in the document
         for field_name, value in marqo_document.items():
             if field_name == MARQO_DOC_ID:
                 continue
-
+                
             validate_field_name(field_name)
-            
+
+            # This method broadly processes the field based on its type and updates the vespa_fields,
+            # vespa_field_types, numeric_fields, numeric_field_map dictionaries. Numeric fields and numeric field maps
+            # are special cases and are processed later.
             self._process_field(
                 field_name=field_name,
                 value=value,
-                fields=fields,
-                field_types=field_types,
+                fields=vespa_fields,
+                field_types=vespa_field_types,
                 numeric_fields=numeric_fields,
+                numeric_field_map=numeric_field_map,
                 doc_id=doc_id
+            )
+
+        # This method creates the update statement for updating int fields / int map fields.
+        int_fields_changed = self._update_numeric_field(
+            int, numeric_field_map, original_doc, vespa_fields, vespa_field_types
+        )
+        # This method creates the update statement for float numeric fields / float map fields.
+        float_fields_changed = self._update_numeric_field(
+            float, numeric_field_map, original_doc, vespa_fields, vespa_field_types
+        )
+
+        # Handle score modifier updates
+        if int_fields_changed or float_fields_changed:
+            self._update_score_modifiers(
+                original_doc=original_doc,
+                numeric_field_map=numeric_field_map,
+                vespa_fields=vespa_fields
             )
 
         return {
             "id": doc_id,
-            "field_types": field_types,
-            "fields": fields
+            "fields": vespa_fields,
+            "field_types": vespa_field_types,
+            "create_timestamp": original_doc.fixed_fields.create_timestamp if original_doc else None
         }
+
+    def _update_score_modifiers(self, original_doc: Optional[SemiStructuredVespaDocument], 
+                              numeric_field_map: Dict[str, Any],
+                              vespa_fields: Dict[str, Any]) -> None:
+        """Helper to update score modifiers for numeric fields"""
+            
+        original_fields = {}
+        # Find score modifiers to remove
+        score_modifier_to_be_removed = []
+        if original_doc:
+            original_fields.update(original_doc.fixed_fields.int_fields)
+            original_fields.update(original_doc.fixed_fields.float_fields)
+            score_modifier_to_be_removed = [
+                {"p": field} for field in original_fields
+                if field not in numeric_field_map 
+                and original_doc.fixed_fields.field_types.get(field) in ('int_map', 'float_map')
+            ]
+
+
+        if len(score_modifier_to_be_removed) > 0 or len(score_modifier_to_be_removed) > 0:
+            vespa_fields[common.SCORE_MODIFIERS] = {
+                "modify": {
+                    "operation": "replace",
+                    "cells": numeric_field_map
+                } if len(numeric_field_map) > 0 else None,
+                "remove": {
+                    "addresses": score_modifier_to_be_removed
+                } if len(score_modifier_to_be_removed) > 0 else None
+            }
 
     def _process_field(
         self,
@@ -260,6 +325,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         fields: Dict[str, Any],
         field_types: Dict[str, Any],
         numeric_fields: Dict[str, Any],
+        numeric_field_map: Dict[str, Any],
         doc_id: str
     ) -> None:
         """Process a single field from a document based on its type.
@@ -281,9 +347,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if isinstance(value, bool):
             self._handle_boolean_field(field_name, value, fields, field_types)
         elif isinstance(value, dict):
-            self._handle_dict_field(field_name, value, fields, field_types, numeric_fields, doc_id)
+            self._handle_dict_field(field_name, value, fields, field_types, numeric_fields, doc_id, numeric_field_map)
         elif isinstance(value, (int, float)):
-            self._handle_numeric_field(field_name, value, field_types, fields, numeric_fields)
+            numeric_field_map[field_name] = value # sets information about numeric fields in a map so it the numeric field + score modifiers can be updated later
         elif isinstance(value, list):
             self._handle_string_array_field(field_name, value, fields, field_types)
         elif isinstance(value, str):
@@ -293,6 +359,76 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 f'Unsupported field type {type(value)} for field {field_name} in doc {doc_id}'
             )
 
+    def _update_numeric_field(
+        self,
+        numeric_type: Type[Union[int, float]],
+        numeric_field_map: Dict[str, Union[int, float]],
+        original_doc: Optional[SemiStructuredVespaDocument],
+        vespa_fields: Dict[str, Any],
+        vespa_field_types: Dict[str, Any]
+    ) -> bool:
+        """Updates numeric fields (int/float) in Vespa documents.
+        
+        Args:
+            numeric_type: The type of numeric field (int or float)
+            numeric_field_map: Map of field names to their numeric values
+            original_doc: Original Vespa document if it exists
+            vespa_fields: Fields to be updated in Vespa
+            vespa_field_types: Field type metadata to be updated
+            
+        Returns:
+            bool: True if any fields were changed
+        """
+        fields_changed = False
+        field_prefix = common.INT_FIELDS if numeric_type is int else common.FLOAT_FIELDS
+        
+        # Get original fields if document exists
+        original_fields = {}
+        if original_doc is not None:
+            original_fields = (original_doc.fixed_fields.int_fields 
+                             if numeric_type is int
+                             else original_doc.fixed_fields.float_fields)
+
+        # Process fields in update request
+        for field_name, value in numeric_field_map.items():
+            if not isinstance(value, numeric_type):
+                continue
+                
+            vespa_field_name = f'{field_prefix}{{{field_name}}}'
+            vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPE}{{{field_name}}}'
+            
+            # Set field value
+            vespa_fields[vespa_field_name] = {"assign": value}
+            
+            # Set field type based on original document
+            is_map_type = (original_doc is not None and 
+                         original_doc.fixed_fields.field_types.get(field_name) in ('int_map', 'float_map'))
+            
+            if is_map_type:
+                field_type = MarqoFieldTypes.INT_MAP if numeric_type is int else MarqoFieldTypes.FLOAT_MAP
+            else:
+                field_type = MarqoFieldTypes.INT if numeric_type is int else MarqoFieldTypes.FLOAT
+                
+            vespa_fields[vespa_field_types_field_name] = {"assign": field_type.value}
+            vespa_field_types[field_name] = field_type.value
+            fields_changed = True
+
+        # Remove fields no longer in map
+        if original_doc is not None:
+            for original_field_name in original_fields:
+                if (original_field_name not in numeric_field_map and 
+                    original_doc.fixed_fields.field_types.get(original_field_name) in ('int_map', 'float_map')):
+                    
+                    vespa_field_name = f'{field_prefix}{{{original_field_name}}}'
+                    vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPE}{{{original_field_name}}}'
+                    
+                    vespa_fields[vespa_field_name] = {"remove": 0}
+                    vespa_fields[vespa_field_types_field_name] = {"remove": 0}
+                    vespa_field_types.pop(original_field_name, None)
+                    fields_changed = True
+
+        return fields_changed
+    
     def _handle_boolean_field(
         self,
         field_name: str,
@@ -324,85 +460,22 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         fields: Dict[str, Any],
         field_types: Dict[str, Any],
         numeric_fields: Dict[str, Any],
-        doc_id: str
+        doc_id: str,
+        numeric_field_map: Dict[str, Any]
     ) -> None:
-        """Handle dictionary field processing for document updates.
-
-        This method processes a dictionary field by:
-        1. Iterating through the dictionary key-value pairs
-        2. Creating a full key by combining the field name and dictionary key
-        3. For numeric values (int/float):
-            - Updates numeric_fields dictionary for score modifier calculation
-            - Sets appropriate field type (INT_MAP or FLOAT_MAP)
-            - Creates update statements for the field value, field type metadata and score modifiers
-        4. Raises error for non-numeric values
-
-        Args:
-            field_name: The name of the dictionary field
-            value: The dictionary value to be processed
-            fields: Dictionary to store the update statements for fields
-            field_types: Dictionary mapping field names to their Marqo field types
-            numeric_fields: Dictionary storing numeric field values for score modifier updates
-            doc_id: The ID of the document containing this field
-
-        Raises:
-            MarqoDocumentParsingError: If any dictionary value is not numeric (int/float)
-        """
-        for key, val in value.items():
-            full_key = f'{field_name}.{key}'
-            if isinstance(val, (int, float)):
-                # setting numeric_fields for score modifier updation
-                numeric_fields[full_key] = val
-                # setting field types for later creating pre-conditions
-                field_types[full_key] = (
-                    MarqoFieldTypes.INT_MAP.value if isinstance(val, int)
-                    else MarqoFieldTypes.FLOAT_MAP.value
-                )
-                # Step for updating the actual field
-                self._create_update_statement_for_updating_field(fields, full_key, val)
-                # Step for updating field type metadata.
-                self._create_update_statement_for_updating_field_type_metadata(fields, field_types, full_key)
-                # Step for creating update statement for updating score modifiers
-                self._create_update_statement_for_updating_score_modifiers(numeric_fields, fields)
+        keys_to_remove = [
+            key for key in numeric_field_map.keys()
+            if key.startswith(f'{field_name}.')
+        ]
+        for key in keys_to_remove: #remove existing entries for this specific map field
+            del numeric_field_map[key]
+            
+        # Add new entries
+        for k, v in value.items():
+            if isinstance(v, (int, float)):
+                numeric_field_map[f'{field_name}.{k}'] = v
             else:
-                raise MarqoDocumentParsingError(
-                    f'Unsupported field type {type(val)} for field {field_name} in doc {doc_id}'
-                )
-
-
-    def _handle_numeric_field(
-        self,
-        field_name: str,
-        value: Union[int, float],
-        field_types: Dict[str, Any],
-        fields: Dict[str, Any],
-        numeric_fields: Dict[str, Any]
-    ) -> None:
-        """Handle numeric field processing for document updates.
-
-        This method processes a numeric field by:
-        1. Storing the numeric value for score modifier calculation
-        2. Setting the appropriate field type (INT or FLOAT)
-        3. Creating update statements for:
-           - The field value
-           - Field type metadata
-           - Score modifiers
-
-        Args:
-            field_name: The name of the numeric field
-            value: The numeric value (integer or float) to be processed
-            field_types: Dictionary mapping field names to their Marqo field types
-            fields: Dictionary to store the update statements for fields
-            numeric_fields: Dictionary storing numeric field values for score modifier updates
-        """
-        numeric_fields[field_name] = value
-        field_types[field_name] = ( # setting field types for later creating pre-conditions
-            MarqoFieldTypes.INT.value if isinstance(value, int)
-            else MarqoFieldTypes.FLOAT.value
-        )
-        self._create_update_statement_for_updating_field(fields, field_name, value) # To create update statement for updating the actual field
-        self._create_update_statement_for_updating_field_type_metadata(fields, field_types, field_name) # To create update statement for updating 'field type' metadata 
-        self._create_update_statement_for_updating_score_modifiers(numeric_fields, fields) # To create update statement for updating score modifiers
+                raise MarqoDocumentParsingError(f'Unsupported field type {type(v)} for field {field_name} in doc {doc_id}')
 
     def _handle_string_array_field(
         self,
@@ -432,7 +505,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if not all(isinstance(v, str) for v in value) or self.get_marqo_index().name_to_string_array_field_map.get(field_name) is None:
             raise MarqoDocumentParsingError('Unstructured index updates only support updating existing string array fields')
         field_types[field_name] = MarqoFieldTypes.STRING_ARRAY.value # setting field types for later creating pre-conditions
-        self._create_update_statement_for_updating_field(fields, field_name, value) # To create update statement for updating the actual field 
+        self._create_update_statement_for_updating_field(fields, field_name, value) # To create update statement for updating the actual field
         self._create_update_statement_for_updating_field_type_metadata(fields, field_types, field_name) # To create update statement for updating 'field type' metadata
 
     def _handle_string_field(

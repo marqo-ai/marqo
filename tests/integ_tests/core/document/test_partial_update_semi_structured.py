@@ -12,10 +12,9 @@ class TestPartialUpdate(MarqoTestCase):
     def setUpClass(cls) -> None:
         super().setUpClass()
 
-        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured_12')
+        semi_structured_index_request = cls.unstructured_marqo_index_request(name='test_partial_update_semi_structured_13')
         cls.create_indexes([semi_structured_index_request])
         cls.index = cls.indexes[0]
-        # cls.index = cls.config.index_management.get_index('test_partial_update_semi_structured')
 
     @classmethod
     def tearDownClass(cls):
@@ -104,6 +103,10 @@ class TestPartialUpdate(MarqoTestCase):
             self.assertFalse(doc['bool_field'])
             self._assert_fields_unchanged(doc, ['bool_field'])
 
+    def test_update_numeric_array_field(self):
+        res = self.config.document.partial_update_documents([{'_id': '1', 'numeric_array1': [4, 5]}], self.config.index_management.get_index(self.index.name))
+        self.assertTrue(res.errors)
+
     def test_partial_update_should_update_int_field_to_int(self):
         for doc in [self.doc, self.doc2, self.doc3]:
             res = self.config.document.partial_update_documents([{'_id': doc['_id'], 'int_field': 500}], self.index)
@@ -141,6 +144,14 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['int_map.b'], 3)
         self._assert_fields_unchanged(doc, ['int_map'])
 
+    def test_partial_update_should_update_int_map_with_new_value(self):
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {
+            'd': 2
+          }
+        }], self.index)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(doc['int_map.b'], 2)
+
 
     def test_partial_update_should_update_float_map(self):
         res = self.config.document.partial_update_documents([{'_id': '2', 'float_map': {'c': 2.0, 'd': 3.0}}],
@@ -153,10 +164,10 @@ class TestPartialUpdate(MarqoTestCase):
 
 
     def test_partial_update_should_allow_changing_numeric_types_in_map(self):
-        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': 2, 'int_map': {
             'a': 2,  # update int to int
         }, 'float_map': {
-            'c': 3.0,  # update float to int
+            'c': 3.0,  # update float to float
         }}], self.index)
         self.assertFalse(res.errors)
 
@@ -239,9 +250,7 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['marqo__score_modifiers']['cells']['int_field'], 123.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells']['float_field'], 123.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.a'], 2.0)
-        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.b'], 2.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 3.0)
-        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.d'], 2.0)
 
 
     # Test update multiple fields

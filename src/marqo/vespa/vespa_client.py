@@ -443,6 +443,41 @@ class VespaClient:
 
         return batch_response
 
+    def get_batch_with_specific_fields(self,
+                  ids: List[str],
+                  fields: List[str],
+                  schema: str,
+                  concurrency: Optional[int] = None,
+                  timeout: int = 60) -> GetBatchResponse:
+        """
+        Get a batch of documents by ID concurrently.
+
+        Documents will be fetched with `concurrency` concurrent pooled connections.
+
+        Missing (404) documents will be returned in the response. Any other non-200 responses will raise an exception.
+
+        Args:
+            fields: List of fields to be retrieved
+            ids: List of document IDs to get
+            schema: Schema to get from
+            concurrency: Number of concurrent get requests
+            timeout: Timeout in seconds per request
+
+        Returns:
+            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404)
+        """
+        if not ids:
+            return GetBatchResponse(responses=[], errors=False)
+
+        if concurrency is None:
+            concurrency = self.get_pool_size
+
+        batch_response = conc.run_coroutine(
+            self._get_batch_async_with_specific_fields(ids, fields, schema, concurrency, timeout)
+        )
+
+        return batch_response
+
     def delete_document(self, id: str, schema: str) -> DeleteDocumentResponse:
         """
         Delete a document by ID.
@@ -947,6 +982,32 @@ class VespaClient:
 
         return GetBatchResponse(responses=responses, errors=errors)
 
+    async def _get_batch_async_with_specific_fields(self,
+                               ids: List[str],
+                               fields: List[str],
+                               schema: str,
+                               connections: int, timeout: int) -> GetBatchResponse:
+        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
+                                                         max_connections=connections)) as async_client:
+            semaphore = asyncio.Semaphore(connections)
+            tasks = [
+                asyncio.create_task(
+                    self._get_document_async_with_specific_fields(semaphore, async_client, id, fields, schema, timeout)
+                )
+                for id in ids
+            ]
+            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+
+        responses = []
+        errors = False
+        for task in tasks:
+            result = task.result()
+            responses.append(result)
+            if result.status != 200:
+                errors = True
+
+        return GetBatchResponse(responses=responses, errors=errors)
+
     async def _get_document_async(self,
                                   semaphore: asyncio.Semaphore,
                                   async_client: httpx.AsyncClient,
@@ -965,6 +1026,27 @@ class VespaClient:
                 return GetBatchDocumentResponse(**resp.json(), status=resp.status_code)
 
             self._raise_for_status(resp)
+
+    async def _get_document_async_with_specific_fields(self,
+                                  semaphore: asyncio.Semaphore,
+                                  async_client: httpx.AsyncClient,
+                                  id: str,
+                                  fields: List[str],
+                                  schema: str,
+                                  timeout: int) -> GetBatchDocumentResponse:
+        async with semaphore:
+            try:
+                resp = await async_client.get(
+                    f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{",".join(fields)}', timeout=timeout
+                )
+            except httpx.HTTPError as e:
+                raise VespaError(e) from e
+
+            if resp.status_code in [200, 404]:
+                return GetBatchDocumentResponse(**resp.json(), status=resp.status_code)
+
+            self._raise_for_status(resp)
+
 
     async def _delete_batch_async(self,
                                   ids: List[str],

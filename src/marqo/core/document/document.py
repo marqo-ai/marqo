@@ -127,11 +127,18 @@ class Document:
         unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]] = []
 
         # Remove duplicated documents based on _id
-        partial_documents, doc_ids = self.remove_duplicated_documents(partial_documents)
+        partial_documents, doc_ids, documents_that_contain_maps = self.process_documents(partial_documents)
+        existing_vespa_documents = {}
+
+        if documents_that_contain_maps:
+            get_batch_response = self.vespa_client.get_batch_with_specific_fields(list(documents_that_contain_maps), ['marqo__id', 'marqo__int_fields', 'marqo__float_fields', 'marqo__field_types'], marqo_index.schema_name)
+            responses = get_batch_response.responses
+            for resp in responses:
+                existing_vespa_documents[resp.document.fields['marqo__id']] = resp.document.dict()
 
         for index, doc in enumerate(partial_documents):
             try:
-                vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc))
+                vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc, existing_vespa_documents.get(doc.get(MARQO_DOC_ID, ''), None)))
                 vespa_documents.append(vespa_document)
             except ParsingError as e:
                 unsuccessful_docs.append(
@@ -183,34 +190,57 @@ class Document:
         return MarqoUpdateDocumentsResponse(errors=errors, index_name=index_name, items=items,
                                             processingTimeMs=(timer() - start_time) * 1000)
 
-    def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
-        """Remove duplicated documents based on _id in the given list of documents.
+    def process_documents(self, documents: List[Dict]) -> Tuple[List, set, set]:
+        """Process documents to remove duplicates and identify documents containing maps.
+        
+        This method combines duplicate removal and map detection into a single pass through
+        the documents for better efficiency.
 
-        For a list of documents, if there exists duplicate _id, the last document will be used while the
-        previous ones will be removed from the list.
-
-        This function does not validate the documents, it only removes the duplicates based on _id fields.
+        Args:
+            documents: List of document dictionaries to process
+            
+        Returns:
+            Tuple containing:
+            - List of deduplicated documents
+            - Set of unique document IDs
+            - Set of document IDs that contain dictionary values
         """
-        # Deduplicate docs, keep the latest
         docs = []
         doc_ids = set()
+        documents_with_maps = set()
+        
+        # Process documents in reverse to keep latest version of duplicates
         for i in range(len(documents) - 1, -1, -1):
             doc = documents[i]
-
-            if isinstance(doc, dict) and '_id' in doc:
-                doc_id = doc['_id']
-                try:
-                    if doc_id is not None and doc_id in doc_ids:
-                        logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
-                        continue
-                    doc_ids.add(doc_id)
-                except TypeError as e:  # Happens if ID is a non-hashable type -- ID validation will catch this later on
-                    logger.debug(f'Could not hash document ID {doc_id}: {e}')
-
-            docs.append(doc)
-        # Reverse to preserve order in request
+            
+            if not isinstance(doc, dict) or '_id' not in doc:
+                docs.append(doc)
+                continue
+                
+            doc_id = doc['_id']
+            
+            try:
+                # Skip if we've already seen this ID
+                if doc_id is not None and doc_id in doc_ids:
+                    logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
+                    continue
+                
+                # Check for dictionary values while processing doc
+                for value in doc.values():
+                    if isinstance(value, dict):
+                        documents_with_maps.add(doc_id)
+                        break
+                        
+                doc_ids.add(doc_id)
+                docs.append(doc)
+                
+            except TypeError as e:
+                logger.debug(f'Could not hash document ID {doc_id}: {e}')
+                docs.append(doc)
+                
+        # Reverse to preserve original order
         docs.reverse()
-        return docs, doc_ids
+        return docs, doc_ids, documents_with_maps
 
     def translate_add_documents_response(self, responses: Optional[FeedBatchResponse],
                                          index_name: str,
