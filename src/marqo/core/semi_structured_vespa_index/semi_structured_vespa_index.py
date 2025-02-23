@@ -303,7 +303,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             score_modifier_to_be_removed = [
                 {"p": field} for field in original_fields
                 if field not in numeric_field_map 
-                and original_doc.fixed_fields.field_types.get(field) in ('int_map', 'float_map')
+                and original_doc.fixed_fields.field_types.get(field) in (MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value)
             ]
 
 
@@ -402,7 +402,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             
             # Set field type based on original document
             is_map_type = (original_doc is not None and 
-                         original_doc.fixed_fields.field_types.get(field_name) in ('int_map', 'float_map'))
+                         original_doc.fixed_fields.field_types.get(field_name) in (MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value))
             
             if is_map_type:
                 field_type = MarqoFieldTypes.INT_MAP if numeric_type is int else MarqoFieldTypes.FLOAT_MAP
@@ -417,7 +417,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if original_doc is not None:
             for original_field_name in original_fields:
                 if (original_field_name not in numeric_field_map and 
-                    original_doc.fixed_fields.field_types.get(original_field_name) in ('int_map', 'float_map')):
+                    original_doc.fixed_fields.field_types.get(original_field_name) in (MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value)):
                     
                     vespa_field_name = f'{field_prefix}{{{original_field_name}}}'
                     vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPES}{{{original_field_name}}}'
