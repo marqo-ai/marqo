@@ -23,7 +23,7 @@ MARQO_DOC_MULTIMODAL_PARAMS = "multimodal_params"
 VESPA_DOC_MULTIMODAL_PARAMS = "marqo__multimodal_params"
 
 # A metadata field that's used to store a dictionary of key-value pairs where key is the field name and value is a string denoting the field type
-VESPA_DOC_FIELD_TYPE = "marqo__field_types"
+VESPA_DOC_FIELD_TYPES = "marqo__field_types"
 VESPA_DOC_CREATE_TIMESTAMP = "marqo__create_timestamp"
 
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'

@@ -395,7 +395,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 continue
                 
             vespa_field_name = f'{field_prefix}{{{field_name}}}'
-            vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPE}{{{field_name}}}'
+            vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPES}{{{field_name}}}'
             
             # Set field value
             vespa_fields[vespa_field_name] = {"assign": value}
@@ -420,7 +420,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                     original_doc.fixed_fields.field_types.get(original_field_name) in ('int_map', 'float_map')):
                     
                     vespa_field_name = f'{field_prefix}{{{original_field_name}}}'
-                    vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPE}{{{original_field_name}}}'
+                    vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPES}{{{original_field_name}}}'
                     
                     vespa_fields[vespa_field_name] = {"remove": 0}
                     vespa_fields[vespa_field_types_field_name] = {"remove": 0}
@@ -567,7 +567,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             If field_key is "title" and field_types["title"] is "string", this will add:
             {"marqo__field_type{title}": {"assign": "string"}} to update_statement_fields
         """
-        update_field_type_metadata_key = f'{common.VESPA_DOC_FIELD_TYPE}{{{field_key}}}'
+        update_field_type_metadata_key = f'{common.VESPA_DOC_FIELD_TYPES}{{{field_key}}}'
         update_statement_fields[update_field_type_metadata_key] = {"assign": field_types[field_key]}
 
     def _create_update_statement_for_updating_field(self, fields, key, val):

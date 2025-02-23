@@ -10,7 +10,7 @@ from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsin
     InvalidTensorFieldError
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, logger
 from marqo.core.semi_structured_vespa_index import common
-from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPE, STRING_ARRAY
+from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, STRING_ARRAY
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 
 
@@ -26,7 +26,7 @@ class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     float_fields: Dict[str, float] = Field(default_factory=dict, alias=common.FLOAT_FIELDS)
     score_modifiers_fields: Dict[str, Any] = Field(default_factory=dict, alias=common.SCORE_MODIFIERS)
     vespa_multimodal_params: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_MULTIMODAL_PARAMS)
-    field_types: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_FIELD_TYPE)
+    field_types: Dict[str, str] = Field(default_factory=dict, alias=common.VESPA_DOC_FIELD_TYPES)
 
 
 class SemiStructuredVespaDocument(MarqoBaseModel):
@@ -61,7 +61,6 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         text_fields = {}
         string_arrays_dict = {}
         string_arrays_list = []
-        field_types = fields.get(VESPA_DOC_FIELD_TYPE, {})
 
         def process_field(field_name: str, fields: Dict) -> None:
             """Helper function to process individual tensor fields, lexical fields and populate the appropriate dictionaries"""
@@ -101,7 +100,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 float_fields=cls.extract_field(fields, common.FLOAT_FIELDS, dict()),
                 score_modifiers_fields=cls.extract_field(fields, common.SCORE_MODIFIERS, dict()),
                 vespa_multimodal_params=cls.extract_field(fields, common.VESPA_DOC_MULTIMODAL_PARAMS, dict()),
-                field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPE, dict())
+                field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
             return cls(id=document[cls._VESPA_DOC_ID],
@@ -137,7 +136,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 float_fields=cls.extract_field(fields, common.FLOAT_FIELDS, dict()),
                 score_modifiers_fields=cls.extract_field(fields, common.SCORE_MODIFIERS, dict()),
                 vespa_multimodal_params=cls.extract_field(fields, common.VESPA_DOC_MULTIMODAL_PARAMS, dict()),
-                field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPE, dict())
+                field_types=cls.extract_field(fields, VESPA_DOC_FIELD_TYPES, dict())
             )
 
             return cls(id=document[cls._VESPA_DOC_ID],
@@ -390,7 +389,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
         # Note: We are not adding field_types & create_timestamp to the document because
-        #  it's a field for internal Marqo use only.
+        # it's a field for internal Marqo use only.
 
         # text fields
         for field_name, field_content in self.text_fields.items():

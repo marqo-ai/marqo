@@ -16,7 +16,7 @@ import orjson
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
-from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPE
+from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
@@ -874,8 +874,8 @@ class VespaClient:
             data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
             if types is not None: # Types will be none for structured index as we are not storing types at the time of Add docs.
                 for key, value in types.items():
-                    data["condition"] += (f' and (not {schema}.{VESPA_DOC_FIELD_TYPE}{{\"{key}\"}} or {schema}.{VESPA_DOC_FIELD_TYPE}{{\"{key}\"}}==\"{value}\")'
-                                          f' and (not ({schema}.{VESPA_DOC_FIELD_TYPE}{{\"{key}\"}}=="{MarqoFieldTypes.TENSOR.value}"))')
+                    data["condition"] += (f' and (not {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}} or {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}==\"{value}\")'
+                                          f' and (not ({schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}=="{MarqoFieldTypes.TENSOR.value}"))')
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
             except httpx.RequestError as e:

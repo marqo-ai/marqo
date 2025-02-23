@@ -28,7 +28,8 @@ class SemiStructuredFieldCountConfig(ImmutableStrictBaseModel):
         EnvVars.MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED))
     max_tensor_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
         EnvVars.MARQO_MAX_TENSOR_FIELD_COUNT_UNSTRUCTURED))
-
+    max_string_array_field_count: int = pydantic.Field(default_factory=lambda: read_env_vars_and_defaults_ints(
+        EnvVars.MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED))
 
 class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
     def __init__(self, marqo_index: SemiStructuredMarqoIndex, add_docs_params: AddDocsParams,
@@ -116,6 +117,13 @@ class SemiStructuredAddDocumentsHandler(UnstructuredAddDocumentsHandler):
     def _add_string_array_field_to_index(self, field_name):
         if field_name in self.marqo_index.name_to_string_array_field_map:
             return
+
+        max_string_array_field_count = self.field_count_config.max_string_array_field_count
+        if len(self.marqo_index.string_array_fields) >= max_string_array_field_count:
+            raise TooManyFieldsError(f'Index {self.marqo_index.name} has {len(self.marqo_index.string_array_fields)} '
+                                     f'string array fields. Your request to add {field_name} as a string array field is '
+                                     f'rejected since it exceeds the limit of {max_string_array_field_count}. Please set '
+                                     f'a larger limit in MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED environment variable.')
 
         logger.debug(f'Adding string array field {field_name} to index {self.marqo_index.name}')
 

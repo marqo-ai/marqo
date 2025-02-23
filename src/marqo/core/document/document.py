@@ -12,7 +12,8 @@ from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResp
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
     UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
-from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION
+from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION, \
+    VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
     SemiStructuredAddDocumentsHandler, SemiStructuredFieldCountConfig
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
@@ -131,10 +132,11 @@ class Document:
         existing_vespa_documents = {}
 
         if marqo_index.type is IndexType.SemiStructured and documents_that_contain_maps: # Only retrieve the document back if the partial update request contains maps and the index is semi-structured
-            get_batch_response = self.vespa_client.get_batch_with_specific_fields(list(documents_that_contain_maps), ['marqo__id', 'marqo__int_fields', 'marqo__float_fields', 'marqo__field_types'], marqo_index.schema_name)
+            get_batch_response = self.vespa_client.get_batch_with_specific_fields(list(documents_that_contain_maps), [
+                VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES], marqo_index.schema_name)
             responses = get_batch_response.responses
             for resp in responses:
-                existing_vespa_documents[resp.document.fields['marqo__id']] = resp.document.dict()
+                existing_vespa_documents[resp.document.fields[VESPA_FIELD_ID]] = resp.document.dict()
 
         for index, doc in enumerate(partial_documents):
             try:
