@@ -244,7 +244,7 @@ class CachePatchModels:
                     f"Invalid patch model: {model}. Please ensure that this is a valid patch model."
                 )
 
-        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cpu', 'cuda']
+        self.default_devices = ['cpu'] if not torch.cuda.is_available() else ['cuda']
 
     def run(self):
         N = 10
