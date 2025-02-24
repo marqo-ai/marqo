@@ -1,7 +1,7 @@
 import io
 from typing import List, Union, Protocol, Optional
 
-import clip
+import open_clip
 import torch
 import httpx
 from orjson import orjson
@@ -35,10 +35,12 @@ class LocalVectoriser:
                   model_properties: dict = None, device: str = None, normalize_embeddings: bool = True,
                   model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT,
                   media_download_headers: Optional[dict] = None, **kwargs) -> List[List[float]]:
-        return s2_inference.vectorise(model_name=model_name, content=content, model_properties=model_properties,
-                                      device=device, normalize_embeddings=normalize_embeddings, model_auth=model_auth,
-                                      enable_cache=enable_cache, modality=modality,
-                                      media_download_headers=media_download_headers, **kwargs)
+
+        with RequestMetricsStore.for_request().time("inference.local_vectorise"):
+            return s2_inference.vectorise(model_name=model_name, content=content, model_properties=model_properties,
+                                          device=device, normalize_embeddings=normalize_embeddings, model_auth=model_auth,
+                                          enable_cache=enable_cache, modality=modality,
+                                          media_download_headers=media_download_headers, **kwargs)
 
 
 class StaticVectoriser:
@@ -47,7 +49,6 @@ class StaticVectoriser:
         random_array = np.random.rand(dimension)
         normalized_array = random_array / np.linalg.norm(random_array)
         self.static_vector = [normalized_array.tolist()]
-
     def vectorise(self, model_name: str, content: Union[str, List[str]],
                   model_properties: dict = None, device: str = None, normalize_embeddings: bool = True,
                   model_auth: ModelAuth = None, enable_cache: bool = False, modality: Modality = Modality.TEXT,
@@ -88,8 +89,10 @@ class RemoteVectoriser:
             raise InferenceError(e) from e
 
         resp.raise_for_status()
+        result = VectoriseResponse.construct(**orjson.loads(resp.text))
+        RequestMetricsStore.for_request().add_time("inference.local_vectorise", result.vectorise_time)
 
-        return orjson.loads(resp.text)
+        return result.embeddings
 
 
 class RemoteSlimVectoriser:
@@ -100,7 +103,7 @@ class RemoteSlimVectoriser:
         )
         # Only support clip models for now
         self.preprocess = _get_transform(224)
-        self.tokenise = clip.tokenize
+        self.tokenise = open_clip.get_tokenizer('ViT-B-16-SigLIP')
 
     @staticmethod
     def tensor_to_json(tensor: torch.Tensor) -> dict:
@@ -130,7 +133,7 @@ class RemoteSlimVectoriser:
         # Preprocess
         if modality == Modality.TEXT:
             with RequestMetricsStore.for_request().time("inference.preprocess"):
-                tensor: torch.Tensor = self.tokenise(content, truncate=True)
+                tensor: torch.Tensor = self.tokenise(content)
         elif modality == Modality.IMAGE:
             if isinstance(content, list):
                 # we only support 1 image now
@@ -164,9 +167,6 @@ class RemoteSlimVectoriser:
                 resp = self.http_client.post(endpoint, files=self.create_vectorize_request(request, tensor))
         except httpx.HTTPError as e:
             raise InferenceError(e) from e
-
-        print("Status Code:", resp.status_code)
-        print("Response Body:", resp.text)
 
         resp.raise_for_status()
 

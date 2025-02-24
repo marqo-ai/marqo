@@ -41,19 +41,21 @@ def tensor_from_json(tensor_dict):
     return tensor
 
 
-async def tensor_from_file(tensor_file):
-    tensor_buffer = io.BytesIO(await tensor_file.read())
+def tensor_from_file(tensor_file: UploadFile):
+    tensor_buffer = io.BytesIO(tensor_file.file.read())
     return torch.load(tensor_buffer)
 
 
 @inf_app.post("/vectorise-binary")
-async def vectorise_binary(
+def vectorise_binary(
         metadata: str = Form(...),
         tensor_file: UploadFile = File(...)
 ):
     try:
         request = VectoriseRequest(**orjson.loads(metadata))
-        return vectorise_internal(request, await tensor_from_file(tensor_file))
+        tensor = tensor_from_file(tensor_file).to(request.device)
+        logger.debug(f'Preprocessed tensor: {tensor.shape}, {tensor.dtype}')
+        return vectorise_internal(request, tensor)
     except Exception as e:
         logger.error(e)
         raise e
