@@ -2,12 +2,19 @@
 FROM maven:3.8.7-openjdk-18-slim as maven_build
 
 WORKDIR /app/vespa
-COPY vespa .
-RUN mvn clean package
+# Copy only the pom.xml and any other files required for dependency resolution
+COPY vespa/pom.xml vespa/
+# Download dependencies (this layer will be cached if pom.xml hasn't changed)
+RUN mvn dependency:go-offline
+
+COPY vespa/src /app/vespa/src
+# Enable parallel builds with Maven (-T 1C uses one thread per CPU core)
+RUN mvn clean package -T 1C
 
 # Stage 2: Base image for Python setup
 FROM marqoai/marqo-base:36 as base_image
 
+# This is to allow installing python dependencies from github repos
 RUN dnf install -y git
 
 # Allow mounting volume containing data and configs for vespa
@@ -34,10 +41,9 @@ COPY scripts/ /app/scripts
 COPY run_marqo.sh /app/run_marqo.sh
 COPY src /app/src
 
-
 ENV PYTHONPATH "${PYTHONPATH}:/app"
 RUN chmod +x ./run_marqo.sh
 RUN echo $COMMITHASH > build_info.txt
-CMD ["./run_marqo.sh"]
+
 ENTRYPOINT ["./run_marqo.sh"]
 
