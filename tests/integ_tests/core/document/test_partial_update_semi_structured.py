@@ -300,6 +300,9 @@ class TestPartialUpdate(MarqoTestCase):
             res = self.config.document.partial_update_documents([{'_id': '2', 'marqo__': 1}], self.index)
             self.assertTrue(res.errors)
 
-    def test_partial_update_sort_of_backwards_compatibility_test(self):
-        res = self.config.document.partial_update_documents([{'_id': '2', 'string_array': ["ccc"]}], self.index)
-        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+    def test_partial_update_trying_to_add_multi_modal_field(self):
+        res = self.config.document.partial_update_documents([{'_id': '1',
+            "tensor_subfield": "new_title",
+        }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn('tensor_subfield of type str does not exist in the original document. We do not support adding new lexical fields in partial updates', res.items[0].error)

@@ -16,7 +16,7 @@ import orjson
 import marqo.logging
 import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
-from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES
+from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
@@ -414,6 +414,7 @@ class VespaClient:
     def get_batch(self,
                   ids: List[str],
                   schema: str,
+                  fields: Optional[List[str]] = None,
                   concurrency: Optional[int] = None,
                   timeout: int = 60) -> GetBatchResponse:
         """
@@ -426,6 +427,7 @@ class VespaClient:
         Args:
             ids: List of document IDs to get
             schema: Schema to get from
+            fields: A optional list of fields to fetch from the document
             concurrency: Number of concurrent get requests
             timeout: Timeout in seconds per request
 
@@ -439,42 +441,7 @@ class VespaClient:
             concurrency = self.get_pool_size
 
         batch_response = conc.run_coroutine(
-            self._get_batch_async(ids, schema, concurrency, timeout)
-        )
-
-        return batch_response
-
-    def get_batch_with_specific_fields(self,
-                  ids: List[str],
-                  fields: List[str],
-                  schema: str,
-                  concurrency: Optional[int] = None,
-                  timeout: int = 60) -> GetBatchResponse:
-        """
-        Get a batch of documents by ID concurrently.
-
-        Documents will be fetched with `concurrency` concurrent pooled connections.
-
-        Missing (404) documents will be returned in the response. Any other non-200 responses will raise an exception.
-
-        Args:
-            fields: List of fields to be retrieved
-            ids: List of document IDs to get
-            schema: Schema to get from
-            concurrency: Number of concurrent get requests
-            timeout: Timeout in seconds per request
-
-        Returns:
-            List of GetDocumentResponse objects containing the documents fetched and any missing documents (404)
-        """
-        if not ids:
-            return GetBatchResponse(responses=[], errors=False)
-
-        if concurrency is None:
-            concurrency = self.get_pool_size
-
-        batch_response = conc.run_coroutine(
-            self._get_batch_async_with_specific_fields(ids, fields, schema, concurrency, timeout)
+            self._get_batch_async(ids, fields, schema, concurrency, timeout)
         )
 
         return batch_response
@@ -846,7 +813,7 @@ class VespaClient:
                 asyncio.create_task(
                     self._update_document_async(semaphore, async_client, document, schema, timeout, vespa_id_field)
                 )
-                for document in batch # this is coming from partial updates request (this gets populated with timestamp before this update_documents_batch_async)
+                for document in batch
             ]
             await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
 
@@ -866,6 +833,7 @@ class VespaClient:
         doc_id = document.id
         data = {'fields': document.fields}
         types = document.field_types
+        create_timestamp = document.create_timestamp
 
         # only used for documents that are not updated
         error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
@@ -876,6 +844,8 @@ class VespaClient:
                 for key, value in types.items():
                     data["condition"] += (f' and (not {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}} or {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}==\"{value}\")'
                                           f' and (not ({schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}=="{MarqoFieldTypes.TENSOR.value}"))')
+            if create_timestamp is not None:
+                data["condition"] += f' and {schema}.{VESPA_DOC_CREATE_TIMESTAMP}=={create_timestamp}'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
             except httpx.RequestError as e:
@@ -960,6 +930,7 @@ class VespaClient:
 
     async def _get_batch_async(self,
                                ids: List[str],
+                               fields: Optional[List[str]],
                                schema: str,
                                connections: int, timeout: int) -> GetBatchResponse:
         async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
@@ -967,33 +938,7 @@ class VespaClient:
             semaphore = asyncio.Semaphore(connections)
             tasks = [
                 asyncio.create_task(
-                    self._get_document_async(semaphore, async_client, id, schema, timeout)
-                )
-                for id in ids
-            ]
-            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
-
-        responses = []
-        errors = False
-        for task in tasks:
-            result = task.result()
-            responses.append(result)
-            if result.status != 200:
-                errors = True
-
-        return GetBatchResponse(responses=responses, errors=errors)
-
-    async def _get_batch_async_with_specific_fields(self,
-                               ids: List[str],
-                               fields: List[str],
-                               schema: str,
-                               connections: int, timeout: int) -> GetBatchResponse:
-        async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=connections,
-                                                         max_connections=connections)) as async_client:
-            semaphore = asyncio.Semaphore(connections)
-            tasks = [
-                asyncio.create_task(
-                    self._get_document_async_with_specific_fields(semaphore, async_client, id, fields, schema, timeout)
+                    self._get_document_async(semaphore, async_client, id, fields, schema, timeout)
                 )
                 for id in ids
             ]
@@ -1013,13 +958,20 @@ class VespaClient:
                                   semaphore: asyncio.Semaphore,
                                   async_client: httpx.AsyncClient,
                                   id: str,
+                                  fields: Optional[List[str]],
                                   schema: str,
                                   timeout: int) -> GetBatchDocumentResponse:
         async with semaphore:
             try:
-                resp = await async_client.get(
-                    f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}', timeout=timeout
-                )
+                if fields is not None:
+                    resp = await async_client.get(
+                        f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{",".join(fields)}',
+                        timeout=timeout
+                    )
+                else:
+                    resp = await async_client.get(
+                        f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}', timeout=timeout
+                    )
             except httpx.HTTPError as e:
                 raise VespaError(e) from e
 

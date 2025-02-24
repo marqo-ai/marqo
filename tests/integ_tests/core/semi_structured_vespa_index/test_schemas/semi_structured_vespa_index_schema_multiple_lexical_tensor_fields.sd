@@ -225,7 +225,6 @@ schema marqo__test_00semi_00structured_00schema {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
-        summary marqo__create_timestamp type double {}
         summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
@@ -239,7 +238,6 @@ schema marqo__test_00semi_00structured_00schema {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
-        summary marqo__create_timestamp type double {}
         summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}

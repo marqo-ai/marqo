@@ -12,6 +12,7 @@ from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, logger
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, STRING_ARRAY
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
+from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS, MARQO_DOC_MULTIMODAL_PARAMS_WEIGHTS
 
 
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
@@ -93,6 +94,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
             fixed_fields = SemiStructuredVespaDocumentFields.construct(
                 marqo__id=cls.extract_field(fields, common.VESPA_FIELD_ID, None),
+                create_timestamp=cls.extract_field(fields, common.VESPA_DOC_CREATE_TIMESTAMP, None),
                 short_string_fields=cls.extract_field(fields, common.SHORT_STRINGS_FIELDS, dict()),
                 string_arrays=cls.extract_field(fields, common.STRING_ARRAY, list()),
                 int_fields=cls.extract_field(fields, common.INT_FIELDS, dict()),
@@ -207,7 +209,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     def _process_regular_fields(cls, document: dict, instance, marqo_index: SemiStructuredMarqoIndex, doc_id: str):
         """Process non-tensor fields in the document"""
         for field_name, field_content in document.items():
-            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS, constants.MARQO_CREATE_TIMESTAMP]:
+            if field_name in [index_constants.MARQO_DOC_ID, constants.MARQO_DOC_TENSORS]:
                 continue
             try:
                 cls._handle_field_content(field_name, field_content, instance, marqo_index)
@@ -296,11 +298,11 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                 if instance.index_supports_partial_updates:
                     instance.fixed_fields.field_types[marqo_tensor_field] = MarqoFieldTypes.TENSOR.value # Set field_types as tensor for tensor fields
 
-                    multimodal_params = document.get('multimodal_params')
+                    multimodal_params = document.get(MARQO_DOC_MULTIMODAL_PARAMS)
                     if multimodal_params is not None and multimodal_params.get(marqo_tensor_field) is not None: # Set field_types as tensor for sub-fields of multimodal combo fields
                         try:
-                            multimodal_params = json.loads(document.get('multimodal_params').get(marqo_tensor_field))
-                            multimodal_combo_sub_fields = multimodal_params.get('weights').keys()
+                            multimodal_params = json.loads(document.get(MARQO_DOC_MULTIMODAL_PARAMS).get(marqo_tensor_field))
+                            multimodal_combo_sub_fields = multimodal_params.get(MARQO_DOC_MULTIMODAL_PARAMS_WEIGHTS).keys()
                             for sub_field in multimodal_combo_sub_fields:
                                 instance.fixed_fields.field_types[sub_field] = MarqoFieldTypes.TENSOR.value
                         except json.JSONDecodeError as e:

@@ -158,8 +158,8 @@ class AddDocumentsHandler(ABC):
 
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
-                result = self.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
-                                                         self.marqo_index.schema_name)
+                result = self.vespa_client.get_batch(ids = list(self.add_docs_response_collector.valid_original_ids()),
+                                                         schema = self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
                 self._populate_existing_tensors(existing_vespa_docs)
 
