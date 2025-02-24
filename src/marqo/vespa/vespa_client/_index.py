@@ -49,6 +49,7 @@ from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, 
     DeleteBatchResponse, DeleteAllDocumentsResponse
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
     GetBatchDocumentResponse
+from ...core.models import MarqoIndex
 
 if TYPE_CHECKING:
     from ._client_base import VespaClientBase
@@ -572,3 +573,30 @@ class VespaIndexMixin:
                 raise VespaError(f'Unexpected response: {resp.text}')
 
             self._raise_for_status(resp)
+
+    def get_index_setting_by_name(self, index_name: str) -> Optional[MarqoIndex]:
+        try:
+            resp = self.http_client.get(f'{self.document_url}/index-settings/{index_name}')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        if resp.status_code == 404:
+            return None
+
+        self._raise_for_status(resp)
+
+        return MarqoIndex.parse_obj(resp.json())
+
+    def get_all_index_settings(self) -> List[MarqoIndex]:
+        try:
+            resp = self.http_client.get(f'{self.document_url}/index-settings')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        index_list = resp.json()
+        if isinstance(index_list, list):
+            return [MarqoIndex.parse_obj(item) for item in index_list]
+
+        raise VespaError(f'Get all index settings returns invalid response: {index_list}')

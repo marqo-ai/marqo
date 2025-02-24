@@ -43,6 +43,7 @@ import httpx
 
 import marqo.logging
 from marqo.vespa.exceptions import VespaError
+from ..models.application_metrics import ApplicationMetrics
 
 if TYPE_CHECKING:
     from ._client_base import VespaClientBase
@@ -202,3 +203,21 @@ class VespaUtilsMixin:
 
         except (JSONDecodeError, KeyError) as e:
             raise VespaError(f'Unexpected response: {response.text}') from e
+
+    def get_metrics(self) -> ApplicationMetrics:
+        """
+        Get metrics for every service on all nodes for the application.
+
+        See https://docs.vespa.ai/en/operations-selfhosted/monitoring.html#metrics-v2-values for more information.
+
+        Returns:
+             A selected set of metrics for every service on all nodes for the application
+        """
+        try:
+            resp = self.http_client.get(f'{self.document_url}/metrics/v2/values')
+        except httpx.HTTPError as e:
+            raise VespaError(e) from e
+
+        self._raise_for_status(resp)
+
+        return ApplicationMetrics(**resp.json())
