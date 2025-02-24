@@ -265,11 +265,15 @@ class OPEN_CLIP(AbstractCLIPModel):
             assert outputs.shape == _shape_before
         return self._convert_output(outputs)
 
-    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
+    def encode_text(self, sentence: Union[str, List[str], Tensor], normalize=True) -> FloatTensor:
         if self.model is None:
             self.load()
 
-        text = self.tokenizer(sentence).to(self.device)
+        if isinstance(sentence, Tensor):
+            text = sentence.to(self.device)
+        else:
+            text = self.tokenizer(sentence).to(self.device)
+
 
         with torch.no_grad():
             if self.device.startswith("cuda"):

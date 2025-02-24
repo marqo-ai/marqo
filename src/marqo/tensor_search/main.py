@@ -78,7 +78,7 @@ def run_api_serer():
             "fmt"] = "%(asctime)s - %(levelname)s - PID: %(process)d - X-Request-PID: %(request_pid)s - %(message)s"
         # bind to 0.0.0.0 to expose this port in container
         uvicorn.run("api:app", host="0.0.0.0", port=8882, workers=api_worker_count, log_config=log_config,
-                    socket_load_balance=True)
+                    socket_load_balance=False)
 
     elif asgi_server == 'gunicorn':
         # options = {
@@ -105,7 +105,6 @@ def run_api_serer():
         server.serve()
 
 def run_inf_app(worker_count: int):
-    # bind to localhost only so it is not visible outside the container
     # TODO We will need to make sure the inference server has bootstrapped (warmed up) before start serving request
 
     # if run_gunicorn:
@@ -116,16 +115,16 @@ def run_inf_app(worker_count: int):
     #     }
     #     StandaloneApplication("inf_api:inf_app", options).run()
     # else:
-    uvicorn.run("inf_api:inf_app", host="localhost", port=8881, workers=worker_count)
+    uvicorn.run("inf_api:inf_app", host="0.0.0.0", port=8881, workers=worker_count)
 
 
 @contextlib.contextmanager
-def maybe_run_inference_server():
+def maybe_run_inference_server(remote_inference_worker_count: int):
     will_run_remote_inference = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE) == 'TRUE'
+    bypassing_inference = os.environ.get("MARQO_BYPASS_INFERENCE", "FALSE") == 'TRUE'
     remote_inference_url = utils.read_env_vars_and_defaults(EnvVars.MARQO_REMOTE_INFERENCE_URL)
-    remote_inference_worker_count = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_WORKER_COUNT)
 
-    if will_run_remote_inference and remote_inference_url == default_env_vars()[EnvVars.MARQO_REMOTE_INFERENCE_URL]:
+    if not bypassing_inference and will_run_remote_inference and remote_inference_url == default_env_vars()[EnvVars.MARQO_REMOTE_INFERENCE_URL]:
         p = multiprocessing.Process(target=run_inf_app, args=[remote_inference_worker_count], name='marqo-inference')
         p.start()
 
@@ -142,7 +141,11 @@ if __name__ == "__main__":
     # To use CUDA with multiprocessing, we must use the 'spawn' start method
     multiprocessing.set_start_method('spawn')
 
-    on_start(_config, StartMode.BOOTSTRAP)
-
-    with maybe_run_inference_server():
-        run_api_serer()
+    inference_mode = os.environ.get("MARQO_INFERENCE_MODE", "FALSE") == 'TRUE'
+    remote_inference_worker_count = utils.read_env_vars_and_defaults_ints(EnvVars.MARQO_INFERENCE_WORKER_COUNT)
+    if inference_mode:
+        run_inf_app(remote_inference_worker_count)
+    else:
+        on_start(_config, StartMode.BOOTSTRAP)
+        with maybe_run_inference_server(remote_inference_worker_count):
+            run_api_serer()

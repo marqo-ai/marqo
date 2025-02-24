@@ -14,3 +14,5 @@ orjson==3.10.14
 gunicorn==23.0.0
 granian==1.6.4
 uvicorn@git+https://github.com/vvanglro/uvicorn.git@f2b1037
+fastapi==0.86.0
+python-multipart==0.0.20

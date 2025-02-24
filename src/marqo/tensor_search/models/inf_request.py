@@ -14,11 +14,17 @@ class VectoriseRequest(BaseModel):
     modality: Modality = Modality.TEXT
     normalize_embeddings: bool = True
     device: str
-    content: Union[str, List[str]]
+    content: Optional[Union[str, List[str]]]
     enable_cache: bool = False,
     media_download_headers: Optional[dict] = None
+
+    preprocessed: bool = False
 
     # TODO support other fields in **kwargs
 
     # TODO support other content types: List[Image], List[bytes], etc.
 
+
+class VectoriseResponse(BaseModel):
+    embeddings: List[List[float]]
+    vectorise_time: float

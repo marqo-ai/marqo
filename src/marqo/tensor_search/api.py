@@ -1,7 +1,8 @@
 """The API entrypoint for Tensor Search"""
+import asyncio
 import json
 import os
-from contextlib import asynccontextmanager
+import time
 from typing import List
 
 import pydantic
@@ -39,7 +40,6 @@ from marqo.tensor_search.web import api_validation, api_utils
 from marqo.upgrades.upgrade import UpgradeRunner, RollbackRunner
 from marqo.vespa import exceptions as vespa_exceptions
 from starlette.middleware.base import BaseHTTPMiddleware
-import logging
 
 logger = get_logger(__name__)
 
@@ -50,13 +50,19 @@ start_mode = StartMode.API if will_run_remote_inference else (StartMode.API | St
 on_start(get_config(), start_mode)
 
 
-# Middleware to capture a specific header (e.g., 'X-Request-ID')
 class CustomHeaderLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        start_time = time.perf_counter()
         # Extract the custom header, for example, 'X-Request-ID'
         request_pid = request.headers.get('X-Request-PID', 'na')
         request.state.request_pid = request_pid
+
         response = await call_next(request)
+
+        # Also capture process time
+        duration = time.perf_counter() - start_time
+        response.headers["X-Process-Time"] = str(duration)
+
         return response
 
 
@@ -64,8 +70,8 @@ app = FastAPI(
     title="Marqo",
     version=version.get_version(),
 )
-app.add_middleware(TelemetryMiddleware)
 app.add_middleware(CustomHeaderLoggingMiddleware)
+app.add_middleware(TelemetryMiddleware)
 app.router.route_class = MarqoCustomRoute
 
 
@@ -213,6 +219,18 @@ def shutdown_event():
 def root():
     return {"message": "Welcome to Marqo",
             "version": version.get_version()}
+
+
+@app.get("/async_wait")
+async def async_wait():
+    while True:
+        pass
+
+
+@app.get("/sync_wait")
+def sync_wait():
+    while True:
+        pass
 
 
 @app.get('/memory')

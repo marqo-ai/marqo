@@ -45,8 +45,8 @@ def _convert_image_to_rgb(image: ImageType) -> ImageType:
     return image.convert("RGB")
 
 
-def _get_transform(n_px: int, image_mean: List[float] = None, image_std: List[float] = None) -> torch.Tensor:
-    '''This function returns a transform to preprocess the image. The processed image will be passed into
+def _get_transform(n_px: int, image_mean: List[float] = None, image_std: List[float] = None) -> Compose:
+    """This function returns a transform to preprocess the image. The processed image will be passed into
     clip model for inference.
     Args:
         n_px: the size of the processed image
@@ -55,7 +55,7 @@ def _get_transform(n_px: int, image_mean: List[float] = None, image_std: List[fl
 
     Returns:
         the processed image tensor with shape (3, n_px, n_px)
-    '''
+    """
     img_mean = image_mean or OPENAI_DATASET_MEAN
     img_std = image_std or OPENAI_DATASET_STD
     return Compose([
@@ -402,12 +402,15 @@ class CLIP:
     def normalize(outputs):
         return outputs.norm(dim=-1, keepdim=True)
 
-    def encode_text(self, sentence: Union[str, List[str]], normalize=True) -> FloatTensor:
+    def encode_text(self, sentence: Union[str, List[str], Tensor], normalize=True) -> FloatTensor:
 
         if self.model is None:
             self.load()
 
-        text = self.tokenizer(sentence, truncate=True).to(self.device)
+        if isinstance(sentence, (str, List[str])):
+            text = self.tokenizer(sentence, truncate=True).to(self.device)
+        else:
+            text = sentence.to(self.device)
 
         with torch.no_grad():
             outputs = self.model.encode_text(text)
