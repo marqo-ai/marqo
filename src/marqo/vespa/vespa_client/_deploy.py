@@ -175,3 +175,17 @@ class VespaDeployMixin:
         self._raise_for_status(response)
 
         return response.json()['version']
+
+    def prepare(self, prepare_url: str, timeout: int):
+        response = self.http_client.put(prepare_url, timeout=timeout)
+
+        self._raise_for_status(response)
+
+        return response.json()
+
+    def activate(self, activate_url: str, timeout: int):
+        response = self.http_client.put(activate_url, timeout=timeout)
+
+        self._raise_for_status(response)
+
+        return response.json()
