@@ -306,3 +306,195 @@ class TestPartialUpdate(MarqoTestCase):
         }], self.index)
         self.assertTrue(res.errors)
         self.assertIn('tensor_subfield of type str does not exist in the original document. We do not support adding new lexical fields in partial updates', res.items[0].error)
+
+    def test_partial_update_should_handle_mixed_numeric_map_updates(self):
+        """Test updating maps with mix of additions and removals"""
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            'int_map': {
+                'a': 10,  # Update existing
+                'c': 3,   # Add new
+                'b': 20   # Update existing
+            },
+            'float_map': {
+                'c': 10.5,  # Update existing
+                'e': 5.5    # Add new
+            }
+        }], self.index)
+        self.assertFalse(res.errors)
+        
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(10, doc['int_map.a'])
+        self.assertEqual(20, doc['int_map.b'])
+        self.assertEqual(3, doc['int_map.c'])
+        self.assertEqual(10.5, doc['float_map.c'])
+        self.assertEqual(5.5, doc['float_map.e'])
+
+    def test_partial_update_should_reject_invalid_map_values(self):
+        """Test rejection of invalid value types in numeric maps"""
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            'int_map': {
+                'a': 'string',  # Invalid type
+                'b': 2.5,      # Invalid type
+                'c': True      # Invalid type
+            }
+        }], self.index)
+        self.assertTrue(res.errors)
+        
+        # Verify original values unchanged
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(1, doc['int_map.a'])
+        self.assertEqual(2, doc['int_map.b'])
+
+    def test_partial_update_should_handle_multiple_docs(self):
+        """Test updating multiple documents in one request"""
+        updates = [
+            {
+                '_id': '2',
+                'int_field': 1000,
+                'float_map': {'c': 99.9}
+            },
+            {
+                '_id': '3', 
+                'bool_field': False,
+                'int_map': {'a': 777}
+            }
+        ]
+        res = self.config.document.partial_update_documents(updates, self.index)
+        self.assertFalse(res.errors)
+        
+        # Verify updates
+        doc2 = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(1000, doc2['int_field'])
+        self.assertEqual(99.9, doc2['float_map.c'])
+        
+        doc3 = tensor_search.get_document_by_id(self.config, self.index.name, '3')
+        self.assertFalse(doc3['bool_field'])
+        self.assertEqual(777, doc3['int_map.a'])
+
+    def test_partial_update_should_handle_duplicate_doc_ids(self):
+        """Test handling of duplicate document IDs in update request"""
+        updates = [
+            {
+                '_id': '2',
+                'int_field': 100
+            },
+            {
+                '_id': '2',
+                'int_field': 200
+            }
+        ]
+        res = self.config.document.partial_update_documents(updates, self.index)
+        self.assertFalse(res.errors)
+        
+        # Verify last update wins
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(200, doc['int_field'])
+
+    def test_partial_update_should_handle_non_existent_doc_id(self):
+        """Test updating non-existent document"""
+        res = self.config.document.partial_update_documents([{
+            '_id': 'non_existent',
+            'int_field': 100
+        }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn('marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. please fix the request and try again', res.items[0].error.lower())
+
+    def test_partial_update_should_handle_none_id(self):
+        """Test handling of None _id field"""
+        res = self.config.document.partial_update_documents([{
+            '_id': None,
+            'int_field': 100
+        }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn('_id', res.items[0].error.lower())
+
+    def test_partial_update_should_handle_missing_id(self):
+        """Test handling of document without _id field"""
+        res = self.config.document.partial_update_documents([{
+            'int_field': 100
+        }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn('_id', res.items[0].error.lower())
+
+    def test_partial_update_should_handle_empty_update_list(self):
+        """Test handling of empty document list"""
+        res = self.config.document.partial_update_documents([], self.index)
+        self.assertFalse(res.errors)
+        self.assertEqual(0, len(res.items))
+
+    def test_partial_update_should_handle_mixed_valid_invalid_docs(self):
+        """Test batch with mix of valid and invalid documents"""
+        updates = [
+            {
+                '_id': '2',
+                'int_field': 100
+            },
+            {
+                '_id': '3',
+                'bool_field': True
+            },
+            {
+                'missing_id': True
+            }
+        ]
+        res = self.config.document.partial_update_documents(updates, self.index)
+        self.assertTrue(res.errors)
+
+        # Verify valid updates succeeded
+        doc2 = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(100, doc2['int_field'])
+
+        doc3 = tensor_search.get_document_by_id(self.config, self.index.name, '3')
+        self.assertTrue(doc3['bool_field'])
+
+        # Verify error responses for invalid docs
+        self.assertEqual(3, len(res.items))
+        print(res)
+        self.assertFalse(res.items[0].error)  # Valid doc
+        self.assertFalse(res.items[1].error)  # Valid doc
+        self.assertIn("'_id' is a required field", res.items[2].error)  # Missing ID
+
+    def test_partial_update_should_handle_nested_maps(self):
+        """Test handling of nested maps in updates"""
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            'int_map': {
+                'nested': {
+                    'too': 'deep'
+                }
+            }
+        }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn('unsupported field type', res.items[0].error.lower())
+
+    def test_partial_update_should_preserve_other_fields(self):
+        """Test that non-updated fields remain unchanged"""
+        original_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            'int_field': 999
+        }], self.index)
+        self.assertFalse(res.errors)
+
+        updated_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+
+        # Verify updated field
+        self.assertEqual(999, updated_doc['int_field'])
+
+        # Verify all other fields unchanged
+        for field, value in original_doc.items():
+            if field != 'int_field':
+                self.assertEqual(value, updated_doc.get(field),
+                                 f"Field {field} changed unexpectedly")
+
+    def test_partial_update_should_handle_empty_string_id(self):
+        """Test handling of empty string as document ID"""
+        res = self.config.document.partial_update_documents([{
+            '_id': '',
+            'int_field': 100
+        }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn("document id can't be empty", res.items[0].error.lower())
