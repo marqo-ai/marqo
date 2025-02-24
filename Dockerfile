@@ -3,7 +3,7 @@ FROM maven:3.8.7-openjdk-18-slim as maven_build
 
 WORKDIR /app/vespa
 # Copy only the pom.xml and any other files required for dependency resolution
-COPY vespa/pom.xml vespa/
+COPY vespa/pom.xml /app/vespa/
 # Download dependencies (this layer will be cached if pom.xml hasn't changed)
 RUN mvn dependency:go-offline
 
