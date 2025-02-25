@@ -595,10 +595,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # Create the vespa doc field name
         if isinstance(val, bool):
             vespa_doc_field_name = f'{common.BOOL_FIELDS}{{{key}}}'
-        elif isinstance(val, float):
-            vespa_doc_field_name = f'{common.FLOAT_FIELDS}{{{key}}}'
-        elif isinstance(val, int):
-            vespa_doc_field_name = f'{common.INT_FIELDS}{{{key}}}'
         elif isinstance(val, list):
             vespa_doc_field_name = f'{common.STRING_ARRAY}_{key}'
 

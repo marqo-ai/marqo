@@ -498,3 +498,37 @@ class TestPartialUpdate(MarqoTestCase):
         }], self.index)
         self.assertTrue(res.errors)
         self.assertIn("document id can't be empty", res.items[0].error.lower())
+
+    def test_partial_update_should_handle_random_dict_field(self):
+        res = self.config.document.partial_update_documents(
+            [{
+                '_id': '2',
+                "random_field": {
+                    "content1": "abcd",
+                    "content2": "efgh"
+                }
+            }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn('Unsupported field type', res.items[0].error)
+
+    def test_partial_update_should_handle_random_field_type(self):
+        res = self.config.document.partial_update_documents(
+            [{
+                '_id': '2',
+                "random_field": None
+            }], self.index)
+        self.assertTrue(res.errors)
+        self.assertIn('Unsupported field type', res.items[0].error)
+
+    def test_partial_update_should_handle_empty_dict_field(self):
+        res = self.config.document.partial_update_documents(
+            [{
+                '_id': '2',
+                "float_map": {}
+            }], self.index
+        )
+        self.assertFalse(res.errors)
+        updated_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertIsNone(updated_doc.get('float_map.c', None))
+        self.assertIsNone(updated_doc.get('float_map.d', None))
+        self._assert_fields_unchanged(updated_doc, ['float_map.c', 'float_map.d'])

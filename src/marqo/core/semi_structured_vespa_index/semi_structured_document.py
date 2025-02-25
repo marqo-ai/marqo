@@ -306,8 +306,8 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
                             for sub_field in multimodal_combo_sub_fields:
                                 instance.fixed_fields.field_types[sub_field] = MarqoFieldTypes.TENSOR.value
                         except json.JSONDecodeError as e:
-                            logger.error("Failed to parse weights for multimodal combo field")
-                        
+                            raise MarqoDocumentParsingError(f"Error parsing multimodal params for field {marqo_tensor_field}: {str(e)}")
+
                 cls._verify_marqo_tensor_field_name(marqo_tensor_field, marqo_index)
                 cls._verify_marqo_tensor_field(marqo_tensor_field, tensor_value)
 

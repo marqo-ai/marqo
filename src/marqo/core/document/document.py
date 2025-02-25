@@ -236,14 +236,17 @@ class Document:
                 if is_index_semi_structured:
                     for field_name, field_value in doc.items():
                         if isinstance(field_value, dict):
-                            for key, val in field_value.items():
-                                if isinstance(val, (int, float)):
-                                    documents_with_maps.add(doc_id)
-                                    break
-                                else:
-                                    raise MarqoDocumentParsingError(
-                                        f'Unsupported field type {type(val)} for field {field_name} in doc {doc_id}'
-                                    )
+                            if len(field_value) == 0: # If the dictionary is empty, get back the document so that we can update the doc with an empty dictionary (i.e remove the map from the doc).
+                                documents_with_maps.add(doc_id)
+                            else:
+                                for key, val in field_value.items():
+                                    if isinstance(val, (int, float)):
+                                        documents_with_maps.add(doc_id)
+                                        break
+                                    else:
+                                        raise MarqoDocumentParsingError(
+                                            f'Unsupported field type {type(val)} for field {field_name} in doc {doc_id}'
+                                        )
                             break
                 doc_ids.add(doc_id)
                 docs.append(doc)
