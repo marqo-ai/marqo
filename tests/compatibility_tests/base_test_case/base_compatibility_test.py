@@ -38,7 +38,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         cls.removeAllModels()
         if cls.indexes_to_delete:
             cls.delete_indexes(cls.indexes_to_delete)
-            cls.logger.info(f"Deleting indexes {cls.indexes_to_delete} for test class: {cls.__qualname__}")
+            cls.logger.debug(f"Deleting indexes {cls.indexes_to_delete}")
 
         cls.delete_file()
 
@@ -48,7 +48,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         filepath = cls.get_results_file_path()
         with filepath.open('w') as f:
             json.dump(results, f, indent=4)
-        cls.logger.info(f"Results saved to {filepath}")
+        cls.logger.debug(f"Results saved to {filepath}")
 
     @classmethod
     def load_results_from_file(cls):
@@ -56,7 +56,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         filepath = cls.get_results_file_path()
         with filepath.open('r') as f:
             results = json.load(f)
-        cls.logger.info(f"Results loaded from {filepath}")
+        cls.logger.debug(f"Results loaded from {filepath}")
         return results
 
     @classmethod
@@ -65,9 +65,9 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         filepath = cls.get_results_file_path()
         if filepath.exists():
             filepath.unlink()
-            cls.logger.info(f"Results file deleted: {filepath}")
+            cls.logger.debug(f"Results file deleted: {filepath}")
         else:
-            cls.logger.info(f"Not deleting, as the results file was never created in the first place.")
+            cls.logger.debug(f"Not deleting, as the results file was never created in the first place.")
 
     @abstractmethod
     def prepare(self):

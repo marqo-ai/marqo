@@ -74,8 +74,7 @@ class TestCreateIndexBringYourOwnModel(BaseCompatibilityTestCase):
             ])
             self.logger.error(f"Some subtests failed:\n{failure_message}. When the corresponding test runs for this index, it is expected to fail")
 
-        if not errors:
-            self.save_results_to_file(all_results)
+        self.save_results_to_file(all_results)
 
     def test_expected_settings(self):
         expected_settings = self.load_results_from_file()
