@@ -4,6 +4,7 @@ import random
 import string
 import unittest
 from unittest import mock
+import pytest
 
 import requests
 
@@ -97,6 +98,7 @@ class TestPagination(MarqoTestCase):
 
         return list(unique_strings)
 
+    @pytest.mark.skip_for_multinode
     def test_pagination_single_field(self):
         num_docs = 400
         batch_size = 100
@@ -156,6 +158,7 @@ class TestPagination(MarqoTestCase):
                             self.assertEqual(full_search_results["hits"][i]["_id"], paginated_search_results["hits"][i]["_id"])
                             self.assertEqual(full_search_results["hits"][i]["_score"], paginated_search_results["hits"][i]["_score"])
 
+    @pytest.mark.skip_for_multinode
     def test_pagination_hybrid(self):
         num_docs = 400
         batch_size = 100

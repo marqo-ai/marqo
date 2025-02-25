@@ -1,9 +1,36 @@
 name: unit_test_200gb_CI
+run-name: Unit Tests with ${{ inputs.number_of_shards || 1 }} shards and ${{ inputs.number_of_replicas || 0 }} replicas
 # runs unit tests on AMD64 machine
 
 on:
   workflow_call:
+    inputs:
+      number_of_shards:
+        type: number
+        description: 'Number of shards (content nodes per group in Vespa). Minimum of 1.'
+        required: true
+        default: 1
+
+      number_of_replicas:
+        type: number
+        description: 'Number of replicas (groups in Vespa minus 1). Minimum of 0.'
+        required: true
+        default: 0
+
   workflow_dispatch:
+    inputs:
+      number_of_shards:
+        type: number
+        description: 'Number of shards (content nodes per group in Vespa). Minimum of 1.'
+        required: true
+        default: 1
+
+      number_of_replicas:
+        type: number
+        description: 'Number of replicas (groups in Vespa - 1)'
+        required: true
+        default: 0
+
   push:
     branches:
       - mainline
@@ -16,7 +43,7 @@ on:
       - releases/*
 
 concurrency:
-  group: integ-tests-${{ github.ref }}
+  group: unit-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
   cancel-in-progress: true
 
 permissions:
@@ -39,9 +66,9 @@ jobs:
         run: |
           cd marqo
           set -x
-          
+
           # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request"  || "${GITHUB_EVENT_NAME}" == "pull_request_review" ]]; then
             BASE_COMMIT=${{ github.event.pull_request.base.sha }}
             HEAD_COMMIT=${{ github.event.pull_request.head.sha }}
           elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
@@ -70,11 +97,46 @@ jobs:
             echo "doc_only=true" >> $GITHUB_OUTPUT
           fi
 
-  Start-Runner:
-    name: Start self-hosted EC2 runner
-    runs-on: ubuntu-latest
+  Determine-Vespa-Setup:
     needs:
       - Check-Changes
+    runs-on: ubuntu-latest
+    if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
+    outputs:
+      VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
+      MULTINODE_TEST_ARGS: ${{ steps.set_var.outputs.MULTINODE_TEST_ARGS }}
+    steps:
+      - name: Determine VESPA_MULTINODE_SETUP
+        id: set_var
+        run: |
+          # For single node, initialize as false
+          echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
+          # Only enforce coverage check if single node
+          echo "MULTINODE_TEST_ARGS=--cov-fail-under=69" >> $GITHUB_OUTPUT
+          echo "First assuming single node Vespa setup."
+
+          # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
+          NUMBER_OF_SHARDS="${{ inputs.number_of_shards || 1 }}"
+          NUMBER_OF_REPLICAS="${{ inputs.number_of_replicas || 0 }}"
+
+          # Convert inputs to integers
+          NUMBER_OF_SHARDS_INT=$(echo "$NUMBER_OF_SHARDS" | awk '{print int($0)}')
+          NUMBER_OF_REPLICAS_INT=$(echo "$NUMBER_OF_REPLICAS" | awk '{print int($0)}')
+
+          # Evaluate the conditions
+          if [[ "$NUMBER_OF_SHARDS_INT" -gt 1 || "$NUMBER_OF_REPLICAS_INT" -gt 0 ]]; then
+            echo "Now using multi-node Vespa setup. Shards are $NUMBER_OF_SHARDS_INT and replicas are $NUMBER_OF_REPLICAS_INT."
+            echo "VESPA_MULTINODE_SETUP=true" >> $GITHUB_OUTPUT
+            # If multinode vespa, ignore unrelated tests to save time and prevent errors
+            echo "MULTINODE_TEST_ARGS=--multinode --ignore=tests/integ_tests/core/index_management/test_index_management.py --ignore=tests/integ_tests/core/inference --ignore=tests/integ_tests/processing --ignore=tests/integ_tests/s2_inference" >> $GITHUB_OUTPUT
+          fi
+
+  Start-Runner:
+    needs:
+      - Determine-Vespa-Setup
+      - Check-Changes
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
     if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     outputs:
       label: ${{ steps.start-ec2-runner.outputs.label }}
@@ -93,7 +155,8 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
           ec2-image-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-          ec2-instance-type: m6i.xlarge
+          # m6i.xlarge if single node vespa, but m6i.2xlarge if multinode vespa
+          ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
           subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
           security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
           aws-resource-tags: > # optional, requires additional permissions
@@ -111,9 +174,13 @@ jobs:
     needs:
       - Check-Changes # required to start the main job when the runner is ready
       - Start-Runner # required to get output from the start-runner job
+      - Determine-Vespa-Setup
     if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
     environment: marqo-test-suite
+    env:
+      VESPA_MULTINODE_SETUP: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP }}
+      MULTINODE_TEST_ARGS: ${{ needs.Determine-Vespa-Setup.outputs.MULTINODE_TEST_ARGS }}
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
@@ -171,7 +238,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: python marqo/tests/api_tests/v1/scripts/start_vespa.py
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
       - name: Run Unit Tests
         run: |
@@ -186,10 +253,10 @@ jobs:
 
           cd marqo
 
-          export PYTHONPATH="./src"
+          export PYTHONPATH="./src:."
           set -o pipefail
-          pytest --ignore=tests/integ_tests/test_documentation.py \
-            --durations=100 --cov=src --cov-branch --cov-context=test --cov-fail-under=69 \
+          pytest ${{ env.MULTINODE_TEST_ARGS }} --ignore=tests/integ_tests/test_documentation.py \
+            --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/integ_tests/ | tee pytest_output.txt
