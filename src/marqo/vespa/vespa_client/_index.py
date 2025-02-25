@@ -131,6 +131,7 @@ class VespaIndexMixin:
         for response in responses:
             if response.status != 200:
                 errors = True
+                break
 
         return FeedBatchResponse(responses=responses, errors=errors)
 
@@ -164,6 +165,7 @@ class VespaIndexMixin:
         for response in responses:
             if response.status != 200:
                 errors = True
+                break
 
         return FeedBatchResponse(responses=responses, errors=errors)
 
@@ -549,6 +551,7 @@ class VespaIndexMixin:
             responses.append(result)
             if result.status != 200:
                 errors = True
+                break
 
         return DeleteBatchResponse(responses=responses, errors=errors)
 
@@ -570,7 +573,7 @@ class VespaIndexMixin:
         except JSONDecodeError:
             if resp.status_code == 200:
                 # A 200 response shouldn't reach here
-                raise VespaError(f'Unexpected response: {resp.text}')
+                raise VespaError(f'Unexpected response from Vespa')
 
             self._raise_for_status(resp)
 

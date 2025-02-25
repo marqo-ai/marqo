@@ -145,7 +145,7 @@ class VespaDeployMixin:
         """
         return self._get_convergence_status().converged
 
-    def wait_for_application_convergence(self: "VespaClientBase", timeout: int = 120) -> None:
+    def wait_for_application_convergence(self: "VespaClientBase", timeout: float = 120) -> None:
         """
         Wait for Vespa application to converge, checking every second.
 
