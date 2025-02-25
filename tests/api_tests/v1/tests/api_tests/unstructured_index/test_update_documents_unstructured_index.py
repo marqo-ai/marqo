@@ -66,7 +66,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
 
-        assert add_docs_response["errors"] == False
+        self.assertFalse(add_docs_response["errors"])
 
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
@@ -89,14 +89,14 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         get_docs_response = self.client.index(self.text_index_name).get_document(document_id = '1')
 
-        assert get_docs_response['bool_field'] == False
-        assert get_docs_response['int_field'] == 1
-        assert get_docs_response['float_field'] == 500.0
-        assert get_docs_response['int_map.a'] == 2
-        assert get_docs_response['float_map.c'] == 3.0
-        assert get_docs_response['string_array'] == ["ccc"]
-        assert get_docs_response['update_field_that_doesnt_exist'] == 500
-        assert get_docs_response['string_array2'] == ["123", "456"]
+        self.assertEqual(get_docs_response['bool_field'], False)
+        self.assertEqual(get_docs_response['int_field'], 1)
+        self.assertEqual(get_docs_response['float_field'], 500.0)
+        self.assertEqual(get_docs_response['int_map.a'], 2)
+        self.assertEqual(get_docs_response['float_map.c'], 3.0)
+        self.assertEqual(get_docs_response['string_array'], ["ccc"])
+        self.assertEqual(get_docs_response['update_field_that_doesnt_exist'], 500)
+        self.assertEqual(get_docs_response['string_array2'], ["123", "456"])
 
     def test_update_document_with_ids_change_field_type(self):
         text_docs = [{
@@ -131,7 +131,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
 
-        assert add_docs_response["errors"] == False
+        self.assertFalse(add_docs_response["errors"])
 
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
@@ -150,7 +150,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             }]
         )
 
-        assert update_docs_response["errors"] == True
+        self.assertTrue(update_docs_response["errors"])
 
-        assert update_docs_response['items'][0]['status'] == 400
-        assert update_docs_response['items'][0]['message'] == "Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again"
+        self.assertEqual(update_docs_response['items'][0]['status'], 400)
+        self.assertEqual(update_docs_response['items'][0]['message'], "Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again")

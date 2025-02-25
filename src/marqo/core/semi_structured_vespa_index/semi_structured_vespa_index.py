@@ -349,7 +349,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if isinstance(value, bool):
             self._handle_boolean_field(field_name, value, fields, field_types)
         elif isinstance(value, dict):
-            self._handle_dict_field(field_name, value, fields, field_types, numeric_fields, doc_id, numeric_field_map)
+            self._handle_dict_field(field_name, value, doc_id, numeric_field_map)
         elif isinstance(value, (int, float)):
             numeric_field_map[field_name] = value # sets information about numeric fields in a map so it the numeric field + score modifiers can be updated later
         elif isinstance(value, list):

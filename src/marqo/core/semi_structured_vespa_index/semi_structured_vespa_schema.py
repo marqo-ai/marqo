@@ -6,7 +6,6 @@ from jinja2 import Environment, FileSystemLoader
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, MarqoIndex
 from marqo.core.models.marqo_index_request import UnstructuredMarqoIndexRequest
 from marqo.core.vespa_index.vespa_schema import VespaSchema
-from marqo.version import __version__
 
 
 class SemiStructuredVespaSchema(VespaSchema):
