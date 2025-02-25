@@ -149,5 +149,15 @@ dump.rdb
 
 .DS_Store
 
+# Local vespa artifacts
 # Tester app for unit tests
 scripts/vespa_local/vespa_tester_app.zip
+
+# Dynamically generated files for multinode vespa
+scripts/vespa_local/docker-compose.yml
+scripts/vespa_local/services.xml
+scripts/vespa_local/hosts.xml
+
+scripts/vespa_local/multinode/docker-compose.yml
+scripts/vespa_local/multinode/services.xml
+scripts/vespa_local/multinode/hosts.xml
