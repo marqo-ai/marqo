@@ -2,8 +2,6 @@ import asyncio
 import functools
 import os
 import unittest
-from json import JSONDecodeError
-from pickle import FALSE
 from unittest.mock import patch, ANY
 
 import httpcore
