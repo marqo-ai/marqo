@@ -384,12 +384,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         fields_changed = False
         field_prefix = common.INT_FIELDS if numeric_type is int else common.FLOAT_FIELDS
         
-        # Get original fields if document exists
-        original_fields = {}
-        if original_doc is not None:
-            original_fields = (original_doc.fixed_fields.int_fields 
-                             if numeric_type is int
-                             else original_doc.fixed_fields.float_fields)
 
         # Process fields in update request
         for field_name, value in numeric_field_map.items():
@@ -417,6 +411,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         # Remove fields no longer in map
         if original_doc is not None:
+            original_fields = (original_doc.fixed_fields.int_fields # Get original fields if document exists
+                             if numeric_type is int
+                             else original_doc.fixed_fields.float_fields)
+
             for original_field_name in original_fields:
                 if (original_field_name not in numeric_field_map and 
                     original_doc.fixed_fields.field_types.get(original_field_name) in (MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value)):
@@ -459,9 +457,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         self,
         field_name: str,
         value: Dict[str, Any],
-        fields: Dict[str, Any],
-        field_types: Dict[str, Any],
-        numeric_fields: Dict[str, Any],
         doc_id: str,
         numeric_field_map: Dict[str, Any]
     ) -> None:

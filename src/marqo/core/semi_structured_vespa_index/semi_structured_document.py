@@ -277,17 +277,19 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
     @classmethod
     def _handle_dict_field(cls, field_name: str, field_content: Dict[str, Union[int, float]], instance):
         for k, v in field_content.items():
-            field_key = f"{field_name}.{k}"
+            field_key = f"{field_name}.{k}" # field_key is the flattened field name for a dict field.
             if isinstance(v, int):
                 instance.fixed_fields.int_fields[field_key] = v
                 instance.fixed_fields.score_modifiers_fields[field_key] = v
                 if instance.index_supports_partial_updates:
                     instance.fixed_fields.field_types[field_key] = MarqoFieldTypes.INT_MAP.value
+                    instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.INT_MAP.value # Marking the overall dict field as a int_map_entry field as well
             elif isinstance(v, float):
                 instance.fixed_fields.float_fields[field_key] = float(v)
                 instance.fixed_fields.score_modifiers_fields[field_key] = v
                 if instance.index_supports_partial_updates:
                     instance.fixed_fields.field_types[field_key] = MarqoFieldTypes.FLOAT_MAP.value
+                    instance.fixed_fields.field_types[field_name] = MarqoFieldTypes.FLOAT_MAP.value # Marking the overall dict field as a float_map_entry field as well
 
     @classmethod
     def _process_tensor_fields(cls, document: Dict, instance, marqo_index: SemiStructuredMarqoIndex):
