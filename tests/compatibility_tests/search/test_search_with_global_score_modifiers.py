@@ -84,6 +84,9 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
 
             for retrieval_method, ranking_method in self.hybrid_test_cases:
                 try:
+                    if retrieval_method not in all_results[index_name]:
+                        all_results[index_name][retrieval_method] = {}
+                        
                     result = self.client.index(index_name).search(
                         q="dogs",
                         search_method="HYBRID",
@@ -108,6 +111,8 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
                         rerank_depth=2      # To show not all results are reranked
                     )
                     all_results[index_name][retrieval_method][ranking_method] = result
+                    self.logger.debug(f"Result for {index_name} with retrieval method {retrieval_method} "
+                                      f"and ranking method {ranking_method}: {result}")
                 except Exception as e:
                     errors.append((index_name, traceback.format_exc()))
 
@@ -161,7 +166,7 @@ class TestSearchWithGlobalScoreModifiers(BaseCompatibilityTestCase):
 
         if test_failures:
             failure_message = "\n".join([
-                f"Failure in query idx: {idx} : {error}"
+                f"Failure in idx: {idx} : {error}"
                 for idx, error in test_failures
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
