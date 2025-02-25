@@ -18,6 +18,9 @@ from tests.compatibility_tests.docker_manager import DockerManager
 # Marqo changed how it transfers state post version 2.9.0, this variable stores that context
 marqo_transfer_state_version = semver.VersionInfo.parse("2.9.0")
 
+# Global set to track imported modules
+_imported_modules = set()
+
 
 class Mode(Enum):
     PREPARE = "prepare"
@@ -39,13 +42,18 @@ def load_all_subclasses(package_name):
     Args:
         package_name (str): The top-level package name to search for subclasses.
     """
+    global _imported_modules
     package = importlib.import_module(package_name)
     for _, name, is_pkg in pkgutil.walk_packages(package.__path__, f"{package_name}."):
-        logger.debug(f"Processing this {name}, {is_pkg}")
+        logger.debug(f"Processing subclass: {name}, is package? -> {is_pkg}")
         if is_pkg:
+            continue
+        if name in _imported_modules:
+            logger.debug(f"Skipping already imported module: {name}")
             continue
         try:
             importlib.import_module(name)
+            _imported_modules.add(name)
             logger.debug(f"Imported module with name {name}")
         except ImportError as e:
             logger.error(f"Could not import module with {name}")

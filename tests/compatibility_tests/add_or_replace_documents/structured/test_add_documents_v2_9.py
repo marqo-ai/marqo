@@ -52,7 +52,8 @@ class TestAddDocumentsv2_9(BaseCompatibilityTestCase):
             }
         }]
 
-    indexes_to_test_on = []
+    # Populate indexes_to_test_on with index names from settings
+    indexes_to_test_on = [index["indexName"] for index in indexes_settings_to_test_on]
 
     text_docs = [{
         "text_field": "The Travels of Marco Polo",
