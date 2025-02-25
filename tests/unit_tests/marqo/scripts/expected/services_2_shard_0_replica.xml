@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<services xmlns:deploy="vespa" xmlns:preprocess="properties" version="1.0">
+    <admin version="2.0">
+        <configservers>
+            <configserver hostalias="config-0"/>
+            <configserver hostalias="config-1"/>
+            <configserver hostalias="config-2"/>
+        </configservers>
+        <cluster-controllers>
+            <cluster-controller hostalias="config-0" jvm-options="-Xms32M -Xmx64M"/>
+            <cluster-controller hostalias="config-1" jvm-options="-Xms32M -Xmx64M"/>
+            <cluster-controller hostalias="config-2" jvm-options="-Xms32M -Xmx64M"/>
+        </cluster-controllers>
+        <slobroks>
+            <slobrok hostalias="config-0"/>
+            <slobrok hostalias="config-1"/>
+            <slobrok hostalias="config-2"/>
+        </slobroks>
+        <adminserver hostalias="config-0"/>
+    </admin>
+    <container id="default" version="1.0">
+        <document-api/>
+        <search/>
+        <nodes>
+            <jvm options="-Xms32M -Xmx256M -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"/>
+            <node hostalias="api-0"/>
+            <node hostalias="api-1"/>
+        </nodes>
+    </container>
+    <content id="content_default" version="1.0">
+        <redundancy>1</redundancy>
+        <documents>
+            <document type="test_vespa_client" mode="index"/>
+        </documents>
+        <group>
+            <distribution partitions="*"/>
+            <group name="group-0" distribution-key="0">
+                <node hostalias="content-0-0" distribution-key="0"/>
+                <node hostalias="content-0-1" distribution-key="1"/>
+            </group>
+        </group>
+    </content>
+</services>

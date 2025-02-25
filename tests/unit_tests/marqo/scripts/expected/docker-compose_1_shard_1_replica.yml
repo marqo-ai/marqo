@@ -1,0 +1,149 @@
+services:
+  config-0:
+    image: vespaengine/vespa:8.431.32
+    container_name: config-0
+    hostname: config-0.vespanet
+    environment:
+      VESPA_CONFIGSERVERS: config-0.vespanet,config-1.vespanet,config-2.vespanet
+      VESPA_CONFIGSERVER_JVMARGS: -Xms32M -Xmx128M
+      VESPA_CONFIGPROXY_JVMARGS: -Xms32M -Xmx128M
+    networks:
+    - vespanet
+    ports:
+    - 19071:19071
+    - 19100:19100
+    - 19050:19050
+    - 2181:2181
+    - 20092:19092
+    - 19098:19098
+    command: configserver,services
+    healthcheck:
+      test: curl http://localhost:19071/state/v1/health
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  config-1:
+    image: vespaengine/vespa:8.431.32
+    container_name: config-1
+    hostname: config-1.vespanet
+    environment:
+      VESPA_CONFIGSERVERS: config-0.vespanet,config-1.vespanet,config-2.vespanet
+      VESPA_CONFIGSERVER_JVMARGS: -Xms32M -Xmx128M
+      VESPA_CONFIGPROXY_JVMARGS: -Xms32M -Xmx128M
+    networks:
+    - vespanet
+    ports:
+    - 19072:19071
+    - 19101:19100
+    - 19051:19050
+    - 2182:2181
+    - 20093:19092
+    command: configserver,services
+    healthcheck:
+      test: curl http://localhost:19071/state/v1/health
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  config-2:
+    image: vespaengine/vespa:8.431.32
+    container_name: config-2
+    hostname: config-2.vespanet
+    environment:
+      VESPA_CONFIGSERVERS: config-0.vespanet,config-1.vespanet,config-2.vespanet
+      VESPA_CONFIGSERVER_JVMARGS: -Xms32M -Xmx128M
+      VESPA_CONFIGPROXY_JVMARGS: -Xms32M -Xmx128M
+    networks:
+    - vespanet
+    ports:
+    - 19073:19071
+    - 19102:19100
+    - 19052:19050
+    - 2183:2181
+    - 20094:19092
+    command: configserver,services
+    healthcheck:
+      test: curl http://localhost:19071/state/v1/health
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  api-0:
+    image: vespaengine/vespa:8.431.32
+    container_name: api-0
+    hostname: api-0.vespanet
+    environment:
+    - VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet
+    networks:
+    - vespanet
+    ports:
+    - 8080:8080
+    - 5005:5005
+    - 20095:19092
+    command: services
+    depends_on:
+      config-0:
+        condition: service_healthy
+      config-1:
+        condition: service_healthy
+      config-2:
+        condition: service_healthy
+  api-1:
+    image: vespaengine/vespa:8.431.32
+    container_name: api-1
+    hostname: api-1.vespanet
+    environment:
+    - VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet
+    networks:
+    - vespanet
+    ports:
+    - 8081:8080
+    - 5006:5005
+    - 20096:19092
+    command: services
+    depends_on:
+      config-0:
+        condition: service_healthy
+      config-1:
+        condition: service_healthy
+      config-2:
+        condition: service_healthy
+  content-0-0:
+    image: vespaengine/vespa:8.431.32
+    container_name: content-0-0
+    hostname: content-0-0.vespanet
+    environment:
+    - VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet
+    networks:
+    - vespanet
+    ports:
+    - 19107:19107
+    - 20097:19092
+    command: services
+    depends_on:
+      config-0:
+        condition: service_healthy
+      config-1:
+        condition: service_healthy
+      config-2:
+        condition: service_healthy
+  content-1-0:
+    image: vespaengine/vespa:8.431.32
+    container_name: content-1-0
+    hostname: content-1-0.vespanet
+    environment:
+    - VESPA_CONFIGSERVERS=config-0.vespanet,config-1.vespanet,config-2.vespanet
+    networks:
+    - vespanet
+    ports:
+    - 19108:19107
+    - 20098:19092
+    command: services
+    depends_on:
+      config-0:
+        condition: service_healthy
+      config-1:
+        condition: service_healthy
+      config-2:
+        condition: service_healthy
+networks:
+  vespanet:
+    driver: bridge
