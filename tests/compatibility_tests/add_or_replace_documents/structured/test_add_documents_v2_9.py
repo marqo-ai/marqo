@@ -72,8 +72,8 @@ class TestAddDocumentsv2_9(BaseCompatibilityTestCase):
         "_id": "article_602"
     },
     {
-        "Title": "Extravehicular Mobility Unit (EMU)",
-        "Description": "The EMU is a spacesuit that provides environmental protection",
+        "text_field": "Extravehicular Mobility Unit (EMU)",
+        "caption": "The EMU is a spacesuit that provides environmental protection",
         "tags": ["space", "EMU", "NASA", "astronaut"],
         "my_int": 354,
         "boolean_field": True,

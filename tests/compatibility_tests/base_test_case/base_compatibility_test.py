@@ -36,7 +36,7 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         # Be sure to set the indexes_to_delete list with the indexes you want to delete, in the test class.
         if cls.indexes_to_delete:
             cls.logger.debug(f"Deleting indexes: {cls.indexes_to_delete}")
-        super.tearDownClass()
+        super().tearDownClass()
         cls.delete_file()
 
     @classmethod
