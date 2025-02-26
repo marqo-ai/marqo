@@ -83,7 +83,7 @@ class TestAddDocumentsv2_12(BaseCompatibilityTestCase):
         all_results = {}
 
         for index in self.indexes_to_test_on:
-            self.logger.debug(f'Feeding documents to {index.get("indexName")}')
+            self.logger.debug(f'Getting documents from {index.get("indexName")}')
             index_name = index['indexName']
             all_results[index_name] = {}
 
