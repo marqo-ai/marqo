@@ -30,6 +30,7 @@ import requests
 import argparse
 
 VESPA_VERSION = os.getenv('VESPA_VERSION', '8.472.109')
+VESPA_DISK_USAGE_LIMIT = os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75)
 VESPA_CONFIG_URL="http://localhost:19071"
 VESPA_DOCUMENT_URL="http://localhost:8080"
 VESPA_QUERY_URL="http://localhost:8080"
@@ -141,8 +142,7 @@ class VespaLocalSingleNode(VespaLocal):
 
     def get_services_xml_content(self) -> str:
         return textwrap.dedent(
-            """<?xml version="1.0" encoding="utf-8" ?>
-            <!-- Copyright Yahoo. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root. -->
+            f"""<?xml version="1.0" encoding="utf-8" ?>
             <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
                 <container id="default" version="1.0">
                     <document-api/>
@@ -156,6 +156,11 @@ class VespaLocalSingleNode(VespaLocal):
                     <documents>
                         <document type="test_vespa_client" mode="index"/>
                     </documents>
+                    <tuning>
+                        <resource-limits>
+                            <disk>{VESPA_DISK_USAGE_LIMIT}</disk>
+                        </resource-limits>
+                    </tuning>
                     <nodes>
                         <node hostalias="node1" distribution-key="0"/>
                     </nodes>
