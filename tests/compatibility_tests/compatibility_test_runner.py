@@ -93,7 +93,6 @@ def full_test_run(marqo_version: str):
 def run_prepare_mode(version_to_test_against: str):
 
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
-    load_all_subclasses("tests.compatibility_tests")
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
     errors = []
     for test_class in BaseCompatibilityTestCase.__subclasses__():
@@ -180,6 +179,7 @@ def backwards_compatibility_test(from_version: str, to_version: str, to_version_
         Exception: If there is an error during the test process.
     """
     try:
+        load_all_subclasses("tests.compatibility_tests")
         # Step 1: Start from_version container and run tests in prepare mode
         logger.info(f"Starting backwards compatibility tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
 
@@ -238,6 +238,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
     """
     logger.info(f"Starting Marqo rollback tests with from_version: {from_version}, to_version: {to_version}, to_version_image: {to_version_image}")
     try:
+        load_all_subclasses("tests.compatibility_tests")
         # Step 0: Generate a volume name to be used with the "from_version" Marqo container for state transfer.
         from_version_volume = docker_manager.get_volume_name_from_marqo_version(from_version)
 

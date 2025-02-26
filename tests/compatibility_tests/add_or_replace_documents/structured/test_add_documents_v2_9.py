@@ -96,12 +96,12 @@ class TestAddDocumentsv2_9(BaseCompatibilityTestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
+        cls.indexes_to_delete = cls.indexes_to_test_on
         super().tearDownClass()
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.indexes_to_delete = [index['indexName'] for index in cls.indexes_to_test_on]
+        cls.indexes_to_delete = cls.indexes_to_test_on
         super().setUpClass()
 
     def prepare(self):
