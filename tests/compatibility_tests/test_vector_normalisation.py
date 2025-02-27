@@ -1,5 +1,5 @@
 import traceback
-
+import uuid
 import pytest
 
 from tests.compatibility_tests.base_test_case.base_compatibility_test import BaseCompatibilityTestCase
