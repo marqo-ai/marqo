@@ -428,8 +428,9 @@ class TestVespaClient(AsyncMarqoTestCase):
             self.assertIn("Network Error", r.message)
 
     def test_get_vespa_version(self):
+        expected_vespa_version = '8.472.109'
         version = self.client.get_vespa_version()
-        self.assertEqual(ANY, version)
+        self.assertEqual(expected_vespa_version, version)
 
     def test_translate_vespa_document_response_status(self):
         test_cases = [
