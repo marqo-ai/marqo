@@ -835,7 +835,6 @@ class VespaClient:
         data = {'fields': document.fields}
         types = document.field_types
         create_timestamp = document.create_timestamp
-        is_request_for_structured_index = types is None and create_timestamp is None
 
         # only used for documents that are not updated
         error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
@@ -850,7 +849,7 @@ class VespaClient:
                 data["condition"] += f' and {schema}.{VESPA_DOC_CREATE_TIMESTAMP}=={create_timestamp}'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
-                if resp.status_code == 412 and is_request_for_structured_index:
+                if resp.status_code == 412 and types is None and create_timestamp is None:
                     # If Vespa response is 412, and the request is for structured index, it means the document does not exist
                     # in the index, as we don't have type checks / timestamp (version) checks for structured indexes.
                     # We return a 404 error for this case.

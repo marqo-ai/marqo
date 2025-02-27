@@ -13,7 +13,7 @@ from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutErr
 from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
-from tests.integ_tests.marqo_test import AsyncMarqoTestCase
+from integ_tests.marqo_test import AsyncMarqoTestCase
 
 
 class TestFeedDocumentAsync(AsyncMarqoTestCase):
