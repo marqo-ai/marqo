@@ -35,6 +35,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
  group: cpu-local-api-tests-${{ github.ref }}

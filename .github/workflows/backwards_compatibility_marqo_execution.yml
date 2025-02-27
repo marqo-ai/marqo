@@ -1,6 +1,10 @@
 # Execution workflow
 name: Marqo Compatibility Tests Execution
 
+permissions:
+  contents: read
+  id-token: write
+
 on:
   workflow_call:
     # from_version: Used as: the identifier for a workflow call, for logging purposes and for pulling image from DockerHub. We need to pass a version here: ex: 2.11.1
