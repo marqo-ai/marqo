@@ -152,4 +152,3 @@ jobs:
       ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
     secrets:
       GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-      AWS_ACCOUNT_ID_OPEN_SOURCE: ${{ secrets.AWS_ACCOUNT_ID_OPEN_SOURCE }}
