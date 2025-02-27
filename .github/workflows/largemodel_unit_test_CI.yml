@@ -46,8 +46,8 @@ jobs:
     strategy:
       matrix:
         run: [
-          [1, ${{ needs.Start-Runner.outputs.label1}}],
-          [2, ${{ needs.Start-Runner.outputs.label2}}]
+          [1, ${{ needs.Start-Runner.outputs.label1 }}],
+          [2, ${{ needs.Start-Runner.outputs.label2 }}]
         ]
 
     steps:
