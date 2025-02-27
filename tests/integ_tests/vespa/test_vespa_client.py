@@ -13,7 +13,7 @@ from marqo.vespa.exceptions import VespaError, VespaStatusError, VespaTimeoutErr
 from marqo.vespa.models import VespaDocument, QueryResult
 from marqo.vespa.models.query_result import Error
 from marqo.vespa.vespa_client import VespaClient
-from integ_tests.marqo_test import AsyncMarqoTestCase
+from tests.integ_tests.marqo_test import AsyncMarqoTestCase
 
 
 class TestFeedDocumentAsync(AsyncMarqoTestCase):
@@ -436,7 +436,7 @@ class TestFeedDocumentAsync(AsyncMarqoTestCase):
         test_cases = [
             (200, 200, None),
             (404, 404, "Document does not exist in the index"),
-            (412, 400, "Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again"),
+            (412, 400, "Marqo vector store couldn't update the document"),
             (429, 429, "Marqo vector store receives too many requests. Please try again later"),
             (507, 400, "Marqo vector store is out of memory or disk space"),
             (123, 500, "Marqo vector store returns an unexpected error with this document"),

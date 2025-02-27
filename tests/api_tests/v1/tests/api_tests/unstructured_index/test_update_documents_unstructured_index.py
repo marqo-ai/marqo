@@ -153,4 +153,5 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertTrue(update_docs_response["errors"])
 
         self.assertEqual(update_docs_response['items'][0]['status'], 400)
-        self.assertEqual(update_docs_response['items'][0]['message'], "Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again")
+        self.assertIn(update_docs_response['items'][0]['message'], "Marqo vector store couldn't update the document. Please see")
+        self.assertIn(update_docs_response['items'][0]['message'], "reference/api/documents/update-documents/#response")
