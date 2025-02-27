@@ -44,7 +44,8 @@ class TestPartialUpdate(MarqoTestCase):
             "custom_vector_field": {
                 "content": "abcd",
                 "vector": [1.0] * 32
-            }
+            },
+            "lexical_field": "some string that signifies lexical field"
         }
         self.doc3 = {
             '_id': '3',
@@ -275,6 +276,18 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertTrue(res.errors)
         self.assertEqual(400, res.items[0].status)
         self.assertIn('Unstructured index updates only support updating existing string array fields', res.items[0].error)
+
+    def test_partial_update_should_allow_adding_new_string_string_array_field_if_present_in_other_docs_in_same_index(self):
+        """Tests that partial updates allow adding new string / string array fields if they are present in some other document in the same index.
+
+        For example, doc2 contains lexical_field and string_array. Hence when we try to add lexical_field and string_array to doc1, it should be allowed.
+        """
+        res = self.config.document.partial_update_documents([{'_id': '1', "lexical_field": "some value 2", 'string_array': ["ccc"]}],
+                                                            self.config.index_management.get_index(self.index.name))
+        self.assertFalse(res.errors)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '1')
+        self.assertEqual("some value 2", doc['lexical_field'])
+        self.assertEqual(["ccc"], doc['string_array'])
 
     def test_partial_update_should_update_short_string(self):
         """Test that partial updates to short strings are successful.
