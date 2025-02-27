@@ -81,7 +81,7 @@ jobs:
       Prepare-Matrix
     strategy:
       matrix:
-        instance: ${{ needs.Prepare-Matrix.outputs.instances }}
+        instance: ${{ fromJSON(needs.Prepare-Matrix.outputs.instances) }}
     if: ${{ inputs.action == 'start' }}
     name: Start EC2 runner
     runs-on: ubuntu-latest
