@@ -7,7 +7,7 @@ from tests.compatibility_tests.base_test_case.base_compatibility_test import Bas
 
 @pytest.mark.marqo_version('2.13.0')
 class CompatibilityTestVectorNormalisation(BaseCompatibilityTestCase):
-    text_index_with_normalize_embeddings_true = "add_doc_api_test_structured_index_with_normalize_embeddings_true" + str(uuid.uuid4()).replace('-', '')
+    text_index_with_normalize_embeddings_true = "add_doc_api_test_structured_index_with_normalize_embeddings_true"
 
     DEFAULT_DIMENSIONS = 384
     custom_vector = [1.0 for _ in range(DEFAULT_DIMENSIONS)]
