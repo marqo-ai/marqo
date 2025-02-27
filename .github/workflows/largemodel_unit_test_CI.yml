@@ -126,12 +126,14 @@ jobs:
     if: ${{ always() }} # Ensures the runner is stopped even if tests fail
     strategy:
       matrix:
-        label: [needs.Start-Runner.outputs.label1, needs.Start-Runner.outputs.label2]
-        ec2-instance-id: [needs.Start-Runner.outputs.ec2-instance-id1, needs.Start-Runner.outputs.ec2-instance-id2]
+        ec2-details : [
+          [needs.Start-Runner.outputs.label1, needs.Start-Runner.outputs.ec2-instance-id1],
+          [needs.Start-Runner.outputs.label2, needs.Start-Runner.outputs.ec2-instance-id2]
+        ]
     uses: ./.github/workflows/manage_ec2_runner.yml
     with:
       action: stop
-      label: ${{ matrix.label }}
-      ec2-instance-id: ${{ matrix.ec2-instance-id }}
+      label: ${{ matrix.ec2-details[0] }}
+      ec2-instance-id: ${{ matrix.ec2-details[1] }}
     secrets:
       GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}

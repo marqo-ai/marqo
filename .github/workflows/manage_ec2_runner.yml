@@ -70,7 +70,7 @@ jobs:
       - name: Prepare matrix
         id: prepare-matrix
         run: |
-          instances=$(seq -s ',' 1 ${{ inputs.instances }} | sed 's/,$//'))
+          instances=$(seq -s ',' 1 ${{ inputs.instances }} | sed 's/,$//')
           echo "instances=[$instances]" >> $GITHUB_ENV
           echo "instances=[$instances]" >> $GITHUB_OUTPUT
       - name: Show matrix
