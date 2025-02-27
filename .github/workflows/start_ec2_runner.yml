@@ -1,35 +1,23 @@
-name: Manage EC2 Runner
+name: Start EC2 Runner
 
 on:
   workflow_call:
     inputs:
-      action:
-        description: 'Action to perform on the EC2 runner (start/stop)'
-        required: true
-        type: string
       base-ami-id:
         description: 'Base AMI ID for the EC2 runner'
-        required: false
+        required: true
         type: string
       ec2-instance-type:
         description: 'Instance type for the EC2 runner'
-        required: false
-        type: string
-      label:
-        description: 'Label for the EC2 runner'
-        required: false
-        type: string
-      ec2-instance-id:
-        description: 'Instance ID for the EC2 runner'
-        required: false
+        required: true
         type: string
     secrets:
       GH_PERSONAL_ACCESS_TOKEN:
         required: true
       MARQO_WORKFLOW_TESTS_SUBNET_ID:
-        required: false
+        required: true
       MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID:
-        required: false
+        required: true
     outputs:
       label:
         description: "EC2 Runner Label"
@@ -40,7 +28,6 @@ on:
 
 jobs:
   Start-Runner:
-    if: ${{ inputs.action == 'start' }}
     name: Start EC2 runner
     runs-on: ubuntu-latest
     outputs:
@@ -52,6 +39,7 @@ jobs:
         with:
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::424082663841:role/GhRunnerManagerRole-Marqo
+
       - name: Start EC2 runner
         id: start-ec2-runner
         uses: machulav/ec2-github-runner@v2
@@ -71,24 +59,6 @@ jobs:
               {"Key": "WorkflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
               {"Key": "PoloRole", "Value": "testing"}
             ]
-
-  Stop-Runner:
-    name: Stop EC2 runner
-    runs-on: ubuntu-latest
-    if: ${{ inputs.action == 'stop' }}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: us-east-1
-          role-to-assume: arn:aws:iam::424082663841:role/GhRunnerManagerRole-Marqo
-      - name: Stop EC2 runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: stop
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          label: ${{ inputs.label }}
-          ec2-instance-id: ${{ inputs.ec2-instance-id }}
 
 permissions:
   contents: read

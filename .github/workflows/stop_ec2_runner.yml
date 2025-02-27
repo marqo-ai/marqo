@@ -1,0 +1,39 @@
+name: Stop EC2 Runner
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        description: 'Label for the EC2 runner'
+        required: true
+        type: string
+      ec2-instance-id:
+        description: 'Instance ID for the EC2 runner'
+        required: true
+        type: string
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN:
+        required: true
+
+jobs:
+  Stop-Runner:
+    name: Stop EC2 runner
+    runs-on: ubuntu-latest
+    if: ${{ inputs.action == 'stop' }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::424082663841:role/GhRunnerManagerRole-Marqo
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          label: ${{ inputs.label }}
+          ec2-instance-id: ${{ inputs.ec2-instance-id }}
+
+permissions:
+  contents: read
+  id-token: write

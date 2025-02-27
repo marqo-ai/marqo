@@ -137,9 +137,8 @@ jobs:
       - Determine-Vespa-Setup
       - Check-Changes
     if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
-    uses: ./.github/workflows/manage_ec2_runner.yml
+    uses: ./.github/workflows/start_ec2_runner.yml
     with:
-      action: start
       base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
       ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
     secrets:
@@ -152,9 +151,8 @@ jobs:
       - Determine-Vespa-Setup
       - Check-Changes
     if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
-    uses: ./.github/workflows/manage_ec2_runner.yml
+    uses: ./.github/workflows/start_ec2_runner.yml
     with:
-      action: start
       base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
       ec2-instance-type: ${{ needs.Determine-Vespa-Setup.outputs.VESPA_MULTINODE_SETUP == 'true' && 'm6i.2xlarge' || 'm6i.xlarge' }}
     secrets:
@@ -331,9 +329,8 @@ jobs:
     strategy:
       matrix:
         instance: [0, 1] # Zero-based index for JSON list access
-    uses: ./.github/workflows/manage_ec2_runner.yml
+    uses: ./.github/workflows/stop_ec2_runner.yml
     with:
-      action: stop
       label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
       ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
     secrets:
