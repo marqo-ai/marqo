@@ -67,7 +67,7 @@ jobs:
           echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
 
   Test-Marqo:
-    name: Run Large Model Unit Tests (Part ${{ matrix.part/1 }})
+    name: Run Large Model Unit Tests (Part ${{ matrix.part }}/1)
     needs: Create-Matrix # Ensures it starts only after the runners are ready
     strategy:
       matrix:
