@@ -91,11 +91,18 @@ def full_test_run(marqo_version: str):
     run_test_mode(marqo_version)
 
 def run_prepare_mode(version_to_test_against: str):
-
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
     errors = []
+
+    # Skip any tests that have already been prepared
+    seen_classes = set()
     for test_class in BaseCompatibilityTestCase.__subclasses__():
+        if test_class in seen_classes:
+            logger.info(f"Skipping duplicate test class {test_class.__name__} as it has already been processed")
+            continue
+        seen_classes.add(test_class)
+        
         logger.info(f"========================================================================================")
         markers = getattr(test_class, "pytestmark", [])
         # Check for specific markers
@@ -143,6 +150,7 @@ def construct_pytest_arguments(version_to_test_against):
     return pytest_args
 
 def run_test_mode(version_to_test_against):
+    logger.info(f"Beginning test mode on all test cases for version: {version_to_test_against}")
     pytest_args = construct_pytest_arguments(version_to_test_against)
     pytest_result = pytest.main(pytest_args)
 
