@@ -31,8 +31,12 @@ on:
       MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID:
         required: false
     outputs:
-      label: ${{ jobs.Start-Runner.outputs.label }}
-      ec2-instance-id: ${{ jobs.Start-Runner.outputs.ec2-instance-id }}
+      label:
+        description: "EC2 Runner Label"
+        value: ${{ jobs.Start-Runner.outputs.label }}
+      ec2-instance-id:
+        description: "EC2 Instance ID"
+        value: ${{ jobs.Start-Runner.outputs.ec2-instance-id }}
 
 jobs:
   Start-Runner:
@@ -58,7 +62,7 @@ jobs:
           ec2-instance-type: ${{ inputs.ec2-instance-type }}
           subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
           security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
-          aws-resource-tags: > # optional, requires additional permissions
+          aws-resource-tags: >
             [
               {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
               {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
