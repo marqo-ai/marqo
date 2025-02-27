@@ -48,10 +48,34 @@ jobs:
       MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
       MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
 
+  Start-Runner3:
+    uses: ./.github/workflows/manage_ec2_runner.yml
+    with:
+      action: start
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+
+  Start-Runner4:
+    uses: ./.github/workflows/manage_ec2_runner.yml
+    with:
+      action: start
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+
   Create-Matrix:
     needs:
       - Start-Runner1
       - Start-Runner2
+      - Start-Runner3
+      - Start-Runner4
     runs-on: ubuntu-latest
     outputs:
       labels: ${{ steps.create-matrix.outputs.labels }}
@@ -60,18 +84,18 @@ jobs:
       - name: Create matrix
         id: create-matrix
         run: |
-          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}"]'
-          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}"]'
+          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}", "${{ needs.Start-Runner3.outputs.label }}", "${{ needs.Start-Runner4.outputs.label }}"]'
+          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}", "${{ needs.Start-Runner3.outputs.ec2-instance-id }}", "${{ needs.Start-Runner4.outputs.ec2-instance-id }}"]'
           
           echo "labels=$LABELS" >> $GITHUB_OUTPUT
           echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
 
   Test-Marqo:
-    name: Run Large Model Unit Tests (Part ${{ matrix.part }}/1)
+    name: Run Large Model Unit Tests (Part ${{ matrix.part }}/3)
     needs: Create-Matrix # Ensures it starts only after the runners are ready
     strategy:
       matrix:
-        part: [ 0, 1 ] # Zero-based index for JSON list access
+        part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
     runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
     environment: marqo-test-suite
 
@@ -143,7 +167,7 @@ jobs:
           export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
 
           # Run only the assigned test partition
-          pytest marqo/tests/integ_tests --largemodel --split-n 2 --split-part ${{ matrix.part }}
+          pytest marqo/tests/integ_tests --largemodel --split-n 4 --split-part ${{ matrix.part }}
 
   Stop-Runner:
     needs:
@@ -152,11 +176,11 @@ jobs:
     if: ${{ always() }} # Ensures the runner is stopped even if tests fail
     strategy:
       matrix:
-        part: [0, 1]  # Zero-based index for JSON list access
+        instance: [0, 1, 2, 3]  # Zero-based index for JSON list access
     uses: ./.github/workflows/manage_ec2_runner.yml
     with:
       action: stop
-      label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }}
-      ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.part] }}
+      label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
+      ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
     secrets:
       GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
