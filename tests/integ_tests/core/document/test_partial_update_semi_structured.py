@@ -120,7 +120,7 @@ class TestPartialUpdate(MarqoTestCase):
         for doc in test_docs:
             with self.subTest(f"Updating document with ID {doc['_id']}"):
                 id = doc['_id']
-                res = self.config.document.partial_update_documents([{'_id': id, 'bool_field': False}], self.index)
+                res = self.config.document.partial_update_documents([{'_id': id, 'bool_field': False}], self.config.index_management.get_index(self.index.name))
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
         
         # Then verify the updates
@@ -143,7 +143,7 @@ class TestPartialUpdate(MarqoTestCase):
         for doc in test_docs:
             with self.subTest(f"Updating document with ID {doc['_id']}"):
                 id = doc['_id']
-                res = self.config.document.partial_update_documents([{'_id': id, 'int_field': 500}], self.index)
+                res = self.config.document.partial_update_documents([{'_id': id, 'int_field': 500}], self.config.index_management.get_index(self.index.name))
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
         
         # Then verify the updates
@@ -159,7 +159,7 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test case basically verifies that we can add new fields via partial updates
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'update_field_that_doesnt_exist': 500}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'update_field_that_doesnt_exist': 500}], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
         self.assertEqual(500, doc['update_field_that_doesnt_exist'])
@@ -170,7 +170,7 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates to int fields are rejected when the value is a float.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': 1.0}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': 1.0}], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn('Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again', res.items[0].error)
         self.assertEqual(400, res.items[0].status)
@@ -180,7 +180,7 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates to float fields are successful.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'float_field': 500.0}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'float_field': 500.0}], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
         self.assertEqual(500.0, doc['float_field'])
@@ -191,7 +191,7 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates to int maps are successful.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {'a': 2, 'b': 3}}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {'a': 2, 'b': 3}}], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
         self.assertEqual(doc['int_map.a'], 2)
@@ -206,7 +206,7 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {
             'd': 2
           }
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
         self.assertIsNone(doc.get('int_map.a'))
         self.assertIsNone(doc.get('int_map.b'))
@@ -219,7 +219,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to float maps are successful.
         """
         res = self.config.document.partial_update_documents([{'_id': '2', 'float_map': {'c': 2.0, 'd': 3.0}}],
-                                                            self.index)
+                                                            self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
         self.assertEqual(doc['float_map.c'], 2.0)
@@ -238,7 +238,7 @@ class TestPartialUpdate(MarqoTestCase):
             'a': 2,  # update int to int
         }, 'float_map': {
             'c': 3.0,  # update float to float
-        }, 'bool_field': False, 'float_field': 500.0}], self.index)
+        }, 'bool_field': False, 'float_field': 500.0}], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
 
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
@@ -351,9 +351,13 @@ class TestPartialUpdate(MarqoTestCase):
         """
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {
             'a': 2,  # update int to int
+            'd': 5,  # new entry in int map
         }, 'float_map': {
-            'c': 3.0,  # update float to int
-        }}], self.index)
+            'c': 3.0,  # update float to float
+        }, 'new_int' : 1,  # new int field
+            'new_float': 2.0,  # new float field
+            'new_map': {'a': 1, 'b': 2.0},  # new map field
+          }], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         res = self.config.vespa_client.get_document('2', self.config.index_management.get_index(self.index.name).schema_name)
         doc = res.document.dict().get('fields')
@@ -363,6 +367,11 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 3.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells'].get('int_map.b', None), None)
         self.assertEqual(doc['marqo__score_modifiers']['cells'].get('float_map.d', None), None)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_int'], 1.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_float'], 2.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_map.a'], 1.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_map.b'], 2.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.d'], 5.0)
 
 
     def test_partial_update_should_add_new_fields(self):
@@ -371,12 +380,17 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to new fields are successful.
         """
         res = self.config.document.partial_update_documents([{'_id': '2', 'new_field': 500, 'new_float': 500.0,
-                                                              'new_int_map':{'a':2}}], self.index)
+                                                              'new_int_map':{'a':2},
+                                                              'new_bool_field': True,
+                                                              'new_float_field': 10.0
+                                                              }], self.config.index_management.get_index(self.index.name))
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
-        self._assert_fields_unchanged(doc, ['new_field', 'new_float', 'new_int_map'])
+        self._assert_fields_unchanged(doc, [])
         self.assertEqual(500.0, doc['new_float'])
         self.assertEqual(2, doc['new_int_map.a'])
         self.assertEqual(500, doc['new_field'])
+        self.assertEqual(True, doc['new_bool_field'])
+        self.assertEqual(10.0, doc['new_float_field'])
 
     # Reject any tensor field change
     def test_partial_update_should_reject_tensor_field(self):
@@ -384,9 +398,9 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates to tensor fields are rejected.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'tensor_field': 'new_title'}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'tensor_field': 'new_title'}], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
-        self.assertIn('tensor_field of type str does not exist in the original document. We do not support adding new lexical fields in partial updates', res.items[0].error)
+        self.assertIn('Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again', res.items[0].error)
         self.assertEqual(400, res.items[0].status)
 
     def test_partial_update_should_reject_multi_modal_field_subfield(self):
@@ -394,9 +408,9 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates to tensor subfields are rejected.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'tensor_subfield': 'new_description'}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'tensor_subfield': 'new_description'}], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
-        self.assertIn('tensor_subfield of type str does not exist in the original document. We do not support adding new lexical fields in partial updates', res.items[0].error)
+        self.assertIn('Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again', res.items[0].error)
         self.assertEqual(400, res.items[0].status)
 
     def test_partial_update_should_reject_custom_vector_field(self):
@@ -407,10 +421,11 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{'_id': '2', 'custom_vector_field': {
             "content": "efgh",
             "vector": [1.0] * 32
-        }}], self.index)
+        }}], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertEqual(400, res.items[0].status)
-        self.assertIn("Unsupported field type <class 'str'> for field custom_vector_field in doc 2", res.items[0].error)
+        self.assertIn("Unsupported field type <class 'str'> for field custom_vector_field in doc 2. "
+                      "We only support int and float types for map values when updating a document", res.items[0].error)
 
     def test_partial_update_should_reject_multimodal_combo_field(self):
         """Test that partial updates to multimodal combo fields are rejected.
@@ -420,7 +435,7 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{'_id': '2', 'multimodal_combo_field': {
             "tensor_field": "new_title",
             "tensor_subfield": "new_description"
-        }}], self.index)
+        }}], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn("Unsupported field type <class 'str'> for field multimodal_combo_field in doc 2", res.items[0].error)
         self.assertEqual(400, res.items[0].status)
@@ -430,7 +445,7 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates to numeric array fields are rejected.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'int_array': [1, 2, 3]}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_array': [1, 2, 3]}], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn("Unstructured index updates only support updating existing string array fields", res.items[0].error)
         self.assertEqual(400, res.items[0].status)
@@ -440,7 +455,7 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates to new lexical fields are rejected.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'new_lexical_field': 'some string that signifies new lexical field'}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'new_lexical_field': 'some string that signifies new lexical field'}], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn("new_lexical_field of type str does not exist in the original document. We do not support adding new lexical fields in partial updates", res.items[0].error)
         self.assertEqual(400, res.items[0].status)
@@ -451,7 +466,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to invalid field names are rejected.
         """
         with pytest.raises(InvalidFieldNameError):
-            res = self.config.document.partial_update_documents([{'_id': '2', 'marqo__': 1}], self.index)
+            res = self.config.document.partial_update_documents([{'_id': '2', 'marqo__': 1}], self.config.index_management.get_index(self.index.name))
 
 
     def test_partial_update_should_handle_mixed_numeric_map_updates(self):
@@ -477,7 +492,7 @@ class TestPartialUpdate(MarqoTestCase):
                 'c': 10.5,  # Update existing
                 'e': 5.5    # Add new
             }
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         
         doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
@@ -501,7 +516,7 @@ class TestPartialUpdate(MarqoTestCase):
                 'b': 2.5,      # Invalid type
                 'c': True      # Invalid type
             }
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn("Unsupported field type <class 'str'> for field int_map in doc 2", res.items[0].error)
         self.assertEqual(400, res.items[0].status)
@@ -530,7 +545,7 @@ class TestPartialUpdate(MarqoTestCase):
                 'int_map': {'a': 777}
             }
         ]
-        res = self.config.document.partial_update_documents(updates, self.index)
+        res = self.config.document.partial_update_documents(updates, self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         
         # Verify updates
@@ -560,7 +575,7 @@ class TestPartialUpdate(MarqoTestCase):
                 'int_field': 200
             }
         ]
-        res = self.config.document.partial_update_documents(updates, self.index)
+        res = self.config.document.partial_update_documents(updates, self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         
         # Verify last update wins
@@ -576,7 +591,7 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{
             '_id': 'non_existent',
             'int_field': 100
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn('marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. please fix the request and try again', res.items[0].error.lower())
 
@@ -588,7 +603,7 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{
             '_id': None,
             'int_field': 100
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn('document _id must be a string type! received _id none of type `nonetype`', res.items[0].error.lower())
         self.assertEqual(400, res.items[0].status)
@@ -601,7 +616,7 @@ class TestPartialUpdate(MarqoTestCase):
         """
         res = self.config.document.partial_update_documents([{
             'int_field': 100
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn("'_id' is a required field", res.items[0].error.lower())
         self.assertEqual(400, res.items[0].status)
@@ -611,7 +626,7 @@ class TestPartialUpdate(MarqoTestCase):
         
         This test verifies that partial updates can correctly handle empty document lists.
         """
-        res = self.config.document.partial_update_documents([], self.index)
+        res = self.config.document.partial_update_documents([], self.config.index_management.get_index(self.index.name))
         self.assertFalse(res.errors)
         self.assertEqual(0, len(res.items))
 
@@ -630,7 +645,7 @@ class TestPartialUpdate(MarqoTestCase):
                 'missing_id': True
             }
         ]
-        res = self.config.document.partial_update_documents(updates, self.index)
+        res = self.config.document.partial_update_documents(updates, self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
 
         # Verify valid updates succeeded
@@ -661,7 +676,7 @@ class TestPartialUpdate(MarqoTestCase):
                     'too': 'deep'
                 }
             }
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertEqual(400, res.items[0].status)
         self.assertIn('unsupported field type', res.items[0].error.lower())
@@ -674,7 +689,7 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{
             '_id': '',
             'int_field': 100
-        }], self.index)
+        }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn("document id can't be empty", res.items[0].error.lower())
 
@@ -690,7 +705,7 @@ class TestPartialUpdate(MarqoTestCase):
                     "content1": "abcd",
                     "content2": "efgh"
                 }
-            }], self.index)
+            }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn('Unsupported field type', res.items[0].error)
 
@@ -703,7 +718,7 @@ class TestPartialUpdate(MarqoTestCase):
             [{
                 '_id': '2',
                 "random_field": None
-            }], self.index)
+            }], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn('Unsupported field type', res.items[0].error)
 
@@ -734,7 +749,7 @@ class TestPartialUpdate(MarqoTestCase):
                 '_id': '2',
                 "float_map": 100
             }
-        ], self.index)
+        ], self.config.index_management.get_index(self.index.name))
         self.assertTrue(res.errors)
         self.assertIn("Marqo vector store either cannot find the document you are trying to update, "
                       "or you are trying to change type of a variable as part of an update request which is not"
@@ -745,7 +760,7 @@ class TestPartialUpdate(MarqoTestCase):
 
         This test verifies that partial updates to int maps are rejected.
         """
-        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': 100}], self.index)
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': 100}], self.config.index_management.get_index(self.index.name))
         self.assertIn('Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again', res.items[0].error)
         self.assertTrue(res.errors)
         self.assertEqual(400, res.items[0].status)

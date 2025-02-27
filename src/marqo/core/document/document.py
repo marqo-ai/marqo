@@ -245,7 +245,7 @@ class Document:
                                         break
                                     else:
                                         raise MarqoDocumentParsingError(
-                                            f'Unsupported field type {type(val)} for field {field_name} in doc {doc_id}'
+                                            f'Unsupported field type {type(val)} for field {field_name} in doc {doc_id}. We only support int and float types for map values when updating a document.'
                                         )
                             break
                 doc_ids.add(doc_id)

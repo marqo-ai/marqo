@@ -330,6 +330,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             vespa_fields[common.SCORE_MODIFIERS] = {
                 "modify": {
                     "operation": "replace",
+                    "create": True,
                     "cells": numeric_field_map
                 } if len(numeric_field_map) > 0 else None,
                 "remove": {
