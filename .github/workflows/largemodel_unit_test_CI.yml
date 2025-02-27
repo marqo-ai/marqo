@@ -39,15 +39,16 @@ jobs:
       MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run Large Model Unit Tests (Part ${{ matrix.part }})
+    name: Run Large Model Unit Tests (Part ${{ matrix.run[0] }})
     needs: Start-Runner # Ensures it starts only after the runner is ready
-    runs-on: ${{ matrix.label }}
+    runs-on: ${{ matrix.run[1] }}
     environment: marqo-test-suite
     strategy:
       matrix:
-        part: [1, 2]
-        instance-id: [needs.Start-Runner.outputs.ec2-instance-id1, needs.Start-Runner.outputs.ec2-instance-id2]
-        label: [needs.Start-Runner.outputs.label1, needs.Start-Runner.outputs.label2]
+        run: [
+          [1, ${{ needs.Start-Runner.outputs.label1}}],
+          [2, ${{ needs.Start-Runner.outputs.label2}}]
+        ]
 
     steps:
       - name: Checkout marqo repo
@@ -101,7 +102,7 @@ jobs:
       - name: Start Vespa
         run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
-      - name: Run Large Model Unit Tests (Part ${{ matrix.part }})
+      - name: Run Large Model Unit Tests (Part ${{ matrix.run[0] }})
         run: |
           # Define these for use by Marqo
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -117,7 +118,7 @@ jobs:
           export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
 
           # Run only the assigned test partition
-          pytest marqo/tests/integ_tests --largemodel --split-n 2 --split-part ${{ matrix.part }}
+          pytest marqo/tests/integ_tests --largemodel --split-n 2 --split-part ${{ matrix.run[0] }}
 
   Stop-Runner:
     needs:
@@ -127,8 +128,8 @@ jobs:
     strategy:
       matrix:
         ec2-details : [
-          [needs.Start-Runner.outputs.label1, needs.Start-Runner.outputs.ec2-instance-id1],
-          [needs.Start-Runner.outputs.label2, needs.Start-Runner.outputs.ec2-instance-id2]
+          [${{ needs.Start-Runner.outputs.label1 }}, ${{ needs.Start-Runner.outputs.ec2-instance-id1 }}],
+          [${{ needs.Start-Runner.outputs.label2 }}, ${{ needs.Start-Runner.outputs.ec2-instance-id2 }}]
         ]
     uses: ./.github/workflows/manage_ec2_runner.yml
     with:
