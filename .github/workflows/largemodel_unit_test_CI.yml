@@ -1,5 +1,5 @@
 name: largemodel_unit_test_CI
-# runs unit tests on CUDA machine with large model tests.
+# Runs unit tests on CUDA machine with large model tests.
 
 on:
   workflow_call:
@@ -26,43 +26,28 @@ permissions:
 
 jobs:
   Start-Runner:
-    name: Start self-hosted EC2 runner
-    runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.start-ec2-runner.outputs.label }}
-      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Start EC2 runner
-        id: start-ec2-runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: start
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
-          ec2-instance-type: g4dn.2xlarge
-          subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-          security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
-          aws-resource-tags: > # optional, requires additional permissions
-            [
-              {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
-              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
-              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
-              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
-              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
-              {"Key": "PoloRole", "Value": "testing"}
-            ]
+    strategy:
+      matrix:
+        part: [1, 2]  # Run four instances in parallel
+    uses: ./.github/workflows/manage_ec2_runner.yml
+    with:
+      action: start
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
 
   Test-Marqo:
-    name: Run Large Model Unit Tests
-    needs: Start-Runner # required to start the main job when the runner is ready
-    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    name: Run Large Model Unit Tests (Part ${{ matrix.part }})
+    needs: Start-Runner # Ensures it starts only after the runner is ready
+    runs-on: ${{ needs.Start-Runner.outputs.label }} # Run on the corresponding runner
     environment: marqo-test-suite
+    strategy:
+      matrix:
+        part: [1, 2]  # Run four instances in parallel
+
     steps:
       - name: Checkout marqo repo
         uses: actions/checkout@v3
@@ -85,13 +70,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r marqo-base/requirements/amd64-gpu-requirements.txt
-          # override base requirements with marqo requirements, if needed: 
+          # Override base requirements with marqo requirements if needed: 
           pip install -r marqo/requirements.dev.txt
           pip install pytest==7.4.0
 
       - name: Download nltk data
         run: |
-            python -m nltk.downloader punkt_tab
+          python -m nltk.downloader punkt_tab
 
       - name: Build Vespa
         run: |
@@ -115,9 +100,9 @@ jobs:
       - name: Start Vespa
         run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
-      - name: Run Large Model Unit Tests
+      - name: Run Large Model Unit Tests (Part ${{ matrix.part }})
         run: |
-          # Define these for use by marqo
+          # Define these for use by Marqo
           export VESPA_CONFIG_URL=http://localhost:19071
           export VESPA_DOCUMENT_URL=http://localhost:8080
           export VESPA_QUERY_URL=http://localhost:8080
@@ -129,26 +114,23 @@ jobs:
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
           export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
-          pytest marqo/tests/integ_tests --largemodel 
+
+          # Run only the assigned test partition
+          pytest marqo/tests/integ_tests --largemodel --split-n 2 --split-part ${{ matrix.part }}
 
   Stop-Runner:
-    name: Stop self-hosted EC2 runner
     needs:
-      - Start-Runner # required to get output from the start-runner job
-      - Test-Marqo # required to wait when the main job is done
-    runs-on: ubuntu-latest
-    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Stop EC2 runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: stop
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          label: ${{ needs.start-runner.outputs.label }}
-          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
+      - Start-Runner
+      - Test-Marqo # Waits for all test jobs to finish
+    if: ${{ always() }} # Ensures the runner is stopped even if tests fail
+    strategy:
+      matrix:
+        part: [1, 2]  # Ensure cleanup per instance
+    uses: ./.github/workflows/manage_ec2_runner.yml
+    with:
+      action: stop
+      label: ${{ needs.Start-Runner.outputs.label }}
+      ec2-instance-id: ${{ needs.Start-Runner.outputs.ec2-instance-id }}
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+      AWS_ACCOUNT_ID_OPEN_SOURCE: ${{ secrets.AWS_ACCOUNT_ID_OPEN_SOURCE }}
