@@ -27,14 +27,12 @@ permissions:
 
 jobs:
   Start-Runner:
-    strategy:
-      matrix:
-        part: [1, 2]  # Run four instances in parallel
     uses: ./.github/workflows/manage_ec2_runner.yml
     with:
       action: start
       base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
       ec2-instance-type: g4dn.2xlarge
+      instances: 2
     secrets:
       GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
       MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
@@ -43,11 +41,13 @@ jobs:
   Test-Marqo:
     name: Run Large Model Unit Tests (Part ${{ matrix.part }})
     needs: Start-Runner # Ensures it starts only after the runner is ready
-    runs-on: ${{ needs.Start-Runner.outputs.label }} # Run on the corresponding runner
+    runs-on: ${{ matrix.label }}
     environment: marqo-test-suite
     strategy:
       matrix:
-        part: [1, 2]  # Run four instances in parallel
+        part: [1, 2]
+        instance-id: [needs.Start-Runner.outputs.ec2-instance-id1, needs.Start-Runner.outputs.ec2-instance-id2]
+        label: [needs.Start-Runner.outputs.label1, needs.Start-Runner.outputs.label2]
 
     steps:
       - name: Checkout marqo repo
@@ -126,11 +126,12 @@ jobs:
     if: ${{ always() }} # Ensures the runner is stopped even if tests fail
     strategy:
       matrix:
-        part: [1, 2]  # Ensure cleanup per instance
+        label: [needs.Start-Runner.outputs.label1, needs.Start-Runner.outputs.label2]
+        ec2-instance-id: [needs.Start-Runner.outputs.ec2-instance-id1, needs.Start-Runner.outputs.ec2-instance-id2]
     uses: ./.github/workflows/manage_ec2_runner.yml
     with:
       action: stop
-      label: ${{ needs.Start-Runner.outputs.label }}
-      ec2-instance-id: ${{ needs.Start-Runner.outputs.ec2-instance-id }}
+      label: ${{ matrix.label }}
+      ec2-instance-id: ${{ matrix.ec2-instance-id }}
     secrets:
       GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
