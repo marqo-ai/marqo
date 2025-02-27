@@ -55,6 +55,7 @@ class SearchQuery(BaseMarqoModel):
     modelAuth: Optional[ModelAuth] = None
     textQueryPrefix: Optional[str] = None
     hybridParameters: Optional[HybridParameters] = None
+    targetHits: Optional[int] = None
 
     @validator("searchMethod", pre=True)
     def _preprocess_search_method(cls, value):

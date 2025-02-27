@@ -1470,7 +1470,9 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            model_auth: Optional[ModelAuth] = None,
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
-           hybrid_parameters: Optional[HybridParameters] = None) -> Dict:
+           hybrid_parameters: Optional[HybridParameters] = None,
+           target_hits: int = None,
+           ) -> Dict:
     """The root search method. Calls the specific search method
 
     Validation should go here. Validations include:
@@ -1499,6 +1501,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
+        target_hits: The number of hits to target in the search
     Returns:
 
     """
@@ -1596,7 +1599,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, target_hits=target_hits
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -1609,7 +1612,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters
+                hybrid_parameters=hybrid_parameters, target_hits=target_hits
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -1624,7 +1627,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
-            score_modifiers=score_modifiers
+            score_modifiers=score_modifiers, target_hits=target_hits
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
@@ -2144,7 +2147,8 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None) -> Dict:
+        highlights: bool = False, text_query_prefix: Optional[str] = None, target_hits: Optional[int] = None
+) -> Dict:
     """
     
     Args:
