@@ -275,36 +275,59 @@ jobs:
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} | tee pytest_output.log
 
-      - name: Check Test Coverage of New Code
-        id: check_test_coverage
-        continue-on-error: true
-        run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-            cd marqo
-            echo "Running diff-cover against branch $BASE_BRANCH"
-            git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
-              --compare-branch $BASE_BRANCH --fail-under=95
-          else
-            echo "Skipping diff-cover on Push events"
-            echo "Skipped diff-cover on Push events" > marqo/diff_cov.md
-            touch marqo/diff_cov.html
-          fi
-
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report
           path: marqo/cov_html/
 
+  Merge-Coverage:
+    needs:
+      - Test-Marqo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all coverage files
+        uses: actions/download-artifact@v4
+        with:
+          name: marqo-test-report
+          path: marqo/cov_html/
+
+      - name: Merge Coverage Reports
+        run: |
+          pip install coverage
+          coverage combine coverage-reports/
+          coverage report
+          coverage xml
+
+      - name: Check Test Coverage of New Code
+        id: check_test_coverage
+        continue-on-error: true
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+            cd coverage-reports
+            echo "Running diff-cover against branch $BASE_BRANCH"
+            git fetch origin $BASE_BRANCH:$BASE_BRANCH
+            diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
+              --compare-branch $BASE_BRANCH --fail-under=95
+          else
+            echo "Skipping diff-cover on Push events"
+            echo "Skipped diff-cover on Push events" > coverage-reports/diff_cov.md
+            touch coverage-reports/diff_cov.html
+          fi
+
+      - name: Upload Merged Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-coverage
+          path: coverage-reports/
+
   Stop-Runner:
     needs:
       - Check-Changes # required to start the main job when the runner is ready
       - Create-Matrix # Ensures it starts only after the runners are ready
       - Test-Marqo # required to wait when the main job is done
-    if: |
-      always() && needs.Start-Runner.result == 'success'
+    if: ${{ always() }} # Ensures the runner is stopped even if tests fail
     strategy:
       matrix:
         instance: [0, 1] # Zero-based index for JSON list access
