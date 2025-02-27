@@ -6,6 +6,7 @@ MARQO_DOC_HIGHLIGHTS = '_highlights'  # doc-level so must not clash with index f
 MARQO_DOC_CHUNKS = 'chunks'
 MARQO_DOC_EMBEDDINGS = 'embeddings'
 MARQO_DOC_ID = '_id'
+MARQO_FIELD_TYPES = "field_types"
 
 MARQO_SEARCH_METHOD_TENSOR = 'tensor'
 MARQO_SEARCH_METHOD_LEXICAL = 'lexical'

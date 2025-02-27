@@ -1,4 +1,4 @@
-{# semi_structured_vespa_schema_template.sd.jinja2 -#}
+{# semi_structured_vespa_schema_template_2_16.sd.jinja2 -#}
 schema {{ index.schema_name }} {
     document {
         field marqo__id type string {
@@ -6,6 +6,22 @@ schema {{ index.schema_name }} {
             attribute: fast-search
             rank: filter
         }
+
+        field marqo__create_timestamp type double {
+                    indexing: attribute | summary
+                    attribute: fast-search
+                    rank: filter
+                }
+
+        field marqo__field_types type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
         {# Reserved fields for bool, int and float fields -#}
         field marqo__int_fields type map<string, long> {
             indexing: summary
@@ -48,12 +64,6 @@ schema {{ index.schema_name }} {
                                   rank: filter }
         }
 
-        field marqo__string_array type array<string> {
-            indexing: attribute | summary
-            attribute: fast-search
-            rank: filter
-        }
-
         {# All int and float fields will be added score modifiers -#}
         field marqo__score_modifiers type tensor<double>(p{}) {
             indexing: attribute | summary
@@ -67,6 +77,14 @@ schema {{ index.schema_name }} {
         field {{ lexical_field.lexical_field_name }} type string {
             indexing: index | summary
             index: enable-bm25
+        }
+        {% endfor -%}
+
+        {% for string_array_field in index.string_array_fields -%}
+        field {{ string_array_field.string_array_field_name }} type array<string> {
+            indexing: attribute | summary
+            attribute: fast-search
+            rank: filter
         }
         {% endfor -%}
 
@@ -254,10 +272,13 @@ schema {{ index.schema_name }} {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
-        summary marqo__string_array type array<string> {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
+        {% for string_array_field in index.string_array_fields -%}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
+        {% endfor -%}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
         {%- endfor %}
@@ -268,10 +289,13 @@ schema {{ index.schema_name }} {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
-        summary marqo__string_array type array<string> {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
+        {% for string_array_field in index.string_array_fields -%}
+        summary {{ string_array_field.string_array_field_name }} type array<string> {source: {{ string_array_field.string_array_field_name }}}
+        {% endfor -%}
         {%- for lexical_field in index.lexical_fields %}
         summary {{ lexical_field.name }} type string {source: {{ lexical_field.lexical_field_name }}}
         {%- endfor %}

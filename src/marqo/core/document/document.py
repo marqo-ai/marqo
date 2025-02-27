@@ -1,25 +1,31 @@
 from timeit import default_timer as timer
 from typing import Dict, List, Tuple, Optional
 
+import semver
+
 import marqo.api.exceptions as api_exceptions
 from marqo.core.constants import MARQO_DOC_ID
 from marqo.core.models.add_docs_params import AddDocsParams
-from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError
+from marqo.core.exceptions import UnsupportedFeatureError, ParsingError, InternalError, MarqoDocumentParsingError
 from marqo.core.index_management.index_management import IndexManagement
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse, MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import IndexType, SemiStructuredMarqoIndex, StructuredMarqoIndex, \
     UnstructuredMarqoIndex
 from marqo.core.models.marqo_update_documents_response import MarqoUpdateDocumentsResponse, MarqoUpdateDocumentsItem
+from marqo.core.semi_structured_vespa_index.common import SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION, \
+    VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import \
     SemiStructuredAddDocumentsHandler, SemiStructuredFieldCountConfig
 from marqo.core.structured_vespa_index.structured_add_document_handler import StructuredAddDocumentsHandler
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.logging import get_logger
+from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
 from marqo.vespa.models.feed_response import FeedBatchResponse
 from marqo.vespa.vespa_client import VespaClient
+from marqo.version import get_version
 
 logger = get_logger(__name__)
 
@@ -95,7 +101,7 @@ class Document:
         If the document does not exist, this document will error out and the error will be returned in the response.
 
         Args:
-            partial_documents: A list of documents to partially update
+            partial_documents: A list of documents to partially update received in the request
             marqo_index: The index object to partially update documents in
 
         Raises:
@@ -104,11 +110,15 @@ class Document:
         Return:
             MarqoUpdateDocumentsResponse containing the response of the partial update operation
         """
-        if marqo_index.type in [IndexType.Unstructured, IndexType.SemiStructured]:
+        if marqo_index.type is IndexType.Unstructured:
             raise UnsupportedFeatureError("Partial document update is not supported for unstructured indexes. "
                                           "Please use add_documents with use_existing_tensor=True instead")
-        elif marqo_index.type == IndexType.Structured:
+        elif marqo_index.type is IndexType.Structured:
             pass
+        elif marqo_index.type is IndexType.SemiStructured:
+            if marqo_index.parsed_marqo_version() < SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION: # Partial updates for semi-structured indexes are only supported for Marqo version >= 2.16.0
+                raise UnsupportedFeatureError("Partial document update is not supported for this index version. "
+                                          "Please upgrade the index version, or create a new index to use this feature.")
         else:
             raise ValueError(f"Invalid index type: {marqo_index.type}")
 
@@ -118,24 +128,37 @@ class Document:
         unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]] = []
 
         # Remove duplicated documents based on _id
-        partial_documents, _ = self.remove_duplicated_documents(partial_documents)
+        partial_documents, doc_ids, documents_that_contain_maps = self.process_documents(partial_documents,
+                                                                                         unsuccessful_docs, is_index_semi_structured=marqo_index.type is IndexType.SemiStructured)
+        existing_vespa_documents = {}
+
+        if marqo_index.type is IndexType.SemiStructured and documents_that_contain_maps: # Only retrieve the document back if the partial update request contains maps and the index is semi-structured
+            get_batch_response = self.vespa_client.get_batch(ids = list(documents_that_contain_maps), fields = [
+                VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP], schema = marqo_index.schema_name)
+            responses = get_batch_response.responses
+            for resp in responses:
+                existing_vespa_documents[resp.document.fields[VESPA_FIELD_ID]] = resp.document.dict()
 
         for index, doc in enumerate(partial_documents):
             try:
-                vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc))
+                vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc, existing_vespa_documents.get(doc.get(MARQO_DOC_ID, ''), None)))
                 vespa_documents.append(vespa_document)
             except ParsingError as e:
                 unsuccessful_docs.append(
                     (index, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''), error=e.message,
                                                      status=int(api_exceptions.InvalidArgError.status_code))))
 
-        vespa_res: UpdateDocumentsBatchResponse = (
-            self.vespa_client.update_documents_batch(vespa_documents,
-                                                     marqo_index.schema_name,
-                                                     vespa_id_field=vespa_index.get_vespa_id_field()))
+        with RequestMetricsStore.for_request().time("partial_update.vespa._bulk"):
+            vespa_res: UpdateDocumentsBatchResponse = (
+                self.vespa_client.update_documents_batch(vespa_documents,
+                                                         marqo_index.schema_name,
+                                                         vespa_id_field=vespa_index.get_vespa_id_field()))
 
-        return self._translate_update_document_response(vespa_res, unsuccessful_docs,
-                                                        marqo_index.name, start_time)
+        with RequestMetricsStore.for_request().time("partial_update.postprocess"):
+            result = self._translate_update_document_response(vespa_res, unsuccessful_docs,
+                                                              marqo_index.name, start_time)
+
+        return result
 
     def _translate_update_document_response(self, responses: UpdateDocumentsBatchResponse, unsuccessful_docs: List,
                                             index_name: str, start_time) \
@@ -170,34 +193,76 @@ class Document:
         return MarqoUpdateDocumentsResponse(errors=errors, index_name=index_name, items=items,
                                             processingTimeMs=(timer() - start_time) * 1000)
 
-    def remove_duplicated_documents(self, documents: List) -> Tuple[List, set]:
-        """Remove duplicated documents based on _id in the given list of documents.
+    def process_documents(self, documents: List[Dict], unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]],
+                          is_index_semi_structured = False) -> Tuple[List, set, set]:
+        """Process documents to remove duplicates and identify documents containing maps.
+        
+        This method combines duplicate removal and map detection into a single pass through
+        the documents for better efficiency.
 
-        For a list of documents, if there exists duplicate _id, the last document will be used while the
-        previous ones will be removed from the list.
-
-        This function does not validate the documents, it only removes the duplicates based on _id fields.
+        Args:
+            is_index_semi_structured: Variable denoting if the index that's is currently being processed is of type SemiStructured
+            unsuccessful_docs: A list of documents which were processed unsuccessfully
+            documents: List of document dictionaries to process
+            
+        Returns:
+            Tuple containing:
+            - List of deduplicated documents
+            - Set of unique document IDs
+            - Set of document IDs that contain dictionary values
         """
-        # Deduplicate docs, keep the latest
         docs = []
         doc_ids = set()
+        documents_with_maps = set()
+        
+        # Process documents in reverse to keep latest version of duplicates
         for i in range(len(documents) - 1, -1, -1):
             doc = documents[i]
+            
+            if not isinstance(doc, dict) or '_id' not in doc:
+                docs.append(doc)
+                continue
+                
+            doc_id = doc['_id']
+            
+            try:
+                # Skip if we've already seen this ID
+                if doc_id is not None and doc_id in doc_ids:
+                    logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
+                    continue
+                
+                # Check for dictionary values while processing doc to populate the documents_with_maps set.
+                # Only do it in case of semi-structured indexes.
+                if is_index_semi_structured:
+                    for field_name, field_value in doc.items():
+                        if isinstance(field_value, dict):
+                            if len(field_value) == 0: # If the dictionary is empty, get back the document so that we can update the doc with an empty dictionary (i.e remove the map from the doc).
+                                documents_with_maps.add(doc_id)
+                            else:
+                                for key, val in field_value.items():
+                                    if isinstance(val, (int, float)):
+                                        documents_with_maps.add(doc_id)
+                                        break
+                                    else:
+                                        raise MarqoDocumentParsingError(
+                                            f'Unsupported field type {type(val)} for field {field_name} in doc {doc_id}. We only support int and float types for map values when updating a document.'
+                                        )
+                            break
+                doc_ids.add(doc_id)
+                docs.append(doc)
+                
+            except TypeError as e:
+                logger.debug(f'Could not hash document ID {doc_id}: {e}')
+                docs.append(doc)
 
-            if isinstance(doc, dict) and '_id' in doc:
-                doc_id = doc['_id']
-                try:
-                    if doc_id is not None and doc_id in doc_ids:
-                        logger.debug(f'Duplicate document ID {doc_id} found, keeping the latest')
-                        continue
-                    doc_ids.add(doc_id)
-                except TypeError as e:  # Happens if ID is a non-hashable type -- ID validation will catch this later on
-                    logger.debug(f'Could not hash document ID {doc_id}: {e}')
+            except MarqoDocumentParsingError as e:
+                unsuccessful_docs.append((i, MarqoUpdateDocumentsItem(id=doc.get(MARQO_DOC_ID, ''),
+                                                                      error=e.message,
+                                                                      status=int(api_exceptions.InvalidArgError.status_code))))
 
-            docs.append(doc)
-        # Reverse to preserve order in request
+        # Reverse to preserve original order
         docs.reverse()
-        return docs, doc_ids
+        return docs, doc_ids, documents_with_maps
 
     def translate_add_documents_response(self, responses: Optional[FeedBatchResponse],
                                          index_name: str,
