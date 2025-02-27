@@ -29,3 +29,9 @@ class VespaClientBase:
         self.http_client = httpx.Client(
             limits=httpx.Limits(max_keepalive_connections=pool_size, max_connections=pool_size)
         )
+
+    def close(self):
+        """
+        Close the VespaClient object.
+        """
+        self.http_client.close()

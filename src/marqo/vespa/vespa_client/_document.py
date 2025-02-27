@@ -1,5 +1,5 @@
 """
-This file contains the `VespaIndexMixin` class, responsible for **all document-related operations**,
+This file contains the `VespaDocumentMixin` class, responsible for **all document-related operations**,
 such as **retrieving, updating, feeding, and deleting documents** in a Vespa index.
 
 Functions Included:
@@ -36,7 +36,7 @@ vespa.delete_document(id="123", schema="products")
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from json import JSONDecodeError
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Dict
 
 import httpx
 
@@ -57,7 +57,7 @@ if TYPE_CHECKING:
 logger = marqo.logging.get_logger(__name__)
 
 
-class VespaIndexMixin:
+class VespaDocumentMixin:
     def feed_document(self: "VespaClientBase", document: VespaDocument, schema: str, timeout: int = 60) -> FeedDocumentResponse:
         """
         Feed a document to Vespa.
@@ -190,7 +190,8 @@ class VespaIndexMixin:
         return GetDocumentResponse(**resp.json())
 
     def get_all_documents(
-            self, schema: str, stream=False, continuation: Optional[str] = None) -> VisitDocumentsResponse:
+            self: "VespaClientBase", schema: str, stream=False, continuation: Optional[str] = None
+    ) -> VisitDocumentsResponse:
         """
         Get all documents in a schema.
         Args:
@@ -201,9 +202,15 @@ class VespaIndexMixin:
         Returns:
             BatchGetDocumentResponse object
         """
+        def _add_query_params(query_url: str, query_params: Dict[str, str]) -> str:
+            if not query_params:
+                return query_url
+
+            query_string = '&'.join([f'{key}={value}' for key, value in query_params.items() if value])
+            return f'{query_url.strip("?")}?{query_string}'
         try:
-            url = self._add_query_params(
-                url=f'{self.document_url}/document/v1/{schema}/{schema}/docid', query_params={
+            url = _add_query_params(
+                query_url=f'{self.document_url}/document/v1/{schema}/{schema}/docid', query_params={
                     'stream': str(stream).lower(),
                     'continuation': continuation
                 }

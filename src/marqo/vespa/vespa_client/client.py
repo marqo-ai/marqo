@@ -28,19 +28,17 @@ vespa.close()
 """
 
 from ._search import VespaSearchMixin
-from ._index import VespaIndexMixin
+from ._document import VespaDocumentMixin
 from ._deploy import VespaDeployMixin
 from ._errors import VespaErrorHandlingMixin
-from ._utils import VespaUtilsMixin
 from ._client_base import VespaClientBase
 
 class VespaClient(
     VespaClientBase,
     VespaSearchMixin,
-    VespaIndexMixin,
+    VespaDocumentMixin,
     VespaDeployMixin,
     VespaErrorHandlingMixin,
-    VespaUtilsMixin
 ):
     def __init__(
             self, config_url: str, document_url: str, query_url: str, content_cluster_name: str,
