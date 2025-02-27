@@ -48,6 +48,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   Check-Changes:
