@@ -49,10 +49,10 @@ def pytest_collection_modifyitems(config, items):
     chunk_size = max(1, len(sorted_classes) // int(parts))
 
     # Determine the range of classes to keep
-    start_idx = (int(part) - 1) * chunk_size
+    start_idx = (int(part)) * chunk_size
     end_idx = start_idx + chunk_size
 
-    if int(part) == int(parts):
+    if int(part) + 1 == int(parts):
         end_idx = len(sorted_classes)
 
     selected_classes = set(sorted_classes[start_idx:end_idx])

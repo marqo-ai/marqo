@@ -36,30 +36,12 @@ on:
       MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID:
         required: false
     outputs:
-      label1:
-        description: "EC2 Runner Label 1"
-        value: ${{ jobs.Start-Runner.outputs.label1 }}
-      label2:
-        description: "EC2 Runner Label 2"
-        value: ${{ jobs.Start-Runner.outputs.label2 }}
-      label3:
-        description: "EC2 Runner Label 3"
-        value: ${{ jobs.Start-Runner.outputs.label3 }}
-      label4:
-        description: "EC2 Runner Label 4"
-        value: ${{ jobs.Start-Runner.outputs.label4 }}
-      ec2-instance-id1:
-        description: "EC2 Instance ID 1"
-        value: ${{ jobs.Start-Runner.outputs.ec2-instance-id1 }}
-      ec2-instance-id2:
-        description: "EC2 Instance ID 2"
-        value: ${{ jobs.Start-Runner.outputs.ec2-instance-id2 }}
-      ec2-instance-id3:
-        description: "EC2 Instance ID 3"
-        value: ${{ jobs.Start-Runner.outputs.ec2-instance-id3 }}
-      ec2-instance-id4:
-        description: "EC2 Instance ID 4"
-        value: ${{ jobs.Start-Runner.outputs.ec2-instance-id4 }}
+      labels:
+        description: "EC2 Runner Labels"
+        value: ${{ jobs.Prepare-Output-Matrix.outputs.labels }}
+      ec2-instance-ids:
+        description: "EC2 Instance IDs"
+        value: ${{ jobs.Prepare-Output-Matrix.outputs.instance-ids }}
 
 jobs:
   Prepare-Matrix:
@@ -124,6 +106,39 @@ jobs:
         run: |
           echo "label${{ matrix.instance }}=${{ steps.start-ec2-runner.outputs.label }}"
           echo "ec2-instance-id${{ matrix.instance }}=${{ steps.start-ec2-runner.outputs.ec2-instance-id }}"
+
+  Prepare-Output-Matrix:
+    runs-on: ubuntu-latest
+    needs: Start-Runner
+    outputs:
+      labels: ${{ steps.prepare-output-matrix.outputs.labels }}
+      instance-ids: ${{ steps.prepare-output-matrix.outputs.instance-ids }}
+    steps:
+      - name: Prepare output matrix
+        id: prepare-output-matrix
+        run: |
+          labels=""
+          instance_ids=""
+          
+          for i in $(seq 1 ${{ inputs.instances }}); do
+            label_var="needs.Start-Runner.outputs.label$i"
+            instance_id_var="needs.Start-Runner.outputs.ec2-instance-id$i"
+          
+            # Append values to CSV lists
+            if [ -n "${!label_var}" ]; then
+              labels+="${!label_var},"
+              instance_ids+="${!instance_id_var},"
+            fi
+          done
+          
+          # Remove trailing comma
+          labels=${labels%,}
+          instance_ids=${instance_ids%,}
+          
+          # Set outputs
+          echo "labels=[$labels]" >> $GITHUB_OUTPUT
+          echo "instance-ids=[$instance_ids]" >> $GITHUB_OUTPUT
+          
             
 
   Stop-Runner:
