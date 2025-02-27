@@ -174,6 +174,7 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': 1.0}], self.index)
         self.assertTrue(res.errors)
         self.assertIn('reference/api/documents/update-documents/#response', res.items[0].error)
+        self.assertIn("Marqo vector store couldn't update the document. Please see", res.items[0].error)
         self.assertEqual(400, res.items[0].status)
 
     def test_partial_update_should_update_float_field_to_float(self):
@@ -755,9 +756,8 @@ class TestPartialUpdate(MarqoTestCase):
             }
         ], self.index)
         self.assertTrue(res.errors)
-        self.assertIn("Marqo vector store either cannot find the document you are trying to update, "
-                      "or you are trying to change type of a variable as part of an update request which is not"
-                      " allowed. Please fix the request and try again",res.items[0].error)
+        self.assertIn("Marqo vector store couldn't update the document. Please see", res.items[0].error)
+        self.assertIn('reference/api/documents/update-documents/#response', res.items[0].error)
 
     def test_updating_int_map_to_int(self):
         """Test that partial updates to int maps are successful.

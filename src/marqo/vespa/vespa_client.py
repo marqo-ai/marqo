@@ -18,6 +18,7 @@ import marqo.vespa.concurrency as conc
 from marqo.core.models import MarqoIndex
 from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
+from marqo.marqo_docs import update_documents_response
 from marqo.vespa.exceptions import (VespaStatusError, VespaError, InvalidVespaApplicationError,
                                     VespaTimeoutError, VespaNotConvergedError, VespaActivationConflictError)
 from marqo.vespa.models import VespaDocument, QueryResult, Error, FeedBatchDocumentResponse, FeedBatchResponse, \
@@ -600,7 +601,7 @@ class VespaClient:
         vespa_status_code_to_marqo_doc_error_map = {
             200: (200, None),
             404: (404, "Document does not exist in the index"),
-            412: (400, "Marqo vector store either cannot find the document you are trying to update, or you are trying to change type of a variable as part of an update request which is not allowed. Please fix the request and try again"), # Update documents get 412 from Vespa for document not found as we use condition
+            412: (400, "Marqo vector store couldn't update the document. Please see" + update_documents_response() + " for more details"), # Update documents get 412 from Vespa for document not found as we use condition
             429: (429, "Marqo vector store receives too many requests. Please try again later"),
             507: (400, "Marqo vector store is out of memory or disk space"),
         }
@@ -834,6 +835,7 @@ class VespaClient:
         data = {'fields': document.fields}
         types = document.field_types
         create_timestamp = document.create_timestamp
+        is_request_for_structured_index = types is None and create_timestamp is None
 
         # only used for documents that are not updated
         error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
@@ -848,6 +850,11 @@ class VespaClient:
                 data["condition"] += f' and {schema}.{VESPA_DOC_CREATE_TIMESTAMP}=={create_timestamp}'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
+                if resp.status_code == 412 and is_request_for_structured_index:
+                    # If Vespa response is 412, and the request is for structured index, it means the document does not exist
+                    # in the index, as we don't have type checks / timestamp (version) checks for structured indexes.
+                    # We return a 404 error for this case.
+                    resp.status_code = 404
             except httpx.RequestError as e:
                 logger.error(e, exc_info=True)
                 return UpdateDocumentResponse(status=500, message="Network Error", id=doc_id, path_id=error_doc_path_id)
