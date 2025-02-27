@@ -23,11 +23,6 @@ on:
         description: 'Instance ID for the EC2 runner'
         required: false
         type: string
-      instances:
-        description: 'Number of instances to start (1-4)'
-        required: false
-        type: number
-        default: 1
     secrets:
       GH_PERSONAL_ACCESS_TOKEN:
         required: true
@@ -36,46 +31,21 @@ on:
       MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID:
         required: false
     outputs:
-      labels:
-        description: "EC2 Runner Labels"
-        value: ${{ jobs.Prepare-Output-Matrix.outputs.labels }}
-      ec2-instance-ids:
-        description: "EC2 Instance IDs"
-        value: ${{ jobs.Prepare-Output-Matrix.outputs.instance-ids }}
+      label:
+        description: "EC2 Runner Label"
+        value: ${{ jobs.Start-Runner.outputs.label }}
+      ec2-instance-id:
+        description: "EC2 Instance ID"
+        value: ${{ jobs.Start-Runner.outputs.ec2-instance-id }}
 
 jobs:
-  Prepare-Matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      instances: ${{ steps.prepare-matrix.outputs.instances }}
-    steps:
-      - name: Prepare matrix
-        id: prepare-matrix
-        run: |
-          instances=$(seq -s ',' 1 ${{ inputs.instances }} | sed 's/,$//')
-          echo "instances=[$instances]" >> $GITHUB_ENV
-          echo "instances=[$instances]" >> $GITHUB_OUTPUT
-      - name: Show matrix
-        run: |
-          echo "Generated matrix: ${{ env.instances }}"
   Start-Runner:
-    needs:
-      Prepare-Matrix
-    strategy:
-      matrix:
-        instance: ${{ fromJSON(needs.Prepare-Matrix.outputs.instances) }}
     if: ${{ inputs.action == 'start' }}
     name: Start EC2 runner
     runs-on: ubuntu-latest
     outputs:
-      label1: ${{ steps.set-output.outputs.label1 }}
-      label2: ${{ steps.set-output.outputs.label2 }}
-      label3: ${{ steps.set-output.outputs.label3 }}
-      label4: ${{ steps.set-output.outputs.label4 }}
-      ec2-instance-id1: ${{ steps.set-output.outputs.ec2-instance-id1 }}
-      ec2-instance-id2: ${{ steps.set-output.outputs.ec2-instance-id2 }}
-      ec2-instance-id3: ${{ steps.set-output.outputs.ec2-instance-id3 }}
-      ec2-instance-id4: ${{ steps.set-output.outputs.ec2-instance-id4 }}
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -101,45 +71,6 @@ jobs:
               {"Key": "WorkflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
               {"Key": "PoloRole", "Value": "testing"}
             ]
-      - name: Set output
-        id: set-output
-        run: |
-          echo "label${{ matrix.instance }}=${{ steps.start-ec2-runner.outputs.label }}"
-          echo "ec2-instance-id${{ matrix.instance }}=${{ steps.start-ec2-runner.outputs.ec2-instance-id }}"
-
-  Prepare-Output-Matrix:
-    runs-on: ubuntu-latest
-    needs: Start-Runner
-    outputs:
-      labels: ${{ steps.prepare-output-matrix.outputs.labels }}
-      instance-ids: ${{ steps.prepare-output-matrix.outputs.instance-ids }}
-    steps:
-      - name: Prepare output matrix
-        id: prepare-output-matrix
-        run: |
-          labels=""
-          instance_ids=""
-          
-          for i in $(seq 1 ${{ inputs.instances }}); do
-            label_var="needs.Start-Runner.outputs.label$i"
-            instance_id_var="needs.Start-Runner.outputs.ec2-instance-id$i"
-          
-            # Append values to CSV lists
-            if [ -n "${!label_var}" ]; then
-              labels+="${!label_var},"
-              instance_ids+="${!instance_id_var},"
-            fi
-          done
-          
-          # Remove trailing comma
-          labels=${labels%,}
-          instance_ids=${instance_ids%,}
-          
-          # Set outputs
-          echo "labels=[$labels]" >> $GITHUB_OUTPUT
-          echo "instance-ids=[$instance_ids]" >> $GITHUB_OUTPUT
-          
-            
 
   Stop-Runner:
     name: Stop EC2 runner
