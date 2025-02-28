@@ -17,7 +17,7 @@ class TestOpenCLIPModelLoad(TestCase):
 
     def test_the_string_replace_for_legacy_model_does_not_apply_to_hf(self):
         """
-        A test to ensure the string replace ("/", "-" for legacy model names does not apply to Hugging Face models.
+        A test to ensure the string replace ("/", "-") for legacy model names does not apply to Hugging Face models.
         """
         model_properties = {
             "name": "hf-hub:timm/ViT-B-16-SigLIP",
@@ -49,7 +49,7 @@ class TestOpenCLIPModelLoad(TestCase):
 
     def test_the_string_replace_for_legacy_model_apply_to_legacy_models(self):
         """
-        A test to ensure the string replace ("/", "-" for legacy model names does not apply to Hugging Face models.
+        A test to ensure the string replace ("/", "-") for legacy model names apply to Hugging Face models.
         """
 
         model_properties = {
