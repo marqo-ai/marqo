@@ -8,6 +8,7 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import ORJSONResponse
 from orjson import orjson
 
+from marqo import version
 from marqo.logging import get_logger
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.multimodal_model_load import Modality
@@ -44,6 +45,12 @@ def tensor_from_json(tensor_dict):
 def tensor_from_file(tensor_file: UploadFile):
     tensor_buffer = io.BytesIO(tensor_file.file.read())
     return torch.load(tensor_buffer)
+
+
+@inf_app.get("/")
+def root():
+    return {"message": "Welcome to Marqo Inference",
+            "version": version.get_version()}
 
 
 @inf_app.post("/vectorise-binary")
