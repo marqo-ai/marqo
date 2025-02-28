@@ -23,9 +23,13 @@ def pytest_collection_modifyitems(config, items):
 
     # Step 1: **Pre-filter tests that would be skipped**
     for item in items:
+        # Skip tests that are cpu_only if --largemodel is set
         if config.getoption("--largemodel") and (
                 "largemodel" not in item.keywords or "cpu_only" in item.keywords or "skip" in item.keywords
         ):
+            continue # Skip adding this test to filtered_items
+        # Skip tests that are largemodel if --largemodel is not set
+        if not config.getoption("--largemodel") and "largemodel" in item.keywords:
             continue # Skip adding this test to filtered_items
 
         if config.getoption("--multinode") and (
