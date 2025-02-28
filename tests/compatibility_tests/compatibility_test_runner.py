@@ -270,7 +270,7 @@ def rollback_test(to_version: str, from_version: str, to_version_image: str):
 
         # Step 9: Trigger rollback Vespa endpoint
         if semver.VersionInfo.parse(from_version) >= semver.VersionInfo.parse("2.13.0"):
-            trigger_rollback_endpoint(from_version)
+            trigger_rollback_endpoint()
 
             # Step 10: Run full test suite again after Vespa rollback
             try:
