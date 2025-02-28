@@ -4,8 +4,8 @@ import pytest
 def pytest_addoption(parser):
     parser.addoption("--largemodel", action="store_true", default=False)
     parser.addoption("--multinode", action="store_true", default=False, help="Run tests that have multiple Vespa nodes")
-    parser.addoption("--split-n", action="store", default=1, help="Split tests into N parts")
-    parser.addoption("--split-part", action="store", default=1, help="Run tests for part N")
+    parser.addoption("--split-n", action="store", type=int, default=1, help="Split tests into N parts")
+    parser.addoption("--split-part", action="store", type=int, default=0, help="Run tests for part N (zero-based index)")
 
 
 def pytest_configure(config):
@@ -18,44 +18,39 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     parts = config.getoption("--split-n")
     part = config.getoption("--split-part")
-    skip_largemodel = pytest.mark.skip(reason="need --largemodel option to run")
-    skip_cpu_only = pytest.mark.skip(reason="skip in --largemodel mode when cpu_only is present")
-    skip_multinode = pytest.mark.skip(reason="Skipped because --multinode was used")
 
-    if config.getoption("--largemodel"):
-        # --largemodel given in cli: only run tests that have largemodel marker
-        for item in items:
-            if "largemodel" not in item.keywords:
-                item.add_marker(skip_cpu_only)
-    else:
-        for item in items:
-            if "largemodel" in item.keywords:
-                item.add_marker(skip_largemodel)
+    filtered_items = []
 
-    if config.getoption("--multinode"):
-        for item in items:
-            if "skip_for_multinode" in item.keywords:
-                item.add_marker(skip_multinode)
-
-    class_to_tests = {}
+    # Step 1: **Pre-filter tests that would be skipped**
     for item in items:
+        if config.getoption("--largemodel") and ("largemodel" not in item.keywords or "cpu_only" in item.keywords):
+            continue # Skip adding this test to filtered_items
+
+        if config.getoption("--multinode") and "skip_for_multinode" in item.keywords:
+            continue  # Skip adding this test to filtered_items
+
+        filtered_items.append(item)
+
+    # Step 2: **Group tests by class after filtering**
+    class_to_tests = {}
+    for item in filtered_items:
         class_name = item.parent.name
         if class_name not in class_to_tests:
             class_to_tests[class_name] = []
         class_to_tests[class_name].append(item)
 
-    # Sort classes and divide into n parts
+    # Step 3: **Distribute the remaining test classes into partitions**
     sorted_classes = sorted(class_to_tests.keys())
-    chunk_size = max(1, len(sorted_classes) // int(parts))
+    chunk_size = max(1, len(sorted_classes) // parts)
 
-    # Determine the range of classes to keep
-    start_idx = (int(part)) * chunk_size
+    # Step 4: **Determine the range of classes to keep in this partition**
+    start_idx = part * chunk_size
     end_idx = start_idx + chunk_size
 
-    if int(part) + 1 == int(parts):
-        end_idx = len(sorted_classes)
+    if part + 1 == parts:
+        end_idx = len(sorted_classes)  # Include all remaining classes in the last partition
 
     selected_classes = set(sorted_classes[start_idx:end_idx])
 
-    # Modify the list of collected tests
-    items[:] = [item for item in items if item.parent.name in selected_classes]
+    # Step 5: **Modify the list of collected tests**
+    items[:] = [item for item in filtered_items if item.parent.name in selected_classes]

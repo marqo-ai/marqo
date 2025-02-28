@@ -56,11 +56,22 @@ jobs:
       MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
       MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
 
+  Start-Runner4:
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: g4dn.2xlarge
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+
   Create-Matrix:
     needs:
       - Start-Runner1
       - Start-Runner2
       - Start-Runner3
+      - Start-Runner4
     runs-on: ubuntu-latest
     outputs:
       labels: ${{ steps.create-matrix.outputs.labels }}
@@ -69,8 +80,8 @@ jobs:
       - name: Create matrix
         id: create-matrix
         run: |
-          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}", "${{ needs.Start-Runner3.outputs.label }}"]'
-          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}", "${{ needs.Start-Runner3.outputs.ec2-instance-id }}"]'
+          LABELS='["${{ needs.Start-Runner1.outputs.label }}", "${{ needs.Start-Runner2.outputs.label }}", "${{ needs.Start-Runner3.outputs.label }}", "${{ needs.Start-Runner4.outputs.label }}"]'
+          INSTANCE_IDS='["${{ needs.Start-Runner1.outputs.ec2-instance-id }}", "${{ needs.Start-Runner2.outputs.ec2-instance-id }}", "${{ needs.Start-Runner3.outputs.ec2-instance-id }}", "${{ needs.Start-Runner4.outputs.ec2-instance-id }}"]'
           
           echo "labels=$LABELS" >> $GITHUB_OUTPUT
           echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
