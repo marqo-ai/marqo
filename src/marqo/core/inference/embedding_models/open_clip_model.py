@@ -251,14 +251,14 @@ class OPEN_CLIP(AbstractCLIPModel):
                      media_download_headers: Optional[Dict] = None,
                      normalize=True) -> FloatTensor:
 
-        self.image_input_processed: Tensor = self._preprocess_images(images, media_download_headers)
+        image_input_processed: Tensor = self._preprocess_images(images, media_download_headers)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+                    outputs = self.model.encode_image(image_input_processed).to(torch.float32)
             else:
-                outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+                outputs = self.model.encode_image(image_input_processed).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
