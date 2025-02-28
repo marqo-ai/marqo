@@ -91,6 +91,7 @@ def full_test_run(marqo_version: str):
     run_test_mode(marqo_version)
 
 def run_prepare_mode(version_to_test_against: str):
+    logger.info(f"===================================== RUN PREPARE MODE BEGINS =================================================")
     version_to_test_against = semver.VersionInfo.parse(version_to_test_against)
     logger.debug(f"Printing all test cases defined under tests/compatibility_tests/: {BaseCompatibilityTestCase.__subclasses__()}")
     errors = []
@@ -98,10 +99,13 @@ def run_prepare_mode(version_to_test_against: str):
     # Skip any tests that have already been prepared
     seen_classes = set()
     for test_class in BaseCompatibilityTestCase.__subclasses__():
-        if test_class in seen_classes:
+        if test_class.__name__ in seen_classes:
             logger.info(f"Skipping duplicate test class {test_class.__name__} as it has already been processed")
             continue
-        seen_classes.add(test_class)
+
+        # Log to confirm no duplicates
+        logger.info(f"{test_class.__name__} has NOT been processed yet. Processed classes: {seen_classes}. Processing now.")
+        seen_classes.add(test_class.__name__)
         
         logger.info(f"========================================================================================")
         markers = getattr(test_class, "pytestmark", [])
