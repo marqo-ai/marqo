@@ -23,34 +23,30 @@ def pytest_collection_modifyitems(config, items):
 
     # Step 1: **Pre-filter tests that would be skipped**
     for item in items:
-        if config.getoption("--largemodel") and ("largemodel" not in item.keywords or "cpu_only" in item.keywords):
+        if config.getoption("--largemodel") and (
+                "largemodel" not in item.keywords or "cpu_only" in item.keywords or "skip" in item.keywords
+        ):
             continue # Skip adding this test to filtered_items
 
-        if config.getoption("--multinode") and "skip_for_multinode" in item.keywords:
+        if config.getoption("--multinode") and (
+                "skip_for_multinode" in item.keywords or "skip" in item.keywords
+        ):
             continue  # Skip adding this test to filtered_items
 
         filtered_items.append(item)
 
-    # Step 2: **Group tests by class after filtering**
-    class_to_tests = {}
-    for item in filtered_items:
-        class_name = item.parent.name
-        if class_name not in class_to_tests:
-            class_to_tests[class_name] = []
-        class_to_tests[class_name].append(item)
+    # Step 2: **Determine size of a partition**
+    chunk_size = max(1, len(filtered_items) // parts)
+    print(f"Total tests: {len(filtered_items)}, Splitting into {parts} parts, each with {chunk_size} tests")
 
-    # Step 3: **Distribute the remaining test classes into partitions**
-    sorted_classes = sorted(class_to_tests.keys())
-    chunk_size = max(1, len(sorted_classes) // parts)
-
-    # Step 4: **Determine the range of classes to keep in this partition**
+    # Step 3: **Determine the range of classes to keep in this partition**
     start_idx = part * chunk_size
     end_idx = start_idx + chunk_size
 
     if part + 1 == parts:
-        end_idx = len(sorted_classes)  # Include all remaining classes in the last partition
+        end_idx = len(filtered_items)  # Include all remaining classes in the last partition
+    print(f"Running tests from index {start_idx} to {end_idx}")
 
-    selected_classes = set(sorted_classes[start_idx:end_idx])
 
-    # Step 5: **Modify the list of collected tests**
-    items[:] = [item for item in filtered_items if item.parent.name in selected_classes]
+    # Step 4: **Modify the list of collected tests**
+    items[:] = filtered_items[start_idx:end_idx]
