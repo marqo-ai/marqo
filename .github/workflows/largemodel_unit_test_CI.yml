@@ -87,11 +87,11 @@ jobs:
           echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
 
   Test-Marqo:
-    name: Run Large Model Unit Tests (Part ${{ matrix.part }}/2)
+    name: Run Large Model Unit Tests (Part ${{ matrix.part }}/3)
     needs: Create-Matrix # Ensures it starts only after the runners are ready
     strategy:
       matrix:
-        part: [ 0, 1, 2] # Zero-based index for JSON list access
+        part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
     runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
     environment: marqo-test-suite
 
@@ -163,7 +163,7 @@ jobs:
           export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
 
           # Run only the assigned test partition
-          pytest marqo/tests/integ_tests --largemodel --split-n 3 --split-part ${{ matrix.part }}
+          pytest marqo/tests/integ_tests --largemodel --split-n 4 --split-part ${{ matrix.part }}
 
   Stop-Runner:
     needs:
@@ -172,7 +172,7 @@ jobs:
     if: ${{ always() }} # Ensures the runner is stopped even if tests fail
     strategy:
       matrix:
-        instance: [0, 1, 2]  # Zero-based index for JSON list access
+        instance: [0, 1, 2, 3]  # Zero-based index for JSON list access
     uses: ./.github/workflows/stop_ec2_runner.yml
     with:
       label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
