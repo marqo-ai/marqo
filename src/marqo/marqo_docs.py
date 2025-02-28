@@ -79,3 +79,6 @@ def search_api_score_modifiers_parameter():
 
 def hugging_face_trust_remote_code():
     return _build_url('models/marqo/bring-your-own-model/#bring-your-own-hugging-face-sentence-transformers-models')
+
+def update_documents_response():
+    return _build_url('reference/api/documents/update-documents/#response')

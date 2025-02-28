@@ -231,7 +231,8 @@ class IndexManagement:
                 return all(k in dict_b and dict_b[k] == v for k, v in dict_a.items())
 
             if (is_subset(marqo_index.tensor_field_map, existing_index.tensor_field_map) and
-                    is_subset(marqo_index.field_map, existing_index.field_map)):
+                    is_subset(marqo_index.field_map, existing_index.field_map) and
+                        is_subset(marqo_index.name_to_string_array_field_map, existing_index.name_to_string_array_field_map)):
                 logger.debug(f'Another thread has updated the index {marqo_index.name} already.')
                 return
 
