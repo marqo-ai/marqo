@@ -131,6 +131,7 @@ class OPEN_CLIP(AbstractCLIPModel):
         try:
             self.preprocess_config = self._aggregate_image_preprocessor_config()
             preprocess = image_transform_v2(self.preprocess_config, is_train=False)
+            print(self.model_properties)
             model = open_clip.create_model(
                 model_name=self.model_properties.name,
                 jit=self.model_properties.jit,
@@ -210,8 +211,11 @@ class OPEN_CLIP(AbstractCLIPModel):
 
     def _load_tokenizer_from_checkpoint(self) -> Callable:
         if not self.model_properties.tokenizer:
-            # Replace '/'with '-' to support old clip model name style
-            return open_clip.get_tokenizer(self.model_properties.name.replace("/", "-"))
+            if self.model_properties.name.startswith(HF_HUB_PREFIX):
+                return open_clip.get_tokenizer(self.model_properties.name)
+            else:
+                # Replace '/'with '-' to support old clip model name style
+                return open_clip.get_tokenizer(self.model_properties.name.replace("/", "-"))
         else:
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(self.model_properties.tokenizer)

@@ -215,6 +215,7 @@ class TestOpenCLIPModelLoad(TestCase):
                         )
                         mock_tokenizer.assert_called_once_with("ViT-B-32")
                         mock_path_exists.assert_called_once_with("/path/to/my_test_model.pt")
+
     def test_load_OpenCLIPModel_with_auth_s3(self):
         """Ensure that the model/checkpoint is downloaded with the correct S3 authentication."""
         model_tag = "my_test_model"
@@ -286,3 +287,68 @@ class TestOpenCLIPModelLoad(TestCase):
         }
         model = OPEN_CLIP(model_properties=model_properties, device="cpu")
         model.load()
+
+    def test_the_string_replace_for_legacy_model_does_not_apply_to_hf(self):
+        """
+        A test to ensure the string replace ("/", "-" for legacy model names does not apply to Hugging Face models.
+        """
+        model_properties = {
+            "name": "hf-hub:timm/ViT-B-16-SigLIP",
+            "type": "open_clip",
+            "dimensions": 768,
+            "url": "https://huggingface.co/Marqo/marqo-fashionSigLIP/resolve/main/open_clip_pytorch_model.bin",
+            "imagePreprocessor": "SigLIP"
+        }
+        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
+                as mock_create_model:
+            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
+                    as mock_tokenizer:
+                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                           return_value="open_clip_pytorch_model.bin") \
+                        as mock_download:
+                    with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
+                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                        model.load()
+                        mock_create_model.assert_called_once_with(
+                            model_name="hf-hub:timm/ViT-B-16-SigLIP",
+                            jit=False,
+                            pretrained="open_clip_pytorch_model.bin",
+                            precision="fp32",
+                            device="cpu",
+                            cache_dir=ModelCache.clip_cache_path
+                        )
+                        # Ensure the name is not modified
+                        mock_tokenizer.assert_called_once_with("hf-hub:timm/ViT-B-16-SigLIP")
+
+    def test_the_string_replace_for_legacy_model_apply_to_legacy_models(self):
+        """
+        A test to ensure the string replace ("/", "-" for legacy model names does not apply to Hugging Face models.
+        """
+
+        model_properties = {
+            "name": "ViT-L/14",
+            "type": "open_clip",
+            "url": "https://a-dummy-url/clip_vit_l_14.pt",
+            "dimensions": 768,
+        }
+        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
+                as mock_create_model:
+            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
+                    as mock_tokenizer:
+                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                           return_value="open_clip_pytorch_model.bin") \
+                        as mock_download:
+                    with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
+                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+                        model.load()
+                        mock_create_model.assert_called_once_with(
+                            # This remains unchanged and open_clip.create_model will handle the replacement
+                            model_name="ViT-L/14",
+                            jit=False,
+                            pretrained="open_clip_pytorch_model.bin",
+                            precision="fp32",
+                            device="cpu",
+                            cache_dir=ModelCache.clip_cache_path
+                        )
+                        # Ensure the name is not modified
+                        mock_tokenizer.assert_called_once_with("ViT-L-14") # The name should be modified to "ViT-L-14"
