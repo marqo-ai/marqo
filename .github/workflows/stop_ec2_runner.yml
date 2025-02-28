@@ -19,7 +19,6 @@ jobs:
   Stop-Runner:
     name: Stop EC2 runner
     runs-on: ubuntu-latest
-    if: ${{ inputs.action == 'stop' }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
