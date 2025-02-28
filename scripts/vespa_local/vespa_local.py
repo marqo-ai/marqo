@@ -107,27 +107,25 @@ class VespaLocal:
                     content_for_hosts_xml = self.get_hosts_xml_content()
                     f.write(content_for_hosts_xml)
 
-    def generate_application_package(self, zip=True) -> str:
+    def generate_application_package(self) -> str:
         # Build application package directory
         self.generate_application_package_files()
 
         # Zip up files
-        if zip:
-            os.chdir(self.base_dir)
-            shutil.make_archive('../' + self.base_dir, 'zip', ".")
-            os.chdir("..")
-            zip_file_path = f"{self.base_dir}.zip"
+        os.chdir(self.base_dir)
+        shutil.make_archive('../' + self.base_dir, 'zip', ".")
+        os.chdir("..")
+        zip_file_path = f"{self.base_dir}.zip"
 
-            if os.path.isfile(zip_file_path):
-                print(f"Zip file created successfully: {zip_file_path}")
-                # Remove the base directory
-                shutil.rmtree(self.base_dir)
-                print(f"Directory {self.base_dir} removed.")
-                return zip_file_path
-            else:
-                print("Failed to create the zip file.")
-                sys.exit(1)
-        return self.base_dir
+        if os.path.isfile(zip_file_path):
+            print(f"Zip file created successfully: {zip_file_path}")
+            # Remove the base directory
+            shutil.rmtree(self.base_dir)
+            print(f"Directory {self.base_dir} removed.")
+            return zip_file_path
+        else:
+            print("Failed to create the zip file.")
+            sys.exit(1)
 
 
 class VespaLocalSingleNode(VespaLocal):
@@ -599,14 +597,6 @@ def deploy_config(args):
     os.system(f'vespa deploy "{here}"')
 
 
-def generate_application_package(args):
-    # Create instance of VespaLocal
-    # vespa_local_instance is used for starting vespa & generating application package.
-    vespa_local_instance = VespaLocalSingleNode()
-    # Generate the application package
-    file_path = vespa_local_instance.generate_application_package(zip=args.zip)
-    print(f"Application package generated at {file_path}")
-
 
 def deploy_application_package(zip_file_path: str, max_retries: int = 5, backoff_factor: float = 0.5) -> None:
     # URL and headers
@@ -643,6 +633,20 @@ def deploy_application_package(zip_file_path: str, max_retries: int = 5, backoff
     # Cleanup
     os.remove(zip_file_path)
     print("Zip file removed.")
+
+
+def generate_and_deploy_application_package(args):
+    # Create instance of VespaLocal
+    # vespa_local_instance is used for starting vespa & generating application package.
+    if args.Shards > 1 or args.Replicas > 0:
+        vespa_local_instance = VespaLocalMultiNode(args.Shards, args.Replicas)
+    else:
+        vespa_local_instance = VespaLocalSingleNode()
+    # Generate the application package
+    zip_file_path = vespa_local_instance.generate_application_package()
+    print(f"Application package generated at {zip_file_path}")
+    # Deploy the application package
+    deploy_application_package(zip_file_path)
 
 
 def has_vespa_converged(waiting_time: int = 600) -> bool:
@@ -698,11 +702,10 @@ def main():
     clean_parser = subparsers.add_parser("stop", help="Stop local Vespa")
     clean_parser.set_defaults(func=stop)
 
-    generate_application_package_parser = subparsers.add_parser("generate-application-package", help="Generate application package")
-    generate_application_package_parser.set_defaults(func=generate_application_package)
-    generate_application_package_parser.add_argument(
-        "--zip", help="Zip the application package", action="store_true"
-    )
+    generate_and_deploy_parser = subparsers.add_parser("generate-and-deploy", help="Generate and deploy application package")
+    generate_and_deploy_parser.set_defaults(func=generate_and_deploy_application_package)
+    generate_and_deploy_parser.add_argument('--Shards', help='The number of shards', default=1, type=int)
+    generate_and_deploy_parser.add_argument('--Replicas', help='The number of replicas', default=0, type=int)
 
     # Parse the command-line arguments and execute the corresponding function
     args = parser.parse_args()
