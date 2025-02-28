@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<hosts>
+    <host name="config-0.vespanet">
+        <alias>config-0</alias>
+    </host>
+    <host name="config-1.vespanet">
+        <alias>config-1</alias>
+    </host>
+    <host name="config-2.vespanet">
+        <alias>config-2</alias>
+    </host>
+    <host name="api-0.vespanet">
+        <alias>api-0</alias>
+    </host>
+    <host name="api-1.vespanet">
+        <alias>api-1</alias>
+    </host>
+    <host name="content-0-0.vespanet">
+        <alias>content-0-0</alias>
+    </host>
+    <host name="content-1-0.vespanet">
+        <alias>content-1-0</alias>
+    </host>
+</hosts>

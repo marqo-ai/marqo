@@ -52,7 +52,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           cd marqo
-          export PYTHONPATH="./src"
+          export PYTHONPATH="./src:."
           pytest tests/unit_tests/ --durations=100 --cov=src --cov-branch --cov-context=test --cov-report=html:cov_html --cov-report=lcov:lcov.info
 
       - name: Upload Test Report

@@ -19,6 +19,7 @@ from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
+import pytest
 
 
 class TestHybridSearch(MarqoTestCase):
@@ -1486,7 +1487,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(["tensor2", "tensor1", "both1"], [hit["_id"] for hit in modified_res["hits"]])
 
 
-
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_lexical_tensor_with_lexical_score_modifiers_succeeds(self):
         """
         Tests that if we do hybrid search with lexical retrieval and tensor ranking, we can use both lexical and tensor
@@ -1553,7 +1554,7 @@ class TestHybridSearch(MarqoTestCase):
                 self.assertEqual(hybrid_res["hits"][2]["_id"], "doc10")     # (score*-10*3)
                 self.assertEqual(hybrid_res["hits"][2]["_score"], -30.0)
 
-
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_same_retrieval_and_ranking_matches_original_method(self):
         """
         Tests that hybrid search with:
@@ -1657,6 +1658,7 @@ class TestHybridSearch(MarqoTestCase):
                         self.assertEqual(len(hybrid_res["hits"]), 1)
                         self.assertEqual(hybrid_res["hits"][0]["_id"], "doc8")
 
+    @pytest.mark.skip_for_multinode
     def test_hybrid_search_with_images(self):
         """
         Tests that hybrid search is accurate with images, both in query and in documents.

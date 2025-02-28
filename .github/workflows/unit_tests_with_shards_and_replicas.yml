@@ -1,0 +1,52 @@
+# Runs unit tests on 4 cases:
+# 1. single node vespa
+# 2. multinode vespa: 1 shard, 1 replica
+# 3. multinode vespa: 2 shard, 0 replicas
+# 4. multinode vespa: 2 shards, 1 replicas
+# Runs only once on PR approval
+
+name: Unit Tests with Shards and Replicas
+
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types: [submitted]
+    branches:
+      - mainline
+      - 'releases/*'
+
+permissions:
+  contents: read
+
+jobs:
+  Unit-Tests-1-Shard-0-Replica:
+    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    secrets: inherit
+    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
+    with:
+        number_of_shards: 1
+        number_of_replicas: 0
+
+  Unit-Tests-1-Shard-1-Replica:
+    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    secrets: inherit
+    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
+    with:
+      number_of_shards: 1
+      number_of_replicas: 1
+
+  Unit-Tests-2-Shard-0-Replica:
+    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    secrets: inherit
+    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
+    with:
+      number_of_shards: 2
+      number_of_replicas: 0
+
+  Unit-Tests-2-Shard-1-Replica:
+    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    secrets: inherit
+    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
+    with:
+      number_of_shards: 2
+      number_of_replicas: 1

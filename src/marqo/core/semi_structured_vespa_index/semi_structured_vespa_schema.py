@@ -1,5 +1,6 @@
 import os
 
+import semver
 from jinja2 import Environment, FileSystemLoader
 
 from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, MarqoIndex
@@ -11,6 +12,8 @@ class SemiStructuredVespaSchema(VespaSchema):
     FIELD_INDEX_PREFIX = 'marqo__lexical_'
     FIELD_CHUNKS_PREFIX = 'marqo__chunks_'
     FIELD_EMBEDDING_PREFIX = 'marqo__embeddings_'
+    FIELD_STRING_ARRAY_PREFIX = 'marqo__string_array_'
+    SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION = semver.VersionInfo.parse("2.16.0")
 
     def __init__(self, index_request: UnstructuredMarqoIndexRequest):
         self._index_request = index_request
@@ -25,7 +28,10 @@ class SemiStructuredVespaSchema(VespaSchema):
     def generate_vespa_schema(cls, marqo_index: SemiStructuredMarqoIndex) -> str:
         template_path = str(os.path.dirname(os.path.abspath(__file__)))
         environment = Environment(loader=FileSystemLoader(template_path))
-        vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
+        if marqo_index.parsed_marqo_version() >= SemiStructuredVespaSchema.SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION:
+            vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template_2_16.sd.jinja2")
+        else:
+            vespa_schema_template = environment.get_template("semi_structured_vespa_schema_template.sd.jinja2")
         return vespa_schema_template.render(index=marqo_index, dimension=str(marqo_index.model.get_dimension()))
 
     def _generate_marqo_index(self, schema_name: str) -> SemiStructuredMarqoIndex:
@@ -46,6 +52,7 @@ class SemiStructuredVespaSchema(VespaSchema):
             updated_at=self._index_request.updated_at,
             lexical_fields=[],
             tensor_fields=[],
+            string_array_fields=[],
             filter_string_max_length=self._index_request.filter_string_max_length,
             treat_urls_and_pointers_as_images=self._index_request.treat_urls_and_pointers_as_images,
             treat_urls_and_pointers_as_media=self._index_request.treat_urls_and_pointers_as_media,

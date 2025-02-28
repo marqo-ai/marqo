@@ -62,7 +62,7 @@ class StructuredVespaIndex(VespaIndex):
     def get_vespa_id_field(self) -> str:
         return common.FIELD_ID
 
-    def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any], existing_vespa_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         vespa_id: Optional[str] = None
         vespa_fields: Dict[str, Any] = dict()
         score_modifiers_2_8: Dict[str, float] = dict()
