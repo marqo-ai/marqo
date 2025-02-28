@@ -26,26 +26,26 @@ class TestOpenCLIPModelLoad(TestCase):
             "url": "https://huggingface.co/Marqo/marqo-fashionSigLIP/resolve/main/open_clip_pytorch_model.bin",
             "imagePreprocessor": "SigLIP"
         }
-        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
-                as mock_create_model:
-            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
-                    as mock_tokenizer:
-                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
-                           return_value="open_clip_pytorch_model.bin") \
-                        as mock_download:
-                    with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
-                        model.load()
-                        mock_create_model.assert_called_once_with(
-                            model_name="hf-hub:timm/ViT-B-16-SigLIP",
-                            jit=False,
-                            pretrained="open_clip_pytorch_model.bin",
-                            precision="fp32",
-                            device="cpu",
-                            cache_dir=ModelCache.clip_cache_path
-                        )
-                        # Ensure the name is not modified
-                        mock_tokenizer.assert_called_once_with("hf-hub:timm/ViT-B-16-SigLIP")
+        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model",
+                   return_value=MagicMock()) as mock_create_model, \
+            patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer",
+                   return_value=MagicMock()) as mock_tokenizer, \
+            patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                  return_value="my_test_model.pt"), \
+            patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
+
+            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+            model.load()
+            mock_create_model.assert_called_once_with(
+                model_name="hf-hub:timm/ViT-B-16-SigLIP",
+                jit=False,
+                pretrained="my_test_model.pt",
+                precision="fp32",
+                device="cpu",
+                cache_dir=ModelCache.clip_cache_path
+            )
+            # Ensure the name is not modified
+            mock_tokenizer.assert_called_once_with("hf-hub:timm/ViT-B-16-SigLIP")
 
     def test_the_string_replace_for_legacy_model_apply_to_legacy_models(self):
         """
@@ -58,24 +58,24 @@ class TestOpenCLIPModelLoad(TestCase):
             "url": "https://a-dummy-url/clip_vit_l_14.pt",
             "dimensions": 768,
         }
-        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model", return_value=MagicMock()) \
-                as mock_create_model:
-            with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer", return_value=MagicMock()) \
-                    as mock_tokenizer:
-                with patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
-                           return_value="open_clip_pytorch_model.bin") \
-                        as mock_download:
-                    with patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
-                        model = OPEN_CLIP(model_properties=model_properties, device="cpu")
-                        model.load()
-                        mock_create_model.assert_called_once_with(
-                            # This remains unchanged and open_clip.create_model will handle the replacement
-                            model_name="ViT-L/14",
-                            jit=False,
-                            pretrained="open_clip_pytorch_model.bin",
-                            precision="fp32",
-                            device="cpu",
-                            cache_dir=ModelCache.clip_cache_path
-                        )
-                        # Ensure the name is not modified
-                        mock_tokenizer.assert_called_once_with("ViT-L-14") # The name should be modified to "ViT-L-14"
+        with patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.create_model",
+                   return_value=MagicMock()) as mock_create_model, \
+            patch("marqo.core.inference.embedding_models.open_clip_model.open_clip.get_tokenizer",
+                   return_value=MagicMock()) as mock_tokenizer, \
+            patch("marqo.core.inference.embedding_models.open_clip_model.download_model",
+                  return_value="my_test_model.pt"), \
+            patch.object(MagicMock(), 'eval', return_value=None) as mock_eval:
+
+            model = OPEN_CLIP(model_properties=model_properties, device="cpu")
+            model.load()
+            mock_create_model.assert_called_once_with(
+                # This remains unchanged and open_clip.create_model will handle the replacement
+                model_name="ViT-L/14",
+                jit=False,
+                pretrained="my_test_model.pt",
+                precision="fp32",
+                device="cpu",
+                cache_dir=ModelCache.clip_cache_path
+            )
+            # Ensure the name is not modified
+            mock_tokenizer.assert_called_once_with("ViT-L-14") # The name should be modified to "ViT-L-14"
