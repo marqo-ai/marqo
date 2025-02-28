@@ -1,12 +1,8 @@
-import json
 import os
 import unittest
 from unittest import mock
 
-import httpx
 import numpy as np
-from fastapi.responses import ORJSONResponse
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import marqo.core.exceptions as core_exceptions
 import marqo.vespa.exceptions as vespa_exceptions
@@ -15,10 +11,14 @@ from marqo.core.models.hybrid_parameters import RetrievalMethod, RankingMethod, 
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
-from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import CustomVectorQuery
 from marqo.tensor_search.models.api_models import ScoreModifierLists
 from marqo.tensor_search.models.search import SearchContext
+from tests.marqo_test import MarqoTestCase, TestImageUrls
+from fastapi.responses import JSONResponse, ORJSONResponse
+from marqo.tensor_search.enums import SearchMethod
+import httpx
+import json
 import pytest
 
 

@@ -6,7 +6,6 @@ import pycurl
 import pytest
 import torch
 from fastapi.responses import ORJSONResponse
-from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 import marqo.api.exceptions as api_exceptions
 import marqo.core.exceptions as core_exceptions
@@ -21,6 +20,7 @@ from marqo.core.unstructured_vespa_index.unstructured_vespa_index import Unstruc
 from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from marqo.tensor_search.models.api_models import SearchQuery, CustomVectorQuery
+from tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
 class TestSearch(MarqoTestCase):
