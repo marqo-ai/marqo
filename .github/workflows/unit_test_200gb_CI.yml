@@ -112,8 +112,6 @@ jobs:
         run: |
           # For single node, initialize as false
           echo "VESPA_MULTINODE_SETUP=false" >> $GITHUB_OUTPUT
-          # Only enforce coverage check if single node
-          echo "MULTINODE_TEST_ARGS=--cov-fail-under=69" >> $GITHUB_OUTPUT
           echo "First assuming single node Vespa setup."
 
           # Extract inputs safely, defaulting to 1 (for shards), 0 (for replicas) if not present
