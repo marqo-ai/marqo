@@ -294,7 +294,9 @@ jobs:
       - name: Move Coverage Files to Common Directory
         run: |
           mkdir -p marqo/cov_html_combined
-          find marqo/cov_html/ -type f -name '.coverage*' -exec mv {} marqo/cov_html_combined/ \;
+          find marqo/cov_html/ -mindepth 2 -type f -name '.coverage*' -exec mv {} marqo/cov_html_combined/ \;
+          echo "Final .coverage files in combined directory:"
+          ls -l marqo/cov_html_combined/
 
       - name: List Merged Coverage Files (Debugging)
         run: ls -l marqo/cov_html_combined || echo "No coverage files found"
