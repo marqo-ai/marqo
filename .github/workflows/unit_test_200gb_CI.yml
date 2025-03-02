@@ -274,7 +274,7 @@ jobs:
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
         with:
-          name: marqo-test-report
+          name: marqo-test-report--${{ matrix.part }}
           path: marqo/cov_html/
 
   Merge-Coverage:
