@@ -24,7 +24,9 @@ class MarqoTestCase(unittest.TestCase):
         }
         cls.client_settings = local_marqo_settings
         cls.authorized_url = cls.client_settings["url"]
-        # A list with index names to be cleared in each setUp call and to be deleted in tearDownClass call
+        # These indexes will:
+        # 1) be cleared in each setUp call
+        # 2) be deleted in tearDownClass call
         cls.indexes_to_delete: List[str] = []
         cls.client = Client(**cls.client_settings)
 
