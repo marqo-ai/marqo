@@ -282,11 +282,22 @@ jobs:
       - Test-Marqo
     runs-on: ubuntu-latest
     steps:
+      - name: Create Directory for Coverage Reports
+        run: mkdir -p marqo/cov_html_combined
+
       - name: Download all coverage files
         uses: actions/download-artifact@v4
         with:
           pattern: marqo-test-report-*
           path: marqo/cov_html/
+
+      - name: Move Coverage Files to Common Directory
+        run: |
+          mkdir -p marqo/cov_html_combined
+          find marqo/cov_html/ -type f -name '.coverage*' -exec mv {} marqo/cov_html_combined/ \;
+
+      - name: List Merged Coverage Files (Debugging)
+        run: ls -l marqo/cov_html_combined || echo "No coverage files found"
 
       - name: Merge Coverage Reports
         run: |
