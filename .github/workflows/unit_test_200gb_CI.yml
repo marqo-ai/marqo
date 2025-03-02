@@ -289,14 +289,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: marqo-test-report-*
-          path: marqo/cov_html/
 
-      - name: Move Coverage Files to Common Directory
+      - name: Move coverage files to a single directory
         run: |
-          mkdir -p marqo/cov_html_combined
-          find marqo/cov_html/ -mindepth 2 -type f -name '.coverage*' -exec mv {} marqo/cov_html_combined/ \;
-          echo "Final .coverage files in combined directory:"
-          ls -l marqo/cov_html_combined/
+          mv marqo-test-report-* marqo/cov_html_combined/
 
       - name: List Merged Coverage Files (Debugging)
         run: ls -l marqo/cov_html_combined || echo "No coverage files found"
