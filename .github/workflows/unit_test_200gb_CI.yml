@@ -269,7 +269,7 @@ jobs:
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
             --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
-            tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} | tee pytest_output.log
+            tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} --split-by=classes | tee pytest_output.log
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
