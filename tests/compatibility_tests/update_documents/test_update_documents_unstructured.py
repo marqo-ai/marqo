@@ -131,20 +131,6 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
 
     def _assert_updates_have_happened(self, result, partial_update_test_case):
         """
-        {
-        '_id': '1',
-        'bool_field': False,
-        'update_field_that_doesnt_exist': 500,
-        'int_field': 1,
-        'float_field': 500.0,
-        'int_map': {
-            'a': 2,  # update int to int
-        },
-        'float_map': {
-            'c': 3.0,  # update float to int #TODO: This should work.
-        },
-        'string_array': ["ccc"]
-        }
         Args:
             result:
             partial_update_test_cases:
@@ -158,8 +144,15 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
             if isinstance(field, dict):
                 for key, value in field.items():
                     key_in_result = key + '.' + value
+                    print("printing key_in_result" + key_in_result)
                     if result.get(key_in_result) != partial_update_test_case.get(field).get(key):
+                        print("printing result.get(key_in_result) " + result.get(key_in_result))
+                        print("partial_update_test_case.get(field).get(key)" + partial_update_test_case.get(field).get(key))
                         self.fail(f"Field {key_in_result} does not match expected value {partial_update_test_case.get(field).get(key)}")
 
+
             if result.get(field) != partial_update_test_case.get(field):
+                print("printing field" + field)
+                print("printing result.get(field)" + result.get(field))
+                print("printing partial_update_test_case.get(field)" + partial_update_test_case.get(field))
                 self.fail(f"Field {field} does not match expected value {partial_update_test_case.get(field)}")
