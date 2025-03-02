@@ -302,7 +302,7 @@ jobs:
       - name: Merge Coverage Reports
         run: |
           pip install coverage
-          coverage combine coverage-reports/
+          coverage combine marqo/cov_html_combined/
           coverage report
           coverage xml
 
@@ -312,22 +312,22 @@ jobs:
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-            cd coverage-reports
+            cd marqo/cov_html_combined/
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
             diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
               --compare-branch $BASE_BRANCH --fail-under=95
           else
             echo "Skipping diff-cover on Push events"
-            echo "Skipped diff-cover on Push events" > coverage-reports/diff_cov.md
-            touch coverage-reports/diff_cov.html
+            echo "Skipped diff-cover on Push events" > marqo/cov_html_combined/diff_cov.md
+            touch marqo/cov_html_combined/diff_cov.html
           fi
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
           name: merged-coverage
-          path: coverage-reports/
+          path: marqo/cov_html_combined
 
   Stop-Runner:
     needs:
