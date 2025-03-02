@@ -119,7 +119,7 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
 
             for test_cases in self.partial_update_test_cases:
                 doc_id = test_cases['_id']
-                get_docs_result = self.client.index(index).get_document(document_id = doc_id)
+                get_docs_result = self.client.index(index_name).get_document(document_id = doc_id)
                 self._assert_updates_have_happened(get_docs_result, test_cases)
 
         if test_failures:
