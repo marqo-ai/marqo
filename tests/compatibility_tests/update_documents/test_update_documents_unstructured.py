@@ -119,7 +119,7 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
 
             for test_cases in self.partial_update_test_cases:
                 doc_id = test_cases['_id']
-                get_docs_result = self.client.index(index).get_document(document_id = doc_id)
+                get_docs_result = self.client.index(index_name).get_document(document_id = doc_id)
                 self._assert_updates_have_happened(get_docs_result, test_cases)
 
         if test_failures:
@@ -128,38 +128,37 @@ class TestUpdateDocumentsUnstructured2_16(BaseCompatibilityTestCase):
                 for idx, error in test_failures
             ])
             self.fail(f"Some subtests failed:\n{failure_message}")
-
     def _assert_updates_have_happened(self, result, partial_update_test_case):
         """
-        {
-        '_id': '1',
-        'bool_field': False,
-        'update_field_that_doesnt_exist': 500,
-        'int_field': 1,
-        'float_field': 500.0,
-        'int_map': {
-            'a': 2,  # update int to int
-        },
-        'float_map': {
-            'c': 3.0,  # update float to int #TODO: This should work.
-        },
-        'string_array': ["ccc"]
-        }
+        Verifies that document updates have been correctly applied.
+        
         Args:
-            result:
-            partial_update_test_cases:
-
-        Returns:
-
+            result (dict): The document retrieved after update operation
+            partial_update_test_case (dict): The update operation that was applied
+            
+        Raises:
+            AssertionError: If any field doesn't match the expected updated value
         """
-        for field in partial_update_test_case:
+        self.logger.debug(f"Verifying updates for document {partial_update_test_case.get('_id')}")
+        
+        for field, expected_value in partial_update_test_case.items():
             if field == "_id":
                 continue
-            if isinstance(field, dict):
-                for key, value in field.items():
-                    key_in_result = key + '.' + value
-                    if result.get(key_in_result) != partial_update_test_case.get(field).get(key):
-                        self.fail(f"Field {key_in_result} does not match expected value {partial_update_test_case.get(field).get(key)}")
-
-            if result.get(field) != partial_update_test_case.get(field):
-                self.fail(f"Field {field} does not match expected value {partial_update_test_case.get(field)}")
+                
+            # Handle dictionary fields
+            if isinstance(expected_value, dict):
+                self.logger.debug(f"Checking dictionary field: {field}")
+                # For dictionary fields, we need to check each key separately
+                for key, value in expected_value.items():
+                    nested_field = f"{field}.{key}"
+                    if result.get(nested_field) != value:
+                        self.fail(f"Nested dictionary field {nested_field} does not match expected value. "
+                                  f"Got: {result.get(nested_field)}, Expected: {value}")
+            # Handle regular fields
+            else:
+                self.logger.debug(f"Checking regular field: {field}")
+                if result.get(field) != expected_value:
+                    self.fail(f"Field {field} does not match expected value. "
+                              f"Got: {result.get(field)}, Expected: {expected_value}")
+                    
+        self.logger.debug(f"All updates verified successfully for document {partial_update_test_case.get('_id')}")
