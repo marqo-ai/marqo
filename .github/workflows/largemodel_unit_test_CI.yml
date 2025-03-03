@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       pytest_path:
-        description: 'Choose which test file/class you want to run. Defaults to all integ tests.'
+        description: 'Choose which test file/class you want to run. Defaults to all integ tests (`marqo/tests/integ_tests`).'
         required: false
   push:
     branches:

@@ -5,6 +5,10 @@ on:
   workflow_call:
   workflow_dispatch:
     inputs:
+      pytest_path:
+        required: false
+        description: >
+          Choose which test file/class you want to run. Defaults to all tests (`tests/`).
       py_marqo_branch:
         required: false
         default: mainline
@@ -106,7 +110,7 @@ jobs:
 
           bash scripts/start_cuda_docker_marqo.sh $MARQO_IMAGE_NAME
           
-          pytest tests/
+          pytest ${{ inputs.pytest_path || 'tests/' }}
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
