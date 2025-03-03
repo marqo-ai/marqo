@@ -21,7 +21,10 @@ import textwrap
 import time
 import sys
 import yaml
-import docker
+try:
+    import docker
+except ImportError:
+    print("docker package not found. If needed, please install it using `pip install docker`.")
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import math
@@ -30,6 +33,7 @@ import requests
 import argparse
 
 VESPA_VERSION = os.getenv('VESPA_VERSION', '8.472.109')
+VESPA_DISK_USAGE_LIMIT = os.getenv('VESPA_DISK_USAGE_LIMIT', 0.75)
 VESPA_CONFIG_URL="http://localhost:19071"
 VESPA_DOCUMENT_URL="http://localhost:8080"
 VESPA_QUERY_URL="http://localhost:8080"
@@ -121,6 +125,8 @@ class VespaLocal:
             return zip_file_path
         else:
             print("Failed to create the zip file.")
+            sys.exit(1)
+
 
 class VespaLocalSingleNode(VespaLocal):
 
@@ -141,8 +147,7 @@ class VespaLocalSingleNode(VespaLocal):
 
     def get_services_xml_content(self) -> str:
         return textwrap.dedent(
-            """<?xml version="1.0" encoding="utf-8" ?>
-            <!-- Copyright Yahoo. Licensed under the terms of the Apache 2.0 license. See LICENSE in the project root. -->
+            f"""<?xml version="1.0" encoding="utf-8" ?>
             <services version="1.0" xmlns:deploy="vespa" xmlns:preprocess="properties">
                 <container id="default" version="1.0">
                     <document-api/>
@@ -156,6 +161,11 @@ class VespaLocalSingleNode(VespaLocal):
                     <documents>
                         <document type="test_vespa_client" mode="index"/>
                     </documents>
+                    <tuning>
+                        <resource-limits>
+                            <disk>{VESPA_DISK_USAGE_LIMIT}</disk>
+                        </resource-limits>
+                    </tuning>
                     <nodes>
                         <node hostalias="node1" distribution-key="0"/>
                     </nodes>
@@ -587,6 +597,7 @@ def deploy_config(args):
     os.system(f'vespa deploy "{here}"')
 
 
+
 def deploy_application_package(zip_file_path: str, max_retries: int = 5, backoff_factor: float = 0.5) -> None:
     # URL and headers
     url = f"{VESPA_CONFIG_URL}/application/v2/tenant/default/prepareandactivate"
@@ -622,6 +633,20 @@ def deploy_application_package(zip_file_path: str, max_retries: int = 5, backoff
     # Cleanup
     os.remove(zip_file_path)
     print("Zip file removed.")
+
+
+def generate_and_deploy_application_package(args):
+    # Create instance of VespaLocal
+    # vespa_local_instance is used for starting vespa & generating application package.
+    if args.Shards > 1 or args.Replicas > 0:
+        vespa_local_instance = VespaLocalMultiNode(args.Shards, args.Replicas)
+    else:
+        vespa_local_instance = VespaLocalSingleNode()
+    # Generate the application package
+    zip_file_path = vespa_local_instance.generate_application_package()
+    print(f"Application package generated at {zip_file_path}")
+    # Deploy the application package
+    deploy_application_package(zip_file_path)
 
 
 def has_vespa_converged(waiting_time: int = 600) -> bool:
@@ -676,6 +701,11 @@ def main():
 
     clean_parser = subparsers.add_parser("stop", help="Stop local Vespa")
     clean_parser.set_defaults(func=stop)
+
+    generate_and_deploy_parser = subparsers.add_parser("generate-and-deploy", help="Generate and deploy application package")
+    generate_and_deploy_parser.set_defaults(func=generate_and_deploy_application_package)
+    generate_and_deploy_parser.add_argument('--Shards', help='The number of shards', default=1, type=int)
+    generate_and_deploy_parser.add_argument('--Replicas', help='The number of replicas', default=0, type=int)
 
     # Parse the command-line arguments and execute the corresponding function
     args = parser.parse_args()
