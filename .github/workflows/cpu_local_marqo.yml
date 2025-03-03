@@ -73,7 +73,9 @@ jobs:
           cache: "pip"
 
       - name: Install Dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install pytest-rerunfailures
 
       - name: Install py-marqo
         run: bash scripts/install_pymarqo.sh ${{ inputs.py_marqo_branch }}
