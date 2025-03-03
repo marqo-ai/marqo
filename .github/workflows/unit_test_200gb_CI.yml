@@ -216,7 +216,7 @@ jobs:
           pytest ${{ env.MULTINODE_TEST_ARGS }} --ignore=tests/integ_tests/test_documentation.py \
             --durations=100 --cov=src --cov-branch --cov-context=test \
             --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
-            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md --reruns 1 \
+            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
             tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} --split-by=classes | tee pytest_output.log
 
       - name: Upload Test Report

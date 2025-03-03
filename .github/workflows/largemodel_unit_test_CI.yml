@@ -165,7 +165,7 @@ jobs:
           export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
 
           # Run only the assigned test partition
-          pytest --reruns 1 marqo/tests/integ_tests --largemodel --split-n 4 --split-part ${{ matrix.part }}
+          pytest marqo/tests/integ_tests --largemodel --split-n 4 --split-part ${{ matrix.part }}
 
   Stop-Runner:
     needs:

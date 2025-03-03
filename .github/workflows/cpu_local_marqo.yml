@@ -94,7 +94,7 @@ jobs:
 
           bash scripts/start_local_marqo.sh $MARQO_IMAGE_NAME
           
-          pytest --reruns 1 tests/
+          pytest tests/
 
   Stop-Runner:
     needs:
