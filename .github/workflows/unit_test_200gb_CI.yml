@@ -213,44 +213,35 @@ jobs:
 
           export PYTHONPATH="./src:."
           set -o pipefail
-          pytest ${{ env.MULTINODE_TEST_ARGS }} --ignore=tests/integ_tests/test_documentation.py \
-            --durations=100 --cov=src --cov-branch --cov-context=test \
-            --cov-report=html:cov_html --cov-report=xml:cov.xml --cov-report term:skip-covered \
-            --md-report --md-report-flavor gfm --md-report-output pytest_result_summary.md \
+          COVERAGE_FILE=.coverage.${{ matrix.part }} pytest ${{ env.MULTINODE_TEST_ARGS }} \
+            --ignore=tests/integ_tests/test_documentation.py --durations=100 \
+            --cov=src --cov-branch --cov-context=test --cov-report term:skip-covered \
             tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} --split-by=classes | tee pytest_output.log
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report-${{ matrix.part }}
-          path: marqo/cov_html/
+          path: .coverage.${{ matrix.part }}
 
   Merge-Coverage:
     needs:
       - Test-Marqo
     runs-on: ubuntu-latest
     steps:
-      - name: Create Directory for Coverage Reports
-        run: mkdir -p marqo/cov_html_combined
 
       - name: Download all coverage files
         uses: actions/download-artifact@v4
         with:
           pattern: marqo-test-report-*
 
-      - name: Move coverage files to a single directory
-        run: |
-          rsync -av --ignore-existing marqo-test-report-*/ marqo/cov_html_combined/
-
-      - name: List Merged Coverage Files (Debugging)
-        run: ls -l marqo/cov_html_combined || echo "No coverage files found"
-
       - name: Merge Coverage Reports
         run: |
           pip install coverage
-          coverage combine marqo/cov_html_combined/
+          coverage combine
           coverage report
           coverage xml
+          coverage html
 
       - name: Check Test Coverage of New Code
         id: check_test_coverage
@@ -258,22 +249,21 @@ jobs:
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-            cd marqo/cov_html_combined/
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
-            diff-cover cov.xml --html-report diff_cov.html --markdown-report diff_cov.md \
+            diff-cover coverage.xml --html-report diff_cov.html --markdown-report diff_cov.md \
               --compare-branch $BASE_BRANCH --fail-under=95
           else
             echo "Skipping diff-cover on Push events"
-            echo "Skipped diff-cover on Push events" > marqo/cov_html_combined/diff_cov.md
-            touch marqo/cov_html_combined/diff_cov.html
+            echo "Skipped diff-cover on Push events" > diff_cov.md
+            touch diff_cov.html
           fi
 
       - name: Upload Merged Coverage Report
         uses: actions/upload-artifact@v4
         with:
           name: merged-coverage
-          path: marqo/cov_html_combined
+          path: htmlcov/
 
   Stop-Runner:
     needs:
