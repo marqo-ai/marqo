@@ -240,7 +240,7 @@ jobs:
 
       - name: Move coverage files to a single directory
         run: |
-          mv marqo-test-report-*/* marqo/cov_html_combined/
+          mv -f marqo-test-report-*/* marqo/cov_html_combined/
 
       - name: List Merged Coverage Files (Debugging)
         run: ls -l marqo/cov_html_combined || echo "No coverage files found"
