@@ -579,7 +579,7 @@ def _load_model(
             attempt += 1
 
             if attempt >= max_retries:
-                raise ModelLoadError(f"🚨 Failed to load model `{model_name}` on `{device}` after {max_retries} attempts.") from e
+                raise e
 
             # Wait before retrying (randomized to avoid collisions)
             sleep_time = retry_delay + random.uniform(1, 3)

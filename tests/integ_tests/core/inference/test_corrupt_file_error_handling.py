@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from marqo.core.inference.embedding_models.hugging_face_model import HuggingFaceModel
-from marqo.s2_inference.errors import InvalidModelPropertiesError, ModelLoadError
+from marqo.s2_inference.errors import InvalidModelPropertiesError
 from marqo.s2_inference.s2_inference import _load_model
 
 
@@ -83,7 +83,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                    return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
-                with self.assertRaises(ModelLoadError) as context:
+                with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn("Marqo encountered an error while attempting to delete a corrupted file",
                               str(context.exception))
@@ -102,7 +102,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                    return_value = self.dummpy_corrupted_file):
             for model_properties in self.dummpy_model_properties:
                 # Execute and Verify
-                with self.assertRaises(ModelLoadError) as context:
+                with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn("Marqo encountered an error when loading custom open_clip model", str(context.exception))
                 mock_os_remove.assert_not_called()
@@ -209,7 +209,7 @@ class TestCorruptFileInHuggingFace(unittest.TestCase):
              patch('os.makedirs'), \
              patch("marqo.core.inference.embedding_models.hugging_face_model.download_model", return_value = "/path/to/file.txt"):
             for model_properties in self.dummy_model_properties:
-                with self.assertRaises(ModelLoadError) as context:
+                with self.assertRaises(RuntimeError) as context:
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn("No such file or directory: '/path/to/file.txt", str(context.exception))
 
