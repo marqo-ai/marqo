@@ -6,6 +6,7 @@ import random
 import threading
 import time
 from typing import List, Dict, Optional
+from urllib3.exceptions import ReadTimeoutError
 
 import numpy as np
 import torch
@@ -542,7 +543,7 @@ def _load_model(
     """
     if calling_func not in ["unit_test", "_update_available_models"]:
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
-                           f"`unit_test` or `_update_available_models` for threading safeness.")
+                           f"`unit_test` or `_update_available_models` for threading safety.")
 
     model_type = model_properties.get("type")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
@@ -570,18 +571,18 @@ def _load_model(
                 )
 
             model.load()  # Load the model
-            print(f"Model `{model_name}` loaded successfully on `{device}`.")
+            print(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
             return model  # ✅ Success, return the model
 
-        except (ModelDownloadError, OSError, RuntimeError) as e:
+        except (ReadTimeoutError, requests.exceptions.Timeout, OSError, RuntimeError) as e:
             print(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
             attempt += 1
 
             if attempt >= max_retries:
-                raise ModelLoadError(f"Failed to load model `{model_name}` on `{device}` after {max_retries} attempts.") from e
+                raise ModelLoadError(f"🚨 Failed to load model `{model_name}` on `{device}` after {max_retries} attempts.") from e
 
-            # Wait before retrying
-            sleep_time = retry_delay + random.uniform(0, 2)  # Add some randomness to avoid collisions
+            # Wait before retrying (randomized to avoid collisions)
+            sleep_time = retry_delay + random.uniform(1, 3)
             print(f"🔄 Retrying in {sleep_time:.2f} seconds...")
             time.sleep(sleep_time)
 
