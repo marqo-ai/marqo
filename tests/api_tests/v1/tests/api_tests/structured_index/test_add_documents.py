@@ -404,6 +404,8 @@ class TestStructuredAddDocuments(MarqoTestCase):
             document_ids=["1", "2", "3", "4"],
             expose_facets=True
         )
+        print("Get res: ")
+        print(get_res)
         for doc in get_res['results']:
             tensor_facets = doc['_tensor_facets']
             self.assertIn('_embedding', tensor_facets[0])
