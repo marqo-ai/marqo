@@ -4,6 +4,10 @@ name: largemodel_unit_test_CI
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      pytest_path:
+        description: 'Choose which test file/class you want to run. Defaults to all integ tests.'
+        required: false
   push:
     branches:
       - mainline
@@ -113,7 +117,7 @@ jobs:
           mvn clean package
 
       - name: Start Vespa
-        run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
+        run: python marqo/scripts/vespa_local/vespa_local.py full-start
 
       - name: Run Large Model Unit Tests
         run: |
@@ -129,7 +133,7 @@ jobs:
           export PRIVATE_MODEL_TESTS_HF_TOKEN=${{ secrets.PRIVATE_MODEL_TESTS_HF_TOKEN }}
           
           export PYTHONPATH="./marqo/tests/integ_tests:./marqo/src"
-          pytest marqo/tests/integ_tests --largemodel 
+          pytest ${{ inputs.pytest_path || 'marqo/tests/integ_tests'}} --largemodel 
 
   Stop-Runner:
     name: Stop self-hosted EC2 runner
