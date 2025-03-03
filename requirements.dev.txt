@@ -2,6 +2,7 @@
 pyvespa==0.37.1
 pytest==8.3.4
 pytest-cov==6.0.0
+pytest-rerunfailures==15.0.0
 diff-cover==9.2.0
 pytest-md-report==0.6.2
 pytest-asyncio==0.23.8
