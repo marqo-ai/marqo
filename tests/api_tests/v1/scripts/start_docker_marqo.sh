@@ -19,6 +19,7 @@ docker run -d --name marqo -it -p 8882:8882 \
     -e MARQO_ENABLE_BATCH_APIS=TRUE \
     -e "MARQO_MAX_CPU_MODEL_MEMORY=1.6" \
     -e MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0 \
+    -e HF_HUB_ENABLE_HF_TRANSFER = 1
     ${@:+"$@"} "$MARQO_DOCKER_IMAGE"
 set +x
 
