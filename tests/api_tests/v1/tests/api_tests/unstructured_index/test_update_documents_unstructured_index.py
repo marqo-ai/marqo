@@ -28,12 +28,6 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         ])
 
         cls.indexes_to_delete = [cls.text_index_name]
-
-    def tearDown(self):
-        if self.indexes_to_delete:
-            self.clear_indexes(self.indexes_to_delete)
-
-    def test_update_document_with_ids(self):
         text_docs = [{
             '_id': '1',
             'tensor_field': 'title',
@@ -64,9 +58,15 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         tensor_fields = ['tensor_field', 'custom_vector_field', 'multimodal_combo_field']
 
-        add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
+        add_docs_response = cls.client.index(cls.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
 
-        self.assertFalse(add_docs_response["errors"])
+        cls.assertFalse(add_docs_response["errors"])
+
+    def tearDown(self):
+        if self.indexes_to_delete:
+            self.clear_indexes(self.indexes_to_delete)
+
+    def test_update_document_with_ids(self):
 
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
@@ -99,39 +99,6 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertEqual(get_docs_response['string_array2'], ["123", "456"])
 
     def test_update_document_with_ids_change_field_type(self):
-        text_docs = [{
-            '_id': '1',
-            'tensor_field': 'title',
-            'tensor_subfield': 'description',
-            "short_string_field": "shortstring",
-            "long_string_field": "Thisisaverylongstring" * 10,
-            "int_field": 123,
-            "float_field": 123.0,
-            "string_array": ["aaa", "bbb"],
-            "string_array2": ["123", "456"],
-            "int_map": {"a": 1, "b": 2},
-            "float_map": {"c": 1.0, "d": 2.0},
-            "bool_field": True,
-            "bool_field2": False,
-            "custom_vector_field": {
-                "content": "abcd",
-                "vector": [1.0] * 32
-            }
-        }]
-
-        mappings = {
-            "custom_vector_field": {"type": "custom_vector"},
-            "multimodal_combo_field": {
-                "type": "multimodal_combination",
-                "weights": {"tensor_field": 1.0, "tensor_subfield": 2.0}
-            }
-        }
-
-        tensor_fields = ['tensor_field', 'custom_vector_field', 'multimodal_combo_field']
-
-        add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
-
-        self.assertFalse(add_docs_response["errors"])
 
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
@@ -157,7 +124,15 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertIn("reference/api/documents/update-documents/#response", update_docs_response['items'][0]['message'])
 
     def test_update_document_with_changes_in_score_modifiers(self):
-        # Test updating a document with new fields and updating existing fields
+        """Test that score modifiers are correctly updated during partial document updates.
+        
+        This test verifies that:
+        1. Score modifiers are properly updated when numeric fields are modified
+        2. New numeric fields are correctly added to score modifiers
+        3. The updated score modifiers affect search results as expected
+        """
+        # First add a document to update
+        """Test updating a document with new fields and updating existing fields."""
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
                 '_id': '1',
@@ -176,9 +151,20 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         self.assertFalse(update_docs_response["errors"])
 
+        # Get the document to verify updates
+        updated_doc = self.client.index(self.text_index_name).get_document(document_id='1')
+        self.assertEqual(updated_doc['int_map.a'], 2)
+        self.assertEqual(updated_doc['int_map.d'], 5)
+        self.assertEqual(updated_doc['float_map.c'], 3.0)
+        self.assertEqual(updated_doc['new_int'], 1)
+        self.assertEqual(updated_doc['new_float'], 2.0)
+        self.assertEqual(updated_doc['new_map.a'], 1)
+        self.assertEqual(updated_doc['new_map.b'], 2.0)
+
         # Test that score modifiers work correctly with the updated fields
         # First search without score modifier to get base score
         base_search_result = self.client.index(self.text_index_name).search("title")
+        self.assertTrue(len(base_search_result["hits"]) > 0, "No search results found")
         base_score = base_search_result["hits"][0]["_score"]
         
         # Search with score modifier weight=0 (should not change score)

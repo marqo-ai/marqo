@@ -388,6 +388,43 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['marqo__score_modifiers']['cells']['new_map.b'], 2.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.d'], 5.0)
 
+    def test_partial_update_should_add_score_modifiers(self):
+        """Test that partial updates to score modifiers are successful.
+
+        This test verifies that partial updates to score modifiers are successful.
+        """
+        # Create a document with existing fields first to verify we're only adding
+        original_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        
+        # Perform update with only additions, not replacements
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            'int_map_2': {
+                'd': 5,  # new entry in int map
+                'e': 6,  # another new entry
+            },
+            'float_map_2': {
+                'f': 4.0,  # new entry in float map
+            },
+            'new_int': 1,  # new int field
+            'new_float': 2.0,  # new float field
+        }], self.index)
+        self.assertFalse(res.errors)
+        res = self.config.vespa_client.get_document('2',
+                                                    self.config.index_management.get_index(self.index.name).schema_name)
+        doc = res.document.dict().get('fields')
+        # Verify original fields are preserved
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.a'], 1.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 1.0)
+                
+        # Verify new fields from the update call in this test 
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_int'], 1.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_float'], 2.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map_2.d'], 5.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map_2.e'], 6.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map_2.f'], 4.0)
 
     def test_partial_update_should_add_new_fields(self):
         """Test that partial updates to new fields are successful.
