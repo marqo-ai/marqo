@@ -11,7 +11,6 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
     add documents / prepare marqo state. Also contains methods to save and load results to/from a file so that
     test results can be compared across versions.
     """
-    indexes_to_delete = []
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -35,11 +34,9 @@ class BaseCompatibilityTestCase(MarqoTestCase, ABC):
         # A function that will be automatically called after each test call
         # This removes all the loaded models. It will also remove all the indexes inside a marqo instance.
         # Be sure to set the indexes_to_delete list with the indexes you want to delete, in the test class.
-        cls.removeAllModels()
         if cls.indexes_to_delete:
-            cls.delete_indexes(cls.indexes_to_delete)
-            cls.logger.debug(f"Deleting indexes {cls.indexes_to_delete}")
-
+            cls.logger.debug(f"Deleting indexes: {cls.indexes_to_delete}")
+        super().tearDownClass()
         cls.delete_file()
 
     @classmethod
