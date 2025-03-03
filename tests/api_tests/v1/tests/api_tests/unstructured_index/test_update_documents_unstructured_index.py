@@ -155,3 +155,77 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertEqual(update_docs_response['items'][0]['status'], 400)
         self.assertIn("Marqo vector store couldn't update the document. Please see", update_docs_response['items'][0]['message'])
         self.assertIn("reference/api/documents/update-documents/#response", update_docs_response['items'][0]['message'])
+
+    def test_update_document_with_changes_in_score_modifiers(self):
+        # Test updating a document with new fields and updating existing fields
+        update_docs_response = self.client.index(self.text_index_name).update_documents(
+            [{
+                '_id': '1',
+                'int_map': {
+                    'a': 2,  # update int to int
+                    'd': 5,  # new entry in int map
+                },
+                'float_map': {
+                    'c': 3.0,  # update float to float
+                },
+                'new_int': 1,  # new int field
+                'new_float': 2.0,  # new float field
+                'new_map': {'a': 1, 'b': 2.0},  # new map field
+            }]
+        )
+
+        self.assertFalse(update_docs_response["errors"])
+
+        # Test that score modifiers work correctly with the updated fields
+        # First search without score modifier to get base score
+        base_search_result = self.client.index(self.text_index_name).search("title")
+        base_score = base_search_result["hits"][0]["_score"]
+        
+        # Search with score modifier weight=0 (should not change score)
+        search_result_weight_0 = self.client.index(self.text_index_name).search("title", score_modifiers={
+            "add_to_score": [{"field_name": "int_map.d", "weight": 0}]
+        })
+        self.assertAlmostEqual(search_result_weight_0["hits"][0]["_score"], base_score, places=5)
+        
+        # Search with score modifier weight=1 (should add int_map.d value to score)
+        search_result_weight_1 = self.client.index(self.text_index_name).search("title", score_modifiers={
+            "add_to_score": [{"field_name": "int_map.d", "weight": 1}]
+        })
+        # The score should be increased by weight * field_value = 1 * 5 = 5
+        self.assertAlmostEqual(
+            search_result_weight_1["hits"][0]["_score"], 
+            base_score + 5, 
+            places=5
+        )
+        
+        # Verify the field value is actually 5
+        self.assertEqual(search_result_weight_1["hits"][0]["int_map.d"], 5)
+        
+        # Now update the document again to change the score modifier field
+        update_docs_response_2 = self.client.index(self.text_index_name).update_documents(
+            [{
+                '_id': '1',
+                'int_map': {
+                    'd': 10,  # update the value from 5 to 10
+                }
+            }]
+        )
+        
+        self.assertFalse(update_docs_response_2["errors"])
+        
+        # Search again with score modifier weight=1 after update
+        search_result_after_update = self.client.index(self.text_index_name).search("title", score_modifiers={
+            "add_to_score": [{"field_name": "int_map.d", "weight": 1}]
+        })
+        
+        # Verify the field value is now 10
+        self.assertEqual(search_result_after_update["hits"][0]["int_map.d"], 10)
+        
+        # The score should now be increased by weight * new_field_value = 1 * 10 = 10
+        self.assertAlmostEqual(
+            search_result_after_update["hits"][0]["_score"], 
+            base_score + 10, 
+            places=5
+        )
+
+

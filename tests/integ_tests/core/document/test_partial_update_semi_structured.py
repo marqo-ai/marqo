@@ -474,7 +474,7 @@ class TestPartialUpdate(MarqoTestCase):
         """
         res = self.config.document.partial_update_documents([{'_id': '2', 'new_lexical_field': 'some string that signifies new lexical field'}], self.index)
         self.assertTrue(res.errors)
-        self.assertIn("new_lexical_field of type str does not exist in the original document. We do not support adding new lexical fields in partial updates", res.items[0].error)
+        self.assertIn("new_lexical_field of type str does not exist in the original document. Marqo does not support adding new lexical fields in partial updates", res.items[0].error)
         self.assertEqual(400, res.items[0].status)
 
     def test_partial_update_invalid_field_name(self):

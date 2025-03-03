@@ -326,17 +326,22 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             ]
 
 
-        if len(score_modifier_to_be_removed) > 0 or len(score_modifier_to_be_removed) > 0:
-            vespa_fields[common.SCORE_MODIFIERS] = {
-                "modify": {
-                    "operation": "replace",
-                    "create": True,
-                    "cells": numeric_field_map
-                } if len(numeric_field_map) > 0 else None,
-                "remove": {
-                    "addresses": score_modifier_to_be_removed
-                } if len(score_modifier_to_be_removed) > 0 else None
+        score_modifiers = {}
+        
+        if len(numeric_field_map) > 0:
+            score_modifiers["modify"] = {
+                "operation": "replace",
+                "create": True,
+                "cells": numeric_field_map
             }
+            
+        if len(score_modifier_to_be_removed) > 0:
+            score_modifiers["remove"] = {
+                "addresses": score_modifier_to_be_removed
+            }
+            
+        if len(score_modifiers) > 0:
+            vespa_fields[common.SCORE_MODIFIERS] = score_modifiers
 
     def _process_field(
         self,
@@ -585,7 +590,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if lexical_field_name not in self.get_marqo_index().lexical_field_map:
             raise MarqoDocumentParsingError(
                 f'{field_name} of type str does not exist in the original document. '
-                'We do not support adding new lexical fields in partial updates'
+                'Marqo does not support adding new lexical fields in partial updates'
             )
 
         fields[lexical_field_name] = {"assign": value} # To create update statement for updating the lexical fields

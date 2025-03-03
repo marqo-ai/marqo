@@ -137,7 +137,8 @@ class Document:
                 VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP], schema = marqo_index.schema_name)
             responses = get_batch_response.responses
             for resp in responses:
-                existing_vespa_documents[resp.document.fields[VESPA_FIELD_ID]] = resp.document.dict()
+                if resp.document:
+                    existing_vespa_documents[resp.document.fields[VESPA_FIELD_ID]] = resp.document.dict()
 
         for index, doc in enumerate(partial_documents):
             try:
