@@ -72,6 +72,7 @@ jobs:
       - Start-Runner2
       - Start-Runner3
       - Start-Runner4
+    if: ${{ always() }} # Ensures the matrix is created even if some runners fail to start
     runs-on: ubuntu-latest
     outputs:
       labels: ${{ steps.create-matrix.outputs.labels }}

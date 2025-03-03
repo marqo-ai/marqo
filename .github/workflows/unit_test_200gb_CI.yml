@@ -41,6 +41,8 @@ on:
     branches:
       - mainline
       - releases/*
+    paths-ignore:
+      - '**.md'
 
 concurrency:
   group: unit-tests-${{ github.ref }}-${{ inputs.number_of_shards }}-${{ inputs.number_of_replicas }}
@@ -51,58 +53,8 @@ permissions:
   id-token: write
 
 jobs:
-  Check-Changes:
-    runs-on: ubuntu-latest
-    outputs:
-      doc_only: ${{ steps.set-output.outputs.doc_only }}
-    steps:
-      - name: Checkout marqo repo
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          path: marqo
-
-      - name: Check for Documentation-Only Changes
-        id: set-output
-        run: |
-          cd marqo
-          set -x
-
-          # Determine BASE_COMMIT and HEAD_COMMIT based on the event type
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request"  || "${GITHUB_EVENT_NAME}" == "pull_request_review" ]]; then
-            BASE_COMMIT=${{ github.event.pull_request.base.sha }}
-            HEAD_COMMIT=${{ github.event.pull_request.head.sha }}
-          elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
-            BASE_COMMIT=${{ github.event.before }}
-            HEAD_COMMIT=${{ github.sha }}
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            # For manual dispatch, explicitly set doc_only
-            echo "doc_only=false" >> $GITHUB_ENV
-            echo "doc_only=false" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "Unsupported event: ${GITHUB_EVENT_NAME}"
-            exit 1
-          fi
-
-          # Debug: Print base and head commits
-          echo "Base commit: $BASE_COMMIT"
-          echo "Head commit: $HEAD_COMMIT"
-
-          # Perform the diff to check for non-documentation changes
-          if git diff --name-only $BASE_COMMIT $HEAD_COMMIT -- | grep -vE '\.(md)$'; then
-            echo "doc_only=false" >> $GITHUB_ENV
-            echo "doc_only=false" >> $GITHUB_OUTPUT
-          else
-            echo "doc_only=true" >> $GITHUB_ENV
-            echo "doc_only=true" >> $GITHUB_OUTPUT
-          fi
-
   Determine-Vespa-Setup:
-    needs:
-      - Check-Changes
     runs-on: ubuntu-latest
-    if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     outputs:
       VESPA_MULTINODE_SETUP: ${{ steps.set_var.outputs.VESPA_MULTINODE_SETUP }}
       MULTINODE_TEST_ARGS: ${{ steps.set_var.outputs.MULTINODE_TEST_ARGS }}
@@ -133,8 +85,6 @@ jobs:
   Start-Runner1:
     needs:
       - Determine-Vespa-Setup
-      - Check-Changes
-    if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     uses: ./.github/workflows/start_ec2_runner.yml
     with:
       base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
@@ -147,8 +97,6 @@ jobs:
   Start-Runner2:
     needs:
       - Determine-Vespa-Setup
-      - Check-Changes
-    if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     uses: ./.github/workflows/start_ec2_runner.yml
     with:
       base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
@@ -162,6 +110,7 @@ jobs:
     needs:
       - Start-Runner1
       - Start-Runner2
+    if: ${{ always() }} # Ensure the matrix is created even if one of the runners fails to start
     runs-on: ubuntu-latest
     outputs:
       labels: ${{ steps.create-matrix.outputs.labels }}
@@ -179,10 +128,8 @@ jobs:
   Test-Marqo:
     name: Run Unit Tests (Part ${{ matrix.part }}/1)
     needs:
-      - Check-Changes # required to start the main job when the runner is ready
       - Create-Matrix # Ensures it starts only after the runners are ready
       - Determine-Vespa-Setup
-    if: ${{ needs.Check-Changes.outputs.doc_only == 'false' }} # Run only if there are non-documentation changes
     strategy:
       matrix:
         part: [ 0, 1 ] # Zero-based index for JSON list access
@@ -329,7 +276,6 @@ jobs:
 
   Stop-Runner:
     needs:
-      - Check-Changes # required to start the main job when the runner is ready
       - Create-Matrix # Ensures it starts only after the runners are ready
       - Test-Marqo # required to wait when the main job is done
     if: ${{ always() }} # Ensures the runner is stopped even if tests fail
