@@ -245,14 +245,13 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: Move Coverage Files
-        run: mv marqo-test-report-*/.* .
+        run: mv marqo-test-report-*/.* marqo/
 
       - name: Merge Coverage Reports
         run: |
+          cd marqo
           pip install coverage
           coverage combine
-          mv .coverage marqo
-          cd marqo
           coverage report
           coverage xml
           coverage html
