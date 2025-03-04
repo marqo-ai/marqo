@@ -260,6 +260,7 @@ jobs:
         id: check_test_coverage
         continue-on-error: true
         run: |
+          cd marqo
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
