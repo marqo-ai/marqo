@@ -250,8 +250,9 @@ jobs:
       - name: Merge Coverage Reports
         run: |
           pip install coverage
-          cd marqo
           coverage combine
+          mv .coverage marqo
+          cd marqo
           coverage report
           coverage xml
           coverage html
