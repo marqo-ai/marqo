@@ -250,6 +250,7 @@ jobs:
       - name: Merge Coverage Reports
         run: |
           cd marqo
+          export PYTHONPATH="./src:."
           pip install coverage
           coverage combine
           coverage report
