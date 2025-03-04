@@ -60,7 +60,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         add_docs_response = cls.client.index(cls.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
 
-        cls.assertFalse(add_docs_response["errors"])
+        cls.assertFalse(add_docs_response["errors"], "Error adding documents to index")
 
     def tearDown(self):
         if self.indexes_to_delete:

@@ -400,11 +400,11 @@ class TestPartialUpdate(MarqoTestCase):
         res = self.config.document.partial_update_documents([{
             '_id': '2',
             'int_map_2': {
-                'd': 5,  # new entry in int map
-                'e': 6,  # another new entry
+                'd': 5,  # adding entirely new map
+                'e': 6,
             },
             'float_map_2': {
-                'f': 4.0,  # new entry in float map
+                'f': 4.0,  # adding entirely new map
             },
             'new_int': 1,  # new int field
             'new_float': 2.0,  # new float field
