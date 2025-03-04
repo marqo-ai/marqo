@@ -224,7 +224,7 @@ jobs:
       - name: (Debug) List All Files
         run: ls -lah marqo/
 
-      - name: Upload Test Report
+      - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report-${{ matrix.part }}
@@ -247,15 +247,20 @@ jobs:
       - name: Move Coverage Files
         run: mv marqo-test-report-*/.* marqo/
 
-      - name: Merge Coverage Reports
+      - name: Merge Coverage Results
         run: |
           cd marqo
           export PYTHONPATH="./src:."
           pip install coverage
           coverage combine
-          coverage report
-          coverage xml
-          coverage html
+
+      - name: Generate Coverage Reports
+        run: |
+          cd marqo
+          export PYTHONPATH="./src:."
+          coverage report -i
+          coverage xml -i
+          coverage html -i
 
       - name: Check Test Coverage of New Code
         id: check_test_coverage
