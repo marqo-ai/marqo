@@ -28,6 +28,13 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         ])
 
         cls.indexes_to_delete = [cls.text_index_name]
+
+    def tearDown(self):
+        if self.indexes_to_delete:
+            self.clear_indexes(self.indexes_to_delete)
+
+    def test_update_document_with_ids(self):
+
         text_docs = [{
             '_id': '1',
             'tensor_field': 'title',
@@ -58,15 +65,9 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         tensor_fields = ['tensor_field', 'custom_vector_field', 'multimodal_combo_field']
 
-        add_docs_response = cls.client.index(cls.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
+        add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
 
-        cls.assertFalse(add_docs_response["errors"], "Error adding documents to index")
-
-    def tearDown(self):
-        if self.indexes_to_delete:
-            self.clear_indexes(self.indexes_to_delete)
-
-    def test_update_document_with_ids(self):
+        self.assertFalse(add_docs_response["errors"])
 
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
@@ -99,6 +100,40 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertEqual(get_docs_response['string_array2'], ["123", "456"])
 
     def test_update_document_with_ids_change_field_type(self):
+
+        text_docs = [{
+            '_id': '1',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            }
+        }]
+
+        mappings = {
+            "custom_vector_field": {"type": "custom_vector"},
+            "multimodal_combo_field": {
+                "type": "multimodal_combination",
+                "weights": {"tensor_field": 1.0, "tensor_subfield": 2.0}
+            }
+        }
+
+        tensor_fields = ['tensor_field', 'custom_vector_field', 'multimodal_combo_field']
+
+        add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
+
+        self.assertFalse(add_docs_response["errors"])
 
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
@@ -133,6 +168,41 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         """
         # First add a document to update
         """Test updating a document with new fields and updating existing fields."""
+
+        text_docs = [{
+            '_id': '1',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            }
+        }]
+
+        mappings = {
+            "custom_vector_field": {"type": "custom_vector"},
+            "multimodal_combo_field": {
+                "type": "multimodal_combination",
+                "weights": {"tensor_field": 1.0, "tensor_subfield": 2.0}
+            }
+        }
+
+        tensor_fields = ['tensor_field', 'custom_vector_field', 'multimodal_combo_field']
+
+        add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
+
+        self.assertFalse(add_docs_response["errors"])
+
         update_docs_response = self.client.index(self.text_index_name).update_documents(
             [{
                 '_id': '1',

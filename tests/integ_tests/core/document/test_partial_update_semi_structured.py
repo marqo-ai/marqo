@@ -201,6 +201,20 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['int_map.b'], 3)
         self._assert_fields_unchanged(doc, ['int_map'])
 
+    def test_partial_update_should_replace_int_map(self):
+        """Test that partial updates to int maps are successful.
+
+        This test verifies that partial updates to int maps are successful.
+        """
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {'f': 2, 'g': 3}}], self.index)
+        self.assertFalse(res.errors)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(doc['int_map.f'], 2)
+        self.assertEqual(doc['int_map.g'], 3)
+        self.assertEqual(doc.get('int_map.a'), None)
+        self.assertEqual(doc.get('int_map.b'), None)
+        self._assert_fields_unchanged(doc, ['int_map'])
+
     def test_partial_update_should_update_int_map_with_new_value(self):
         """Test that partial updates to int maps with new values are successful.
         
