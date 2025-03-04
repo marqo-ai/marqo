@@ -588,6 +588,42 @@ class TestMarqoFashionCLIP(TestCase):
         self.assertLess(text_difference, 1e-4, f"Text embeddings are not close enough. "
                                                f"The average difference is: {text_difference}")
 
+    def test_MarqoFashionSigLIPModel_load_via_hf_hub_model_name(self):
+        """
+        Marqtune team always provide the model name with the hf hub model name, instead of the model architecture name.
+        E.g., they provide hf-hub:timm/ViT-B-16-SigLIP instead of ViT-B-16-SigLIP.
+
+        We need to ensure this works as expected. We use FashionSigLIP model for this test.
+        """
+
+        model_properties = {
+            "name": "hf-hub:timm/ViT-B-16-SigLIP",
+            "type": "open_clip",
+            "dimensions": 768,
+            "url": "https://huggingface.co/Marqo/marqo-fashionSigLIP/resolve/main/open_clip_pytorch_model.bin",
+            "imagePreprocessor": "SigLIP"
+        }
+        model = OPEN_CLIP(device="cpu", model_properties=model_properties)
+
+        model.load()
+
+        self.assertIsNotNone(model.model)
+        self.assertIsNotNone(model.tokenizer)
+        self.assertIsNotNone(model.preprocess)
+
+        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT)))
+        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT)))
+
+        image_difference = np.linalg.norm(marqo_image_embeddings - self.SiGLIP_IMAGE_EMBEDDING) / len(
+            marqo_image_embeddings)
+        text_difference = np.linalg.norm(marqo_text_embeddings - self.SiGLIP_TEXT_EMBEDDING) / len(
+            marqo_text_embeddings)
+
+        self.assertLess(image_difference, 1e-4, f"Image embeddings are not close enough. "
+                                                f"The average difference is: {image_difference}")
+        self.assertLess(text_difference, 1e-4, f"Text embeddings are not close enough. "
+                                               f"The average difference is: {text_difference}")
+
     def test_MarqoFashionCLIPModel_load(self):
         """Test the load method of MarqoFashionCLIPModel."""
 
