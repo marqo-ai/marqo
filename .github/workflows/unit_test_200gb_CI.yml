@@ -222,7 +222,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report-${{ matrix.part }}
-          path: marqo/.coverage.${{ matrix.part }}
+          path: **/.coverage.*
 
   Merge-Coverage:
     needs:
