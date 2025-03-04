@@ -8,6 +8,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
+from marqo.tensor_search.helper import get_target_hits_and_additional_hits_from_query
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -660,12 +661,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-        if marqo_query.ef_search is not None:
-            target_hits = min(marqo_query.limit + marqo_query.offset, marqo_query.ef_search)
-            additional_hits = max(marqo_query.ef_search - (marqo_query.limit + marqo_query.offset), 0)
-        else:
-            target_hits = marqo_query.limit + marqo_query.offset
-            additional_hits = 0
+        target_hits, additional_hits = get_target_hits_and_additional_hits_from_query(marqo_query)
 
         terms = []
         for field in fields_to_search:

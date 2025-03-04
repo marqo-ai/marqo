@@ -2213,7 +2213,7 @@ def _vector_text_search(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, targetHits=target_hits
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
@@ -2230,7 +2230,8 @@ def _vector_text_search(
         offset=offset,
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
-        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None
+        score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
+        target_hits=target_hits
     )
 
     vespa_index = vespa_index_factory(marqo_index)

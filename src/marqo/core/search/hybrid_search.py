@@ -37,7 +37,8 @@ class HybridSearch:
             media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
             score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
             highlights: bool = False, text_query_prefix: Optional[str] = None,
-            hybrid_parameters: HybridParameters = None) -> Dict:
+            hybrid_parameters: HybridParameters = None, target_hits: Optional[int] = None
+    ) -> Dict:
         """
 
             Args:
@@ -61,6 +62,7 @@ class HybridSearch:
                 text_query_prefix: prefix for text queries (for vectorisation only)
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
+                target_hits: target number of hits to return. If None, the default value will be used.
             Returns:
 
             Output format:
@@ -197,7 +199,8 @@ class HybridSearch:
             if hybrid_parameters.scoreModifiersLexical is not None else None,
             score_modifiers_tensor=hybrid_parameters.scoreModifiersTensor.to_marqo_score_modifiers()
             if hybrid_parameters.scoreModifiersTensor is not None else None,
-            hybrid_parameters=hybrid_parameters
+            hybrid_parameters=hybrid_parameters,
+            target_hits=target_hits
         )
 
         vespa_index = vespa_index_factory(marqo_index)
