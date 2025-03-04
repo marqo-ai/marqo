@@ -239,8 +239,15 @@ jobs:
 
       - name: Download all coverage files
         uses: actions/download-artifact@v4
-        with:
-          pattern: marqo-test-report-*
+
+      - name: (Debug) List all downloaded files
+        run: ls -lah
+
+      - name: (Debug) List marqo directory
+        run: ls -lah marqo/
+
+      - name: (Debug) Find Coverage Files
+        run: find . -name ".coverage*"
 
       - name: Merge Coverage Reports
         run: |
