@@ -13,7 +13,7 @@ docker rm -f marqo 2>/dev/null || true
 # -d detaches docker from process (so subprocess does not wait for it)
 # ${@:+"$@"} adds ALL args (past $1) if any exist.
 set -x
-docker run -d --name marqo --gpus all -p 8882:8882 \
+docker run -d --privileged --name marqo --gpus all -p 8882:8882 \
   -e MARQO_ENABLE_BATCH_APIS=TRUE \
   -e MARQO_MAX_CUDA_MODEL_MEMORY=15 \
   -e MARQO_MAX_CPU_MODEL_MEMORY=15 \
