@@ -236,6 +236,10 @@ jobs:
       - Test-Marqo
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout marqo repo
+        uses: actions/checkout@v3
+        with:
+          path: marqo
 
       - name: Download all coverage files
         uses: actions/download-artifact@v4
@@ -246,6 +250,7 @@ jobs:
       - name: Merge Coverage Reports
         run: |
           pip install coverage
+          cd marqo
           coverage combine
           coverage report
           coverage xml
