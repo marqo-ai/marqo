@@ -218,11 +218,17 @@ jobs:
             --cov=src --cov-branch --cov-context=test --cov-report term:skip-covered \
             tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} --split-by=classes | tee pytest_output.log
 
+      - name: (Debug) Find Coverage Files
+        run: find . -name ".coverage*"
+
+      - name: (Debug) List All Files
+        run: ls -lah
+
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report-${{ matrix.part }}
-          path: **/.coverage.*
+          path: marqo/**/.coverage.${{ matrix.part }}
 
   Merge-Coverage:
     needs:
