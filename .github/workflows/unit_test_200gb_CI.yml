@@ -240,14 +240,11 @@ jobs:
       - name: Download all coverage files
         uses: actions/download-artifact@v4
 
-      - name: (Debug) List all downloaded files
-        run: ls -lah
+      - name: (Debug) List Files in marqo-test-report-*
+        run: ls -lah marqo-test-report-*
 
-      - name: (Debug) List marqo directory
-        run: ls -lah marqo/
-
-      - name: (Debug) Find Coverage Files
-        run: find . -name ".coverage*"
+      - name: Move Coverage Files
+        run: mv marqo-test-report-*/* .
 
       - name: Merge Coverage Reports
         run: |
