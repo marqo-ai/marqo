@@ -201,6 +201,19 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['int_map.b'], 3)
         self._assert_fields_unchanged(doc, ['int_map'])
 
+    def test_partial_update_should_replace_int_map(self):
+        """Test that partial updates to int maps where we change the keys inside
+        a specific int map are successful
+        """
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {'f': 2, 'g': 3}}], self.index)
+        self.assertFalse(res.errors)
+        doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        self.assertEqual(doc['int_map.f'], 2)
+        self.assertEqual(doc['int_map.g'], 3)
+        self.assertEqual(doc.get('int_map.a'), None)
+        self.assertEqual(doc.get('int_map.b'), None)
+        self._assert_fields_unchanged(doc, ['int_map'])
+
     def test_partial_update_should_update_int_map_with_new_value(self):
         """Test that partial updates to int maps with new values are successful.
         
@@ -388,6 +401,67 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['marqo__score_modifiers']['cells']['new_map.b'], 2.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.d'], 5.0)
 
+    def test_partial_update_should_add_score_modifiers(self):
+        """Test that partial updates which specifically add new fields reflect properly in score modifiers tensors.
+        """
+        # Create a document with existing fields first to verify we're only adding
+        original_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+        
+        # Perform update with only additions, not replacements
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            'int_map_2': {
+                'd': 5,  # adding entirely new map
+                'e': 6,
+            },
+            'float_map_2': {
+                'f': 4.0,  # adding entirely new map
+            },
+            'new_int': 1,  # new int field
+            'new_float': 2.0,  # new float field
+        }], self.index)
+        self.assertFalse(res.errors)
+        res = self.config.vespa_client.get_document('2',
+                                                    self.config.index_management.get_index(self.index.name).schema_name)
+        doc = res.document.dict().get('fields')
+        # Verify original fields are preserved
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.a'], 1.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 1.0)
+                
+        # Verify new fields from the update call in this test 
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_int'], 1.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['new_float'], 2.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map_2.d'], 5.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map_2.e'], 6.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map_2.f'], 4.0)
+
+    def test_partial_update_only_update_existing_score_modifiers(self):
+        """
+        Test that partial updates which specifically change the existing keys inside existing maps
+         reflect properly in score modifiers tensors.
+        """
+        # Create a document with existing fields first to verify we're only adding
+        original_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+
+        # Perform update with only additions, not replacements
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            "int_map": {"a": 3, "b": 4},
+            "float_map": {"c": 3.0, "d": 4.0},
+        }], self.index)
+        self.assertFalse(res.errors)
+        res = self.config.vespa_client.get_document('2',
+                                                    self.config.index_management.get_index(self.index.name).schema_name)
+        doc = res.document.dict().get('fields')
+        # Verify original fields are preserved
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.a'], 3.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.b'], 4.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 3.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.d'], 4.0)
 
     def test_partial_update_should_add_new_fields(self):
         """Test that partial updates to new fields are successful.
@@ -474,7 +548,7 @@ class TestPartialUpdate(MarqoTestCase):
         """
         res = self.config.document.partial_update_documents([{'_id': '2', 'new_lexical_field': 'some string that signifies new lexical field'}], self.index)
         self.assertTrue(res.errors)
-        self.assertIn("new_lexical_field of type str does not exist in the original document. We do not support adding new lexical fields in partial updates", res.items[0].error)
+        self.assertIn("new_lexical_field of type str does not exist in the original document. Marqo does not support adding new lexical fields in partial updates", res.items[0].error)
         self.assertEqual(400, res.items[0].status)
 
     def test_partial_update_invalid_field_name(self):
@@ -782,3 +856,18 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertIn("Marqo vector store couldn't update the document. Please see", res.items[0].error)
         self.assertTrue(res.errors)
         self.assertEqual(400, res.items[0].status)
+
+
+    def test_updating_non_existent_document_with_maps(self):
+        """
+        Test updating a non-existent document with maps.
+
+        This test verifies that attempting to update a non-existent document with a map field
+        results in an error response. It checks a special handling we have added for documents in update requests which contain maps fields.
+        These documents are not originally present in Vespa and Marqo must return appropriate response for them.
+        """
+        res =  self.config.document.partial_update_documents([{'_id': '4', 'metadata': {'key1': 2}}], self.index)
+        self.assertTrue(res.errors)
+        self.assertEqual(400, res.items[0].status)
+        self.assertIn("Marqo vector store couldn't update the document. Please see", res.items[0].error)
+        self.assertIn('reference/api/documents/update-documents/#response', res.items[0].error)
