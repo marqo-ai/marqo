@@ -138,7 +138,7 @@ class Document:
         # 1. Retrieve those documents, which contain maps in the update request, from Vespa.
         # 2. If there's any documents that dont' exist in Vespa, we will append them to unsuccessful_docs
         if marqo_index.type is IndexType.SemiStructured and documents_that_contain_maps: # Only retrieve the document back if the partial update request contains maps and the index is semi-structured
-            get_batch_response = self.vespa_client.get_batch(ids = list(documents_that_contain_maps), fields = [
+            get_batch_response = self.vespa_client.get_batch(ids = list(documents_that_contain_maps.keys()), fields = [
                 VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP], schema = marqo_index.schema_name)
             responses = get_batch_response.responses
             for resp in responses:
@@ -146,7 +146,7 @@ class Document:
                     existing_vespa_documents[resp.document.fields[VESPA_FIELD_ID]] = resp.document.dict()
                 else: 
                     id = self.extract_document_id_from_vespa_id(resp) # Extract the document id from the Vespa response. Vespa response will contain the document id even though the document was not found.
-                    unsuccessful_docs.append((documents_that_contain_maps.get(id), MarqoAddDocumentsItem(id = id, 
+                    unsuccessful_docs.append((documents_that_contain_maps.get(id), MarqoUpdateDocumentsItem(id = id,
                                                                                                          status = int(api_exceptions.BadRequestError.status_code),
                                                                                                          error = "Marqo vector store couldn't update the document. Please see: " + update_documents_response() + " for more details")))
                     documents_that_contain_maps_but_dont_exist_in_vespa.add(id)
