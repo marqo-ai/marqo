@@ -218,12 +218,6 @@ jobs:
             --cov=src --cov-branch --cov-context=test --cov-report term:skip-covered \
             tests/integ_tests/ --split-n 2 --split-part ${{ matrix.part }} --split-by=classes | tee pytest_output.log
 
-      - name: (Debug) Find Coverage Files
-        run: find . -name ".coverage*"
-
-      - name: (Debug) List All Files
-        run: ls -lah marqo/
-
       - name: Upload Test Result
         uses: actions/upload-artifact@v4
         with:
@@ -232,6 +226,7 @@ jobs:
           include-hidden-files: true
 
   Merge-Coverage:
+    name: Merge Coverage And Generate Reports
     needs:
       - Test-Marqo
     runs-on: ubuntu-latest
@@ -278,6 +273,7 @@ jobs:
             export BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
             echo "Running diff-cover against branch $BASE_BRANCH"
             git fetch origin $BASE_BRANCH:$BASE_BRANCH
+            pip install diff-cover
             diff-cover coverage.xml --html-report diff_cov.html --markdown-report diff_cov.md \
               --compare-branch $BASE_BRANCH --fail-under=95
           else
@@ -290,7 +286,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: merged-coverage
-          path: htmlcov/
+          path: marqo/htmlcov/
 
   Stop-Runner:
     needs:
