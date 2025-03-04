@@ -247,13 +247,20 @@ jobs:
       - name: Move Coverage Files
         run: mv marqo-test-report-*/.* marqo/
 
+      - name: DEBUG coverages
+        run: |
+          cd marqo
+          export PYTHONPATH="./src:."
+          pip install coverage
+          coverage debug data
+
       - name: Merge Coverage Results
         run: |
           cd marqo
           export PYTHONPATH="./src:."
           pip install coverage
           coverage combine
-
+          
       - name: Generate Coverage Reports
         run: |
           cd marqo
