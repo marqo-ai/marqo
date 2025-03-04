@@ -222,13 +222,25 @@ jobs:
         run: find . -name ".coverage*"
 
       - name: (Debug) List All Files
-        run: ls -lah
+        run: ls -lah marqo/
 
       - name: Upload Test Report
         uses: actions/upload-artifact@v4
         with:
           name: marqo-test-report-${{ matrix.part }}
-          path: marqo/**/.coverage.${{ matrix.part }}
+          path: marqo/.coverage.${{ matrix.part }}
+
+      - name: Upload Test Report 1 (Debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-test-report-${{ matrix.part }}
+          path: marqo/.coverage.*
+
+      - name: Upload Test Report 2 (Debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: marqo-test-report-${{ matrix.part }}
+          path: ./marqo/.coverage.*
 
   Merge-Coverage:
     needs:
