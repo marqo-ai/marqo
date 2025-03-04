@@ -202,9 +202,8 @@ class TestPartialUpdate(MarqoTestCase):
         self._assert_fields_unchanged(doc, ['int_map'])
 
     def test_partial_update_should_replace_int_map(self):
-        """Test that partial updates to int maps are successful.
-
-        This test verifies that partial updates to int maps are successful.
+        """Test that partial updates to int maps where we change the keys inside
+        a specific int map are successful
         """
         res = self.config.document.partial_update_documents([{'_id': '2', 'int_map': {'f': 2, 'g': 3}}], self.index)
         self.assertFalse(res.errors)
@@ -403,9 +402,7 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.d'], 5.0)
 
     def test_partial_update_should_add_score_modifiers(self):
-        """Test that partial updates to score modifiers are successful.
-
-        This test verifies that partial updates to score modifiers are successful.
+        """Test that partial updates which specifically add new fields reflect properly in score modifiers tensors.
         """
         # Create a document with existing fields first to verify we're only adding
         original_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
@@ -439,6 +436,32 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map_2.d'], 5.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map_2.e'], 6.0)
         self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map_2.f'], 4.0)
+
+    def test_partial_update_only_update_existing_score_modifiers(self):
+        """
+        Test that partial updates which specifically change the existing keys inside existing maps
+         reflect properly in score modifiers tensors.
+        """
+        # Create a document with existing fields first to verify we're only adding
+        original_doc = tensor_search.get_document_by_id(self.config, self.index.name, '2')
+
+        # Perform update with only additions, not replacements
+        res = self.config.document.partial_update_documents([{
+            '_id': '2',
+            "int_map": {"a": 3, "b": 4},
+            "float_map": {"c": 3.0, "d": 4.0},
+        }], self.index)
+        self.assertFalse(res.errors)
+        res = self.config.vespa_client.get_document('2',
+                                                    self.config.index_management.get_index(self.index.name).schema_name)
+        doc = res.document.dict().get('fields')
+        # Verify original fields are preserved
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_field'], 123.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.a'], 3.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.b'], 4.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 3.0)
+        self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.d'], 4.0)
 
     def test_partial_update_should_add_new_fields(self):
         """Test that partial updates to new fields are successful.
