@@ -20,6 +20,7 @@ from marqo.core.structured_vespa_index.structured_add_document_handler import St
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index.vespa_index import for_marqo_index as vespa_index_factory
 from marqo.logging import get_logger
+from marqo.marqo_docs import update_documents_response
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.models import UpdateDocumentsBatchResponse, VespaDocument
 from marqo.vespa.models.delete_document_response import DeleteAllDocumentsResponse
@@ -128,10 +129,14 @@ class Document:
         unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]] = []
 
         # Remove duplicated documents based on _id
-        partial_documents, doc_ids, documents_that_contain_maps = self.process_documents(partial_documents,
+        partial_documents, documents_that_contain_maps = self.process_documents(partial_documents,
                                                                                          unsuccessful_docs, is_index_semi_structured=marqo_index.type is IndexType.SemiStructured)
+        documents_that_contain_maps_but_dont_exist_in_vespa = set() # Set to keep track of documents that contain maps but don't exist in Vespa. This will remain unpopulated for structured indexes.
         existing_vespa_documents = {}
 
+        # This block will only execute for SemiStructured Indexes and in case the request has documents that contain maps.
+        # 1. Retrieve those documents, which contain maps in the update request, from Vespa.
+        # 2. If there's any documents that dont' exist in Vespa, we will append them to unsuccessful_docs
         if marqo_index.type is IndexType.SemiStructured and documents_that_contain_maps: # Only retrieve the document back if the partial update request contains maps and the index is semi-structured
             get_batch_response = self.vespa_client.get_batch(ids = list(documents_that_contain_maps), fields = [
                 VESPA_FIELD_ID, INT_FIELDS, FLOAT_FIELDS, VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP], schema = marqo_index.schema_name)
@@ -139,8 +144,18 @@ class Document:
             for resp in responses:
                 if resp.document:
                     existing_vespa_documents[resp.document.fields[VESPA_FIELD_ID]] = resp.document.dict()
+                else: 
+                    id = self.extract_document_id_from_vespa_id(resp) # Extract the document id from the Vespa response. Vespa response will contain the document id even though the document was not found.
+                    unsuccessful_docs.append((documents_that_contain_maps.get(id), MarqoAddDocumentsItem(id = id, 
+                                                                                                         status = int(api_exceptions.BadRequestError.status_code),
+                                                                                                         error = "Marqo vector store couldn't update the document. Please see: " + update_documents_response() + " for more details")))
+                    documents_that_contain_maps_but_dont_exist_in_vespa.add(id)
 
         for index, doc in enumerate(partial_documents):
+            if (marqo_index.type is IndexType.SemiStructured # Only have this check in place for SemiStructured indexes
+                    and documents_that_contain_maps_but_dont_exist_in_vespa
+                    and doc.get(MARQO_DOC_ID, '') in documents_that_contain_maps_but_dont_exist_in_vespa):
+                continue
             try:
                 vespa_document = VespaDocument(**vespa_index.to_vespa_partial_document(doc, existing_vespa_documents.get(doc.get(MARQO_DOC_ID, ''), None)))
                 vespa_documents.append(vespa_document)
@@ -182,7 +197,7 @@ class Document:
 
         if responses is not None:
             for resp in responses.responses:
-                doc_id = resp.id.split('::')[-1] if resp.id else None
+                doc_id = self.extract_document_id_from_vespa_id(resp)
                 status, message = self.vespa_client.translate_vespa_document_response(resp.status, None)
                 new_item = MarqoUpdateDocumentsItem(id=doc_id, status=status, message=message, error=message)
                 items.append(new_item)
@@ -195,7 +210,7 @@ class Document:
                                             processingTimeMs=(timer() - start_time) * 1000)
 
     def process_documents(self, documents: List[Dict], unsuccessful_docs: List[Tuple[int, MarqoUpdateDocumentsItem]],
-                          is_index_semi_structured = False) -> Tuple[List, set, set]:
+                          is_index_semi_structured = False) -> Tuple[List[Dict], Dict]:
         """Process documents to remove duplicates and identify documents containing maps.
         
         This method combines duplicate removal and map detection into a single pass through
@@ -210,11 +225,11 @@ class Document:
             Tuple containing:
             - List of deduplicated documents
             - Set of unique document IDs
-            - Set of document IDs that contain dictionary values
+            - Dictionary of document IDs that contain dictionary values and their index in the documents list
         """
         docs = []
         doc_ids = set()
-        documents_with_maps = set()
+        documents_with_maps = {}
         
         # Process documents in reverse to keep latest version of duplicates
         for i in range(len(documents) - 1, -1, -1):
@@ -238,11 +253,11 @@ class Document:
                     for field_name, field_value in doc.items():
                         if isinstance(field_value, dict):
                             if len(field_value) == 0: # If the dictionary is empty, get back the document so that we can update the doc with an empty dictionary (i.e remove the map from the doc).
-                                documents_with_maps.add(doc_id)
+                                documents_with_maps[doc_id] = i
                             else:
                                 for key, val in field_value.items():
                                     if isinstance(val, (int, float)):
-                                        documents_with_maps.add(doc_id)
+                                        documents_with_maps[doc_id] = i
                                         break
                                     else:
                                         raise MarqoDocumentParsingError(
@@ -263,7 +278,7 @@ class Document:
 
         # Reverse to preserve original order
         docs.reverse()
-        return docs, doc_ids, documents_with_maps
+        return docs, documents_with_maps
 
     def translate_add_documents_response(self, responses: Optional[FeedBatchResponse],
                                          index_name: str,
@@ -288,7 +303,7 @@ class Document:
 
         if responses is not None:
             for resp in responses.responses:
-                doc_id = resp.id.split('::')[-1] if resp.id else None
+                doc_id = self.extract_document_id_from_vespa_id(resp)
                 status, message = self.vespa_client.translate_vespa_document_response(resp.status, resp.message)
                 new_item = MarqoAddDocumentsItem(id=doc_id, status=status, message=message)
                 new_items.append(new_item)
@@ -299,3 +314,7 @@ class Document:
 
         return MarqoAddDocumentsResponse(errors=errors, index_name=index_name, items=new_items,
                                          processingTimeMs=add_docs_processing_time_ms)
+
+    def extract_document_id_from_vespa_id(self, resp):
+        doc_id = resp.id.split('::')[-1] if resp.id else None
+        return doc_id

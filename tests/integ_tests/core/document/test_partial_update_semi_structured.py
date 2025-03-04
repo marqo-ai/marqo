@@ -856,3 +856,18 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertIn("Marqo vector store couldn't update the document. Please see", res.items[0].error)
         self.assertTrue(res.errors)
         self.assertEqual(400, res.items[0].status)
+
+
+    def test_updating_non_existent_document_with_maps(self):
+        """
+        Test updating a non-existent document with maps.
+
+        This test verifies that attempting to update a non-existent document with a map field
+        results in an error response. It checks a special handling we have added for documents in update requests which contain maps fields.
+        These documents are not originally present in Vespa and Marqo must return appropriate response for them.
+        """
+        res =  self.config.document.partial_update_documents([{'_id': '4', 'metadata': {'key1': 2}}], self.index)
+        self.assertTrue(res.errors)
+        self.assertEqual(400, res.items[0].status)
+        self.assertIn("Marqo vector store couldn't update the document. Please see", res.items[0].error)
+        self.assertIn('reference/api/documents/update-documents/#response', res.items[0].error)
