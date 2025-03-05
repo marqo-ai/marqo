@@ -21,13 +21,10 @@ import textwrap
 import time
 import sys
 import yaml
-try:
-    import docker
-except ImportError:
-    print("docker package not found. If needed, please install it using `pip install docker`.")
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import math
+import logging
 
 import requests
 import argparse
@@ -39,6 +36,9 @@ VESPA_DOCUMENT_URL="http://localhost:8080"
 VESPA_QUERY_URL="http://localhost:8080"
 MINIMUM_API_NODES = 2
 
+# Configure logging: change to logging.WARNING to suppress debug logs.
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class VespaLocal:
     # Base directory for the application package
@@ -118,13 +118,13 @@ class VespaLocal:
         zip_file_path = f"{self.base_dir}.zip"
 
         if os.path.isfile(zip_file_path):
-            print(f"Zip file created successfully: {zip_file_path}")
+            logger.info(f"Zip file created successfully: {zip_file_path}")
             # Remove the base directory
             shutil.rmtree(self.base_dir)
-            print(f"Directory {self.base_dir} removed.")
+            logger.info(f"Directory {self.base_dir} removed.")
             return zip_file_path
         else:
-            print("Failed to create the zip file.")
+            logger.info("Failed to create the zip file.")
             sys.exit(1)
 
 
@@ -135,7 +135,7 @@ class VespaLocalSingleNode(VespaLocal):
             "schemas": ["test_vespa_client.sd"],
             "": ["services.xml"]
         }
-        print("Creating single node Vespa setup.")
+        logger.info("Creating single node Vespa setup.")
 
     def start(self):
         os.system("docker rm -f vespa 2>/dev/null || true")
@@ -178,18 +178,18 @@ class VespaLocalSingleNode(VespaLocal):
         # Check if the single vespa container is running
         while True:
             if time.time() - start_time > max_wait_time:
-                print("Maximum wait time exceeded. Vespa container may not be running.")
+                logger.info("Maximum wait time exceeded. Vespa container may not be running.")
                 break
 
             try:
                 output = subprocess.check_output(["docker", "inspect", "--format", "{{.State.Status}}", "vespa"])
                 if output.decode().strip() == "running":
-                    print("Vespa container is up and running.")
+                    logger.info("Vespa container is up and running.")
                     break
             except subprocess.CalledProcessError:
                 pass
 
-            print("Waiting for Vespa container to start...")
+            logger.info("Waiting for Vespa container to start...")
             time.sleep(5)
 
 
@@ -202,7 +202,7 @@ class VespaLocalMultiNode(VespaLocal):
             "schemas": ["test_vespa_client.sd"],
             "": ["hosts.xml", "services.xml"]
         }
-        print(f"Creating multi-node Vespa setup with {number_of_shards} shards and {number_of_replicas} replicas.")
+        logger.info(f"Creating multi-node Vespa setup with {number_of_shards} shards and {number_of_replicas} replicas.")
 
     def generate_docker_compose(self, vespa_version: str):
         """
@@ -211,7 +211,7 @@ class VespaLocalMultiNode(VespaLocal):
         """
         services = {}
 
-        print(
+        logger.info(
             f"Creating `docker-compose.yml` with {self.number_of_shards} shards and {self.number_of_replicas} replicas.")
 
         BASE_CONFIG_PORT_A = 19071  # configserver (deploy here)
@@ -227,7 +227,7 @@ class VespaLocalMultiNode(VespaLocal):
 
         TOTAL_CONTENT_NODES = (self.number_of_replicas + 1) * self.number_of_shards
         TOTAL_API_NODES = max(MINIMUM_API_NODES, math.ceil(TOTAL_CONTENT_NODES / 4))
-        print(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
+        logger.info(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
 
         # Config Nodes (3)
         nodes_created = 0
@@ -340,11 +340,11 @@ class VespaLocalMultiNode(VespaLocal):
 
         with open('docker-compose.yml', 'w') as f:
             yaml.dump(docker_compose, f, sort_keys=False)
-        print(f"Generated `docker-compose.yml` successfully.")
+        logger.info(f"Generated `docker-compose.yml` successfully.")
 
-        print("Health check URLs:")
+        logger.info("Health check URLs:")
         for url in urls_to_health_check:
-            print(url)
+            logger.info(url)
 
     def get_services_xml_content(self):
         """
@@ -352,10 +352,10 @@ class VespaLocalMultiNode(VespaLocal):
         Generates (number_of_replicas + 1) groups of number_of shards content nodes each.
         """
 
-        print(f"Writing content for `services.xml` with {self.number_of_shards} shards and {self.number_of_replicas} replicas.")
+        logger.info(f"Writing content for `services.xml` with {self.number_of_shards} shards and {self.number_of_replicas} replicas.")
         TOTAL_CONTENT_NODES = (self.number_of_replicas + 1) * self.number_of_shards
         TOTAL_API_NODES = max(MINIMUM_API_NODES, math.ceil(TOTAL_CONTENT_NODES / 4))
-        print(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
+        logger.info(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
 
         # Define the root element with namespaces
         services = ET.Element('services', {
@@ -444,7 +444,7 @@ class VespaLocalMultiNode(VespaLocal):
         pretty_xml_bytes = reparsed.toprettyxml(indent="    ", encoding='utf-8')
         pretty_xml = pretty_xml_bytes.decode('utf-8')
 
-        print("Generated services.xml content successfully!")
+        logger.info("Generated services.xml content successfully!")
         return pretty_xml
 
     def get_hosts_xml_content(self):
@@ -453,10 +453,10 @@ class VespaLocalMultiNode(VespaLocal):
         Generates (number_of_replicas + 1) groups of number_of shards content nodes each.
         """
 
-        print(f"Writing content for `hosts.xml` with {self.number_of_shards} shards and {self.number_of_replicas} replicas.")
+        logger.info(f"Writing content for `hosts.xml` with {self.number_of_shards} shards and {self.number_of_replicas} replicas.")
         TOTAL_CONTENT_NODES = (self.number_of_replicas + 1) * self.number_of_shards
         TOTAL_API_NODES = max(MINIMUM_API_NODES, math.ceil(TOTAL_CONTENT_NODES / 4))
-        print(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
+        logger.info(f"Total content nodes: {TOTAL_CONTENT_NODES}, Total API nodes: {TOTAL_API_NODES}")
 
         # Define the root element
         hosts = ET.Element('hosts')
@@ -495,7 +495,7 @@ class VespaLocalMultiNode(VespaLocal):
         pretty_xml_bytes = reparsed.toprettyxml(indent="    ", encoding='utf-8')
         pretty_xml = pretty_xml_bytes.decode('utf-8')
 
-        print("Generated hosts.xml content successfully!")
+        logger.info("Generated hosts.xml content successfully!")
         return pretty_xml
 
     def start(self):
@@ -510,11 +510,12 @@ class VespaLocalMultiNode(VespaLocal):
 
     def wait_vespa_running(self, max_wait_time: int = 20):
         # Just wait 20 seconds
-        print(f"Waiting for Vespa to start for {max_wait_time} seconds.")
+        logger.info(f"Waiting for Vespa to start for {max_wait_time} seconds.")
         time.sleep(max_wait_time)
 
 
 def container_exists(container_name):
+    import docker   # Only try importing docker here. Not needed for other functions.
     client = docker.from_env()
     try:
         container = client.containers.get(container_name)
@@ -522,7 +523,7 @@ def container_exists(container_name):
     except docker.errors.NotFound:
         return False
     except docker.errors.APIError as e:
-        print(f"Error accessing Docker API: {e}")
+        logger.info(f"Error accessing Docker API: {e}")
         return False
 
 
@@ -572,19 +573,19 @@ def start(args):
 
 def restart(args):
     if container_exists("vespa"):
-        print("Single Node Vespa setup found (container with name 'vespa'). Restarting container.")
+        logger.info("Single Node Vespa setup found (container with name 'vespa'). Restarting container.")
         os.system("docker restart vespa")
     else:
-        print("Assuming Multi Node Vespa setup. Restarting all containers.")
+        logger.info("Assuming Multi Node Vespa setup. Restarting all containers.")
         os.system("docker compose restart")
 
 
 def stop(args):
     if container_exists("vespa"):
-        print("Single Node Vespa setup found (container with name 'vespa'). Stopping container.")
+        logger.info("Single Node Vespa setup found (container with name 'vespa'). Stopping container.")
         os.system("docker stop vespa")
     else:
-        print("Assuming Multi Node Vespa setup. Stopping and removing all containers.")
+        logger.info("Assuming Multi Node Vespa setup. Stopping and removing all containers.")
         os.system("docker compose down")
 
 
@@ -607,35 +608,41 @@ def deploy_application_package(zip_file_path: str, max_retries: int = 5, backoff
 
     # Ensure the zip file exists
     if not os.path.isfile(zip_file_path):
-        print("Zip file does not exist.")
+        logger.info("Zip file does not exist.")
         return
 
-    print("Start deploying the application package...")
+    logger.info("Start deploying the application package...")
 
     # Attempt to send the request with retries
     for attempt in range(max_retries):
         try:
             with open(zip_file_path, 'rb') as zip_file:
                 response = requests.post(url, headers=headers, data=zip_file)
-            print(response.text)
+            logger.info(response.text)
             break  # Success, exit the retry loop
         except requests.exceptions.RequestException as e:
-            print(f"Attempt {attempt + 1} failed due to a request error: {e}")
+            logger.info(f"Attempt {attempt + 1} failed due to a request error: {e}")
             if attempt < max_retries - 1:
                 # Calculate sleep time using exponential backoff
                 sleep_time = backoff_factor * (2 ** attempt)
-                print(f"Retrying in {sleep_time} seconds...")
+                logger.info(f"Retrying in {sleep_time} seconds...")
                 time.sleep(sleep_time)
             else:
-                print("Max retries reached. Aborting.")
+                logger.info("Max retries reached. Aborting.")
                 return
 
     # Cleanup
     os.remove(zip_file_path)
-    print("Zip file removed.")
+    logger.info("Zip file removed.")
 
 
 def generate_and_deploy_application_package(args):
+    # For print messages for cleaner logs (call this function with --LogLevel INFO)
+    numeric_level = getattr(logging, args.LogLevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError(f'Invalid log level: {args.loglevel}')
+    logger.setLevel(numeric_level)
+
     # Create instance of VespaLocal
     # vespa_local_instance is used for starting vespa & generating application package.
     if args.Shards > 1 or args.Replicas > 0:
@@ -644,13 +651,12 @@ def generate_and_deploy_application_package(args):
         vespa_local_instance = VespaLocalSingleNode()
     # Generate the application package
     zip_file_path = vespa_local_instance.generate_application_package()
-    print(f"Application package generated at {zip_file_path}")
     # Deploy the application package
     deploy_application_package(zip_file_path)
 
 
 def has_vespa_converged(waiting_time: int = 600) -> bool:
-    print("Checking if Vespa has converged...")
+    logger.info("Checking if Vespa has converged...")
     converged = False
     start_time = time.time()
     while time.time() - start_time < waiting_time:
@@ -662,17 +668,17 @@ def has_vespa_converged(waiting_time: int = 600) -> bool:
             if data.get('converged') == True:
                 converged = True
                 break
-            print("  Waiting for Vespa convergence to be true...")
+            logger.info("  Waiting for Vespa convergence to be true...")
         except Exception as e:
-            print(f"  Error checking convergence: {str(e)}")
+            logger.info(f"  Error checking convergence: {str(e)}")
 
         time.sleep(10)
 
     if not converged:
-        print("Vespa did not converge in time")
+        logger.info("Vespa did not converge in time")
         sys.exit(1)
 
-    print("Vespa application has converged. Vespa setup complete!")
+    logger.info("Vespa application has converged. Vespa setup complete!")
 
 
 def main():
@@ -702,10 +708,15 @@ def main():
     clean_parser = subparsers.add_parser("stop", help="Stop local Vespa")
     clean_parser.set_defaults(func=stop)
 
+    # This function is used in prod (run_marqo.sh)
     generate_and_deploy_parser = subparsers.add_parser("generate-and-deploy", help="Generate and deploy application package")
     generate_and_deploy_parser.set_defaults(func=generate_and_deploy_application_package)
     generate_and_deploy_parser.add_argument('--Shards', help='The number of shards', default=1, type=int)
     generate_and_deploy_parser.add_argument('--Replicas', help='The number of replicas', default=0, type=int)
+    generate_and_deploy_parser.add_argument('--LogLevel',
+                                            help='Set the logging level (e.g., DEBUG, INFO, WARNING, ERROR)',
+                                            default='INFO', type=str)
+
 
     # Parse the command-line arguments and execute the corresponding function
     args = parser.parse_args()
