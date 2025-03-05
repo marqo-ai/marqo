@@ -1627,7 +1627,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
             config=config, marqo_index=marqo_index, text=text, result_count=result_count, offset=offset,
             searchable_attributes=searchable_attributes, verbose=verbose,
             filter_string=filter, attributes_to_retrieve=attributes_to_retrieve, highlights=highlights,
-            score_modifiers=score_modifiers, target_hits=target_hits
+            score_modifiers=score_modifiers
         )
     else:
         raise api_exceptions.InvalidArgError(f"Search called with unknown search method: {search_method}")
