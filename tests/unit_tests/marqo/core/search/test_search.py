@@ -1,17 +1,7 @@
-import unittest
-from unittest.mock import patch, MagicMock
-
 from marqo.tensor_search import tensor_search
-from marqo.core.models.marqo_index import (
-    StructuredMarqoIndex, Model, TextPreProcessing, ImagePreProcessing,
-    DistanceMetric, VectorNumericType, HnswConfig, FieldType, FieldFeature, IndexType, Field, TensorField
-)
-from marqo.config import Config
-from marqo.tensor_search.telemetry import RequestMetricsStore
+from tests.unit_tests.marqo.base_test_case import BaseUnitTest
 
-class TensorSearchTest(unittest.TestCase):
-
-
+class SearchTest(BaseUnitTest):
     def test_tensor_search(self):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor")
         self.vespa_client_mock.query.assert_called_once()
@@ -29,8 +19,8 @@ class TensorSearchTest(unittest.TestCase):
             )
         )
         self.assertEqual(call_args['model_restrict'], 'test_schema')
-        self.assertEqual(call_args['hits'], '3')
-        self.assertEqual(call_args['offset'], '0')
+        self.assertEqual(call_args['hits'], 3)
+        self.assertEqual(call_args['offset'], 0)
 
     def test_tensor_search_with_target_hits(self):
         tensor_search.search(self.config, "index_name", "query", search_method="tensor", target_hits=5)

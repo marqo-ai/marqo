@@ -27,7 +27,7 @@ class BaseUnitTest(unittest.TestCase):
         # Create a real StructuredMarqoIndex instance with the same schema as `default_text_index`
         self.model = Model(name="hf/all_datasets_v4_MiniLM-L6")
 
-        self.index = StructuredMarqoIndex(
+        self.structured_index = StructuredMarqoIndex(
             name="index_name", schema_name="test_schema", type=IndexType.Structured, model=self.model,
             normalize_embeddings=True,
             text_preprocessing=TextPreProcessing(split_length=5, split_overlap=2, split_method="word"),
@@ -67,7 +67,7 @@ class BaseUnitTest(unittest.TestCase):
         self.logger_mock = MagicMock()
 
         self.get_index_patcher = patch(
-            "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=self.index
+            "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=self.structured_index
         )
         self.logger_patcher = patch(
             "marqo.tensor_search.tensor_search.logger", self.logger_mock
@@ -75,6 +75,13 @@ class BaseUnitTest(unittest.TestCase):
 
         self.get_index_patcher.start()
         self.logger_patcher.start()
+
+    def set_index_to_return(self, index):
+        self.get_index_patcher.stop()
+        self.get_index_patcher = patch(
+            "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=index
+        )
+        self.get_index_patcher.start()
 
     def tearDown(self):
         self.get_index_patcher.stop()
