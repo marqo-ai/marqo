@@ -890,6 +890,7 @@ class TestSearchSemiStructured(MarqoTestCase):
             (["int_field"], {"int_field"}),
             (["float_field"], {"float_field"}),
             (["string_array"], {"string_array"}),
+            (["non_existent_string_array"], set()),  # non_existent field is provided
             (["int_map"], {"int_map.a", "int_map.b"}),
             (["float_map"], {"float_map.c", "float_map.d"}),
             (["bool_field"], {"bool_field"}),
