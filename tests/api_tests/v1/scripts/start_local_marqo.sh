@@ -7,8 +7,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-python3 "$SCRIPT_DIR/start_vespa.py"
-
+# Start single node vespa
+python3 "$SCRIPT_DIR/../../../../scripts/vespa_local/vespa_local.py" full-start
 MARQO_DOCKER_IMAGE="$1"
 shift
 
@@ -28,6 +28,7 @@ docker run -d --name marqo -p 8882:8882 --add-host host.docker.internal:host-gat
     -e ZOOKEEPER_HOSTS="host.docker.internal:2181" \
     -e MARQO_INDEX_DEPLOYMENT_LOCK_TIMEOUT=0 \
     -e MARQO_MODELS_TO_PRELOAD='[]' \
+    -e HF_HUB_ENABLE_HF_TRANSFER=1 \
     ${@:+"$@"} "$MARQO_DOCKER_IMAGE" --memory=8g
 set +x
 

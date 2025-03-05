@@ -158,9 +158,8 @@ class AddDocumentsHandler(ABC):
 
             # retrieve existing docs for existing tensor
             if self.add_docs_params.use_existing_tensors:
-                # TODO capture the telemetry data for retrieving exiting docs?
-                result = self.vespa_client.get_batch(list(self.add_docs_response_collector.valid_original_ids()),
-                                                            self.marqo_index.schema_name)
+                result = self.vespa_client.get_batch(ids = list(self.add_docs_response_collector.valid_original_ids()),
+                                                         schema = self.marqo_index.schema_name)
                 existing_vespa_docs = [r.document for r in result.responses if r.status == 200]
                 self._populate_existing_tensors(existing_vespa_docs)
 
@@ -168,17 +167,15 @@ class AddDocumentsHandler(ABC):
             self._vectorise_tensor_fields()
 
         # FIXME this step is not timed in the original implementation
-        vespa_docs = self._convert_to_vespa_docs()
+        vespa_docs = self._convert_to_vespa_docs() # Responsible for converting the marqo docs (i.e the dictionary that we collected all documents to earlier) to vespa docs
 
         self._pre_persist_to_vespa()
 
         # persist to vespa if there are still valid docs
-        with RequestMetricsStore.for_request().time("add_documents.vespa._bulk"):
-            response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
+        response = self.vespa_client.feed_batch(vespa_docs, self.marqo_index.schema_name)
 
-        with RequestMetricsStore.for_request().time("add_documents.postprocess"):
-            self._handle_vespa_response(response)
-            return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
+        self._handle_vespa_response(response)
+        return self.add_docs_response_collector.to_add_doc_responses(self.marqo_index.name)
 
     @abstractmethod
     def _create_tensor_fields_container(self) -> TensorFieldsContainer:
