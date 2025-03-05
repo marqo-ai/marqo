@@ -2,11 +2,8 @@
 The functions defined here would have endpoints, later on.
 """
 import datetime
-import random
 import threading
-import time
 from typing import List, Dict, Optional
-from urllib3.exceptions import ReadTimeoutError
 
 import numpy as np
 import torch
@@ -522,69 +519,47 @@ def get_model_size(model_name: str, model_properties: dict) -> (int, float):
 
 def _load_model(
         model_name: str, model_properties: dict, device: str,
-        calling_func: str = None, model_auth: Optional[ModelAuth] = None,
-        max_retries: int = 3, retry_delay: int = 5
+        calling_func: str = None, model_auth: Optional[ModelAuth] = None
 ) -> Any:
-    """Load a model with retry mechanism in case of transient failures.
+    """_summary_
 
     Args:
-        model_name (str): Model name to fetch from external library.
-        model_properties (dict): Model properties (e.g., dimensions, type).
-        device (str): Target device (e.g., "cuda:0", "cpu").
-        model_auth (Optional[ModelAuth]): Authorization for downloading models.
-        max_retries (int): Number of retry attempts before failing.
-        retry_delay (int): Delay (seconds) between retries.
+        model_name (str): Actual model_name to be fetched from external library
+                        prefer passing it in the form of model_properties['name']
+        device (str): Required. Should always be passed when loading model
+        model_auth: Authorisation details for downloading a model (if required)
 
     Returns:
-        Any: Loaded model.
-
-    Raises:
-        ModelLoadError: If loading fails after all retries.
+        Any: _description_
     """
     if calling_func not in ["unit_test", "_update_available_models"]:
         raise RuntimeError(f"The function `{_load_model.__name__}` should only be called by "
-                           f"`unit_test` or `_update_available_models` for threading safety.")
+                           f"`unit_test` or `_update_available_models` for threading safeness.")
+
+    print(f"loading for: model_name={model_name} and properties={model_properties}")
 
     model_type = model_properties.get("type")
     loader = _get_model_loader(model_properties.get('name', None), model_properties)
 
-    attempt = 0
-    while attempt < max_retries:
-        try:
-            print(f"Attempt {attempt+1}/{max_retries}: Loading model `{model_name}` on `{device}`...")
-
-            # Load the model
-            if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
-                model = loader(
-                    device=device,
-                    model_properties=model_properties,
-                    model_auth=model_auth,
-                )
-            else:
-                model = loader(
-                    model_properties.get('name', None),
-                    device=device,
-                    embedding_dim=model_properties['dimensions'],
-                    model_properties=model_properties,
-                    model_auth=model_auth,
-                    max_seq_length=model_properties.get('tokens', get_default_seq_length())
-                )
-
-            model.load()  # Load the model
-            print(f"✅ Model `{model_name}` loaded successfully on `{device}`.")
-            return model  # ✅ Success, return the model
-
-        except (ReadTimeoutError, requests.exceptions.Timeout, OSError, RuntimeError) as e:
-            print(f"⚠️ Error loading model `{model_name}` on `{device}`: {e}")
-            attempt += 1
-
-            if attempt >= max_retries:
-                raise e
-
-            # Wait before retrying (randomized to avoid collisions)
-            sleep_time = retry_delay + random.uniform(1, 3)
-            print(f"🔄 Retrying in {sleep_time:.2f} seconds...")
-            time.sleep(sleep_time)
+    # TODO For each refactored model class, add a new elif block here and remove the if block
+    #  once we have all models refactored
+    if model_type in (ModelType.OpenCLIP, ModelType.HF_MODEL, ModelType.HF_STELLA, ModelType.LanguageBind):
+        model = loader(
+            device=device,
+            model_properties=model_properties,
+            model_auth=model_auth,
+        )
+    else:
+        model = loader(
+            model_properties.get('name', None),
+            device=device,
+            embedding_dim=model_properties['dimensions'],
+            model_properties=model_properties,
+            model_auth=model_auth,
+            max_seq_length=model_properties.get('tokens', get_default_seq_length())
+        )
+    model.load()
+    return model
 
 
 def clear_loaded_models() -> None:

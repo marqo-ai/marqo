@@ -87,8 +87,7 @@ class TestCorruptFileInOpenCLIP(unittest.TestCase):
                     _ = _load_model(**self.load_parameters, model_properties=model_properties)
                 self.assertIn("Marqo encountered an error while attempting to delete a corrupted file",
                               str(context.exception))
-                mock_os_remove.assert_called_with(self.dummpy_corrupted_file)
-                self.assertEqual(mock_os_remove.call_count, 3) # retries 3 times
+                mock_os_remove.assert_called_once_with(self.dummpy_corrupted_file)
 
 
                 # Reset the mock
