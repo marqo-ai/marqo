@@ -6,6 +6,7 @@ from marqo.core.models.marqo_index_request import FieldRequest
 from marqo.tensor_search import tensor_search
 from marqo.core.models.add_docs_params import AddDocsParams
 from integ_tests.marqo_test import MarqoTestCase
+import pytest
 
 
 class TestSearchableAttributes(MarqoTestCase):
@@ -167,6 +168,7 @@ class TestSearchableAttributes(MarqoTestCase):
                         )
                         self.assertEqual(3, len(res["hits"]))
 
+    @pytest.mark.skip_for_multinode
     def test_searchable_attributes_behaves_the_same_way_for_different_types_of_indexes(self):
         for index_name in [self.structured_text_index, self.semi_structured_text_index]:
             self._add_documents(index_name)

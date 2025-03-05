@@ -215,6 +215,7 @@ class TestOpenCLIPModelLoad(TestCase):
                         )
                         mock_tokenizer.assert_called_once_with("ViT-B-32")
                         mock_path_exists.assert_called_once_with("/path/to/my_test_model.pt")
+
     def test_load_OpenCLIPModel_with_auth_s3(self):
         """Ensure that the model/checkpoint is downloaded with the correct S3 authentication."""
         model_tag = "my_test_model"

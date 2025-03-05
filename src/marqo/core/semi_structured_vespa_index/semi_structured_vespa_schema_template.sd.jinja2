@@ -6,7 +6,6 @@ schema {{ index.schema_name }} {
             attribute: fast-search
             rank: filter
         }
-
         {# Reserved fields for bool, int and float fields -#}
         field marqo__int_fields type map<string, long> {
             indexing: summary

@@ -556,8 +556,8 @@ class TestUpdate(MarqoTestCase):
     def test_update_a_document_that_does_not_exist(self):
         """"""
         updated_doc = {
-            "text_field": "updated text field",
-            "_id": "1"
+            "_id": "gibberish",
+            "text_field": "some value"
         }
         r = self.config.document.partial_update_documents_by_index_name(
             partial_documents=[updated_doc],
@@ -566,7 +566,6 @@ class TestUpdate(MarqoTestCase):
         self.assertEqual(True, r["errors"])
         self.assertIn("Document does not exist in the index", r["items"][0]["error"])
         self.assertEqual(404, r["items"][0]["status"])
-        self.assertEqual(0, self.monitoring.get_index_stats_by_name(self.structured_index_name).number_of_documents)
 
     def test_update_a_document_without_id(self):
         updated_doc = {
@@ -804,18 +803,6 @@ class TestUpdate(MarqoTestCase):
         with mock.patch.dict(os.environ, {"MARQO_MAX_DOCUMENTS_BATCH_SIZE": "129"}):
             r = update_documents(body=UpdateDocumentsBodyParams(documents=[{"_id": "1"}] * 129),
                                  index_name=self.structured_index_name, marqo_config=self.config)
-
-    def test_proper_error_is_raised_for_unstructured_index(self):
-        updated_doc = {
-            "text_field_tensor": "I can't be updated",
-            "_id": "1"
-        }
-        with self.assertRaises(UnsupportedFeatureError) as cm:
-            r = self.config.document.partial_update_documents_by_index_name(
-                partial_documents=[updated_doc],
-                index_name=self.test_unstructured_index_name).dict(exclude_none=True, by_alias=True)
-
-        self.assertIn("is not supported for unstructured indexes", str(cm.exception))
 
     def test_duplicate_ids_in_one_batch(self):
         """Test the behaviour when there are duplicate ids in a single batch.

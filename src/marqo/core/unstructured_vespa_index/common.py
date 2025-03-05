@@ -21,6 +21,7 @@ RANK_PROFILE_BM25_MODIFIERS = "bm25_modifiers"
 
 MARQO_DOC_MULTIMODAL_PARAMS = "multimodal_params"
 VESPA_DOC_MULTIMODAL_PARAMS = "marqo__multimodal_params"
+MARQO_DOC_MULTIMODAL_PARAMS_WEIGHTS = "weights"
 
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
 SUMMARY_ALL_VECTOR = 'all-vector-summary'
