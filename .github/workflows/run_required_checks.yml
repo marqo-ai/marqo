@@ -5,6 +5,9 @@ on:
       - mainline
       - releases/*
 
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   Determine-changes:
