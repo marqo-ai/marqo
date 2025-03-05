@@ -60,10 +60,7 @@ jobs:
     with:
       base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
       ec2-instance-type: m6i.xlarge
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+    secrets: inherit
 
   compatibility_tests:
     # This job runs on the newly created runner
@@ -126,5 +123,4 @@ jobs:
     with:
       label: ${{ needs.start-runner.outputs.label }}
       ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+    secrets: inherit

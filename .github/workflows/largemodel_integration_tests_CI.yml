@@ -1,5 +1,5 @@
-name: largemodel_unit_test_CI
-# Runs unit tests on CUDA machine with large model tests.
+name: Large Model Integration Tests CI
+# Runs integration tests on CUDA machine with large model tests.
 
 on:
   workflow_call:
@@ -18,7 +18,7 @@ on:
       - '**.md'
 
 concurrency:
-  group: large-model-unit-tests-${{ github.ref }}
+  group: large-model-integration-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -31,40 +31,28 @@ jobs:
     with:
       base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
       ec2-instance-type: g4dn.2xlarge
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+    secrets: inherit
 
   Start-Runner2:
     uses: ./.github/workflows/start_ec2_runner.yml
     with:
       base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
       ec2-instance-type: g4dn.2xlarge
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+    secrets: inherit
 
   Start-Runner3:
     uses: ./.github/workflows/start_ec2_runner.yml
     with:
       base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
       ec2-instance-type: g4dn.2xlarge
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+    secrets: inherit
 
   Start-Runner4:
     uses: ./.github/workflows/start_ec2_runner.yml
     with:
       base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
       ec2-instance-type: g4dn.2xlarge
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+    secrets: inherit
 
   Create-Matrix:
     needs:
@@ -88,13 +76,14 @@ jobs:
           echo "ec2-instance-ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
 
   Test-Marqo:
-    name: Run Large Model Unit Tests (Part ${{ matrix.part }}/3)
+    name: Run Large Model Integration Tests (Part ${{ matrix.part }}/3)
     needs: Create-Matrix # Ensures it starts only after the runners are ready
     strategy:
       matrix:
         part: [ 0, 1, 2, 3 ] # Zero-based index for JSON list access
     runs-on: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.part] }} # Selects the correct runner
     environment: marqo-test-suite
+    timeout-minutes: 60
 
     steps:
       - name: Checkout marqo repo
@@ -148,7 +137,7 @@ jobs:
       - name: Start Vespa
         run: python marqo/scripts/vespa_local/vespa_local.py full-start --Shards ${{ inputs.number_of_shards || 1 }} --Replicas ${{ inputs.number_of_replicas || 0 }}
 
-      - name: Run Large Model Unit Tests (Part ${{ matrix.part }})
+      - name: Run Large Model Integration Tests (Part ${{ matrix.part }})
         run: |
           # Define these for use by Marqo
           export VESPA_CONFIG_URL=http://localhost:19071
@@ -179,5 +168,4 @@ jobs:
     with:
       label: ${{ fromJSON(needs.Create-Matrix.outputs.labels)[matrix.instance] }}
       ec2-instance-id: ${{ fromJSON(needs.Create-Matrix.outputs.ec2-instance-ids)[matrix.instance] }}
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+    secrets: inherit

@@ -37,10 +37,8 @@ jobs:
     with:
       base-ami-id: ${{ vars.MARQO_CUDA_TESTS_INSTANCE_AMI }}
       ec2-instance-type: g4dn.2xlarge
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-      MARQO_WORKFLOW_TESTS_SUBNET_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+    secrets: inherit
+
 
   Test-Marqo:
     name: Run CUDA Docker Marqo API Tests
@@ -93,5 +91,5 @@ jobs:
     with:
       label: ${{ needs.start-runner.outputs.label }}
       ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
-    secrets:
-      GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+    secrets: inherit
+
