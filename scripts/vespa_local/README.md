@@ -8,6 +8,13 @@ variable to the desired version. For example:
 ```commandline
 export VESPA_VERSION="latest"
 ```
+### Set Vespa max disk utilization
+**NOTE:** Not recommended for production use. This is only for local development.
+- By default, Vespa has limit of 0.75 (75%) disk utilization. To change it, set the `VESPA_DISK_USAGE_LIMIT` variable to float
+value between 0 and 1. For example:
+```commandline
+export VESPA_DISK_USAGE_LIMIT=0.9
+```
 ## Single Node Vespa (default & recommended)
 - Runs 1 Vespa container on your machine. This serves as the config, api, and content node.
 - This is equivalent to running Vespa with 0 replicas and 1 shard.

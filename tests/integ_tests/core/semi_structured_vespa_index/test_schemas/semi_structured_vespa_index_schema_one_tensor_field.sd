@@ -6,6 +6,21 @@ schema marqo__test_00semi_00structured_00schema {
             rank: filter
         }
 
+        field marqo__create_timestamp type double {
+                    indexing: attribute | summary
+                    attribute: fast-search
+                    rank: filter
+                }
+
+        field marqo__field_types type map<string, string> {
+            struct-field key { indexing : attribute
+                               attribute: fast-search
+                               rank: filter }
+            struct-field value { indexing : attribute
+                                  attribute: fast-search
+                                  rank: filter }
+        }
+
         field marqo__int_fields type map<string, long> {
             indexing: summary
             struct-field key { indexing : attribute
@@ -44,12 +59,6 @@ schema marqo__test_00semi_00structured_00schema {
             struct-field value { indexing : attribute
                                   attribute: fast-search
                                   rank: filter }
-        }
-
-        field marqo__string_array type array<string> {
-            indexing: attribute | summary
-            attribute: fast-search
-            rank: filter
         }
 
         field marqo__score_modifiers type tensor<double>(p{}) {
@@ -131,7 +140,7 @@ schema marqo__test_00semi_00structured_00schema {
 
     document-summary all-non-vector-summary {
         summary marqo__id type string {}
-        summary marqo__string_array type array<string> {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}
@@ -140,7 +149,7 @@ schema marqo__test_00semi_00structured_00schema {
 
     document-summary all-vector-summary {
         summary marqo__id type string {}
-        summary marqo__string_array type array<string> {}
+        summary marqo__field_types type map<string, string> {}
         summary marqo__bool_fields type map<string, byte> {}
         summary marqo__int_fields type map<string, long> {}
         summary marqo__float_fields type map<string, double> {}

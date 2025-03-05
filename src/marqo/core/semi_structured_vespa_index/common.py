@@ -1,3 +1,5 @@
+import semver
+
 VESPA_FIELD_ID = "marqo__id"
 STRINGS = "marqo__strings"
 SHORT_STRINGS_FIELDS = "marqo__short_string_fields"
@@ -19,6 +21,10 @@ RANK_PROFILE_BM25_MODIFIERS = "bm25_modifiers"
 
 MARQO_DOC_MULTIMODAL_PARAMS = "multimodal_params"
 VESPA_DOC_MULTIMODAL_PARAMS = "marqo__multimodal_params"
+
+# A metadata field that's used to store a dictionary of key-value pairs where key is the field name and value is a string denoting the field type
+VESPA_DOC_FIELD_TYPES = "marqo__field_types"
+VESPA_DOC_CREATE_TIMESTAMP = "marqo__create_timestamp"
 
 SUMMARY_ALL_NON_VECTOR = 'all-non-vector-summary'
 SUMMARY_ALL_VECTOR = 'all-vector-summary'
@@ -51,3 +57,5 @@ QUERY_INPUT_HYBRID_FIELDS_TO_RANK_TENSOR = "marqo__fields_to_rank_tensor"
 
 VESPA_DOC_HYBRID_RAW_TENSOR_SCORE = 'marqo__raw_tensor_score'
 VESPA_DOC_HYBRID_RAW_LEXICAL_SCORE = 'marqo__raw_lexical_score'
+
+SEMISTRUCTURED_INDEX_PARTIAL_UPDATE_SUPPORT_VERSION = semver.VersionInfo.parse("2.16.0") #Denotes the Marqo version from which partial update support for semi-structured index was added

@@ -25,7 +25,7 @@ class UnstructuredVespaIndex(VespaIndex):
     def get_vespa_id_field(self) -> str:
         return unstructured_common.VESPA_FIELD_ID
 
-    def to_vespa_partial_document(self, marqo_document: Dict[str, Any]) -> Dict[str, Any]:
+    def to_vespa_partial_document(self, marqo_document: Dict[str, Any], existing_vespa_document: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         raise NotImplementedError("Partial document update is not supported for unstructured indexes. This"
                                   "function should not be called.")
 

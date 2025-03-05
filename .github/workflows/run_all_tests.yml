@@ -63,10 +63,10 @@ jobs:
     uses: ./.github/workflows/cpu_docker_marqo.yml
     secrets: inherit
 
-  run-largemodel-unit-tests:
+  run-largemodel-integration-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/largemodel_unit_test_CI.yml
+    uses: ./.github/workflows/largemodel_integration_tests_CI.yml
     secrets: inherit
 
   run-cpu-local-tests:
@@ -75,16 +75,16 @@ jobs:
     uses: ./.github/workflows/cpu_local_marqo.yml
     secrets: inherit
 
-  run-unit-tests:
+  run-integration-tests:
     needs: should-tests-run
     if: needs.should-tests-run.outputs.decision == 'true'
-    uses: ./.github/workflows/unit_test_200gb_CI.yml
+    uses: ./.github/workflows/integration_tests_CI.yml
     secrets: inherit
 
   summary:
     if: ${{ always() }}
     name: Test Summary
-    needs: [should-tests-run, run-arm64-tests, run-cuda-tests, run-cpu-docker-tests, run-largemodel-unit-tests, run-cpu-local-tests, run-unit-tests]
+    needs: [should-tests-run, run-arm64-tests, run-cuda-tests, run-cpu-docker-tests, run-largemodel-integration-tests, run-cpu-local-tests, run-integration-tests]
     runs-on: ubuntu-latest
     steps:
     - name: Check test results

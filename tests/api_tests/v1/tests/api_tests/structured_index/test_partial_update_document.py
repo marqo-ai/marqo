@@ -16,9 +16,6 @@ class TestStructuredUpdateDocuments(MarqoTestCase):
     large_score_modifier_index_name = ("update_doc_api_test_score_modifier_index" +
                                         str(uuid.uuid4()).replace('-', ''))
 
-    test_unstructured_index_name = ("update_doc_api_test_unstructured_index" +
-                                    str(uuid.uuid4()).replace('-', ''))
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -61,17 +58,11 @@ class TestStructuredUpdateDocuments(MarqoTestCase):
                     ["score_modifier", "filter"]} for i in range(100)] +
                 [{"name": "text_field_tensor", "type": "text"}],
                 "tensorFields": ["text_field_tensor"],
-            },
-            {
-                "indexName": cls.test_unstructured_index_name,
-                "type": "unstructured",
-                "model": "random/small",
             }
         ]
         )
 
-        cls.indexes_to_delete = [cls.update_doc_index_name, cls.large_score_modifier_index_name,
-                                 cls.test_unstructured_index_name]
+        cls.indexes_to_delete = [cls.update_doc_index_name, cls.large_score_modifier_index_name]
 
     def tearDown(self):
         if self.indexes_to_delete:
@@ -744,15 +735,3 @@ class TestStructuredUpdateDocuments(MarqoTestCase):
             self.client.index(self.update_doc_index_name).update_documents(documents=documents)
 
         self.assertIn("Number of docs in update_documents request (129) exceeds", str(e.exception))
-
-    def test_proper_error_on_unstructured_index(self):
-        """Test that an error is thrown when attempting to update a document in an unstructured index."""
-        updated_doc = {
-            "text_field": "updated text field",
-            "_id": "1"
-        }
-
-        with self.assertRaises(MarqoWebError) as e:
-            self.client.index(self.test_unstructured_index_name).update_documents(documents=[updated_doc])
-
-        self.assertIn("is not supported for unstructured indexes", str(e.exception))

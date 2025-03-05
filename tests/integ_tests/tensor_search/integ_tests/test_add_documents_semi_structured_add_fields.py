@@ -309,7 +309,7 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         self.assertEqual({'2', '3'}, {hit['_id'] for hit in res['hits']})
 
     def test_add_documents_should_raise_error_when_field_count_exceeds_limit(self):
-        field_count_config = SemiStructuredFieldCountConfig(max_lexical_field_count=6, max_tensor_field_count=5)
+        field_count_config = SemiStructuredFieldCountConfig(max_lexical_field_count=6, max_tensor_field_count=5, max_string_array_field_count=5)
         self.config.document.add_documents(
             AddDocsParams(
                 index_name=self.text_index_6,
@@ -320,6 +320,11 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
                     "tensor_field3": "content 3",
                     "tensor_field4": "content 4",
                     "tensor_field5": "content 5",
+                    "string_array_field1": ["content 1"],
+                    "string_array_field2": ["content 2"],
+                    "string_array_field3": ["content 3"],
+                    "string_array_field4": ["content 4"],
+                    "string_array_field5": ["content 5"],
                 }],
                 device="cpu", tensor_fields=[
                     "tensor_field1",
@@ -360,4 +365,19 @@ class TestAddDocumentsSemiStructuredAddFields(MarqoTestCase):
         self.assertIn('has 6 lexical fields. Your request to add lexical_field7 as a lexical field is '
                       'rejected since it exceeds the limit of 6. Please set a larger limit in '
                       'MARQO_MAX_LEXICAL_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err2.exception))
+
+        with self.assertRaises(TooManyFieldsError) as err3:
+            self.config.document.add_documents(AddDocsParams(
+                index_name=self.text_index_6,
+                docs=[{
+                    "_id": "4",
+                    "string_array_field6": ["content 1"],
+                    "string_array_field7": ["content 2"],
+                }],
+                tensor_fields=[]),
+                field_count_config=field_count_config
+            )
+            self.assertIn('has 5 string array fields. Your request to add string_array_field7 as a string array field is '
+                          'rejected since it exceeds the limit of 5. Please set a larger limit in '
+                          'MARQO_MAX_STRING_ARRAY_FIELD_COUNT_UNSTRUCTURED environment variable.', str(err3.exception))
 
