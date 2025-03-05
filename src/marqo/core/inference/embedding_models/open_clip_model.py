@@ -210,8 +210,11 @@ class OPEN_CLIP(AbstractCLIPModel):
 
     def _load_tokenizer_from_checkpoint(self) -> Callable:
         if not self.model_properties.tokenizer:
-            # Replace '/'with '-' to support old clip model name style
-            return open_clip.get_tokenizer(self.model_properties.name.replace("/", "-"))
+            if self.model_properties.name.startswith(HF_HUB_PREFIX):
+                return open_clip.get_tokenizer(self.model_properties.name)
+            else:
+                # Replace '/'with '-' to support old clip model name style
+                return open_clip.get_tokenizer(self.model_properties.name.replace("/", "-"))
         else:
             logger.info(f"Custom HFTokenizer is provided. Loading...")
             return HFTokenizer(self.model_properties.tokenizer)
@@ -251,14 +254,14 @@ class OPEN_CLIP(AbstractCLIPModel):
                      media_download_headers: Optional[Dict] = None,
                      normalize=True) -> FloatTensor:
 
-        self.image_input_processed: Tensor = self._preprocess_images(images, media_download_headers)
+        image_input_processed: Tensor = self._preprocess_images(images, media_download_headers)
 
         with torch.no_grad():
             if self.device.startswith("cuda"):
                 with torch.cuda.amp.autocast():
-                    outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+                    outputs = self.model.encode_image(image_input_processed).to(torch.float32)
             else:
-                outputs = self.model.encode_image(self.image_input_processed).to(torch.float32)
+                outputs = self.model.encode_image(image_input_processed).to(torch.float32)
 
         if normalize:
             _shape_before = outputs.shape
