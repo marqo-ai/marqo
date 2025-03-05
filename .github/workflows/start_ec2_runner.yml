@@ -1,0 +1,65 @@
+name: Start EC2 Runner
+
+on:
+  workflow_call:
+    inputs:
+      base-ami-id:
+        description: 'Base AMI ID for the EC2 runner'
+        required: true
+        type: string
+      ec2-instance-type:
+        description: 'Instance type for the EC2 runner'
+        required: true
+        type: string
+    secrets:
+      GH_PERSONAL_ACCESS_TOKEN:
+        required: true
+      MARQO_WORKFLOW_TESTS_SUBNET_ID:
+        required: true
+      MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID:
+        required: true
+    outputs:
+      label:
+        description: "EC2 Runner Label"
+        value: ${{ jobs.Start-Runner.outputs.label }}
+      ec2-instance-id:
+        description: "EC2 Instance ID"
+        value: ${{ jobs.Start-Runner.outputs.ec2-instance-id }}
+
+jobs:
+  Start-Runner:
+    name: Start EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::424082663841:role/GhRunnerManagerRole-Marqo
+
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+          ec2-image-id: ${{ inputs.base-ami-id }}
+          ec2-instance-type: ${{ inputs.ec2-instance-type }}
+          subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
+          security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
+          aws-resource-tags: >
+            [
+              {"Key": "Name", "Value": "marqo-github-runner-${{ github.run_id }}"},
+              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
+              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
+              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
+              {"Key": "WorkflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
+              {"Key": "PoloRole", "Value": "testing"}
+            ]
+
+permissions:
+  contents: read
+  id-token: write
