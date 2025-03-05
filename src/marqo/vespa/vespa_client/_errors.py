@@ -28,6 +28,7 @@ from marqo.vespa.exceptions import (
     VespaStatusError, VespaError, VespaTimeoutError, InvalidVespaApplicationError, VespaActivationConflictError
 )
 from marqo.vespa.models import QueryResult, Error
+from marqo.marqo_docs import update_documents_response
 import marqo.logging
 if TYPE_CHECKING:
     from ._client_base import VespaClientBase
@@ -127,8 +128,10 @@ class VespaErrorHandlingMixin:
         vespa_status_code_to_marqo_doc_error_map = {
             200: (200, None),
             404: (404, "Document does not exist in the index"),
-            # Update documents get 412 from Vespa for document not found as we use condition
-            412: (404, "Document does not exist in the index"),
+            412: (
+                400,
+                "Marqo vector store couldn't update the document. Please see: " + update_documents_response() + " for more details"
+            ),
             429: (429, "Marqo vector store receives too many requests. Please try again later"),
             507: (400, "Marqo vector store is out of memory or disk space"),
         }

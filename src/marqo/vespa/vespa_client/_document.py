@@ -50,6 +50,8 @@ from marqo.vespa.models.delete_document_response import DeleteDocumentResponse, 
 from marqo.vespa.models.get_document_response import GetDocumentResponse, VisitDocumentsResponse, GetBatchResponse, \
     GetBatchDocumentResponse
 from ...core.models import MarqoIndex
+from ...core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, VESPA_DOC_CREATE_TIMESTAMP
+from ...core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 
 if TYPE_CHECKING:
     from ._client_base import VespaClientBase
@@ -224,9 +226,12 @@ class VespaDocumentMixin:
 
         return VisitDocumentsResponse(**resp.json())
 
-    def get_batch(
-            self, ids: List[str], schema: str, concurrency: Optional[int] = None,
-            timeout: int = 60) -> GetBatchResponse:
+    def get_batch(self,
+                  ids: List[str],
+                  schema: str,
+                  fields: Optional[List[str]] = None,
+                  concurrency: Optional[int] = None,
+                  timeout: int = 60) -> GetBatchResponse:
         """
         Get a batch of documents by ID concurrently.
 
@@ -237,6 +242,7 @@ class VespaDocumentMixin:
         Args:
             ids: List of document IDs to get
             schema: Schema to get from
+            fields: A optional list of fields to fetch from the document
             concurrency: Number of concurrent get requests
             timeout: Timeout in seconds per request
 
@@ -250,7 +256,7 @@ class VespaDocumentMixin:
             concurrency = self.get_pool_size
 
         batch_response = conc.run_coroutine(
-            self._get_batch_async(ids, schema, concurrency, timeout)
+            self._get_batch_async(ids, fields, schema, concurrency, timeout)
         )
 
         return batch_response
@@ -403,15 +409,27 @@ class VespaDocumentMixin:
                                      timeout: int, vespa_id_field: str) -> UpdateDocumentResponse:
         doc_id = document.id
         data = {'fields': document.fields}
+        types = document.field_types
+        create_timestamp = document.create_timestamp
 
         # only used for documents that are not updated
         error_doc_path_id = f"/document/v1/{schema}/{schema}/docid/{doc_id}"
-
         async with semaphore:
             end_point = f'{self.document_url}/document/v1/{schema}/{schema}/docid/{doc_id}?create=false'
             data["condition"] = f'{schema}.{vespa_id_field}==\"{doc_id}\"'
+            if types is not None: # Types will be none for structured index as we are not storing types at the time of Add docs.
+                for key, value in types.items():
+                    data["condition"] += (f' and (not {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}} or {schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}==\"{value}\")'
+                                          f' and (not ({schema}.{VESPA_DOC_FIELD_TYPES}{{\"{key}\"}}=="{MarqoFieldTypes.TENSOR.value}"))')
+            if create_timestamp is not None:
+                data["condition"] += f' and {schema}.{VESPA_DOC_CREATE_TIMESTAMP}=={create_timestamp}'
             try:
                 resp = await async_client.put(end_point, json=data, timeout=timeout)
+                if resp.status_code == 412 and types is None and create_timestamp is None:
+                    # If Vespa response is 412, and the request is for structured index, it means the document does not exist
+                    # in the index, as we don't have type checks / timestamp (version) checks for structured indexes.
+                    # We return a 404 error for this case.
+                    resp.status_code = 404
             except httpx.RequestError as e:
                 logger.error(e, exc_info=True)
                 return UpdateDocumentResponse(status=500, message="Network Error", id=doc_id, path_id=error_doc_path_id)
@@ -430,6 +448,7 @@ class VespaDocumentMixin:
                 logger.error(e, exc_info=True)
                 return UpdateDocumentResponse(status=resp.status_code, message=e.message, id=doc_id,
                                               error_doc_path_id=error_doc_path_id)
+
 
     async def _feed_document_async(self: "VespaClientBase", semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient,
                                    document: VespaDocument, schema: str,
@@ -517,16 +536,39 @@ class VespaDocumentMixin:
 
         return GetBatchResponse(responses=responses, errors=errors)
 
-    async def _get_document_async(self: "VespaClientBase",
+    async def _get_document_async(
+            self: "VespaClientBase", semaphore: asyncio.Semaphore, async_client: httpx.AsyncClient, id: str, fields: Optional[List[str]],
+            schema: str, timeout: int) -> GetBatchDocumentResponse:
+        async with semaphore:
+            try:
+                if fields is not None:
+                    resp = await async_client.get(
+                        f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{",".join(fields)}',
+                        timeout=timeout
+                    )
+                else:
+                    resp = await async_client.get(
+                        f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}', timeout=timeout
+                    )
+            except httpx.HTTPError as e:
+                raise VespaError(e) from e
+
+            if resp.status_code in [200, 404]:
+                return GetBatchDocumentResponse(**resp.json(), status=resp.status_code)
+
+            self._raise_for_status(resp)
+
+    async def _get_document_async_with_specific_fields(self: "VespaClientBase",
                                   semaphore: asyncio.Semaphore,
                                   async_client: httpx.AsyncClient,
                                   id: str,
+                                  fields: List[str],
                                   schema: str,
                                   timeout: int) -> GetBatchDocumentResponse:
         async with semaphore:
             try:
                 resp = await async_client.get(
-                    f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}', timeout=timeout
+                    f'{self.document_url}/document/v1/{schema}/{schema}/docid/{id}?fieldSet={schema}:{",".join(fields)}', timeout=timeout
                 )
             except httpx.HTTPError as e:
                 raise VespaError(e) from e
