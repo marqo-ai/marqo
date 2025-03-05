@@ -1,0 +1,42 @@
+name: Run Required Checks
+on:
+  pull_request:
+    branches:
+      - mainline
+      - releases/*
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  Determine-changes:
+    name: Determine Scope of Changes
+    runs-on: ubuntu-latest
+    outputs:
+      non_documentation_changes_found: ${{ steps.check_changes.outputs.non_documentation_changes_found }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Non-Markdown Changes
+        id: check_changes
+        run: |
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -vE '\.md$'; then
+            echo "non_documentation_changes_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "non_documentation_changes_found=false" >> $GITHUB_OUTPUT
+          fi
+
+  Run-integration-tests:
+    needs: Determine-changes
+    if: ${{ needs.Determine-changes.outputs.non_documentation_changes_found == 'true' }}
+    uses: ./.github/workflows/integration_tests_CI.yml
+    with:
+      number_of_shards: 1
+      number_of_replicas: 0
+    secrets: inherit
+
+  # TODO: Add more jobs here as needed
