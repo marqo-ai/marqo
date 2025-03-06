@@ -19,16 +19,10 @@ class BaseUnitTest(unittest.TestCase):
         cls.mock_get_request.return_value = cls.mock_request
         RequestMetricsStore.set_in_request(cls.mock_request)
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.metrics_store_patcher.stop()
+        cls.model = Model(name="hf/all_datasets_v4_MiniLM-L6")
 
-    def setUp(self):
-        # Create a real StructuredMarqoIndex instance with the same schema as `default_text_index`
-        self.model = Model(name="hf/all_datasets_v4_MiniLM-L6")
-
-        self.structured_index = StructuredMarqoIndex(
-            name="index_name", schema_name="test_schema", type=IndexType.Structured, model=self.model,
+        cls.structured_index = StructuredMarqoIndex(
+            name="index_name", schema_name="test_schema", type=IndexType.Structured, model=cls.model,
             normalize_embeddings=True,
             text_preprocessing=TextPreProcessing(split_length=5, split_overlap=2, split_method="word"),
             image_preprocessing=ImagePreProcessing(patch_method=None), distance_metric=DistanceMetric.Euclidean,
@@ -36,10 +30,10 @@ class BaseUnitTest(unittest.TestCase):
             marqo_version="2.16.0", created_at=1234567890, updated_at=1234567890, fields=[Field(
                 name="text_field_1", type=FieldType.Text, features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
                 lexical_field_name="text_field_1", filter_field_name="text_field_1"
-                ), Field(
+            ), Field(
                 name="text_field_2", type=FieldType.Text, features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
                 lexical_field_name="text_field_2", filter_field_name="text_field_2"
-                ), Field(
+            ), Field(
                 name="int_field_1", type=FieldType.Int, features=[FieldFeature.Filter], filter_field_name="text_field_1"
             ), Field(
                 name="float_field_1", type=FieldType.Float, features=[FieldFeature.Filter],
@@ -49,7 +43,7 @@ class BaseUnitTest(unittest.TestCase):
                     "text_field_1": 1.0,
                     "text_field_2": 2.0
                 }
-                ), Field(
+            ), Field(
                 name="custom_vector_field", type=FieldType.CustomVector, )], tensor_fields=[
                 TensorField(name="text_field_1", chunk_field_name="text_field_1", embeddings_field_name="text_field_1"),
                 TensorField(name="text_field_2", chunk_field_name="text_field_2", embeddings_field_name="text_field_2"),
@@ -62,19 +56,41 @@ class BaseUnitTest(unittest.TestCase):
                 )]
         )
 
-        self.vespa_client_mock = MagicMock()
-        self.config = Config(self.vespa_client_mock)
-        self.logger_mock = MagicMock()
+        cls.vespa_client_mock = MagicMock()
+        cls.config = Config(cls.vespa_client_mock)
+        cls.logger_mock = MagicMock()
 
-        self.get_index_patcher = patch(
-            "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=self.structured_index
+        cls.get_index_patcher = patch(
+            "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=cls.structured_index
         )
-        self.logger_patcher = patch(
-            "marqo.tensor_search.tensor_search.logger", self.logger_mock
+        cls.logger_patcher = patch(
+            "marqo.tensor_search.tensor_search.logger", cls.logger_mock
         )
 
-        self.get_index_patcher.start()
-        self.logger_patcher.start()
+        cls.get_index_patcher.start()
+        cls.logger_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.metrics_store_patcher.stop()
+
+    def get_expected_tensor_yql(cls, index=None, target_hits=3):
+        if index is None:
+            index = cls.structured_index
+        yql = f"select * from {index.schema_name} where ("
+        for field in index.fields:
+            if field.type in (FieldType.Float, FieldType.Int):
+                continue
+            yql += (
+                f"({{targetHits:{target_hits}, approximate:True, hnsw.exploreAdditionalHits:1997}}"
+                f"nearestNeighbor({field.name}, marqo__query_embedding)) OR "
+            )
+        return yql[:-4] + ")"
+
+    def get_expected_lexical_yql(self, query, index=None):
+        if index is None:
+            index = self.structured_index
+        return f'select * from {index.schema_name} where (weakAnd(default contains "{query}"))'
 
     def set_index_to_return(self, index):
         self.get_index_patcher.stop()
@@ -83,6 +99,14 @@ class BaseUnitTest(unittest.TestCase):
         )
         self.get_index_patcher.start()
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.get_index_patcher.stop()
+        cls.logger_patcher.stop()
+
     def tearDown(self):
         self.get_index_patcher.stop()
-        self.logger_patcher.stop()
+        self.get_index_patcher = patch(
+            "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=self.structured_index
+        )
+        self.get_index_patcher.start()
