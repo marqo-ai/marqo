@@ -1,6 +1,10 @@
 # Execution workflow
 name: Marqo Compatibility Tests Execution
 
+permissions:
+  contents: read
+  id-token: write
+
 on:
   workflow_call:
     # from_version: Used as: the identifier for a workflow call, for logging purposes and for pulling image from DockerHub. We need to pass a version here: ex: 2.11.1
@@ -52,44 +56,12 @@ on:
 
 jobs:
   Start-Runner:
-    permissions:
-      contents: read # This permission is necessary to read repository contents
-      actions: write # Used by machulav/ec2-github-runner@v2 for managing self-hosted runners. The workflow needs to create and manage GitHub Actions runners on EC2
-      id-token: write # Used by aws-actions/configure-aws-credentials@v4. Required for AWS authentication and OIDC token management
-      checks: write # Used implicitly by GitHub Actions to report job statuses and create check runs
-      statuses: write # Used implicitly by GitHub Actions to report job statuses and create check runs
-    name: Start self-hosted EC2 runner
-    runs-on: ubuntu-latest
-    outputs:
-      label: ${{ steps.start-ec2-runner.outputs.label }}
-      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Start EC2 runner
-        id: start-ec2-runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: start
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          ec2-image-id: ${{ secrets.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
-          ec2-instance-type: m6i.xlarge
-          subnet-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SUBNET_ID }}
-          security-group-id: ${{ secrets.MARQO_WORKFLOW_TESTS_SECURITY_GROUP_ID }}
-          aws-resource-tags: > # optional, requires additional permissions
-            [
-              {"Key": "Name", "Value": "marqo-compatibility-test-runner-${{ github.run_id }}"},
-              {"Key": "GitHubRepo", "Value": "${{ github.repository }}"},
-              {"Key": "WorkflowName", "Value": "${{ github.workflow }}"},
-              {"Key": "WorkflowRunId", "Value": "${{ github.run_id }}"},
-              {"Key": "WorlflowURL", "Value": "${{ github.event.repository.html_url }}/actions/runs/${{ github.run_id }}"},
-              {"Key": "PoloRole", "Value": "testing"}
-            ]
-            
+    uses: ./.github/workflows/start_ec2_runner.yml
+    with:
+      base-ami-id: ${{ vars.MARQO_CPU_AMD64_TESTS_INSTANCE_AMI }}
+      ec2-instance-type: m6i.xlarge
+    secrets: inherit
+
   compatibility_tests:
     # This job runs on the newly created runner
     runs-on: ${{ needs.start-runner.outputs.label }}
@@ -143,29 +115,12 @@ jobs:
             --to_image "$TO_IMAGE" \
 
   Stop-Runner:
-    name: Stop self-hosted EC2 runner
-    permissions:
-      contents: read # This permission is necessary to read repository contents
-      actions: write # Used by machulav/ec2-github-runner@v2 for managing self-hosted runners. The workflow needs to create and manage GitHub Actions runners on EC2
-      id-token: write # Used by aws-actions/configure-aws-credentials@v4. Required for AWS authentication and OIDC token management
-      checks: write # Used implicitly by GitHub Actions to report job statuses and create check runs
-      statuses: write # Used implicitly by GitHub Actions to report job statuses and create check runs
     needs:
       - Start-Runner # required to get output from the start-runner job
       - compatibility_tests # required to wait when the main job is done
-    runs-on: ubuntu-latest
     if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.MARQO_WORKFLOW_TESTS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.MARQO_WORKFLOW_TESTS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      - name: Stop EC2 runner
-        uses: machulav/ec2-github-runner@v2
-        with:
-          mode: stop
-          github-token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
-          label: ${{ needs.start-runner.outputs.label }}
-          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
+    uses: ./.github/workflows/stop_ec2_runner.yml
+    with:
+      label: ${{ needs.start-runner.outputs.label }}
+      ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}
+    secrets: inherit
