@@ -6,11 +6,9 @@ schema marqo__test_00semi_00structured_00schema {
             rank: filter
         }
 
-        field marqo__create_timestamp type double {
-                    indexing: attribute | summary
-                    attribute: fast-search
-                    rank: filter
-                }
+        field marqo__version_uuid type string {
+                indexing: summary
+        }
 
         field marqo__field_types type map<string, string> {
             struct-field key { indexing : attribute

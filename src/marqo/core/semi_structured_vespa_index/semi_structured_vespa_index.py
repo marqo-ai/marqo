@@ -1,3 +1,4 @@
+import uuid
 from typing import Dict, Any, List, Optional, Type, Union, cast
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
@@ -218,7 +219,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             - 'id': Document ID
             - 'field_types': Field name to type mapping
             - 'fields': Field values
-            - 'create_timestamp': Original document timestamp if it exists
+            - 'version_uuid': Original document version_uuid if it exists
 
         Raises:
             MarqoDocumentParsingError: If '_id' field is missing
@@ -283,11 +284,15 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 vespa_fields=vespa_fields
             )
 
+        # Check if original_doc exists, then if fixed_fields exists, and only then access version_uuid
+        if original_doc is not None and original_doc.fixed_fields.version_uuid:
+            vespa_fields[common.VESPA_DOC_VERSION_UUID] = {"assign": str(uuid.uuid4())}
+            
         return {
             "id": doc_id,
             "fields": vespa_fields,
             "field_types": vespa_field_types,
-            "create_timestamp": original_doc.fixed_fields.create_timestamp if original_doc else None
+            "version_uuid": original_doc.fixed_fields.version_uuid if original_doc else None # Pass the original document's version uuid, if it exists.
         }
 
     def _update_score_modifiers(self, original_doc: Optional[SemiStructuredVespaDocument], 
