@@ -11,13 +11,15 @@ import uvicorn
 import vespa.application as pyvespa
 from starlette.applications import Starlette
 
-from marqo import config, version, tensor_search
+from marqo import config, version
+from marqo.config import Config
 from marqo.core.index_management.index_management import IndexManagement
+from marqo.core.models.add_docs_params import AddDocsParams
+from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import (StructuredMarqoIndexRequest, UnstructuredMarqoIndexRequest,
                                                    FieldRequest, MarqoIndexRequest)
 from marqo.core.monitoring.monitoring import Monitoring
-from marqo.tensor_search import tensor_search
 from marqo.tensor_search.telemetry import RequestMetricsStore
 from marqo.vespa.vespa_client import VespaClient
 from marqo.vespa.zookeeper_client import ZookeeperClient
@@ -110,9 +112,8 @@ class MarqoTestCase(unittest.TestCase):
         return indexes
 
     @classmethod
-    def add_documents(cls, *args, **kwargs):
-        # TODO change to use config.document.add_documents when tensor_search.add_documents is removed
-        return tensor_search.add_documents(*args, **kwargs)
+    def add_documents(cls, config: Config, add_docs_params: AddDocsParams) -> MarqoAddDocumentsResponse:
+        return config.document.add_documents(add_docs_params)
 
     def setUp(self) -> None:
         self.clear_indexes(self.indexes)
