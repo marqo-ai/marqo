@@ -932,7 +932,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["image_field_1"] if index_name == self.unstructured_image_index_unnormalized_name \
                 else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -966,7 +966,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["image_field_1"] if index_name == self.unstructured_marqo_index_name \
                 else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -999,7 +999,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
             tensor_fields = ["text_field_1"] if index_name == self.unstructured_text_index_unnormalized_name \
                 else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1046,7 +1046,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     }
             }
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1088,7 +1088,7 @@ class TestAddDocumentsCombined(MarqoTestCase):
                     }
             }
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1200,7 +1200,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             tensor_fields = ["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"] \
                 if index_name == self.unstructured_language_bind_index_name else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1232,7 +1232,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             tensor_fields = ["text_field_1", "image_field_1", "audio_field_1", "video_field_1", "multimodal_field"] \
                 if index_name == self.unstructured_language_bind_index_name else None
             with self.subTest(index_name):
-                res = tensor_search.add_documents(
+                res = self.add_documents(
                     self.config,
                     add_docs_params=AddDocsParams(
                         docs=documents,
@@ -1267,7 +1267,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                     tensor_fields = ["video_field_1", "text_field_1"] if "unstructured" in index else None
                     
                     # Add documents
-                    result = tensor_search.add_documents(
+                    result = self.add_documents(
                         config=self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index,
@@ -1319,7 +1319,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                         "_id": "1"
                     }
 
-                    res = tensor_search.add_documents(
+                    res = self.add_documents(
                         self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index,
@@ -1361,7 +1361,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
                         "_id": "1"
                     }
 
-                    res = tensor_search.add_documents(
+                    res = self.add_documents(
                         self.config,
                         add_docs_params=AddDocsParams(
                             index_name=index,
@@ -1394,7 +1394,7 @@ class TestLanguageBindModelAddDocumentCombined(MarqoTestCase):
             }
         ]
         with self.subTest("custom-languagebind-model-add-documents"):
-            res = tensor_search.add_documents(
+            res = self.add_documents(
                 self.config,
                 add_docs_params=AddDocsParams(
                     index_name=self.unstructured_custom_language_bind_index_name,

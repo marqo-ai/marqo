@@ -6,7 +6,8 @@ from unittest import mock
 
 import pytest
 
-from marqo.api.exceptions import IndexNotFoundError, BadRequestError
+from marqo.api.exceptions import BadRequestError
+from marqo.core.exceptions import IndexNotFoundError
 from marqo.core.models.marqo_index import *
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
