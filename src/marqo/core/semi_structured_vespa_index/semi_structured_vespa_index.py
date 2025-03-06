@@ -217,8 +217,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         Returns:
             Dict containing the Vespa partial document format with:
             - 'id': Document ID
-            - 'field_types': Field name to type mapping
-            - 'fields': Field values
+            - 'field_types': Field name to type mapping. Later used to create pre-conditions
+            - 'fields': Field values. Each field is represented as an update statement, for the actual field, the field type metadata, and the score modifiers if applicable. Example:
+                - 'marqo__bool_fields{active}': {"assign": 1}
+                - 'marqo__field_type{active}': {"assign": "bool"}
             - 'version_uuid': Original document version_uuid if it exists
 
         Raises:
@@ -240,7 +242,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         vespa_field_types = {}
 
         # Initialize dictionary to be later used for updating score modifiers. 
-        numeric_fields = {}
 
         numeric_field_map: Dict[str, Any] = dict() # This map is used to store the numeric fields in the document. It is used to update the numeric fields & score modifiers later
         if original_doc:
@@ -255,17 +256,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             validate_field_name(field_name)
 
             # This method broadly processes the field based on its type and updates the vespa_fields,
-            # vespa_field_types, numeric_fields, numeric_field_map dictionaries. Numeric fields and numeric field maps
+            # vespa_field_types, numeric_field_map dictionaries. Numeric fields and numeric field maps
             # are special cases and are processed later.
-            self._process_field(
-                field_name=field_name,
-                value=value,
-                fields=vespa_fields,
-                field_types=vespa_field_types,
-                numeric_fields=numeric_fields,
-                numeric_field_map=numeric_field_map,
-                doc_id=doc_id
-            )
+            self._process_field(field_name=field_name, value=value, fields=vespa_fields, field_types=vespa_field_types,
+                                numeric_field_map=numeric_field_map, doc_id=doc_id)
 
         # This method creates the update statement for updating int fields / int map fields.
         int_fields_changed = self._create_update_statement_for_updating_numeric_and_numeric_map_field(
@@ -347,16 +341,8 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         if len(score_modifiers) > 0:
             vespa_fields[common.SCORE_MODIFIERS] = score_modifiers
 
-    def _process_field(
-        self,
-        field_name: str,
-        value: Any,
-        fields: Dict[str, Any],
-        field_types: Dict[str, Any],
-        numeric_fields: Dict[str, Any],
-        numeric_field_map: Dict[str, Any],
-        doc_id: str
-    ) -> None:
+    def _process_field(self, field_name: str, value: Any, fields: Dict[str, Any], field_types: Dict[str, Any],
+                       numeric_field_map: Dict[str, Any], doc_id: str) -> None:
         """Process a single field from a document based on its type.
 
         This method determines the type of the field value and delegates processing to the appropriate handler method.
@@ -366,8 +352,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             field_name: The name of the field being processed
             value: The value of the field, can be of the type bool, dict, int, float, list, or str
             fields: Dictionary to store the update statements corresponding to the processed fields 
-            field_types: Dictionary mapping field names to their Marqo field types
-            numeric_fields: Dictionary storing numeric field values for being later used to update score modifier 
+            field_types: Dictionary mapping field names to their Marqo field types. Later used to create pre-conditions.
             doc_id: The ID of the document containing this field
 
         Raises:
@@ -543,8 +528,10 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             # Set the appropriate field type based on the value type
             if isinstance(v, int):
                 field_types[f'{field_name}.{k}'] = MarqoFieldTypes.INT_MAP.value
+                field_types[f'{field_name}'] = MarqoFieldTypes.INT_MAP.value
             else:  # Must be float based on the earlier check
                 field_types[f'{field_name}.{k}'] = MarqoFieldTypes.FLOAT_MAP.value
+                field_types[f'{field_name}'] = MarqoFieldTypes.FLOAT_MAP.value
 
     def _handle_string_array_field(
         self,

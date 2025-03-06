@@ -784,6 +784,10 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
         self.assertEqual(1, len(doc[enums.TensorField.tensor_facets]))
         self.assertIn("title", doc[enums.TensorField.tensor_facets][0])
 
+    def _assert_field_types(self, vespa_fields, field_names, field_types, id):
+        for field_name, field_type in zip(field_names, field_types):
+            self.assertEqual(vespa_fields['marqo__field_types'][field_name], field_type.value,
+                             f"Expected {field_name} to have type {field_type.value} for document {id}")
 
     def test_original_document_has_correct_field_types(self):
         """
@@ -793,14 +797,12 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
 
         Test that the original document has the correct field types for the fields that are added.
         """
-        self.doc = { # This document helps us understand / test behavior of partial updating fields when
-            # Those fields don't exist in the original document
+        self.doc = {
             '_id': '1',
             "string_array": ["aaa", "bbb"],
             "string_array2": ["123", "456"],
         }
-        self.doc2 = { # This document helps us test behavior of partial updating fields when
-            # Those fields already exist in the original document
+        self.doc2 = {
             '_id': '2',
             'tensor_field': 'title',
             'tensor_subfield': 'description',
@@ -820,7 +822,7 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             },
             "lexical_field": "some string that signifies lexical field"
         }
-        self.doc3 = { # This document doesn't contain any string arrays, it's used to test adding new string arrays
+        self.doc3 = {
             '_id': '3',
             'tensor_field': 'title',
             'tensor_subfield': 'description',
@@ -836,11 +838,6 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
                 "content": "abcd",
                 "vector": [1.0] * 32
             }
-        }
-        self.id_to_doc = {
-            '1': self.doc,
-            '2': self.doc2,
-            '3': self.doc3
         }
         self.add_documents(self.config, add_docs_params=AddDocsParams(
             index_name=self.default_text_index,
@@ -861,23 +858,116 @@ class TestAddDocumentsSemiStructured(MarqoTestCase):
             raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(
                 self.index.name).schema_name)
             vespa_fields = raw_vespa_doc.document.dict().get('fields')
+
+            field_names = [
+                'int_map.a', 'int_map.b', 'float_map.c', 'float_map.d', 'bool_field',
+                'short_string_field', 'long_string_field', 'int_field', 'float_field',
+                'bool_field2', 'custom_vector_field', 'tensor_field', 'tensor_subfield',
+                'multimodal_combo_field'
+            ]
+            field_types = [
+                MarqoFieldTypes.INT_MAP, MarqoFieldTypes.INT_MAP, MarqoFieldTypes.FLOAT_MAP,
+                MarqoFieldTypes.FLOAT_MAP, MarqoFieldTypes.BOOL, MarqoFieldTypes.STRING,
+                MarqoFieldTypes.STRING, MarqoFieldTypes.INT, MarqoFieldTypes.FLOAT,
+                MarqoFieldTypes.BOOL, MarqoFieldTypes.TENSOR, MarqoFieldTypes.TENSOR,
+                MarqoFieldTypes.TENSOR, MarqoFieldTypes.TENSOR
+            ]
+
             if id in ['1', '2']:
-                self.assertEqual(vespa_fields['marqo__field_types']['string_array'], MarqoFieldTypes.STRING_ARRAY.value, f"Expected string_array to have type 'string_array' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['string_array2'], MarqoFieldTypes.STRING_ARRAY.value, f"Expected string_array2 to have type 'string_array' for document {id}")
+                self._assert_field_types(vespa_fields, ['string_array', 'string_array2'], [MarqoFieldTypes.STRING_ARRAY, MarqoFieldTypes.STRING_ARRAY], id)
             if id in ['2', '3']:
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.a'], MarqoFieldTypes.INT_MAP.value, f"Expected int_map.a to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.b'], MarqoFieldTypes.INT_MAP.value, f"Expected int_map.b to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map.c'], MarqoFieldTypes.FLOAT_MAP.value, f"Expected float_map.c to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map.d'], MarqoFieldTypes.FLOAT_MAP.value, f"Expected float_map.d to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['bool_field'], MarqoFieldTypes.BOOL.value, f"Expected bool_field to have type 'bool' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['short_string_field'], MarqoFieldTypes.STRING.value, f"Expected short_string_field to have type 'string' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['long_string_field'], MarqoFieldTypes.STRING.value, f"Expected long_string_field to have type 'string' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_field'], MarqoFieldTypes.INT.value, f"Expected int_field to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_field'], MarqoFieldTypes.FLOAT.value, f"Expected float_field to have type 'float' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['bool_field2'], MarqoFieldTypes.BOOL.value, f"Expected bool_field2 to have type 'bool' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['custom_vector_field'], MarqoFieldTypes.TENSOR.value, f"Expected custom_vector_field to have type 'custom_vector' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['tensor_field'], MarqoFieldTypes.TENSOR.value, f"Expected tensor_field to have type 'tensor' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['tensor_subfield'], MarqoFieldTypes.TENSOR.value, f"Expected tensor_subfield to have type 'tensor' for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['multimodal_combo_field'], MarqoFieldTypes.TENSOR.value, f"Expected multimodal_combo_field to have type 'tensor' for document {id}")
+                self._assert_field_types(vespa_fields, field_names, field_types, id)
             if id is '2':
-                self.assertEqual(vespa_fields['marqo__field_types']['lexical_field'], MarqoFieldTypes.STRING.value, f"Expected lexical_field to have type 'string' for document {id}")
+                self._assert_field_types(vespa_fields, ['lexical_field'], [MarqoFieldTypes.STRING], id)
+
+    def test_original_document_has_correct_field_types_tensor_field(self):
+        """
+        This test is added in 2.16 release where we launched support for partial updates for unstructured indexes.
+        As part of this we introduced a new field in Vespa called marqo__field_types.
+        This field is used to store the field types of the fields that are added to the document.
+
+        Test that the original document has the correct field types for the fields that are added.
+        """
+        self.doc = {
+            '_id': '1',
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+        }
+        self.doc2 = {
+            '_id': '2',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "string_array": ["aaa", "bbb"],
+            "string_array2": ["123", "456"],
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            },
+            "lexical_field": "some string that signifies lexical field"
+        }
+        self.doc3 = {
+            '_id': '3',
+            'tensor_field': 'title',
+            'tensor_subfield': 'description',
+            "short_string_field": "shortstring",
+            "long_string_field": "Thisisaverylongstring" * 10,
+            "int_field": 123,
+            "float_field": 123.0,
+            "int_map": {"a": 1, "b": 2},
+            "float_map": {"c": 1.0, "d": 2.0},
+            "bool_field": True,
+            "bool_field2": False,
+            "custom_vector_field": {
+                "content": "abcd",
+                "vector": [1.0] * 32
+            }
+        }
+        self.add_documents(self.config, add_docs_params=AddDocsParams(
+            index_name=self.default_text_index,
+            docs=[self.doc, self.doc2],
+            tensor_fields=['tensor_field', 'custom_vector_field', 'multimodal_combo_field'],
+            mappings = {
+                "custom_vector_field": {"type": "custom_vector"},
+                "multimodal_combo_field": {
+                    "type": "multimodal_combination",
+                    "weights": {"tensor_field": 1.0, "tensor_subfield": 2.0}
+                }
+            }
+        ))
+        resp = self.add_documents(self.config, add_docs_params=AddDocsParams(
+            index_name=self.default_text_index,
+            docs=[self.doc3],
+            tensor_fields=['custom_vector_field'],
+            mappings = {
+                "custom_vector_field": {"type": "custom_vector"},
+            }
+        ))
+
+        self.index = self.config.index_management.get_index(self.default_text_index)
+
+        for doc in [self.doc3]:
+            id = doc['_id']
+            raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(
+                self.index.name).schema_name)
+            vespa_fields = raw_vespa_doc.document.dict().get('fields')
+            field_names = [
+                'int_map.a', 'int_map.b', 'float_map.c', 'float_map.d', 'bool_field',
+                'short_string_field', 'long_string_field', 'int_field', 'float_field',
+                'bool_field2', 'custom_vector_field', 'tensor_field', 'tensor_subfield'
+            ]
+            field_types = [
+                MarqoFieldTypes.INT_MAP, MarqoFieldTypes.INT_MAP, MarqoFieldTypes.FLOAT_MAP,
+                MarqoFieldTypes.FLOAT_MAP, MarqoFieldTypes.BOOL, MarqoFieldTypes.STRING,
+                MarqoFieldTypes.STRING, MarqoFieldTypes.INT, MarqoFieldTypes.FLOAT,
+                MarqoFieldTypes.BOOL, MarqoFieldTypes.TENSOR, MarqoFieldTypes.STRING,
+                MarqoFieldTypes.STRING
+            ]
+            self._assert_field_types(vespa_fields, field_names, field_types, id)

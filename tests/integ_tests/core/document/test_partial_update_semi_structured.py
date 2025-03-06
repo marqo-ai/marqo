@@ -112,6 +112,15 @@ class TestPartialUpdate(MarqoTestCase):
             else:
                 self.assertEqual(value, doc.get(field, None), f'{field} is changed.')
 
+    def _assert_field_types(self, field_names, field_types, id):
+        raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
+        vespa_fields = raw_vespa_doc.document.dict().get('fields')
+
+        for field_name, field_type in zip(field_names, field_types):
+            self.assertEqual(vespa_fields.get('marqo__field_types').get(field_name), field_type, 
+                            f"Expected {field_name} to have type {field_type} for document {id}")
+
+
     # Test update single field
     def test_partial_update_should_update_bool_field(self):
         """Test that boolean fields can be updated correctly via partial updates.
@@ -137,9 +146,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(updated_doc, ['bool_field'])
 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['bool_field'], 'bool', f"Expected bool_field to have type 'bool' for document {id}")
+                self._assert_field_types(['bool_field'], [MarqoFieldTypes.BOOL.value], id)
 
     def test_partial_update_should_update_int_field_to_int(self):
         """Test that integer fields can be updated correctly via partial updates.
@@ -166,9 +173,7 @@ class TestPartialUpdate(MarqoTestCase):
 
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['int_field'], MarqoFieldTypes.INT.value, f"Expected int_field to have type {MarqoFieldTypes.INT.value} for document {id}")
+                self._assert_field_types(['int_field'], [MarqoFieldTypes.INT.value], id)
 
     def test_partial_update_to_non_existent_field(self): 
         """Test that partial updates to non-existent fields are successful.
@@ -188,10 +193,8 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['update_field_that_doesnt_exist'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['update_field_that_doesnt_exist'], MarqoFieldTypes.INT.value,
-                              f"Expected update_field_that_doesnt_exist to have type {MarqoFieldTypes.INT.value} for document {id}")
+                self._assert_field_types(['update_field_that_doesnt_exist'], [MarqoFieldTypes.INT.value], id)
+
 
     def test_partial_update_should_not_update_int_field_to_float(self):
         """Test that partial updates to int fields are rejected when the value is a float.
@@ -227,10 +230,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['float_field'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['float_field'], 'float', 
-                              f"Expected float_field to have type 'float' for document {id}")
+                self._assert_field_types(['float_field'], [MarqoFieldTypes.FLOAT.value], id)
 
     def test_partial_update_should_update_int_map(self):
         """Test that partial updates to int maps are successful.
@@ -248,16 +248,13 @@ class TestPartialUpdate(MarqoTestCase):
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(doc['int_map.c'], 2, f"Expected int_map.c to be 2 for document {id}")
                 self.assertEqual(doc['int_map.d'], 3, f"Expected int_map.d to be 3 for document {id}")
+                self.assertEqual(doc.get('int_map.a'), None, f"Expected int_map.a to be None for document {id}")
+                self.assertEqual(doc.get('int_map.b'), None, f"Expected int_map.b to be None for document {id}")
                 self._assert_fields_unchanged(doc, ['int_map'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.c'], MarqoFieldTypes.INT_MAP.value, 
-                                  f"Expected int_map.c to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.d'], MarqoFieldTypes.INT_MAP.value, 
-                                  f"Expected int_map.d to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-
+                self._assert_field_types(['int_map.c', 'int_map.d', 'int_map.a', 'int_map.b'], [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, None, None], id)
+    
     def test_partial_update_should_replace_int_map(self):
         """Test that partial updates to int maps where we change the keys inside
         a specific int map are successful
@@ -278,13 +275,8 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['int_map'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.f'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected int_map.f to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.g'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected int_map.g to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-
+                self._assert_field_types(['int_map.f', 'int_map.g', 'int_map.a', 'int_map.b'], [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, None, None], id)
+    
     def test_partial_update_should_update_int_map_with_new_value(self):
         """Test that partial updates to int maps with new values are successful."""
         test_docs = [self.doc2, self.doc3]
@@ -303,15 +295,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(doc['int_map.d'], 2, f"Expected int_map.d to be 2 for document {id}")
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.d'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected int_map.d to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-
-                #Verify that the int_map.a and int_map.b is removed from the field types
-                self.assertEqual(vespa_fields['marqo__field_types'].get('int_map.a', None), None)
-                self.assertEqual(vespa_fields['marqo__field_types'].get('int_map.b', None), None)
-
+                self._assert_field_types(['int_map.d', 'int_map.a', 'int_map.b'], [MarqoFieldTypes.INT_MAP.value, None, None], id)
     def test_partial_update_should_update_float_map(self):
         """Test that partial updates to float maps are successful.
         
@@ -331,12 +315,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['float_map'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map.c'], MarqoFieldTypes.FLOAT_MAP.value, 
-                              f"Expected float_map.c to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map.d'], MarqoFieldTypes.FLOAT_MAP.value, 
-                              f"Expected float_map.d to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
+                self._assert_field_types(['float_map.c', 'float_map.d'], [MarqoFieldTypes.FLOAT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value], id)
 
     def test_partial_update_should_allow_changing_multiple_maps_in_same_request(self):
         """Test that partial updates to multiple maps in the same request are successful.
@@ -365,6 +344,9 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertIsNone(doc.get('float_map.d'), f"Expected float_map.d to be None for document {id}")
                 self._assert_fields_unchanged(doc, ['int_map.a', 'int_map.b', 'float_map.d', 'float_map.c', 'int_field', 'bool_field', 'float_field'])
 
+                # Verify field types
+                self._assert_field_types(['int_map.a', 'int_map.b', 'float_map.c', 'float_map.d', 'int_field', 'bool_field', 'float_field'], [MarqoFieldTypes.INT_MAP.value, None, MarqoFieldTypes.FLOAT_MAP.value, None, MarqoFieldTypes.INT.value, MarqoFieldTypes.BOOL.value, MarqoFieldTypes.FLOAT.value], id)
+
     def test_partial_update_should_update_string_array(self):
         """Test that partial updates to string arrays are successful.
         
@@ -383,11 +365,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['string_array'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['string_array'], 'string_array', 
-                              f"Expected string_array to have type 'string_array' for document {id}")
-
+                self._assert_field_types(['string_array'], [MarqoFieldTypes.STRING_ARRAY.value], id)
     def test_partial_update_should_reject_new_string_array_field(self):
         """Test that partial updates to new string arrays are rejected."""
         test_docs = [self.doc, self.doc2, self.doc3]
@@ -417,6 +395,10 @@ class TestPartialUpdate(MarqoTestCase):
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual("some value 2", doc['lexical_field'], f"Expected lexical_field to be 'some value 2' for document {id}")
                 self.assertEqual(["ccc"], doc['string_array'], f"Expected string_array to be ['ccc'] for document {id}")
+                self._assert_fields_unchanged(doc, ['lexical_field', 'string_array'])
+
+                # Verify field types
+                self._assert_field_types(['lexical_field', 'string_array'], [MarqoFieldTypes.STRING.value, MarqoFieldTypes.STRING_ARRAY.value], id)
 
     def test_partial_update_should_update_short_string(self):
         """Test that partial updates to short strings are successful."""
@@ -435,10 +417,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['short_string_field'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['short_string_field'], 'string', 
-                              f"Expected short_string_field to have type 'string' for document {id}")
+                self._assert_field_types(['short_string_field'], [MarqoFieldTypes.STRING.value], id)
 
     def test_partial_update_should_update_long_string(self):
         """Test that partial updates to long strings are successful."""
@@ -457,10 +436,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['long_string_field'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['long_string_field'], 'string', 
-                              f"Expected long_string_field to have type 'string' for document {id}")
+                self._assert_field_types(['long_string_field'], [MarqoFieldTypes.STRING.value], id)
 
     def test_partial_update_should_update_long_string_to_short_string(self):
         """Test that partial updates to long strings to short strings are successful."""
@@ -479,10 +455,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['long_string_field'])
                 
                 # Verify field type
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                self.assertEqual(vespa_fields['marqo__field_types']['long_string_field'], MarqoFieldTypes.STRING.value, 
-                              f"Expected long_string_field to have type {MarqoFieldTypes.STRING.value} for document {id}")
+                self._assert_field_types(['long_string_field'], [MarqoFieldTypes.STRING.value], id)
 
     def test_partial_update_should_update_short_string_to_long_string(self):
         """Test that partial updates to short strings to long strings are successful."""
@@ -524,31 +497,19 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
                 
                 # Verify field types
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
+                # Verify field types
+                field_names = ['int_map.a', 'int_map.d', 'float_map.c', 'new_int', 'new_float', 
+                              'new_map.a', 'new_map.b', 'int_map.b', 'float_map.d']
+                field_types = [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, 
+                              MarqoFieldTypes.FLOAT_MAP.value, MarqoFieldTypes.INT.value, 
+                              MarqoFieldTypes.FLOAT.value, MarqoFieldTypes.INT_MAP.value, 
+                              MarqoFieldTypes.FLOAT_MAP.value, None, None]
                 
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.a'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected int_map.a to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.d'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected int_map.d to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map.c'], MarqoFieldTypes.FLOAT_MAP.value, 
-                              f"Expected float_map.c to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_int'], MarqoFieldTypes.INT.value, 
-                              f"Expected new_int to have type {MarqoFieldTypes.INT.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_float'], MarqoFieldTypes.FLOAT.value, 
-                              f"Expected new_float to have type {MarqoFieldTypes.FLOAT.value} for document {id}")
-
-                # assert that the map keys that must've been removed don't exist in marqo__field_types
-                self.assertEqual(vespa_fields['marqo__field_types'].get('int_map.b', None), None)
-                self.assertEqual(vespa_fields['marqo__field_types'].get('float_map.d', None), None)
-
-                # Check the new map fields
-                self.assertEqual(vespa_fields['marqo__field_types']['new_map.a'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected new_map.a to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_map.b'], MarqoFieldTypes.FLOAT_MAP.value, 
-                              f"Expected new_map.b to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
+                
+                self._assert_field_types(field_names, field_types, id)
                 
                 # Also check score modifiers values
+                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
                 doc = raw_vespa_doc.document.dict().get('fields')
                 int_field_val = self.id_to_doc[id].get('int_field', 0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['int_field'], float(int_field_val))
@@ -592,19 +553,13 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
                 
                 # Verify field types
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
+                # Verify field types using helper method
+                field_names = ['int_map_2.d', 'int_map_2.e', 'float_map_2.f', 'new_int', 'new_float']
+                field_types = [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, 
+                              MarqoFieldTypes.FLOAT_MAP.value, MarqoFieldTypes.INT.value, 
+                              MarqoFieldTypes.FLOAT.value]
                 
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map_2.d'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected int_map_2.d to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map_2.e'], MarqoFieldTypes.INT_MAP.value, 
-                              f"Expected int_map_2.e to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map_2.f'], MarqoFieldTypes.FLOAT_MAP.value, 
-                              f"Expected float_map_2.f to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_int'], MarqoFieldTypes.INT.value, 
-                              f"Expected new_int to have type {MarqoFieldTypes.INT.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_float'], MarqoFieldTypes.FLOAT.value, 
-                              f"Expected new_float to have type {MarqoFieldTypes.FLOAT.value} for document {id}")
+                self._assert_field_types(field_names, field_types, id)
                 
                 res = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
                 doc = res.document.dict().get('fields')
@@ -685,19 +640,11 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(10.0, doc['new_float_field'], f"Expected new_float_field to be 10.0 for document {id}")
                 
                 # Verify field types
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
+                field_names = ['new_field', 'new_float', 'new_int_map.a', 'new_bool_field', 'new_float_field']
+                field_types = [MarqoFieldTypes.INT.value, MarqoFieldTypes.FLOAT.value, MarqoFieldTypes.INT_MAP.value, 
+                               MarqoFieldTypes.BOOL.value, MarqoFieldTypes.FLOAT.value]
                 
-                self.assertEqual(vespa_fields['marqo__field_types']['new_field'], MarqoFieldTypes.INT.value,
-                              f"Expected new_field to have type {MarqoFieldTypes.INT.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_float'], MarqoFieldTypes.FLOAT.value,
-                              f"Expected new_float to have type {MarqoFieldTypes.FLOAT.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_int_map.a'], MarqoFieldTypes.INT_MAP.value,
-                              f"Expected new_int_map.a to have type {MarqoFieldTypes.INT.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_bool_field'], MarqoFieldTypes.BOOL.value,
-                              f"Expected new_bool_field to have type {MarqoFieldTypes.BOOL.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['new_float_field'], MarqoFieldTypes.FLOAT.value,
-                              f"Expected new_float_field to have type {MarqoFieldTypes.FLOAT.value} for document {id}")
+                self._assert_field_types(field_names, field_types, id)
 
     # Reject any tensor field change
     def test_partial_update_should_reject_tensor_field(self):
@@ -849,19 +796,18 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['int_map.a', 'int_map.b', 'int_map.c', 'float_map.c', 'float_map.e', 'float_map.d'])
                 
                 # Verify field types
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
-                vespa_fields = raw_vespa_doc.document.dict().get('fields')
-                
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.a'], MarqoFieldTypes.INT_MAP.value,
-                              f"Expected int_map.a to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.b'], MarqoFieldTypes.INT_MAP.value,
-                              f"Expected int_map.b to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['int_map.c'], MarqoFieldTypes.INT_MAP.value,
-                              f"Expected int_map.c to have type {MarqoFieldTypes.INT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map.c'], MarqoFieldTypes.FLOAT_MAP.value,
-                              f"Expected float_map.c to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
-                self.assertEqual(vespa_fields['marqo__field_types']['float_map.e'], MarqoFieldTypes.FLOAT_MAP.value,
-                              f"Expected float_map.e to have type {MarqoFieldTypes.FLOAT_MAP.value} for document {id}")
+                # Verify field types
+                self._assert_field_types(
+                    ['int_map.a', 'int_map.b', 'int_map.c', 'float_map.c', 'float_map.e'],
+                    [
+                        MarqoFieldTypes.INT_MAP.value,
+                        MarqoFieldTypes.INT_MAP.value,
+                        MarqoFieldTypes.INT_MAP.value,
+                        MarqoFieldTypes.FLOAT_MAP.value,
+                        MarqoFieldTypes.FLOAT_MAP.value
+                    ],
+                    id
+                )
 
     def test_partial_update_should_reject_invalid_map_values(self):
         """Test rejection of invalid value types in numeric maps
@@ -1124,6 +1070,18 @@ class TestPartialUpdate(MarqoTestCase):
         self.assertTrue(res.errors)
         self.assertEqual(400, res.items[0].status)
 
+    def test_updating_int_to_int_map(self):
+        """Test that partial updates changing int field to int maps are rejected.
+        """
+
+        res = self.config.document.partial_update_documents([{'_id': '2', 'int_field': {'a': 100}}], self.index)
+        print(res)
+        raw_vespa_doc = self.config.vespa_client.get_document('2', self.index.schema_name)
+        print(raw_vespa_doc)
+        self.assertTrue(res.errors)
+        self.assertIn('reference/api/documents/update-documents/#response', res.items[0].error)
+        self.assertIn("Marqo vector store couldn't update the document. Please see", res.items[0].error)
+        self.assertEqual(400, res.items[0].status)
 
     def test_updating_non_existent_document_with_maps(self):
         """
