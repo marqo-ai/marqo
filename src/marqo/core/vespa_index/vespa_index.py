@@ -211,6 +211,9 @@ class VespaIndex(ABC):
 
         return result
 
+    def escape(self, s: str) -> str:
+        return s.replace('\\', '\\\\').replace('"', '\\"')
+
 
 def for_marqo_index(marqo_index: MarqoIndex) -> VespaIndex:
     """
