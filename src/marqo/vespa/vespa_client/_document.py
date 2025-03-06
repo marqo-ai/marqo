@@ -7,8 +7,6 @@ Functions Included:
 1. **Feeding Documents**
    - `feed_document()` → Feed a single document to Vespa.
    - `feed_batch()` → Feed multiple documents asynchronously.
-   - `feed_batch_sync()` → Feed documents sequentially (for debugging).
-   - `feed_batch_multithreaded()` → Feed documents using multiple threads.
 
 2. **Retrieving Documents**
    - `get_document()` → Fetch a document by ID.
@@ -113,63 +111,6 @@ class VespaDocumentMixin:
         )
 
         return batch_response
-
-    def feed_batch_sync(self: "VespaClientBase", batch: List[VespaDocument], schema: str) -> FeedBatchResponse:
-        """
-        Feed a batch of documents to Vespa sequentially.
-
-        This method is for debugging and experimental purposes only. Sequential feeding can be very slow.
-
-        Args:
-            batch: List of documents to feed
-            schema: Schema to feed to
-
-        Returns:
-            List of FeedResponse objects
-        """
-        responses = [self._feed_document_sync(self.http_client, document, schema, timeout=60) for document in batch]
-
-        errors = False
-        for response in responses:
-            if response.status != 200:
-                errors = True
-                break
-
-        return FeedBatchResponse(responses=responses, errors=errors)
-
-    def feed_batch_multithreaded(
-            self, batch: List[VespaDocument], schema: str, max_threads: int = 10) -> FeedBatchResponse:
-        """
-        Feed a batch of documents to Vespa concurrently using a thread pool.
-
-        This method is for debugging and experimental purposes only. Use `feed_batch` instead to feed documents
-        asynchronously with one thread.
-
-        Args:
-            batch: List of documents to feed
-            schema: Schema to feed to
-            max_threads: Maximum number of threads to use
-
-        Returns:
-            List of FeedResponse objects
-        """
-        with httpx.Client(
-                limits=httpx.Limits(max_keepalive_connections=max_threads, max_connections=max_threads)
-        ) as sync_client:
-            with ThreadPoolExecutor(max_workers=max_threads) as executor:
-                responses = list(
-                    executor.map(
-                        lambda document: self._feed_document_sync(sync_client, document, schema, timeout=60), batch
-                    )
-                )
-
-        errors = False
-        for response in responses:
-            if response.status != 200:
-                errors = True
-                break
-
-        return FeedBatchResponse(responses=responses, errors=errors)
 
     def get_document(self: "VespaClientBase", id: str, schema: str) -> GetDocumentResponse:
         """

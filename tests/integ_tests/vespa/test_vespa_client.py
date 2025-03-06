@@ -121,32 +121,6 @@ class TestVespaClient(AsyncMarqoTestCase):
 
         run()
 
-    def test_feed_batch_sync_successful(self):
-        documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
-            VespaDocument(id="doc2", fields={"title": "Title 2"}),
-        ]
-
-        self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
-
-    def test_feed_batch_sync_emptyBatch_successful(self):
-        documents = []
-
-        self._base_test_feed_batch_successful(self.client.feed_batch_sync, documents)
-
-    def test_feed_batch_multithreaded_successful(self):
-        documents = [
-            VespaDocument(id="doc1", fields={"title": "Title 1", "contents": "Content 1"}),
-            VespaDocument(id="doc2", fields={"title": "Title 2"}),
-        ]
-
-        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
-
-    def test_feed_batch_multithreaded_emptyBatch_successful(self):
-        documents = []
-
-        self._base_test_feed_batch_successful(self.client.feed_batch_multithreaded, documents)
-
     def test_delete_document_successful(self):
         documents = [
             {"id": "doc1", "fields": {"title": "Title 1", "contents": "Content 1"}},
