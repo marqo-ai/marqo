@@ -11,16 +11,17 @@ from marqo.tensor_search.telemetry import RequestMetricsStore
 class BaseUnitTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        """Mock RequestMetricsStore to avoid complications with not having TelemetryMiddleware configuring metrics.
-        """
+        # Mock RequestMetricsStore to avoid complications with not having TelemetryMiddleware configuring metrics.
         cls.mock_request = MagicMock()
         cls.metrics_store_patcher = patch('marqo.tensor_search.telemetry.RequestMetricsStore._get_request')
         cls.mock_get_request = cls.metrics_store_patcher.start()
         cls.mock_get_request.return_value = cls.mock_request
         RequestMetricsStore.set_in_request(cls.mock_request)
 
+        # Create a model
         cls.model = Model(name="hf/all_datasets_v4_MiniLM-L6")
 
+        # Structured index with multimodal fields
         cls.structured_index = StructuredMarqoIndex(
             name="index_name", schema_name="test_schema", type=IndexType.Structured, model=cls.model,
             normalize_embeddings=True,
@@ -56,10 +57,12 @@ class BaseUnitTest(unittest.TestCase):
                 )]
         )
 
+        # Mock VespaClient and Config
         cls.vespa_client_mock = MagicMock()
         cls.config = Config(cls.vespa_client_mock)
         cls.logger_mock = MagicMock()
 
+        # Patch the get_index method to return the structured index
         cls.get_index_patcher = patch(
             "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=cls.structured_index
         )
@@ -68,11 +71,15 @@ class BaseUnitTest(unittest.TestCase):
             "marqo.tensor_search.tensor_search.logger", cls.logger_mock
         )
 
+        # Start the patchers
         cls.get_index_patcher.start()
         cls.logger_patcher.start()
 
     @classmethod
     def tearDownClass(cls):
+        # Stop the patchers
+        cls.get_index_patcher.stop()
+        cls.logger_patcher.stop()
         cls.metrics_store_patcher.stop()
 
     def get_expected_tensor_yql(self, target_hits=3):
@@ -97,17 +104,15 @@ class BaseUnitTest(unittest.TestCase):
         self.current_index = index
         self.get_index_patcher.start()
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.get_index_patcher.stop()
-        cls.logger_patcher.stop()
-
     def tearDown(self):
+        # Reset the index to the structured index (Default)
         self.get_index_patcher.stop()
         self.get_index_patcher = patch(
             "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=self.structured_index
         )
         self.current_index = self.structured_index
         self.get_index_patcher.start()
+
+        # Reset the mocks
         self.logger_mock.reset_mock()
         self.vespa_client_mock.reset_mock()
