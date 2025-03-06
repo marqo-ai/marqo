@@ -36,7 +36,7 @@ VESPA_DOCUMENT_URL="http://localhost:8080"
 VESPA_QUERY_URL="http://localhost:8080"
 MINIMUM_API_NODES = 2
 
-# Configure logging: change to logging.WARNING to suppress debug logs.
+# Configure logging: default is INFO. Run script with LogLevel=WARNING to suppress debug logs.
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
