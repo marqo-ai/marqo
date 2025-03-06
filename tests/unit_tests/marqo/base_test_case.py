@@ -63,6 +63,7 @@ class BaseUnitTest(unittest.TestCase):
         cls.get_index_patcher = patch(
             "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=cls.structured_index
         )
+        cls.current_index = cls.structured_index
         cls.logger_patcher = patch(
             "marqo.tensor_search.tensor_search.logger", cls.logger_mock
         )
@@ -74,11 +75,9 @@ class BaseUnitTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.metrics_store_patcher.stop()
 
-    def get_expected_tensor_yql(cls, index=None, target_hits=3):
-        if index is None:
-            index = cls.structured_index
-        yql = f"select * from {index.schema_name} where ("
-        for field in index.fields:
+    def get_expected_tensor_yql(self, target_hits=3):
+        yql = f"select * from {self.current_index.schema_name} where ("
+        for field in self.current_index.fields:
             if field.type in (FieldType.Float, FieldType.Int):
                 continue
             yql += (
@@ -87,16 +86,15 @@ class BaseUnitTest(unittest.TestCase):
             )
         return yql[:-4] + ")"
 
-    def get_expected_lexical_yql(self, query, index=None):
-        if index is None:
-            index = self.structured_index
-        return f'select * from {index.schema_name} where (weakAnd(default contains "{query}"))'
+    def get_expected_lexical_yql(self, query):
+        return f'select * from {self.current_index.schema_name} where (weakAnd(default contains "{query}"))'
 
     def set_index_to_return(self, index):
         self.get_index_patcher.stop()
         self.get_index_patcher = patch(
             "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=index
         )
+        self.current_index = index
         self.get_index_patcher.start()
 
     @classmethod
@@ -109,4 +107,7 @@ class BaseUnitTest(unittest.TestCase):
         self.get_index_patcher = patch(
             "marqo.tensor_search.tensor_search.index_meta_cache.get_index", return_value=self.structured_index
         )
+        self.current_index = self.structured_index
         self.get_index_patcher.start()
+        self.logger_mock.reset_mock()
+        self.vespa_client_mock.reset_mock()
