@@ -6,7 +6,7 @@ from marqo.core.exceptions import TooManyFieldsError
 from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import Model, ImagePreProcessing, PatchMethod, SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index.semi_structured_add_document_handler import SemiStructuredFieldCountConfig
-from marqo.tensor_search import tensor_search, index_meta_cache
+from marqo.tensor_search import tensor_search
 from marqo.tensor_search.enums import SearchMethod
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 

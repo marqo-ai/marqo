@@ -1,20 +1,18 @@
 import functools
-import math
 import os
 import uuid
 from unittest import mock
 
-import PIL
+import math
 import pytest
 
-from marqo.api.exceptions import IndexNotFoundError, BadRequestError
+from marqo.api.exceptions import BadRequestError
+from marqo.core.exceptions import IndexNotFoundError
+from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.models.marqo_index import *
 from marqo.core.models.marqo_index_request import FieldRequest
-from marqo.s2_inference import types
-from marqo.tensor_search import add_docs
 from marqo.tensor_search import enums
 from marqo.tensor_search import tensor_search
-from marqo.core.models.add_docs_params import AddDocsParams
 from integ_tests.marqo_test import MarqoTestCase, TestImageUrls
 
 
