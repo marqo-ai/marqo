@@ -241,7 +241,6 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         vespa_fields = {}
         vespa_field_types = {}
 
-        # Initialize dictionary to be later used for updating score modifiers. 
 
         numeric_field_map: Dict[str, Any] = dict() # This map is used to store the numeric fields in the document. It is used to update the numeric fields & score modifiers later
         if original_doc:
@@ -278,10 +277,11 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 vespa_fields=vespa_fields
             )
 
-        # Check if original_doc exists, then if fixed_fields exists, and only then access version_uuid
+        # Add version_uuid to the vespa_fields to update the document's version_uuid,
+        # only if this is a type of update that requires updating version_uuid (i.e a partial update with map fields)
         if original_doc is not None and original_doc.fixed_fields.version_uuid:
             vespa_fields[common.VESPA_DOC_VERSION_UUID] = {"assign": str(uuid.uuid4())}
-            
+
         return {
             "id": doc_id,
             "fields": vespa_fields,
@@ -522,9 +522,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if not isinstance(v, (int, float)):
                 raise MarqoDocumentParsingError(f'Unsupported field type {type(v)} for field {field_name} in doc {doc_id}. '
                                                'We only support int and float types for map values when updating a document')
-                
+
             numeric_field_map[f'{field_name}.{k}'] = v
-            
+
             # Set the appropriate field type based on the value type
             if isinstance(v, int):
                 field_types[f'{field_name}.{k}'] = MarqoFieldTypes.INT_MAP.value

@@ -112,13 +112,14 @@ class TestPartialUpdate(MarqoTestCase):
             else:
                 self.assertEqual(value, doc.get(field, None), f'{field} is changed.')
 
-    def _assert_field_types(self, field_names, field_types, id):
+    def _assert_field_types(self, id, field_type_pairs):
         raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
         vespa_fields = raw_vespa_doc.document.dict().get('fields')
 
-        for field_name, field_type in zip(field_names, field_types):
-            self.assertEqual(vespa_fields.get('marqo__field_types').get(field_name), field_type, 
-                            f"Expected {field_name} to have type {field_type} for document {id}")
+        for field_name, field_type in field_type_pairs:
+            expected_type = field_type.value if field_type is not None else None
+            self.assertEqual(vespa_fields.get('marqo__field_types').get(field_name), expected_type,
+                            f"Expected {field_name} to have type {expected_type} for document {id}")
 
 
     # Test update single field
@@ -146,7 +147,9 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(updated_doc, ['bool_field'])
 
                 # Verify field type
-                self._assert_field_types(['bool_field'], [MarqoFieldTypes.BOOL.value], id)
+                self._assert_field_types(id, [
+                    ('bool_field', MarqoFieldTypes.BOOL)
+                ])
 
     def test_partial_update_should_update_int_field_to_int(self):
         """Test that integer fields can be updated correctly via partial updates.
@@ -171,29 +174,33 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(500, updated_doc['int_field'], f"Expected int_field to be 500 for document {id}")
                 self._assert_fields_unchanged(updated_doc, ['int_field'])
 
-                
-                # Verify field type
-                self._assert_field_types(['int_field'], [MarqoFieldTypes.INT.value], id)
 
-    def test_partial_update_to_non_existent_field(self): 
+                # Verify field type
+                self._assert_field_types(id, [
+                    ('int_field', MarqoFieldTypes.INT)
+                ])
+
+    def test_partial_update_to_non_existent_field(self):
         """Test that partial updates to non-existent fields are successful.
         
         This test case basically verifies that we can add new fields via partial updates
         """
         test_docs = [self.doc, self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Adding new field to document with ID {doc['_id']}"):
                 id = doc['_id']
                 res = self.config.document.partial_update_documents([{'_id': id, 'update_field_that_doesnt_exist': 500}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(500, doc['update_field_that_doesnt_exist'], f"Expected new field value to be 500 for document {id}")
                 self._assert_fields_unchanged(doc, ['update_field_that_doesnt_exist'])
-                
+
                 # Verify field type
-                self._assert_field_types(['update_field_that_doesnt_exist'], [MarqoFieldTypes.INT.value], id)
+                self._assert_field_types(id, [
+                    ('update_field_that_doesnt_exist', MarqoFieldTypes.INT)
+                ])
 
 
     def test_partial_update_should_not_update_int_field_to_float(self):
@@ -202,7 +209,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to int fields are rejected when the value is a float.
         """
         test_docs = [self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update int field to float for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -218,19 +225,21 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to float fields are successful.
         """
         test_docs = [self.doc, self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Updating float field for document with ID {doc['_id']}"):
                 id = doc['_id']
                 res = self.config.document.partial_update_documents([{'_id': id, 'float_field': 500.0}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(500.0, doc['float_field'], f"Expected float_field to be 500.0 for document {id}")
                 self._assert_fields_unchanged(doc, ['float_field'])
-                
+
                 # Verify field type
-                self._assert_field_types(['float_field'], [MarqoFieldTypes.FLOAT.value], id)
+                self._assert_field_types(id, [
+                    ('float_field', MarqoFieldTypes.FLOAT)
+                ])
 
     def test_partial_update_should_update_int_map(self):
         """Test that partial updates to int maps are successful.
@@ -238,45 +247,55 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to int maps are successful.
         """
         test_docs = [self.doc, self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Updating int map for document with ID {doc['_id']}"):
                 id = doc['_id']
                 res = self.config.document.partial_update_documents([{'_id': id, 'int_map': {'c': 2, 'd': 3}}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(doc['int_map.c'], 2, f"Expected int_map.c to be 2 for document {id}")
                 self.assertEqual(doc['int_map.d'], 3, f"Expected int_map.d to be 3 for document {id}")
                 self.assertEqual(doc.get('int_map.a'), None, f"Expected int_map.a to be None for document {id}")
                 self.assertEqual(doc.get('int_map.b'), None, f"Expected int_map.b to be None for document {id}")
                 self._assert_fields_unchanged(doc, ['int_map'])
-                
+
                 # Verify field type
-                self._assert_field_types(['int_map.c', 'int_map.d', 'int_map.a', 'int_map.b'], [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, None, None], id)
-    
+                self._assert_field_types(id, [
+                    ('int_map.c', MarqoFieldTypes.INT_MAP),
+                    ('int_map.d', MarqoFieldTypes.INT_MAP),
+                    ('int_map.a', None),
+                    ('int_map.b', None)
+                ])
+
     def test_partial_update_should_replace_int_map(self):
         """Test that partial updates to int maps where we change the keys inside
         a specific int map are successful
         """
         test_docs = [self.doc,self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Replacing int map keys for document with ID {doc['_id']}"):
                 id = doc['_id']
                 res = self.config.document.partial_update_documents([{'_id': id, 'int_map': {'f': 2, 'g': 3}}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(doc['int_map.f'], 2, f"Expected int_map.f to be 2 for document {id}")
                 self.assertEqual(doc['int_map.g'], 3, f"Expected int_map.g to be 3 for document {id}")
                 self.assertEqual(doc.get('int_map.a'), None, f"Expected int_map.a to be None for document {id}")
                 self.assertEqual(doc.get('int_map.b'), None, f"Expected int_map.b to be None for document {id}")
                 self._assert_fields_unchanged(doc, ['int_map'])
-                
+
                 # Verify field type
-                self._assert_field_types(['int_map.f', 'int_map.g', 'int_map.a', 'int_map.b'], [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, None, None], id)
-    
+                self._assert_field_types(id, [
+                    ('int_map.f', MarqoFieldTypes.INT_MAP),
+                    ('int_map.g', MarqoFieldTypes.INT_MAP),
+                    ('int_map.a', None),
+                    ('int_map.b', None)
+                ])
+
     def test_partial_update_should_update_int_map_with_new_value(self):
         """Test that partial updates to int maps with new values are successful."""
         test_docs = [self.doc2, self.doc3]
@@ -288,34 +307,41 @@ class TestPartialUpdate(MarqoTestCase):
                     'd': 2
                 }}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertIsNone(doc.get('int_map.a'), f"Expected int_map.a to be None for document {id}")
                 self.assertIsNone(doc.get('int_map.b'), f"Expected int_map.b to be None for document {id}")
                 self.assertEqual(doc['int_map.d'], 2, f"Expected int_map.d to be 2 for document {id}")
-                
+
                 # Verify field type
-                self._assert_field_types(['int_map.d', 'int_map.a', 'int_map.b'], [MarqoFieldTypes.INT_MAP.value, None, None], id)
+                self._assert_field_types(id, [
+                    ('int_map.d', MarqoFieldTypes.INT_MAP),
+                    ('int_map.a', None),
+                    ('int_map.b', None)
+                ])
     def test_partial_update_should_update_float_map(self):
         """Test that partial updates to float maps are successful.
         
         This test verifies that partial updates to float maps are successful.
         """
         test_docs = [self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Updating float map for document with ID {doc['_id']}"):
                 id = doc['_id']
                 res = self.config.document.partial_update_documents([{'_id': id, 'float_map': {'c': 2.0, 'd': 3.0}}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(doc['float_map.c'], 2.0, f"Expected float_map.c to be 2.0 for document {id}")
                 self.assertEqual(doc['float_map.d'], 3.0, f"Expected float_map.d to be 3.0 for document {id}")
                 self._assert_fields_unchanged(doc, ['float_map'])
-                
+
                 # Verify field type
-                self._assert_field_types(['float_map.c', 'float_map.d'], [MarqoFieldTypes.FLOAT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value], id)
+                self._assert_field_types(id, [
+                    ('float_map.c', MarqoFieldTypes.FLOAT_MAP),
+                    ('float_map.d', MarqoFieldTypes.FLOAT_MAP)
+                ])
 
     def test_partial_update_should_allow_changing_multiple_maps_in_same_request(self):
         """Test that partial updates to multiple maps in the same request are successful.
@@ -323,7 +349,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to multiple maps in the same request are successful.
         """
         test_docs = [self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Updating multiple fields for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -333,7 +359,7 @@ class TestPartialUpdate(MarqoTestCase):
                     'c': 3.0,  # update float to float
                 }, 'bool_field': False, 'float_field': 500.0}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(2, doc['int_field'], f"Expected int_field to be 2 for document {id}")
                 self.assertFalse(doc['bool_field'], f"Expected bool_field to be False for document {id}")
@@ -345,7 +371,15 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_fields_unchanged(doc, ['int_map.a', 'int_map.b', 'float_map.d', 'float_map.c', 'int_field', 'bool_field', 'float_field'])
 
                 # Verify field types
-                self._assert_field_types(['int_map.a', 'int_map.b', 'float_map.c', 'float_map.d', 'int_field', 'bool_field', 'float_field'], [MarqoFieldTypes.INT_MAP.value, None, MarqoFieldTypes.FLOAT_MAP.value, None, MarqoFieldTypes.INT.value, MarqoFieldTypes.BOOL.value, MarqoFieldTypes.FLOAT.value], id)
+                self._assert_field_types(id, [
+                    ('int_map.a', MarqoFieldTypes.INT_MAP),
+                    ('int_map.b', None),
+                    ('float_map.c', MarqoFieldTypes.FLOAT_MAP),
+                    ('float_map.d', None),
+                    ('int_field', MarqoFieldTypes.INT),
+                    ('bool_field', MarqoFieldTypes.BOOL),
+                    ('float_field', MarqoFieldTypes.FLOAT)
+                ])
 
     def test_partial_update_should_update_string_array(self):
         """Test that partial updates to string arrays are successful.
@@ -353,23 +387,25 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to string arrays are successful.
         """
         test_docs = [self.doc, self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Updating string array for document with ID {doc['_id']}"):
                 id = doc['_id']
                 res = self.config.document.partial_update_documents([{'_id': id, 'string_array': ["ccc"]}], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(["ccc"], doc['string_array'], f"Expected string_array to be ['ccc'] for document {id}")
                 self._assert_fields_unchanged(doc, ['string_array'])
-                
+
                 # Verify field type
-                self._assert_field_types(['string_array'], [MarqoFieldTypes.STRING_ARRAY.value], id)
+                self._assert_field_types(id, [
+                    ('string_array', MarqoFieldTypes.STRING_ARRAY)
+                ])
     def test_partial_update_should_reject_new_string_array_field(self):
         """Test that partial updates to new string arrays are rejected."""
         test_docs = [self.doc, self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Adding new string array for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -384,21 +420,24 @@ class TestPartialUpdate(MarqoTestCase):
         For example, doc2 contains lexical_field and string_array. Hence when we try to add lexical_field and string_array to doc1, it should be allowed.
         """
         test_docs = [self.doc, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Adding field from another document to document with ID {doc['_id']}"):
                 id = doc['_id']
                 res = self.config.document.partial_update_documents([{'_id': id, "lexical_field": "some value 2", 'string_array': ["ccc"]}],
                                                                 self.config.index_management.get_index(self.index.name))
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual("some value 2", doc['lexical_field'], f"Expected lexical_field to be 'some value 2' for document {id}")
                 self.assertEqual(["ccc"], doc['string_array'], f"Expected string_array to be ['ccc'] for document {id}")
                 self._assert_fields_unchanged(doc, ['lexical_field', 'string_array'])
 
                 # Verify field types
-                self._assert_field_types(['lexical_field', 'string_array'], [MarqoFieldTypes.STRING.value, MarqoFieldTypes.STRING_ARRAY.value], id)
+                self._assert_field_types(id, [
+                    ('lexical_field', MarqoFieldTypes.STRING),
+                    ('string_array', MarqoFieldTypes.STRING_ARRAY)
+                ])
 
     def test_partial_update_should_update_short_string(self):
         """Test that partial updates to short strings are successful."""
@@ -411,13 +450,15 @@ class TestPartialUpdate(MarqoTestCase):
                 res = self.config.document.partial_update_documents(
                     [{'_id': id, 'short_string_field': 'updated_short_string'}], index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual('updated_short_string', doc['short_string_field'], f"Expected short_string_field to be 'updated_short_string' for document {id}")
                 self._assert_fields_unchanged(doc, ['short_string_field'])
-                
+
                 # Verify field type
-                self._assert_field_types(['short_string_field'], [MarqoFieldTypes.STRING.value], id)
+                self._assert_field_types(id, [
+                    ('short_string_field', MarqoFieldTypes.STRING)
+                ])
 
     def test_partial_update_should_update_long_string(self):
         """Test that partial updates to long strings are successful."""
@@ -430,13 +471,15 @@ class TestPartialUpdate(MarqoTestCase):
                 res = self.config.document.partial_update_documents(
                     [{'_id': id, 'long_string_field': 'updated_long_string' * 10}], index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual('updated_long_string' * 10, doc['long_string_field'], f"Expected long_string_field to be updated for document {id}")
                 self._assert_fields_unchanged(doc, ['long_string_field'])
-                
+
                 # Verify field type
-                self._assert_field_types(['long_string_field'], [MarqoFieldTypes.STRING.value], id)
+                self._assert_field_types(id, [
+                    ('long_string_field', MarqoFieldTypes.STRING)
+                ])
 
     def test_partial_update_should_update_long_string_to_short_string(self):
         """Test that partial updates to long strings to short strings are successful."""
@@ -449,13 +492,15 @@ class TestPartialUpdate(MarqoTestCase):
                 res = self.config.document.partial_update_documents(
                     [{'_id': id, 'long_string_field': 'short'}], index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual('short', doc['long_string_field'], f"Expected long_string_field to be 'short' for document {id}")
                 self._assert_fields_unchanged(doc, ['long_string_field'])
-                
+
                 # Verify field type
-                self._assert_field_types(['long_string_field'], [MarqoFieldTypes.STRING.value], id)
+                self._assert_field_types(id, [
+                    ('long_string_field', MarqoFieldTypes.STRING)
+                ])
 
     def test_partial_update_should_update_short_string_to_long_string(self):
         """Test that partial updates to short strings to long strings are successful."""
@@ -495,19 +540,22 @@ class TestPartialUpdate(MarqoTestCase):
                     'new_map': {'a': 1, 'b': 2.0},  # new map field
                 }], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 # Verify field types
-                # Verify field types
-                field_names = ['int_map.a', 'int_map.d', 'float_map.c', 'new_int', 'new_float', 
-                              'new_map.a', 'new_map.b', 'int_map.b', 'float_map.d']
-                field_types = [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, 
-                              MarqoFieldTypes.FLOAT_MAP.value, MarqoFieldTypes.INT.value, 
-                              MarqoFieldTypes.FLOAT.value, MarqoFieldTypes.INT_MAP.value, 
-                              MarqoFieldTypes.FLOAT_MAP.value, None, None]
-                
-                
-                self._assert_field_types(field_names, field_types, id)
-                
+                field_type_pairs = [
+                    ('int_map.a', MarqoFieldTypes.INT_MAP),
+                    ('int_map.d', MarqoFieldTypes.INT_MAP),
+                    ('float_map.c', MarqoFieldTypes.FLOAT_MAP),
+                    ('new_int', MarqoFieldTypes.INT),
+                    ('new_float', MarqoFieldTypes.FLOAT),
+                    ('new_map.a', MarqoFieldTypes.INT_MAP),
+                    ('new_map.b', MarqoFieldTypes.FLOAT_MAP),
+                    ('int_map.b', None),
+                    ('float_map.d', None)
+                ]
+
+                self._assert_field_types(id, field_type_pairs)
+
                 # Also check score modifiers values
                 raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
                 doc = raw_vespa_doc.document.dict().get('fields')
@@ -530,13 +578,13 @@ class TestPartialUpdate(MarqoTestCase):
     def test_partial_update_should_add_score_modifiers(self):
         """Test that partial updates which specifically add new fields reflect properly in score modifiers tensors."""
         test_docs = [self.doc, self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Adding score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
                 # Create a document with existing fields first to verify we're only adding
                 original_doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
-                
+
                 # Perform update with only additions, not replacements
                 res = self.config.document.partial_update_documents([{
                     '_id': id,
@@ -551,16 +599,18 @@ class TestPartialUpdate(MarqoTestCase):
                     'new_float': 2.0,  # new float field
                 }], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 # Verify field types
                 # Verify field types using helper method
-                field_names = ['int_map_2.d', 'int_map_2.e', 'float_map_2.f', 'new_int', 'new_float']
-                field_types = [MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.INT_MAP.value, 
-                              MarqoFieldTypes.FLOAT_MAP.value, MarqoFieldTypes.INT.value, 
-                              MarqoFieldTypes.FLOAT.value]
-                
-                self._assert_field_types(field_names, field_types, id)
-                
+                field_type_pairs = [
+                    ('int_map_2.d', MarqoFieldTypes.INT_MAP),
+                    ('int_map_2.e', MarqoFieldTypes.INT_MAP),
+                    ('float_map_2.f', MarqoFieldTypes.FLOAT_MAP),
+                    ('new_int', MarqoFieldTypes.INT),
+                    ('new_float', MarqoFieldTypes.FLOAT)
+                ]
+                self._assert_field_types(id, field_type_pairs)
+
                 res = self.config.vespa_client.get_document(id, self.config.index_management.get_index(self.index.name).schema_name)
                 doc = res.document.dict().get('fields')
                 
@@ -570,7 +620,7 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map_2.f'], 4.0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['new_int'], 1.0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['new_float'], 2.0)
-                
+
                 # Verify original fields are preserved (with conditional checks)
                 int_field_val = self.id_to_doc[id].get('int_field')
                 if int_field_val:
@@ -589,7 +639,7 @@ class TestPartialUpdate(MarqoTestCase):
         """Test that partial updates which specifically change the existing keys inside existing maps
          reflect properly in score modifiers tensors."""
         test_docs = [self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Updating existing score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -603,7 +653,7 @@ class TestPartialUpdate(MarqoTestCase):
                     "float_map": {"c": 3.0, "d": 4.0},
                 }], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 res = self.config.vespa_client.get_document(id,
                                                         self.config.index_management.get_index(self.index.name).schema_name)
                 doc = res.document.dict().get('fields')
@@ -630,7 +680,7 @@ class TestPartialUpdate(MarqoTestCase):
                                                                 'new_float_field': 10.0
                                                                 }], self.config.index_management.get_index(self.index.name))
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self._assert_fields_unchanged(doc, [])
                 self.assertEqual(500.0, doc['new_float'], f"Expected new_float to be 500.0 for document {id}")
@@ -638,13 +688,16 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(500, doc['new_field'], f"Expected new_field to be 500 for document {id}")
                 self.assertEqual(True, doc['new_bool_field'], f"Expected new_bool_field to be True for document {id}")
                 self.assertEqual(10.0, doc['new_float_field'], f"Expected new_float_field to be 10.0 for document {id}")
-                
+
                 # Verify field types
-                field_names = ['new_field', 'new_float', 'new_int_map.a', 'new_bool_field', 'new_float_field']
-                field_types = [MarqoFieldTypes.INT.value, MarqoFieldTypes.FLOAT.value, MarqoFieldTypes.INT_MAP.value, 
-                               MarqoFieldTypes.BOOL.value, MarqoFieldTypes.FLOAT.value]
-                
-                self._assert_field_types(field_names, field_types, id)
+                field_type_pairs = [
+                    ('new_field', MarqoFieldTypes.INT),
+                    ('new_float', MarqoFieldTypes.FLOAT),
+                    ('new_int_map.a', MarqoFieldTypes.INT_MAP),
+                    ('new_bool_field', MarqoFieldTypes.BOOL),
+                    ('new_float_field', MarqoFieldTypes.FLOAT)
+                ]
+                self._assert_field_types(id, field_type_pairs)
 
     # Reject any tensor field change
     def test_partial_update_should_reject_tensor_field(self):
@@ -653,7 +706,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to tensor fields are rejected.
         """
         test_docs = [self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update tensor field for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -669,7 +722,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to tensor subfields are rejected.
         """
         test_docs = [self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update tensor subfield for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -685,7 +738,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to custom vector fields are rejected.
         """
         test_docs = [self.doc , self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update custom vector field for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -704,7 +757,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to multimodal combo fields are rejected.
         """
         test_docs = [self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update multimodal combo field for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -722,7 +775,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to numeric array fields are rejected.
         """
         test_docs = [self.doc,self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update numeric array field for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -737,7 +790,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates to new lexical fields are rejected.
         """
         test_docs = [self.doc, self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update new lexical field for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -768,7 +821,7 @@ class TestPartialUpdate(MarqoTestCase):
         document and checking each individual key-value pair.
         """
         test_docs = [self.doc,self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Updating mixed numeric maps for document with ID {doc['_id']}"):
                 id = doc['_id']
@@ -785,7 +838,7 @@ class TestPartialUpdate(MarqoTestCase):
                     }
                 }], self.index)
                 self.assertFalse(res.errors, f"Expected no errors when updating document {id}")
-                
+
                 doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
                 self.assertEqual(10, doc['int_map.a'])
                 self.assertEqual(20, doc['int_map.b'])
@@ -794,19 +847,17 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(5.5, doc['float_map.e'])
                 self.assertEqual(None, doc.get('float_map.d', None))
                 self._assert_fields_unchanged(doc, ['int_map.a', 'int_map.b', 'int_map.c', 'float_map.c', 'float_map.e', 'float_map.d'])
-                
-                # Verify field types
+
                 # Verify field types
                 self._assert_field_types(
-                    ['int_map.a', 'int_map.b', 'int_map.c', 'float_map.c', 'float_map.e'],
+                    id,
                     [
-                        MarqoFieldTypes.INT_MAP.value,
-                        MarqoFieldTypes.INT_MAP.value,
-                        MarqoFieldTypes.INT_MAP.value,
-                        MarqoFieldTypes.FLOAT_MAP.value,
-                        MarqoFieldTypes.FLOAT_MAP.value
-                    ],
-                    id
+                        ('int_map.a', MarqoFieldTypes.INT_MAP),
+                        ('int_map.b', MarqoFieldTypes.INT_MAP),
+                        ('int_map.c', MarqoFieldTypes.INT_MAP),
+                        ('float_map.c', MarqoFieldTypes.FLOAT_MAP),
+                        ('float_map.e', MarqoFieldTypes.FLOAT_MAP)
+                    ]
                 )
 
     def test_partial_update_should_reject_invalid_map_values(self):
@@ -815,7 +866,7 @@ class TestPartialUpdate(MarqoTestCase):
         This test verifies that partial updates reject invalid value types in numeric maps.
         """
         test_docs = [self.doc,self.doc2, self.doc3]
-        
+
         for doc in test_docs:
             with self.subTest(f"Attempting to update invalid map values for document with ID {doc['_id']}"):
                 id = doc['_id']
