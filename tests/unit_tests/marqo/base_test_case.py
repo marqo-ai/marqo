@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 
 from marqo.core.models.marqo_index import (
     StructuredMarqoIndex, Model, TextPreProcessing, ImagePreProcessing,
@@ -7,6 +7,7 @@ from marqo.core.models.marqo_index import (
 )
 from marqo.config import Config
 from marqo.tensor_search.telemetry import RequestMetricsStore
+from marqo.version import get_version
 
 class BaseUnitTest(unittest.TestCase):
     @classmethod
@@ -28,7 +29,7 @@ class BaseUnitTest(unittest.TestCase):
             text_preprocessing=TextPreProcessing(split_length=5, split_overlap=2, split_method="word"),
             image_preprocessing=ImagePreProcessing(patch_method=None), distance_metric=DistanceMetric.Euclidean,
             vector_numeric_type=VectorNumericType.Float, hnsw_config=HnswConfig(ef_construction=200, m=16),
-            marqo_version="2.16.0", created_at=1234567890, updated_at=1234567890, fields=[Field(
+            marqo_version=get_version(), created_at=1234567890, updated_at=1234567890, fields=[Field(
                 name="text_field_1", type=FieldType.Text, features=[FieldFeature.LexicalSearch, FieldFeature.Filter],
                 lexical_field_name="text_field_1", filter_field_name="text_field_1"
             ), Field(
