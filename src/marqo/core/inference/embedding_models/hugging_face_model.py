@@ -1,7 +1,7 @@
 import os
 import tarfile
 import zipfile
-from typing import Tuple, Callable, Optional
+from typing import Tuple, Callable, Optional, Dict
 
 import numpy as np
 import torch
@@ -17,7 +17,7 @@ from marqo.core.exceptions import InternalError
 from marqo.core.inference.model_download import download_model
 from marqo.s2_inference.configs import ModelCache
 from marqo.s2_inference.errors import InvalidModelPropertiesError
-from marqo.s2_inference.types import Union, FloatTensor, List
+from marqo.s2_inference.types import Union, FloatTensor, List, Modality
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
@@ -169,7 +169,8 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         else:
             raise InternalError(f"Invalid pooling method: {self.model_properties.pooling_method}")
 
-    def encode(self, sentence: Union[str, List[str]], normalize=True) -> np.ndarray:
+    def encode(self, sentence: Union[str, List[str]], modality: Modality = Modality.TEXT,
+               normalize=True, media_download_headers: Optional[Dict] = None) -> np.ndarray:
         if isinstance(sentence, str):
             sentence = [sentence]
 

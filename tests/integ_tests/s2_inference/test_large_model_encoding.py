@@ -1,12 +1,7 @@
 import functools
-import os
-import torch
-import pytest
 import json
-from marqo.s2_inference.types import FloatTensor
-from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, _convert_tensor_to_numpy
-from unittest.mock import patch
-import numpy as np
+import os
+import shutil
 import unittest
 from unittest.mock import patch
 
@@ -14,6 +9,9 @@ import numpy as np
 import pytest
 import torch
 
+from integ_tests.marqo_test import TestImageUrls
+from marqo.s2_inference.configs import ModelCache
+from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.s2_inference.s2_inference import (
     _check_output_type, vectorise,
     _convert_vectorized_output,
@@ -22,10 +20,6 @@ from marqo.s2_inference.s2_inference import _load_model as og_load_model
 from marqo.s2_inference.s2_inference import clear_loaded_models, get_model_properties_from_registry, \
     _convert_tensor_to_numpy
 from marqo.s2_inference.types import FloatTensor
-from integ_tests.marqo_test import TestImageUrls
-from marqo.s2_inference.multimodal_model_load import Modality
-from marqo.s2_inference.configs import ModelCache
-import shutil
 
 _load_model = functools.partial(og_load_model, calling_func="unit_test")
 
