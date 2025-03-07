@@ -62,7 +62,7 @@ class HybridSearch:
                 text_query_prefix: prefix for text queries (for vectorisation only)
                 hybrid_parameters: HybridParameters object to specify all parameters for hybrid search. If not provided,
                     default values will be used.
-                target_hits: target number of hits to return. If None, the default value will be used.
+                target_hits: target number of hits to return. If None, the default value `limit + offset` will be used.
             Returns:
 
             Output format:
