@@ -206,7 +206,7 @@ class LanguagebindModel(AbstractEmbeddingModel):
         self._preprocessors = {c: transform_dict[c](self._model.modality_config[c]) for c in
                                self._clip_type.dict(exclude_none=True).keys()}
 
-    def encode(self, content, modality, media_download_headers: Optional[Dict] = None, normalize=True, **kwargs):
+    def encode(self, content, modality, media_download_headers: Optional[Dict] = None, normalize=True):
         if media_download_headers is None:
             media_download_headers = dict()
 

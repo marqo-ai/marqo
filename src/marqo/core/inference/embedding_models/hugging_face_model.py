@@ -169,7 +169,7 @@ class HuggingFaceModel(AbstractEmbeddingModel):
         else:
             raise InternalError(f"Invalid pooling method: {self.model_properties.pooling_method}")
 
-    def encode(self, sentence: Union[str, List[str]], normalize=True, **kwargs) -> Union[FloatTensor, np.ndarray]:
+    def encode(self, sentence: Union[str, List[str]], normalize=True) -> np.ndarray:
         if isinstance(sentence, str):
             sentence = [sentence]
 

@@ -53,22 +53,14 @@ class AbstractCLIPModel(AbstractEmbeddingModel):
     def encode_image(self, inputs, normalize: bool = True, media_download_headers: dict = None) -> np.ndarray:
         pass
 
-    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], normalize=True, **kwargs) -> np.ndarray:
-        default = "text"
-        infer = kwargs.pop('infer', True)
-        if infer and _is_image(inputs):
-            is_image = True
-        else:
-            if default == 'text':
-                is_image = False
-            elif default == 'image':
-                is_image = True
-            else:
-                raise UnidentifiedImageError(f"expected default='image' or default='text' but received {default}")
+    def encode(self, inputs: Union[str, ImageType, List[Union[str, ImageType]]], modality: Modality, normalize=True,
+               media_download_headers: Optional[Dict] = None) -> np.ndarray:
+
+        is_image = modality == Modality.IMAGE and _is_image(inputs)
 
         if is_image:
             logger.debug('image')
-            media_download_headers = kwargs.get("media_download_headers", dict())
+            media_download_headers = media_download_headers or dict()
             return self.encode_image(inputs, normalize=normalize, media_download_headers=media_download_headers)
         else:
             logger.debug('text')
