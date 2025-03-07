@@ -5,6 +5,7 @@ import numpy as np
 from marqo.core.inference.embedding_models.open_clip_model import OPEN_CLIP
 from marqo.s2_inference.model_registry import _get_open_clip_properties
 from marqo.s2_inference.s2_inference import clear_loaded_models
+from marqo.s2_inference.types import Modality
 
 OPEN_CLIP_MODEL_PROPERTIES = _get_open_clip_properties()
 
@@ -575,8 +576,8 @@ class TestMarqoFashionCLIP(TestCase):
         self.assertIsNotNone(model.tokenizer)
         self.assertIsNotNone(model.preprocess)
 
-        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT)))
-        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT)))
+        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT, modality=Modality.IMAGE)))
+        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT, modality=Modality.TEXT)))
 
         image_difference = np.linalg.norm(marqo_image_embeddings - self.SiGLIP_IMAGE_EMBEDDING) / len(
             marqo_image_embeddings)
@@ -611,8 +612,8 @@ class TestMarqoFashionCLIP(TestCase):
         self.assertIsNotNone(model.tokenizer)
         self.assertIsNotNone(model.preprocess)
 
-        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT)))
-        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT)))
+        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT, modality=Modality.IMAGE)))
+        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT, modality=Modality.TEXT)))
 
         image_difference = np.linalg.norm(marqo_image_embeddings - self.SiGLIP_IMAGE_EMBEDDING) / len(
             marqo_image_embeddings)
@@ -637,8 +638,8 @@ class TestMarqoFashionCLIP(TestCase):
         self.assertIsNotNone(model.tokenizer)
         self.assertIsNotNone(model.preprocess)
 
-        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT)))
-        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT)))
+        marqo_image_embeddings = np.squeeze(np.array(model.encode(self.IMAGE_CONTENT, modality=Modality.IMAGE)))
+        marqo_text_embeddings = np.squeeze(np.array(model.encode(self.TEXT_CONTENT, modality=Modality.TEXT)))
 
         image_difference = (np.linalg.norm(marqo_image_embeddings - self.FASHIONCLIP_IMAGE_EMBEDDING)
                             / len(marqo_image_embeddings))
