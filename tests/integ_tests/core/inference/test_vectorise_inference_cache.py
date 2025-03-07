@@ -11,6 +11,7 @@ from PIL import Image
 
 from marqo.s2_inference.s2_inference import get_marqo_inference_cache, clear_marqo_inference_cache, clear_loaded_models
 from integ_tests.marqo_test import TestImageUrls
+from marqo.s2_inference.types import Modality
 
 
 class TestVectoriseInferenceCache(unittest.TestCase):
@@ -136,14 +137,14 @@ class TestVectoriseInferenceCache(unittest.TestCase):
         content = [TestImageUrls.IMAGE1.value]
         # First call
         original_vector = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
-                                    device="cpu", enable_cache=True, infer=True)
+                                    device="cpu", enable_cache=True, modality=Modality.IMAGE)
         # following calls
         with patch("marqo.s2_inference.s2_inference._encode_without_cache") as mock_encode:
             _ = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
-                          device="cpu", enable_cache=True, infer=True)
+                          device="cpu", enable_cache=True, modality=Modality.IMAGE)
             mock_encode.assert_not_called()
         cached_vector = vectorise(model_name="open_clip/ViT-B-32/laion2b_s34b_b79k", content=content,
-                                  device="cpu", enable_cache=True, infer=True)
+                                  device="cpu", enable_cache=True, modality=Modality.IMAGE)
         self.assertEqual(original_vector, cached_vector)
 
     def test_vectorise_cacheDifferentModelsSameContent(self):
