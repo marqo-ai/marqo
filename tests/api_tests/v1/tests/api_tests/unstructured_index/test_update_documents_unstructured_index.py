@@ -1,4 +1,7 @@
 import uuid
+import threading
+import time
+from datetime import datetime
 
 from marqo.client import Client
 
@@ -158,6 +161,107 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertIn("Marqo vector store couldn't update the document. Please see", update_docs_response['items'][0]['message'])
         self.assertIn("reference/api/documents/update-documents/#response", update_docs_response['items'][0]['message'])
 
+    def test_concurrent_document_updates(self):
+        """Test concurrent updates to different fields of the same document.
+        
+        This test verifies that:
+        1. Multiple threads can update different fields of the same document concurrently
+        2. Updates are properly applied without conflicts
+        3. The final document state reflects one of the updates correctly
+        """
+        # First add a document to update
+        text_docs = [{
+            '_id': '3',
+            'tensor_field': 'concurrent update test',
+            'description': 'This document will be updated by multiple threads',
+            'int_field': 100,
+            'float_field': 100.0,
+        }]
+
+        add_docs_response = self.client.index(self.text_index_name).add_documents(documents=text_docs)
+        self.assertFalse(add_docs_response["errors"])
+
+        def update_rank_thread(index_name, rank_values):
+            for i, new_rank in enumerate(rank_values):
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] Rank update {i+1}/{len(rank_values)}: Setting rank to {new_rank}")
+                r = self.client.index(index_name).update_documents([{'_id': '3', 'score_map': {'rank': new_rank}}])
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] Rank update {i+1} complete. Response: {r}")
+                time.sleep(0.5)  # Small delay between updates
+
+        def update_popularity_thread(index_name, popularity_values):
+            for i, new_pop in enumerate(popularity_values):
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] Popularity update {i+1}/{len(popularity_values)}: Setting popularity to {new_pop}")
+                r = self.client.index(index_name).update_documents([{'_id': '3', 'score_map': {'popularity': new_pop}}])
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] Popularity update {i+1} complete. Response: {r}")
+                time.sleep(0.5)  # Same delay now for both threads
+
+        rank_values = [0.85, 0.87, 0.90, 0.82, 0.88]
+        popularity_values = [0.72, 0.75, 0.79, 0.81, 0.78]
+
+        rank_thread = threading.Thread(target=update_rank_thread, args=(self.text_index_name, rank_values))
+        pop_thread = threading.Thread(target=update_popularity_thread, args=(self.text_index_name, popularity_values))
+
+        rank_thread.start()
+        pop_thread.start()
+
+        rank_thread.join()
+        pop_thread.join()
+
+        print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Both updates completed")
+
+        # Get the document to verify updates
+        updated_doc = self.client.index(self.text_index_name).get_document(document_id='3')
+        
+        # Check that only one of the fields is present (due to concurrent updates)
+        has_rank = 'score_map.rank' in updated_doc
+        has_popularity = 'score_map.popularity' in updated_doc
+        
+        # Either rank or popularity should be present, but not both
+        self.assertTrue(has_rank or has_popularity, "Neither rank nor popularity field is present")
+        self.assertTrue(has_rank != has_popularity, "Both rank and popularity fields are present. Only one value should be present")
+        
+        # If rank is present, verify it's one of the rank values
+        if has_rank:
+            self.assertIn(updated_doc['score_map.rank'], rank_values, 
+                         f"Rank value {updated_doc['score_map.rank']} is not in expected values {rank_values}")
+        
+        # If popularity is present, verify it's one of the popularity values
+        if has_popularity:
+            self.assertIn(updated_doc['score_map.popularity'], popularity_values,
+                         f"Popularity value {updated_doc['score_map.popularity']} is not in expected values {popularity_values}")
+        
+        # Verify original fields are still intact
+        self.assertEqual(updated_doc['tensor_field'], 'concurrent update test')
+        self.assertEqual(updated_doc['description'], 'This document will be updated by multiple threads')
+        self.assertEqual(updated_doc['int_field'], 100)
+        self.assertEqual(updated_doc['float_field'], 100.0)
+        
+        # Test search with score modifiers using the updated field (whichever is present)
+        base_search_result = self.client.index(self.text_index_name).search("concurrent update")
+        base_score = base_search_result["hits"][0]["_score"]
+
+        if has_rank:
+            search_result = self.client.index(self.text_index_name).search("concurrent update", score_modifiers={
+                "add_to_score": [{"field_name": "score_map.rank", "weight": 1}]
+            })
+            
+            self.assertTrue(len(search_result["hits"]) > 0, "No search results found")
+            hit = search_result["hits"][0]
+            self.assertAlmostEqual(hit["_score"], base_score + 1*updated_doc['score_map.rank'], places = 5)
+            
+        if has_popularity:
+            search_result = self.client.index(self.text_index_name).search("concurrent update", score_modifiers={
+                "add_to_score": [{"field_name": "score_map.popularity", "weight": 1}]
+            })
+            
+            self.assertTrue(len(search_result["hits"]) > 0, "No search results found")
+            hit = search_result["hits"][0]
+            self.assertAlmostEqual(hit["_score"], base_score + 1*updated_doc['score_map.popularity'], places = 5)
+
     def test_update_document_with_changes_in_score_modifiers(self):
         """Test that score modifiers are correctly updated during partial document updates.
         
@@ -283,5 +387,3 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             base_score + 10, 
             places=5
         )
-
-
