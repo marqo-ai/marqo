@@ -8,7 +8,7 @@ schema {{ index.schema_name }} {
         }
 
         field marqo__version_uuid type string {
-                indexing: summary
+                indexing: attribute | summary
         }
 
         field marqo__field_types type map<string, string> {

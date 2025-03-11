@@ -7,7 +7,7 @@ schema marqo__test_00semi_00structured_00schema {
         }
 
         field marqo__version_uuid type string {
-                indexing: summary
+                indexing: attribute | summary
         }
 
         field marqo__field_types type map<string, string> {
