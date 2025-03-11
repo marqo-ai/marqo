@@ -1,40 +1,49 @@
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Optional, Dict, Any, List, Tuple, Union
 
+import pydantic
 from numpy import ndarray
+from pydantic import StrictStr, root_validator, ValidationError
 
 from marqo.base_model import ImmutableBaseModel
-from marqo.core.inference.api import PreprocessingConfig, InferenceError
+from marqo.core.inference.api import PreprocessingConfig, InferenceError, Modality
 # TODO Ideally this should be in a shared module
 from marqo.tensor_search.models.private_models import ModelAuth
 
 
-class Modality(str, Enum):
-    TEXT = "language"
-    IMAGE = "image"
-    VIDEO = "video"
-    AUDIO = "audio"
-
-
 class ModelConfig(ImmutableBaseModel):
-    model_name: str
-    model_properties: Optional[Dict[str, Any]]
-    model_auth: Optional[ModelAuth]
-    normalize_embeddings: bool
+    model_name: StrictStr = pydantic.Field(alias='modelName')
+    model_properties: Optional[Dict[str, Any]] = pydantic.Field(default=None, alias='modelProperties')
+    model_auth: Optional[ModelAuth] = pydantic.Field(default=None, alias='modelAuth')
+    normalize_embeddings: bool = pydantic.Field(default=True, alias='normalizeEmbeddings')
 
 
 class InferenceRequest(ImmutableBaseModel):
     modality: Modality
-    contents: List[str]
-    device: Optional[str]
-    model_config: ModelConfig
-    preprocessing_config: PreprocessingConfig
-    use_inference_cache: bool
+    contents: List[str] = pydantic.Field(min_items=1)
+    device: Optional[str] = pydantic.Field(default=None)
+    model_config: ModelConfig = pydantic.Field(alias='modelConfig')
+    preprocessing_config: PreprocessingConfig = pydantic.Field(alias='preprocessingConfig')
+    use_inference_cache: bool = pydantic.Field(default=False, alias='useInferenceCache')
+
+    @root_validator(pre=False)
+    def check_preprocessing_config_matches_modality(cls, values):
+        modality: Modality = values.get('modality')
+        preprocessing_config: PreprocessingConfig = values.get('preprocessing_config')
+        supported_modalities = preprocessing_config.supported_modalities()
+
+        if modality not in supported_modalities:
+            raise ValueError(f"{type(preprocessing_config)} only supports modality: {supported_modalities}, "
+                             f"but modality: {modality} is specified in the request")
+
+        return values
 
 
 class InferenceResult(ImmutableBaseModel):
     result: List[Union[InferenceError, List[Tuple[str, ndarray]]]]
+
+    class Config(ImmutableBaseModel.Config):
+        arbitrary_types_allowed = True
 
 
 class Inference(ABC):
