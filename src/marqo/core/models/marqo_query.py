@@ -23,7 +23,7 @@ class MarqoQuery(StrictBaseModel, ABC):
     filter: Optional[SearchFilter] = None
     score_modifiers: Optional[List[ScoreModifier]] = None
     expose_facets: bool = False
-    target_hits: Optional[int] = None
+    target_hits: Optional[int] = None # hits to return per node before reranking
 
     @validator('filter', pre=True, always=True)
     def parse_filter(cls, filter):
