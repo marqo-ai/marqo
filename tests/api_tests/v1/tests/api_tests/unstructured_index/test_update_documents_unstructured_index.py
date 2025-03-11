@@ -178,7 +178,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             'float_field': 100.0,
         }]
 
-        add_docs_response = self.client.index(self.text_index_name).add_documents(documents=text_docs)
+        add_docs_response = self.client.index(self.text_index_name).add_documents(documents=text_docs, mappings={}, tensor_fields=['tensor_field', 'description'])
         self.assertFalse(add_docs_response["errors"])
 
         def update_rank_thread(index_name, rank_values):
