@@ -161,7 +161,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertIn("Marqo vector store couldn't update the document. Please see", update_docs_response['items'][0]['message'])
         self.assertIn("reference/api/documents/update-documents/#response", update_docs_response['items'][0]['message'])
 
-    def test_concurrent_document_updates(self):
+    def test_concurrent_partial_update_requests(self):
         """Test concurrent updates to different fields of the same document.
         
         This test verifies that:
@@ -387,3 +387,4 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             base_score + 10, 
             places=5
         )
+
