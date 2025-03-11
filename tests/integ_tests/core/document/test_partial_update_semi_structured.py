@@ -523,13 +523,24 @@ class TestPartialUpdate(MarqoTestCase):
                                 filter=f'short_string_field:{original_value}')
         self.assertEqual(1, len(res['hits']))
 
-    def test_partial_update_should_update_score_modifiers(self):
-        """Test that partial updates to score modifiers are successful."""
+    def test_partial_update_should_update_score_modifiers_and_version_uuid(self):
+        """Test that partial updates to score modifiers are successful.
+            Along with updating score modifiers, we also check that version_uuid changes since we are processing an update request that contains maps.
+        """
         test_docs = [self.doc2, self.doc3]
-        
+
+        version_uuid = {}
+
         for doc in test_docs:
             with self.subTest(f"Updating score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
+                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index( # Doing a get to set the version_uuid, which we'll check later to make sure it has changed after
+                    # processing an update request that contains maps
+                    self.index.name).schema_name)
+                doc = raw_vespa_doc.document.dict().get('fields')
+                self.assertIsNotNone(doc.get('marqo__version_uuid'))  # version_uuid should be present.
+                version_uuid[id] = doc.get('marqo__version_uuid')
+
                 res = self.config.document.partial_update_documents([{'_id': id, 'int_map': {
                     'a': 2,  # update int to int
                     'd': 5,  # new entry in int map
@@ -574,14 +585,27 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['new_map.a'], 1.0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['new_map.b'], 2.0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.d'], 5.0)
+                # Assert that after processing an update request that contains map fields, version uuid changes
+                self.assertNotEqual(doc.get('marqo__version_uuid'), version_uuid.get(id)) # version_uuid should change
 
     def test_partial_update_should_add_score_modifiers(self):
-        """Test that partial updates which specifically add new fields reflect properly in score modifiers tensors."""
+        """
+        Test that partial updates which specifically add new fields reflect properly in score modifiers tensors.
+        Along with updating score modifiers, we also check that version_uuid changes since we are processing an update request that contains maps.
+        """
         test_docs = [self.doc, self.doc2, self.doc3]
+        version_uuid = {}
 
         for doc in test_docs:
             with self.subTest(f"Adding score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
+                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index( # Doing a get to set the version_uuid, which we'll check later to make sure it has changed after
+                    # processing an update request that contains maps
+                    self.index.name).schema_name)
+                doc = raw_vespa_doc.document.dict().get('fields')
+                self.assertIsNotNone(doc.get('marqo__version_uuid'))  # version_uuid should be present.
+                version_uuid[id] = doc.get('marqo__version_uuid')
+
                 # Create a document with existing fields first to verify we're only adding
                 original_doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
 
@@ -621,6 +645,11 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['new_int'], 1.0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['new_float'], 2.0)
 
+                # Verify that the version_uuid has changed. Only applicable for cases where we process update requests
+                # that contain maps in them.
+                self.assertNotEqual(doc.get('marqo__version_uuid'), version_uuid.get(id)) # version_uuid should change
+
+
                 # Verify original fields are preserved (with conditional checks)
                 int_field_val = self.id_to_doc[id].get('int_field')
                 if int_field_val:
@@ -636,13 +665,25 @@ class TestPartialUpdate(MarqoTestCase):
                     self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], float(float_map_c_val))
 
     def test_partial_update_only_update_existing_score_modifiers(self):
-        """Test that partial updates which specifically change the existing keys inside existing maps
-         reflect properly in score modifiers tensors."""
+        """
+         Test that partial updates which specifically change the existing keys inside existing maps
+         reflect properly in score modifiers tensors.
+         Along with updating score modifiers, we also check that version_uuid changes since we are processing an update request that contains maps.
+         """
         test_docs = [self.doc2, self.doc3]
+        version_uuid = {}
 
         for doc in test_docs:
             with self.subTest(f"Updating existing score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
+                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index( # Doing a get to set the version_uuid, which we'll check later to make sure it has changed after
+                    # processing an update request that contains maps
+                    self.index.name).schema_name)
+                doc = raw_vespa_doc.document.dict().get('fields')
+                self.assertIsNotNone(doc.get('marqo__version_uuid'))  # version_uuid should be present.
+                version_uuid[id] = doc.get('marqo__version_uuid')
+
+
                 # Create a document with existing fields first to verify we're only adding
                 original_doc = tensor_search.get_document_by_id(self.config, self.index.name, id)
 
@@ -666,6 +707,11 @@ class TestPartialUpdate(MarqoTestCase):
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['int_map.b'], 4.0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.c'], 3.0)
                 self.assertEqual(doc['marqo__score_modifiers']['cells']['float_map.d'], 4.0)
+
+                # Verify that the version_uuid has changed. Only applicable for cases where we process update requests
+                # that contain maps in them.
+                self.assertNotEqual(doc.get('marqo__version_uuid'), version_uuid.get(id)) # version_uuid should change
+
 
     def test_partial_update_should_add_new_fields(self):
         """Test that partial updates to new fields are successful."""
