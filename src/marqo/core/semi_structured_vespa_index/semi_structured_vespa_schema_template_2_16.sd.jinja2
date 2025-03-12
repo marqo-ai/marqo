@@ -7,11 +7,9 @@ schema {{ index.schema_name }} {
             rank: filter
         }
 
-        field marqo__create_timestamp type double {
-                    indexing: attribute | summary
-                    attribute: fast-search
-                    rank: filter
-                }
+        field marqo__version_uuid type string {
+                indexing: attribute | summary
+        }
 
         field marqo__field_types type map<string, string> {
             struct-field key { indexing : attribute
