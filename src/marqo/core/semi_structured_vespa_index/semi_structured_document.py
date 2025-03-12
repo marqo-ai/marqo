@@ -16,7 +16,7 @@ from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARA
 
 
 def generate_uuid_str() -> str:
-    return str(uuid.uuid4())
+    return str(uuid.uuid4()).replace('-', '')
 
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     """A class with fields that are common to all Vespa documents."""
