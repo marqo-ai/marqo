@@ -6,7 +6,7 @@ import pytest
 import torch
 from PIL.Image import Image
 
-from marqo.core.inference.tensor_fields_container import SingleVectoriser, ModelConfig, BatchCachingVectoriser
+from marqo.core.vespa_index.tensor_fields_container import SingleVectoriser, ModelConfig, BatchCachingVectoriser
 from marqo.core.exceptions import AddDocumentsError, ModelError
 from marqo.s2_inference.clip_utils import load_image_from_path
 from marqo.s2_inference.errors import ModelDownloadError

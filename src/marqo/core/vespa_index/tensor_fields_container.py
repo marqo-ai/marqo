@@ -1,7 +1,6 @@
-import hashlib
 import json
 from abc import ABC, abstractmethod
-from typing import List, Dict, Set, Optional, Any, Generator, Tuple, cast, TypeVar, Callable, Union
+from typing import List, Dict, Set, Optional, Any, Generator, Tuple, cast, TypeVar, Callable
 
 import numpy as np
 from PIL.Image import Image
@@ -10,17 +9,16 @@ from torch import Tensor
 
 from marqo.core import constants
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import AddDocumentsError, ModelError, InternalError
+from marqo.core.exceptions import AddDocumentsError, ModelError
 from marqo.core.models.marqo_index import FieldType, TextPreProcessing, ImagePreProcessing
 from marqo.s2_inference import errors as s2_inference_errors
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.s2_inference.processing import image as image_processor
 from marqo.s2_inference.processing import text as text_processor
-
+from marqo.tensor_search.models.private_models import ModelAuth
 # TODO remove these deps
 from marqo.tensor_search.telemetry import RequestMetricsStore
-from marqo.tensor_search.models.private_models import ModelAuth
 
 # Content chunk of different modality can have different types
 # - Text: str

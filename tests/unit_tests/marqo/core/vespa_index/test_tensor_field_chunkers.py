@@ -6,7 +6,7 @@ import torch
 from PIL.Image import Image
 from torch import tensor
 
-from marqo.core.inference.tensor_fields_container import TextChunker, ImageChunker, AudioVideoChunker
+from marqo.core.vespa_index.tensor_fields_container import TextChunker, ImageChunker, AudioVideoChunker
 from marqo.core.exceptions import AddDocumentsError
 from marqo.core.models.marqo_index import TextPreProcessing, TextSplitMethod, ImagePreProcessing, PatchMethod
 from marqo.s2_inference.clip_utils import load_image_from_path
@@ -66,7 +66,7 @@ class TestTensorFieldChunkers(unittest.TestCase):
         self.assertEqual(1, len(content_chunks))
         self.assertIsInstance(content_chunks[0], Image)
 
-    @patch('marqo.core.inference.tensor_fields_container.image_processor.chunk_image')
+    @patch('marqo.core.vespa_index.tensor_fields_container.image_processor.chunk_image')
     def test_image_chunker_should_raise_error_when_chunking_fails(self, mock_chunk_image):
         image_url = TestImageUrls.HIPPO_REALISTIC.value
         media_repo = {image_url: load_image_from_path(image_url, {})}

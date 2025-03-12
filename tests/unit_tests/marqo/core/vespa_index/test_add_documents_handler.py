@@ -4,26 +4,22 @@ from unittest.mock import patch
 
 import pytest
 
+from integ_tests.marqo_test import MarqoTestCase
+from integ_tests.marqo_test import TestAudioUrls, TestVideoUrls, TestImageUrls
 from marqo.core.constants import MARQO_DOC_ID
-from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError, \
-    InternalError
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
-from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer
 from marqo.core.exceptions import DuplicateDocumentError, AddDocumentsError, MarqoDocumentParsingError, InternalError
+from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem
 from marqo.core.models.marqo_index import FieldType
 from marqo.core.unstructured_vespa_index.unstructured_add_document_handler import \
     UnstructuredAddDocumentsHandler
 from marqo.core.vespa_index.add_documents_handler import AddDocumentsResponseCollector, AddDocumentsHandler
+from marqo.core.vespa_index.tensor_fields_container import TensorFieldsContainer
 from marqo.s2_inference import s2_inference
 from marqo.s2_inference.errors import S2InferenceError
-from marqo.s2_inference.types import Modality
 from marqo.s2_inference.multimodal_model_load import Modality
 from marqo.vespa.models import VespaDocument, FeedBatchResponse, FeedBatchDocumentResponse
 from marqo.vespa.models.get_document_response import Document, GetBatchResponse, GetBatchDocumentResponse
-from integ_tests.marqo_test import MarqoTestCase
-from integ_tests.marqo_test import TestAudioUrls, TestVideoUrls, TestImageUrls
 
 
 @pytest.mark.unittest

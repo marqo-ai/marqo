@@ -6,14 +6,14 @@ from typing import List, Dict, Optional, Any, Tuple, Set
 
 from marqo.api import exceptions as api_errors
 from marqo.core.constants import MARQO_DOC_ID, MARQO_CUSTOM_VECTOR_NORMALIZATION_MINIMUM_VERSION
-from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
-from marqo.core.inference.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
-    TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser, ContentChunkType
 from marqo.core.exceptions import AddDocumentsError, DuplicateDocumentError, MarqoDocumentParsingError, InternalError, \
-    UnsupportedFeatureError, VespaDocumentParsingError
+    UnsupportedFeatureError
 from marqo.core.models import MarqoIndex
+from marqo.core.models.add_docs_params import AddDocsParams, BatchVectorisationMode
 from marqo.core.models.marqo_add_documents_response import MarqoAddDocumentsItem, MarqoAddDocumentsResponse
 from marqo.core.models.marqo_index import FieldType
+from marqo.core.vespa_index.tensor_fields_container import Chunker, TensorFieldsContainer, TensorFieldContent, \
+    TextChunker, ImageChunker, AudioVideoChunker, ModelConfig, Vectoriser, ContentChunkType
 from marqo.logging import get_logger
 from marqo.tensor_search import validation, add_docs
 from marqo.tensor_search.telemetry import RequestMetricsStore

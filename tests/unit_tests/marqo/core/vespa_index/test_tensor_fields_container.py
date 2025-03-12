@@ -4,9 +4,9 @@ from typing import cast
 import pytest
 
 from marqo.core.constants import MARQO_DOC_ID, MARQO_DOC_TENSORS, MARQO_DOC_CHUNKS, MARQO_DOC_EMBEDDINGS
-from marqo.core.inference.tensor_fields_container import TensorFieldsContainer, MultiModalTensorFieldContent
 from marqo.core.exceptions import AddDocumentsError
-from marqo.core.models.marqo_index import FieldType, Field
+from marqo.core.models.marqo_index import FieldType
+from marqo.core.vespa_index.tensor_fields_container import TensorFieldsContainer, MultiModalTensorFieldContent
 
 
 @pytest.mark.unittest
