@@ -1,3 +1,4 @@
+import uuid
 from typing import Dict, Any, List, Optional, Type, Union, cast
 
 from marqo.core.constants import MARQO_DOC_HIGHLIGHTS, MARQO_DOC_ID
@@ -9,7 +10,8 @@ from marqo.core.search import search_filter
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.common import VESPA_FIELD_ID, BOOL_FIELDS, SHORT_STRINGS_FIELDS, \
     STRING_ARRAY, INT_FIELDS, FLOAT_FIELDS
-from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument
+from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument, \
+    generate_uuid_str
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
@@ -220,7 +222,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             - 'fields': Field values. Each field is represented as an update statement, for the actual field, the field type metadata, and the score modifiers if applicable. Example:
                 - 'marqo__bool_fields{active}': {"assign": 1}
                 - 'marqo__field_type{active}': {"assign": "bool"}
-            - 'create_timestamp': Original document timestamp if it exists
+            - 'version_uuid': Original document version_uuid if it exists
 
         Raises:
             MarqoDocumentParsingError: If '_id' field is missing
@@ -276,11 +278,16 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 vespa_fields=vespa_fields
             )
 
+        # Add version_uuid to the vespa_fields to update the document's version_uuid,
+        # only if this is a type of update that requires updating version_uuid (i.e a partial update with map fields)
+        if original_doc is not None and original_doc.fixed_fields.version_uuid:
+            vespa_fields[common.VESPA_DOC_VERSION_UUID] = {"assign": generate_uuid_str()}
+
         return {
             "id": doc_id,
             "fields": vespa_fields,
             "field_types": vespa_field_types,
-            "create_timestamp": original_doc.fixed_fields.create_timestamp if original_doc else None
+            "version_uuid": original_doc.fixed_fields.version_uuid if original_doc else None # Pass the original document's version uuid, if it exists.
         }
 
     def _update_score_modifiers(self, original_doc: Optional[SemiStructuredVespaDocument], 
@@ -516,9 +523,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if not isinstance(v, (int, float)):
                 raise MarqoDocumentParsingError(f'Unsupported field type {type(v)} for field {field_name} in doc {doc_id}. '
                                                'We only support int and float types for map values when updating a document')
-                
+
             numeric_field_map[f'{field_name}.{k}'] = v
-            
+
             # Set the appropriate field type based on the value type
             if isinstance(v, int):
                 field_types[f'{field_name}.{k}'] = MarqoFieldTypes.INT_MAP.value

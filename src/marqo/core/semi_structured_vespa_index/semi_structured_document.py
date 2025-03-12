@@ -1,5 +1,5 @@
 import json
-import time
+import uuid
 from typing import List, Dict, Any, Union
 
 from pydantic import Field
@@ -8,17 +8,20 @@ from marqo.base_model import MarqoBaseModel
 from marqo.core import constants as index_constants, constants
 from marqo.core.exceptions import VespaDocumentParsingError, MarqoDocumentParsingError, InvalidFieldNameError, \
     InvalidTensorFieldError
-from marqo.core.models.marqo_index import SemiStructuredMarqoIndex, logger
+from marqo.core.models.marqo_index import SemiStructuredMarqoIndex
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.common import VESPA_DOC_FIELD_TYPES, STRING_ARRAY
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.core.unstructured_vespa_index.common import MARQO_DOC_MULTIMODAL_PARAMS, MARQO_DOC_MULTIMODAL_PARAMS_WEIGHTS
 
 
+def generate_uuid_str() -> str:
+    return str(uuid.uuid4()).replace('-', '')
+
 class SemiStructuredVespaDocumentFields(MarqoBaseModel):
     """A class with fields that are common to all Vespa documents."""
     marqo__id: str = Field(alias=common.VESPA_FIELD_ID)
-    create_timestamp: float = Field(default_factory=time.time, alias=common.VESPA_DOC_CREATE_TIMESTAMP)
+    version_uuid: str = Field(default_factory=generate_uuid_str, alias=common.VESPA_DOC_VERSION_UUID)
 
     short_string_fields: Dict[str, str] = Field(default_factory=dict, alias=common.SHORT_STRINGS_FIELDS)
     string_arrays: List[str] = Field(default_factory=list, alias=common.STRING_ARRAY) # Indexes created pre marqo version 2.16 will have string arrays stored as a list of strings
@@ -94,7 +97,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
             fixed_fields = SemiStructuredVespaDocumentFields.construct(
                 marqo__id=cls.extract_field(fields, common.VESPA_FIELD_ID, None),
-                create_timestamp=cls.extract_field(fields, common.VESPA_DOC_CREATE_TIMESTAMP, None),
+                version_uuid=cls.extract_field(fields, common.VESPA_DOC_VERSION_UUID, None),
                 short_string_fields=cls.extract_field(fields, common.SHORT_STRINGS_FIELDS, dict()),
                 string_arrays=cls.extract_field(fields, common.STRING_ARRAY, list()),
                 int_fields=cls.extract_field(fields, common.INT_FIELDS, dict()),
@@ -191,8 +194,6 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
         doc_id = document[index_constants.MARQO_DOC_ID]
         instance = cls(id=doc_id, fixed_fields=SemiStructuredVespaDocumentFields(marqo__id=doc_id), index_supports_partial_updates=index_supports_partial_updates)
 
-        if common.VESPA_DOC_CREATE_TIMESTAMP in document:
-            instance.fixed_fields.create_timestamp = document[common.VESPA_DOC_CREATE_TIMESTAMP]
         # Process regular fields
         cls._process_regular_fields(document, instance, marqo_index, doc_id)
 
@@ -392,7 +393,7 @@ class SemiStructuredVespaDocument(MarqoBaseModel):
 
         marqo_document.update({k: bool(v) for k, v in self.fixed_fields.bool_fields.items()})
         marqo_document[index_constants.MARQO_DOC_ID] = self.fixed_fields.marqo__id
-        # Note: We are not adding field_types & create_timestamp to the document because
+        # Note: We are not adding field_types & version_uuid to the document because
         # it's a field for internal Marqo use only.
 
         # text fields
