@@ -3,7 +3,7 @@ import unittest
 from pydantic import ValidationError
 
 from marqo.core.inference.api import ChunkConfig, TextChunkConfig, TextPreprocessingConfig, ImagePreprocessingConfig, \
-    AudioVideoPreprocessingConfig
+    AudioVideoPreprocessingConfig, Modality
 
 
 class TestChunkConfig(unittest.TestCase):
@@ -185,6 +185,9 @@ class TestTextPreprocessingConfig(unittest.TestCase):
         self.assertIn('"TextPreprocessingConfig" is immutable and does not support item assignment',
                       str(context.exception))
 
+    def test_supported_modalities(self):
+        self.assertSetEqual(TextPreprocessingConfig().supported_modalities, {Modality.TEXT})
+
 
 class TestImagePreprocessingConfig(unittest.TestCase):
     def test_default_values(self):
@@ -268,6 +271,9 @@ class TestImagePreprocessingConfig(unittest.TestCase):
             config.should_chunk = True
         self.assertIn('"ImagePreprocessingConfig" is immutable and does not support item assignment', str(context.exception))
 
+    def test_supported_modalities(self):
+        self.assertSetEqual(ImagePreprocessingConfig().supported_modalities, {Modality.IMAGE})
+
 
 class TestAudioVideoPreprocessingConfig(unittest.TestCase):
     def test_default_values(self):
@@ -345,3 +351,5 @@ class TestAudioVideoPreprocessingConfig(unittest.TestCase):
             config.should_chunk = True
         self.assertIn('"AudioVideoPreprocessingConfig" is immutable and does not support item assignment', str(context.exception))
 
+    def test_supported_modalities(self):
+        self.assertSetEqual(AudioVideoPreprocessingConfig().supported_modalities, {Modality.AUDIO, Modality.VIDEO})

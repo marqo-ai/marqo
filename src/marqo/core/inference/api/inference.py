@@ -30,7 +30,7 @@ class InferenceRequest(ImmutableBaseModel):
     def check_preprocessing_config_matches_modality(cls, values):
         modality: Modality = values.get('modality')
         preprocessing_config: PreprocessingConfig = values.get('preprocessing_config')
-        supported_modalities = preprocessing_config.supported_modalities()
+        supported_modalities = preprocessing_config.supported_modalities
 
         if modality not in supported_modalities:
             raise ValueError(f"{type(preprocessing_config)} only supports modality: {supported_modalities}, "

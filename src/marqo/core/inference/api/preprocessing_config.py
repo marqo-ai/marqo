@@ -12,6 +12,7 @@ class PreprocessingConfig(ImmutableBaseModel, ABC):
     """Parent class of preprocessing config for all modality types"""
     should_chunk: bool = pydantic.Field(default=False, alias='shouldChunk')
 
+    @property
     @abstractmethod
     def supported_modalities(self) -> Set[Modality]:
         pass
@@ -41,6 +42,7 @@ class TextPreprocessingConfig(PreprocessingConfig):
             raise ValueError("`chunk_config` must not be provided when `should_chunk` is False.")
         return values
 
+    @property
     def supported_modalities(self) -> Set[Modality]:
         return {Modality.TEXT}
 
@@ -70,6 +72,7 @@ class ImagePreprocessingConfig(PreprocessingConfig):
             raise ValueError("`patch_method` must not be provided when `should_chunk` is False.")
         return values
 
+    @property
     def supported_modalities(self) -> Set[Modality]:
         return {Modality.IMAGE}
 
@@ -90,6 +93,7 @@ class AudioVideoPreprocessingConfig(PreprocessingConfig):
             raise ValueError("`chunk_config` must not be provided when `should_chunk` is False.")
         return values
 
+    @property
     def supported_modalities(self) -> Set[Modality]:
         return {Modality.AUDIO, Modality.VIDEO}
 
