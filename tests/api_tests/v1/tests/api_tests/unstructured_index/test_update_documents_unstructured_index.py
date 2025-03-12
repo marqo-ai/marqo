@@ -161,12 +161,12 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertIn("Marqo vector store couldn't update the document. Please see", update_docs_response['items'][0]['message'])
         self.assertIn("reference/api/documents/update-documents/#response", update_docs_response['items'][0]['message'])
 
-    def test_concurrent_partial_update_requests(self):
+    def test_concurrent_partial_update_requests_on_maps(self):
         """Test concurrent updates to different fields of the same document.
         
         This test verifies that:
         1. Multiple threads can update different fields of the same document concurrently
-        2. Updates are properly applied without conflicts
+        2. Updates are applied, some of which fail due to concurrent updates, but the final state is consistent
         3. The final document state reflects one of the updates correctly
         """
         # First add a document to update
@@ -187,6 +187,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
                 print(f"[{timestamp}] Rank update {i+1}/{len(rank_values)}: Setting rank to {new_rank}")
                 r = self.client.index(index_name).update_documents([{'_id': '3', 'score_map': {'rank': new_rank}}])
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                # We can't be sure that the response will be error-free due to concurrent updates. So we will not check that here
                 print(f"[{timestamp}] Rank update {i+1} complete. Response: {r}")
                 time.sleep(0.5)  # Small delay between updates
 
@@ -196,6 +197,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
                 print(f"[{timestamp}] Popularity update {i+1}/{len(popularity_values)}: Setting popularity to {new_pop}")
                 r = self.client.index(index_name).update_documents([{'_id': '3', 'score_map': {'popularity': new_pop}}])
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                # We can't be sure that the response will be error-free due to concurrent updates. So we will not check that here
                 print(f"[{timestamp}] Popularity update {i+1} complete. Response: {r}")
                 time.sleep(0.5)  # Same delay now for both threads
 
@@ -261,6 +263,107 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             self.assertTrue(len(search_result["hits"]) > 0, "No search results found")
             hit = search_result["hits"][0]
             self.assertAlmostEqual(hit["_score"], base_score + 1*updated_doc['score_map.popularity'], places = 5)
+
+    def test_concurrent_partial_update_requests_on_numeric_fields(self):
+        """Test concurrent updates to different fields of the same document.
+
+        This test verifies that:
+        1. Multiple threads can update different fields of the same document concurrently
+        2. Updates are properly applied without conflicts
+        3. The final document state reflects one of the updates correctly
+        """
+        # First add a document to update
+        text_docs = [{
+            '_id': '3',
+            'tensor_field': 'concurrent update test',
+            'description': 'This document will be updated by multiple threads',
+            'int_field': 100,
+            'float_field': 100.0,
+        }]
+
+        add_docs_response = self.client.index(self.text_index_name).add_documents(documents=text_docs, mappings={},
+                                                                                  tensor_fields=['tensor_field',
+                                                                                                 'description'])
+        self.assertFalse(add_docs_response["errors"])
+
+        def update_rank_thread(index_name, rank_values):
+            for i, new_rank in enumerate(rank_values):
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] Rank update {i + 1}/{len(rank_values)}: Setting rank to {new_rank}")
+                r = self.client.index(index_name).update_documents([{'_id': '3', 'rank': new_rank}])
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] Rank update {i + 1} complete. Response: {r}")
+                self.assertFalse(r["errors"]) # Assert that there are no errors in the response
+                time.sleep(0.5)  # Small delay between updates
+
+        def update_popularity_thread(index_name, popularity_values):
+            for i, new_pop in enumerate(popularity_values):
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(
+                    f"[{timestamp}] Popularity update {i + 1}/{len(popularity_values)}: Setting popularity to {new_pop}")
+                r = self.client.index(index_name).update_documents([{'_id': '3', 'popularity': new_pop}])
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] Popularity update {i + 1} complete. Response: {r}")
+                self.assertFalse(r["errors"]) # Assert that there are no errors in the response
+                time.sleep(0.5)  # Same delay now for both threads
+
+        rank_values = [0.85, 0.87, 0.90, 0.82, 0.88]
+        popularity_values = [0.72, 0.75, 0.79, 0.81, 0.78]
+
+        rank_thread = threading.Thread(target=update_rank_thread, args=(self.text_index_name, rank_values))
+        pop_thread = threading.Thread(target=update_popularity_thread, args=(self.text_index_name, popularity_values))
+
+        rank_thread.start()
+        pop_thread.start()
+
+        rank_thread.join()
+        pop_thread.join()
+
+        print(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Both updates completed")
+
+        # Get the document to verify updates
+        updated_doc = self.client.index(self.text_index_name).get_document(document_id='3')
+
+        # Check that only one of the fields is present (due to concurrent updates)
+        has_rank = 'rank' in updated_doc
+        has_popularity = 'popularity' in updated_doc
+
+        # Either rank or popularity should be present, but not both
+        self.assertTrue(has_rank and has_popularity, "Neither rank nor popularity field is present")
+
+        # If rank is present, verify it's one of the rank values
+        self.assertIn(updated_doc['rank'], rank_values,
+                      f"Rank value {updated_doc['rank']} is not in expected values {rank_values}")
+
+        # If popularity is present, verify it's one of the popularity values
+        self.assertIn(updated_doc['popularity'], popularity_values,
+                          f"Popularity value {updated_doc['popularity']} is not in expected values {popularity_values}")
+
+        # Verify original fields are still intact
+        self.assertEqual(updated_doc['tensor_field'], 'concurrent update test')
+        self.assertEqual(updated_doc['description'], 'This document will be updated by multiple threads')
+        self.assertEqual(updated_doc['int_field'], 100)
+        self.assertEqual(updated_doc['float_field'], 100.0)
+
+        # Test search with score modifiers using the updated field (whichever is present)
+        base_search_result = self.client.index(self.text_index_name).search("concurrent update")
+        base_score = base_search_result["hits"][0]["_score"]
+
+        search_result = self.client.index(self.text_index_name).search("concurrent update", score_modifiers={
+            "add_to_score": [{"field_name": "rank", "weight": 1}]
+        })
+
+        self.assertTrue(len(search_result["hits"]) > 0, "No search results found")
+        hit = search_result["hits"][0]
+        self.assertAlmostEqual(hit["_score"], base_score + 1 * updated_doc['rank'], places=5)
+
+        search_result = self.client.index(self.text_index_name).search("concurrent update", score_modifiers={
+            "add_to_score": [{"field_name": "popularity", "weight": 1}]
+        })
+
+        self.assertTrue(len(search_result["hits"]) > 0, "No search results found")
+        hit = search_result["hits"][0]
+        self.assertAlmostEqual(hit["_score"], base_score + 1 * updated_doc['popularity'], places=5)
 
     def test_update_document_with_changes_in_score_modifiers(self):
         """Test that score modifiers are correctly updated during partial document updates.
@@ -388,3 +491,151 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             places=5
         )
 
+    def test_concurrent_mixed_update_requests(self):
+        """Test concurrent updates using different API methods on the same document.
+
+        This test verifies that:
+        1. Multiple threads can update the same document using different API methods concurrently
+        2. One thread uses update_documents to modify specific fields
+        3. One thread uses add_documents to replace the entire document
+        4. The document remains in a consistent state after all operations
+        """
+        # First add a document to update
+        text_docs = [{
+            '_id': '4',
+            'tensor_field': 'mixed update test',
+            'description': 'This document will be updated by multiple threads using different methods',
+            'int_field': 100,
+            'float_field': 100.0,
+            'tags': ['initial', 'document'],
+        }]
+
+        add_docs_response = self.client.index(self.text_index_name).add_documents(
+            documents=text_docs,
+            mappings={},
+            tensor_fields=['tensor_field', 'description']
+        )
+        self.assertFalse(add_docs_response["errors"])
+
+        def update_documents_thread(index_name):
+            """Thread that updates specific fields using update_documents."""
+            for i in range(10):
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] update_documents thread - iteration {i + 1}/10: Updating int_field and metadata")
+                r = self.client.index(index_name).update_documents([{
+                    '_id': '4',
+                    'int_field': 200 + i,
+                    'tensor_field': f'update_documents replaced content {i + 1}',
+                    'description': f'This document was updated in iteration {i + 1} inside an update_documents thread',
+                }])
+                self.assertTrue(r["errors"]) # We can be sure that the response will be error-free due to concurrent updates and the updates sent by the other add documents
+                # thread
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] update_documents thread - iteration {i + 1} complete. Response: {r}")
+                time.sleep(0.5)  # Delay between updates
+
+        def add_documents_thread(index_name):
+            """Thread that replaces the entire document using add_documents."""
+            for i in range(10):
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] add_documents thread - iteration {i + 1}/10: Replacing document")
+                r = self.client.index(index_name).add_documents(
+                    documents=[{
+                        '_id': '4',
+                        'tensor_field': f'add_documents replaced content {i + 1}',
+                        'description': f'This document was replaced in iteration {i + 1} inside an add_documents thread',
+                        'int_field': 300 + i,
+                        'float_field': 300.0 + i,
+                        'tags': ['replaced', f'iteration-{i + 1}'],
+                    }],
+                    tensor_fields=['tensor_field', 'description']
+                )
+                self.assertFalse(r["errors"]) # Assert that there are no errors in the response
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                print(f"[{timestamp}] add_documents thread - iteration {i + 1} complete. Response: {r}")
+                time.sleep(0.5)  # Delay between updates
+
+        # Create and start threads
+        update_thread = threading.Thread(target=update_documents_thread, args=(self.text_index_name,))
+        add_thread = threading.Thread(target=add_documents_thread, args=(self.text_index_name,))
+
+        add_thread.start()
+        update_thread.start()
+
+        add_thread.join()
+        update_thread.join()
+
+        # Verify the final document state
+        final_doc = self.client.index(self.text_index_name).get_document(document_id='4')
+
+        # We can't predict exactly which thread's updates will be the final state
+        # but we can verify that the document exists and has expected structure
+        self.assertEqual(final_doc['_id'], '4')
+        self.assertIn('tensor_field', final_doc)
+        self.assertIn('description', final_doc)
+        self.assertIn('int_field', final_doc)
+        self.assertIn('float_field', final_doc)
+        self.assertIn('This document was replaced in iteration 10 inside an add_documents thread', final_doc['description'])
+        self.assertIn('add_documents replaced content 10', final_doc['tensor_field'])
+
+        # Log the final state for debugging
+        print(f"Final document state after concurrent updates: {final_doc}")
+
+    def test_partial_update_new_map_field(self):
+        """
+        Test that adding a new map field by partially updating the field should work fine
+        """
+        text_docs = [
+            {
+                '_id': '4',
+                'text': 'This is a test document',
+                'rank': 100,
+            }
+        ]
+        add_docs_response = self.client.index(self.text_index_name).add_documents(
+            documents=text_docs,
+            mappings={},
+            tensor_fields=['text']
+        )
+
+        get_doc = self.client.index(self.text_index_name).get_document('4')
+        self.assertEqual(get_doc['rank'], text_docs[0]['rank'])
+
+        update_docs_response = self.client.index(self.text_index_name).update_documents(
+            [ {
+                '_id': '4',
+                'metadata': {'key1': 100.5}
+            }]
+        )
+        self.assertFalse(update_docs_response['errors'])
+
+        update_docs_response_2 = self.client.index(self.text_index_name).update_documents(
+            [{
+                '_id': '4',
+                'metadata': {'key2': 100.5},
+            }]
+        )
+
+        self.assertFalse(update_docs_response_2['errors'])
+
+        get_docs_result = self.client.index(index_name=self.text_index_name).get_document(document_id='4')
+        self.assertIsNone(get_docs_result.get('metadata.key1'))
+        self.assertEqual(get_docs_result['metadata.key2'], 100.5)
+
+        base_search_result = self.client.index(index_name=self.text_index_name).search("test document")
+        base_score = base_search_result["hits"][0]["_score"]
+
+        search_result_with_non_existent_score_modifier = self.client.index(index_name = self.text_index_name).search("test document", score_modifiers={
+            "add_to_score": [{"field_name": "metadata.key1", "weight": 1}]
+        })
+
+        score_with_non_existent_score_modifier = search_result_with_non_existent_score_modifier["hits"][0]["_score"]
+        # Since the score modifier should not exist after the map has been completely replaced, the scores should be the same
+        self.assertAlmostEqual(score_with_non_existent_score_modifier, base_score, 5)
+
+        search_with_existing_score_modifier = self.client.index(index_name = self.text_index_name).search("test document", score_modifiers={
+            "add_to_score": [{"field_name": "metadata.key2", "weight": 1}]
+        })
+
+        score_with_existing_score_modifier = search_with_existing_score_modifier["hits"][0]["_score"]
+        self.assertAlmostEqual(score_with_existing_score_modifier, base_score + 1*100.5, 5)
