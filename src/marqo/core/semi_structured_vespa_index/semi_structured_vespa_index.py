@@ -10,7 +10,8 @@ from marqo.core.search import search_filter
 from marqo.core.semi_structured_vespa_index import common
 from marqo.core.semi_structured_vespa_index.common import VESPA_FIELD_ID, BOOL_FIELDS, SHORT_STRINGS_FIELDS, \
     STRING_ARRAY, INT_FIELDS, FLOAT_FIELDS
-from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument
+from marqo.core.semi_structured_vespa_index.semi_structured_document import SemiStructuredVespaDocument, \
+    generate_uuid_str
 from marqo.core.semi_structured_vespa_index.semi_structured_vespa_schema import SemiStructuredVespaSchema
 from marqo.core.structured_vespa_index.structured_vespa_index import StructuredVespaIndex
 from marqo.core.unstructured_vespa_index.unstructured_validation import validate_field_name
@@ -280,7 +281,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
         # Add version_uuid to the vespa_fields to update the document's version_uuid,
         # only if this is a type of update that requires updating version_uuid (i.e a partial update with map fields)
         if original_doc is not None and original_doc.fixed_fields.version_uuid:
-            vespa_fields[common.VESPA_DOC_VERSION_UUID] = {"assign": str(uuid.uuid4())}
+            vespa_fields[common.VESPA_DOC_VERSION_UUID] = {"assign": generate_uuid_str()}
 
         return {
             "id": doc_id,

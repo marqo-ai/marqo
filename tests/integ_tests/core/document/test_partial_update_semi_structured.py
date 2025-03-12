@@ -534,9 +534,9 @@ class TestPartialUpdate(MarqoTestCase):
         for doc in test_docs:
             with self.subTest(f"Updating score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index( # Doing a get to set the version_uuid, which we'll check later to make sure it has changed after
-                    # processing an update request that contains maps
-                    self.index.name).schema_name)
+                # Doing a get to set the version_uuid in the version_uuid hashmap, which we'll check later to make sure it has changed after
+                # processing an update request that contains maps
+                raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
                 doc = raw_vespa_doc.document.dict().get('fields')
                 self.assertIsNotNone(doc.get('marqo__version_uuid'))  # version_uuid should be present.
                 version_uuid[id] = doc.get('marqo__version_uuid')
@@ -599,9 +599,9 @@ class TestPartialUpdate(MarqoTestCase):
         for doc in test_docs:
             with self.subTest(f"Adding score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index( # Doing a get to set the version_uuid, which we'll check later to make sure it has changed after
-                    # processing an update request that contains maps
-                    self.index.name).schema_name)
+                # Doing a get to set the version_uuid in the version_uuid hashmap, which we'll check later to make sure it has changed after
+                # processing an update request that contains maps
+                raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
                 doc = raw_vespa_doc.document.dict().get('fields')
                 self.assertIsNotNone(doc.get('marqo__version_uuid'))  # version_uuid should be present.
                 version_uuid[id] = doc.get('marqo__version_uuid')
@@ -676,9 +676,9 @@ class TestPartialUpdate(MarqoTestCase):
         for doc in test_docs:
             with self.subTest(f"Updating existing score modifiers for document with ID {doc['_id']}"):
                 id = doc['_id']
-                raw_vespa_doc = self.config.vespa_client.get_document(id, self.config.index_management.get_index( # Doing a get to set the version_uuid, which we'll check later to make sure it has changed after
-                    # processing an update request that contains maps
-                    self.index.name).schema_name)
+                # Doing a get to set the version_uuid in the version_uuid hashmap, which we'll check later to make sure it has changed after
+                # processing an update request that contains maps
+                raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
                 doc = raw_vespa_doc.document.dict().get('fields')
                 self.assertIsNotNone(doc.get('marqo__version_uuid'))  # version_uuid should be present.
                 version_uuid[id] = doc.get('marqo__version_uuid')
