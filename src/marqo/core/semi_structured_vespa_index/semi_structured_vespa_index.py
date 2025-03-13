@@ -459,7 +459,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if (original_field_name not in numeric_field_map and
                 original_doc.fixed_fields.field_types.get(original_field_name) in (MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value)):
 
-                map_name = self._extract_map_name_from_field(field_name)
+                map_name = self._extract_map_name_from_field(original_field_name)
                 vespa_field_name = f'{field_prefix}{{{original_field_name}}}'
                 vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPES}{{{original_field_name}}}'
 
