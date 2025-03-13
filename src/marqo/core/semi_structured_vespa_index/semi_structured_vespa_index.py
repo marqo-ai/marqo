@@ -445,7 +445,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
                 # Handle creating update statements for the map field name. 
                 if "." in field_name:
                     # For fields like "map1.key1", extract the map name "map1"
-                    map_name = field_name.split(".", 1)[0]
+                    map_name = self._extract_map_name_from_field(field_name)
                     # Create assign statement for adding / updating statement for the map field. This is done for the prefix in a flattened map field name.
                     vespa_fields[f'{common.VESPA_DOC_FIELD_TYPES}{{{map_name}}}'] = {"assign": vespa_field_types.get(map_name)}
 
@@ -459,7 +459,7 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
             if (original_field_name not in numeric_field_map and
                 original_doc.fixed_fields.field_types.get(original_field_name) in (MarqoFieldTypes.INT_MAP.value, MarqoFieldTypes.FLOAT_MAP.value)):
 
-                map_name = original_field_name.split(".", 1)[0]
+                map_name = self._extract_map_name_from_field(field_name)
                 vespa_field_name = f'{field_prefix}{{{original_field_name}}}'
                 vespa_field_types_field_name = f'{common.VESPA_DOC_FIELD_TYPES}{{{original_field_name}}}'
 
@@ -474,6 +474,19 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
         return fields_changed
     
+    def _extract_map_name_from_field(self, field_name: str) -> str:
+        """Extract the map name from a flattened field name.
+        For fields like "map_name.key_name", this method extracts the map name portion.
+        
+        Args:
+            field_name: The flattened field name (e.g., "map1.key1")
+        Returns:
+            The map name portion of the field (e.g., "map1")
+        """
+        if "." in field_name:
+            return field_name.split(".", 1)[0]
+        return field_name
+
     def _handle_boolean_field(
         self,
         field_name: str,
