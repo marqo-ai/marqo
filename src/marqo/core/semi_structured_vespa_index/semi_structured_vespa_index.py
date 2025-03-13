@@ -465,10 +465,9 @@ class SemiStructuredVespaIndex(StructuredVespaIndex, UnstructuredVespaIndex):
 
                 vespa_fields[vespa_field_name] = {"remove": 0} # remove statement for removing the field from marqo__int_fields / marqo__float_fields
                 vespa_fields[vespa_field_types_field_name] = {"remove": 0} # remove statement for removing the field from marqo__field_types.
-                # This could be the actual field name or the flattened field name in case of maps.
                 vespa_field_types.pop(original_field_name, None)
 
-                if vespa_field_types.get(map_name) is None: # Remove statement for removing the map field from marqo__field_types. 
+                if vespa_field_types.get(map_name) is None: # Remove statement for removing the map field from marqo__field_types. This is prefix for a flattened map field.
                     vespa_fields[f'{common.VESPA_DOC_FIELD_TYPES}{{{map_name}}}'] = {"remove": 0}
                     
                 fields_changed = True
