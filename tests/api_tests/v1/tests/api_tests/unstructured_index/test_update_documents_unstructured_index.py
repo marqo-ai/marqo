@@ -102,8 +102,131 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
         self.assertEqual(get_docs_response['update_field_that_doesnt_exist'], 500)
         self.assertEqual(get_docs_response['string_array2'], ["123", "456"])
 
-    def test_update_document_with_ids_change_field_type(self):
+    def test_add_new_fields_with_update_documents_api(self):
+        """Test that new fields can be added to a document using partial updates.
+        
+        This test verifies that a document can be initially created with minimal fields,
+        then updated to add new fields of various types, and that these fields are
+        correctly stored and retrievable.
 
+        Note: this test only covers the fields that can be successfully added.
+        """
+        # First add a minimal document with just an ID
+        initial_doc = [{
+            '_id': 'minimal_doc',
+            'tensor_field': 'initial content'  # Need at least one field for indexing
+        }]
+        
+        # Add the minimal document
+        add_docs_response = self.client.index(self.text_index_name).add_documents(
+            documents=initial_doc,
+            tensor_fields=['tensor_field']
+        )
+        self.assertFalse(add_docs_response["errors"])
+        
+        # Now update the document with new fields of various types. 
+        # We won't be adding new lexical fields, as that is not supported. 
+        update_docs_response = self.client.index(self.text_index_name).update_documents([{
+            '_id': 'minimal_doc',
+            'new_int_field': 42,
+            'new_float_field': 3.14159,
+            'new_bool_field': True,
+            'new_int_map': {
+                'key1': 100,
+                'key2': 200
+            },
+            'new_float_map': {
+                'pi': 3.14,
+                'e': 2.718
+            }
+        }])
+        
+        self.assertFalse(update_docs_response["errors"])
+        
+        # Get the document back and verify all fields exist with correct values
+        get_docs_response = self.client.index(self.text_index_name).get_document(document_id='minimal_doc')
+        
+        # Verify original field
+        self.assertEqual(get_docs_response['tensor_field'], 'initial content')
+        
+        # Verify new fields
+        self.assertEqual(get_docs_response['new_int_field'], 42)
+        self.assertEqual(get_docs_response['new_float_field'], 3.14159)
+        self.assertEqual(get_docs_response['new_bool_field'], True)
+        self.assertEqual(get_docs_response['new_int_map.key1'], 100)
+        self.assertEqual(get_docs_response['new_int_map.key2'], 200)
+        self.assertEqual(get_docs_response['new_float_map.pi'], 3.14)
+        self.assertEqual(get_docs_response['new_float_map.e'], 2.718)
+
+    def test_add_new_tensor_fields_with_update_documents_api(self):
+        """Test that adding new tensor fields, string arrays, and strings via update_documents fails.
+        
+        This test verifies that attempting to add new tensor fields, string arrays, or string fields
+        during an update operation results in appropriate error responses, as these field types
+        cannot be added after initial document creation.
+        """
+        # First add a minimal document with just an ID and a tensor field
+        initial_doc = [{
+            '_id': 'tensor_update_doc',
+            'tensor_field': 'initial content'  # Need at least one field for indexing
+        }]
+        
+        # Add the minimal document
+        add_docs_response = self.client.index(self.text_index_name).add_documents(
+            documents=initial_doc,
+            tensor_fields=['tensor_field']
+        )
+        self.assertFalse(add_docs_response["errors"])
+        
+        # Define the fields that should fail when added during update
+        fields_to_test = [
+            {'name': 'new_tensor_field', 'value': 'This should fail', 'type': 'tensor'},
+            {'name': 'new_string_array', 'value': ['item1', 'item2'], 'type': 'string_array'},
+            {'name': 'new_string_field', 'value': 'This should also fail', 'type': 'string'}
+        ]
+        
+        # Try to update with each field individually
+        for field in fields_to_test:
+            update_docs_response = self.client.index(self.text_index_name).update_documents([{
+                '_id': 'tensor_update_doc',
+                field['name']: field['value']
+            }])
+            
+            # Verify that errors were returned
+            self.assertTrue(update_docs_response["errors"], 
+                           f"Expected error when adding new {field['type']} but got success")
+            
+            # Check the error details
+            error_details = update_docs_response["items"][0]
+            self.assertEqual(error_details["status"], 400, 
+                            f"Expected status code 400 for {field['type']} but got {error_details['status']}")
+
+            print("printing error here", error_details["error"])
+            # Assert the error message - leaving exact message to be filled in
+            if field['type'] == 'tensor' or field['type'] == 'string':
+                self.assertIn(f"{field['name']} of type str does not exist in the original document. "
+                              f"Marqo does not support adding new lexical fields in partial updates"
+                              , error_details["error"])
+            elif field['type'] == 'string_array':
+                self.assertIn("Unstructured index updates only support updating existing string array fields"
+                              , error_details["error"])
+
+            # Verify the document still has only the original field
+            get_docs_response = self.client.index(self.text_index_name).get_document(document_id='tensor_update_doc')
+            
+            # Original field should still be there
+            self.assertEqual(get_docs_response['tensor_field'], 'initial content')
+            
+            # New field should not have been added
+            self.assertNotIn(field['name'], get_docs_response)
+
+    def test_update_document_and_change_field_type(self):
+        """Test that changing field types during document updates fails with appropriate errors.
+        
+        This test verifies that attempting to change a field's type (e.g., float to int, int to string)
+        during an update operation results in the expected error responses.
+        """
+        # First add a document with various field types
         text_docs = [{
             '_id': '1',
             'tensor_field': 'title',
@@ -134,32 +257,60 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
         tensor_fields = ['tensor_field', 'custom_vector_field', 'multimodal_combo_field']
 
-        add_docs_response = self.client.index(self.text_index_name).add_documents(documents = text_docs, mappings = mappings, tensor_fields = tensor_fields)
-
+        add_docs_response = self.client.index(self.text_index_name).add_documents(documents=text_docs, mappings=mappings, tensor_fields=tensor_fields)
         self.assertFalse(add_docs_response["errors"])
 
-        update_docs_response = self.client.index(self.text_index_name).update_documents(
-            [{
-                '_id': '1',
-                'bool_field': False,
-                'update_field_that_doesnt_exist': 500,
-                'int_field': 1,
-                'float_field': 500, # The request is same as the test case test_update_document_with_ids, except the float_field value is changed to int. This will result in a 412 condition check failed error.
-                'int_map': {
-                    'a': 2,
-                },
-                'float_map': {
-                    'c': 3.0,
-                },
-                'string_array': ["ccc"]
-            }]
-        )
+        # Define field type change scenarios to test
+        type_change_scenarios = [
+            {"field": "float_field", "new_value": 500, "original_type": "float", "new_type": "int"},
+            {"field": "int_field", "new_value": 123.5, "original_type": "int", "new_type": "float"},
+            {"field": "bool_field", "new_value": "true", "original_type": "bool", "new_type": "string"},
+            {"field": "short_string_field", "new_value": 42, "original_type": "string", "new_type": "int"},
+            {"field": "int_map", "new_value": {"a": 2.5}, "original_type": "int_map", "new_type": "float_map"},
+            {"field": "float_map", "new_value": {"c": 3}, "original_type": "float_map", "new_type": "int_map"},
+            {"field": "string_array", "new_value": 123, "original_type": "string_array", "new_type": "int"},
+            # Map to scalar type changes
+            {"field": "int_map", "new_value": 42, "original_type": "int_map", "new_type": "int"},
+            {"field": "int_map", "new_value": 42.5, "original_type": "int_map", "new_type": "float"},
+            {"field": "float_map", "new_value": 42, "original_type": "float_map", "new_type": "int"},
+            {"field": "float_map", "new_value": 42.5, "original_type": "float_map", "new_type": "float"}
+        ]
 
-        self.assertTrue(update_docs_response["errors"])
-
-        self.assertEqual(update_docs_response['items'][0]['status'], 400)
-        self.assertIn("Marqo vector store couldn't update the document. Please see", update_docs_response['items'][0]['message'])
-        self.assertIn("reference/api/documents/update-documents/#response", update_docs_response['items'][0]['message'])
+        # Test each type change scenario in a subtest
+        for scenario in type_change_scenarios:
+            with self.subTest(f"Changing {scenario['field']} from {scenario['original_type']} to {scenario['new_type']}"):
+                update_payload = {
+                    '_id': '1',
+                    scenario['field']: scenario['new_value']
+                }
+                
+                update_docs_response = self.client.index(self.text_index_name).update_documents([update_payload])
+                print(update_docs_response)
+                
+                # Verify the update failed with appropriate error
+                self.assertTrue(update_docs_response["errors"])
+                self.assertEqual(update_docs_response['items'][0]['status'], 400)
+                if scenario['original_type'] == "bool":
+                    self.assertIn("bool_field of type str does not exist in the original document. Marqo does not support adding new lexical fields in partial updates",
+                                  update_docs_response['items'][0]['error'])
+                else:
+                    self.assertIn("Marqo vector store couldn't update the document. Please see",
+                                  update_docs_response['items'][0]['message'])
+                    self.assertIn("reference/api/documents/update-documents/#response",
+                                  update_docs_response['items'][0]['message'])
+                
+                # Verify the original document is unchanged for this field
+                get_docs_response = self.client.index(self.text_index_name).get_document(document_id='1')
+                
+                # Handle special case for map fields which are flattened in the response
+                if scenario['field'] == "int_map":
+                    self.assertEqual(get_docs_response['int_map.a'], 1)
+                    self.assertEqual(get_docs_response['int_map.b'], 2)
+                elif scenario['field'] == "float_map":
+                    self.assertEqual(get_docs_response['float_map.c'], 1.0)
+                    self.assertEqual(get_docs_response['float_map.d'], 2.0)
+                else:
+                    self.assertEqual(get_docs_response[scenario['field']], text_docs[0][scenario['field']])
 
     def test_concurrent_partial_update_requests_on_maps(self):
         """Test concurrent updates to different fields of the same document.
@@ -491,7 +642,7 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
             places=5
         )
 
-    def test_concurrent_mixed_update_requests(self):
+    def test_concurrent_mixed_add_documents_and_update_documents_requests(self):
         """Test concurrent updates using different API methods on the same document.
 
         This test verifies that:
@@ -583,7 +734,10 @@ class TestUpdateDocumentsInUnstructuredIndex(MarqoTestCase):
 
     def test_partial_update_new_map_field(self):
         """
-        Test that adding a new map field by partially updating the field should work fine
+        Test the following scenario:
+        1. Add a map with a partial update,
+        2. Update it with another partial update, remove the existing keys
+        3. Final state of the doc should only contain the Map sent in #2
         """
         text_docs = [
             {
