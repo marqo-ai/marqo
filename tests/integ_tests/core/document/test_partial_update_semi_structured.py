@@ -7,6 +7,8 @@ from marqo.core.models.add_docs_params import AddDocsParams
 from marqo.core.semi_structured_vespa_index.marqo_field_types import MarqoFieldTypes
 from marqo.tensor_search import tensor_search
 from integ_tests.marqo_test import MarqoTestCase
+import copy
+
 
 class TestPartialUpdate(MarqoTestCase):
     @classmethod
@@ -115,10 +117,29 @@ class TestPartialUpdate(MarqoTestCase):
             'float_map.c': MarqoFieldTypes.FLOAT_MAP.value,
             'float_map.d': MarqoFieldTypes.FLOAT_MAP.value,
         }
+        self.field_to_field_type_doc_minimal_doc = {
+            "short_string_field": MarqoFieldTypes.STRING.value,
+            "long_string_field": MarqoFieldTypes.STRING.value,
+            "int_field": MarqoFieldTypes.INT.value,
+            "float_field": MarqoFieldTypes.FLOAT.value,
+            "bool_field": MarqoFieldTypes.BOOL.value,
+            "bool_field2": MarqoFieldTypes.BOOL.value,
+            "int_map": MarqoFieldTypes.INT_MAP.value,
+            "float_map": MarqoFieldTypes.FLOAT_MAP.value,
+            "int_map.key1": MarqoFieldTypes.INT_MAP.value,
+            "int_map.key2": MarqoFieldTypes.INT_MAP.value,
+            "int_map.key3": MarqoFieldTypes.INT_MAP.value,
+            "float_map.key1": MarqoFieldTypes.FLOAT_MAP.value,
+            "float_map.key2": MarqoFieldTypes.FLOAT_MAP.value,
+            "float_map.key3": MarqoFieldTypes.FLOAT_MAP.value,
+            "string_array": MarqoFieldTypes.STRING_ARRAY.value,
+            "lexical_field": MarqoFieldTypes.STRING.value,
+        }
         self.doc_to_field_type_map = {
             '1': self.field_to_field_type_doc1,
             '2': self.field_to_field_type_doc2,
             '3': self.field_to_field_type_doc3,
+            'minimal_doc': self.field_to_field_type_doc_minimal_doc
         }
 
         self.add_documents(self.config, add_docs_params=AddDocsParams(
@@ -185,35 +206,57 @@ class TestPartialUpdate(MarqoTestCase):
             self.assertEqual(vespa_fields.get('marqo__field_types').get(field_name), expected_type,
                             f"Expected {field_name} to have type {expected_type} for document {id}")
             
-        self._assert_field_types_not_changed(id, vespa_fields, [field_name for field_name, _ in field_type_pairs])
+        self._assert_field_types_not_changed(id, vespa_fields, field_type_pairs)
             
-    def _assert_field_types_not_changed(self, id: str, vespa_fields: dict, excluded_fields: List[str]):
-        """Verify that field types remain unchanged except for the specified excluded fields.
-        
+    def _assert_field_types_not_changed(self, id: str, vespa_fields: dict, excluded_fields: List[Tuple[str, MarqoFieldTypes]]):
+        """
+        Verify that field types remain unchanged except for the specified excluded fields.
+
         This helper method checks that all field types in the document match their expected values,
         excluding the fields that were intentionally modified during the test.
-        
+
         Args:
-            id: The document ID to check
-            excluded_fields: List of field names that were intentionally modified and should be excluded from verification
+            id (str): The document ID to check.
+            vespa_fields (dict): The fields from the Vespa document.
+            excluded_fields (List[Tuple[str, MarqoFieldTypes]]): List of field names that were intentionally modified and should be excluded from verification.
         """
-        raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
-        vespa_fields = raw_vespa_doc.document.dict().get('fields')
-        field_types = vespa_fields.get('marqo__field_types')
+        # Get the actual field types from the Vespa document
+        actual_field_types = vespa_fields.get('marqo__field_types')
+        # Get the expected field types from our mapping
+        doc_to_field_type = self.doc_to_field_type_map[id]
         
-        for field, value in field_types.items(): 
-            if field in excluded_fields:
-                continue
-            
-            doc_to_field_type = self.doc_to_field_type_map[id]
-            # Verify field exists in either field_to_field_type or excluded_fields
-            if field not in doc_to_field_type and field not in excluded_fields:
-                self.fail(f"Field '{field}' found in field_types but doesn't exist in doc_to_field_type map or excluded_fields for document {id}. "
-                          f"This means it's an extra field that shouldn't be present in Marqo__field_types.")
-            
-            self.assertEqual(value, doc_to_field_type.get(field), f"Expected {field} to have type {value} for document {id}")
+        # Create a copy of the expected field types and remove excluded fields
+        expected_field_types = copy.deepcopy(doc_to_field_type)
 
+        # Process each excluded field
+        for field_name, field_value in excluded_fields:
+            # If field value is None, remove the field from expected types if it exists. We do this because 
+            # fields of type None signify that the field was supposed to be removed from the document
+            if field_value is None:
+                if field_name in expected_field_types:
+                    del expected_field_types[field_name]
+            # Otherwise update the expected type with the new value. We do this because 
+            # this field signifies a new field that has been added to the document. 
+            else:
+                if field_name not in expected_field_types:
+                    expected_field_types[field_name] = field_value.value
 
+        # Compare actual and expected field types
+        is_expected_and_actual_equal = actual_field_types == expected_field_types
+        # If they don't match, find and report the differences
+        if not is_expected_and_actual_equal:
+            # Find common fields between actual and expected
+            intersection = set(actual_field_types.items()) & set(expected_field_types.items())
+            # Find fields that are in expected but not in actual
+            fields_present_in_expected_but_not_in_actual = set(expected_field_types.items()) - intersection
+            # Find fields that are in actual but not in expected  
+            fields_present_in_actual_but_not_in_expected = set(actual_field_types.items()) - intersection
+            # Report any missing fields that should be present
+            for field, _ in fields_present_in_expected_but_not_in_actual:
+                self.fail(f"Field {field} is present in expected field types but not in actual field types")
+            # Report any extra fields that shouldn't be present
+            for field, _ in fields_present_in_actual_but_not_in_expected:
+                self.fail(f"Field {field} is present in actual field types but not in expected field types")
     # Test update single field
     def test_partial_update_should_update_bool_field(self):
         """Test that boolean fields can be updated correctly via partial updates.
@@ -1007,6 +1050,7 @@ class TestPartialUpdate(MarqoTestCase):
                         ('int_map.c', MarqoFieldTypes.INT_MAP),
                         ('float_map.c', MarqoFieldTypes.FLOAT_MAP),
                         ('float_map.e', MarqoFieldTypes.FLOAT_MAP),
+                        ('float_map.d', None),
                         ('float_map', MarqoFieldTypes.FLOAT_MAP)
                     ]
                 )
