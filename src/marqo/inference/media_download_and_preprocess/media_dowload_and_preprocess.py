@@ -17,6 +17,8 @@ from marqo.tensor_search import utils
 from marqo.tensor_search.enums import EnvVars
 from marqo.tensor_search.telemetry import RequestMetricsStore, RequestMetrics
 
+from marqo.inference.type import *
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +30,7 @@ def threaded_download_and_preprocess_content(
         download_timeout_ms: int = 3000,
         audio_video_preprocessing_config: Optional[AudioVideoPreprocessingConfig] = None,
         metric_obj: Optional[RequestMetrics] = None,
-) -> list[Union[MediaDownloadError, PreprocessingError, list[Tuple[str, Tensor]]]]:
+) -> list[PreprocessedContent]:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -64,7 +66,7 @@ def threaded_download_and_preprocess_content(
                 )
             except PIL.UnidentifiedImageError as e:
                 metric_obj.increment_counter(f"{url}.UnidentifiedImageError")
-                thread_results.append(MediaDownloadError(e))
+                thread_results.append(MediaDownloadError(str(e)))
                 continue
             if isinstance(image, Image):
                 preprocessed_image: List[Tensor] = preprocessor.preprocess([image], modality)
@@ -91,9 +93,9 @@ def process_batch(
         media_download_headers: Optional[Dict] = None,
         download_timeout_ms: int = 3000,
         audio_video_preprocessing_config: Optional[AudioVideoPreprocessingConfig] = None,
-) -> list[list[tuple[str, Tensor]]]:
+) -> list[PreprocessedContent]:
 
-    results: list[list[tuple[str, Tensor]]] = []
+    results: list[PreprocessedContent] = []
 
     content_per_thread = math.ceil(len(content) / thread_count)
     m = [RequestMetrics() for _ in range(thread_count)]
@@ -117,7 +119,6 @@ def process_batch(
             ]
         ))
 
-    results = []
     for partial_result in results_nested:
         results.extend(partial_result)
 
