@@ -310,7 +310,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
            processing_start: float = None,
            text_query_prefix: Optional[str] = None,
            hybrid_parameters: Optional[HybridParameters] = None,
-           target_hits: int = None,
            ) -> Dict:
     """The root search method. Calls the specific search method
 
@@ -340,7 +339,6 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
         model_auth: Authorisation details for downloading a model (if required)
         text_query_prefix: The prefix to be used for chunking text fields or search queries.
         hybrid_parameters: Parameters for hybrid search
-        target_hits: The number of hits to target in the search
     Returns:
 
     """
@@ -438,7 +436,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 filter_string=filter, device=selected_device, attributes_to_retrieve=attributes_to_retrieve,
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
-                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, target_hits=target_hits
+                model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix, rerank_depth=rerank_depth
             )
         elif search_method.upper() == SearchMethod.HYBRID:
             # TODO: Deal with circular import when all modules are refactored out.
@@ -451,7 +449,7 @@ def search(config: Config, index_name: str, text: Optional[Union[str, dict, Cust
                 boost=boost,
                 media_download_headers=media_download_headers, context=context, score_modifiers=score_modifiers,
                 model_auth=model_auth, highlights=highlights, text_query_prefix=text_query_prefix,
-                hybrid_parameters=hybrid_parameters, target_hits=target_hits
+                hybrid_parameters=hybrid_parameters
             )
 
     elif search_method.upper() == SearchMethod.LEXICAL:
@@ -986,7 +984,7 @@ def _vector_text_search(
         attributes_to_retrieve: Optional[List[str]] = None, boost: Optional[Dict] = None,
         media_download_headers: Optional[Dict] = None, context: Optional[SearchContext] = None,
         score_modifiers: Optional[ScoreModifierLists] = None, model_auth: Optional[ModelAuth] = None,
-        highlights: bool = False, text_query_prefix: Optional[str] = None, target_hits: Optional[int] = None
+        highlights: bool = False, text_query_prefix: Optional[str] = None, rerank_depth: Optional[int] = None
 ) -> Dict:
     """
     
@@ -1007,6 +1005,8 @@ def _vector_text_search(
         score_modifiers: a dictionary to modify the score based on field values, for tensor search only
         model_auth: Authorisation details for downloading a model (if required)
         highlights: if True, highlights will be returned
+        text_query_prefix: prefix to add to text queries
+        rerank_depth: the number of hits per shard during retrieval
     Returns:
 
     Note:
@@ -1052,7 +1052,7 @@ def _vector_text_search(
         q=query, searchableAttributes=searchable_attributes, searchMethod=SearchMethod.TENSOR, limit=result_count,
         offset=offset, showHighlights=False, filter=filter_string, attributesToRetrieve=attributes_to_retrieve,
         boost=boost, mediaDownloadHeaders=media_download_headers, context=context, scoreModifiers=score_modifiers,
-        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, targetHits=target_hits
+        index=marqo_index, modelAuth=model_auth, text_query_prefix=text_query_prefix, rerankDepth=rerank_depth
     )]
 
     with RequestMetricsStore.for_request().time(f"search.vector_inference_full_pipeline"):
@@ -1070,7 +1070,7 @@ def _vector_text_search(
         searchable_attributes=searchable_attributes,
         attributes_to_retrieve=attributes_to_retrieve,
         score_modifiers=score_modifiers.to_marqo_score_modifiers() if score_modifiers is not None else None,
-        target_hits=target_hits
+        rerank_depth=rerank_depth
     )
 
     vespa_index = vespa_index_factory(marqo_index)

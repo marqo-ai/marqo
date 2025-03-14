@@ -1,3 +1,5 @@
+import copy
+
 import marqo.core.search.search_filter as search_filter
 from marqo.core.exceptions import (InvalidDataTypeError, InvalidFieldNameError, VespaDocumentParsingError,
                                    InvalidDataRangeError, MarqoDocumentParsingError)
@@ -8,7 +10,7 @@ from marqo.core.models.marqo_query import MarqoTensorQuery, MarqoLexicalQuery, M
 from marqo.core.structured_vespa_index import common
 from marqo.core.vespa_index.vespa_index import VespaIndex
 from marqo.exceptions import InternalError
-from marqo.tensor_search.helper import get_target_hits_and_additional_hits_from_query
+from marqo.tensor_search.helper import get_rerank_depth_and_additional_hits_from_query
 
 
 class StructuredVespaIndex(VespaIndex):
@@ -491,7 +493,11 @@ class StructuredVespaIndex(VespaIndex):
         fields_to_search_tensor = self._get_tensor_fields_to_search(
             searchable_attributes=marqo_query.hybrid_parameters.searchableAttributesTensor
         )
-        tensor_term = self._get_tensor_search_term(marqo_query) if fields_to_search_tensor else "False"
+        tensor_term = "False"
+        if fields_to_search_tensor:
+            tensor_marqo_query = copy.deepcopy(marqo_query)
+            tensor_marqo_query.rerank_depth = marqo_query.hybrid_parameters.rerankDepthTensor
+            tensor_term = self._get_tensor_search_term(tensor_marqo_query)
 
         # Lexical term
         fields_to_search_lexical = self._get_lexical_fields_to_search(
@@ -661,7 +667,7 @@ class StructuredVespaIndex(VespaIndex):
         else:
             fields_to_search = self._marqo_index.tensor_field_map.keys()
 
-        target_hits, additional_hits = get_target_hits_and_additional_hits_from_query(marqo_query)
+        rerank_depth, additional_hits = get_rerank_depth_and_additional_hits_from_query(marqo_query)
 
         terms = []
         for field in fields_to_search:
@@ -670,7 +676,7 @@ class StructuredVespaIndex(VespaIndex):
             terms.append(
                 f'('
                 f'{{'
-                f'targetHits:{target_hits}, '
+                f'targetHits:{rerank_depth}, '
                 f'approximate:{str(marqo_query.approximate)}, '
                 f'hnsw.exploreAdditionalHits:{additional_hits}'
                 f'}}'

@@ -1,18 +1,18 @@
 from marqo.core.models import MarqoTensorQuery
 
 
-def get_target_hits_and_additional_hits_from_query(query: MarqoTensorQuery):
+def get_rerank_depth_and_additional_hits_from_query(query: MarqoTensorQuery):
     if query.ef_search is not None:
-        base_target_hits = min(query.limit + query.offset, query.ef_search)
+        base_rerank_depth = min(query.limit + query.offset, query.ef_search)
         additional_hits = max(query.ef_search - (query.limit + query.offset), 0)
     else:
-        base_target_hits = query.limit + query.offset
+        base_rerank_depth = query.limit + query.offset
         additional_hits = 0
 
-    # Set target hits provided by query, with minimum of base_target_hits
-    if query.target_hits is not None:
-        target_hits = max(base_target_hits, query.target_hits)
+    # Set rerank depth provided by query, with minimum of base_rerank_depth
+    if query.rerank_depth is not None:
+        rerank_depth = max(base_rerank_depth, query.rerank_depth)
     else:
-        target_hits = base_target_hits
+        rerank_depth = base_rerank_depth
 
-    return target_hits, additional_hits
+    return rerank_depth, additional_hits

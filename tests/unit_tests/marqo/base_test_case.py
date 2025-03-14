@@ -83,13 +83,13 @@ class BaseUnitTest(unittest.TestCase):
         cls.logger_patcher.stop()
         cls.metrics_store_patcher.stop()
 
-    def get_expected_tensor_yql(self, target_hits=3):
+    def get_expected_tensor_yql(self, rerank_depth=3):
         yql = f"select * from {self.current_index.schema_name} where ("
         for field in self.current_index.fields:
             if field.type in (FieldType.Float, FieldType.Int):
                 continue
             yql += (
-                f"({{targetHits:{target_hits}, approximate:True, hnsw.exploreAdditionalHits:1997}}"
+                f"({{targetHits:{rerank_depth}, approximate:True, hnsw.exploreAdditionalHits:1997}}"
                 f"nearestNeighbor({field.name}, marqo__query_embedding)) OR "
             )
         return yql[:-4] + ")"

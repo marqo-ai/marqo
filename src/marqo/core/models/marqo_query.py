@@ -23,7 +23,6 @@ class MarqoQuery(StrictBaseModel, ABC):
     filter: Optional[SearchFilter] = None
     score_modifiers: Optional[List[ScoreModifier]] = None
     expose_facets: bool = False
-    target_hits: Optional[int] = None # hits to return per node before reranking
 
     @validator('filter', pre=True, always=True)
     def parse_filter(cls, filter):
@@ -45,6 +44,7 @@ class MarqoTensorQuery(MarqoQuery):
     vector_query: List[float]
     ef_search: Optional[int] = None
     approximate: bool = True
+    rerank_depth: Optional[int] = None
 
     # TODO - validate that ef_search >= offset+limit if provided
 
@@ -63,6 +63,7 @@ class MarqoHybridQuery(MarqoTensorQuery, MarqoLexicalQuery):
     # Core module will use these fields instead of the score_modifiers_lexical and score_modifiers_tensor inside the HybridParameters
     score_modifiers_lexical: Optional[List[ScoreModifier]] = None
     score_modifiers_tensor: Optional[List[ScoreModifier]] = None
+    rerank_depth_tensor: Optional[int] = None
 
     @root_validator(pre=True)
     def validate_searchable_attributes_and_score_modifiers(cls, values):

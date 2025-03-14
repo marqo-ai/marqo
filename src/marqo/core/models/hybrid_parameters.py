@@ -33,6 +33,8 @@ class HybridParameters(StrictBaseModel):
     scoreModifiersLexical: Optional[ScoreModifierLists] = None
     scoreModifiersTensor: Optional[ScoreModifierLists] = None
 
+    rerankDepthTensor: Optional[int] = None
+
     @root_validator(pre=False)
     def validate_properties(cls, values):
         # alpha can only be defined for RRF and NormalizeLinear
