@@ -87,6 +87,8 @@ class StructuredAddDocumentsHandler(AddDocumentsHandler):
             raise AddDocumentsError(f"Error processing {tensor_field.field_name}, detected as {modality.value}, "
                                     f"but expected field type is {tensor_field.field_type}")
 
+        return modality
+
     def _validate_field(self, field_name: str, field_content: Any) -> None:
         try:
             # TODO extract the validation logic somewhere else

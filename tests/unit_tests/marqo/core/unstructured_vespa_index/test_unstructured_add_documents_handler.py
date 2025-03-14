@@ -35,8 +35,10 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
                 return Modality.AUDIO
             elif url == self.VIDEO_URL:
                 return Modality.VIDEO
-            else:
+            elif url == self.INVALID_URL:
                 raise MediaDownloadError(f"Error downloading media file {url}")
+            else:
+                return Modality.TEXT
 
         self.mock_infer_modality.side_effect = infer_modality_side_effect
 
@@ -54,7 +56,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
             ),
         )
 
-    def test_unstructured_add_documents_handler_infer_modality_logic_image_false_and_media_false(self):
+    def test_infer_modality_logic_image_false_and_media_false(self):
         """Test the logic of the infer_modality method in UnstructuredAddDocumentsHandler when
         both treat_urls_and_pointers_as_images and treat_urls_and_pointers_as_media are False."""
         handler = self._get_handler(treat_as_images=False, treat_as_media=False)
@@ -63,6 +65,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
             (self.AUDIO_URL, "audio url should be treated as text"),
             (self.VIDEO_URL, "video url should be treated as text"),
             (self.IMAGE_URL, "image url should be treated as text"),
+            ('text', "text should be treated as text"),
         ]
         for url, test_case in test_cases:
             with self.subTest(msg=test_case):
@@ -72,7 +75,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
                 self.assertEqual(Modality.TEXT, modality)
                 self.mock_infer_modality.assert_not_called()
 
-    def test_unstructured_add_documents_handler_infer_modality_logic_image_true_and_media_false(self):
+    def test_infer_modality_logic_image_true_and_media_false(self):
         """Test the logic of the infer_modality method in UnstructuredAddDocumentsHandler when
         treat_urls_and_pointers_as_images=True and treat_urls_and_pointers_as_media=False."""
         handler = self._get_handler(treat_as_images=True, treat_as_media=False)
@@ -80,6 +83,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
             (self.AUDIO_URL, "audio url should be treated as text", Modality.TEXT),
             (self.VIDEO_URL, "video url should be treated as text", Modality.TEXT),
             (self.IMAGE_URL, "image url should be treated as image", Modality.IMAGE),
+            ('text', "text should be treated as text", Modality.TEXT),
         ]
 
         for url, test_case, expected_modality in test_cases:
@@ -89,7 +93,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
                                 is_top_level_tensor_field=True))
                 self.assertEqual(expected_modality,modality)
 
-    def test_unstructured_add_documents_handler_infer_modality_logic_image_true_and_media_true(self):
+    def test_infer_modality_logic_image_true_and_media_true(self):
         """Test the logic of the infer_modality method in UnstructuredAddDocumentsHandler when
         treat_urls_and_pointers_as_images=True and treat_urls_and_pointers_as_media=True."""
         handler = self._get_handler(treat_as_images=True, treat_as_media=True)
@@ -98,6 +102,7 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
             (self.AUDIO_URL, "audio url should be treated as audio", Modality.AUDIO),
             (self.VIDEO_URL, "video url should be treated as video", Modality.VIDEO),
             (self.IMAGE_URL, "image url should be treated as image", Modality.IMAGE),
+            ('text', "text should be treated as text", Modality.TEXT),
         ]
 
         for url, test_case, expected_modality in test_cases:
@@ -107,11 +112,12 @@ class TestUnstructuredAddDocumentsHandler(unittest.TestCase):
                                 is_top_level_tensor_field=True))
                 self.assertEqual(expected_modality, modality)
 
-    def test_unstructured_add_documents_handler_infer_modality_should_raise_error_when_fails_to_download(self):
+    def test_infer_modality_should_raise_error_when_fails_to_download(self):
         handler = self._get_handler(treat_as_images=True, treat_as_media=True)
 
         with self.assertRaises(AddDocumentsError) as context:
             handler._infer_modality(
-                TensorField(doc_id='id', field_name='dummy_field_name', field_content=self.INVALID_URL,
+                TensorField(doc_id='id', field_name='field1', field_content=self.INVALID_URL,
                             is_top_level_tensor_field=True))
-        self.assertIn('Error downloading media file', str(context.exception))
+        self.assertIn(f'Error processing field1: Error downloading media file {self.INVALID_URL}',
+                      str(context.exception))

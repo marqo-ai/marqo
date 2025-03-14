@@ -100,7 +100,7 @@ class UnstructuredAddDocumentsHandler(AddDocumentsHandler):
         try:
             modality = infer_modality(tensor_field.field_content, self.add_docs_params.media_download_headers)
         except MediaDownloadError as err:
-            raise AddDocumentsError(err.message) from err
+            raise AddDocumentsError(f"Error processing {tensor_field.field_name}: {err.message}") from err
 
         if not self.marqo_index.treat_urls_and_pointers_as_media and modality in {Modality.AUDIO, Modality.VIDEO}:
             return Modality.TEXT
