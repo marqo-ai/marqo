@@ -28,7 +28,7 @@ def threaded_download_and_preprocess_content(
         download_timeout_ms: int = 3000,
         audio_video_preprocessing_config: Optional[AudioVideoPreprocessingConfig] = None,
         metric_obj: Optional[RequestMetrics] = None,
-) -> list[Union[PIL.UnidentifiedImageError, list[Tuple[str, Tensor]]]]:
+) -> list[Union[MediaDownloadError, PreprocessingError, list[Tuple[str, Tensor]]]]:
     """A thread calls this function to download images for its allocated documents
 
     This should be called only if treat URLs as images is True.
@@ -55,7 +55,7 @@ def threaded_download_and_preprocess_content(
 
     """
     _id = f'image_download.{threading.get_ident()}'
-    thread_results: list[Union[PIL.UnidentifiedImageError, list[Tuple[str, Tensor]]]] = []
+    thread_results: list[Union[MediaDownloadError, PreprocessingError, list[Tuple[str, Tensor]]]] = []
     with metric_obj.time(f"{_id}.thread_time"):
         for url in allocated_content:
             try:
@@ -63,9 +63,8 @@ def threaded_download_and_preprocess_content(
                     url, media_download_headers, timeout_ms=download_timeout_ms, metrics_obj=metric_obj
                 )
             except PIL.UnidentifiedImageError as e:
-                image = e
                 metric_obj.increment_counter(f"{url}.UnidentifiedImageError")
-                thread_results.append(image)
+                thread_results.append(MediaDownloadError(e))
                 continue
             if isinstance(image, Image):
                 preprocessed_image: List[Tensor] = preprocessor.preprocess([image], modality)
@@ -100,25 +99,27 @@ def process_batch(
     m = [RequestMetrics() for _ in range(thread_count)]
     thread_allocated_docs = [content[i: i + content_per_thread] for i in range(0, len(content), content_per_thread)]
 
+    # Using the map function to ensure the results are in the same order as the input
     with ThreadPoolExecutor(max_workers=len(thread_allocated_docs)) as executor:
-        futures = [
-            executor.submit(
-                threaded_download_and_preprocess_content,
-                allocation,
-                preprocessor,
-                modality,
-                media_download_headers,
-                download_timeout_ms,
-                audio_video_preprocessing_config,
-                m[i]
-            )
-            for i, allocation in enumerate(thread_allocated_docs)
-        ]
+        results_nested = list(executor.map(
+            lambda args: threaded_download_and_preprocess_content(*args),
+            [
+                (
+                    allocation,
+                    preprocessor,
+                    modality,
+                    media_download_headers,
+                    download_timeout_ms,
+                    audio_video_preprocessing_config,
+                    m[i]
+                )
+                for i, allocation in enumerate(thread_allocated_docs)
+            ]
+        ))
 
-        # Unhandled exceptions will be raised here.
-        # We only raise the first exception if there are multiple exceptions
-        for future in concurrent.futures.as_completed(futures):
-            results.extend(future.result())
+    results = []
+    for partial_result in results_nested:
+        results.extend(partial_result)
 
     # Fix up metric_obj to make it not mention thread-ids
     # metric_obj = RequestMetricsStore.for_request()

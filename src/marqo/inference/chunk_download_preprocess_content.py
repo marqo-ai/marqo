@@ -15,13 +15,14 @@ from marqo.inference.media_download_and_preprocess.media_dowload_and_preprocess 
     process_batch)
 from marqo.inference.native_inference.embedding_models.abstract_preprocessor import AbstractPreprocessor
 from marqo.inference.split_text import split_text, prefix_text_chunks
+from marqo.inference.type import *
 
 
 def chunk_download_preprocess_content(
         content: list[str], modality: Modality, preprocessor: AbstractPreprocessor,
         preprocessing_config: Union[PreprocessingConfig,
         TextPreprocessingConfig, ImagePreprocessingConfig, AudioVideoPreprocessingConfig]) \
-        -> list[list[tuple[str, Tensor]]]:
+        -> list[PreprocessedContent]:
     """
     The function that handles the chunking, downloading, and preprocessing of content with the given modality.
     Args:
@@ -58,8 +59,8 @@ def chunk_download_preprocess_content(
 
 def _split_prefix_preprocess_text(
         content: list[str], preprocessor: AbstractPreprocessor,
-        preprocessing_config: TextPreprocessingConfig) -> list[tuple[str, Tensor]]:
-    results: list[list[tuple[str, Tensor]]] = []
+        preprocessing_config: TextPreprocessingConfig) -> list[PreprocessedContent]:
+    results: list[PreprocessedContent] = []
     if preprocessing_config.should_chunk:
         for text in content:
             splitted_text: list[str] = split_text(
@@ -82,7 +83,7 @@ def _split_prefix_preprocess_text(
 
 def _download_and_preprocess_image(
         content: list[str], preprocessor: AbstractPreprocessor,
-        preprocessing_config: ImagePreprocessingConfig) -> list[list[tuple[str, Tensor]]]:
+        preprocessing_config: ImagePreprocessingConfig) -> list[PreprocessedContent]:
 
     results = process_batch(
         content=content,

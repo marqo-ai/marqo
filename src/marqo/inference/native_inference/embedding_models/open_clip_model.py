@@ -63,7 +63,7 @@ class OpenCLIPPreprocessor(AbstractCLIPPreprocessor):
             Each tensor has the shape (N, 3, H, W) where N is the batch_size,
              H and W are the height and width of the image.
         """
-        # Need unsqueeze[0] to add the batch dimension
+        # Need unsqueeze(0) to add the batch dimension
         return [self.image_preprocessor(image).unsqueeze(0) for image in inputs]
 
 

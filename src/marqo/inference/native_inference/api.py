@@ -6,6 +6,7 @@ from marqo.inference.chunk_download_preprocess_content import chunk_download_pre
 from marqo.inference.load_model import load_model
 from marqo.inference.encode_content import encode_processed_content, format_results
 from torch import Tensor
+from marqo.inference.type import *
 
 
 app = FastAPI(
@@ -37,7 +38,7 @@ def inference(request: InferenceRequest) -> InferenceResult:
     )
 
     # Chunk, download, and preprocess the content
-    preprocessed_content: List[List[tuple[str, Tensor]]] = chunk_download_preprocess_content(
+    preprocessed_content_list: List[PreprocessedContent] = chunk_download_preprocess_content(
         content=request.contents,
         modality=request.modality,
         preprocessing_config=request.preprocessing_config,
@@ -47,12 +48,11 @@ def inference(request: InferenceRequest) -> InferenceResult:
     # Encode the processed content
     embeddings: List[Tensor] = encode_processed_content(
         model=model,
-        preprocessed_content=preprocessed_content,
+        preprocessed_content_list=preprocessed_content_list,
         modality=request.modality,
         normalize=request.model_config.normalize_embeddings
     )
 
     # Format the results
-    formated_result = format_results(preprocessed_content, embeddings)
-
+    formated_result = format_results(preprocessed_content_list, embeddings)
     return formated_result
