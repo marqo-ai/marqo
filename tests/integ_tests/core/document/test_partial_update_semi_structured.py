@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 import pytest
 
@@ -72,6 +72,55 @@ class TestPartialUpdate(MarqoTestCase):
             '2': self.doc2,
             '3': self.doc3
         }
+        self.field_to_field_type_doc1 = {
+            'string_array': MarqoFieldTypes.STRING_ARRAY.value,
+            'string_array2': MarqoFieldTypes.STRING_ARRAY.value,
+        }
+        self.field_to_field_type_doc2 = {
+            'string_array': MarqoFieldTypes.STRING_ARRAY.value,
+            'string_array2': MarqoFieldTypes.STRING_ARRAY.value,
+            'int_map': MarqoFieldTypes.INT_MAP.value,
+            'float_map': MarqoFieldTypes.FLOAT_MAP.value,
+            'bool_field': MarqoFieldTypes.BOOL.value,
+            'bool_field2': MarqoFieldTypes.BOOL.value,
+            'custom_vector_field': MarqoFieldTypes.TENSOR.value,
+            'multimodal_combo_field': MarqoFieldTypes.TENSOR.value, 
+            'tensor_field': MarqoFieldTypes.TENSOR.value,
+            'tensor_subfield': MarqoFieldTypes.TENSOR.value,
+            'short_string_field': MarqoFieldTypes.STRING.value,
+            'long_string_field': MarqoFieldTypes.STRING.value,
+            'lexical_field': MarqoFieldTypes.STRING.value,
+            'int_map.a': MarqoFieldTypes.INT_MAP.value, 
+            'int_map.b': MarqoFieldTypes.INT_MAP.value,
+            'float_map.c': MarqoFieldTypes.FLOAT_MAP.value,
+            'float_map.d': MarqoFieldTypes.FLOAT_MAP.value,
+            'float_field': MarqoFieldTypes.FLOAT.value,
+            'int_field': MarqoFieldTypes.INT.value,
+        }
+        self.field_to_field_type_doc3 = {
+            'bool_field': MarqoFieldTypes.BOOL.value,
+            'bool_field2': MarqoFieldTypes.BOOL.value,
+            'int_field': MarqoFieldTypes.INT.value,
+            'float_field': MarqoFieldTypes.FLOAT.value,
+            'int_map': MarqoFieldTypes.INT_MAP.value,
+            'float_map': MarqoFieldTypes.FLOAT_MAP.value,
+            'custom_vector_field': MarqoFieldTypes.TENSOR.value,
+            'multimodal_combo_field': MarqoFieldTypes.TENSOR.value,
+            'tensor_field': MarqoFieldTypes.TENSOR.value,
+            'tensor_subfield': MarqoFieldTypes.TENSOR.value,
+            'short_string_field': MarqoFieldTypes.STRING.value,
+            'long_string_field': MarqoFieldTypes.STRING.value,
+            'int_map.a': MarqoFieldTypes.INT_MAP.value,
+            'int_map.b': MarqoFieldTypes.INT_MAP.value,
+            'float_map.c': MarqoFieldTypes.FLOAT_MAP.value,
+            'float_map.d': MarqoFieldTypes.FLOAT_MAP.value,
+        }
+        self.doc_to_field_type_map = {
+            '1': self.field_to_field_type_doc1,
+            '2': self.field_to_field_type_doc2,
+            '3': self.field_to_field_type_doc3,
+        }
+
         self.add_documents(self.config, add_docs_params=AddDocsParams(
             index_name=self.index.name,
             docs=[self.doc, self.doc2, self.doc3],
@@ -112,7 +161,22 @@ class TestPartialUpdate(MarqoTestCase):
             else:
                 self.assertEqual(value, doc.get(field, None), f'{field} is changed.')
 
-    def _assert_field_types(self, id, field_type_pairs):
+    def _assert_field_types(self, id: str, field_type_pairs: List[Tuple[str, MarqoFieldTypes]]):
+        """
+        Verify that the field types of a document match the expected types.
+
+        This method retrieves the document from Vespa and checks that the field types
+        match the expected types provided in the `field_type_pairs` list.
+
+        Args:
+            id (str): The ID of the document to check.
+            field_type_pairs (List[Tuple[str, MarqoFieldTypes]]): A list of tuples where each tuple contains
+                a field name and its expected type.
+
+        Raises:
+            AssertionError: If any field type does not match the expected type.
+        """
+
         raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
         vespa_fields = raw_vespa_doc.document.dict().get('fields')
 
@@ -120,6 +184,34 @@ class TestPartialUpdate(MarqoTestCase):
             expected_type = field_type.value if field_type is not None else None
             self.assertEqual(vespa_fields.get('marqo__field_types').get(field_name), expected_type,
                             f"Expected {field_name} to have type {expected_type} for document {id}")
+            
+        self._assert_field_types_not_changed(id, vespa_fields, [field_name for field_name, _ in field_type_pairs])
+            
+    def _assert_field_types_not_changed(self, id: str, vespa_fields: dict, excluded_fields: List[str]):
+        """Verify that field types remain unchanged except for the specified excluded fields.
+        
+        This helper method checks that all field types in the document match their expected values,
+        excluding the fields that were intentionally modified during the test.
+        
+        Args:
+            id: The document ID to check
+            excluded_fields: List of field names that were intentionally modified and should be excluded from verification
+        """
+        raw_vespa_doc = self.config.vespa_client.get_document(id, self.index.schema_name)
+        vespa_fields = raw_vespa_doc.document.dict().get('fields')
+        field_types = vespa_fields.get('marqo__field_types')
+        
+        for field, value in field_types.items(): 
+            if field in excluded_fields:
+                continue
+            
+            doc_to_field_type = self.doc_to_field_type_map[id]
+            # Verify field exists in either field_to_field_type or excluded_fields
+            if field not in doc_to_field_type and field not in excluded_fields:
+                self.fail(f"Field '{field}' found in field_types but doesn't exist in doc_to_field_type map or excluded_fields for document {id}. "
+                          f"This means it's an extra field that shouldn't be present in Marqo__field_types.")
+            
+            self.assertEqual(value, doc_to_field_type.get(field), f"Expected {field} to have type {value} for document {id}")
 
 
     # Test update single field
@@ -179,7 +271,6 @@ class TestPartialUpdate(MarqoTestCase):
                 self._assert_field_types(id, [
                     ('int_field', MarqoFieldTypes.INT)
                 ])
-
     def test_partial_update_to_non_existent_field(self):
         """Test that partial updates to non-existent fields are successful.
         
@@ -569,6 +660,7 @@ class TestPartialUpdate(MarqoTestCase):
                     ('new_float', MarqoFieldTypes.FLOAT),
                     ('new_map.a', MarqoFieldTypes.INT_MAP),
                     ('new_map.b', MarqoFieldTypes.FLOAT_MAP),
+                    ('new_map', MarqoFieldTypes.FLOAT_MAP),
                     ('int_map.b', None),
                     ('float_map.d', None)
                 ]
